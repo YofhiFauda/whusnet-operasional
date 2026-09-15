@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\Gender;
+use App\Models\InternetPackage;
 use App\Models\RestrictedPackage;
 use App\Support\RupiahInput;
 use Illuminate\Foundation\Http\FormRequest;
@@ -125,6 +126,27 @@ class CustomerRegistrationRequest extends FormRequest
             // Documents
             'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
             'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
+            // FAB (Formulir Akan Berlangganan Bisnis) — wajib kalau kategori
+            // paket yang dipilih adalah kategori Bisnis (mis. "Paket Bisnis
+            // Broadband/UKM/Dedicated"), BUKAN restricted_packages —
+            // restricted_packages itu whitelist paket per role (Skema 1,
+            // isinya bisa paket reguler seperti Net138), gak ada hubungan
+            // dengan jenis pelanggan bisnis/rumahan. Cocok kategori dicek
+            // via substring "bisnis" (case-insensitive) supaya gak hardcode
+            // ID/nama kategori — nama kategori dikelola admin lewat
+            // PackageCategory dan boleh berubah.
+            'fab_document' => [
+                'nullable',
+                Rule::requiredIf(function () {
+                    $packageId = $this->input('internet_package_id');
+                    $category = $packageId
+                        ? InternetPackage::where('id', $packageId)->value('category')
+                        : null;
+
+                    return $category && stripos($category, 'bisnis') !== false;
+                }),
+                'file', 'mimes:jpeg,png,jpg,pdf', 'max:4096',
+            ],
 
             // Skip Survey — Sales input data survey langsung saat registrasi
             // (lihat ActionCode::SKIP_SURVEY). Field-field di bawah cuma
@@ -158,6 +180,7 @@ class CustomerRegistrationRequest extends FormRequest
             'latitude.required_if' => 'Titik koordinat (Latitude) wajib diisi saat Skip Survey aktif.',
             'longitude.required_if' => 'Titik koordinat (Longitude) wajib diisi saat Skip Survey aktif.',
             'foto_rumah.required_if' => 'Foto Rumah wajib diunggah saat Skip Survey aktif.',
+            'fab_document.required' => 'Formulir Akan Berlangganan Bisnis (FAB) wajib diunggah untuk paket yang divalidasi Business Development.',
             'nearest_odp.required_if' => 'ODP Terdekat wajib diisi saat Skip Survey aktif.',
             'cable_estimation_meter.required_if' => 'Estimasi Kabel wajib diisi saat Skip Survey aktif.',
             'difficulty_level.required_if' => 'Tingkat Kesulitan wajib dipilih saat Skip Survey aktif.',

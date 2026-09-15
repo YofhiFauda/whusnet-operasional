@@ -889,8 +889,8 @@
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
                                         
-                                        <input type="number" step="0.01" min="0.01" name="installation_fee"
-                                            value="<?php echo e(old('installation_fee', $customer->customerService?->internetPackage?->installation_fee ?? 0)); ?>" required autofocus
+                                        <input type="text" inputmode="decimal" data-rupiah name="installation_fee" id="installation_fee"
+                                            value="<?php echo e(old('installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->customerService?->internetPackage?->installation_fee ?? 0))); ?>" required autofocus
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                                     </div>
                                     <?php $__errorArgs = ['installation_fee'];

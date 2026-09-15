@@ -20,6 +20,16 @@ Berikut adalah daftar dokumentasi yang berkaitan dengan proses onboarding:
 - `CustomerWorkflowService`: Mengatur transisi *state machine* status pelanggan secara terpusat.
 - Laravel Scheduler (`php artisan schedule:run`): Mengatur SLA Auto-Reminder untuk pelanggan yang *stuck* di tahapan tertentu lebih dari batas waktu SLA.
 
+## Perubahan Terbaru (2026-09-14)
+
+**NPWP & Jenis Kontrak sekarang beneran tersimpan.** Dua input itu ADA di form
+sejak awal (`create.blade.php` step 1 & 2) tapi `CustomerRegistrationRequest`
+tidak pernah memvalidasinya — kekirim, lalu di-drop diam-diam. Sekarang
+`npwp` (nullable, max 30) → `customers.npwp`, `jenis_kontrak` (`sewa`/`beli`)
+→ `customer_services.contract_type`. Sama-sama diperbaiki juga di Edit
+Pelanggan — detail: [`../data-pelanggan/README.md` §Perubahan Terbaru
+2026-09-14](../data-pelanggan/README.md).
+
 ## Pola Redirect (PRG)
 
 Setelah registrasi berhasil (`store`) → redirect ke `customers.show` (halaman Detail pelanggan baru),

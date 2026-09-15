@@ -108,10 +108,10 @@
 
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
             <?php if($isActive && $customer->customerService): ?>
-                <a href="<?php echo e(route('invoices.create', ['customer_id' => $customer->id])); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
+                <button type="button" onclick="openInvoiceModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
                     <i class="fa-solid fa-plus"></i>
                     Buat Tagihan
-                </a>
+                </button>
             <?php endif; ?>
         <?php endif; ?>
 
@@ -945,9 +945,9 @@ unset($__errorArgs, $__bag); ?>
                 </div>
                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
                     <?php if($isActive && $customer->customerService): ?>
-                        <a href="<?php echo e(route('invoices.create', ['customer_id' => $customer->id])); ?>" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold shadow-sm cursor-pointer">
+                        <button type="button" onclick="openInvoiceModal()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold shadow-sm cursor-pointer">
                             + Buat Tagihan Manual
-                        </a>
+                        </button>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>
@@ -1248,7 +1248,71 @@ unset($__errorArgs, $__bag); ?>
 </div>
 
 <!-- MODALS SECTION -->
-
+<!-- MODAL: Manual Invoice -->
+<?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
+    <?php if($isActive && $customer->customerService): ?>
+        <?php
+            $defaultPeriod = now()->format('Y-m');
+            $defaultIssueDate = now()->format('Y-m-d');
+            $defaultDueDate = now()->addDays(14)->format('Y-m-d');
+            if ($customer->customerService->due_date) {
+                $dueDay = \Carbon\Carbon::parse($customer->customerService->due_date)->day;
+                try {
+                    $defaultDueDate = now()->day($dueDay)->format('Y-m-d');
+                } catch (\Exception $e) {
+                    $defaultDueDate = now()->addDays(14)->format('Y-m-d');
+                }
+            }
+        ?>
+        <div id="manual-invoice-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Buat Tagihan Manual</h3>
+                    <button type="button" onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+                <form action="<?php echo e(route('customers.invoices.manual', $customer->id)); ?>" method="POST">
+                    <?php echo csrf_field(); ?>
+                    <div class="p-6 space-y-4 text-xs">
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pelanggan: <?php echo e($customer->full_name); ?></span>
+                            <span class="text-xs font-bold text-slate-900 dark:text-slate-100"><?php echo e($customer->customerService->package_name_snapshot); ?> (Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>)</span>
+                        </div>
+                        <div>
+                            <label for="billing_period" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Periode Tagihan</label>
+                            <input type="month" name="billing_period" id="billing_period" value="<?php echo e($defaultPeriod); ?>" required class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tanggal Terbit & Jatuh Tempo</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="date" name="issue_date" id="issue_date" value="<?php echo e($defaultIssueDate); ?>" required class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+                                <input type="date" name="due_date" id="due_date" value="<?php echo e($defaultDueDate); ?>" required class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="invoice_type" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Jenis Tagihan</label>
+                            <select name="invoice_type" id="invoice_type" required class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-semibold text-xs text-slate-800 dark:text-slate-200">
+                                <option value="bulanan" <?php echo e($customer->invoices->count() > 0 ? 'selected' : ''); ?>>Tagihan Bulanan Rutin</option>
+                                <option value="awal" <?php echo e($customer->invoices->count() === 0 ? 'selected' : ''); ?>>Tagihan Awal (PSB)</option>
+                                <option value="reaktivasi">Tagihan Reaktivasi</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="prorate_amount" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tagihan Prorate (Opsional)</label>
+                            
+                            <input type="text" inputmode="decimal" data-rupiah name="prorate_amount" id="prorate_amount" value="0" oninput="recalcInvoiceTotal()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+                        </div>
+                        <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                            <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
+                            <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-sm cursor-pointer">Proses Tagihan</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    <?php endif; ?>
+<?php endif; ?>
 
 <!-- MODAL: Document Upload Modal -->
 <?php if(auth()->user()->hasPermission('upload_customer_documents')): ?>
@@ -1566,6 +1630,9 @@ unset($__errorArgs, $__bag); ?>
     function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
 
+    function openInvoiceModal() { openModal('manual-invoice-modal'); }
+    function closeInvoiceModal() { closeModal('manual-invoice-modal'); }
+
     // Modal milik partial tab Pemasangan & Perangkat. Sebelumnya fungsi ini HANYA
     // ada di customers/fieldwork.blade.php, jadi tombol "Isi Data Pemasangan" /
     // "Isi Laporan Uji" / "Isi Ubah Data Perangkat" di halaman Detail Pelanggan
@@ -1577,9 +1644,17 @@ unset($__errorArgs, $__bag); ?>
     function openDeviceModal() { openModal('device-modal'); }
     function closeDeviceModal() { closeModal('device-modal'); }
 
-    // recalcInvoiceTotal() dihapus bersama modal Buat Tagihan Manual
-    // (ADHOC-60) — pratinjau totalnya sekarang hidup di halaman
-    // `/invoices/create`, menghitung seluruh baris rincian, bukan cuma prorata.
+    const BASE_NETT = <?php echo e((float)$totalBill); ?>;
+    function recalcInvoiceTotal() {
+        // Kolom prorata bermasking ribuan — parseFloat('50.000') = 50, dan
+        // pratinjau total tagihan akan berbohong tanpa parser ini.
+        const prorateEl = document.getElementById('prorate_amount');
+        const prorate = (prorateEl && window.Rupiah ? window.Rupiah.angka(prorateEl.value) : parseFloat(prorateEl?.value || 0)) || 0;
+        const total   = BASE_NETT + prorate;
+        const fmt = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
+        const totalEl = document.getElementById('preview-total');
+        if (totalEl) totalEl.textContent = fmt(total);
+    }
 </script>
 <?php $__env->stopSection(); ?>
 

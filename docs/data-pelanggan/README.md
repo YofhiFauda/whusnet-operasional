@@ -127,3 +127,45 @@ Ikut diperbaiki: form pemilih jumlah baris di footer pagination dulu `action="/c
 sehingga mengubah "Baris" dari halaman Putus/Gagal melempar user balik ke List Pelanggan. Sekarang
 `url()->current()`.
 
+## Perubahan Terbaru (2026-09-14) — Edit Pelanggan (`customers.edit`/`.update`)
+
+Halaman `/customers/{id}/edit` dirombak total dari wizard 5-step lama (skin
+lawas, field campur aduk) jadi 7-step, mengikuti skin desain terbaru
+(`x-ui.icon`, `max-w-6xl` naked header, mobile+desktop stepper) yang sudah
+lebih dulu dipakai Registrasi (`customers/create.blade.php`), Laporan Survey,
+dan Laporan Pemasangan. Step: **1 Identitas → 2 Alamat & Lokasi → 3 POP &
+Distribusi → 4 Dokumen → 5 Layanan & Paket → 6 Referral → 7 Parameter Teknis**
+(dulu 1 step "Data Diri & Wilayah" isinya identitas+alamat+POP dicampur).
+
+**Field yang harus diketahui sebelum menyentuh halaman ini lagi:**
+
+1. **Diskon Promosi & PPN prefill dari `customer_services`, BUKAN dari kolom
+   `customers.discount_amount`/`tax_percent`.** Dua kolom `customers` itu cuma
+   snapshot registrasi, gampang menyimpang dari `customer_services` (sumber
+   kebenaran billing sungguhan — sama seperti `show.blade.php` baca, lihat
+   `docs/billing-pembayaran/perbandingan-tagihan-awal-vs-bulanan-legacy.md`
+   §6.3). Fallback ke kolom `customers` cuma kalau `customer_services` belum
+   ada baris sama sekali. **Jangan balik ke baca `customers.tax_percent`
+   langsung** — itu bug yang baru diperbaiki (kasus CID C1X4ARQ000004).
+2. **NPWP & Jenis Kontrak** — dua field yang dari awal ADA di form Registrasi
+   tapi TIDAK PERNAH divalidasi (`CustomerRegistrationRequest`), jadi kekirim
+   percuma. Sekarang divalidasi di Registrasi maupun Edit: `npwp` → kolom
+   `customers.npwp`, `jenis_kontrak` (sewa/beli) → `customer_services.contract_type`.
+3. **Step 7 "Parameter Teknis" nulis ke DUA tabel** — field ringan lama
+   (`customers.ont_sn/odp_code/olt_code/vlan_id`, sudah **dihapus dari UI**
+   2026-09-14 atas keputusan produk, kolomnya sendiri TIDAK dihapus, cuma
+   validasinya dicabut dari `update()` biar gak diam-diam ke-null-kan) VS
+   detail terstruktur (`customer_devices`/`customer_technical_details`) yang
+   field-nya identik dengan Laporan Pemasangan. Edit Pelanggan sekarang jadi
+   **penulis kedua** ke dua tabel itu (selain `CustomerInstallationController`)
+   — sadar risikonya, detail di [`../customer-lifecycle/business-logic.md`
+   §6](../customer-lifecycle/business-logic.md#6-tahap-4--pemasangan-customerinstallationcontroller).
+4. **`status` (workflow) TIDAK BISA lagi diubah dari Edit Pelanggan** — field
+   dicabut dari tampilan (keputusan produk 2026-09-14), dikirim sebagai hidden
+   input berisi nilai sekarang (validasi server masih `required`, dipakai
+   hitung ulang CID). Transisi status tetap lewat flow masing-masing
+   (survey/pemasangan/verifikasi/dll, lihat §1-§8 di
+   `../customer-lifecycle/business-logic.md`).
+
+Test: `tests/Feature/CustomerEditTest.php`, `tests/Feature/CustomerRegistrationTest.php`.
+

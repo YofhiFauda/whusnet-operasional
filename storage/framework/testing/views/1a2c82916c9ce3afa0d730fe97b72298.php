@@ -111,56 +111,6 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                <!-- Filter Kategori Pendapatan -->
-                <div>
-                    <label for="revenue_category_id" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Kategori Pendapatan</label>
-                    <select id="revenue_category_id" name="revenue_category_id" class="w-full rounded-md border-slate-300 dark:border-slate-600 text-sm focus:border-sky-500 focus:ring-sky-500">
-                        <option value="">Semua Kategori</option>
-                        <?php $__currentLoopData = $revenueCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                            <option value="<?php echo e($category->id); ?>" <?php if((string) $revenueCategoryId === (string) $category->id): echo 'selected'; endif; ?>>
-                                <?php echo e($category->name); ?>
-
-                            </option>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                    </select>
-                </div>
-
-                <!-- Filter Sub Kategori Pendapatan -->
-                <div>
-                    <label for="revenue_subcategory_id" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Sub Kategori Pendapatan</label>
-                    <select id="revenue_subcategory_id" name="revenue_subcategory_id" class="w-full rounded-md border-slate-300 dark:border-slate-600 text-sm focus:border-sky-500 focus:ring-sky-500">
-                        <option value="">Semua Sub Kategori</option>
-                        <?php $__currentLoopData = $revenueCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                            <?php if($category->subcategories->isNotEmpty()): ?>
-                                <optgroup label="<?php echo e($category->name); ?>">
-                                    <?php $__currentLoopData = $category->subcategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sub): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                        <option value="<?php echo e($sub->id); ?>" <?php if((string) $revenueSubcategoryId === (string) $sub->id): echo 'selected'; endif; ?>>
-                                            <?php echo e($sub->name); ?>
-
-                                        </option>
-                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                </optgroup>
-                            <?php endif; ?>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                    </select>
-                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Pilih sub kategori cukup lewat sini — kategori induknya otomatis ikut.</p>
-                </div>
-            </div>
-
-            <?php if($revenueCategoryId || $revenueSubcategoryId): ?>
-                <?php
-                    $activeRevenueLabel = $revenueSubcategoryId
-                        ? optional($revenueCategories->flatMap->subcategories->firstWhere('id', (int) $revenueSubcategoryId))->name
-                        : optional($revenueCategories->firstWhere('id', (int) $revenueCategoryId))->name;
-                ?>
-                <?php if($activeRevenueLabel): ?>
-                    <p class="text-[11px] text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/50 rounded-md px-3 py-2">
-                        Menampilkan tagihan yang MENGANDUNG kategori <strong><?php echo e($activeRevenueLabel); ?></strong>. Total &amp; Sisa Tunggakan di kartu atas tetap nilai DOKUMEN penuh (tagihan gabungan bisa punya kategori lain juga) — rincian murni kategori ini ada di blok "Rincian Tagihan per Kategori Pendapatan" di bawah tabel filter.
-                    </p>
-                <?php endif; ?>
-            <?php endif; ?>
-
             <!-- Additional Filters & Action Buttons -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-4 border-t border-slate-100 dark:border-slate-700/50 gap-4">
                 <!-- Toggle Tunggakan -->
@@ -189,8 +139,6 @@
             </div>
         </form>
     </div>
-
-    <?php echo $__env->make('reports.partials.revenue-breakdown', ['rows' => $revenueBreakdown, 'mode' => 'invoices'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <!-- Data Table Card -->
     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm overflow-hidden">

@@ -19,6 +19,7 @@ use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerDevice;
+use App\Models\CustomerDocument;
 use App\Models\CustomerInstallation;
 use App\Models\CustomerService;
 use App\Models\CustomerStatusLog;
@@ -326,7 +327,14 @@ class CustomerController extends Controller
         // ID Sales gak auto-terisi buat dia.
         $restrictedRoleNames = Role::where('is_package_restricted', true)->pluck('name');
 
-        return view('customers.create', compact('packages', 'cities', 'pops', 'salesUsers', 'agents', 'restrictedRoleNames'));
+        // Paket yang butuh FAB (Formulir Akan Berlangganan Bisnis) saat
+        // Registrasi — paket berkategori Bisnis (lihat komentar
+        // CustomerRegistrationRequest::rules() kenapa BUKAN restricted_packages).
+        // Dikirim ke JS supaya blok upload FAB cuma muncul begitu paket yang
+        // relevan dipilih; validasi sebenarnya tetap di server.
+        $fabRequiredPackageIds = $packages->filter(fn ($package) => stripos((string) $package->category, 'bisnis') !== false)->pluck('id');
+
+        return view('customers.create', compact('packages', 'cities', 'pops', 'salesUsers', 'agents', 'restrictedRoleNames', 'fabRequiredPackageIds'));
     }
 
     /**
@@ -389,6 +397,8 @@ class CustomerController extends Controller
         unset($validated['foto_rumah']);
         $fotoKontrak = $request->file('foto_kontrak');
         unset($validated['foto_kontrak']);
+        $fabDocument = $request->file('fab_document');
+        unset($validated['fab_document']);
 
         // Data survey (Skip Survey) — bukan kolom customers, ditangani
         // terpisah di blok 5 lewat CustomerSurvey::create().
@@ -411,7 +421,7 @@ class CustomerController extends Controller
         $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate, $jenisKontrak) {
+        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak, $fabDocument, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate, $jenisKontrak) {
             // Pendaftaran baru lewat UI = orang baru → person baru berdiri sendiri
             // (tanpa legacy_key). Pencarian "mungkin orang yang sama?" saat
             // registrasi adalah pekerjaan gel.2; di sini cukup jaga invarian
@@ -430,6 +440,23 @@ class CustomerController extends Controller
             }
             if (! empty($updates)) {
                 $customer->update($updates);
+            }
+
+            // FAB (Formulir Akan Berlangganan Bisnis) — wajib untuk paket
+            // berkategori Bisnis (lihat CustomerRegistrationRequest::rules()).
+            // Beda dari foto_rumah/foto_kontrak (kolom langsung di customers),
+            // FAB disimpan lewat CustomerDocument (DocumentType::FAB) supaya
+            // konsisten dengan jalur upload dokumen lain di Detail Pelanggan &
+            // gampang ditambah tanpa migrasi kolom baru tiap ada dokumen baru.
+            if ($fabDocument instanceof UploadedFile) {
+                $fabPath = FileUploadService::uploadCustomerRegistrationDoc($fabDocument, $customer, 'fab');
+
+                CustomerDocument::create([
+                    'customer_id' => $customer->id,
+                    'document_type' => DocumentType::FAB->value,
+                    'file_path' => $fabPath,
+                    'uploaded_by' => auth()->id(),
+                ]);
             }
 
             // 2. Create customer address
