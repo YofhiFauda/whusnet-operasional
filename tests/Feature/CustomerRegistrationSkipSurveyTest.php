@@ -214,7 +214,15 @@ class CustomerRegistrationSkipSurveyTest extends TestCase
         $this->assertSame(0, Customer::count());
     }
 
-    public function test_normal_registration_without_skip_survey_still_creates_survey_task(): void
+    /**
+     * ADHOC-73 (Verifikasi Registrasi) — sebelumnya registrasi normal (non
+     * Skip Survey) LANGSUNG bikin Task+FopTask Survey & status `waiting_survey`
+     * seketika submit (nama test lama: "...still_creates_survey_task").
+     * Sekarang berhenti dulu di `registered`, TANPA Task/FopTask apa pun,
+     * sampai Admin/CS approve di CustomerRegistrationVerificationController —
+     * lihat CustomerRegistrationVerificationTest untuk alur approve-nya.
+     */
+    public function test_normal_registration_without_skip_survey_waits_for_registration_verification(): void
     {
         Storage::fake('public');
         $sales = $this->makeSales();
@@ -224,9 +232,9 @@ class CustomerRegistrationSkipSurveyTest extends TestCase
         $response->assertSessionHasNoErrors();
 
         $customer = Customer::where('full_name', 'Budi Skip Survey')->firstOrFail();
-        $this->assertSame('waiting_survey', $customer->status);
+        $this->assertSame('registered', $customer->status);
         $this->assertSame(0, CustomerSurvey::where('customer_id', $customer->id)->count());
-        $this->assertGreaterThan(0, Task::where('customer_id', $customer->id)->count());
-        $this->assertGreaterThan(0, FopTask::where('customer_id', $customer->id)->count());
+        $this->assertSame(0, Task::where('customer_id', $customer->id)->count());
+        $this->assertSame(0, FopTask::where('customer_id', $customer->id)->count());
     }
 }

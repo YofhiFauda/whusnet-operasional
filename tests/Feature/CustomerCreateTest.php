@@ -92,7 +92,10 @@ class CustomerCreateTest extends TestCase
             'identity_number' => '3502181010900002',
             'primary_phone' => '08123456789',
             'pop_id' => $pop->id,
-            'status' => 'waiting_survey',
+            // ADHOC-73 — non-Skip-Survey berhenti dulu di `registered` sampai
+            // Admin/CS approve di Verifikasi Registrasi, gak lagi langsung
+            // `waiting_survey` seketika submit.
+            'status' => 'registered',
             'sales_code' => 'SLS-099',
             'ont_sn' => 'ONT-ZTE-TEST',
         ]);

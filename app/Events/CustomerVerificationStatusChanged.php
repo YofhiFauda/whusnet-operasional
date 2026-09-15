@@ -6,11 +6,22 @@ use App\Models\Customer;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
+ * `ShouldBroadcastNow` (bukan `ShouldBroadcast`/queue) — dicek 2026-09-15,
+ * SEMUA titik yang bikin `status` dirty (verifikasi CS/BD, mulai/selesai
+ * survey & instalasi) itu aksi 1-klik per pelanggan, bukan loop bulk. Import
+ * massal (`CustomerController::confirmImport()`) pakai `Customer::create()`
+ * (bukan `update()`), jadi gak nyentuh observer `updated()` ini sama sekali
+ * — aman gak jadi broadcast storm sinkron pas import ratusan baris
+ * (docs/plan/analisa-broadcast-vs-lonceng-notif.md §2). KALAU ke depan ada
+ * jalur bulk beneran yang manggil `$customer->update(['status' => ...])`
+ * di loop, pertimbangkan exclude jalur itu dari observer / balik ke
+ * `ShouldBroadcast` — JANGAN diam-diam ganti event ini balik ke queued.
+ *
  * Broadcast "status workflow pelanggan berubah" — dipicu CustomerObserver::updated()
  * begitu kolom `status` dirty, BUKAN dispatch manual di tiap controller. Status
  * pelanggan diubah dari banyak jalur (CustomerWorkflowService::transition(),
@@ -25,7 +36,7 @@ use Illuminate\Queue\SerializesModels;
  * scope & permission user (verifications.row), bukan percaya payload broadcast
  * mentah buat re-render.
  */
-class CustomerVerificationStatusChanged implements ShouldBroadcast
+class CustomerVerificationStatusChanged implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

@@ -21,6 +21,7 @@ use App\Http\Controllers\CustomerInstallationController;
 use App\Http\Controllers\CustomerNetworkAssignmentController;
 use App\Http\Controllers\CustomerPackageController;
 use App\Http\Controllers\CustomerQrController;
+use App\Http\Controllers\CustomerRegistrationVerificationController;
 use App\Http\Controllers\CustomerReportController;
 use App\Http\Controllers\CustomerSurveyController;
 use App\Http\Controllers\CustomerTerminatedController;
@@ -974,6 +975,23 @@ Route::middleware('auth')->group(function () {
         Route::get('/business-development-verifications', [BusinessDevelopmentVerificationController::class, 'index'])->name('business-development-verifications.index');
         Route::get('/business-development-verifications/{customer}', [BusinessDevelopmentVerificationController::class, 'show'])->name('business-development-verifications.show');
         Route::put('/business-development-verifications/{customer}', [BusinessDevelopmentVerificationController::class, 'verify'])->name('business-development-verifications.verify');
+    });
+
+    // Antrean "Verifikasi Registrasi" (ADHOC-73) — pelanggan hasil Registrasi
+    // (non-Skip-Survey) menunggu disetujui Admin/CS sebelum Task+FopTask
+    // Survey kebentuk. Lihat CustomerRegistrationVerificationController &
+    // docs/plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md.
+    // Approve & reject permission TERPISAH dari view (beda dari BD Verification
+    // di atas) — dua aksi independen yang wajar dipisah PIC-nya.
+    Route::middleware('permission:customer_registration_verification.view')->group(function () {
+        Route::get('/customer-registration-verifications', [CustomerRegistrationVerificationController::class, 'index'])->name('customer-registration-verifications.index');
+        Route::get('/customer-registration-verifications/{customer}', [CustomerRegistrationVerificationController::class, 'show'])->name('customer-registration-verifications.show');
+    });
+    Route::middleware('permission:customer_registration_verification.approve')->group(function () {
+        Route::put('/customer-registration-verifications/{customer}/approve', [CustomerRegistrationVerificationController::class, 'approve'])->name('customer-registration-verifications.approve');
+    });
+    Route::middleware('permission:customer_registration_verification.reject')->group(function () {
+        Route::put('/customer-registration-verifications/{customer}/reject', [CustomerRegistrationVerificationController::class, 'reject'])->name('customer-registration-verifications.reject');
     });
 
     // Business Development — Restriksi Paket (Skema 1), Master Agent (Skema 3),

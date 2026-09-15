@@ -83,25 +83,25 @@
                         <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')"
                                 title="Pelanggan"
                                 class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*')
+                                       {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*')
                                            ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold'
                                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87"/><path stroke-linecap="round" stroke-linejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"/>
                                 </svg>
                                 <span class="sidebar-text">Pelanggan</span>
                             </div>
                             <svg id="chevron-pelanggan"
                                  class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300
-                                        {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                        {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
 
                         <div id="submenu-pelanggan"
-                             class="submenu-container {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'is-open' : '' }}">
+                             class="submenu-container {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') ? 'is-open' : '' }}">
                             <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
 
                                 @if(auth()->user()->hasPermission('customers.create'))
@@ -112,6 +112,16 @@
                                 </a>
                                 @endif
 
+                                @if(auth()->user()->hasPermission('customer_registration_verification.view'))
+                                <a href="{{ route('customer-registration-verifications.index') }}"
+                                   class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors
+                                          {{ Request::is('customer-registration-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    <span>Verifikasi Registrasi</span>
+                                    @if(isset($badge_registration_verification_count) && $badge_registration_verification_count > 0)
+                                        <span class="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_registration_verification_count }}</span>
+                                    @endif
+                                </a>
+                                @endif
                                 @if(auth()->user()->hasPermission('customers.detail.survey.view'))
                                 <a href="{{ route('surveys.queue') }}"
                                    class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors

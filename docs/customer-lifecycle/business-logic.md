@@ -21,7 +21,7 @@
 | `terminated` | *(final, tidak ada transisi keluar)* |
 | `rejected` | *(final, tidak ada transisi keluar)* |
 
-**Catatan penting:** registrasi (`CustomerController::store`) langsung set `status = 'waiting_survey'` (normal) atau `status = 'waiting_acc'` (Skip Survey, §3.1), **melewati** `registered` — status `registered` di enum lebih sebagai state teoretis/starting point default (`$customer->status ?? 'registered'` di `CustomerWorkflowService`), bukan state yang benar-benar disinggahi di alur manapun saat ini. Edge `registered → waiting_acc` tetap didaftarkan di `allowedNextTransitions()` biar state machine-nya sah kalau suatu saat ada kode lain yang transisi eksplisit lewat `CustomerWorkflowService`, walau jalur Skip Survey sendiri nge-set status langsung di `Customer::create()` (customer belum ada baris buat ditransisikan lewat service).
+**Catatan (koreksi 2026-09-15, ADHOC-73 — Verifikasi Registrasi):** paragraf di bawah ini sempat bilang `registered` "bukan state yang benar-benar disinggahi" — itu **sudah tidak benar**. Registrasi non-Skip-Survey (`CustomerController::store()`) sekarang set `status = 'registered'` beneran (BUKAN langsung `waiting_survey`) dan BERHENTI di situ — TANPA Task/FopTask Survey — sampai Admin/CS approve di `/customer-registration-verifications` (`CustomerRegistrationVerificationController::approve()`), yang baru memindahkan ke `waiting_survey` + bikin Task/FopTask Survey (logic yang dulu ada di `store()` dipindah ke situ). Tolak → `rejected` (alasan wajib, textarea bebas). Skip Survey **TIDAK** melewati gerbang ini — tetap set status langsung di `Customer::create()` seperti dijelaskan di bawah (§3.1), gak pernah singgah cukup lama di `registered`. Detail: [`../plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md`](../plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md).
 
 ## 2. Efek Samping Otomatis Tiap Transisi
 
@@ -34,7 +34,7 @@
 ## 3. Tahap 1 — Registrasi
 
 - Entry point: `CustomerController::store()`, permission `customers.create`.
-- Status langsung `waiting_survey` (lihat catatan di atas) — bukan lewat `registered` dulu.
+- Status jadi `registered` (non-Skip-Survey) — **bukan** langsung `waiting_survey` lagi (ADHOC-73, lihat catatan koreksi di atas). Pindah ke `waiting_survey` cuma lewat approve di Verifikasi Registrasi.
 - `customer_status` (field terpisah, label operasional Bahasa Indonesia) di-mapping dari `status` lewat tabel statis di controller (e.g. `waiting_survey` → `survey`).
 - Nomor pelanggan (`customer_code`) di-generate dari sequence per-POP (`Pop::generateRegistrationNumber()`).
 - Foto KTP/rumah/kontrak diupload terpisah dari field lain, disimpan di `customers.foto_*` (redundant dengan `customer_addresses.house_photo`/`ktp_photo`/`contract_photo` — dua sumber sama, legacy duplikasi kolom).

@@ -319,6 +319,14 @@ class RolePermissionSeeder extends Seeder
                 'master_status_pelanggan.view',
                 'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
                 'qr_scan.view', // Scan QR Internal (2026-08-27) — shortcut bikin tiket dari QR pelanggan
+                // Verifikasi Registrasi (ADHOC-73) — helpdesk = role terdekat "CS"
+                // di sistem ini. Murni RBAC, bisa dipindah/ditambah ke role lain
+                // kapan saja lewat Role Matrix, gak ada logic yang mengunci ke
+                // role ini di kode (CustomerRegistrationVerificationController
+                // cuma cek permission).
+                'customer_registration_verification.view',
+                'customer_registration_verification.approve',
+                'customer_registration_verification.reject',
             ],
 
             'fop' => [

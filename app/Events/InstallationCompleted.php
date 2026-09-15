@@ -5,11 +5,18 @@ namespace App\Events;
 use App\Models\Customer;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class InstallationCompleted implements ShouldBroadcast
+/**
+ * `ShouldBroadcastNow` (sinkron, gak lewat queue Horizon) — dipicu langsung
+ * aksi tombol FOP/teknisi, payload cuma ID/status ringkas. Konsisten sama
+ * `CashDepositUpdated`/`CollectorDepositUpdated`: event board yang butuh
+ * nyampe SEKARANG gak boleh gantung ke availability worker queue
+ * (docs/plan/analisa-broadcast-vs-lonceng-notif.md §2).
+ */
+class InstallationCompleted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

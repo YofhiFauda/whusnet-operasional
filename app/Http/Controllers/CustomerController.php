@@ -355,7 +355,13 @@ class CustomerController extends Controller
         // Skip Survey lompat langsung ke antrean Pemasangan — pelanggan gak
         // pernah masuk antrean Survey teknisi maupun ACC Admin sama sekali
         // (lihat blok 5 di bawah yang di-skip kalau $skipSurvey).
-        $validated['status'] = $skipSurvey ? 'waiting_installation' : 'waiting_survey';
+        //
+        // Non-Skip-Survey TIDAK LAGI langsung `waiting_survey` (ADHOC-73,
+        // Verifikasi Registrasi) — berhenti dulu di `registered` sampai
+        // Admin/CS approve di CustomerRegistrationVerificationController,
+        // yang baru memindahkan ke `waiting_survey` + bikin Task/FopTask
+        // Survey. Lihat docs/plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md.
+        $validated['status'] = $skipSurvey ? 'waiting_installation' : 'registered';
         $validated['updated_by'] = auth()->id();
 
         // Skema 3 (2026-09-12) — ID Sales/Agent/Referral. Actor ber-role
@@ -601,28 +607,15 @@ class CustomerController extends Controller
                 ]);
 
                 app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::PEMASANGAN);
-            } else {
-                // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey) + FopTask
-                //    anchor-nya. FopTask dibuat di sini, bukan menunggu papan
-                //    /fop-tasks dibuka: dia anchor wajib task_materials &
-                //    task_work_tools, dan tanpa itu isian estimasi material serta
-                //    checklist alat di laporan survey hilang tanpa pesan error.
-                $year = date('Y');
-                $count = Task::whereYear('created_at', $year)->count() + 1;
-                Task::create([
-                    'task_number' => sprintf('TASK-%s-%04d', $year, $count),
-                    'task_type' => TaskType::SURVEY->value,
-                    'title' => 'Survey Calon Pelanggan: '.$customer->full_name,
-                    'description' => null,
-                    'pop_id' => $customer->pop_id,
-                    'customer_id' => $customer->id,
-                    'status' => TaskStatus::PENDING->value,
-                    'created_by' => auth()->id() ?? 1,
-                    'updated_by' => auth()->id() ?? 1,
-                ]);
-
-                app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::SURVEY);
             }
+            // ELSE (non-Skip-Survey): TIDAK bikin Task/FopTask Survey di sini lagi
+            // (ADHOC-73, Verifikasi Registrasi). Pelanggan berhenti dulu di status
+            // `registered` — Task (SURVEY) + FopTask-nya baru kebentuk begitu
+            // Admin/CS approve di CustomerRegistrationVerificationController::
+            // approve(), supaya Task FOP gak kebanjiran entri yang belum
+            // ditinjau siapa pun. Skip Survey TETAP tidak tersentuh (dikonfirmasi
+            // user) — cabang if di atas tetap langsung bikin Task PEMASANGAN.
+            // Lihat docs/plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md.
 
             return $customer;
         });

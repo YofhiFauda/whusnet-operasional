@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Enums\TaskType;
+use App\Enums\WorkflowTransition;
 use App\Models\Customer;
 use App\Models\CustomerQrToken;
 use App\Models\FopTask;
@@ -273,9 +274,18 @@ class AppServiceProvider extends ServiceProvider
         View::composer(['layouts.app', 'components.layout.sidebar', 'components.layout.app-shell'], function ($view) {
             $surveyCount = 0;
             $verificationCount = 0;
+            $registrationVerificationCount = 0;
 
             if (auth()->check()) {
                 $user = auth()->user();
+
+                // Antrean "Verifikasi Registrasi" (ADHOC-73) — pelanggan yang
+                // baru diregistrasi (non-Skip-Survey), belum disetujui Admin/CS.
+                if ($user->hasPermission('customer_registration_verification.view')) {
+                    $registrationVerificationCount = Customer::applyUserScope($user)
+                        ->where('status', WorkflowTransition::REGISTERED->value)
+                        ->count();
+                }
 
                 if ($user->hasPermission('customers.detail.survey.view')) {
                     $surveyQuery = Customer::applyUserScope($user)
@@ -319,7 +329,8 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $view->with('badge_survey_count', $surveyCount)
-                ->with('badge_verification_count', $verificationCount);
+                ->with('badge_verification_count', $verificationCount)
+                ->with('badge_registration_verification_count', $registrationVerificationCount);
         });
     }
 }

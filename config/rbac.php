@@ -485,6 +485,19 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Antrean "Verifikasi Registrasi" — pelanggan hasil Registrasi
+        // (non-Skip-Survey) menunggu disetujui Admin/CS sebelum Task+FopTask
+        // Survey kebentuk (ADHOC-73). Beda dari business_development_verification
+        // di atas: approve/reject di sini DUA aksi independen yang wajar
+        // dipisah PIC-nya, jadi permission-nya statis 3 biji, bukan
+        // gerbang-view + logic dinamis. Lihat
+        // docs/plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md §3.4.
+        'customer_registration_verification' => [
+            ActionCode::VIEW->value,
+            ActionCode::APPROVE->value,
+            ActionCode::REJECT->value,
+        ],
+
         // Modul Gudang/Inventory (ADHOC-54) — docs/plan/warehouse/rancangan-ui.md §1.2.
         // `warehouse` root cuma VIEW (dashboard + ledger — §2.1/§2.9). Empat
         // sub-feature action-nya SENGAJA sempit (bukan CRUD generik) —

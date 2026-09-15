@@ -105,7 +105,9 @@ class CustomerRegistrationTest extends TestCase
         $this->assertDatabaseHas('customers', [
             'full_name' => 'John Doe',
             'identity_number' => '1234567890123456',
-            'status' => 'waiting_survey', // Enforced by controller
+            // ADHOC-73 — controller sekarang paksa `registered` (bukan lagi
+            // `waiting_survey`) sampai disetujui di Verifikasi Registrasi.
+            'status' => 'registered', // Enforced by controller
         ]);
 
         $customer = Customer::first();
