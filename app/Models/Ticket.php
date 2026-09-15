@@ -37,6 +37,7 @@ use Illuminate\Support\Carbon;
     'customer_address',
     'customer_village',
     'customer_phone',
+    'reporter_phone',
     'customer_odp',
     'customer_package',
     'customer_device',
@@ -261,6 +262,36 @@ class Ticket extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(TicketAttachment::class);
+    }
+
+    /**
+     * Pelanggan terdampak (tiket batch, mis. ODP LOS) — lihat
+     * TicketBatchMember docblock. Kosong buat tiket normal (non-batch).
+     */
+    public function batchMembers(): HasMany
+    {
+        return $this->hasMany(TicketBatchMember::class);
+    }
+
+    /**
+     * Tiket ini "batch" (Parent, support banyak pelanggan lewat
+     * batchMembers()) kalau kategori issue-nya dicentang `is_batch` di Master
+     * Issue. Tiket lama/kategori kosong selalu false — jangan disimpulkan
+     * dari `customer_id` null doang (itu konsekuensi, bukan sumber kebenaran).
+     */
+    public function isBatch(): bool
+    {
+        return (bool) $this->issueCategory?->is_batch;
+    }
+
+    /**
+     * No. HP yang tampil di List Task — `reporter_phone` (No. HP Pelapor)
+     * kalau diisi staf, fallback ke HP pelanggan (data master atau snapshot)
+     * kalau kosong. Lihat revisi Worksheet Helpdesk poin 3.
+     */
+    public function contactPhone(): ?string
+    {
+        return $this->reporter_phone ?: ($this->customer?->primary_phone ?? $this->customer_phone);
     }
 
     /**

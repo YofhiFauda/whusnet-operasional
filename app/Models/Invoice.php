@@ -148,6 +148,22 @@ class Invoice extends Model
     }
 
     /**
+     * Rincian baris tagihan per kategori pendapatan (ADHOC-60).
+     *
+     * Jumlah `amount` seluruh baris SAMA DENGAN `subtotal` — bukan
+     * `total_amount`, karena diskon & PPN berlaku di level tagihan. Tagihan
+     * lama yang terbit sebelum ADHOC-60 bisa tidak punya baris sama sekali;
+     * `invoices/show.blade.php` jatuh balik ke kolom biaya lama untuk kasus
+     * itu, jadi jangan asumsikan relasi ini selalu terisi.
+     *
+     * @return HasMany<InvoiceItem, $this>
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(InvoiceItem::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /**
      * Satu sumber kebenaran untuk `paid_amount` / `remaining_amount` /
      * `invoice_status`, dipakai semua jalur (single payment, batch, void).
      * Sebelumnya logika ini ter-duplikasi di PaymentController::store dan

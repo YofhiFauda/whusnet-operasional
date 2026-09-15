@@ -65,7 +65,16 @@ $functionalCategories = [
         'features' => [
             'warehouse', 'warehouse_transfer', 'warehouse_issue',
             'warehouse_custody', 'warehouse_traceability',
+            'warehouse_adjustment', 'warehouse_reassign',
+            'warehouse_report', 'warehouse_stock_request',
         ],
+    ],
+    'group_busdev' => [
+        'title' => 'Business Development',
+        'subtitle' => 'Monitoring akuisisi pelanggan, restriksi paket Sales/Teknisi, master Agent, dan omset Sales.',
+        'icon' => 'chart-bar',
+        'badge' => 'bg-fuchsia-50 dark:bg-fuchsia-950/50 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-800',
+        'features' => ['customer_acquisitions', 'agents', 'package_restrictions', 'sales_omset_dashboard'],
     ],
 ];
 
@@ -113,6 +122,14 @@ $featureMeta = [
     'warehouse_issue' => ['name' => 'Issue Barang ke Teknisi', 'desc' => 'Mengeluarkan barang dari gudang cabang untuk dibawa teknisi ke lapangan.'],
     'warehouse_custody' => ['name' => 'Custody Barang di Tangan Teknisi', 'desc' => 'Melihat barang yang sedang dipegang tiap teknisi (belum dipasang/dikembalikan).'],
     'warehouse_traceability' => ['name' => 'Pelacakan Aset (Asset Traceability)', 'desc' => 'Menelusuri riwayat lengkap satu barang bernomor seri, dari gudang sampai ke pelanggan.'],
+    'warehouse_adjustment' => ['name' => 'Adjustment Stok (Rusak/Hilang/Opname)', 'desc' => 'Lapor barang rusak/hilang, stock opname, dan ambang batas stok rendah per gudang.'],
+    'warehouse_reassign' => ['name' => 'Reassign Custody Teknisi', 'desc' => 'Pindahkan barang di tangan teknisi (custody/serial) ke teknisi lain — untuk kasus resign/cuti.'],
+    'warehouse_report' => ['name' => 'Laporan Gudang (Agregat Periodik)', 'desc' => 'Laporan agregat pergerakan & kerugian barang per gudang/cabang dalam suatu periode.'],
+    'warehouse_stock_request' => ['name' => 'Permintaan Stok Cabang', 'desc' => 'Ajukan permintaan stok dari Cabang ke Pusat saat stok cabang menipis, beserta persetujuannya.'],
+    'customer_acquisitions' => ['name' => 'Pelanggan Aktif < 30 Hari (Busdev)', 'desc' => 'Monitoring pelanggan baru diverifikasi admin, dikelompokkan per bulan — dipakai Busdev untuk rekap komisi Sales.'],
+    'agents' => ['name' => 'Master Agent', 'desc' => 'Kelola data mitra Agent (bukan akun login) yang dipakai saat mendaftarkan pelanggan atas nama Agent.'],
+    'package_restrictions' => ['name' => 'Restriksi Paket per Role', 'desc' => 'Atur daftar paket internet yang boleh dipilih role bertanda "Batasi pilihan paket internet" (mis. Sales, Teknisi).'],
+    'sales_omset_dashboard' => ['name' => 'Dashboard Omset Sales', 'desc' => 'Pantau omset (Biaya Langganan − PPN 11%) per Sales, per periode bulan.'],
 ];
 
 // 3. Pemetaan Aksi Hak Akses (Human-Friendly Action Labels, Badges & Deskripsi Fungsi)
@@ -306,10 +323,29 @@ $permissionDescMap = [
     'cash_deposit.validate' => 'Periksa uang yang diserahkan lalu tutup setoran kas. Pemeriksa tidak boleh sama dengan penyetor.',
     'cash_deposit.approve' => 'Tutup selisih kas — titik kerugian (atau kelebihan) diakui. Sengaja terpisah dari memeriksa.',
 
+    // ── Gudang & Inventory ───────────────────────────────────────
+    'warehouse_adjustment.create' => 'Lapor rusak/hilang/scrapped, isi stock opname, ambil alat pelanggan putus (custody/serial), dan atur ambang stok rendah.',
+    'warehouse_reassign.create' => 'Pindahkan custody barang (per-batch atau per-serial) dari satu teknisi ke teknisi lain.',
+    'warehouse_report.view' => 'Buka Laporan Gudang: agregat pergerakan & kerugian barang per gudang/cabang, discope POP user.',
+    'warehouse_stock_request.view' => 'Buka daftar & detail Permintaan Stok Cabang.',
+    'warehouse_stock_request.create' => 'Ajukan Permintaan Stok baru dari Cabang ke Pusat.',
+    'warehouse_stock_request.approve' => 'Setujui permintaan stok dan catat pengiriman (deliver/fulfill) dari Pusat.',
+    'warehouse_stock_request.reject' => 'Tolak permintaan stok yang diajukan cabang.',
+    'warehouse_stock_request.cancel' => 'Batalkan permintaan stok yang diajukan sendiri.',
+
     // ── Laporan ──────────────────────────────────────────────────
     'reports.view' => 'Buka SEMUA halaman laporan (pelanggan, tagihan, pembayaran, import) sekaligus tombol ekspornya.',
     'reports.export' => '[Belum aktif] Tombol ekspor laporan sudah digerbangi `reports.view`; permission ini belum dipasang ke route.',
     'reports.print' => '[Belum aktif] Belum ada route cetak laporan terpisah.',
+
+    // ── Business Development (Skema 1-3, 2026-09-12) ──────────────
+    'customer_acquisitions.view' => 'Buka daftar pelanggan aktif < 30 hari diverifikasi, dikelompokkan per bulan.',
+    'agents.view' => 'Buka daftar Master Agent (mitra akuisisi pelanggan).',
+    'agents.create' => 'Tambah Agent baru.',
+    'agents.update' => 'Ubah data Agent & aktif/nonaktifkan lewat tombol Toggle Status.',
+    'package_restrictions.view' => 'Buka halaman Restriksi Paket: lihat daftar paket yang diizinkan untuk role restricted.',
+    'package_restrictions.update' => 'Ubah daftar paket yang diizinkan untuk role bertanda "Batasi pilihan paket internet".',
+    'sales_omset_dashboard.view' => 'Buka Dashboard Omset Sales: agregasi omset per Sales, per periode bulan, dengan rincian per pelanggan.',
 ];
 
 // Helper Function: Ambil Info Aksi

@@ -109,31 +109,173 @@ endif;
 unset($__errorArgs, $__bag); ?>
     </div>
 
-    <div>
-        <label for="password" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            <?php echo e($isEdit ? 'Password Baru' : 'Password'); ?>
-
-        </label>
-        <input id="password" name="password" type="password"
-               placeholder="Min. 8 karakter, huruf besar/kecil, angka & simbol"
-               class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
-        <?php $__errorArgs = ['password'];
+    <div class="col-span-1 md:col-span-2 grid gap-4 md:grid-cols-2 pt-2 border-t border-slate-100 dark:border-slate-700/60"
+         x-data="{
+             showPassword: false,
+             showConfirm: false,
+             password: '',
+             confirmPassword: '',
+             get hasMinLength() { return this.password.length >= 8; },
+             get hasMixedCase() { return /[A-Z]/.test(this.password) && /[a-z]/.test(this.password); },
+             get hasNumber() { return /[0-9]/.test(this.password); },
+             get hasSymbol() { return /[^A-Za-z0-9]/.test(this.password); },
+             get strengthScore() {
+                 let s = 0;
+                 if (this.password.length >= 8) s++;
+                 if (this.password.length >= 12) s++;
+                 if (/[A-Z]/.test(this.password) && /[a-z]/.test(this.password)) s++;
+                 if (/[0-9]/.test(this.password)) s++;
+                 if (/[^A-Za-z0-9]/.test(this.password)) s++;
+                 return Math.min(4, s);
+             },
+             get strengthLabel() {
+                 if (!this.password) return '';
+                 const labels = ['Sangat Lemah', 'Lemah', 'Sedang', 'Kuat', 'Sangat Kuat'];
+                 return labels[this.strengthScore] || '';
+             },
+             get strengthColor() {
+                 const colors = ['bg-rose-500', 'bg-amber-500', 'bg-yellow-500', 'bg-sky-500', 'bg-emerald-500'];
+                 return colors[this.strengthScore] || 'bg-slate-200 dark:bg-slate-700';
+             },
+             get isMatched() {
+                 return this.confirmPassword.length > 0 && this.password === this.confirmPassword;
+             }
+         }">
+        <div>
+            <label for="password" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <?php echo e($isEdit ? 'Password Baru' : 'Password'); ?> <?php if(!$isEdit): ?><span class="text-rose-500">*</span><?php endif; ?>
+            </label>
+            <div class="relative">
+                <input id="password"
+                       name="password"
+                       :type="showPassword ? 'text' : 'password'"
+                       x-model="password"
+                       placeholder="Min. 8 karakter, huruf besar/kecil, angka & simbol"
+                       autocomplete="new-password"
+                       class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900/50 pl-3 pr-10 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 <?php $__errorArgs = ['password'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?><p class="mt-1 text-xs text-rose-600"><?php echo e($message); ?></p><?php unset($message);
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 ring-1 ring-rose-500 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>">
+
+                <button type="button"
+                        @click="showPassword = !showPassword"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
+                        tabindex="-1"
+                        title="Tampilkan / sembunyikan password">
+                    <svg x-show="!showPassword" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <svg x-show="showPassword" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                    </svg>
+                </button>
+            </div>
+            <?php $__errorArgs = ['password'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                <p class="mt-1 text-xs text-rose-600 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <?php echo e($message); ?>
+
+                </p>
+            <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
-    </div>
 
-    <div>
-        <label for="password_confirmation" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            <?php echo e($isEdit ? 'Konfirmasi Password Baru' : 'Konfirmasi Password'); ?>
+            
+            <div x-show="password.length > 0" x-transition.opacity class="mt-2 space-y-1">
+                <div class="flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400 dark:text-slate-500">Kekuatan Sandi:</span>
+                    <span class="font-bold" :class="{
+                        'text-rose-500': strengthScore <= 1,
+                        'text-amber-500': strengthScore === 2,
+                        'text-sky-500': strengthScore === 3,
+                        'text-emerald-500': strengthScore === 4
+                    }" x-text="strengthLabel"></span>
+                </div>
+                <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex gap-1">
+                    <div class="h-full rounded-full transition-all duration-300"
+                         :class="strengthColor"
+                         :style="`width: ${Math.max(15, (strengthScore / 4) * 100)}%`"></div>
+                </div>
+            </div>
 
-        </label>
-        <input id="password_confirmation" name="password_confirmation" type="password"
-               class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            
+            <div class="mt-2.5 space-y-1 text-[11px] text-slate-500 dark:text-slate-400" <?php if($isEdit): ?> x-show="password.length > 0" x-transition.opacity <?php endif; ?>>
+                <div class="flex items-center gap-1.5" :class="hasMinLength ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Minimal 8 karakter</span>
+                </div>
+                <div class="flex items-center gap-1.5" :class="hasMixedCase ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Huruf besar dan huruf kecil</span>
+                </div>
+                <div class="flex items-center gap-1.5" :class="hasNumber ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Minimal 1 angka</span>
+                </div>
+                <div class="flex items-center gap-1.5" :class="hasSymbol ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Minimal 1 simbol (!@#$%dst)</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <label for="password_confirmation" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <?php echo e($isEdit ? 'Konfirmasi Password Baru' : 'Konfirmasi Password'); ?> <?php if(!$isEdit): ?><span class="text-rose-500">*</span><?php endif; ?>
+            </label>
+            <div class="relative">
+                <input id="password_confirmation"
+                       name="password_confirmation"
+                       :type="showConfirm ? 'text' : 'password'"
+                       x-model="confirmPassword"
+                       placeholder="Ulangi password"
+                       autocomplete="new-password"
+                       class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900/50 pl-3 pr-10 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+
+                <button type="button"
+                        @click="showConfirm = !showConfirm"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
+                        tabindex="-1"
+                        title="Tampilkan / sembunyikan password">
+                    <svg x-show="!showConfirm" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <svg x-show="showConfirm" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                    </svg>
+                </button>
+            </div>
+
+            
+            <template x-if="confirmPassword.length > 0">
+                <p class="mt-1.5 text-xs flex items-center gap-1 font-medium"
+                   :class="isMatched ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="isMatched ? 'M5 13l4 4L19 7' : 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'"/>
+                    </svg>
+                    <span x-text="isMatched ? 'Konfirmasi password cocok.' : 'Konfirmasi password belum sama.'"></span>
+                </p>
+            </template>
+        </div>
     </div>
 </div>
 

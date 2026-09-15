@@ -143,4 +143,47 @@ class UserCrudTest extends TestCase
         $this->assertFalse($user->pops->contains($popA));
         $this->assertTrue(Hash::check('NewPassword123!', $user->password));
     }
+
+    public function test_create_user_view_renders_password_criteria_and_toggle(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $response = $this->get(route('users.create'));
+
+        $response->assertOk();
+        $response->assertSee('Minimal 8 karakter', false);
+        $response->assertSee('Huruf besar dan huruf kecil', false);
+        $response->assertSee('Minimal 1 angka', false);
+        $response->assertSee('Minimal 1 simbol (!@#$%dst)', false);
+        $response->assertSee('Kekuatan Sandi:', false);
+        $response->assertSee('showPassword', false);
+        $response->assertSee('showConfirm', false);
+    }
+
+    public function test_create_user_validates_password_complexity_rules(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $role = Role::where('name', 'Teknisi')->firstOrFail();
+
+        // Weak password: only lowercase, no symbols, no numbers, < 8 chars
+        $response = $this->post(route('users.store'), [
+            'name' => 'Test Password User',
+            'email' => 'test.password@example.com',
+            'status' => 'active',
+            'role_id' => $role->id,
+            'scope_type' => 'all_pop',
+            'password' => 'weak',
+            'password_confirmation' => 'weak',
+        ]);
+
+        $response->assertSessionHasErrors(['password']);
+        $errors = session('errors')->get('password');
+        $this->assertContains('Password user minimal 8 karakter.', $errors);
+        $this->assertContains('Password user wajib kombinasi huruf besar dan huruf kecil.', $errors);
+        $this->assertContains('Password user wajib mengandung minimal 1 angka.', $errors);
+        $this->assertContains('Password user wajib mengandung minimal 1 simbol (!@#$% dst).', $errors);
+    }
 }

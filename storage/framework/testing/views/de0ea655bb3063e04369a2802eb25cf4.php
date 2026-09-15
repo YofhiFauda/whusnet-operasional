@@ -231,6 +231,39 @@
                 </a>
 
                 
+                <?php if($ticket->isBatch() && $ticket->batchMembers->isNotEmpty()): ?>
+                <div class="px-4 pb-3 pl-[4.4rem]">
+                    <div class="pl-4 border-l-2 border-violet-400 dark:border-violet-700 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+                                Pelanggan Terdampak
+                            </span>
+                            <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold font-mono bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800">
+                                <?php echo e($ticket->batchMembers->count()); ?> Orang
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <?php $__currentLoopData = $ticket->batchMembers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <div class="p-2 rounded-lg border border-border bg-surface flex items-center justify-between gap-2 shadow-2xs">
+                                <div class="min-w-0">
+                                    <div class="font-bold text-text-main text-xs truncate"><?php echo e($member->customer_name); ?></div>
+                                    <div class="text-[10px] font-mono text-sky-600 dark:text-sky-400"><?php echo e($member->cid ?: '—'); ?></div>
+                                </div>
+                                <?php if($member->phone): ?>
+                                    <a href="https://wa.me/<?php echo e($member->phone); ?>" target="_blank" rel="noopener"
+                                       class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 transition-colors">
+                                        WA
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                
                 <?php if($hasActions): ?>
                 <div class="flex items-center gap-2 px-4 pb-3 pl-[4.4rem]">
                     <?php if($ticketActions['can_close']): ?>

@@ -219,6 +219,39 @@
                     <?php endif; ?>
 
                     
+                    <?php
+                        $ticketForBatch = $task->fopTask?->ticket;
+                    ?>
+                    <?php if($ticketForBatch?->isBatch()): ?>
+                    <div class="flex flex-col sm:flex-row sm:items-start py-3 border-b border-border gap-1.5 sm:gap-4 select-text">
+                        <span class="text-violet-700 dark:text-violet-400 sm:w-36 shrink-0 font-bold font-ui flex items-center gap-1.5 select-none">
+                            <svg class="h-3.5 w-3.5 text-violet-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 3c0-1.5-1.79-2.86-4-3.44M6 12.56C3.79 13.14 2 14.5 2 16" />
+                            </svg>
+                            Pelanggan Terdampak
+                        </span>
+                        <div class="flex-1 font-ui">
+                            <?php if($ticketForBatch->batchMembers->isEmpty()): ?>
+                            <p class="text-xs text-warning font-semibold">Belum ada pelanggan terdampak dicatat — cek halaman Worksheet Helpdesk (tiket <?php echo e($ticketForBatch->ticket_number); ?>).</p>
+                            <?php else: ?>
+                            <div class="bg-violet-50/70 dark:bg-violet-900/10 border border-violet-200/80 dark:border-violet-800/40 rounded-xl p-3 space-y-1.5 shadow-xs">
+                                <p class="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                                    <?php echo e($ticketForBatch->batchMembers->count()); ?> Pelanggan
+                                </p>
+                                <?php $__currentLoopData = $ticketForBatch->batchMembers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                                    <span class="font-bold text-text-main"><?php echo e($member->customer_name); ?></span>
+                                    <span class="font-mono text-[11px] text-text-muted"><?php echo e($member->cid ?: '—'); ?></span>
+                                    <span class="font-mono text-[11px] text-text-muted"><?php echo e($member->phone ?: '—'); ?></span>
+                                </div>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    
                     <?php if($task->fopTask?->ticket?->catatan_teknis): ?>
                     <div class="flex flex-col sm:flex-row sm:items-start py-3 border-b border-border gap-1.5 sm:gap-4 select-text">
                         <span class="text-sky-700 dark:text-sky-400 sm:w-36 shrink-0 font-bold font-ui flex items-center gap-1.5 select-none">

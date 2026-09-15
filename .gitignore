@@ -29,3 +29,7 @@ Thumbs.db
 # Scramble — OpenAPI spec regenerated via `php artisan scramble:export`, tidak
 # perlu dicommit. Cache-nya juga file-based, lihat config/scramble.php.
 /api.json
+
+# Artefak redirect `> NUL` dari shell Windows — bukan file project, kebentuk
+# tiap ada perintah yang nulis ke device NUL dari dalam WSL/bind mount.
+/NUL

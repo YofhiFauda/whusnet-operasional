@@ -1,0 +1,293 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  docker-compose PRODUKSI — dipakai Coolify (git-based build, bukan
+#  bind-mount seperti docker-compose.yml dev)
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Deploy di Coolify: New Resource → Docker Compose → arahkan ke file ini.
+# Isi semua ${VAR} lewat tab "Environment Variables" Coolify (bukan .env yang
+# ikut commit) — pakai `.env.production.example` di repo ini sebagai daftar
+# variabel yang wajib diisi.
+#
+# Domain publik: set FQDN di service `nginx` lewat UI Coolify (Coolify
+# menyuntikkan proxy Traefik-nya sendiri di depan port yang di-`expose`,
+# JANGAN pakai `ports:` host-mapped seperti di compose dev — itu untuk akses
+# langsung tanpa reverse proxy Coolify).
+#
+# DB: sengaja TIDAK disertakan di sini. Pakai MySQL managed Coolify (resource
+# terpisah) atau database eksternal, lalu isi DB_HOST/DB_PORT/dst lewat env.
+# Kalau memang mau MySQL sebagai service compose ini juga, tambahkan sendiri
+# sesuai pola `redis` di bawah — tidak disertakan defaultnya supaya data
+# pelanggan/billing tidak menyatu siklus hidupnya dengan redeploy image app.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: runtime
+      # VITE_REVERB_APP_KEY WAJIB lewat build arg, bukan `environment:` biasa —
+      # Vite meng-inline VITE_* ke bundle JS SAAT BUILD image, sudah lewat masa
+      # baca env runtime container. Lihat catatan di Dockerfile.prod stage `assets`.
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
+    image: whusnet-app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment: &app_env
+      CONTAINER_ROLE: app
+      APP_NAME: ${APP_NAME:-Whusnet-Operasional}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY}
+      APP_URL: ${APP_URL}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-*}
+      FORCE_HTTPS: ${FORCE_HTTPS:-true}
+      APP_TIMEZONE: Asia/Jakarta
+      APP_LOCALE: id
+      APP_FALLBACK_LOCALE: id
+      APP_FAKER_LOCALE: id_ID
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      LOG_CHANNEL: stack
+      LOG_STACK: single
+      LOG_DEPRECATIONS_CHANNEL: "null"
+      LOG_LEVEL: ${LOG_LEVEL:-warning}
+      DB_CONNECTION: mysql
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SESSION_DRIVER: redis
+      SESSION_LIFETIME: ${SESSION_LIFETIME:-120}
+      SESSION_ENCRYPT: "false"
+      SESSION_SECURE_COOKIE: "true"
+      SESSION_SAME_SITE: lax
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # WAJIB diisi (lihat service `redis` — `requirepass` selalu nyala di
+      # sana). Tanpa default palsu ("null" string, dsb): kalau ini kosong,
+      # AUTH ke redis gagal keras & container unhealthy — lebih baik daripada
+      # diam-diam connect ke redis tanpa password.
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Harus lebih besar dari timeout job terpanjang (MatchPaymentReceipt =
+      # 240s, supervisor kwitansi = 300s) — lihat catatan di docker-compose.yml dev.
+      REDIS_QUEUE_RETRY_AFTER: 360
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: reverb
+      REVERB_PORT: 8081
+      REVERB_SCHEME: http
+      REVERB_SERVER_HOST: 0.0.0.0
+      REVERB_SERVER_PORT: 8081
+      MAIL_MAILER: ${MAIL_MAILER:-log}
+      MAIL_SCHEME: ${MAIL_SCHEME:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+      MAIL_FROM_NAME: ${APP_NAME:-Whusnet-Operasional}
+      FILESYSTEM_DISK: local
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      QR_HMAC_SECRET: ${QR_HMAC_SECRET}
+      QR_BASE_URL: ${APP_URL}
+      PORTAL_BASE_URL: ${PORTAL_BASE_URL:-}
+      PORTAL_ALLOWED_ORIGIN: ${PORTAL_ALLOWED_ORIGIN:-}
+      PORTAL_CLIENT_SECRET: ${PORTAL_CLIENT_SECRET:-}
+      PORTAL_WEBHOOK_URL: ${PORTAL_WEBHOOK_URL:-}
+      PORTAL_WEBHOOK_SECRET: ${PORTAL_WEBHOOK_SECRET:-}
+      COLLECTOR_DUE_WINDOW_DAYS: ${COLLECTOR_DUE_WINDOW_DAYS:-7}
+      # Notifikasi teknisi in-app (TelegramBotService, config/services.php) —
+      # BEDA dari TELEGRAM_EXTERNAL_* di bawah, lihat catatan config/webhooks.php.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # Webhook keluar API 1 (docs/api/) — tujuan Website B / Telegram pihak
+      # luar. Kosong = fitur nonaktif diam-diam (listener skip), bukan error.
+      WEBHOOK_WEBSITE_B_URL: ${WEBHOOK_WEBSITE_B_URL:-}
+      WEBHOOK_WEBSITE_B_SECRET: ${WEBHOOK_WEBSITE_B_SECRET:-}
+      TELEGRAM_EXTERNAL_BOT_TOKEN: ${TELEGRAM_EXTERNAL_BOT_TOKEN:-}
+      TELEGRAM_EXTERNAL_CHAT_ID: ${TELEGRAM_EXTERNAL_CHAT_ID:-}
+      # API masuk POP-distribusi (docs/api/api-pop-distribusi/) — Website B
+      # connect ke sini. Dua token terpisah, lihat config/webhooks.php.
+      POP_DISTRIBUSI_READ_TOKEN: ${POP_DISTRIBUSI_READ_TOKEN:-}
+      NETWORK_ASSIGNMENT_WRITE_TOKEN: ${NETWORK_ASSIGNMENT_WRITE_TOKEN:-}
+    volumes:
+      - storage_data:/var/www/storage
+      - cache_data:/var/www/bootstrap/cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # `php artisan --version` cuma butuh vendor/autoload buat jalan — lolos
+      # detik pertama walau migrate/storage:link/cache masih JALAN di
+      # entrypoint (proses PID 1 yang sama, tapi HEALTHCHECK exec terpisah
+      # dan concurrent). horizon/reverb/scheduler/nginx semua gate di
+      # `app: service_healthy`, jadi healthcheck lemah = mereka bisa start
+      # sebelum migrasi kelar (job jalan di skema lama) atau sebelum php-fpm
+      # benar-benar listen (nginx dapat 502). Entrypoint nulis marker
+      # /tmp/app-ready SETELAH migrate+cache selesai & TEPAT SEBELUM exec
+      # php-fpm — healthcheck nunggu marker itu, bukan cuma artisan bisa jalan.
+      test: ["CMD-SHELL", "test -f /tmp/app-ready && php artisan --version || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - app_network
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: web
+      # Sama nilainya dengan build arg service `app` — WAJIB identik supaya
+      # Docker build cache stage `assets` (shared, dipakai `app` DAN `nginx`)
+      # tidak invalidasi/duplikat build cuma karena arg beda.
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
+    image: whusnet-nginx:${APP_VERSION:-latest}
+    restart: unless-stopped
+    # Port yang dibaca Coolify buat routing domain (Traefik). JANGAN tambah
+    # `ports:` host-mapped di sini — biarkan Coolify yang mem-proxy.
+    expose:
+      - "80"
+    volumes:
+      - storage_data:/var/www/storage
+    depends_on:
+      app:
+        condition: service_healthy
+      reverb:
+        condition: service_started
+    networks:
+      - app_network
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    # `--requirepass` WAJIB nyala di sini — app/horizon/reverb/scheduler
+    # semua dikirim REDIS_PASSWORD (lihat &app_env), jadi kalau server ini
+    # tidak diset password yang SAMA, salah satu dari dua hal: AUTH dari
+    # client selalu gagal (password diisi tapi server tak minta), atau redis
+    # kebuka tanpa auth di app_network (password dikosongkan). Redis
+    # menyimpan session/cache/queue/broadcasting — jangan biarkan tanpa auth.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  horizon:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: runtime
+    image: whusnet-app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+      CONTAINER_ROLE: horizon
+    volumes:
+      - storage_data:/var/www/storage
+      - cache_data:/var/www/bootstrap/cache
+    depends_on:
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'horizon' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_network
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: runtime
+    image: whusnet-app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+      CONTAINER_ROLE: reverb
+    volumes:
+      - storage_data:/var/www/storage
+      - cache_data:/var/www/bootstrap/cache
+    depends_on:
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.20"
+          memory: 256M
+    healthcheck:
+      # nc lebih tepat dari curl buat WebSocket — cek port TCP terbuka saja.
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8081 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_network
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: runtime
+    image: whusnet-app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+      CONTAINER_ROLE: scheduler
+    volumes:
+      - storage_data:/var/www/storage
+      - cache_data:/var/www/bootstrap/cache
+    depends_on:
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 192M
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'schedule:work' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  storage_data:
+  cache_data:
+  redis_data:

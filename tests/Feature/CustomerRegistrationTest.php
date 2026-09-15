@@ -142,4 +142,38 @@ class CustomerRegistrationTest extends TestCase
             'identity_number' => '3502182039200001',
         ]);
     }
+
+    /**
+     * Regresi: npwp & jenis_kontrak sudah ada di form Registrasi (create.blade.php)
+     * sejak awal tapi TIDAK PERNAH divalidasi di CustomerRegistrationRequest —
+     * keduanya kekirim percuma (npwp silent-drop, jenis_kontrak gak pernah nyampe
+     * customer_services.contract_type). Ditemukan &amp; diperbaiki 2026-09-12.
+     */
+    public function test_registration_saves_npwp_and_jenis_kontrak()
+    {
+        Storage::fake('public');
+
+        $response = $this->actingAs($this->admin)->post('/customers', [
+            'full_name' => 'Npwp Test',
+            'identity_number' => '1234567890123456',
+            'gender' => 'Laki-laki',
+            'primary_phone' => '081234567890',
+            'npwp' => '12.345.678.9-012.000',
+            'registration_date' => now()->format('Y-m-d'),
+            'pop_id' => $this->pop->id,
+            'address' => 'Jl. Test No. 3',
+            'city_id' => $this->city->id,
+            'district_id' => $this->district->id,
+            'village_id' => $this->village->id,
+            'internet_package_id' => $this->package->id,
+            'jenis_kontrak' => 'beli',
+            'contract_period_months' => 12,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $customer = Customer::where('full_name', 'Npwp Test')->firstOrFail();
+        $this->assertSame('12.345.678.9-012.000', $customer->npwp);
+        $this->assertSame('beli', $customer->customerService->contract_type);
+    }
 }

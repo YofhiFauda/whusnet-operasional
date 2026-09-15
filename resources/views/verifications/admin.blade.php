@@ -5,20 +5,34 @@
     $isSurveyStage = in_array($status, ['waiting_survey', 'survey_in_progress']);
     $isWaitingAccStage = in_array($status, ['waiting_acc', 'surveyed']);
     $isInstallationStage = in_array($status, ['waiting_installation', 'installation_in_progress', 'revision_installation']);
-    $isVerifAdminStage = in_array($status, ['installed', 'verification_admin', 'active']);
+    // 'waiting_business_development_verification' (kategori Bisnis, gate BD,
+    // ADHOC-67 susulan) TERMASUK di sini — pelanggan tahap ini SUDAH lolos
+    // CS (tab Registrasi/Survey/Pemasangan/Pengujian sudah final), cuma tab
+    // Verifikasi yang beda isinya (lihat cabang BD di dalamnya).
+    $isVerifAdminStage = in_array($status, ['installed', 'verification_admin', 'active', \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value]);
+    $isWaitingBdStageForBadge = $status === \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value;
 
     $showTabSurvey = !$isSurveyStage;
     $showTabPemasangan = !$isSurveyStage && !$isWaitingAccStage;
     $showTabPengujian = $isVerifAdminStage;
     $showTabVerifikasi = $isVerifAdminStage;
 
-    $breadcrumbQueueName = $isSurveyStage ? 'Antrean Survey' : 'Antrean Verifikasi & Pemasangan';
-    $breadcrumbQueueRoute = $isSurveyStage ? route('surveys.queue') : route('verifications.queue');
+    $breadcrumbQueueName = match(true) {
+        $isSurveyStage => 'Antrean Survey',
+        $isWaitingBdStageForBadge => 'Menunggu Verifikasi BD',
+        default => 'Antrean Verifikasi & Pemasangan',
+    };
+    $breadcrumbQueueRoute = match(true) {
+        $isSurveyStage => route('surveys.queue'),
+        $isWaitingBdStageForBadge => route('business-development-verifications.index'),
+        default => route('verifications.queue'),
+    };
 
     $stageBadgeLabel = match(true) {
         $isSurveyStage => 'Antrean Survey',
         $isWaitingAccStage => 'Menunggu ACC Survey',
         $isInstallationStage => 'Proses Pemasangan',
+        $isWaitingBdStageForBadge => 'Verifikasi BD',
         $isVerifAdminStage => 'Verifikasi Admin',
         default => Str::headline($status),
     };
@@ -748,15 +762,192 @@
 
             @php
                 $service = $customer->customerService;
+                $isWaitingBdStage = $customer->status === \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value;
             @endphp
 
+            @if($isWaitingBdStage)
+                {{-- CABANG BD: pelanggan sudah lolos verifikasi CS (Invoice Awal
+                     sudah terbit, tab Registrasi/Survey/Pemasangan/Pengujian di
+                     atas ini sudah final) — nyangkut di sini nunggu Business
+                     Development isi "Biaya Instalasi" & aktivasi. Halaman & data
+                     yang ditampilkan SAMA PERSIS dengan verifikasi CS (reuse view
+                     ini, bukan halaman terpisah) — cuma tab ini yang beda:
+                     `BusinessDevelopmentVerificationController::verify()`, TANPA
+                     jalur Tolak/Revisi (dikonfirmasi user, beda dari cabang CS
+                     di bawah). --}}
+                <div class="mb-6 bg-success-bg border border-success-border rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-success shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <div>
+                            <p class="text-sm font-semibold text-success dark:text-white">Langkah Terakhir: Verifikasi BD</p>
+                            <p class="text-xs text-success dark:text-white mt-1">CS sudah menerbitkan tagihan awal &amp; menyelesaikan teknis (lihat tab sebelumnya). Isi Biaya Instalasi lalu tekan "Verifikasi &amp; Aktifkan" untuk menerbitkan tagihan Biaya Instalasi sekaligus mengaktifkan pelanggan ini. <span class="font-semibold">Tidak ada jalur tolak</span> — pastikan nominalnya benar sebelum submit.</p>
+                        </div>
+                    </div>
+                </div>
+
+                @if($service)
+                <div class="mb-6">
+                    <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Ringkasan Layanan</h4>
+                    <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-5">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Paket Internet</span>
+                                <span class="block text-sm font-bold text-text-main">{{ $customer->internetPackage->name ?? '-' }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Biaya Bulanan</span>
+                                <span class="block text-sm font-mono font-bold text-text-main">Rp {{ number_format($service->total_monthly_bill ?? 0, 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Diskon</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format($service->discount ?? 0, 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">PPN</span>
+                                <span class="block text-sm font-mono text-text-main">{{ number_format($service->ppn ?? 0, 0, ',', '.') }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                {{-- Hasil Verifikasi CS — data hasil hitung CS di
+                     `finalVerify()`, bukan Ringkasan Layanan statis. Invoice
+                     AWAL kategori Bisnis sengaja BELUM terbit di titik CS
+                     (nunggu BD juga setuju), jadi ada dua bentuk: $initialInvoice
+                     kalau sudah terbit (invoice sungguhan + link detail),
+                     $pendingInitialInvoice kalau masih snapshot (badge "Belum
+                     Terbit"). BD butuh liat ini SEBELUM isi Biaya Instalasi:
+                     tanggal aktivasi yang CS pakai, dan bukti "Biaya
+                     Pemasangan" di tagihan CS memang 0 (ditagih terpisah di
+                     sini, bukan kecatet dobel). --}}
+                @if($initialInvoice)
+                <div class="mb-6">
+                    <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
+                        <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider">Hasil Verifikasi CS — {{ $initialInvoice->invoice_number }}</h4>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $initialInvoice->invoice_status->value === 'lunas' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' }}">
+                            {{ $initialInvoice->invoice_status->label() }}
+                        </span>
+                    </div>
+                    <div class="bg-surface border border-border rounded-xl p-5">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 mb-4">
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Tanggal Aktivasi</span>
+                                <span class="block text-sm font-bold text-text-main">{{ $initialInvoice->issue_date?->translatedFormat('d F Y') ?? '-' }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Prorata</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format((float) $initialInvoice->prorate_amount, 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Biaya Pemasangan (CS)</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format((float) $initialInvoice->extra_installation_fee, 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Total Tagihan Awal</span>
+                                <span class="block text-sm font-mono font-bold text-primary">Rp {{ number_format((float) $initialInvoice->total_amount, 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+                        <a href="{{ route('invoices.show', $initialInvoice) }}" class="text-xs font-semibold text-primary hover:underline">
+                            Lihat Detail Tagihan Awal →
+                        </a>
+                    </div>
+                </div>
+                @elseif($pendingInitialInvoice)
+                {{-- Kategori Bisnis, BD BELUM verifikasi — Invoice AWAL sengaja
+                     belum terbit (baru terbit saat form di bawah disubmit,
+                     lihat BusinessDevelopmentVerificationController::verify()).
+                     Angkanya tetap ditampilkan dari snapshot yang dititipkan
+                     CS, biar BD gak nebak dari Ringkasan Layanan statis. --}}
+                <div class="mb-6">
+                    <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
+                        <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider">Hasil Verifikasi CS</h4>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                            Belum Terbit
+                        </span>
+                    </div>
+                    <div class="bg-surface border border-border rounded-xl p-5">
+                        <p class="text-xs text-text-muted mb-4">Tagihan awal baru terbit setelah Anda verifikasi di bawah — angka berikut hasil hitung CS saat verifikasi.</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Tanggal Aktivasi</span>
+                                <span class="block text-sm font-bold text-text-main">{{ \Illuminate\Support\Carbon::parse($pendingInitialInvoice['issue_date'])->translatedFormat('d F Y') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Prorata</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format((float) $pendingInitialInvoice['billing']['prorate_amount'], 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Biaya Pemasangan (CS)</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format((float) $pendingInitialInvoice['billing']['extra_installation_fee'], 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Total Tagihan Awal (Estimasi)</span>
+                                <span class="block text-sm font-mono font-bold text-primary">Rp {{ number_format((float) $pendingInitialInvoice['billing']['total_amount'], 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                @if($customer->canInstallationFeeBeValidatedBy(auth()->user()))
+                    <form method="POST" action="{{ route('business-development-verifications.verify', $customer) }}" class="space-y-6">
+                        @csrf
+                        @method('PUT')
+
+                        <div>
+                            <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Form Verifikasi BD</h4>
+                            <div class="bg-surface border border-border rounded-xl p-6 space-y-5 shadow-sm">
+                                <div>
+                                    <label for="installation_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">BIAYA INSTALASI <span class="text-red-500">*</span></label>
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
+                                        {{-- Prefill dari biaya instalasi bawaan paket (Master Paket
+                                             Internet) — tetap bisa diubah BD (nego harga per klien
+                                             Bisnis). `?? 0` wajib — ada paket yang installation_fee
+                                             bawaannya null (lihat InternetPackageSeeder). --}}
+                                        <input type="text" inputmode="decimal" data-rupiah name="installation_fee" id="installation_fee"
+                                            value="{{ old('installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->customerService?->internetPackage?->installation_fee ?? 0)) }}" required autofocus
+                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
+                                    </div>
+                                    @error('installation_fee')
+                                        <p class="text-xs text-error mt-1">{{ $message }}</p>
+                                    @enderror
+                                    <p class="text-[11px] text-text-muted mt-1">Terisi otomatis dari biaya instalasi bawaan paket — boleh diubah kalau ada nego harga. Submit langsung menerbitkan tagihan Insidental (kategori Jasa Instalasi), terpisah dari Tagihan Awal yang dibuat CS.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-5 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <a href="{{ route('business-development-verifications.index') }}"
+                                class="text-sm font-medium text-text-secondary hover:text-text-main transition-colors px-4 py-2 border border-border rounded-lg hover:bg-surface-muted">
+                                ← Kembali ke Antrean
+                            </a>
+                            <button type="submit"
+                                class="flex justify-center items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                Verifikasi & Aktifkan
+                            </button>
+                        </div>
+                    </form>
+                @else
+                    <div class="bg-surface-muted border border-border rounded-xl p-5 text-sm text-text-secondary">
+                        Anda tidak punya izin memvalidasi Biaya Instalasi kategori paket ini.
+                    </div>
+                @endif
+            @else
             {{-- Info notifikasi --}}
             <div class="mb-6 bg-success-bg border border-success-border rounded-xl p-4">
                 <div class="flex items-start gap-3">
                     <svg class="w-5 h-5 text-success shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <div>
-                        <p class="text-sm font-semibold text-success dark:text-white">Langkah Terakhir: Verifikasi & Aktivasi Pelanggan</p>
-                        <p class="text-xs text-success dark:text-white mt-1">Periksa kembali data pemasangan dan pengujian di tab sebelumnya, kemudian isi form di bawah ini untuk mengaktifkan pelanggan dan menerbitkan tagihan pertama.</p>
+                        @if($customer->needsBusdevInstallationFeeVerification())
+                            <p class="text-sm font-semibold text-success dark:text-white">Langkah Terakhir: Verifikasi CS (Kategori Bisnis — Lanjut ke BD)</p>
+                            <p class="text-xs text-success dark:text-white mt-1">Periksa kembali data pemasangan dan pengujian di tab sebelumnya, kemudian isi form di bawah ini untuk menerbitkan tagihan pertama. Pelanggan kategori Bisnis <span class="font-semibold">belum resmi Aktif</span> setelah ini — menunggu Business Development (BD) verifikasi Biaya Instalasi dulu.</p>
+                        @else
+                            <p class="text-sm font-semibold text-success dark:text-white">Langkah Terakhir: Verifikasi & Aktivasi Pelanggan</p>
+                            <p class="text-xs text-success dark:text-white mt-1">Periksa kembali data pemasangan dan pengujian di tab sebelumnya, kemudian isi form di bawah ini untuk mengaktifkan pelanggan dan menerbitkan tagihan pertama.</p>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -791,7 +982,8 @@
             {{-- FORM VERIFIKASI --}}
 
 
-            <form id="verifyForm" method="POST" action="{{ route('customers.verification.final', $customer) }}" class="space-y-6">
+            <form id="verifyForm" method="POST" action="{{ route('customers.verification.final', $customer) }}" class="space-y-6"
+                  data-needs-bd="{{ $customer->needsBusdevInstallationFeeVerification() ? '1' : '0' }}">
                 @csrf
 
                 <div>
@@ -837,13 +1029,29 @@
                                     <label for="extra_installation_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">BIAYA PEMASANGAN</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
-                                        {{-- Prefill dari master paket, tapi tetap bisa diubah: pemasangan
-                                             boleh digratiskan/promo. `?? 0` wajib — ada paket yang
-                                             installation_fee-nya null (lihat InternetPackageSeeder). --}}
-                                        <input type="text" inputmode="decimal" data-rupiah name="extra_installation_fee" id="fv_extra_installation_fee"
-                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
-                                            value="{{ old('extra_installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->internetPackage->installation_fee ?? 0)) }}" onkeyup="calculateFees()" onchange="calculateFees()">
+                                        @if($customer->needsBusdevInstallationFeeVerification())
+                                            {{-- Kategori paket ini butuh validasi BD (Master Kategori Paket)
+                                                 — biaya instalasi ditagih TERPISAH oleh BD setelah verifikasi
+                                                 ini (`/business-development-verifications`), bukan di sini.
+                                                 Dikunci ke 0 & disabled biar CS gak keliru mengisi dobel;
+                                                 server (`finalVerify()`) tetap menimpa ke 0 kalau ada yang
+                                                 nekat kirim manual. --}}
+                                            <input type="text" disabled
+                                                class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface-muted font-mono text-text-disabled cursor-not-allowed"
+                                                value="0">
+                                            <input type="hidden" name="extra_installation_fee" value="0">
+                                        @else
+                                            {{-- Prefill dari master paket, tapi tetap bisa diubah: pemasangan
+                                                 boleh digratiskan/promo. `?? 0` wajib — ada paket yang
+                                                 installation_fee-nya null (lihat InternetPackageSeeder). --}}
+                                            <input type="text" inputmode="decimal" data-rupiah name="extra_installation_fee" id="fv_extra_installation_fee"
+                                                class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+                                                value="{{ old('extra_installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->internetPackage->installation_fee ?? 0)) }}" onkeyup="calculateFees()" onchange="calculateFees()">
+                                        @endif
                                     </div>
+                                    @if($customer->needsBusdevInstallationFeeVerification())
+                                        <p class="text-[11px] text-text-muted mt-1">Kategori Bisnis — biaya instalasi diisi &amp; ditagih BD setelah pelanggan ini diverifikasi.</p>
+                                    @endif
                                 </div>
                                 <div>
                                     <label for="other_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">MATERAI</label>
@@ -971,13 +1179,17 @@
                                 <button type="submit" id="btn-activate"
                                     class="flex justify-center items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    Aktivasi & Terbitkan Tagihan
+                                    {{-- Kategori Bisnis TIDAK langsung Aktif di sini — nyangkut dulu
+                                         di antrean BD (WAITING_BUSINESS_DEVELOPMENT_VERIFICATION).
+                                         Label WAJIB jujur soal ini, jangan bilang "Aktivasi". --}}
+                                    {{ $customer->needsBusdevInstallationFeeVerification() ? 'Verifikasi & Terbitkan Tagihan' : 'Aktivasi & Terbitkan Tagihan' }}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </form>
+            @endif
         </div>
     </div>
 </div>
@@ -1152,8 +1364,19 @@
     }
 
     function calculateFees() {
+        // Cabang BD (WAITING_BUSINESS_DEVELOPMENT_VERIFICATION) tidak
+        // merender form CS sama sekali — `billing_params`/`verifyForm`
+        // gak ada di DOM. Guard di sini (satu titik), bukan di tiap
+        // pemanggil (inline onkeyup/onchange DAN initial call di
+        // DOMContentLoaded), supaya aman dari null tanpa nyisir semua
+        // titik panggil satu-satu.
+        const billingParams = document.getElementById('billing_params');
+        if (!billingParams) {
+            return;
+        }
+
         // Parameter layanan dititipkan di data-* supaya tidak ikut ter-POST.
-        const params = document.getElementById('billing_params').dataset;
+        const params = billingParams.dataset;
         const baseMonthly = parseFloat(params.monthlyPrice) || 0;
         const discount = parseFloat(params.discount) || 0;
         const ppnRate = parseFloat(params.ppn) || 0;
@@ -1294,25 +1517,117 @@
                 e.preventDefault();
                 const total = verifyForm.dataset.totalAmount || 0;
                 const totalFormatted = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(total);
+                const needsBd = verifyForm.dataset.needsBd === '1';
 
-                const message = `
-                    <div class="space-y-3">
-                        <p>Tindakan ini akan:</p>
-                        <ul class="list-disc list-inside text-text-secondary space-y-1 ml-2">
-                            <li>Mengaktifkan pelanggan (status &rarr; <span class="font-bold text-success">Aktif</span>)</li>
-                            <li>Menerbitkan tagihan pertama sebesar <span class="font-bold font-mono text-text-main">${totalFormatted}</span></li>
-                        </ul>
-                        <p class="font-medium text-text-main mt-2">Apakah Anda yakin?</p>
+                const message = needsBd
+                    ? `
+                    <div class="whitespace-normal space-y-4 text-left">
+                        <p class="text-sm text-text-secondary leading-relaxed">
+                            Tindakan ini akan memproses verifikasi CS dan mengarahkan data pelanggan ke antrean verifikasi Business Development:
+                        </p>
+
+                        <div class="space-y-2.5">
+                            <!-- Card 1: Tagihan Pertama -->
+                            <div class="p-3.5 bg-surface border border-border rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-900/50">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-semibold text-text-secondary">Tagihan Pertama (Prorata)</div>
+                                        <div class="text-[11px] text-text-muted truncate">Diterbitkan tanpa biaya instalasi</div>
+                                    </div>
+                                </div>
+                                <div class="font-mono font-bold text-sm text-text-main bg-surface-muted px-2.5 py-1 rounded-md border border-border shrink-0">
+                                    ${totalFormatted}
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Status Pelanggan & Alur BD -->
+                            <div class="p-3.5 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-800/40 rounded-xl space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-6 h-6 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300 flex items-center justify-center shrink-0">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <span class="text-xs font-semibold text-amber-900 dark:text-amber-200">Status Selanjutnya</span>
+                                    </div>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                                        Menunggu Verifikasi BD
+                                    </span>
+                                </div>
+                                <p class="text-xs text-amber-900/90 dark:text-amber-300/90 leading-relaxed pl-8">
+                                    Pelanggan <span class="font-bold underline decoration-amber-400 underline-offset-2">belum resmi Aktif</span> sampai Tim Business Development memvalidasi & mengisi <span class="font-semibold">Biaya Instalasi</span>.
+                                </p>
+                            </div>
+                        </div>
+
+                        <p class="text-xs font-medium text-text-muted pt-1">
+                            Apakah Anda yakin ingin memproses verifikasi dan melanjutkan ke BD?
+                        </p>
+                    </div>
+                `
+                    : `
+                    <div class="whitespace-normal space-y-4 text-left">
+                        <p class="text-sm text-text-secondary leading-relaxed">
+                            Tindakan ini akan mengaktifkan layanan pelanggan dengan rincian berikut:
+                        </p>
+
+                        <div class="space-y-2.5">
+                            <!-- Card 1: Status Pelanggan -->
+                            <div class="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-800/40 rounded-xl flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-800">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-semibold text-text-secondary">Status Layanan</div>
+                                        <div class="text-[11px] text-text-muted">Pelanggan langsung resmi aktif</div>
+                                    </div>
+                                </div>
+                                <span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 shrink-0">
+                                    Aktif
+                                </span>
+                            </div>
+
+                            <!-- Card 2: Tagihan Pertama -->
+                            <div class="p-3.5 bg-surface border border-border rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-900/50">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-semibold text-text-secondary">Tagihan Pertama</div>
+                                        <div class="text-[11px] text-text-muted truncate">Total tagihan awal terbit</div>
+                                    </div>
+                                </div>
+                                <div class="font-mono font-bold text-sm text-text-main bg-surface-muted px-2.5 py-1 rounded-md border border-border shrink-0">
+                                    ${totalFormatted}
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-xs font-medium text-text-muted pt-1">
+                            Apakah Anda yakin ingin memproses aktivasi pelanggan ini?
+                        </p>
                     </div>
                 `;
 
                 window.Dialog.show({
-                    title: 'Konfirmasi Aktivasi Pelanggan',
+                    title: needsBd ? 'Konfirmasi Verifikasi CS (Lanjut ke BD)' : 'Konfirmasi Aktivasi Pelanggan',
                     contentHtml: message,
                     icon: 'warning',
                     buttons: [
                         { text: 'Batal', type: 'secondary' },
-                        { text: 'Lanjutkan Aktivasi', type: 'primary', onClick: () => {
+                        { text: needsBd ? 'Lanjutkan' : 'Lanjutkan Aktivasi', type: 'primary', onClick: () => {
                             window.Dialog.close();
                             // Submit programatik melewati listener `submit`
                             // global — kolom biaya bermasking dibersihkan di sini.

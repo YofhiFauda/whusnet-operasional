@@ -113,10 +113,6 @@ class CustomerEditTest extends TestCase
             'agent_code' => 'AGT-UPD',
             'referral_customer_code' => 'CID-UPD',
             'status' => 'active',
-            'ont_sn' => 'ONT-UPD',
-            'odp_code' => 'ODP-UPD',
-            'olt_code' => 'OLT-UPD',
-            'vlan_id' => '1025',
         ];
 
         $response = $this->put("/customers/{$customer->id}", $updatedData);
@@ -131,8 +127,67 @@ class CustomerEditTest extends TestCase
             'primary_phone' => '08987654321',
             'pop_id' => $pop->id,
             'status' => 'active',
-            'ont_sn' => 'ONT-UPD',
         ]);
+    }
+
+    /**
+     * Regresi: ont_sn/odp_code/olt_code/vlan_id DICABUT dari validasi update()
+     * (2026-09-12, atas permintaan user — sudah digantikan Informasi Perangkat
+     * Aktif + Distribusi Jaringan Detail). Pastikan mengirim key itu di request
+     * TIDAK diam-diam menimpa/menghapus nilai lama yang sudah tersimpan.
+     */
+    public function test_customer_edit_ignores_legacy_technical_fields_without_wiping_them(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $pop = Pop::create([
+            'code' => 'SMN7',
+            'pop_code' => 'SMN7',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko 7',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'customer_code' => 'C-SMN-000004',
+            'full_name' => 'Legacy Technical Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+            'ont_sn' => 'ONT-OLD',
+            'odp_code' => 'ODP-OLD',
+            'olt_code' => 'OLT-OLD',
+            'vlan_id' => '999',
+        ]);
+
+        $data = [
+            'full_name' => 'Legacy Technical Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+            // Form Edit sekarang gak pernah kirim field ini, tapi kalaupun ada
+            // klien nakal yang tetap ngirim, tetap harus diabaikan (bukan cuma
+            // gak ada di form) — makanya dicoba kirim di sini.
+            'ont_sn' => 'ONT-SHOULD-BE-IGNORED',
+            'odp_code' => 'ODP-SHOULD-BE-IGNORED',
+            'olt_code' => 'OLT-SHOULD-BE-IGNORED',
+            'vlan_id' => '1',
+        ];
+
+        $response = $this->put("/customers/{$customer->id}", $data);
+
+        $response->assertRedirect("/customers/{$customer->id}");
+
+        $customer->refresh();
+        $this->assertSame('ONT-OLD', $customer->ont_sn);
+        $this->assertSame('ODP-OLD', $customer->odp_code);
+        $this->assertSame('OLT-OLD', $customer->olt_code);
+        $this->assertSame('999', $customer->vlan_id);
     }
 
     public function test_customer_edit_with_valid_file_uploads_stores_them_on_disk(): void
@@ -273,5 +328,278 @@ class CustomerEditTest extends TestCase
 
         $this->assertNull($customer->foto_rumah);
         $this->assertNull($customer->foto_kontrak);
+    }
+
+    public function test_customer_edit_saves_structured_device_and_technical_detail(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $pop = Pop::create([
+            'code' => 'SMN5',
+            'pop_code' => 'SMN5',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko 5',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'customer_code' => 'C-SMN-000002',
+            'full_name' => 'Teknis Detail Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+        ]);
+
+        $data = [
+            'full_name' => 'Teknis Detail Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+            'device_type' => 'ont',
+            'connection_mode' => 'pppoe',
+            'brand' => 'ZTE',
+            'model' => 'F609',
+            'serial_number' => 'ZTEGC1234567',
+            'mac_address' => '00:11:22:33:44:55',
+            'pppoe_username' => 'user_ponorogo_01',
+            'pppoe_password' => 'rahasia123',
+            'wifi_ssid' => 'Whusnet-Test',
+            'wifi_password' => 'wifi12345',
+            'odp_number' => 'ODP-01',
+            'odp_port' => 'Port 4',
+            'olt_number' => '1',
+            'olt_slot' => '2',
+            'olt_port' => '3',
+            'vlan' => '100',
+            'router_number' => 'Distribusi-9',
+            'initial_attenuation' => '-19.5',
+        ];
+
+        $response = $this->put("/customers/{$customer->id}", $data);
+
+        $response->assertRedirect("/customers/{$customer->id}");
+
+        $this->assertDatabaseHas('customer_devices', [
+            'customer_id' => $customer->id,
+            'device_type' => 'ont',
+            'connection_mode' => 'pppoe',
+            'brand' => 'ZTE',
+            'model' => 'F609',
+            'serial_number' => 'ZTEGC1234567',
+            'mac_address' => '00:11:22:33:44:55',
+            'wifi_ssid' => 'Whusnet-Test',
+        ]);
+
+        $this->assertDatabaseHas('customer_technical_details', [
+            'customer_id' => $customer->id,
+            'odp_number' => 'ODP-01',
+            'odp_port' => 'Port 4',
+            'olt_number' => '1',
+            'olt_slot' => '2',
+            'olt_port' => '3',
+            'vlan' => '100',
+            'router_number' => 'Distribusi-9',
+        ]);
+    }
+
+    /**
+     * Regresi: npwp & jenis_kontrak sama kasusnya dengan Registrasi — sekarang
+     * juga bisa dikoreksi lewat Edit Pelanggan (2026-09-12).
+     */
+    public function test_customer_edit_saves_npwp_and_jenis_kontrak(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $pop = Pop::create([
+            'code' => 'SMN6',
+            'pop_code' => 'SMN6',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko 6',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $package = InternetPackage::firstOrFail();
+
+        $customer = Customer::create([
+            'customer_code' => 'C-SMN-000003',
+            'full_name' => 'Npwp Edit Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+        ]);
+
+        $data = [
+            'full_name' => 'Npwp Edit Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+            'npwp' => '98.765.432.1-098.000',
+            'internet_package_id' => $package->id,
+            'jenis_kontrak' => 'sewa',
+            'contract_period_months' => 12,
+        ];
+
+        $response = $this->put("/customers/{$customer->id}", $data);
+
+        $response->assertRedirect("/customers/{$customer->id}");
+
+        $customer->refresh();
+        $this->assertSame('98.765.432.1-098.000', $customer->npwp);
+        $this->assertSame('sewa', $customer->customerService->contract_type);
+    }
+
+    /**
+     * Regresi kasus nyata (CID C1X4ARQ000004, Ardiyanto Cahyo Nugroho,
+     * 2026-09-14): customers.tax_percent bisa menyimpang dari
+     * customer_services.ppn begitu pelanggan diverifikasi/diedit admin —
+     * customer_services adalah sumber kebenaran billing sungguhan (dipakai
+     * Detail Pelanggan, lihat show.blade.php baris 14-17), BUKAN kolom
+     * customers. Step 5 Edit dulu prefill dari customers.tax_percent/
+     * discount_amount, jadi buka halaman ini lalu Simpan TANPA sentuh
+     * apa pun diam-diam menimpa PPN/diskon asli dengan angka basi.
+     */
+    public function test_customer_edit_prefills_discount_and_tax_from_customer_service_not_customers_table(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $pop = Pop::create([
+            'code' => 'SMN8',
+            'pop_code' => 'SMN8',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko 8',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $package = InternetPackage::firstOrFail();
+
+        // customers.discount_amount/tax_percent SENGAJA beda dari
+        // customer_services — persis kondisi data Ardiyanto.
+        $customer = Customer::create([
+            'customer_code' => 'C-SMN-000005',
+            'full_name' => 'Divergent Billing Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'internet_package_id' => $package->id,
+            'discount_amount' => 0,
+            'tax_percent' => 11,
+            'status' => 'active',
+        ]);
+
+        $customer->customerService()->create([
+            'internet_package_id' => $package->id,
+            'package_name_snapshot' => $package->name,
+            'monthly_price' => 165000,
+            'discount' => 0,
+            'ppn' => 0,
+            'other_fee' => 11000,
+            'total_monthly_bill' => 165000,
+            'billing_cycle' => 'monthly',
+            'service_status' => 'aktif',
+            'billing_status' => 'active',
+        ]);
+
+        // 1. Halaman edit harus menampilkan PPN 0 (dari customer_services),
+        //    bukan 11 (dari kolom customers yang sudah basi).
+        $editResponse = $this->get("/customers/{$customer->id}/edit");
+        $editResponse->assertStatus(200);
+        $editResponse->assertSee('name="tax_percent" id="tax_percent" oninput="updateLayananBreakdown()" value="0.00"', false);
+
+        // 2. Submit ulang APA ADANYA (simulasi "buka lalu Simpan tanpa ubah
+        //    apa pun") tidak boleh menimpa ppn customer_services jadi 11.
+        $data = [
+            'full_name' => 'Divergent Billing Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'active',
+            'internet_package_id' => $package->id,
+            'contract_period_months' => 12,
+            'discount_amount' => 0,
+            'tax_percent' => 0,
+        ];
+
+        $response = $this->put("/customers/{$customer->id}", $data);
+        $response->assertRedirect("/customers/{$customer->id}");
+
+        $customer->refresh();
+        // Inti pengujian: ppn TETAP 0, bukan diam-diam ketimpa jadi 11 dari
+        // kolom customers yang basi.
+        $this->assertSame('0.00', $customer->customerService->ppn);
+        // total_monthly_bill ikut dihitung ulang dari harga LIVE paket
+        // (bukan snapshot 165000 yang di-set manual di atas) — sengaja tidak
+        // di-hardcode di sini, itu bagian terpisah dari perilaku update()
+        // yang sudah ada sebelumnya, bukan yang diperbaiki task ini.
+        $this->assertSame(number_format((float) $package->monthly_price, 2, '.', ''), $customer->customerService->total_monthly_bill);
+    }
+
+    /**
+     * Regresi (2026-09-14): `total_monthly_bill` WAJIB murni harga+PPN,
+     * TANPA `other_fee` — `GenerateMonthlyInvoicesCommand` (Tagihan Bulanan
+     * sungguhan) tidak pernah baca `other_fee` sama sekali, dan
+     * `InitialInvoiceService` (Tagihan Awal/Registrasi) eksplisit bilang
+     * materai/other_fee "TIDAK PERNAH ikut tagihan bulanan". Dulu update()
+     * malah nge-fold other_fee ke total_monthly_bill (temuan nyata: CID
+     * C1X4ARQ000004).
+     */
+    public function test_customer_edit_total_monthly_bill_excludes_other_fee(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $pop = Pop::create([
+            'code' => 'SMN9',
+            'pop_code' => 'SMN9',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko 9',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $package = InternetPackage::firstOrFail();
+
+        $customer = Customer::create([
+            'customer_code' => 'C-SMN-000006',
+            'full_name' => 'Other Fee Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+        ]);
+
+        $data = [
+            'full_name' => 'Other Fee Name',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+            'internet_package_id' => $package->id,
+            'contract_period_months' => 12,
+            'discount_amount' => 0,
+            'tax_percent' => 0,
+            'other_fee' => 11000,
+        ];
+
+        $response = $this->put("/customers/{$customer->id}", $data);
+        $response->assertRedirect("/customers/{$customer->id}");
+
+        $customer->refresh();
+        $this->assertSame('11000.00', $customer->customerService->other_fee);
+        // total_monthly_bill = harga paket murni, other_fee TIDAK ditambahkan.
+        $this->assertSame(number_format((float) $package->monthly_price, 2, '.', ''), $customer->customerService->total_monthly_bill);
     }
 }

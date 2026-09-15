@@ -461,6 +461,68 @@
                             </div>
                         </div>
 
+                        <!-- Skema 3 (2026-09-12) — ID Sales/Agent/Referral wajib
+                             terisi SAAT REGISTRASI (dulu cuma ada di halaman edit,
+                             jadi sering kelewat & data komisi hilang). -->
+                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3 pt-2">
+                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">3. INFORMASI REFERRAL &amp; AKUISISI</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Menentukan komisi Sales/Agent — isi sesuai siapa yang mendaftarkan pelanggan ini</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div>
+                                <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Sales</label>
+                                {{-- Berbasis is_package_restricted (2026-09-12, koreksi user) — bukan hardcode role 'sales', lihat CustomerController::create() --}}
+                                @if(auth()->user()->role?->is_package_restricted)
+                                    <input type="text" value="{{ auth()->user()->name }} (Anda)" disabled
+                                           class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                    <input type="hidden" name="sales_user_id" value="{{ auth()->id() }}">
+                                @else
+                                    {{-- Actor DI LUAR role yang ditandai "Batasi pilihan paket
+                                         internet" (Skema 1) — ID Sales gak auto-terisi buat dia,
+                                         pilih manual (2026-09-14, permintaan user). --}}
+                                    <p class="text-[10px] text-amber-600 dark:text-amber-400 mb-1.5">
+                                        Auto-deteksi ID Sales cuma berlaku untuk role
+                                        <span class="font-semibold">{{ $restrictedRoleNames->implode(', ') ?: '(belum ada role diatur)' }}</span>.
+                                        Role Anda ({{ auth()->user()->role?->name ?? '—' }}) di luar itu — pilih manual di bawah.
+                                    </p>
+                                    <select name="sales_user_id" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                        <option value="">— Tidak ada —</option>
+                                        @foreach($salesUsers as $salesUser)
+                                            <option value="{{ $salesUser->id }}" {{ old('sales_user_id') == $salesUser->id ? 'selected' : '' }}>{{ $salesUser->name }}</option>
+                                        @endforeach
+                                    </select>
+                                @endif
+                                @error('sales_user_id')<p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
+                            </div>
+
+                            @if($agents->isNotEmpty())
+                            <div>
+                                <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Agent</label>
+                                <select name="agent_id" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="">— Tidak ada —</option>
+                                    @foreach($agents as $agent)
+                                        <option value="{{ $agent->id }}" {{ old('agent_id') == $agent->id ? 'selected' : '' }}>{{ $agent->code }} — {{ $agent->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('agent_id')<p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            @endif
+
+                            <div class="relative" x-data="referralSearch()">
+                                <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Referral Pelanggan</label>
+                                <input type="text" x-model="query" @input.debounce.400ms="search()" placeholder="Cari nama/CID pelanggan existing..."
+                                       class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <input type="hidden" name="referral_customer_id" :value="selectedId">
+                                <ul x-show="results.length > 0" x-cloak class="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto text-xs">
+                                    <template x-for="r in results" :key="r.id">
+                                        <li @click="pick(r)" class="px-3 py-2 hover:bg-sky-50 dark:hover:bg-sky-900/30 cursor-pointer" x-text="r.customer_code + ' — ' + r.full_name"></li>
+                                    </template>
+                                </ul>
+                                @error('referral_customer_id')<p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+
                     </div>
 
                 </div>
@@ -496,6 +558,30 @@
 
 @section('scripts')
 <script>
+    /* Skema 3 (2026-09-12) — autocomplete ID Referral Pelanggan, cari
+       pelanggan existing lewat CID/nama. Nol dependency baru (vanilla fetch
+       + Alpine yang sudah dibundel), pola sama komponen Alpine lain di app. */
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('referralSearch', () => ({
+            query: '',
+            results: [],
+            selectedId: '{{ old('referral_customer_id') }}',
+            async search() {
+                if (this.query.length < 2) {
+                    this.results = [];
+                    return;
+                }
+                const res = await fetch(`{{ route('customers.search-referral') }}?q=${encodeURIComponent(this.query)}`);
+                this.results = res.ok ? await res.json() : [];
+            },
+            pick(r) {
+                this.selectedId = r.id;
+                this.query = r.customer_code + ' — ' + r.full_name;
+                this.results = [];
+            },
+        }));
+    });
+
     /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;
     const totalStepsCount = 2;

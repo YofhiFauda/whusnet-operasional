@@ -18,6 +18,8 @@ class AuthTest extends TestCase
         $response->assertSee('Login - Whusnet Billing');
         $response->assertSee('WHUS');
         $response->assertSee('NET');
+        $response->assertSee('showPassword', false);
+        $response->assertSee('Tampilkan / sembunyikan kata sandi', false);
     }
 
     public function test_user_can_login_with_valid_credentials(): void

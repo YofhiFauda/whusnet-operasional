@@ -2,7 +2,7 @@
 <?php $__env->startSection('page_title', 'Dashboard Analytics NOC'); ?>
 
 <?php $__env->startSection('content'); ?>
-<div class="space-y-6 max-w-7xl mx-auto pb-12" x-data="nocDashboardHandler()">
+<div class="space-y-6 max-w-8xl mx-auto pb-12" x-data="nocDashboardHandler()">
 
     
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border border-border rounded-xl p-5 shadow-xs">
@@ -123,7 +123,10 @@
                 </div>
             </div>
             <p class="text-2xl font-black mt-2 text-text-main font-mono"><?php echo e(number_format($stats['total_ticket'])); ?></p>
-            <p class="text-[10px] text-text-muted mt-1">Pada periode terpilih</p>
+            <p class="text-[10px] text-text-muted mt-1 flex items-center gap-1.5">
+                <span>Pada periode terpilih</span>
+                <?php echo $__env->make('noc.partials.delta-badge', ['delta' => $deltaStats['total_ticket'] ?? null], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+            </p>
             <div class="h-1 w-full bg-sky-500/20 rounded-full mt-3 overflow-hidden">
                 <div class="h-full bg-sky-500 rounded-full w-full"></div>
             </div>
@@ -140,8 +143,9 @@
                 </div>
             </div>
             <p class="text-2xl font-black mt-2 text-emerald-600 dark:text-emerald-400 font-mono"><?php echo e(number_format($stats['ticket_selesai'])); ?></p>
-            <p class="text-[10px] text-text-muted mt-1">
-                <?php echo e($stats['total_ticket'] > 0 ? round(($stats['ticket_selesai'] / $stats['total_ticket']) * 100, 1) : 0); ?>% dari total tiket
+            <p class="text-[10px] text-text-muted mt-1 flex items-center gap-1.5 flex-wrap">
+                <span><?php echo e($stats['total_ticket'] > 0 ? round(($stats['ticket_selesai'] / $stats['total_ticket']) * 100, 1) : 0); ?>% dari total tiket</span>
+                <?php echo $__env->make('noc.partials.delta-badge', ['delta' => $deltaStats['ticket_selesai'] ?? null], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </p>
             <div class="h-1 w-full bg-emerald-500/20 rounded-full mt-3 overflow-hidden">
                 <div class="h-full bg-emerald-500 rounded-full" style="width: <?php echo e($stats['total_ticket'] > 0 ? ($stats['ticket_selesai'] / $stats['total_ticket']) * 100 : 0); ?>%"></div>
@@ -159,8 +163,9 @@
                 </div>
             </div>
             <p class="text-2xl font-black mt-2 text-indigo-600 dark:text-indigo-400 font-mono"><?php echo e(number_format($stats['ticket_assign_fop'])); ?></p>
-            <p class="text-[10px] text-text-muted mt-1">
-                <?php echo e($stats['total_ticket'] > 0 ? round(($stats['ticket_assign_fop'] / $stats['total_ticket']) * 100, 1) : 0); ?>% eskalasi lapangan
+            <p class="text-[10px] text-text-muted mt-1 flex items-center gap-1.5 flex-wrap">
+                <span><?php echo e($stats['total_ticket'] > 0 ? round(($stats['ticket_assign_fop'] / $stats['total_ticket']) * 100, 1) : 0); ?>% eskalasi lapangan</span>
+                <?php echo $__env->make('noc.partials.delta-badge', ['delta' => $deltaStats['ticket_assign_fop'] ?? null], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </p>
             <div class="h-1 w-full bg-indigo-500/20 rounded-full mt-3 overflow-hidden">
                 <div class="h-full bg-indigo-500 rounded-full" style="width: <?php echo e($stats['total_ticket'] > 0 ? ($stats['ticket_assign_fop'] / $stats['total_ticket']) * 100 : 0); ?>%"></div>
@@ -178,8 +183,10 @@
                 </div>
             </div>
             <p class="text-2xl font-black mt-2 text-rose-600 dark:text-rose-400 font-mono"><?php echo e(number_format($stats['ticket_dibatalkan'])); ?></p>
-            <p class="text-[10px] text-text-muted mt-1">
-                <?php echo e($stats['total_ticket'] > 0 ? round(($stats['ticket_dibatalkan'] / $stats['total_ticket']) * 100, 1) : 0); ?>% dibatalkan
+            <p class="text-[10px] text-text-muted mt-1 flex items-center gap-1.5 flex-wrap">
+                <span><?php echo e($stats['total_ticket'] > 0 ? round(($stats['ticket_dibatalkan'] / $stats['total_ticket']) * 100, 1) : 0); ?>% dibatalkan</span>
+                
+                <?php echo $__env->make('noc.partials.delta-badge', ['delta' => $deltaStats['ticket_dibatalkan'] ?? null, 'invert' => true], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </p>
             <div class="h-1 w-full bg-rose-500/20 rounded-full mt-3 overflow-hidden">
                 <div class="h-full bg-rose-500 rounded-full" style="width: <?php echo e($stats['total_ticket'] > 0 ? ($stats['ticket_dibatalkan'] / $stats['total_ticket']) * 100 : 0); ?>%"></div>
@@ -276,52 +283,17 @@
                     <p class="text-[11px] text-text-muted mt-0.5">Pemetaan konsentrasi keluhan untuk deteksi dini daerah bermasalah.</p>
                 </div>
                 <span class="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20">
-                    HEATMAP MATRIKS
+                    STACKED BAR
                 </span>
             </div>
 
-            <div class="p-4 overflow-x-auto">
+            <div class="p-4">
                 <?php if(count($trendMatrix['regions']) > 0 && count($trendMatrix['issues']) > 0): ?>
-                    <table class="w-full text-xs text-left border-collapse">
-                        <thead>
-                            <tr class="border-b border-border">
-                                <th class="p-2.5 font-extrabold text-text-muted uppercase text-[10px] bg-slate-50/50 dark:bg-slate-900/50 rounded-tl-lg">Daerah / POP</th>
-                                <?php $__currentLoopData = $trendMatrix['issues']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $issueName): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                    <th class="p-2.5 font-extrabold text-text-muted uppercase text-[10px] text-center max-w-[120px] truncate" title="<?php echo e($issueName); ?>">
-                                        <?php echo e($issueName); ?>
-
-                                    </th>
-                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border/60">
-                            <?php $__currentLoopData = $trendMatrix['regions']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $regionName): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-900/30 transition-colors">
-                                    <td class="p-2.5 font-bold text-text-main truncate max-w-[180px]" title="<?php echo e($regionName); ?>">
-                                        <?php echo e($regionName); ?>
-
-                                    </td>
-                                    <?php $__currentLoopData = $trendMatrix['issues']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $issueName): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                        <?php
-                                            $cnt = $trendMatrix['matrix'][$regionName][$issueName] ?? 0;
-                                            $maxC = max(1, $trendMatrix['maxCount']);
-                                            $ratio = $cnt / $maxC;
-                                        ?>
-                                        <td class="p-2 text-center">
-                                            <?php if($cnt > 0): ?>
-                                                <span class="inline-block px-2.5 py-1 rounded-md font-mono font-bold text-xs transition-transform hover:scale-105 <?php echo e($ratio >= 0.7 ? 'bg-rose-500 text-white shadow-xs' : ($ratio >= 0.35 ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30' : 'bg-slate-100 dark:bg-slate-800 text-text-main')); ?>">
-                                                    <?php echo e($cnt); ?>
-
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="text-text-muted/40 font-mono text-[11px]">-</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                </tr>
-                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                        </tbody>
-                    </table>
+                    
+                    <div class="h-72">
+                        <canvas id="chart-trend-matrix"></canvas>
+                    </div>
+                    <script type="application/json" id="data-trend-matrix"><?php echo json_encode($trendMatrix, 15, 512) ?></script>
                 <?php else: ?>
                     <div class="py-8 text-center text-xs text-text-muted">Tidak cukup data untuk menampilkan matriks tren issue daerah.</div>
                 <?php endif; ?>
@@ -329,6 +301,229 @@
         </div>
 
     </div>
+
+    
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        
+        <div id="daily-trend-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs lg:col-span-2">
+            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
+                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+                    Tren Harian Volume Tiket
+                </h2>
+                <p class="text-[11px] text-text-muted mt-0.5">Masuk vs selesai vs dibatalkan, maks. 60 hari terakhir dari rentang terpilih.</p>
+            </div>
+            <div class="p-4">
+                <div class="h-64">
+                    <canvas id="chart-daily-trend"></canvas>
+                </div>
+                <script type="application/json" id="data-daily-trend"><?php echo json_encode($dailyTrend, 15, 512) ?></script>
+            </div>
+        </div>
+
+        
+        <div id="sla-compliance-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs flex flex-col">
+            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
+                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    SLA Compliance
+                </h2>
+                <p class="text-[11px] text-text-muted mt-0.5">Dari <?php echo e($slaCompliance['total']); ?> tiket resolved berSLA.</p>
+            </div>
+            <div class="p-4 flex-1 flex flex-col items-center justify-center">
+                <?php if($slaCompliance['total'] > 0): ?>
+                    <canvas id="chart-sla-compliance" width="180" height="180"></canvas>
+                    <script type="application/json" id="data-sla-compliance"><?php echo json_encode($slaCompliance, 15, 512) ?></script>
+                    <p class="text-2xl font-black mt-3 <?php echo e($slaCompliance['ontime_pct'] >= 80 ? 'text-emerald-600 dark:text-emerald-400' : ($slaCompliance['ontime_pct'] >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')); ?> font-mono">
+                        <?php echo e($slaCompliance['ontime_pct']); ?>%
+                    </p>
+                    <p class="text-[10px] text-text-muted">On-time (<?php echo e($slaCompliance['ontime']); ?> dari <?php echo e($slaCompliance['total']); ?>)</p>
+                <?php else: ?>
+                    <div class="py-8 text-center text-xs text-text-muted">Belum ada tiket resolved ber-SLA pada periode ini.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        
+        <div id="aging-buckets-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs lg:col-span-3">
+            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
+                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Distribusi Aging Tiket Aktif NOC
+                </h2>
+                <p class="text-[11px] text-text-muted mt-0.5">Seluruh antrean handler=NOC berstatus terbuka, bukan cuma yang tampil di list di bawah.</p>
+            </div>
+            <div class="p-4">
+                <div class="h-40">
+                    <canvas id="chart-aging-buckets"></canvas>
+                </div>
+                <script type="application/json" id="data-aging-buckets"><?php echo json_encode($agingBuckets, 15, 512) ?></script>
+            </div>
+        </div>
+
+    </div>
+
+    
+    <div class="space-y-6">
+
+        
+        <div id="monthly-complaint-region-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
+                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                    Tren Bulanan Komplain per Daerah (Semua POP)
+                </h2>
+                <p class="text-[11px] text-text-muted mt-0.5">
+                    12 bulan terakhir, lintas semua POP dalam scope Anda — dipakai buat cari daerah paling sering komplain, tidak terikat filter periode/POP di atas.
+                    "Komplain" = Ticket Maintenance (<?php echo e($monthlyComplaintTrend['total']); ?> tiket).
+                </p>
+            </div>
+            <div class="p-4">
+                <div class="h-80">
+                    <canvas id="chart-monthly-complaint-region"></canvas>
+                </div>
+                <script type="application/json" id="data-monthly-complaint"><?php echo json_encode($monthlyComplaintTrend, 15, 512) ?></script>
+            </div>
+        </div>
+
+        
+        <div id="monthly-complaint-issue-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
+                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Tren Bulanan Komplain per Kategori Issue (Semua POP)
+                </h2>
+                <p class="text-[11px] text-text-muted mt-0.5">
+                    Komplainnya soal apa saja tiap bulan — top 5 kategori + Lainnya, sumber sama dengan chart daerah di atas.
+                </p>
+            </div>
+            <div class="p-4">
+                <div class="h-80">
+                    <canvas id="chart-monthly-complaint-issue"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    
+    <div id="per-pop-analytics-container">
+        <?php if(count($perPopAnalytics) > 0): ?>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                <h2 class="text-xs font-black uppercase tracking-wider text-text-main">Performa &amp; Analisa per POP</h2>
+            </div>
+            <script type="application/json" id="data-per-pop-analytics"><?php echo json_encode($perPopAnalytics, 15, 512) ?></script>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <?php $__currentLoopData = $perPopAnalytics; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $pop): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+                        <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
+                            <h3 class="text-xs font-black uppercase tracking-wider text-text-main"><?php echo e($pop['pop_name']); ?></h3>
+                            <p class="text-[11px] text-text-muted mt-0.5">Jumlah Komplain (bar) vs Total Pelanggan (garis) — 12 bulan terakhir.</p>
+                        </div>
+                        <div class="p-4">
+                            <div class="h-64">
+                                <canvas id="chart-pop-<?php echo e($pop['pop_id']); ?>"></canvas>
+                            </div>
+                        </div>
+                        <div class="px-5 py-3.5 border-t border-border bg-indigo-500/5">
+                            <p class="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Analisa</p>
+                            <p class="text-xs text-text-main leading-relaxed"><?php echo e($pop['analysis']); ?></p>
+                        </div>
+                    </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    
+    <?php if($canViewPerformance): ?>
+        <div id="leaderboard-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
+                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
+                    <svg class="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Leaderboard Performa Individu
+                </h2>
+                <p class="text-[11px] text-text-muted mt-0.5">Diukur dari riwayat tiket (ticket_histories) per aktor — satu tiket bisa dipegang lebih dari satu orang, jadi atribusinya per aksi, bukan per tiket.</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border">
+                
+                <div class="p-4">
+                    <h3 class="text-[11px] font-extrabold uppercase text-sky-600 dark:text-sky-400 mb-2 flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Helpdesk
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs text-left">
+                            <thead>
+                                <tr class="border-b border-border text-[10px] uppercase text-text-muted font-extrabold">
+                                    <th class="py-2 pr-2">Nama</th>
+                                    <th class="py-2 px-2 text-center">Selesai</th>
+                                    <th class="py-2 px-2 text-center">Eskalasi NOC</th>
+                                    <th class="py-2 px-2 text-center">Avg. Durasi</th>
+                                    <th class="py-2 pl-2 text-center">SLA Breach</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border/60">
+                                <?php $__empty_1 = true; $__currentLoopData = $leaderboard['helpdesk']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                                    <tr>
+                                        <td class="py-2 pr-2 font-bold text-text-main truncate max-w-[140px]"><?php echo e($row['name']); ?></td>
+                                        <td class="py-2 px-2 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400"><?php echo e($row['jumlah_selesai']); ?></td>
+                                        <td class="py-2 px-2 text-center font-mono"><?php echo e($row['jumlah_eskalasi_noc']); ?></td>
+                                        <td class="py-2 px-2 text-center font-mono text-text-muted">
+                                            <?php echo e($row['avg_durasi_menit'] !== null ? ($row['avg_durasi_menit'] < 60 ? $row['avg_durasi_menit'].'m' : intdiv($row['avg_durasi_menit'], 60).'j '.($row['avg_durasi_menit'] % 60).'m') : '-'); ?>
+
+                                        </td>
+                                        <td class="py-2 pl-2 text-center font-mono <?php echo e($row['sla_breach_count'] > 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-text-muted'); ?>"><?php echo e($row['sla_breach_count']); ?></td>
+                                    </tr>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                                    <tr><td colspan="5" class="py-6 text-center text-text-muted">Belum ada data pada periode ini.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                
+                <div class="p-4">
+                    <h3 class="text-[11px] font-extrabold uppercase text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> NOC
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs text-left">
+                            <thead>
+                                <tr class="border-b border-border text-[10px] uppercase text-text-muted font-extrabold">
+                                    <th class="py-2 pr-2">Nama</th>
+                                    <th class="py-2 px-2 text-center">Selesai</th>
+                                    <th class="py-2 px-2 text-center">Eskalasi FOP</th>
+                                    <th class="py-2 px-2 text-center">Avg. Durasi</th>
+                                    <th class="py-2 pl-2 text-center">SLA Breach</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border/60">
+                                <?php $__empty_1 = true; $__currentLoopData = $leaderboard['noc']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                                    <tr>
+                                        <td class="py-2 pr-2 font-bold text-text-main truncate max-w-[140px]"><?php echo e($row['name']); ?></td>
+                                        <td class="py-2 px-2 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400"><?php echo e($row['jumlah_selesai']); ?></td>
+                                        <td class="py-2 px-2 text-center font-mono"><?php echo e($row['jumlah_eskalasi_fop']); ?></td>
+                                        <td class="py-2 px-2 text-center font-mono text-text-muted">
+                                            <?php echo e($row['avg_durasi_menit'] !== null ? ($row['avg_durasi_menit'] < 60 ? $row['avg_durasi_menit'].'m' : intdiv($row['avg_durasi_menit'], 60).'j '.($row['avg_durasi_menit'] % 60).'m') : '-'); ?>
+
+                                        </td>
+                                        <td class="py-2 pl-2 text-center font-mono <?php echo e($row['sla_breach_count'] > 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-text-muted'); ?>"><?php echo e($row['sla_breach_count']); ?></td>
+                                    </tr>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                                    <tr><td colspan="5" class="py-6 text-center text-text-muted">Belum ada data pada periode ini.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
     
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -362,7 +557,7 @@
                         }
                     ?>
                     <div class="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-900/40 transition-colors cursor-pointer"
-                         onclick="window.dispatchEvent(new CustomEvent('open-ticket-drawer', { detail: { ticketId: <?php echo e($ticket->id); ?> } }))">
+                         onclick="window.dispatchEvent(new CustomEvent('open-ticket-drawer', { detail: { id: <?php echo e($ticket->id); ?> } }))">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2 text-xs flex-wrap">
                                 <span class="font-mono font-bold text-sky-600 dark:text-sky-400">#<?php echo e($ticket->ticket_number); ?></span>
@@ -459,6 +654,7 @@
                 if (window.initNocDashboardEcho) {
                     window.initNocDashboardEcho();
                 }
+                window.nocDashboardRenderCharts && window.nocDashboardRenderCharts();
             }
         };
     }
@@ -466,6 +662,243 @@
     (function () {
         const allowedPopIds = <?php echo json_encode($allowedPopIds ?? [], 15, 512) ?>;
         let refreshing = false;
+
+        // Registry chart instance aktif, biar bisa di-destroy sebelum
+        // digambar ulang — Chart.js gak auto-replace kalau canvas yang sama
+        // dipakai instance baru tanpa destroy() dulu (numpuk/leak memory,
+        // apalagi canvas ini innerHTML-nya diganti tiap refetchAndSwap()).
+        const chartInstances = {};
+
+        function readJsonData(id) {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            try {
+                return JSON.parse(el.textContent);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function renderCharts() {
+            if (typeof window.Chart === 'undefined') return;
+
+            Object.keys(chartInstances).forEach(key => {
+                chartInstances[key]?.destroy();
+                delete chartInstances[key];
+            });
+
+            // Palet dipakai berdampingan sama linePalette (tren bulanan) —
+            // beda variabel karena disini series-nya "issues" (index tetap,
+            // dari $trendMatrix['issues']), bukan top-N+Lainnya dinamis.
+            const stackedBarPalette = ['#0ea5e9', '#f59e0b', '#8b5cf6', '#10b981', '#f43f5e', '#94a3b8'];
+
+            const trendMatrixData = readJsonData('data-trend-matrix');
+            const trendMatrixCanvas = document.getElementById('chart-trend-matrix');
+            if (trendMatrixData && trendMatrixCanvas) {
+                const datasets = trendMatrixData.issues.map((issueName, i) => ({
+                    label: issueName,
+                    data: trendMatrixData.regions.map(regionName => trendMatrixData.matrix[regionName]?.[issueName] ?? 0),
+                    backgroundColor: stackedBarPalette[i % stackedBarPalette.length],
+                    stack: 'hotspot',
+                }));
+
+                chartInstances.trendMatrix = new Chart(trendMatrixCanvas, {
+                    type: 'bar',
+                    data: { labels: trendMatrixData.regions, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                        scales: {
+                            x: { stacked: true, ticks: { font: { size: 10 } } },
+                            y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+                        },
+                    },
+                });
+            }
+
+            const trend = readJsonData('data-daily-trend');
+            const trendCanvas = document.getElementById('chart-daily-trend');
+            if (trend && trendCanvas) {
+                chartInstances.trend = new Chart(trendCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: trend.labels,
+                        datasets: [
+                            { label: 'Masuk', data: trend.masuk, borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,0.1)', tension: 0.3, fill: true },
+                            { label: 'Selesai', data: trend.selesai, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3, fill: true },
+                            { label: 'Dibatalkan', data: trend.dibatalkan, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.1)', tension: 0.3, fill: true },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+                            x: { ticks: { font: { size: 10 } } },
+                        },
+                    },
+                });
+            }
+
+            const sla = readJsonData('data-sla-compliance');
+            const slaCanvas = document.getElementById('chart-sla-compliance');
+            if (sla && slaCanvas && sla.total > 0) {
+                chartInstances.sla = new Chart(slaCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['On-time', 'Breach'],
+                        datasets: [{ data: [sla.ontime, sla.breach], backgroundColor: ['#10b981', '#f43f5e'], borderWidth: 0 }],
+                    },
+                    options: {
+                        responsive: false,
+                        cutout: '72%',
+                        plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                    },
+                });
+            }
+
+            const aging = readJsonData('data-aging-buckets');
+            const agingCanvas = document.getElementById('chart-aging-buckets');
+            if (aging && agingCanvas) {
+                chartInstances.aging = new Chart(agingCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: ['0-8 Jam', '8-24 Jam', '> 24 Jam'],
+                        datasets: [{
+                            label: 'Jumlah Tiket',
+                            data: [aging['0_8'], aging['8_24'], aging['24_plus']],
+                            backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'],
+                            borderRadius: 6,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+                            // autoSkip:false WAJIB — cuma 3 kategori, tapi
+                            // Chart.js tetap nge-skip tick tengah ("8-24 Jam")
+                            // kalau area canvas dianggap kurang tinggi (kejadian
+                            // nyata sebelum canvas dikasih wrapper h-40 di atas).
+                            y: { ticks: { font: { size: 12 }, autoSkip: false } },
+                        },
+                    },
+                });
+            }
+
+            // Palet tetap buat bar chart tren komplain bulanan — "Lainnya"
+            // SELALU abu-abu, biar warna kategori top-5 konsisten dipakai
+            // kedua chart (daerah & issue) walau namanya beda.
+            const barPalette = ['#0ea5e9', '#f59e0b', '#8b5cf6', '#10b981', '#f43f5e'];
+
+            function renderMonthlyTrendChart(canvasId, labels, seriesObj) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas || !seriesObj) return null;
+
+                const seriesNames = Object.keys(seriesObj);
+                const datasets = seriesNames.map((name, i) => ({
+                    label: name,
+                    data: seriesObj[name],
+                    backgroundColor: name === 'Lainnya' ? '#94a3b8' : barPalette[i % barPalette.length],
+                    // TANPA stack — grouped bar (bar berdampingan per bulan),
+                    // biar satu daerah/issue spesifik gampang dibandingkan
+                    // antar bulan (beda kebutuhan dari Tren Matriks yang
+                    // stacked, itu buat lihat TOTAL per daerah).
+                }));
+
+                return new Chart(canvas, {
+                    type: 'bar',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                        scales: {
+                            x: { ticks: { font: { size: 10 } } },
+                            y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+                        },
+                    },
+                });
+            }
+
+            const monthlyComplaint = readJsonData('data-monthly-complaint');
+            if (monthlyComplaint) {
+                chartInstances.monthlyComplaintRegion = renderMonthlyTrendChart(
+                    'chart-monthly-complaint-region', monthlyComplaint.labels, monthlyComplaint.by_region?.series
+                );
+                chartInstances.monthlyComplaintIssue = renderMonthlyTrendChart(
+                    'chart-monthly-complaint-issue', monthlyComplaint.labels, monthlyComplaint.by_issue?.series
+                );
+            }
+
+            // Card per-POP: combo Bar (Jumlah Komplain) + Line (Total
+            // Pelanggan) dual-axis — skalanya beda jauh (komplain puluhan,
+            // pelanggan ribuan), jadi WAJIB sumbu Y terpisah kiri/kanan,
+            // bukan satu sumbu (garis pelanggan bakal keliatan flat kalau
+            // dipaksa satu skala sama bar komplain).
+            const perPopAnalytics = readJsonData('data-per-pop-analytics');
+            if (perPopAnalytics) {
+                perPopAnalytics.forEach(pop => {
+                    const canvas = document.getElementById(`chart-pop-${pop.pop_id}`);
+                    if (!canvas) return;
+
+                    chartInstances[`pop${pop.pop_id}`] = new Chart(canvas, {
+                        data: {
+                            labels: pop.labels,
+                            datasets: [
+                                {
+                                    type: 'bar',
+                                    label: 'Jumlah Komplain',
+                                    data: pop.complaints,
+                                    backgroundColor: '#f43f5e',
+                                    yAxisID: 'yComplaint',
+                                    order: 2,
+                                },
+                                {
+                                    type: 'line',
+                                    label: 'Total Pelanggan',
+                                    data: pop.customers,
+                                    borderColor: '#0ea5e9',
+                                    backgroundColor: '#0ea5e9',
+                                    tension: 0.3,
+                                    pointRadius: 2,
+                                    yAxisID: 'yCustomer',
+                                    order: 1,
+                                },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                            scales: {
+                                x: { ticks: { font: { size: 10 } } },
+                                yComplaint: {
+                                    position: 'left', beginAtZero: true,
+                                    title: { display: true, text: 'Komplain', font: { size: 10 } },
+                                    ticks: { precision: 0, font: { size: 10 } },
+                                },
+                                yCustomer: {
+                                    position: 'right', beginAtZero: true,
+                                    title: { display: true, text: 'Pelanggan', font: { size: 10 } },
+                                    grid: { drawOnChartArea: false },
+                                    ticks: { precision: 0, font: { size: 10 } },
+                                },
+                            },
+                        },
+                    });
+                });
+            }
+        }
+
+        window.nocDashboardRenderCharts = renderCharts;
 
         async function refetchAndSwap() {
             if (refreshing) return;
@@ -477,11 +910,18 @@
                 const html = await res.text();
                 const doc = new DOMParser().parseFromString(html, 'text/html');
 
-                ['stat-cards-container', 'region-stats-container', 'issue-stats-container', 'trend-matrix-container', 'active-tickets-container', 'activity-feed-container'].forEach(id => {
+                [
+                    'stat-cards-container', 'region-stats-container', 'issue-stats-container',
+                    'trend-matrix-container', 'daily-trend-container', 'sla-compliance-container',
+                    'aging-buckets-container', 'monthly-complaint-region-container', 'monthly-complaint-issue-container',
+                    'per-pop-analytics-container', 'leaderboard-container', 'active-tickets-container', 'activity-feed-container',
+                ].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
                     if (el && newEl) el.innerHTML = newEl.innerHTML;
                 });
+
+                renderCharts();
             } catch (e) {
                 // Silently handle error
             } finally {

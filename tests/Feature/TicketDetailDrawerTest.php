@@ -293,6 +293,30 @@ class TicketDetailDrawerTest extends TestCase
         $this->assertStringContainsString('openDetail('.$ticket->id.')', $row[0]);
     }
 
+    /**
+     * Bug nyata (laporan user, browser console): klik baris "Tiket Aktif NOC"
+     * di NOC Dashboard nembak `GET /api/tickets/undefined/detail` (404) —
+     * `noc/dashboard.blade.php` dispatch `open-ticket-drawer` dengan payload
+     * `{ ticketId: ... }`, padahal `detail-drawer.blade.php` (dipakai bareng
+     * halaman ini) dengerin `$event.detail.id` (key `id`, BUKAN `ticketId`).
+     * Drawer selalu buka dengan id undefined, gak peduli tiket mana yang
+     * diklik. Fix: nama key disamain ke `id`.
+     */
+    public function test_noc_dashboard_ticket_row_dispatches_id_key_matching_drawer_listener(): void
+    {
+        $ticket = $this->submitTicket();
+
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
+            ->assertRedirect();
+
+        $response = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
+
+        $response->assertOk();
+        $response->assertSee("{ id: {$ticket->id} }", false);
+        $response->assertDontSee('ticketId:', false);
+    }
+
     private function submitTicket(): Ticket
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), [

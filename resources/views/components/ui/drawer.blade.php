@@ -29,7 +29,7 @@
     aria-labelledby="slide-over-title" role="dialog" aria-modal="true"
 >
     <!-- Overlay -->
-    <div x-show="show" x-transition.opacity class="fixed inset-0 top-16 bg-text-main/50 transition-opacity"></div>
+    <div x-show="show" x-transition.opacity class="fixed inset-0 top-16 bg-slate-900/50 dark:bg-slate-950/75 backdrop-blur-xs transition-opacity"></div>
 
     <div class="fixed inset-0 top-16 overflow-hidden">
         <div class="absolute inset-0 overflow-hidden">

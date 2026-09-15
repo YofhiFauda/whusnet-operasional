@@ -18,9 +18,14 @@
 
     $discountedPrice = max(0, $monthlyPrice - $discount);
     $ppnAmount       = round($discountedPrice * ($ppnPercent / 100), 2);
+    // $otherFee SENGAJA TIDAK ikut $totalBill (2026-09-14) — Tagihan Bulanan
+    // murni harga+PPN, sama seperti GenerateMonthlyInvoicesCommand &
+    // CustomerController::store()/update(). $otherFee (materai dkk) cuma
+    // sekali di Tagihan Awal/Registrasi, ditampilkan terpisah di breakdown
+    // di bawah (tab Billing), bukan ditambah ke total di sini.
     $totalBill       = $customer->customerService
         ? (float)$customer->customerService->total_monthly_bill
-        : ($discountedPrice + $ppnAmount + $otherFee);
+        : ($discountedPrice + $ppnAmount);
 
     $isActive = in_array($customer->status, ['active', 'suspended']) || $customer->data_completeness_status === 'siap_billing';
 @endphp
@@ -495,15 +500,16 @@
                 <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">ID SALES</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->sales_code ?? '-' }}</span>
+                        {{-- Skema 3 (2026-09-12) — FK jadi sumber utama, kode lama (varchar) fallback data legacy. --}}
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->salesUser?->name ?? $customer->sales_code ?? '-' }}</span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">KODE AGENT</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->agent_code ?? '-' }}</span>
+                        <span class="block text-[9px] font-bold text-slate-400 uppercase">AGENT</span>
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->agent?->name ?? $customer->agent_code ?? '-' }}</span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">REFERRAL PELANGGAN</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->referral_customer_code ?? '-' }}</span>
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->referralCustomer?->full_name ?? $customer->referral_customer_code ?? '-' }}</span>
                     </div>
                 </div>
             </div>
@@ -663,6 +669,75 @@
                     @else
                     <div class="p-4 text-center text-slate-400">
                         Belum ada paket internet yang terpilih.
+                    </div>
+                    @endif
+
+                    @if($customer->customerService && auth()->user()->hasPermission('customers.detail.packages.change'))
+                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30" x-data="{ gantiPaketOpen: false }">
+                        <div class="flex items-center justify-between">
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
+                            <template x-if="!gantiPaketOpen">
+                                <button type="button" @click="gantiPaketOpen = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
+                            </template>
+                        </div>
+                        <template x-if="gantiPaketOpen">
+                            <form action="{{ route('customers.package.update', $customer) }}" method="POST" class="mt-3 flex flex-col sm:flex-row gap-2">
+                                @csrf
+                                @method('PUT')
+                                <select name="internet_package_id" required class="flex-1 text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                    <option value="">Pilih paket baru...</option>
+                                    @foreach($availablePackages as $package)
+                                    <option value="{{ $package->id }}" @selected($customer->customerService->internet_package_id === $package->id)>{{ $package->name }} — {{ $package->download_speed_mbps }}/{{ $package->upload_speed_mbps }} Mbps — Rp {{ number_format((float) $package->monthly_price, 0, ',', '.') }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Simpan</button>
+                                    <button type="button" @click="gantiPaketOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                </div>
+                            </form>
+                        </template>
+                        <p class="text-[10px] text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
+                    </div>
+                    @endif
+
+                    {{-- Putus Langganan — inline toggle Alpine di halaman Detail miliknya
+                         sendiri (bukan modal, bukan halaman baru), sama pola dengan
+                         "Ganti Paket" di atas. Sebelumnya tombol "Putus Langganan" di
+                         Quick Hub List cuma window.location ke '#terminate' tanpa ada
+                         elemen id="terminate" sama sekali di sini — link mati, form
+                         terminasi gak pernah dirender. x-init di bawah baca hash URL
+                         DAN $errors->has('reason') (kalau validasi server gagal, biar
+                         panelnya otomatis kebuka lagi pas redirect back). --}}
+                    @if($customer->customerService && auth()->user()->hasPermission('customers.deactivate') && in_array($customer->status, ['active', 'suspended'], true))
+                    <div id="terminate" class="border border-rose-200 dark:border-rose-900/40 rounded-lg p-4 bg-rose-50/40 dark:bg-rose-950/20"
+                         x-data="{ terminateOpen: {{ $errors->has('reason') ? 'true' : 'false' }} }"
+                         x-init="if (window.location.hash === '#terminate' || terminateOpen) {
+                            terminateOpen = true;
+                            switchTab('paket-layanan');
+                            $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+                         }">
+                        <div class="flex items-center justify-between">
+                            <span class="block text-[9px] font-bold text-rose-500 uppercase tracking-wider">PUTUS LANGGANAN</span>
+                            <template x-if="!terminateOpen">
+                                <button type="button" @click="terminateOpen = true" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400">Putus Langganan</button>
+                            </template>
+                        </div>
+                        <template x-if="terminateOpen">
+                            <form action="{{ route('customers.terminate', $customer) }}" method="POST" class="mt-3 space-y-2"
+                                  onsubmit="event.preventDefault(); window.confirmDelete('Yakin memutuskan langganan pelanggan {{ $customer->full_name }}? Layanan akan dihentikan permanen dan tidak bisa diaktifkan lagi lewat toggle Isolir.', this);">
+                                @csrf
+                                <textarea name="reason" rows="2" required maxlength="500" placeholder="Alasan pemutusan langganan (wajib diisi)..."
+                                          class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">{{ old('reason') }}</textarea>
+                                @error('reason')
+                                    <p class="text-[11px] text-rose-600">{{ $message }}</p>
+                                @enderror
+                                <div class="flex gap-2">
+                                    <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Putuskan Langganan</button>
+                                    <button type="button" @click="terminateOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                </div>
+                            </form>
+                        </template>
+                        <p class="text-[10px] text-rose-500/80 mt-2" x-show="terminateOpen" x-cloak>Tindakan permanen — status pelanggan jadi Terminated/Berhenti. Beda dengan Isolir yang masih bisa diaktifkan kembali.</p>
                     </div>
                     @endif
 

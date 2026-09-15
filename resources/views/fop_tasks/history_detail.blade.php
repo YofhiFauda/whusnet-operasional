@@ -258,6 +258,35 @@
             </div>
         </div>
 
+        {{--
+            Pelanggan Terdampak — tiket batch (kategori is_batch, mis. ODP
+            LOS). Grid "Data Pelanggan" di atas mubazir buat kasus ini (gak
+            ada satu pelanggan yang diacu, kolomnya dash semua) — FOP yang
+            buka Detail Task dari papan WAJIB lihat daftar SEMUA pelanggan
+            terdampak di sini, sama kayak teknisi di tasks/show.blade.php
+            (Ticket::isBatch()/batchMembers()).
+        --}}
+        @if($ticket->isBatch())
+        <div class="px-4 pb-4">
+            <p class="text-[10px] font-semibold text-violet-500 dark:text-violet-400 uppercase tracking-wider font-ui mb-2">
+                Pelanggan Terdampak ({{ $ticket->batchMembers->count() }})
+            </p>
+            @if($ticket->batchMembers->isEmpty())
+                <p class="text-[11px] text-amber-600 dark:text-amber-400 font-ui">Belum ada pelanggan terdampak dicatat — cek halaman Worksheet Helpdesk.</p>
+            @else
+            <div class="border border-violet-200 dark:border-violet-800/50 bg-violet-50/60 dark:bg-violet-900/10 rounded p-3 space-y-1.5">
+                @foreach($ticket->batchMembers as $member)
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-ui">
+                    <span class="font-bold text-slate-800 dark:text-slate-200">{{ $member->customer_name }}</span>
+                    <span class="font-mono text-slate-500 dark:text-slate-400">{{ $member->cid ?: '—' }}</span>
+                    <span class="font-mono text-slate-500 dark:text-slate-400">{{ $member->phone ?: '—' }}</span>
+                </div>
+                @endforeach
+            </div>
+            @endif
+        </div>
+        @endif
+
         {{-- Issue/Gangguan & Catatan Teknis — dipisah jadi 2 blok utuh sendiri
              (bukan berbagi 1 baris grid), masing-masing sumbernya beda dan
              gak boleh ketuker: Issue/Gangguan dari $ticket->detail_keluhan
@@ -507,8 +536,20 @@
             @else
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan pemasangan.</p>
             @endif
-        @elseif($fopTask->category === \App\Enums\TaskType::MAINTENANCE)
+        @elseif(in_array($fopTask->category, [\App\Enums\TaskType::MAINTENANCE, \App\Enums\TaskType::CREQ, \App\Enums\TaskType::OREQ, \App\Enums\TaskType::INFR], true))
+            {{-- MTN/C-REQ/O-REQ/INFR REQ SEMUA lewat form & controller yang sama
+                 (TaskMaintenanceController::store(), lihat komentar di sana) —
+                 satu-satunya yang dikecualikan dari form ini cuma SURVEY/PSB.
+                 Jadi ke-4 tipe ini WAJIB dapet tampilan Laporan + Material
+                 Terpakai yang sama, bukan cuma MAINTENANCE doang seperti
+                 sebelumnya (ketauan gap 2026-09-10: C-REQ/O-REQ/INFR punya
+                 maintenance_report + task_materials + custody kepotong di
+                 Gudang, tapi Detail Task FOP nampilin "tidak punya laporan
+                 terstruktur" — data-nya ADA, cuma gak ditampilin). --}}
             @if($maintenance)
+            @php
+                $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+            @endphp
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
@@ -524,6 +565,27 @@
                         @endforeach
                     </div>
                 </div>
+                @if($materialTerpakai->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Material Terpakai (Gudang)</p>
+                    @foreach($materialTerpakai as $material)
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400">{{ $material->item_name }}@if($material->note)<span class="text-slate-400 dark:text-slate-500"> · {{ $material->note }}</span>@endif</span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+                @if($fopTask->workTools->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Alat Kerja Dipinjam</p>
+                    <div class="flex flex-wrap gap-1.5 mt-1">
+                        @foreach($fopTask->workTools as $tool)
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">{{ $tool->tool_name }}</span>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
                 @if($maintenance->opm_photo || $maintenance->speedtest_photo)
                 <div class="col-span-2 flex gap-3 flex-wrap">
                     @if($maintenance->opm_photo)
@@ -536,7 +598,7 @@
                 @endif
             </div>
             @else
-            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan maintenance.</p>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan {{ $fopTask->category->label() }}.</p>
             @endif
         @else
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Tipe task ini tidak punya laporan lapangan terstruktur.</p>

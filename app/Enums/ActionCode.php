@@ -67,4 +67,14 @@ enum ActionCode: string
      * "tolak seluruhnya", cuma partial-match kalau SN gak cocok.
      */
     case RECEIVE = 'receive';
+
+    /**
+     * Ganti paket internet pelanggan aktif (Paket A → Paket B). SENGAJA
+     * bukan UPDATE: `customers.detail.packages.update` sudah dipakai form
+     * edit pelanggan umum (bisa ubah field paket bareng identitas/alamat
+     * dalam satu submit). Ganti paket itu aksi billing tersendiri — efeknya
+     * baru kepakai tagihan periode berikutnya — jadi digerbangi permission
+     * terpisah, bukan numpang wildcard `.update` yang lebih longgar.
+     */
+    case CHANGE = 'change';
 }

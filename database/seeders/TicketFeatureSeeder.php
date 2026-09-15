@@ -20,6 +20,7 @@ use Illuminate\Database\Seeder;
  *     ├─ noc_worksheet.masuk        — DINONAKTIFKAN (ADHOC-06), tab dilebur
  *     └─ noc_worksheet.diproses     — DINONAKTIFKAN (ADHOC-06), tab dilebur
  *   noc_dashboard            (root) — Dashboard NOC
+ *     └─ noc_dashboard.performance   — Leaderboard performa individu Helpdesk/NOC
  *
  * Tiap halaman punya feature (=permission) SENDIRI — dulu semuanya numpang
  * `tickets.view` lewat route bucket generik `/tickets/{bucket}`, jadi gak bisa
@@ -62,6 +63,7 @@ class TicketFeatureSeeder extends Seeder
             ['parent' => 'tickets', 'code' => 'tickets.selesai', 'name' => 'Ticket Selesai', 'sort_order' => 1],
             ['parent' => 'tickets', 'code' => 'tickets.dibatalkan', 'name' => 'Ticket Dibatalkan', 'sort_order' => 2],
             ['parent' => 'tickets', 'code' => 'tickets.history', 'name' => 'History Ticketing', 'sort_order' => 3],
+            ['parent' => 'noc_dashboard', 'code' => 'noc_dashboard.performance', 'name' => 'Leaderboard Performa Individu', 'sort_order' => 1],
         ];
 
         foreach ($subFeatures as $sf) {

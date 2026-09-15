@@ -7,12 +7,17 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\FopTask;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskWorkTool;
 use App\Models\User;
 use App\Models\WorkTool;
+use App\Services\InventoryIssueService;
+use App\Services\InventoryReceiveService;
+use App\Services\InventoryTransferService;
 use App\Services\TaskWorkToolService;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -175,8 +180,24 @@ class WorkToolChecklistTest extends TestCase
     {
         // Sebelumnya material maintenance cuma lima kolom teks bebas
         // (kabel/modem/patchcord/sleeve/lainnya) yang tak bisa diagregasi.
+        //
+        // Fixture-nya sekarang WAJIB item_id dari custody (koreksi lanjutan
+        // ADHOC-54, 2026-09-12: "Lainnya isi manual" DICABUT dari Material
+        // Terpakai — dulu baris ini `item_id: null` + `item_name` karangan,
+        // sekarang harus item master yang beneran diterbitkan ke custody
+        // teknisi, sama pola Pemasangan/Instalasi).
         $task = $this->makeTask(TaskType::MAINTENANCE, 'TASK-WT-MTN2');
         $fopTask = $this->makeFopTask(TaskType::MAINTENANCE, 'TFOP-WT-MTN2', $task);
+
+        $pusat = Pop::create(['code' => 'WT-PST', 'pop_code' => 'WTP', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'Pusat Alat', 'type' => 'pusat', 'status' => 'active']);
+        $catPatchCord = ItemCategory::where('code', 'patch_cord')->firstOrFail();
+        $patchCord = Item::create(['code' => 'PC-WT-001', 'name' => 'Patch Cord SC/UPC', 'item_category_id' => $catPatchCord->id, 'unit' => 'pcs', 'tracking_type' => 'quantity']);
+
+        $admin = User::factory()->create();
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $patchCord, 10, 15000, null, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $this->pop, [['item_id' => $patchCord->id, 'qty' => 10]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$patchCord->id => 10], $admin);
+        app(InventoryIssueService::class)->issue($this->pop, $this->actor, [['item_id' => $patchCord->id, 'qty' => 5]], $admin);
 
         $response = $this->actingAs($this->actor)
             ->post(route('tasks.maintenance.store', $task), [
@@ -184,7 +205,7 @@ class WorkToolChecklistTest extends TestCase
                 'opm_photo' => UploadedFile::fake()->image('opm.jpg'),
                 'speedtest_photo' => UploadedFile::fake()->image('speed.jpg'),
                 'materials' => [
-                    ['item_id' => null, 'item_name' => 'Patch Cord SC/UPC', 'item_type' => 'patch_cord', 'qty' => 1, 'unit' => 'pcs'],
+                    ['item_id' => $patchCord->id, 'qty' => 1, 'unit' => 'pcs'],
                 ],
             ]);
 

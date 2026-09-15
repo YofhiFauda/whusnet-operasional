@@ -49,7 +49,12 @@ class TaskController extends Controller
 
         // village/district/city untuk `clean_address` yang dirender per kartu
         // (tasks/own.blade.php:133 & partials/own-card.blade.php:61).
-        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop', 'fop', 'teamMembers', 'fopTask'])
+        $tasks = Task::with([
+            'customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop', 'fop', 'teamMembers', 'fopTask',
+            // Batch (mis. ODP LOS) — badge "N Pelanggan" di kartu Task Saya,
+            // lihat partials/own-card.blade.php.
+            'fopTask.ticket.batchMembers', 'fopTask.ticket.issueCategory',
+        ])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->where('status', '!=', TaskStatus::DIBATALKAN->value)
             // scheduled_at bertipe timestamp, jadi perbandingan tanggal ditulis
@@ -218,6 +223,13 @@ class TaskController extends Controller
             // assignTechnicians()) — ditampilkan di sini di box terpisah sendiri
             // biar teknisi tetap bisa baca, bukan hilang gara-gara dipisah.
             'fopTask.ticket',
+            // Pelanggan terdampak (tiket batch, mis. ODP LOS) — teknisi WAJIB
+            // lihat daftar ini di Task-nya sendiri, satu FopTask/Task cuma
+            // dibuat SEKALI buat semua pelanggan terdampak (lihat
+            // Ticket::isBatch()/batchMembers(), CLAUDE.md § Sinkronisasi
+            // Ticket ↔ FopTask ↔ Task).
+            'fopTask.ticket.batchMembers',
+            'fopTask.ticket.issueCategory',
         ]);
 
         $recentMaintenanceTasks = collect();

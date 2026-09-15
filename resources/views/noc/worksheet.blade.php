@@ -321,14 +321,28 @@
                                     (Ticket Selesai/Dibatalkan/History) — di halaman kerja,
                                     keluar halaman berarti kehilangan filter & posisi scroll.
                                 --}}
-                                <span class="font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline">
-                                    {{ $ticket->ticket_number }}
-                                </span>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline">
+                                        {{ $ticket->ticket_number }}
+                                    </span>
+                                    @if($ticket->isBatch())
+                                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800 shrink-0 inline-flex items-center gap-1"
+                                              title="Insiden Massal (Batch)">
+                                            <span class="w-1 h-1 rounded-full bg-violet-500 animate-pulse"></span>
+                                            BATCH ({{ $ticket->batchMembers->count() }})
+                                        </span>
+                                    @endif
+                                </div>
                                 <span class="block text-[10px] font-mono text-text-muted">{{ $ticket->type->value }}</span>
                             </td>
                             <td class="px-3 py-2.5">
-                                <span class="font-semibold text-text-main">{{ $ticket->customer->full_name ?? $ticket->customer_name ?? '—' }}</span>
-                                <span class="block font-mono text-[10px] text-text-muted">{{ $ticket->customer?->display_id ?? '—' }}</span>
+                                @if($ticket->isBatch())
+                                    <span class="font-bold text-violet-700 dark:text-violet-300">⚡ {{ $ticket->customer_name ?: 'Insiden Massal' }}</span>
+                                    <span class="block font-mono text-[10px] text-violet-600 dark:text-violet-400">{{ $ticket->batchMembers->count() }} Pelanggan Terdampak</span>
+                                @else
+                                    <span class="font-semibold text-text-main">{{ $ticket->customer->full_name ?? $ticket->customer_name ?? '—' }}</span>
+                                    <span class="block font-mono text-[10px] text-text-muted">{{ $ticket->customer?->display_id ?? '—' }}</span>
+                                @endif
                             </td>
                             <td class="px-3 py-2.5 font-mono text-text-secondary">{{ $ticket->customer_phone ?? '—' }}</td>
                             {{-- Snapshot saat tiket dibuat — sengaja bukan relasi desa terkini --}}

@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Enums\WorkflowTransition;
 use App\Events\CustomerVerificationStatusChanged;
 use App\Models\Customer;
+use App\Models\CustomerAcquisition;
 use App\Models\CustomerPortalToken;
 use App\Services\CustomerQrTokenService;
 
@@ -38,6 +39,20 @@ class CustomerObserver
             // rancangan-qr-pelanggan-final.md §7.3 Kasus 6).
             if ($customer->status === WorkflowTransition::TERMINATED->value) {
                 $this->revokeActiveQrToken($customer, 'Pelanggan terminated');
+            }
+
+            // Modul Customer Acquisition (List Pelanggan <30 hari, dipakai
+            // tim Busdev) — dicatat SEKALI seumur hidup pelanggan, persis
+            // saat pertama kali menyentuh ACTIVE. firstOrCreate (bukan
+            // updateOrCreate) sengaja: kalau pelanggan nanti suspended lalu
+            // diaktifkan lagi, baris lama TIDAK dibuat ulang/ditimpa — modul
+            // ini nyatet "akuisisi baru", bukan tiap kali status balik ke
+            // active (lihat migration customer_acquisitions).
+            if ($customer->status === WorkflowTransition::ACTIVE->value) {
+                CustomerAcquisition::firstOrCreate(
+                    ['customer_id' => $customer->id],
+                    ['periode' => now()->format('Y-m'), 'verified_at' => now()]
+                );
             }
         }
 

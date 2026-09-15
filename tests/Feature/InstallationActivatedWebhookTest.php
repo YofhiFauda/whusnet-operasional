@@ -11,12 +11,18 @@ use App\Models\Customer;
 use App\Models\CustomerDevice;
 use App\Models\District;
 use App\Models\InternetPackage;
+use App\Models\InventorySerial;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
 use App\Models\WebhookOutbox;
+use App\Services\InventoryIssueService;
+use App\Services\InventoryReceiveService;
+use App\Services\InventoryTransferService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -293,15 +299,34 @@ class InstallationActivatedWebhookTest extends TestCase
         return [$customer, $technician, $task];
     }
 
+    /**
+     * Fallback teks manual `serial_number` sudah dicabut (koreksi lanjutan
+     * ADHOC-54) — helper ini menerjemahkan `serial_number` di $overrides jadi
+     * `selected_inventory_serial_id` sungguhan dengan menerbitkan SN itu ke
+     * custody teknisi lebih dulu (Receive Pusat → Transfer Cabang → Issue),
+     * biar test lama yang cuma peduli NILAI SN (bukan cara pengisiannya)
+     * tetap jalan tanpa ditulis ulang satu-satu.
+     */
     private function postPemasangan(Customer $customer, User $technician, array $overrides = []): void
     {
         Storage::fake('public');
+
+        $serialNumber = $overrides['serial_number'] ?? 'SN-DEFAULT-WEBHOOK';
+        unset($overrides['serial_number']);
+
+        $pusat = Pop::firstOrCreate(
+            ['code' => 'WEBHOOK-PST'],
+            ['pop_code' => 'WHPST', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'Pusat Webhook Test', 'type' => 'pusat', 'status' => 'active']
+        );
+        $serial = $this->issueActiveSerialTo($technician, $pusat, $customer->pop, $serialNumber);
+        $kabel = $this->issuePassiveQtyTo($technician, $pusat, $customer->pop);
 
         $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), array_merge([
             'device_type' => 'ont',
             'connection_mode' => 'pppoe',
             'wifi_ssid' => 'WHUSNET_TEST',
             'wifi_password' => 'password123',
+            'selected_inventory_serial_id' => $serial->id,
             'odp_number' => 'ODP-01',
             'odp_port' => '1',
             'olt_number' => 'OLT-01',
@@ -312,12 +337,75 @@ class InstallationActivatedWebhookTest extends TestCase
             'signature_photo' => UploadedFile::fake()->image('signature.jpg'),
             'materials' => [
                 [
-                    'item_name' => 'Kabel Dropcore',
-                    'item_type' => 'kabel_dropcore',
+                    'item_id' => $kabel->id,
                     'qty' => 50,
                     'unit' => 'meter',
                 ],
             ],
         ], $overrides));
+    }
+
+    /**
+     * Opsi "Lainnya (isi manual)" DICABUT dari dropdown Material Terpakai
+     * (koreksi lanjutan ADHOC-54, 2026-09-12) — baris material di
+     * postPemasangan() sekarang wajib `item_id` dari custody, sama alasan
+     * `issueActiveSerialTo()` di atas. Qty di-issue BESAR (10.000m) & cuma
+     * SEKALI per teknisi (cache `$issuedPassiveItem`, pola sama
+     * `$issuedSerials`) — beberapa test di file ini memanggil postPemasangan()
+     * berkali-kali dengan teknisi yang sama, dan custody-nya TIDAK ikut
+     * terkonsumsi di storePemasangan() (baru dipotong di storeSpeedtest(),
+     * lihat InventoryService::reconcileMaterialsAgainstCustody()) jadi aman
+     * dipakai berulang tanpa perlu issue baru tiap panggilan.
+     */
+    private array $issuedPassiveItem = [];
+
+    private function issuePassiveQtyTo(User $technician, Pop $pusat, Pop $cabang): Item
+    {
+        if (isset($this->issuedPassiveItem[$technician->id])) {
+            return $this->issuedPassiveItem[$technician->id];
+        }
+
+        $catPasif = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabel = Item::create([
+            'code' => 'KABEL-WEBHOOK-'.$technician->id, 'name' => 'Kabel Dropcore Webhook Test', 'item_category_id' => $catPasif->id,
+            'unit' => 'meter', 'tracking_type' => 'quantity',
+        ]);
+        $admin = User::factory()->create();
+
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 10000, 5000, null, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $kabel->id, 'qty' => 10000]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$kabel->id => 10000], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $kabel->id, 'qty' => 10000]], $admin);
+
+        return $this->issuedPassiveItem[$technician->id] = $kabel;
+    }
+
+    /**
+     * Cache per-SN — beberapa test sengaja memanggil postPemasangan() dua kali
+     * dengan `serial_number` YANG SAMA (mis. test unchanged-data), SN itu
+     * cuma boleh diterbitkan sekali (unique constraint) & tetap ISSUED di
+     * custody teknisi yang sama (storePemasangan tidak pernah mengonsumsinya).
+     */
+    private array $issuedSerials = [];
+
+    private function issueActiveSerialTo(User $technician, Pop $pusat, Pop $cabang, string $serialNumber): InventorySerial
+    {
+        if (isset($this->issuedSerials[$serialNumber])) {
+            return $this->issuedSerials[$serialNumber];
+        }
+
+        $catAktif = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $ont = Item::create([
+            'code' => 'ONT-'.md5($serialNumber), 'name' => 'ONT Webhook Test', 'item_category_id' => $catAktif->id,
+            'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable',
+        ]);
+        $admin = User::factory()->create();
+
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($pusat, $ont, [$serialNumber], 250000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $ont->id, 'serial_numbers' => [$serialNumber]]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [$serialNumber], [], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $ont->id, 'serial_numbers' => [$serialNumber]]], $admin);
+
+        return $this->issuedSerials[$serialNumber] = $serial->refresh();
     }
 }

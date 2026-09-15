@@ -34,9 +34,13 @@ class DatabaseSeeder extends Seeder
         $this->call(ItemFeatureSeeder::class); // Master Barang/Material
         $this->call(ItemCategoryFeatureSeeder::class); // Master Kategori Barang
         $this->call(WorkToolFeatureSeeder::class); // Master Alat Kerja
-        $this->call(QrFeatureSeeder::class); // QR Pelanggan (Fase 1)
+        $this->call(QrFeatureSeeder::class); // QR Pelanggan (Fase 1) Permission QR
         $this->call(WarehouseFeatureSeeder::class); // Gudang/Inventory (ADHOC-54, Fase 1)
-        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.*/warehouse*.* ke-sync ke owner
+        $this->call(FopAnalyticsFeatureSeeder::class); // Dashboard Analitik FOP
+        $this->call(CustomerAcquisitionFeatureSeeder::class); // Customer Acquisition (Busdev) - Pelanggan Aktif < 30 Hari
+        $this->call(BusinessDevelopmentVerificationFeatureSeeder::class); // Antrean Menunggu Verifikasi BD (pelanggan Bisnis pra-ACTIVE)
+        $this->call(BusinessDevelopmentFeatureSeeder::class); // agents/package_restrictions/sales_omset_dashboard (Skema 1-3, 2026-09-12)
+        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.*/warehouse*.*/fop_analytics.*/customer_acquisitions.*/agents.*/package_restrictions.*/sales_omset_dashboard.* ke-sync ke owner
         $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
         $this->call(ItemCategorySeeder::class); // Kategori tambahan non-system (modem_ont, router_gateway) — sebelum ItemSeeder, dirujuk barangnya
         $this->call(ItemSeeder::class); // Isi awal master barang — tambah sisanya lewat Master Data
@@ -46,6 +50,13 @@ class DatabaseSeeder extends Seeder
         // $this->call(MasterPopSeeder::class);
         $this->call(TechnicianSeeder::class);
         $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
+        $this->call(BusinessDevelopmentSeeder::class); // Data demo Busdev: Restriksi Paket, Master Agent, Omset Sales (Skema 1-3) — reuse Sales/Teknisi di atas, WAJIB setelah keduanya
+        $this->call(FopSeeder::class);
+        $this->call(KolektorSeeder::class);
+        $this->call(AdminGudangPusatSeeder::class);
+        $this->call(AdminGudangCabangSeeder::class);
+        $this->call(NocSeeder::class);
+        $this->call(HelpdeskSeeder::class);
 
         // User::factory(10)->create();
 

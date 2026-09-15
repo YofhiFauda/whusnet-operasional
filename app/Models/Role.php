@@ -6,7 +6,7 @@ use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['code', 'name', 'guard_name', 'description', 'is_system'])]
+#[Fillable(['code', 'name', 'guard_name', 'description', 'is_system', 'is_package_restricted'])]
 class Role extends Model
 {
     use RecordsAuditLogs;
@@ -14,6 +14,14 @@ class Role extends Model
     protected string $auditModule = 'Role Management';
 
     protected array $auditEvents = ['created', 'updated', 'deleted'];
+
+    protected function casts(): array
+    {
+        return [
+            'is_system' => 'boolean',
+            'is_package_restricted' => 'boolean',
+        ];
+    }
 
     public function isFullAccessRole(): bool
     {

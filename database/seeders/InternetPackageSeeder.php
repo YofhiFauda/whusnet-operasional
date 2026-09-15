@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\InternetPackage;
+use App\Models\PackageCategory;
 use Illuminate\Database\Seeder;
 
 class InternetPackageSeeder extends Seeder
@@ -12,7 +13,20 @@ class InternetPackageSeeder extends Seeder
      */
     public function run(): void
     {
-        foreach ($this->packages() as $package) {
+        $packages = $this->packages();
+
+        $categories = collect($packages)->pluck('category')->unique()->values();
+        foreach ($categories as $index => $categoryName) {
+            PackageCategory::query()->firstOrCreate(
+                ['name' => $categoryName],
+                [
+                    'is_active' => true,
+                    'sort_order' => ($index + 1) * 10,
+                ]
+            );
+        }
+
+        foreach ($packages as $package) {
             InternetPackage::query()->updateOrCreate([
                 'package_code' => $package['package_code'],
             ], $package);
@@ -25,10 +39,10 @@ class InternetPackageSeeder extends Seeder
     private function packages(): array
     {
         return [
-            $this->home('Net138', 'Reguler Broadband Home Internet Only', '50 Mbps', 50, 138000, 'Singleband', [], null, 12, 'Gratis', 'Kontrak 12M'),
-            $this->home('Net150', 'Reguler Broadband Home Internet Only', '100 Mbps', 100, 150000, 'Dualband', [], null, 8, 'Gratis', 'Kontrak 8M'),
-            $this->home('Net165', 'Reguler Broadband Home Internet Only', '150 Mbps', 150, 165000, 'Dualband', [], null, 6, 'Gratis', 'Kontrak 6M'),
-            $this->home('Net198', 'Reguler Broadband Home Internet Only', '200 Mbps', 200, 198000, 'Dualband Wifi6', ['CCTV 1CH'], 200000, 6, 'Gratis + 200rb jika ambil CCTV', 'Kontrak 6M'),
+            $this->home('Net138', 'Reguler Broadband Home Internet Only', '35 Mbps', 35, 138000, 'Singleband', [], null, 12, 'Gratis', 'Kontrak 12M'),
+            $this->home('Net150', 'Reguler Broadband Home Internet Only', '45 Mbps', 45, 150000, 'Dualband', [], null, 8, 'Gratis', 'Kontrak 8M'),
+            $this->home('Net165', 'Reguler Broadband Home Internet Only', '70 Mbps', 70, 165000, 'Dualband', [], null, 6, 'Gratis', 'Kontrak 6M'),
+            $this->home('Net198', 'Reguler Broadband Home Internet Only', '100 Mbps', 100, 198000, 'Dualband Wifi6', ['CCTV 1CH'], 200000, 6, 'Gratis + 200rb jika ambil CCTV', 'Kontrak 6M'),
 
             $this->home('NetTC138', 'Broadband Internet + TV', '40 Mbps', 40, 138000, 'Singleband', ['IPTV'], 50000, 12, 'Rp 50.000', 'Kontrak 12'),
             $this->home('NetTC150', 'Broadband Internet + TV', '70 Mbps', 70, 150000, 'Dualband', ['IPTV'], 50000, 8, 'Rp 50.000', 'Kontrak 8'),
@@ -57,6 +71,11 @@ class InternetPackageSeeder extends Seeder
             $this->dedicated('Dedicated250', '250 Mbps', 250, 6500000, ['2 AP Wifi6 & 1 Router'], '1 IP Public', 2500000),
             $this->dedicated('Dedicated500', '500 Mbps', 500, 12000000, ['2 AP Wifi6 & 1 Router'], '2 IP Public', 2500000),
             $this->dedicated('Dedicated1G', '1 Gbps', 1000, 23000000, ['2 AP Wifi6 & 1 Router'], '2 IP Public', 2500000),
+
+            $this->khusus('Net138 Khusus', 'Khusus Broadband Home Internet Only', '50 Mbps', 50, 138000, 'Singleband', [], null, 12, 'Gratis', 'Kontrak 12M'),
+            $this->khusus('Net150 Khusus', 'Khusus Broadband Home Internet Only', '100 Mbps', 100, 150000, 'Dualband', [], null, 8, 'Gratis', 'Kontrak 8M'),
+            $this->khusus('Net165 Khusus', 'Khusus Broadband Home Internet Only', '150 Mbps', 150, 165000, 'Dualband', [], null, 6, 'Gratis', 'Kontrak 6M'),
+            $this->khusus('Net198 Khusus', 'Khusus Broadband Home Internet Only', '200 Mbps', 200, 198000, 'Dualband Wifi6', ['CCTV 1CH'], 200000, 6, 'Gratis + 200rb jika ambil CCTV', 'Kontrak 6M'),
         ];
     }
 
@@ -153,6 +172,29 @@ class InternetPackageSeeder extends Seeder
             'installation_fee' => $installationFee,
             'installation_fee_label' => 'Rp '.number_format($installationFee, 0, ',', '.'),
             'terms' => 'Masa kontrak 1 Tahun',
+        ]);
+    }
+
+    private function khusus(
+        string $code,
+        string $group,
+        string $bandwidthLabel,
+        int $downloadSpeed,
+        int $monthlyPrice,
+        ?string $modem,
+        array $features,
+        ?int $installationFee,
+        ?int $contractMonths,
+        string $installationFeeLabel,
+        string $terms,
+    ): array {
+        return $this->package($code, 'Paket Internet Khusus', $group, $bandwidthLabel, $downloadSpeed, $monthlyPrice, [
+            'modem' => $modem,
+            'features' => $features,
+            'contract_period_months' => $contractMonths,
+            'installation_fee' => $installationFee,
+            'installation_fee_label' => $installationFeeLabel,
+            'terms' => $terms,
         ]);
     }
 

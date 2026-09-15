@@ -64,6 +64,16 @@
                         Jadwal Terlewat
                     </span>
                     @endif
+                    {{--
+                        Tiket batch (mis. ODP LOS) — satu Task ini mewakili
+                        SEMUA pelanggan terdampak, bukan cuma judul Task-nya.
+                        Detail lengkap ada di Detail Task, lihat tasks/show.blade.php.
+                    --}}
+                    @if($task->fopTask?->ticket?->isBatch())
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-900/50">
+                        {{ $task->fopTask->ticket->batchMembers->count() }} Pelanggan
+                    </span>
+                    @endif
                 </div>
                 <span class="font-mono text-[10px] font-semibold text-text-muted shrink-0">{{ $task->task_number }}</span>
             </div>

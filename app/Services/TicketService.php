@@ -17,6 +17,7 @@ use App\Models\Customer;
 use App\Models\CustomerDevice;
 use App\Models\FopTask;
 use App\Models\Ticket;
+use App\Models\TicketBatchMember;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Notifications\AppNotification;
@@ -72,6 +73,16 @@ class TicketService
         bool $confirmedDuplicate = false,
     ): array {
         $result = DB::transaction(function () use ($data, $actor, $attachments, $assignment, $fopOrigin, $enforceDuplicateGuard, $confirmedDuplicate) {
+            $issueCategory = ! empty($data['issue_category_id'])
+                ? TicketIssueCategory::find($data['issue_category_id'])
+                : null;
+
+            // Tiket BATCH / Wilayah Jaringan (kategori is_batch, mis. "ODP LOS", atau tiket manual POP)
+            $isBatch = ($issueCategory?->is_batch || ! empty($data['pop_id'])) && empty($data['customer_id']);
+            if ($isBatch) {
+                return $this->createBatchTicket($data, $actor, $issueCategory, $attachments);
+            }
+
             /** @var Customer $customer */
             $customer = Customer::query()
                 ->applyUserScope($actor)
@@ -109,9 +120,7 @@ class TicketService
             $ticket->customer_id = $customer->id;
             $ticket->pop_id = $customer->pop_id;
             $this->snapshotCustomer($ticket, $customer);
-            $issueCategory = ! empty($data['issue_category_id'])
-                ? TicketIssueCategory::find($data['issue_category_id'])
-                : null;
+            $ticket->reporter_phone = $data['reporter_phone'] ?? null;
 
             $ticket->issue_category_id = $issueCategory?->id;
             $ticket->detail_keluhan = $data['detail_keluhan'];
@@ -176,6 +185,124 @@ class TicketService
         broadcast(new TicketQueueUpdated($result['ticket']->pop_id))->toOthers();
 
         return $result;
+    }
+
+    /**
+     * Tiket BATCH — dipanggil dari create() kalau kategori issue-nya
+     * `is_batch` dan form gak nunjuk `customer_id` (Search Customer Data
+     * dipakai sebagai label bebas, mis. "ODP JTS 13 LOS", + POP dipilih
+     * manual — revisi Worksheet Helpdesk poin 1-2/4). Sengaja method
+     * TERPISAH, bukan dicabang di tengah create(): jalur pelanggan tunggal
+     * di atas sudah padat (duplicate guard, sync FOP, assign teknisi) dan
+     * SEMUA itu gak relevan buat tiket batch (belum ada satu pelanggan pun
+     * yang dipastikan, escalate ke FOP baru bikin SATU FopTask perbaikan
+     * ODP — bukan per pelanggan terdampak, lihat CLAUDE.md § Sinkronisasi
+     * Ticket ↔ FopTask ↔ Task).
+     *
+     * Pelanggan terdampak dicatat belakangan lewat addBatchMember() (tombol
+     * "Tambah" di List Task) — TIDAK diterima di titik create() ini, sesuai
+     * alur revisi (tiket batch lahir dulu, anggota nyusul satu-satu).
+     *
+     * @return array{ticket: Ticket, conflicts: array}
+     */
+    private function createBatchTicket(array $data, User $actor, ?TicketIssueCategory $issueCategory, array $attachments): array
+    {
+        if (empty($data['pop_id'])) {
+            throw ValidationException::withMessages([
+                'pop_id' => 'Tiket kategori batch / non-pelanggan wajib pilih POP/Cabang secara manual.',
+            ]);
+        }
+
+        $label = trim((string) ($data['search_label'] ?? ''));
+
+        if ($label === '') {
+            throw ValidationException::withMessages([
+                'search_label' => 'Isi label pencarian (mis. nama ODP yang terdampak) dulu.',
+            ]);
+        }
+
+        $type = TaskType::from($data['type']);
+
+        $ticket = new Ticket;
+        $ticket->ticket_number = $this->generateTicketNumber();
+        $ticket->type = $type;
+        $ticket->customer_id = null;
+        $ticket->pop_id = $data['pop_id'];
+        // Numpang kolom snapshot customer_name sebagai label bebas — BUKAN
+        // kolom baru (lihat migration add_batch_and_reporter_fields_to_tickets_table).
+        // Field snapshot lain (alamat/odp/paket/dst) sengaja dibiarkan null:
+        // gak ada satu pelanggan yang direpresentasikan di sini.
+        $ticket->customer_name = $label;
+        $ticket->reporter_phone = $data['reporter_phone'] ?? null;
+        $ticket->issue_category_id = $issueCategory?->id;
+        $ticket->detail_keluhan = $data['detail_keluhan'];
+        $ticket->catatan_teknis = $data['catatan_teknis'] ?? null;
+        $ticket->priority = $data['priority'];
+        $ticket->created_by = $actor->id;
+        $ticket->handler = TicketHandler::HELPDESK;
+        $ticket->status = TicketHandlingStatus::OPEN;
+
+        $ticket->sla_hours = $this->resolveSlaHours($type, $ticket->priority, null, $issueCategory);
+        $ticket->sla_deadline_at = now()->addHours($ticket->sla_hours);
+
+        $ticket->save();
+
+        foreach ($attachments as $file) {
+            $this->storeAttachment($ticket, $file, $actor);
+        }
+
+        $ticket->histories()->create([
+            'action' => TicketHistoryAction::DIBUAT,
+            'to_status' => $ticket->handler->value,
+            'actor_id' => $actor->id,
+            'happened_at' => now(),
+        ]);
+
+        if (class_exists(AuditLog::class)) {
+            AuditLog::log($ticket, 'create', null, $ticket->fresh()->toArray());
+        }
+
+        return [
+            'ticket' => $ticket->load(['creator', 'fopTask.technicians', 'attachments', 'issueCategory', 'batchMembers']),
+            'conflicts' => [],
+        ];
+    }
+
+    /**
+     * Tambah satu pelanggan terdampak ke tiket batch — tombol "Tambah" di
+     * List Task (revisi Worksheet Helpdesk poin 4). Boleh dipanggil berkali-
+     * kali selama tiket masih di tangan Helpdesk/NOC (assertTicketStillOpen()) —
+     * dispatch aksi (Selesai/Assign NOC/Assign FOP) tetap di level tiket
+     * parent, bukan per child, jadi menambah anggota TIDAK butuh tiket masih
+     * "OPEN" secara ketat selain guard umum itu.
+     */
+    public function addBatchMember(Ticket $ticket, array $data, User $actor): TicketBatchMember
+    {
+        if (! $ticket->isBatch()) {
+            throw ValidationException::withMessages([
+                'target' => 'Cuma tiket kategori batch yang bisa ditambah pelanggan terdampak.',
+            ]);
+        }
+
+        $this->assertActorOwnsTicket($ticket, $actor);
+
+        $customer = ! empty($data['customer_id'])
+            ? Customer::query()->applyUserScope($actor)->find($data['customer_id'])
+            : null;
+
+        // Pick CID auto-isi nama/HP dari data master (lihat pickBatchCustomer()
+        // di create.blade.php), TAPI staf tetap boleh EDIT sebelum submit
+        // (mis. nama panggilan yang beda dari KTP, atau HP yang beda dari
+        // primary_phone) — input yang diketik WAJIB menang atas data master,
+        // bukan sebaliknya. `customer_id` tetap kesimpen buat jejak link ke
+        // pelanggan aslinya, cuma nama/HP yang ditampilkan bisa menyimpang.
+        return $ticket->batchMembers()->create([
+            'customer_id' => $customer?->id,
+            'cid' => $customer?->display_id ?: ($customer?->cid ?: $customer?->customer_code),
+            'customer_name' => ($data['customer_name'] ?? null) ?: $customer?->full_name,
+            'phone' => ($data['phone'] ?? null) ?: $customer?->primary_phone,
+            'added_by' => $actor->id,
+        ]);
     }
 
     /**
@@ -344,8 +471,14 @@ class TicketService
             $this->assertActorOwnsTicket($ticket, $actor);
             $this->assertTicketStillOpen($ticket);
 
-            /** @var Customer $customer */
-            $customer = Customer::query()->with('pop')->findOrFail($ticket->customer_id);
+            // Tiket BATCH (kategori is_batch, mis. ODP LOS) gak punya
+            // customer_id — cuma Parent-nya yang dikirim ke FOP, SATU FopTask
+            // perbaikan buat semua pelanggan terdampak (child TETAP di
+            // ticket_batch_members, gak pernah kepindah ke FopTask manapun).
+            // `findOrFail(null)` bakal 404 kalau ini gak dicabang duluan.
+            $customer = $ticket->customer_id
+                ? Customer::query()->with('pop')->findOrFail($ticket->customer_id)
+                : null;
 
             $fromHandler = $ticket->handler->value;
             $fopTask = $this->syncToFopTask($ticket, $customer, $actor);
@@ -576,13 +709,16 @@ class TicketService
      * Sengaja mirror persis logic `FopTask::booted()` buat jalur paket, biar
      * dua tempat itu gak diam-diam menyimpang.
      */
-    private function resolveSlaHours(TaskType $type, FopTaskPriority $priority, Customer $customer, ?TicketIssueCategory $issueCategory): int
+    private function resolveSlaHours(TaskType $type, FopTaskPriority $priority, ?Customer $customer, ?TicketIssueCategory $issueCategory): int
     {
         if ($issueCategory?->sla_source === 'prioritas') {
             return $priority->slaHours();
         }
 
-        return $customer->internetPackage?->getHandlingSla($type) ?? $type->defaultHandlingSlaHours();
+        // Tiket batch gak punya satu pelanggan (lihat createBatchTicket()) —
+        // fallback langsung ke default tipe, sla_source 'paket' gak ada
+        // paket buat dijadikan acuan.
+        return $customer?->internetPackage?->getHandlingSla($type) ?? $type->defaultHandlingSlaHours();
     }
 
     /**
@@ -635,7 +771,7 @@ class TicketService
      * yang penugasannya jadi keputusan FOP (kecuali FOP sendiri yang submit
      * sambil langsung assign — lihat assignTechnicians()).
      */
-    private function syncToFopTask(Ticket $ticket, Customer $customer, User $actor, ?string $taskDate = null): FopTask
+    private function syncToFopTask(Ticket $ticket, ?Customer $customer, User $actor, ?string $taskDate = null): FopTask
     {
         $fopTask = new FopTask;
         $fopTask->task_number = $this->generateFopTaskNumber();
@@ -645,10 +781,19 @@ class TicketService
         // konsisten sama identitas pelanggan yang dipakai di seluruh sistem
         // (CID/REQ ID, lihat docs/master/pop/business-logic.md), bukan label
         // tipe tiket generik kayak "Maintenance: ...".
-        $fopTask->tugas = $customer->display_id.'_'.$customer->full_name;
-        $fopTask->village_id = $customer->village_id;
-        $fopTask->pop_id = $customer->pop_id;
-        $fopTask->customer_id = $customer->id;
+        //
+        // Tiket BATCH (kategori is_batch, mis. ODP LOS) gak punya customer —
+        // cuma Parent-nya yang sampai sini (child tetap di
+        // ticket_batch_members, gak ikut ke FopTask sama sekali, lihat
+        // CLAUDE.md § Sinkronisasi Ticket ↔ FopTask ↔ Task). `tugas` numpang
+        // label bebas yang udah di-snapshot ke `customer_name`, village_id/
+        // customer_id dibiarkan null (nullable di skema fop_tasks).
+        $fopTask->tugas = $customer
+            ? $customer->display_id.'_'.$customer->full_name
+            : $ticket->customer_name;
+        $fopTask->village_id = $customer?->village_id;
+        $fopTask->pop_id = $customer?->pop_id ?? $ticket->pop_id;
+        $fopTask->customer_id = $customer?->id;
         $fopTask->issue = mb_substr($ticket->detail_keluhan, 0, 255);
         $fopTask->notes = $this->composeFopNotes($ticket, $actor);
         $fopTask->status = TaskStatus::DRAFT;
@@ -657,9 +802,10 @@ class TicketService
         // create()) — BUKAN biarin FopTask::booted() hitung ulang dari paket.
         // Clock-nya satu, gak reset di titik handoff Ticketing → FOP. Fallback
         // ke logic lama cuma buat tiket peninggalan sebelum kolom ini ada
-        // (sla_hours null).
+        // (sla_hours null). Tiket batch gak punya paket buat diacu (customer
+        // null) — fallback langsung ke default tipe.
         $fopTask->handling_sla_hours = $ticket->sla_hours
-            ?? ($customer->internetPackage?->getHandlingSla($ticket->type) ?? $ticket->type->defaultHandlingSlaHours());
+            ?? ($customer?->internetPackage?->getHandlingSla($ticket->type) ?? $ticket->type->defaultHandlingSlaHours());
         $fopTask->save();
 
         if (class_exists(AuditLog::class)) {

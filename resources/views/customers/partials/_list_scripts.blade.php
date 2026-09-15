@@ -24,7 +24,8 @@
 
         function anyModalOpen() {
             return !document.getElementById('actions-modal')?.classList.contains('hidden')
-                || !document.getElementById('network-modal-wrapper')?.classList.contains('hidden');
+                || !document.getElementById('network-modal-wrapper')?.classList.contains('hidden')
+                || !document.getElementById('package-change-modal-wrapper')?.classList.contains('hidden');
         }
 
         document.addEventListener('keydown', e => {
@@ -42,6 +43,12 @@
                 if (netModal && !netModal.classList.contains('hidden')) {
                     e.preventDefault();
                     closeNetworkAssignmentModal();
+                    return;
+                }
+                const pkgModal = document.getElementById('package-change-modal-wrapper');
+                if (pkgModal && !pkgModal.classList.contains('hidden')) {
+                    e.preventDefault();
+                    closePackageChangeModal();
                     return;
                 }
             }
@@ -89,6 +96,10 @@
     })();
 
     let selectedCustomerData = {};
+    let hubCustomerBalance = 0;
+    let hubRemainingAmount = 0;
+    let hubNextInstallment = 1;
+    let hubPaymentStoreUrl = null;
 
     // Cuma kelas STATE yang ditukar, bukan className utuh. Menimpa className
     // penuh (versi lama) ikut menghapus kelas responsif tab (text-[11px]
@@ -122,7 +133,7 @@
         setTimeout(() => {
             toast.classList.add('hidden');
             toast.classList.remove('flex');
-        }, 3000);
+        }, 3500);
     }
 
     function toggleWaDropdown() {
@@ -178,6 +189,179 @@
         return 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(msg);
     }
 
+    /* ── Helper Form Pembayaran Modal Hub (Setara quick-payment-modal) ── */
+    function hubTogglePaymentMethodFields() {
+        const methodSelect = document.getElementById('payment_method');
+        if (!methodSelect) return;
+        const method = methodSelect.value;
+        const transferFields = document.getElementById('hub-pay-transfer-fields');
+        const collectorFields = document.getElementById('hub-pay-collector-fields');
+        const bankName = document.getElementById('hub_bank_name');
+        const accountNumber = document.getElementById('hub_account_number');
+        const collector = document.getElementById('hub_collected_by');
+
+        const isTransfer = method === 'transfer';
+        const isKolektor = method === 'kolektor';
+
+        if (transferFields) transferFields.classList.toggle('hidden', !isTransfer);
+        if (bankName) bankName.required = isTransfer;
+        if (accountNumber) accountNumber.required = isTransfer;
+
+        if (collectorFields) collectorFields.classList.toggle('hidden', !isKolektor);
+        if (collector) collector.required = isKolektor;
+
+        hubRefreshInstallmentHint();
+    }
+
+    function hubPopulateCollectors(collectors) {
+        const select = document.getElementById('hub_collected_by');
+        if (!select) return;
+        select.innerHTML = '<option value="">Pilih kolektor...</option>';
+        (collectors || []).forEach((c) => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.name;
+            select.appendChild(opt);
+        });
+    }
+
+    function hubFormatRupiah(num) {
+        return 'Rp ' + Math.round(num).toLocaleString('id-ID');
+    }
+
+    function hubApplyCustomerBalance(balance) {
+        hubCustomerBalance = parseFloat(balance) || 0;
+        const block = document.getElementById('hub-pay-balance-block');
+        const availText = document.getElementById('hub-pay-balance-available');
+        const useBalanceCheck = document.getElementById('hub-pay-use-balance');
+        const useBalanceWrap = document.getElementById('hub-pay-use-balance-wrap');
+        const useBalanceInput = document.getElementById('hub-pay-use-balance-amount');
+
+        if (block) block.classList.toggle('hidden', hubCustomerBalance <= 0);
+        if (availText) availText.textContent = hubFormatRupiah(hubCustomerBalance);
+        if (useBalanceCheck) useBalanceCheck.checked = false;
+        if (useBalanceWrap) useBalanceWrap.classList.add('hidden');
+        if (useBalanceInput) useBalanceInput.value = '';
+    }
+
+    function hubUseBalanceAmount() {
+        const check = document.getElementById('hub-pay-use-balance');
+        if (!check || !check.checked) return 0;
+
+        const input = document.getElementById('hub-pay-use-balance-amount');
+        if (!input) return 0;
+        const raw = input.value;
+        const nilai = window.Rupiah ? window.Rupiah.angka(raw) : parseFloat(raw);
+
+        return isNaN(nilai) ? 0 : Math.min(nilai, hubCustomerBalance);
+    }
+
+    function hubApplyBalanceToAmount() {
+        const useBal = hubUseBalanceAmount();
+        hubSetNominal(Math.max(0, hubRemainingAmount - useBal));
+        hubRefreshInstallmentHint();
+    }
+
+    function hubNominal() {
+        const raw = document.getElementById('payment_amount')?.value || '';
+        return window.Rupiah ? window.Rupiah.angka(raw) : parseFloat(raw);
+    }
+
+    function hubNominalPolos() {
+        const raw = document.getElementById('payment_amount')?.value || '';
+        return window.Rupiah ? window.Rupiah.polos(raw) : raw;
+    }
+
+    function hubSetNominal(nilai) {
+        const input = document.getElementById('payment_amount');
+        if (!input) return;
+        const teks = String(nilai ?? '');
+        input.value = window.Rupiah ? window.Rupiah.formatDariServer(teks) : teks;
+    }
+
+    function hubRefreshInstallmentHint() {
+        const installmentHint = document.getElementById('hub-pay-installment-hint');
+        const settleHint = document.getElementById('hub-pay-settle-hint');
+        const overpayHint = document.getElementById('hub-pay-overpay-hint');
+
+        if (installmentHint) installmentHint.classList.add('hidden');
+        if (settleHint) settleHint.classList.add('hidden');
+        if (overpayHint) overpayHint.classList.add('hidden');
+
+        const totalAmount = hubNominal() + hubUseBalanceAmount();
+
+        if (isNaN(totalAmount) || totalAmount <= 0) {
+            return;
+        }
+
+        if (totalAmount > hubRemainingAmount) {
+            const overpay = Math.round((totalAmount - hubRemainingAmount) * 100) / 100;
+            if (overpayHint) {
+                overpayHint.textContent = hubFormatRupiah(hubRemainingAmount) + ' diterapkan ke tagihan (Lunas), ' +
+                    hubFormatRupiah(overpay) + ' tercatat sebagai lebih bayar.';
+                overpayHint.classList.remove('hidden');
+            }
+            return;
+        }
+
+        const leftover = Math.round((hubRemainingAmount - totalAmount) * 100) / 100;
+
+        if (leftover > 0) {
+            if (installmentHint) {
+                installmentHint.textContent = 'Tercatat sebagai Cicilan Ke-' + hubNextInstallment +
+                    '. Tagihan jadi berstatus Sebagian, sisa setelah ini: ' + hubFormatRupiah(leftover) + '.';
+                installmentHint.classList.remove('hidden');
+            }
+        } else {
+            if (settleHint) {
+                settleHint.textContent = 'Pembayaran ini melunasi tagihan. Status jadi Lunas.';
+                settleHint.classList.remove('hidden');
+            }
+        }
+    }
+
+    function updateHubStatusUi(rawStatus) {
+        selectedCustomerData.rawStatus = rawStatus;
+        const isActive = rawStatus === 'active';
+        const isSuspended = rawStatus === 'suspended';
+
+        // Update Modal Status Badge
+        const badgeEl = document.getElementById('actions-modal-status-badge');
+        if (badgeEl) {
+            const statusLabelSpan = badgeEl.querySelector('span:last-child') || badgeEl;
+            statusLabelSpan.innerText = isSuspended ? 'ISOLIR' : (isActive ? 'ACTIVE' : rawStatus.toUpperCase());
+            if (isActive) {
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+            } else if (isSuspended) {
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+            } else {
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
+            }
+        }
+
+        // Update Button Top
+        const toggleBtn = document.getElementById('btn-hub-toggle-status');
+        const toggleBtnText = document.getElementById('btn-hub-toggle-status-text');
+        if (toggleBtn && toggleBtnText) {
+            toggleBtnText.innerText = isActive ? 'Isolir Layanan' : 'Aktifkan Layanan';
+            if (isActive) {
+                toggleBtn.className = 'flex-1 min-w-[140px] h-11 px-2.5 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-amber-100 transition-all btn-interactive touch-target';
+            } else {
+                toggleBtn.className = 'flex-1 min-w-[140px] h-11 px-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-emerald-100 transition-all btn-interactive touch-target';
+            }
+        }
+
+        // Update Footer Toggle Button
+        const footerToggleText = document.getElementById('btn-hub-footer-toggle-text');
+        if (footerToggleText) {
+            footerToggleText.innerText = isActive ? 'Isolir' : 'Aktifkan';
+        }
+
+        // WA template update
+        const waIsolir = document.getElementById('btn-wa-isolir');
+        if (waIsolir) waIsolir.href = getWaLink('isolir');
+    }
+
     function openActionsModal(button) {
         const modal = document.getElementById('actions-modal');
         if (!modal) return;
@@ -216,12 +400,12 @@
             routerBrand: button.getAttribute('data-router-brand') || '-',
             contract: button.getAttribute('data-contract') || '-',
             distribution: button.getAttribute('data-distribution') || '-',
-            // URL aksi dirender server-side (route()) di tombolnya, bukan dirakit
-            // di JS dari id. ADHOC-20 langkah 3.
             paymentInfoUrl: button.getAttribute('data-payment-info-url') || '',
             networkUpdateUrl: button.getAttribute('data-network-update-url') || '',
             networkDataUrl: button.getAttribute('data-network-data-url') || '',
             detailUrl: button.getAttribute('data-detail-url') || '',
+            packageUpdateUrl: button.getAttribute('data-package-update-url') || '',
+            currentPackageId: button.getAttribute('data-current-package-id') || '',
         };
 
         const setElemText = (id, txt) => {
@@ -238,18 +422,7 @@
             avatarEl.innerText = selectedCustomerData.name.substring(0, 2).toUpperCase();
         }
 
-        const badgeEl = document.getElementById('actions-modal-status-badge');
-        if (badgeEl) {
-            const statusLabelSpan = badgeEl.querySelector('span:last-child') || badgeEl;
-            statusLabelSpan.innerText = selectedCustomerData.status.toUpperCase();
-            if (selectedCustomerData.rawStatus === 'active') {
-                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
-            } else if (selectedCustomerData.rawStatus === 'suspended') {
-                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
-            } else {
-                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
-            }
-        }
+        updateHubStatusUi(selectedCustomerData.rawStatus);
 
         const fullLoc = `${selectedCustomerData.pop} (${selectedCustomerData.village})`;
         setElemText('actions-modal-location-text', fullLoc);
@@ -272,19 +445,6 @@
             mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryAddr)}`;
         }
         if (fieldMapsBtn) fieldMapsBtn.href = mapsUrl;
-
-        // Toggle Status Button Text
-        const isActiveService = selectedCustomerData.rawStatus === 'active';
-        const toggleBtnText = document.getElementById('btn-hub-toggle-status-text');
-        if (toggleBtnText) {
-            toggleBtnText.innerText = isActiveService ? 'Isolir Layanan' : 'Aktifkan Layanan';
-        }
-        // Label kembar di bar aksi footer (mobile/tablet) — versinya dipendekkan
-        // karena slotnya cuma selebar ikon.
-        const footerToggleText = document.getElementById('btn-hub-footer-toggle-text');
-        if (footerToggleText) {
-            footerToggleText.innerText = isActiveService ? 'Isolir' : 'Aktifkan';
-        }
 
         // Pre-fill Static Data
         setElemText('hub-fin-package', selectedCustomerData.package);
@@ -317,61 +477,86 @@
         const compBar = document.getElementById('hub-prof-completeness-bar');
         if (compBar) compBar.style.width = selectedCustomerData.completenessPct + '%';
 
+        // Reset Payment Form Inputs
+        const payMethod = document.getElementById('payment_method');
+        if (payMethod) payMethod.value = 'cash';
+        const bankInput = document.getElementById('hub_bank_name');
+        if (bankInput) bankInput.value = '';
+        const accInput = document.getElementById('hub_account_number');
+        if (accInput) accInput.value = '';
+        const noteInput = document.getElementById('hub_note');
+        if (noteInput) noteInput.value = '';
+        const allocInput = document.getElementById('hub_allocation');
+        if (allocInput) allocInput.value = 'Tagihan Bulanan';
+        const errorBox = document.getElementById('hub-pay-error');
+        if (errorBox) errorBox.classList.add('hidden');
+        
+        hubApplyCustomerBalance(0);
+        hubPopulateCollectors([]);
+        hubTogglePaymentMethodFields();
+
         switchActionTab('finance');
         modal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
 
         // Set initial state saat data tagihan dimuat
         togglePaymentFormState(false, 'Memuat data tagihan pelanggan...');
-        // Struk & berkas ikut direset — kalau tidak, data pelanggan sebelumnya
-        // masih nempel selama fetch berjalan.
         setLatestReceipt(null);
         renderHubDocuments(null, null);
 
         // Fetch Live Payment Info
+        loadHubPaymentInfo();
+    }
+
+    function loadHubPaymentInfo() {
+        if (!selectedCustomerData.paymentInfoUrl) return;
+
         const loadingEl = document.getElementById('modal-hub-loading');
         if (loadingEl) loadingEl.classList.remove('hidden');
 
-        // URL dari atribut data-* yang dirender route() di tombolnya — sama seperti
-        // aksi tulis, biar tidak ada definisi path yang hidup dua kali.
         fetch(selectedCustomerData.paymentInfoUrl)
             .then(res => res.json())
             .then(data => {
                 if (loadingEl) loadingEl.classList.add('hidden');
                 const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
-                if (data.invoice_id) {
-                    setElemText('hub-invoice-period-badge', `Periode: ${data.billing_period || '-'}`);
-                    setElemText('hub-fin-due-date', data.due_date || selectedCustomerData.dueDate);
-                    setElemText('hub-fin-arrears', data.total_piutang > 0 ? formatRp(data.total_piutang) : 'Rp 0');
-                    setElemText('hub-fin-total-pay', formatRp(data.remaining_amount));
+                hubRemainingAmount = parseFloat(data.remaining_amount) || 0;
+                hubPaymentStoreUrl = data.payment_store_url || null;
 
-                    // URL dari server (payment_store_url), BUKAN dirakit di sini.
-                    // Tanpa URL-nya form dibiarkan mati — lebih baik tombol tidak
-                    // jalan daripada POST nyasar ke URL halaman daftar.
+                if (data.invoice_id) {
+                    const elPeriod = document.getElementById('hub-invoice-period-badge');
+                    if (elPeriod) elPeriod.innerText = `Periode: ${data.billing_period || '-'}`;
+                    const elDue = document.getElementById('hub-fin-due-date');
+                    if (elDue) elDue.innerText = data.due_date || selectedCustomerData.dueDate;
+                    const elArrears = document.getElementById('hub-fin-arrears');
+                    if (elArrears) elArrears.innerText = data.total_piutang > 0 ? formatRp(data.total_piutang) : 'Rp 0';
+                    const elTotalPay = document.getElementById('hub-fin-total-pay');
+                    if (elTotalPay) elTotalPay.innerText = formatRp(hubRemainingAmount);
+
                     const payForm = document.getElementById('payment-form');
                     if (payForm && data.payment_store_url) {
                         payForm.action = data.payment_store_url;
                     }
                     
-                    // Enable form jika pelanggan punya tagihan aktif
                     togglePaymentFormState(true);
+                    hubSetNominal(hubRemainingAmount);
 
-                    const amountInput = document.getElementById('payment_amount');
-                    if (amountInput) {
-                        // Nilai dari AJAX ikut dimasking supaya sisa tagihan
-                        // tampil 150.000, bukan 150000 di sebelah field yang
-                        // seluruh isinya berformat ribuan.
-                        amountInput.value = window.Rupiah
-                            ? window.Rupiah.formatDariServer(String(data.remaining_amount))
-                            : data.remaining_amount;
-                    }
+                    hubApplyCustomerBalance(data.customer_balance);
+                    hubPopulateCollectors(data.available_collectors);
+
+                    const validPayments = Array.isArray(data.recent_payments)
+                        ? data.recent_payments
+                        : [];
+                    hubNextInstallment = validPayments.length + 1;
+                    hubRefreshInstallmentHint();
                 } else {
-                    setElemText('hub-invoice-period-badge', 'Tidak Ada Tagihan Aktif');
-                    setElemText('hub-fin-total-pay', 'Rp 0');
-                    setElemText('hub-fin-arrears', 'Rp 0');
+                    const elPeriod = document.getElementById('hub-invoice-period-badge');
+                    if (elPeriod) elPeriod.innerText = 'Tidak Ada Tagihan Aktif';
+                    const elTotalPay = document.getElementById('hub-fin-total-pay');
+                    if (elTotalPay) elTotalPay.innerText = 'Rp 0';
+                    const elArrears = document.getElementById('hub-fin-arrears');
+                    if (elArrears) elArrears.innerText = 'Rp 0';
 
-                    // Disable form jika belum ada tagihan
                     togglePaymentFormState(false, 'Pelanggan ini belum memiliki tagihan aktif untuk dibayar.');
                 }
 
@@ -396,8 +581,6 @@
                     }
                 }
 
-                // Struk hanya bisa dicetak kalau pelanggan sudah pernah bayar —
-                // recent_payments sudah urut terbaru dari server.
                 setLatestReceipt(data.recent_payments && data.recent_payments.length > 0
                     ? data.recent_payments[0].receipt_url
                     : null);
@@ -405,10 +588,14 @@
                 renderHubDocuments(data.documents, data.documents_upload_url);
 
                 if (data.technical) {
-                    setElemText('hub-tech-pppoe', data.technical.pppoe_username || selectedCustomerData.pppoe);
-                    setElemText('hub-tech-onu', data.technical.onu_sn || selectedCustomerData.onu);
-                    setElemText('hub-tech-router', data.technical.router_sn || selectedCustomerData.router);
-                    setElemText('hub-tech-distribution', data.technical.distribution || selectedCustomerData.distribution);
+                    const elPppoe = document.getElementById('hub-tech-pppoe');
+                    if (elPppoe) elPppoe.innerText = data.technical.pppoe_username || selectedCustomerData.pppoe;
+                    const elOnu = document.getElementById('hub-tech-onu');
+                    if (elOnu) elOnu.innerText = data.technical.onu_sn || selectedCustomerData.onu;
+                    const elRouter = document.getElementById('hub-tech-router');
+                    if (elRouter) elRouter.innerText = data.technical.router_sn || selectedCustomerData.router;
+                    const elDist = document.getElementById('hub-tech-distribution');
+                    if (elDist) elDist.innerText = data.technical.distribution || selectedCustomerData.distribution;
                 }
             })
             .catch(err => {
@@ -420,7 +607,6 @@
     }
 
     // URL struk pembayaran terakhir pelanggan yang lagi dibuka di Modal Hub.
-    // Direset tiap modal dibuka supaya tidak mencetak struk pelanggan sebelumnya.
     let latestReceiptUrl = null;
 
     function setLatestReceipt(url) {
@@ -437,7 +623,6 @@
     function printLatestReceipt() {
         if (!latestReceiptUrl) {
             showModalToast('Belum ada pembayaran yang bisa dicetak.');
-
             return;
         }
         window.open(latestReceiptUrl, '_blank');
@@ -486,9 +671,9 @@
         if (!payForm) return;
 
         const amountInput = document.getElementById('payment_amount');
-        const methodSelect = payForm.querySelector('select[name="payment_method"]');
+        const methodSelect = document.getElementById('payment_method');
         const dateInput = document.getElementById('payment_date');
-        const submitBtn = payForm.querySelector('button[type="submit"]');
+        const submitBtn = document.getElementById('hub-pay-submit-btn');
         const noticeEl = document.getElementById('payment-form-notice');
         const noticeText = document.getElementById('payment-form-notice-text');
 
@@ -539,8 +724,6 @@
         const modal = document.getElementById('actions-modal');
         if (modal) modal.classList.add('hidden');
         document.body.classList.remove('overflow-hidden');
-        // Dropdown template WA ikut ditutup — kalau tidak, dia masih terbuka
-        // waktu modal dibuka lagi untuk pelanggan lain.
         const waDropdown = document.getElementById('wa-menu-dropdown');
         if (waDropdown) waDropdown.classList.add('hidden');
     }
@@ -559,17 +742,194 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
         });
     }
 
+    /* ── Live Listeners Form Pembayaran ── */
+    document.getElementById('payment_amount')?.addEventListener('input', hubRefreshInstallmentHint);
+
+    document.getElementById('hub-pay-use-balance')?.addEventListener('change', function(e) {
+        const wrap = document.getElementById('hub-pay-use-balance-wrap');
+        if (wrap) wrap.classList.toggle('hidden', !e.target.checked);
+
+        const useBalInput = document.getElementById('hub-pay-use-balance-amount');
+        if (e.target.checked) {
+            const max = Math.min(hubCustomerBalance, hubRemainingAmount);
+            if (useBalInput) {
+                useBalInput.value = window.Rupiah ? window.Rupiah.formatDariServer(String(max)) : String(max);
+            }
+        } else {
+            if (useBalInput) useBalInput.value = '';
+        }
+        hubApplyBalanceToAmount();
+    });
+
+    document.getElementById('hub-pay-use-balance-amount')?.addEventListener('input', hubApplyBalanceToAmount);
+
+    /* ── Submit Handler Pembayaran Cepat via AJAX ── */
+    document.getElementById('payment-form')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (!hubPaymentStoreUrl) return;
+
+        const submitBtn = document.getElementById('hub-pay-submit-btn');
+        const spinner = document.getElementById('hub-pay-spinner');
+        const submitIcon = document.getElementById('hub-pay-submit-icon');
+        const submitText = document.getElementById('hub-pay-submit-text');
+        const errorBox = document.getElementById('hub-pay-error');
+
+        if (errorBox) errorBox.classList.add('hidden');
+
+        const nominal = hubNominal();
+        const useBalance = hubUseBalanceAmount();
+        if ((isNaN(nominal) || nominal < 1) && useBalance < 1) {
+            if (errorBox) {
+                errorBox.textContent = 'Nominal pembayaran wajib diisi minimal Rp 1 atau menggunakan Saldo Pelanggan.';
+                errorBox.classList.remove('hidden');
+            }
+            return;
+        }
+
+        // Loading UI
+        if (submitBtn) submitBtn.disabled = true;
+        if (spinner) spinner.classList.remove('hidden');
+        if (submitIcon) submitIcon.classList.add('hidden');
+        if (submitText) submitText.innerText = 'Menyimpan...';
+
+        const csrfToken = document.querySelector('input[name="_token"]')?.value || document.querySelector('meta[name="csrf-token"]')?.content;
+        const formData = new FormData(this);
+        formData.set('amount', String(hubNominalPolos()));
+        if (useBalance > 0) {
+            formData.set('use_balance_amount', String(useBalance));
+        }
+
+        fetch(hubPaymentStoreUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: formData
+        })
+        .then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const message = data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'Gagal mencatat pembayaran.');
+                throw new Error(message);
+            }
+            return data;
+        })
+        .then(data => {
+            showModalToast(data.message || 'Pembayaran berhasil dicatat!');
+            loadHubPaymentInfo();
+        })
+        .catch(err => {
+            if (errorBox) {
+                errorBox.textContent = err.message || 'Terjadi kesalahan saat mencatat pembayaran.';
+                errorBox.classList.remove('hidden');
+            }
+        })
+        .finally(() => {
+            if (submitBtn) submitBtn.disabled = false;
+            if (spinner) spinner.classList.add('hidden');
+            if (submitIcon) submitIcon.classList.remove('hidden');
+            if (submitText) submitText.innerText = 'Simpan Pembayaran';
+        });
+    });
+
+    /* ── Fungsi Nyata Suspend / Isolir Layanan Pelanggan ── */
     function triggerHubToggleConnection() {
+        if (!selectedCustomerData.id) return;
         const isCurrentActive = selectedCustomerData.rawStatus === 'active';
+        const isSuspended = selectedCustomerData.rawStatus === 'suspended';
+
+        if (!isCurrentActive && !isSuspended) {
+            showModalToast('Layanan hanya dapat diisolir atau diaktifkan untuk pelanggan aktif atau terisolir.');
+            return;
+        }
+
         const actionText = isCurrentActive ? 'mengisolir / menonaktifkan' : 'mengaktifkan kembali';
 
-        if (window.confirmAction) {
-            if (confirm(`Apakah Anda yakin ingin ${actionText} koneksi internet untuk ${selectedCustomerData.name}?`)) {
-                showModalToast(`Status layanan ${selectedCustomerData.name} berhasil diubah.`);
+        // window.Dialog — modal konfirmasi standar app (lihat layouts/app.blade.php).
+        // Dulu pakai confirm() bawaan browser: gak konsisten sama modal lain di
+        // app ini, dan di beberapa kombinasi browser/extension bisa ke-suppress
+        // diam-diam sehingga tombol kelihatan "gak ngapa-ngapain".
+        window.Dialog.show({
+            title: isCurrentActive ? 'Isolir Layanan' : 'Aktifkan Kembali Layanan',
+            message: `Apakah Anda yakin ingin ${actionText} koneksi internet untuk pelanggan "${selectedCustomerData.name}"?`,
+            icon: 'warning',
+            buttons: [
+                { text: 'Batal', type: 'secondary', onClick: () => window.Dialog.close() },
+                {
+                    text: isCurrentActive ? 'Ya, Isolir' : 'Ya, Aktifkan',
+                    type: isCurrentActive ? 'danger' : 'primary',
+                    onClick: () => {
+                        window.Dialog.close();
+                        submitHubToggleConnection(isCurrentActive);
+                    },
+                },
+            ],
+        });
+    }
+
+    function submitHubToggleConnection(isCurrentActive) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value;
+        const btnTop = document.getElementById('btn-hub-toggle-status');
+        const btnText = document.getElementById('btn-hub-toggle-status-text');
+
+        if (btnTop) btnTop.disabled = true;
+        if (btnText) btnText.innerText = 'Memproses...';
+
+        fetch(`/customers/${selectedCustomerData.id}/toggle-suspend`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({
+                _token: csrfToken,
+                note: isCurrentActive ? 'Isolir Layanan dari List Pelanggan' : 'Aktivasi Kembali Layanan dari List Pelanggan'
+            })
+        })
+        .then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.message || 'Gagal mengubah status layanan.');
             }
-        } else if (confirm(`Apakah Anda yakin ingin ${actionText} koneksi internet untuk ${selectedCustomerData.name}?`)) {
-            showModalToast(`Status layanan ${selectedCustomerData.name} berhasil diubah.`);
-        }
+            return data;
+        })
+        .then(data => {
+            updateHubStatusUi(data.raw_status);
+            showModalToast(data.message || 'Status layanan berhasil diperbarui.');
+
+            // Update status badge di tabel list utama secara realtime jika elemennya ada
+            const tableRows = document.querySelectorAll(`button[data-id="${selectedCustomerData.id}"]`);
+            tableRows.forEach(btn => {
+                btn.setAttribute('data-raw-status', data.raw_status);
+                btn.setAttribute('data-status', data.status_label);
+                const tr = btn.closest('tr');
+                if (tr) {
+                    const statusTd = tr.querySelector('td:nth-last-child(2)');
+                    if (statusTd) {
+                        const isNowActive = data.raw_status === 'active';
+                        const isNowSuspended = data.raw_status === 'suspended';
+                        statusTd.innerHTML = `
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${isNowActive ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (isNowSuspended ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800')}">
+                                <span class="w-1.5 h-1.5 rounded-full ${isNowActive ? 'bg-emerald-500 animate-pulse-glow' : (isNowSuspended ? 'bg-amber-500' : 'bg-rose-500')} mr-1.5"></span>
+                                <span>${data.status_label}</span>
+                            </span>
+                        `;
+                    }
+                }
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            showModalToast(err.message || 'Terjadi kesalahan sistem.');
+            updateHubStatusUi(selectedCustomerData.rawStatus);
+        })
+        .finally(() => {
+            if (btnTop) btnTop.disabled = false;
+        });
     }
 
     function triggerDetail() {
@@ -577,14 +937,65 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
         window.location.href = selectedCustomerData.detailUrl;
     }
 
-    // Jembatan Modal Hub → Modal Atur Jaringan. Dua modal tidak boleh tampil
-    // bersamaan (keduanya z-50 + backdrop), jadi hub ditutup dulu baru network dibuka.
+    // Jembatan Modal Hub → Modal Atur Jaringan.
     function triggerNetworkAssignmentFromHub() {
         if (!selectedCustomerData || !selectedCustomerData.networkUpdateUrl) return;
         const updateUrl = selectedCustomerData.networkUpdateUrl;
         const dataUrl = selectedCustomerData.networkDataUrl;
         closeActionsModal();
         openNetworkAssignmentModal(updateUrl, dataUrl);
+    }
+
+    // Jembatan Modal Hub → Modal Ganti Paket. Data (paket/harga aktif) sudah
+    // ada di selectedCustomerData (dari data-* baris tabel), jadi tidak perlu
+    // fetch ulang seperti Atur Jaringan.
+    function triggerPackageChangeFromHub() {
+        if (!selectedCustomerData || !selectedCustomerData.packageUpdateUrl) return;
+        closeActionsModal();
+        openPackageChangeModal(
+            selectedCustomerData.packageUpdateUrl,
+            selectedCustomerData.currentPackageId,
+            selectedCustomerData.package,
+            selectedCustomerData.price,
+            selectedCustomerData.name
+        );
+    }
+
+    /* ── Modal Ganti Paket Internet ──
+       @param {string} updateUrl PUT target (customers.package.update), dirender
+       server-side lewat data-package-update-url di tombol pemanggil. JANGAN
+       merakit path dari id pelanggan di sini — ADHOC-20 langkah 3. */
+    function openPackageChangeModal(updateUrl, currentPackageId, currentPackageLabel, currentPriceLabel, customerName) {
+        const wrapper = document.getElementById('package-change-modal-wrapper');
+        const form = document.getElementById('package-change-form');
+        const select = document.getElementById('pkg-select');
+        const nameEl = document.getElementById('pkg-customer-name');
+        const currentPackageEl = document.getElementById('pkg-current-package');
+        const currentPriceEl = document.getElementById('pkg-current-price');
+
+        if (!wrapper || !form) return;
+        if (!updateUrl) {
+            if (window.Toast) {
+                window.Toast.error('Aksi Gagal', 'Target penyimpanan paket tidak dikenal. Muat ulang halaman.');
+            }
+
+            return;
+        }
+
+        form.action = updateUrl;
+        if (select) select.value = currentPackageId || '';
+        if (nameEl) nameEl.textContent = customerName || '-';
+        if (currentPackageEl) currentPackageEl.textContent = currentPackageLabel || '-';
+        if (currentPriceEl) currentPriceEl.textContent = currentPriceLabel || '-';
+
+        wrapper.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closePackageChangeModal() {
+        const wrapper = document.getElementById('package-change-modal-wrapper');
+        if (wrapper) wrapper.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
     }
 
     function triggerEdit() {
@@ -594,9 +1005,11 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
     function triggerTerminate() {
         closeActionsModal();
         if (!selectedCustomerData.detailUrl) return;
-        if (confirm(`Apakah Anda yakin ingin melakukan PEMUTUSAN / TERMINASI untuk ${selectedCustomerData.name}?`)) {
-            window.location.href = selectedCustomerData.detailUrl + '#terminate';
-        }
+        // Konfirmasi (+ alasan wajib) sudah ditangani panel "Putus Langganan"
+        // di halaman Detail (window.confirmDelete) — bukan di sini, biar gak
+        // dobel dialog dan halaman Detail tetap satu-satunya tempat forms
+        // mutasi data ini benar-benar dirender (lihat customers/show.blade.php).
+        window.location.href = selectedCustomerData.detailUrl + '#terminate';
     }
 
 @include('customers.partials._network_assignment_js')

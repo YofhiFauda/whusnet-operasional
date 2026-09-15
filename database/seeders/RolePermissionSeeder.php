@@ -45,6 +45,48 @@ class RolePermissionSeeder extends Seeder
                 'tickets.qr.create',
             ],
 
+            // Business Development (Skema 1-3, 2026-09-12) — atur restriksi
+            // paket Sales/Teknisi, kelola Master Agent, daftarkan pelanggan
+            // atas nama Agent, pantau omset Sales.
+            'business_development' => [
+                'dashboard.view',
+                'packages.view',
+                // Ubah pemetaan kategori paket → siapa yang validasi Biaya
+                // Instalasi (dropdown permission di Master Kategori Paket).
+                'packages.update',
+                'package_restrictions.view',
+                'package_restrictions.update',
+                'agents.view',
+                'agents.create',
+                'agents.update',
+                'sales_omset_dashboard.view',
+                'customers.view',
+                'customers.detail.view',
+                'customers.create',
+                'customers.update',
+                'customers.detail.identity.view',
+                'customers.detail.identity.update',
+                'customers.detail.address.view',
+                'customers.detail.address.update',
+                'customers.detail.packages.view',
+                'customers.detail.packages.update',
+                'customers.detail.documents.view',
+                'customers.detail.documents.upload',
+                'customers.detail.documents.download',
+                'customer_acquisitions.view',
+                'business_development_verification.view',
+                // SENGAJA TIDAK diberi 'customer_acquisitions.installation_fee.update'
+                // di sini — akses business_development ke "Biaya Instalasi"
+                // datang dari jalur ROLE (package_categories.
+                // installation_fee_approval_role_id, default dipetakan ke
+                // role ini oleh CustomerAcquisitionFeatureSeeder), BUKAN
+                // permission langsung. Permission ini cuma buat jalur teknis
+                // override (admin/owner via wildcard) — kalau digrant di
+                // sini juga, admin gak akan pernah bisa "mencabut" akses
+                // business_development dengan memindah role di Master
+                // Kategori Paket (CustomerAcquisition::canBeValidatedBy()).
+            ],
+
             'atasan' => [
                 'dashboard.view',
                 'pops.view',
@@ -73,6 +115,7 @@ class RolePermissionSeeder extends Seeder
                 'tickets.dibatalkan.view',
                 'qr_scan_logs.view', // Dashboard anomali scan QR (docs/plan/qr-code/)
                 'noc_dashboard.view', // Monitoring tracking NOC, gak akses Worksheet NOC (itu kerjaan NOC)
+                'noc_dashboard.performance.view', // Atasan evaluasi performa individu Helpdesk/NOC
                 // Setoran Kas: atasan MEMERIKSA, tidak menyetor. `create`
                 // sengaja tak diberikan — atasan bukan pemegang kas, dan tanpa
                 // saldo sendiri dia mustahil jadi penyetor sekaligus pemeriksa.
@@ -98,12 +141,31 @@ class RolePermissionSeeder extends Seeder
                 // Permintaan Stok — atasan MEMANTAU antrean, gak fulfill/tolak
                 // (itu keputusan operasional admin gudang Pusat).
                 'warehouse_stock_request.view',
+                // Dashboard Analitik FOP — atasan evaluasi pola & performa
+                // lintas periode, sama pola warehouse_report.view di atas.
+                'fop_analytics.view',
+                // Busdev — atasan cukup MELIHAT list pelanggan <30 hari buat
+                // pemantauan/rekap gaji sales, gak isi kolom manual sendiri.
+                'customer_acquisitions.view',
+                'business_development_verification.view',
+                // Skema 1-3 (2026-09-12) — atasan MEMANTAU (lihat daftar
+                // restriksi, lihat master Agent, lihat dashboard omset),
+                // gak eksekusi (`.update`/`.create` tetap Busdev/admin —
+                // pola sama cash_deposit/warehouse di atas).
+                'package_restrictions.view',
+                'agents.view',
+                'sales_omset_dashboard.view',
             ],
 
             'admin' => [
                 'dashboard.view',
                 'pops.*',
                 'users.*',
+                'customer_acquisitions.*',
+                'business_development_verification.*',
+                'agents.*',
+                'package_restrictions.*',
+                'sales_omset_dashboard.view',
                 'roles.*',
                 'packages.*',
                 'sla_timeline.*',
@@ -176,6 +238,9 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_stock_request.create',
                 'warehouse_stock_request.approve',
                 'warehouse_stock_request.reject',
+                // Dashboard Analitik FOP — admin akses penuh operasional, wajar
+                // ikut lihat laporan agregat lintas periode (sama pola warehouse_report.view).
+                'fop_analytics.view',
             ],
 
             'noc' => [
@@ -298,6 +363,12 @@ class RolePermissionSeeder extends Seeder
                 // integrasi nanti.
                 'warehouse_custody.view',
                 'warehouse_traceability.view',
+                // Dashboard Analitik FOP — role 'fop' justru audiens UTAMA
+                // halaman ini (evaluasi pola & performa lintas periode buat
+                // wilayah kerjanya sendiri), sebelumnya kelewat cuma
+                // digrant ke owner/atasan/admin/pop_admin (mirror
+                // warehouse_report.view yang audiensnya beda).
+                'fop_analytics.view',
             ],
 
             'teknisi' => [
@@ -360,6 +431,9 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.documents.upload',
                 'customers.detail.documents.download',
                 'tickets.*',
+                // Customer Acquisition — list pelanggan <30 hari
+                // diverifikasi, dipantau sales/busdev buat rekap komisi.
+                'customer_acquisitions.view',
             ],
 
             'pop_admin' => [
@@ -422,6 +496,10 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_stock_request.view',
                 'warehouse_stock_request.create',
                 'warehouse_stock_request.cancel',
+                // Dashboard Analitik FOP — pop_admin evaluasi performa
+                // cabangnya sendiri, discope EffectiveAccessService seperti
+                // warehouse_report.view.
+                'fop_analytics.view',
             ],
         ];
 

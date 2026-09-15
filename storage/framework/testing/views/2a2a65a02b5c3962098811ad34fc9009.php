@@ -120,7 +120,12 @@
 
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-semibold text-slate-800 dark:text-slate-200"><?php echo e($category->name); ?></div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-200"><?php echo e($category->name); ?></span>
+                            <?php if($category->is_batch): ?>
+                            <span title="Support Parent/Child banyak pelanggan di Worksheet Helpdesk" class="inline-flex px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-800/50">Batch</span>
+                            <?php endif; ?>
+                        </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="text-sm text-slate-600 dark:text-slate-400"><?php echo e($category->default_priority?->value); ?></span>

@@ -4,23 +4,31 @@
 <?php $__env->startSection('breadcrumb_parent_url', '/'); ?>
 
 <?php $__env->startSection('content'); ?>
-<div x-data="fopDashboardHandler()" class="flex flex-col gap-6 px-6 py-6 max-w-screen-2xl mx-auto font-sans text-text-main">
+<div x-data="fopDashboardHandler()" class="flex flex-col gap-5 sm:gap-6 max-w-screen-2xl mx-auto font-sans text-text-main px-1 sm:px-0">
 
     
-    <div class="page-header flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between mb-2">
+    <div class="page-header flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between mb-1">
         <div class="page-header-left">
             <div class="flex items-center gap-2">
-                <svg class="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                </svg>
+                <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                </div>
                 <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">FOP Dashboard</h1>
             </div>
             <p class="text-xs text-text-muted mt-0.5 font-sans">Ringkasan pengerjaan harian lapangan dan koordinasi tim teknisi · <?php echo e(now()->translatedFormat('l, d F Y')); ?></p>
         </div>
+        <div>
+            <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors shadow-2xs font-sans">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                <span>Kelola Task FOP</span>
+            </a>
+        </div>
     </div>
 
     
-    <div id="stat-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div id="stat-cards-container" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <!-- Card 1: Antrean Survey -->
         <div class="metric-card <?php echo e(($stats['overdue_survey'] ?? 0) > 0 ? 'status-error' : 'status-info'); ?>">
             <div>
@@ -97,6 +105,50 @@
     </div>
 
     
+    <div id="gudang-stats-container" class="flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Pemakaian Alat Gudang (Hari Ini)</p>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('warehouse_report.view')): ?>
+            <a href="<?php echo e(route('warehouse.reports.index')); ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
+                <span>Lihat Laporan Gudang</span>
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+            </a>
+            <?php endif; ?>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div class="metric-card status-info">
+                <div>
+                    <div class="metric-card-label"><span>Keluar dari Gudang</span></div>
+                    <div class="metric-card-value-container">
+                        <p class="metric-card-value"><?php echo e(rtrim(rtrim(number_format($gudangStats['keluar'], 2, ',', '.'), '0'), ',')); ?></p>
+                    </div>
+                </div>
+                <p class="metric-card-footer">Diserahkan ke teknisi hari ini</p>
+            </div>
+            <div class="metric-card status-success">
+                <div>
+                    <div class="metric-card-label"><span>Terpakai</span></div>
+                    <div class="metric-card-value-container">
+                        <p class="metric-card-value"><?php echo e(rtrim(rtrim(number_format($gudangStats['terpakai'], 2, ',', '.'), '0'), ',')); ?></p>
+                    </div>
+                </div>
+                <p class="metric-card-footer">Dipasang/dihabiskan di laporan hari ini</p>
+            </div>
+            <div class="metric-card status-warning">
+                <div>
+                    <div class="metric-card-label"><span>Sisa di Tangan Teknisi</span></div>
+                    <div class="metric-card-value-container">
+                        <p class="metric-card-value"><?php echo e(rtrim(rtrim(number_format($gudangStats['sisa_di_teknisi'], 2, ',', '.'), '0'), ',')); ?></p>
+                    </div>
+                </div>
+                <p class="metric-card-footer">Belum dipakai / belum dikembalikan</p>
+            </div>
+        </div>
+    </div>
+
+    
     <div id="fop-teams-board" class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
             <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Team FOP Aktif</p>
@@ -108,12 +160,12 @@
             </a>
         </div>
         <?php if($activeFopTeams->count() > 0): ?>
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
             <?php $__currentLoopData = $activeFopTeams; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $team): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
             <div @dragover.prevent="onTeamDragOver(<?php echo e($team['id']); ?>)"
                  @dragleave="onTeamDragLeave(<?php echo e($team['id']); ?>)"
                  @drop.prevent="onTeamDrop(<?php echo e($team['id']); ?>)"
-                 :class="dragOverTeamId === <?php echo e($team['id']); ?> ? 'border-primary ring-4 ring-primary/10 bg-primary/5 shadow-md scale-[1.01]' : 'border-border bg-surface shadow-sm'"
+                 :class="dragOverTeamId === <?php echo e($team['id']); ?> ? 'border-primary ring-4 ring-primary/10 bg-primary/5 shadow-md scale-[1.01]' : 'border-border bg-surface shadow-xs'"
                  class="flex flex-col border rounded-xl overflow-hidden hover:shadow-md hover:border-primary-border/60 transition-all duration-200">
                 
                 
@@ -124,26 +176,26 @@
                 </button>
 
                 
-                <div class="p-4 flex-1 flex flex-col gap-2 max-h-48 overflow-y-auto custom-scrollbar">
+                <div class="p-3 sm:p-4 flex-1 flex flex-col gap-2 max-h-56 overflow-y-auto custom-scrollbar">
                     <?php $__empty_1 = true; $__currentLoopData = $team['tasks']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                     <div draggable="<?php echo e($t['draggable'] ? 'true' : 'false'); ?>"
                          @dragstart="<?php echo e($t['draggable'] ? 'true' : 'false'); ?> ? startTaskDrag($event, <?php echo e($t['fop_task_id']); ?>, <?php echo e($team['id']); ?>, <?php echo \Illuminate\Support\Js::from($t['tugas'])->toHtml() ?>) : $event.preventDefault()"
                          @dragend="endTaskDrag()"
                          @click="openTeamDetail(<?php echo e($team['id']); ?>)"
                          :class="[
-                            'flex items-center justify-between text-[11px] rounded-lg px-2.5 py-2 border transition-all duration-150 shadow-xs',
+                            'flex items-center justify-between text-[11px] rounded-lg p-2 sm:px-2.5 sm:py-2 border transition-all duration-150 shadow-xs',
                             dragging && dragging.fopTaskId === <?php echo e($t['fop_task_id']); ?>
 
                                 ? 'opacity-40 border-dashed bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'
                                 : (<?php echo e($t['draggable'] ? 'true' : 'false'); ?>
 
-                                    ? 'cursor-grab hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:bg-slate-700/50 dark:hover:bg-slate-700 dark:hover:bg-slate-700/50 dark:hover:bg-slate-750 border-border hover:border-primary/30'
+                                    ? 'cursor-grab hover:bg-slate-100 dark:hover:bg-slate-700/50 border-border hover:border-primary/30'
                                     : 'cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60')
                          ]">
                         <div class="flex items-center gap-2 truncate flex-1 mr-1">
                             <?php if($t['draggable']): ?>
-                            <!-- Drag Handle Icon -->
-                            <svg class="h-3.5 w-3.5 text-text-disabled shrink-0 cursor-grab" fill="currentColor" viewBox="0 0 24 24">
+                            <!-- Drag Handle Icon on desktop -->
+                            <svg class="hidden md:block h-3.5 w-3.5 text-text-disabled shrink-0 cursor-grab" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M8.5 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
                             </svg>
                             <?php endif; ?>
@@ -152,11 +204,24 @@
                                 <span class="text-[9px] text-text-muted truncate font-sans"><?php echo e($t['customer_name']); ?></span>
                             </div>
                         </div>
-                        <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ml-2 border font-sans"
-                            style="<?php echo e($t['status_style']); ?>">
-                            <?php echo e($t['status']); ?>
+                        
+                        <div class="flex items-center gap-1.5 shrink-0 ml-1">
+                            <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border font-sans"
+                                style="<?php echo e($t['status_style']); ?>">
+                                <?php echo e($t['status']); ?>
 
-                        </span>
+                            </span>
+                            
+                            
+                            <?php if($t['draggable'] && $activeFopTeams->count() > 1): ?>
+                            <button type="button"
+                                    @click.stop="openMobileSwitchTeamModal(<?php echo e($t['fop_task_id']); ?>, <?php echo e($team['id']); ?>, <?php echo \Illuminate\Support\Js::from($t['tugas'])->toHtml() ?>)"
+                                    class="md:hidden p-1 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 cursor-pointer shadow-2xs"
+                                    title="Pindahkan ke Tim Lain">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                            </button>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <div class="flex flex-col items-center justify-center py-6 text-text-muted">
@@ -173,13 +238,13 @@
                         class="text-left px-4 py-3 border-t border-border bg-surface hover:bg-surface-muted flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
                     <div class="flex items-center -space-x-2">
                         <?php $__currentLoopData = $team['members']->take(4); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <span class="h-6 w-6 rounded-full bg-primary text-white border-2 border-surface flex items-center justify-center text-[9px] font-bold tracking-tight font-sans shadow-sm" title="<?php echo e($member['name']); ?>">
+                        <span class="h-6 w-6 rounded-full bg-primary text-white border-2 border-surface flex items-center justify-center text-[9px] font-bold tracking-tight font-sans shadow-xs" title="<?php echo e($member['name']); ?>">
                             <?php echo e($member['initials']); ?>
 
                         </span>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                         <?php if($team['members']->count() > 4): ?>
-                        <span class="h-6 w-6 rounded-full bg-slate-200 text-slate-700 dark:text-slate-300 border-2 border-surface flex items-center justify-center text-[9px] font-bold font-sans shadow-sm">
+                        <span class="h-6 w-6 rounded-full bg-slate-200 text-slate-700 dark:text-slate-300 border-2 border-surface flex items-center justify-center text-[9px] font-bold font-sans shadow-xs">
                             +<?php echo e($team['members']->count() - 4); ?>
 
                         </span>
@@ -191,7 +256,7 @@
             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
         </div>
         <?php else: ?>
-        <div class="bg-surface border border-border rounded-xl flex flex-col items-center justify-center py-12 text-text-muted shadow-sm">
+        <div class="bg-surface border border-border rounded-xl flex flex-col items-center justify-center py-12 text-text-muted shadow-xs">
             <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
@@ -204,9 +269,8 @@
     <script type="application/json" id="fop-teams-json"><?php echo json_encode($activeFopTeams, 15, 512) ?></script>
 
     
-    <div x-show="teamDetail.open"
-         x-effect="document.body.classList.toggle('overflow-hidden', teamDetail.open)"
-         class="fixed inset-0 z-50 overflow-y-auto"
+    <div x-show="mobileSwitchSelectTeamModal.open"
+         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:hidden"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -215,123 +279,50 @@
          x-transition:leave-end="opacity-0"
          style="display: none;">
 
-        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-md" @click="teamDetail.open = false"></div>
+        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="mobileSwitchSelectTeamModal.open = false"></div>
 
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-surface border border-border w-full max-w-lg rounded-xl shadow-xl relative z-10 overflow-hidden"
-                 x-show="teamDetail.open"
-                 @click.away="teamDetail.open = false"
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0 scale-95 translate-y-4"
-                 x-transition:enter-end="opacity-100 scale-100 translate-y-0">
+        <div class="bg-surface border-t border-border w-full rounded-t-2xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-sans"
+             @click.away="mobileSwitchSelectTeamModal.open = false"
+             x-transition:enter="transition ease-out duration-250"
+             x-transition:enter-start="translate-y-full"
+             x-transition:enter-end="translate-y-0">
 
-                <template x-if="teamDetail.data">
-                    <div>
-                        
-                        <div class="px-5 py-4 border-b border-border flex items-center justify-between bg-surface-muted">
+            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0"></div>
+
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted shrink-0">
+                <div>
+                    <h3 class="text-sm font-bold text-text-main">Pindahkan Task ke Tim Lain</h3>
+                    <p class="text-[11px] text-text-muted truncate mt-0.5" x-text="mobileSwitchSelectTeamModal.tugas"></p>
+                </div>
+                <button type="button" @click="mobileSwitchSelectTeamModal.open = false" class="text-text-muted hover:text-text-main p-1">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-3 flex-1 custom-scrollbar">
+                <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider">Pilih Tim Tujuan</label>
+                <div class="flex flex-col gap-2">
+                    <template x-for="team in teamsData.filter(t => t.id !== mobileSwitchSelectTeamModal.fromTeamId)" :key="team.id">
+                        <button type="button" 
+                                @click="selectTargetTeamForMobileSwitch(team.id)"
+                                class="w-full text-left p-3 border border-border rounded-lg bg-surface hover:bg-surface-muted transition-colors flex items-center justify-between">
                             <div>
-                                <h3 class="text-sm font-bold text-text-main font-sans" x-text="teamDetail.data.name"></h3>
-                                <p class="text-[10px] text-text-muted font-medium font-sans mt-0.5" x-text="teamDetail.data.work_date"></p>
+                                <span class="text-xs font-bold text-text-main" x-text="team.name"></span>
+                                <p class="text-[10px] text-text-muted mt-0.5" x-text="team.members.map(m => m.name).join(', ') || 'Belum ada anggota'"></p>
                             </div>
-                            <button type="button" @click="teamDetail.open = false" class="text-text-disabled hover:text-text-main transition-colors cursor-pointer">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        
-                        <div class="p-5 max-h-[60vh] overflow-y-auto space-y-4 custom-scrollbar">
-                            
-                            <div class="bg-surface-muted border border-border rounded-lg p-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-xs font-bold text-text-secondary uppercase tracking-wider font-sans">Progress Team</span>
-                                    <span class="text-xs font-bold font-mono text-text-main" x-text="teamDetail.data.completed_tasks + '/' + teamDetail.data.total_tasks + ' Selesai'"></span>
-                                </div>
-                                <div class="h-2.5 bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                                    <div class="h-full rounded-full transition-all duration-300"
-                                         :style="`width: ${teamDetail.data.progress_percent}%; background: ${teamDetail.data.progress_percent === 100 ? 'var(--color-success)' : 'var(--color-primary)'}`">
-                                    </div>
-                                </div>
-                            </div>
-
-                            
-                            <div>
-                                <h4 class="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2.5 font-sans">Task dalam Team</h4>
-                                <div class="border border-border rounded-lg bg-surface divide-y divide-border overflow-hidden shadow-xs">
-                                    <template x-for="t in teamDetail.data.tasks" :key="t.fop_task_id">
-                                        <a :href="t.task_id ? `<?php echo e(url('/tasks')); ?>/${t.task_id}` : '#'"
-                                           class="block p-4 hover:bg-surface-muted transition-colors duration-150 cursor-pointer"
-                                           :class="!t.task_id ? 'pointer-events-none opacity-60' : ''">
-                                            
-                                            <!-- Top Row -->
-                                            <div class="flex items-start justify-between gap-2 mb-2.5">
-                                                <!-- Left: Badge Kategori -->
-                                                <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border font-sans"
-                                                      :class="t.badge_classes"
-                                                      x-text="t.category_label">
-                                                </span>
-                                                <!-- Right: Task ID & Status -->
-                                                <div class="flex items-center gap-1.5 shrink-0 font-sans">
-                                                    <span class="text-[10px] font-mono text-text-muted font-semibold" x-text="t.task_number"></span>
-                                                    <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border font-sans"
-                                                          :style="t.status_style"
-                                                          x-text="t.status">
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <!-- Body: Customer Name -->
-                                            <div class="mb-1">
-                                                <h5 class="text-xs font-bold text-text-main font-sans" x-text="t.customer_name"></h5>
-                                            </div>
-
-                                            <!-- Body: Customer Address -->
-                                            <div class="mb-3">
-                                                <p class="text-[11px] text-text-muted font-sans leading-relaxed" x-text="t.customer_address"></p>
-                                            </div>
-
-                                            <!-- Footer: Technicians / PIC -->
-                                            <div class="pt-3 border-t border-border/60 flex items-center justify-between">
-                                                <div class="flex items-center gap-1 text-[10px] text-text-muted font-sans">
-                                                    <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                    </svg>
-                                                    <span class="font-semibold text-text-secondary" x-text="t.technicians.join(', ') || 'Belum ada PIC'"></span>
-                                                </div>
-                                                <span class="text-[10px] font-bold text-primary hover:text-primary-hover font-sans inline-flex items-center gap-0.5">
-                                                    <span>Detail Task</span>
-                                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                                    </svg>
-                                                </span>
-                                            </div>
-                                        </a>
-                                    </template>
-                                    <div x-show="teamDetail.data.tasks.length === 0" class="text-xs text-text-muted italic text-center py-6 font-sans">Belum ada task.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        
-                        <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex justify-end">
-                            <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
-                                <span>Kelola di Task FOP</span>
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </a>
-                        </div>
-                    </div>
-                </template>
+                            <svg class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                    </template>
+                </div>
             </div>
         </div>
     </div>
 
     
-    <div x-show="switchTeamModal.open"
-         x-effect="document.body.classList.toggle('overflow-hidden', switchTeamModal.open)"
-         class="fixed inset-0 z-50 overflow-y-auto"
+    <div x-show="teamDetail.open"
+         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -340,77 +331,194 @@
          x-transition:leave-end="opacity-0"
          style="display: none;">
 
-        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-md" @click="switchTeamModal.open = false"></div>
+        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="teamDetail.open = false"></div>
 
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-surface border border-border w-full max-w-md rounded-xl shadow-xl relative z-10 overflow-hidden"
-                 @click.away="switchTeamModal.open = false">
+        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-sans"
+             x-show="teamDetail.open"
+             @click.away="teamDetail.open = false"
+             x-transition:enter="transition ease-out duration-250"
+             x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
+             x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
 
-                <div class="px-5 py-4 border-b border-border flex items-center justify-between bg-surface-muted">
-                    <h3 class="text-sm font-bold text-text-main font-sans">Pindahkan Task ke Team Lain</h3>
-                    <button type="button" @click="switchTeamModal.open = false" class="text-text-disabled hover:text-text-main transition-colors cursor-pointer">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
+            <template x-if="teamDetail.data">
+                <div class="flex flex-col flex-1 overflow-hidden">
+                    <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
 
-                <div class="p-5 space-y-4 font-sans">
-                    <p class="text-xs text-text-secondary leading-relaxed bg-primary-soft/50 p-3 rounded-lg border border-primary-border">
-                        Pindahkan task <span class="font-bold text-text-main font-mono" x-text="switchTeamModal.tugas"></span> dari 
-                        <span class="font-bold text-text-main" x-text="switchTeamModal.fromTeamName"></span> ke 
-                        <span class="font-bold text-text-main" x-text="switchTeamModal.toTeamName"></span>.
-                    </p>
+                    
+                    <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted shrink-0">
+                        <div>
+                            <h3 class="text-sm font-bold text-text-main font-sans" x-text="teamDetail.data.name"></h3>
+                            <p class="text-[10px] text-text-muted font-medium font-sans mt-0.5" x-text="teamDetail.data.work_date"></p>
+                        </div>
+                        <button type="button" @click="teamDetail.open = false" class="text-text-disabled hover:text-text-main transition-colors p-1 cursor-pointer">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
 
-                    <div class="relative" x-data="{ openTechDropdown: false }">
-                        <label class="block text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1.5 font-sans">
-                            Teknisi Pengerjaan di Team Tujuan
-                        </label>
-                        <div @click="openTechDropdown = true" @click.away="openTechDropdown = false"
-                             class="min-h-[38px] w-full border border-border rounded-lg bg-surface px-2 py-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 cursor-text flex items-center gap-1.5 flex-wrap transition-all duration-150">
-                            <template x-for="techId in switchTeamModal.technicianIds" :key="techId">
-                                <span class="inline-flex items-center gap-1 bg-primary-soft text-primary-hover border border-primary-border text-[11px] font-semibold px-2.5 py-0.5 rounded-full shadow-xs">
-                                    <span x-text="switchTeamModal.toTeamMembers.find(m => m.id === techId)?.name"></span>
-                                    <button type="button" @click.stop="toggleSwitchTeamTech(techId)" class="hover:text-error transition-colors cursor-pointer">
-                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </span>
-                            </template>
-                            <input type="text" x-model="switchTeamModal.searchTech" @focus="openTechDropdown = true"
-                                   placeholder="Cari teknisi..." class="flex-1 min-w-[120px] outline-none text-xs bg-transparent border-none p-0 focus:ring-0 text-text-main placeholder-text-muted/60">
+                    
+                    <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+                        
+                        <div class="bg-surface-muted border border-border rounded-lg p-3.5">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-text-secondary uppercase tracking-wider font-sans">Progress Team</span>
+                                <span class="text-xs font-bold font-mono text-text-main" x-text="teamDetail.data.completed_tasks + '/' + teamDetail.data.total_tasks + ' Selesai'"></span>
+                            </div>
+                            <div class="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                                <div class="h-full rounded-full transition-all duration-300"
+                                     :style="`width: ${teamDetail.data.progress_percent}%; background: ${teamDetail.data.progress_percent === 100 ? 'var(--color-success)' : 'var(--color-primary)'}`">
+                                </div>
+                            </div>
                         </div>
 
-                        <div x-show="openTechDropdown" class="absolute z-50 w-full bg-surface border border-border rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto divide-y divide-border" style="display: none;">
-                            <template x-for="member in switchTeamModal.toTeamMembers" :key="member.id">
-                                <label class="flex items-center gap-2.5 px-3 py-2 bg-surface hover:bg-surface-muted cursor-pointer transition-colors duration-100"
-                                       x-show="switchTeamModal.searchTech === '' || member.name.toLowerCase().includes(switchTeamModal.searchTech.toLowerCase())">
-                                    <input type="checkbox"
-                                           :checked="switchTeamModal.technicianIds.includes(member.id)"
-                                           @change="toggleSwitchTeamTech(member.id)"
-                                           class="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer">
-                                    <span class="text-xs text-text-secondary font-medium" x-text="member.name"></span>
-                                </label>
-                            </template>
-                            <p x-show="switchTeamModal.toTeamMembers.length === 0" class="px-3 py-2.5 text-xs text-text-disabled italic text-center font-sans">Team tujuan belum punya anggota.</p>
+                        
+                        <div>
+                            <h4 class="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2 font-sans">Task dalam Team</h4>
+                            <div class="border border-border rounded-lg bg-surface divide-y divide-border overflow-hidden shadow-2xs">
+                                <template x-for="t in teamDetail.data.tasks" :key="t.fop_task_id">
+                                    <a :href="t.task_id ? `<?php echo e(url('/tasks')); ?>/${t.task_id}` : '#'"
+                                       class="block p-3.5 hover:bg-surface-muted transition-colors duration-150 cursor-pointer"
+                                       :class="!t.task_id ? 'pointer-events-none opacity-60' : ''">
+                                        
+                                        <div class="flex items-start justify-between gap-2 mb-2">
+                                            <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border font-sans"
+                                                  :class="t.badge_classes"
+                                                  x-text="t.category_label">
+                                            </span>
+                                            <div class="flex items-center gap-1.5 shrink-0 font-sans">
+                                                <span class="text-[10px] font-mono text-text-muted font-semibold" x-text="t.task_number"></span>
+                                                <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border font-sans"
+                                                      :style="t.status_style"
+                                                      x-text="t.status">
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-1">
+                                            <h5 class="text-xs font-bold text-text-main font-sans" x-text="t.tugas"></h5>
+                                            <p class="text-[11px] text-text-secondary font-medium font-sans" x-text="t.customer_name"></p>
+                                        </div>
+
+                                        <div class="mb-2" x-show="t.customer_address">
+                                            <p class="text-[11px] text-text-muted font-sans leading-relaxed" x-text="t.customer_address"></p>
+                                        </div>
+
+                                        <div class="pt-2.5 border-t border-border/60 flex items-center justify-between">
+                                            <div class="flex items-center gap-1 text-[10px] text-text-muted font-sans">
+                                                <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                                <span class="font-semibold text-text-secondary" x-text="t.technicians.join(', ') || 'Belum ada PIC'"></span>
+                                            </div>
+                                            <span class="text-[10px] font-bold text-primary hover:text-primary-hover font-sans inline-flex items-center gap-0.5">
+                                                <span>Detail</span>
+                                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                            </span>
+                                        </div>
+                                    </a>
+                                </template>
+                                <div x-show="teamDetail.data.tasks.length === 0" class="text-xs text-text-muted italic text-center py-6 font-sans">Belum ada task.</div>
+                            </div>
                         </div>
-                        <p class="text-[11px] text-text-muted mt-1.5 font-sans leading-relaxed">Hanya menampilkan anggota Team tujuan untuk menghindari konflik penugasan. Teknisi lama akan otomatis digantikan.</p>
+                    </div>
+
+                    
+                    <div class="px-5 py-3 border-t border-border bg-surface-muted flex justify-end shrink-0">
+                        <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
+                            <span>Kelola di Task FOP</span>
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        </a>
                     </div>
                 </div>
+            </template>
+        </div>
+    </div>
 
-                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex justify-end gap-2.5">
-                    <button type="button" @click="switchTeamModal.open = false"
-                            class="text-xs font-semibold px-3 py-2 rounded-lg border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main transition-colors cursor-pointer shadow-xs">
-                        Batal
-                    </button>
-                    <button type="button" @click="submitSwitchTeam()"
-                            :disabled="switchTeamModal.technicianIds.length === 0 || switchTeamModal.isSubmitting"
-                            class="text-xs font-semibold px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm">
-                        <span x-show="!switchTeamModal.isSubmitting">Konfirmasi Pindah</span>
-                        <span x-show="switchTeamModal.isSubmitting">Memproses...</span>
-                    </button>
+    
+    <div x-show="switchTeamModal.open"
+         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none;">
+
+        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="switchTeamModal.open = false"></div>
+
+        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-sans"
+             @click.away="switchTeamModal.open = false"
+             x-transition:enter="transition ease-out duration-250"
+             x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
+             x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
+
+            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
+
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted shrink-0">
+                <h3 class="text-sm font-bold text-text-main font-sans">Pindahkan Task ke Team Lain</h3>
+                <button type="button" @click="switchTeamModal.open = false" class="text-text-disabled hover:text-text-main transition-colors cursor-pointer p-1">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4 font-sans overflow-y-auto flex-1 custom-scrollbar">
+                <p class="text-xs text-text-secondary leading-relaxed bg-primary-soft/50 p-3 rounded-lg border border-primary-border">
+                    Pindahkan task <span class="font-bold text-text-main font-mono" x-text="switchTeamModal.tugas"></span> dari 
+                    <span class="font-bold text-text-main" x-text="switchTeamModal.fromTeamName"></span> ke 
+                    <span class="font-bold text-text-main" x-text="switchTeamModal.toTeamName"></span>.
+                </p>
+
+                <div class="relative" x-data="{ openTechDropdown: false }">
+                    <label class="block text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1.5 font-sans">
+                        Teknisi Pengerjaan di Team Tujuan
+                    </label>
+                    <div @click="openTechDropdown = true" @click.away="openTechDropdown = false"
+                         class="min-h-[38px] w-full border border-border rounded-lg bg-surface px-2 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary cursor-text flex items-center gap-1.5 flex-wrap transition-all duration-150">
+                        <template x-for="techId in switchTeamModal.technicianIds" :key="techId">
+                            <span class="inline-flex items-center gap-1 bg-primary-soft text-primary-hover border border-primary-border text-[11px] font-semibold px-2.5 py-0.5 rounded-full shadow-2xs">
+                                <span x-text="switchTeamModal.toTeamMembers.find(m => m.id === techId)?.name"></span>
+                                <button type="button" @click.stop="toggleSwitchTeamTech(techId)" class="hover:text-error transition-colors cursor-pointer p-0.5">
+                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </span>
+                        </template>
+                        <input type="text" x-model="switchTeamModal.searchTech" @focus="openTechDropdown = true"
+                               placeholder="Cari teknisi..." class="flex-1 min-w-[120px] outline-none text-xs bg-transparent border-none p-0 focus:ring-0 text-text-main placeholder-text-muted/60">
+                    </div>
+
+                    <div x-show="openTechDropdown" class="absolute z-50 w-full bg-surface border border-border rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto divide-y divide-border" style="display: none;">
+                        <template x-for="member in switchTeamModal.toTeamMembers" :key="member.id">
+                            <label class="flex items-center gap-2.5 px-3 py-2 bg-surface hover:bg-surface-muted cursor-pointer transition-colors duration-100"
+                                   x-show="switchTeamModal.searchTech === '' || member.name.toLowerCase().includes(switchTeamModal.searchTech.toLowerCase())">
+                                <input type="checkbox"
+                                       :checked="switchTeamModal.technicianIds.includes(member.id)"
+                                       @change="toggleSwitchTeamTech(member.id)"
+                                       class="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer">
+                                <span class="text-xs text-text-secondary font-medium" x-text="member.name"></span>
+                            </label>
+                        </template>
+                        <p x-show="switchTeamModal.toTeamMembers.length === 0" class="px-3 py-2.5 text-xs text-text-disabled italic text-center font-sans">Team tujuan belum punya anggota.</p>
+                    </div>
+                    <p class="text-[11px] text-text-muted mt-1.5 font-sans leading-relaxed">Hanya menampilkan anggota Team tujuan. Teknisi lama akan digantikan.</p>
                 </div>
+            </div>
+
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex justify-end gap-2.5 shrink-0">
+                <button type="button" @click="switchTeamModal.open = false" class="btn-secondary text-xs cursor-pointer">
+                    Batal
+                </button>
+                <button type="button" @click="submitSwitchTeam()"
+                        :disabled="switchTeamModal.technicianIds.length === 0 || switchTeamModal.isSubmitting"
+                        class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
+                    <span x-show="!switchTeamModal.isSubmitting">Konfirmasi Pindah</span>
+                    <span x-show="switchTeamModal.isSubmitting">Memproses...</span>
+                </button>
             </div>
         </div>
     </div>
@@ -419,11 +527,56 @@
     <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
             <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Antrean Survey</p>
-            <span class="text-xs text-text-muted font-medium font-sans bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded shadow-xs">Batas respon 1×24 jam sejak pendaftaran</span>
+            <span class="text-xs text-text-muted font-medium font-sans bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded shadow-2xs">Batas respon 1×24 jam</span>
         </div>
-        <div id="antrian-survey-container" class="bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
+        
+        <div id="antrian-survey-container" class="bg-surface border border-border rounded-xl shadow-xs overflow-hidden">
             <?php if($surveyQueue->count() > 0): ?>
-            <div class="overflow-x-auto">
+            
+            
+            <div class="block md:hidden divide-y divide-border">
+                <?php $__currentLoopData = $surveyQueue; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <div class="p-3.5 flex flex-col gap-2">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <p class="font-bold text-text-main text-xs font-sans"><?php echo e($item['name']); ?></p>
+                            <p class="text-[10px] font-mono text-text-muted font-semibold"><?php echo e($item['cid']); ?> · <?php echo e($item['pop_name']); ?></p>
+                        </div>
+                        <a href="<?php echo e(route('customers.show', $item['id'])); ?>"
+                           class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs">
+                            <span>Detail</span>
+                            <svg class="h-3 w-3 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        </a>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
+                        <span class="text-[10px] text-text-muted"><?php echo e($item['registered_at']); ?></span>
+                        <?php if (isset($component)) { $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => ''.e($item['deadline_iso']).'','totalSeconds' => $item['total_seconds'],'label' => 'Sisa Waktu','compact' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('countdown-timer'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['deadline' => ''.e($item['deadline_iso']).'','total-seconds' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($item['total_seconds']),'label' => 'Sisa Waktu','compact' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
+<?php $attributes = $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
+<?php unset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
+<?php $component = $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
+<?php unset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
+<?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </div>
+
+            
+            <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="border-b border-border bg-surface-muted">
@@ -446,7 +599,6 @@
                             <td class="px-4 py-3 text-text-secondary text-xs font-sans font-medium"><?php echo e($item['pop_name']); ?></td>
                             <td class="px-4 py-3 text-text-muted text-xs font-sans"><?php echo e($item['registered_at']); ?></td>
                             <td class="px-4 py-3">
-                                
                                 <?php if (isset($component)) { $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => ''.e($item['deadline_iso']).'','totalSeconds' => $item['total_seconds'],'label' => 'Sisa Waktu']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -470,7 +622,7 @@
                             </td>
                             <td class="px-4 py-3 text-right">
                                 <a href="<?php echo e(route('customers.show', $item['id'])); ?>"
-                                   class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-xs transition-all duration-150 cursor-pointer">
+                                   class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs transition-all duration-150 cursor-pointer">
                                     <span>Detail</span>
                                     <svg class="h-3.5 w-3.5 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
@@ -499,9 +651,59 @@
         <div class="flex items-center justify-between">
             <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Status Teknisi</p>
         </div>
-        <div id="status-teknisi-container" class="bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
+        <div id="status-teknisi-container" class="bg-surface border border-border rounded-xl shadow-xs overflow-hidden">
             <?php if($teknisiList->count() > 0): ?>
-            <div class="overflow-x-auto">
+            
+            
+            <div class="block md:hidden divide-y divide-border">
+                <?php $__currentLoopData = $teknisiList; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tek): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <div class="p-3.5 flex flex-col gap-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <div class="h-7 w-7 rounded-full bg-primary-soft text-primary border border-primary-border flex items-center justify-center text-[10px] font-bold shrink-0 font-sans shadow-2xs">
+                                <?php echo e($tek['initials']); ?>
+
+                            </div>
+                            <div>
+                                <span class="font-bold text-text-main text-xs font-sans block"><?php echo e($tek['name']); ?></span>
+                                <span class="text-[10px] font-mono font-semibold text-text-secondary"><?php echo e($tek['task_count']); ?> Task</span>
+                                <?php if(($tek['overdue_count'] ?? 0) > 0): ?>
+                                    <span class="text-[9px] font-bold text-error">(<?php echo e($tek['overdue_count']); ?> tertunda)</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <?php if($tek['status'] === 'aktif'): ?>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-success-bg text-success border-success-border">
+                                <span class="h-1.5 w-1.5 rounded-full bg-current animate-pulse"></span>
+                                <span>Aktif</span>
+                            </span>
+                        <?php elseif($tek['status'] === 'terjadwal'): ?>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-info-bg text-info border-info-border">
+                                <span>Terjadwal</span>
+                            </span>
+                        <?php else: ?>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full border border-border bg-slate-50 dark:bg-slate-800/50 text-text-muted font-sans">
+                                <span>Standby</span>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <?php if($tek['location'] && $tek['location'] !== '-'): ?>
+                    <div class="flex items-center gap-1.5 text-[11px] text-text-muted pt-1 border-t border-border/50">
+                        <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span class="truncate"><?php echo e($tek['location']); ?></span>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </div>
+
+            
+            <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="border-b border-border bg-surface-muted">
@@ -516,7 +718,7 @@
                         <tr class="hover:bg-surface-muted/50 transition-colors duration-150">
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-2.5">
-                                    <div class="h-7 w-7 rounded-full bg-primary-soft text-primary border border-primary-border flex items-center justify-center text-[10px] font-bold shrink-0 font-sans shadow-xs">
+                                    <div class="h-7 w-7 rounded-full bg-primary-soft text-primary border border-primary-border flex items-center justify-center text-[10px] font-bold shrink-0 font-sans shadow-2xs">
                                         <?php echo e($tek['initials']); ?>
 
                                     </div>
@@ -541,7 +743,6 @@
                             </td>
                             <td class="px-4 py-3 text-xs font-semibold font-mono text-text-secondary">
                                 <?php echo e($tek['task_count']); ?> Task
-                                
                                 <?php if(($tek['overdue_count'] ?? 0) > 0): ?>
                                     <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border border-error-border bg-error-bg text-error font-sans"
                                           title="Task yang jadwalnya sudah lewat">
@@ -589,6 +790,12 @@ function fopDashboardHandler() {
         teamDetail: { open: false, data: null },
         dragOverTeamId: null,
         dragging: null,
+        mobileSwitchSelectTeamModal: {
+            open: false,
+            fopTaskId: null,
+            fromTeamId: null,
+            tugas: '',
+        },
         switchTeamModal: {
             open: false,
             fopTaskId: null,
@@ -608,7 +815,37 @@ function fopDashboardHandler() {
             this.teamDetail.open = true;
         },
 
-        // ── Drag & Drop: Switch Task antar Team ─────────────────────
+        openMobileSwitchTeamModal(fopTaskId, fromTeamId, tugas) {
+            this.mobileSwitchSelectTeamModal = {
+                open: true,
+                fopTaskId: fopTaskId,
+                fromTeamId: fromTeamId,
+                tugas: tugas,
+            };
+        },
+
+        selectTargetTeamForMobileSwitch(toTeamId) {
+            this.mobileSwitchSelectTeamModal.open = false;
+            const fromTeam = this.teamsData.find(t => t.id === this.mobileSwitchSelectTeamModal.fromTeamId);
+            const toTeam = this.teamsData.find(t => t.id === toTeamId);
+            if (!toTeam) return;
+
+            this.switchTeamModal = {
+                open: true,
+                fopTaskId: this.mobileSwitchSelectTeamModal.fopTaskId,
+                fromTeamId: this.mobileSwitchSelectTeamModal.fromTeamId,
+                fromTeamName: fromTeam ? fromTeam.name : '',
+                toTeamId: toTeam.id,
+                toTeamName: toTeam.name,
+                toTeamMembers: toTeam.members,
+                tugas: this.mobileSwitchSelectTeamModal.tugas,
+                technicianIds: [],
+                searchTech: '',
+                isSubmitting: false,
+            };
+        },
+
+        // ── Drag & Drop: Switch Task antar Team (Desktop) ───────────
         startTaskDrag(event, fopTaskId, fromTeamId, tugas) {
             this.dragging = { fopTaskId, fromTeamId, tugas };
             event.dataTransfer.effectAllowed = 'move';
@@ -722,24 +959,15 @@ function fopDashboardHandler() {
             const bind = () => {
                 popIds.forEach(popId => {
                     window.Echo.private(`fop.${popId}`)
-                        .listen('TaskStarted', (e) => {
-                            this.refreshTaskStats();
-                        })
-                        .listen('TaskCompleted', (e) => {
-                            this.refreshTaskStats();
-                        })
-                        .listen('SurveyStarted',          () => this.refreshDashboardContainers())
-                        .listen('SurveyCompleted',        () => this.refreshDashboardContainers())
-                        .listen('InstallationStarted',    () => this.refreshDashboardContainers())
-                        .listen('InstallationCompleted',  () => this.refreshDashboardContainers());
+                        .listen('TaskStarted', () => this.refreshTaskStats())
+                        .listen('TaskCompleted', () => this.refreshTaskStats())
+                        .listen('SurveyStarted', () => this.refreshDashboardContainers())
+                        .listen('SurveyCompleted', () => this.refreshDashboardContainers())
+                        .listen('InstallationStarted', () => this.refreshDashboardContainers())
+                        .listen('InstallationCompleted', () => this.refreshDashboardContainers());
                 });
             };
 
-            // window.Echo dipasang oleh resources/js/echo.js — script module itu
-            // dieksekusi setelah script Alpine (defer, urut dokumen), jadi normalnya
-            // sudah siap begitu Alpine init() jalan. echo.js menembak event
-            // 'echo:ready' tepat setelah window.Echo di-assign; dengarkan event itu
-            // sebagai jaring pengaman kalau ternyata belum siap — bukan busy-poll.
             if (window.Echo) {
                 bind();
             } else {
@@ -780,11 +1008,6 @@ function fopDashboardHandler() {
             }
         },
 
-        // Ganti full page reload sehabis switch-team: swap board #fop-teams-board
-        // (outerHTML, bukan innerHTML — elemen di dalamnya pakai binding Alpine
-        // @dragover/@click yang harus di-scan ulang) + sinkronkan teamsData dari
-        // payload JSON yang ikut ke-refresh (#fop-teams-json), lalu re-init Alpine
-        // di subtree baru lewat Alpine.initTree().
         async refreshTeamsBoard() {
             try {
                 const res = await fetch(window.location.href);
@@ -803,8 +1026,6 @@ function fopDashboardHandler() {
                     currentBoard.outerHTML = newBoard.outerHTML;
                     window.Alpine.initTree(document.getElementById('fop-teams-board'));
                 } else {
-                    // Fallback kalau Alpine global belum siap — reload penuh
-                    // tetap lebih aman daripada board nyangkut stale.
                     window.location.reload();
                 }
             } catch (e) {

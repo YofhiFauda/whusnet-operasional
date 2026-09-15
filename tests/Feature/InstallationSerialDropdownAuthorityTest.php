@@ -42,6 +42,11 @@ use Tests\TestCase;
  * `serial_number` dari `InventorySerial` begitu `selected_inventory_serial_id`
  * terisi — dropdown jadi satu-satunya sumber kebenaran kalau device ini
  * ke-track Inventory.
+ *
+ * Koreksi lanjutan (permintaan eksplisit user): fallback teks manual DICABUT
+ * total. Teknisi TANPA SN di custody sekarang TIDAK BISA mengisi SN sama
+ * sekali — `serial_number` jadi `prohibited`, `selected_inventory_serial_id`
+ * jadi `required` + dibatasi ke custody tim (`Rule::in`).
  */
 class InstallationSerialDropdownAuthorityTest extends TestCase
 {
@@ -118,7 +123,7 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
     }
 
     #[Test]
-    public function pilih_sn_dari_dropdown_menimpa_teks_manual_yang_berbeda(): void
+    public function sn_dropdown_yang_dipilih_menentukan_serial_number_tersimpan(): void
     {
         Storage::fake('public');
         [$customer, $technician, , $pusat, $cabang] = $this->setupInProgressInstallation();
@@ -138,9 +143,6 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
         $serial->refresh();
 
         $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePayload() + [
-            // Teknisi (sengaja/khilaf) ngetik SN LAIN di kolom manual, tapi
-            // milih SN yang bener di dropdown — dropdown yang harus menang.
-            'serial_number' => 'SN-NGARANG-BEDA',
             'selected_inventory_serial_id' => $serial->id,
         ]);
 
@@ -159,32 +161,65 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
     }
 
     #[Test]
-    public function tanpa_custody_eligible_field_manual_tetap_jadi_fallback(): void
+    public function tanpa_custody_eligible_ditolak_tidak_ada_fallback_manual(): void
     {
         Storage::fake('public');
         [$customer, $technician] = $this->setupInProgressInstallation();
 
         // Gak ada InventorySerial sama sekali di custody teknisi ini —
-        // eligibleSerials kosong, field manual harus tetap jalan seperti
-        // perilaku lama (regresi negatif).
+        // eligibleSerials kosong. Dulu field manual jadi fallback, sekarang
+        // DITOLAK total (permintaan eksplisit user) — teknisi wajib ambil
+        // barang dari Gudang dulu, gak ada jalan pintas ngetik SN sendiri.
         $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePayload() + [
             'serial_number' => 'ZTEMANUAL001',
         ]);
 
-        $response->assertSessionHasNoErrors();
-
-        $detail = CustomerTechnicalDetail::where('customer_id', $customer->id)->firstOrFail();
-        $this->assertEquals('ZTEMANUAL001', $detail->router_or_ont_serial);
+        $response->assertSessionHasErrors('serial_number'); // prohibited
+        $this->assertDatabaseMissing('customer_technical_details', [
+            'customer_id' => $customer->id,
+            'router_or_ont_serial' => 'ZTEMANUAL001',
+        ]);
     }
 
     #[Test]
-    public function tanpa_sn_manual_maupun_dropdown_ditolak_validasi(): void
+    public function tanpa_sn_dropdown_ditolak_validasi(): void
     {
         Storage::fake('public');
         [$customer, $technician] = $this->setupInProgressInstallation();
 
         $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePayload());
 
-        $response->assertSessionHasErrors('serial_number');
+        $response->assertSessionHasErrors('selected_inventory_serial_id');
+    }
+
+    #[Test]
+    public function sn_dropdown_dari_custody_teknisi_lain_ditolak(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInProgressInstallation();
+
+        $catAktif = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $ont = Item::create([
+            'code' => 'ONT-SN-02', 'name' => 'ONT ZTE Test 2', 'item_category_id' => $catAktif->id,
+            'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => OwnershipMode::INSTALLABLE->value,
+        ]);
+
+        $admin = User::factory()->create();
+        $roleTeknisi = Role::where('code', 'teknisi')->firstOrFail();
+        $otherTechnician = User::factory()->create(['role_id' => $roleTeknisi->id, 'status' => 'active']);
+
+        // SN ini ada di custody TEKNISI LAIN, bukan tim task ini — dropdown
+        // di form gak bakal nampilin ini, tapi cek server tetap wajib
+        // menolak walau ID-nya dikirim manual lewat request (bypass UI).
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($pusat, $ont, ['ZTE-LAIN-001'], 250000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-LAIN-001']]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, ['ZTE-LAIN-001'], [], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $otherTechnician, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-LAIN-001']]], $admin);
+
+        $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePayload() + [
+            'selected_inventory_serial_id' => $serial->id,
+        ]);
+
+        $response->assertSessionHasErrors('selected_inventory_serial_id');
     }
 }

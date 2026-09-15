@@ -9,6 +9,22 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'categories' => null,
     'rows' => [],
     'emptyLabel' => 'Belum ada material dicatat.',
+    // Mode "Material Terpakai" pasca-Gudang (ADHOC-54, koreksi 2026-09-12) —
+    // dipakai installations/report.blade.php (Laporan Pemasangan). Survey
+    // (estimasi) & Maintenance TIDAK pakai ini (masih mode lama, item master
+    // bebas + "Lainnya") — estimasi belum ada custody buat dicek (survey
+    // terjadi SEBELUM barang di-issue ke teknisi).
+    //
+    // Saat true: dropdown Barang dibatasi ke $custodyOptions doang (item yang
+    // BENERAN ada sisa custody-nya di tim ini), opsi "Lainnya (isi manual)"
+    // dihapus total, dan tiap opsi nampilin sisa qty. Penegakan SEBENARNYA
+    // tetap di server (storePemasangan() + InventoryService::consumeFromCustody()
+    // di storeSpeedtest()) — ini cuma pagar UI biar ketauan dari awal, bukan
+    // baru gagal di titik penyelesaian.
+    'restrictToCustody' => false,
+    // Collection/array of {item_id, code, name, unit, type, available} — lihat
+    // CustomerInstallationController::eligiblePassiveCustodyForTeam().
+    'custodyOptions' => null,
 ]));
 
 foreach ($attributes->all() as $__key => $__value) {
@@ -30,6 +46,22 @@ foreach (array_filter(([
     'categories' => null,
     'rows' => [],
     'emptyLabel' => 'Belum ada material dicatat.',
+    // Mode "Material Terpakai" pasca-Gudang (ADHOC-54, koreksi 2026-09-12) —
+    // dipakai installations/report.blade.php (Laporan Pemasangan). Survey
+    // (estimasi) & Maintenance TIDAK pakai ini (masih mode lama, item master
+    // bebas + "Lainnya") — estimasi belum ada custody buat dicek (survey
+    // terjadi SEBELUM barang di-issue ke teknisi).
+    //
+    // Saat true: dropdown Barang dibatasi ke $custodyOptions doang (item yang
+    // BENERAN ada sisa custody-nya di tim ini), opsi "Lainnya (isi manual)"
+    // dihapus total, dan tiap opsi nampilin sisa qty. Penegakan SEBENARNYA
+    // tetap di server (storePemasangan() + InventoryService::consumeFromCustody()
+    // di storeSpeedtest()) — ini cuma pagar UI biar ketauan dari awal, bukan
+    // baru gagal di titik penyelesaian.
+    'restrictToCustody' => false,
+    // Collection/array of {item_id, code, name, unit, type, available} — lihat
+    // CustomerInstallationController::eligiblePassiveCustodyForTeam().
+    'custodyOptions' => null,
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
     $$__key = $$__key ?? $__value;
 }
@@ -57,13 +89,25 @@ unset($__defined_vars, $__key, $__value); ?>
         ? \App\Models\ItemCategory::CODE_LAINNYA
         : ($categoryOptions->first()['code'] ?? \App\Models\ItemCategory::CODE_LAINNYA);
 
-    $itemOptions = collect($items ?? [])->map(fn ($item) => [
-        'id' => $item->id,
-        'name' => $item->name,
-        'code' => $item->code,
-        'type' => $item->category?->code ?? $fallbackType,
-        'unit' => $item->unit,
-    ])->values();
+    // Mode custody: opsi dropdown dari $custodyOptions (item yang beneran ada
+    // sisanya di tim ini), BUKAN dari seluruh master $items — analog SN
+    // Perangkat Aktif yang juga dibatasi custody, bukan seluruh InventorySerial.
+    $itemOptions = $restrictToCustody
+        ? collect($custodyOptions ?? [])->map(fn ($row) => [
+            'id' => $row['item_id'],
+            'name' => $row['name'],
+            'code' => $row['code'],
+            'type' => $row['type'] ?? $fallbackType,
+            'unit' => $row['unit'],
+            'available' => (float) $row['available'],
+        ])->values()
+        : collect($items ?? [])->map(fn ($item) => [
+            'id' => $item->id,
+            'name' => $item->name,
+            'code' => $item->code,
+            'type' => $item->category?->code ?? $fallbackType,
+            'unit' => $item->unit,
+        ])->values();
 
     $initialRows = collect($rows)->map(fn ($row) => [
         'item_id' => $row['item_id'] ?? '',
@@ -81,7 +125,8 @@ unset($__defined_vars, $__key, $__value); ?>
         <?php echo \Illuminate\Support\Js::from($categoryOptions)->toHtml() ?>,
         <?php echo \Illuminate\Support\Js::from($initialRows)->toHtml() ?>,
         '<?php echo e($name); ?>',
-        <?php echo \Illuminate\Support\Js::from($fallbackType)->toHtml() ?>
+        <?php echo \Illuminate\Support\Js::from($fallbackType)->toHtml() ?>,
+        <?php echo \Illuminate\Support\Js::from((bool) $restrictToCustody)->toHtml() ?>
     )"
     class="space-y-3"
 >
@@ -100,14 +145,20 @@ unset($__defined_vars, $__key, $__value); ?>
                     @change="onItemChange(index)"
                     class="w-full text-xs font-sans px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 dark:focus:border-sky-400"
                 >
-                    <option value="">— Lainnya (isi manual) —</option>
-                    <template x-for="opt in itemOptions" :key="opt.id">
-                        <option :value="opt.id" x-text="`${opt.code} — ${opt.name}`"></option>
+                    
+                    <template x-if="restrictToCustody">
+                        <option value="">— Pilih Barang —</option>
+                    </template>
+                    <template x-if="!restrictToCustody">
+                        <option value="">— Lainnya (isi manual) —</option>
+                    </template>
+                    <template x-for="opt in itemOptionsFor(row)" :key="opt.id">
+                        <option :value="opt.id" x-text="itemOptionLabel(opt)"></option>
                     </template>
                 </select>
 
                 
-                <template x-if="!row.item_id">
+                <template x-if="!restrictToCustody && !row.item_id">
                     <input
                         type="text"
                         :name="`${fieldName}[${index}][item_name]`"
@@ -115,6 +166,13 @@ unset($__defined_vars, $__key, $__value); ?>
                         placeholder="Nama / spesifikasi barang"
                         class="w-full mt-1.5 text-xs font-sans px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 dark:focus:border-sky-400"
                     >
+                </template>
+
+                
+                <template x-if="restrictToCustody && row.item_id && availableFor(row) !== null">
+                    <p class="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                        Sisa custody tim: <span class="font-semibold" x-text="availableFor(row)"></span> <span x-text="row.unit"></span>
+                    </p>
                 </template>
             </div>
 
@@ -142,10 +200,12 @@ unset($__defined_vars, $__key, $__value); ?>
                     type="number"
                     step="0.01"
                     min="0"
+                    :max="restrictToCustody ? availableFor(row) : null"
                     :name="`${fieldName}[${index}][qty]`"
                     x-model="row.qty"
                     class="w-full text-xs font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 dark:focus:border-sky-400"
                 >
+                
             </div>
 
             
@@ -198,16 +258,17 @@ unset($__defined_vars, $__key, $__value); ?>
     </button>
 </div>
 
-<?php if (! $__env->hasRenderedOnce('27480082-a114-4c61-9ed3-3edd1b93c712')): $__env->markAsRenderedOnce('27480082-a114-4c61-9ed3-3edd1b93c712'); ?>
+<?php if (! $__env->hasRenderedOnce('9c91b626-9d22-4849-8a79-d103664f6373')): $__env->markAsRenderedOnce('9c91b626-9d22-4849-8a79-d103664f6373'); ?>
 <?php $__env->startPush('scripts'); ?>
 <script>
-function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fallbackType) {
+function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fallbackType, restrictToCustody) {
     return {
         itemOptions: itemOptions,
         categoryOptions: categoryOptions,
         rows: initialRows,
         fieldName: fieldName,
         fallbackType: fallbackType,
+        restrictToCustody: restrictToCustody,
 
         addRow() {
             this.rows.push({
@@ -237,6 +298,56 @@ function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fall
 
         defaultUnitFor(code) {
             return this.categoryOptions.find(c => c.code === code)?.default_unit ?? 'pcs';
+        },
+
+        // Mode custody: baris LAMA (tersimpan sebelum fitur ini, atau sisa
+        // custody item-nya sekarang sudah habis) bisa punya item_id yang gak
+        // lagi ada di itemOptions saat ini — tanpa ini <select> jatuh ke
+        // opsi pertama diam-diam pas render (sama masalahnya kayak
+        // typeOptionsFor() buat kategori nonaktif). Ditambahkan HANYA untuk
+        // baris itu sendiri, ditandai jelas "tersimpan" biar teknisi ngerti
+        // ini bukan pilihan baru yang bisa diklaim ulang.
+        itemOptionsFor(row) {
+            if (! this.restrictToCustody) {
+                return this.itemOptions;
+            }
+
+            const known = this.itemOptions.some(o => String(o.id) === String(row.item_id));
+
+            if (known || ! row.item_id) {
+                return this.itemOptions;
+            }
+
+            return [...this.itemOptions, {
+                id: row.item_id,
+                name: `${row.item_name || 'Barang #' + row.item_id} (tersimpan, sisa custody sekarang tidak diketahui)`,
+                code: null,
+                type: row.item_type,
+                unit: row.unit,
+                available: null,
+            }];
+        },
+
+        itemOptionLabel(opt) {
+            if (! this.restrictToCustody) {
+                return `${opt.code} — ${opt.name}`;
+            }
+
+            if (opt.available === null || opt.available === undefined) {
+                return opt.name;
+            }
+
+            return `${opt.code} — ${opt.name} (sisa ${opt.available} ${opt.unit})`;
+        },
+
+        // null = gak ada batas dikenal (mode lama, atau baris legacy yang
+        // item_id-nya sudah gak ada di itemOptions) — dipakai template buat
+        // nyembunyiin hint sisa & `:max` (max="null" di Alpine artinya atribut
+        // dilepas, bukan 0).
+        availableFor(row) {
+            const opt = this.itemOptions.find(o => String(o.id) === String(row.item_id));
+
+            return opt && opt.available !== undefined ? opt.available : null;
         },
 
         removeRow(index) {

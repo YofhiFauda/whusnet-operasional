@@ -109,6 +109,15 @@ RETURN (teknisi → gudang, wajib buat sisa yang gak dipakai)
   └── selisih → dicatat ADJUSTMENT dengan reason=shrinkage_on_return, wajib catatan alasan, di-flag review atasan
 ```
 
+**Q&A — custody itu per-TIM, bukan per-orang (dicatat 2026-09-12 biar gak nanya ulang):**
+
+Skenario: task Pemasangan/Maintenance/C-REQ/O-REQ/INFR REQ dengan 3 anggota tim (A, B, C). Gudang nge-*issue* modem/kabel/patchcord ke **A**. **B** yang menekan "Start Proses". **C** yang menekan tombol submit laporan (Aktivasi / Selesaikan Task).
+
+- **Barang custody A kedeteksi & bisa dipakai C?** Ya. Custody Barang Pasif (`eligiblePassiveCustodyForTeam()` di `CustomerInstallationController` & `TaskMaintenanceController`) dan Perangkat Aktif (`eligibleSerialsForTeam()`, dua controller yang sama) **digabung SELURUH anggota tim task** (`whereIn('technician_id'/'current_technician_id', $teamTechnicianIds)`), bukan cuma milik user yang lagi login. Penegakan final `InventoryService::consumeFromCustody()` juga FIFO **lintas semua anggota** (diurut `issued_at`, bukan dikelompokkan per teknisi dulu) — lihat komentar di method itu.
+- **C boleh submit walau B yang start?** Ya. Syarat submit (`TaskPolicy::statusComplete` → `$task->isMember($user->id)`, dan cek assignment yang sama di `storePemasangan`/`storeSpeedtest`/`TaskMaintenanceController::store()`) cuma **jadi anggota tim task ini** — TIDAK ada syarat "harus yang menekan Start".
+- **Konsekuensinya:** siapa pun dari A/B/C boleh melakukan tahap apa pun (start, isi laporan, submit) selama namanya ada di `teamMembers` task tersebut. Kalau salah satu (misal D) BUKAN anggota tim, custody-nya D tidak ikut terhitung dan D tidak bisa submit laporan task ini — beda task beda tim, custody gak "bocor" lintas task.
+- **Kenapa didesain begini** — dikonfirmasi user 2026-09-12 saat ditawari opsi "per-teknisi yang login": dropdown SN Perangkat Aktif yang sudah ada dari awal juga per-tim, dan `consumeFromCustody()` FIFO-nya memang lintas tim (§ di atas, "keputusan user"). Membatasi Barang Pasif jadi per-orang doang bakal (a) beda logic dari Perangkat Aktif di form yang sama, dan (b) mismatch sama hasil enforcement final yang tetap gabungan tim — dropdown/pre-check bisa nolak/nampilin salah padahal submit sungguhan bakal lolos/gagal beda.
+
 **Kenapa ini lebih kuat dari anomaly detection:** ketahuan PER TRANSAKSI (bukan nunggu data historis numpuk), diverifikasi FISIK oleh pihak kedua (admin gudang megang barangnya, bukan algoritma nebak), dan gak ada false positive dari variasi instalasi (rumah vs gedung beda kebutuhan kabel — anomaly detection gampang salah tuduh, structural constraint gak peduli itu, cuma peduli "yang dikembalikan cocok gak sama yang sisa di sistem").
 
 **Celah yang diakui secara eksplisit (bukan diabaikan):** kalau teknisi dan admin gudang berkolusi — admin gudang konfirmasi terima 20m padahal fisiknya cuma 15m — sistem gak bisa deteksi ini. Mitigasi: stock opname periodik (§5) — kalau admin gudang rutin "menerima" lebih dari yang ada, stok gudang bakal over di sistem tapi under di fisik, ketahuan pas opname. Ini kejujuran soal batas sistem, bukan celah yang ditutup-tutupi.

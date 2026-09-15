@@ -2,12 +2,16 @@
 
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\BusinessDevelopment\AgentController;
+use App\Http\Controllers\BusinessDevelopment\PackageRestrictionController;
+use App\Http\Controllers\BusinessDevelopmentVerificationController;
 use App\Http\Controllers\CashDepositController;
 use App\Http\Controllers\CollectorDepositController;
 use App\Http\Controllers\CollectorPaymentController;
 use App\Http\Controllers\CollectorVisitController;
 use App\Http\Controllers\CollectorWorklistController;
 use App\Http\Controllers\CollectorWorksheetController;
+use App\Http\Controllers\CustomerAcquisitionController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\CustomerDocumentController;
@@ -15,6 +19,7 @@ use App\Http\Controllers\CustomerFailedController;
 use App\Http\Controllers\CustomerFieldworkController;
 use App\Http\Controllers\CustomerInstallationController;
 use App\Http\Controllers\CustomerNetworkAssignmentController;
+use App\Http\Controllers\CustomerPackageController;
 use App\Http\Controllers\CustomerQrController;
 use App\Http\Controllers\CustomerReportController;
 use App\Http\Controllers\CustomerSurveyController;
@@ -23,6 +28,7 @@ use App\Http\Controllers\CustomerTerminationController;
 use App\Http\Controllers\CustomerTestReportController;
 use App\Http\Controllers\CustomerVerificationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FopAnalyticsController;
 use App\Http\Controllers\FopDashboardController;
 use App\Http\Controllers\FopTaskController;
 use App\Http\Controllers\ImportReportController;
@@ -32,6 +38,7 @@ use App\Http\Controllers\Master\DistributionController;
 use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\ItemCategoryController;
 use App\Http\Controllers\Master\ItemController;
+use App\Http\Controllers\Master\PackageCategoryController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\Master\RegionController;
 use App\Http\Controllers\Master\SlaTimelineController;
@@ -50,6 +57,7 @@ use App\Http\Controllers\QrInAppScanController;
 use App\Http\Controllers\QrScanController;
 use App\Http\Controllers\QrTicketController;
 use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\SalesOmsetDashboardController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskMaintenanceController;
 use App\Http\Controllers\TaskStatusController;
@@ -195,6 +203,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
     });
 
+    // Autocomplete "ID Referral Pelanggan" (Skema 3, 2026-09-12) — dipakai
+    // form create & edit, jadi gerbangnya OR keduanya. Statis, didaftarkan
+    // sebelum /customers/{customer} dinamis.
+    Route::middleware('permission:customers.create|customers.update')->group(function () {
+        Route::get('/customers/search-referral', [CustomerController::class, 'searchReferral'])->name('customers.search-referral');
+    });
+
     Route::middleware('permission:customers.import')->group(function () {
         Route::get('/customers/import', [CustomerController::class, 'importForm'])->name('customers.import');
         Route::get('/customers/import/history', [CustomerController::class, 'importHistory'])->name('customers.import.history');
@@ -209,6 +224,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+        Route::post('/customers/{customer}/toggle-suspend', [CustomerController::class, 'toggleSuspend'])->name('customers.toggle-suspend');
     });
 
     // Terminasi langganan — permission SENDIRI (customers.deactivate), BUKAN
@@ -714,10 +730,28 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:packages.create|packages.update')->group(function () {
         Route::get('/master/paket/create', [InternetPackageController::class, 'create'])->name('master.paket.create');
         Route::post('/master/paket', [InternetPackageController::class, 'store'])->name('master.paket.store');
+        // Dipanggil AJAX dari modal "Tambah Kategori" di form paket — lihat
+        // PackageCategoryController::quickStore().
+        Route::post('/master/paket/categories', [PackageCategoryController::class, 'quickStore'])->name('master.paket.categories.store');
     });
 
     Route::middleware('permission:packages.view')->group(function () {
         Route::get('/master/paket', [InternetPackageController::class, 'index'])->name('master.paket.index');
+        Route::get('/master/package-categories', [PackageCategoryController::class, 'index'])->name('master.package-categories.index');
+    });
+
+    // Halaman CRUD tersendiri (BUKAN modal quick-create di atas) — admin
+    // atur SEMUA kategori, termasuk `installation_fee_approval_role_id`
+    // (dinamis, lihat PackageCategoryController). Static route, aman gak
+    // nabrak dynamic {internetPackage} di bawah karena prefix path beda
+    // ("package-categories"). Create/edit/update/destroy SATU permission
+    // (`packages.update`) — kategori bukan resource sensitif terpisah.
+    Route::middleware('permission:packages.update')->group(function () {
+        Route::get('/master/package-categories/create', [PackageCategoryController::class, 'create'])->name('master.package-categories.create');
+        Route::post('/master/package-categories', [PackageCategoryController::class, 'store'])->name('master.package-categories.store');
+        Route::get('/master/package-categories/{package_category}/edit', [PackageCategoryController::class, 'edit'])->name('master.package-categories.edit');
+        Route::put('/master/package-categories/{package_category}', [PackageCategoryController::class, 'update'])->name('master.package-categories.update');
+        Route::delete('/master/package-categories/{package_category}', [PackageCategoryController::class, 'destroy'])->name('master.package-categories.destroy');
     });
 
     // Paket Internet Management - Dynamic Routes Last
@@ -781,6 +815,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/{customer}/device', [CustomerDeviceController::class, 'store'])->name('customers.device.store');
     });
 
+    Route::middleware('permission:customers.detail.packages.change')->group(function () {
+        Route::put('/customers/{customer}/package', [CustomerPackageController::class, 'update'])->name('customers.package.update');
+    });
+
     Route::middleware('permission:customers.detail.documents.upload')->group(function () {
         Route::post('/customers/{customer}/documents', [CustomerDocumentController::class, 'store'])->name('customers.documents.store');
     });
@@ -808,6 +846,12 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:task.view.all')->group(function () {
         Route::get('/fop', [FopDashboardController::class, 'index'])->name('fop.dashboard');
         Route::get('/api/fop/pipeline', [FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
+    });
+
+    // Dashboard Analitik FOP — agregat lintas periode, permission SENDIRI
+    // (bukan task.view.all di atas, itu operasional harian, beda audiens).
+    Route::middleware('permission:fop_analytics.view')->group(function () {
+        Route::get('/fop/analitik', [FopAnalyticsController::class, 'index'])->name('fop.analytics');
     });
 
     // ── Task Management ──────────────────────────────────────────
@@ -901,10 +945,65 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/tickets/worksheet-tasks', [TicketController::class, 'worksheetJson'])->name('tickets.worksheet-tasks');
         // Gap #5 — dupe-check server-side per customer_id, gak kena cap panel.
         Route::get('/api/tickets/duplicates', [TicketController::class, 'duplicates'])->name('tickets.duplicates');
+        // Tambah pelanggan terdampak ke tiket batch (revisi Worksheet Helpdesk
+        // poin 4) — modal AJAX di List Task, permission sama dgn bikin tiket.
+        Route::post('/api/tickets/{ticket}/batch-members', [TicketController::class, 'storeBatchMember'])
+            ->whereNumber('ticket')
+            ->name('tickets.batch-members.store');
     });
     // Halaman arsip — masing-masing route + permission SENDIRI (bukan param
     // {bucket} generik lagi) biar bisa di-toggle independen di Role Matrix.
     // Bucket Masuk & Diproses pindah jadi halaman Worksheet NOC di bawah.
+    // Modul Customer Acquisition (dipakai tim Busdev) — "Pelanggan Aktif
+    // < 30 Hari Diverifikasi", direset otomatis tiap tanggal 1 lewat filter
+    // `periode` (lihat CustomerAcquisitionController). "Harga Dikurangi PPN"
+    // dihitung live, bukan input. Satu-satunya aksi tulis di modul ini:
+    // "Biaya Instalasi" (khusus kategori paket Bisnis) — gerbangnya BUKAN
+    // permission statis di sini, tapi dicek dinamis di controller per baris
+    // dari Master Kategori Paket (`installationFeeApprovalPermission()`).
+    Route::middleware('permission:customer_acquisitions.view')->group(function () {
+        Route::get('/customer-acquisitions', [CustomerAcquisitionController::class, 'index'])->name('customer-acquisitions.index');
+        Route::put('/customer-acquisitions/{customer_acquisition}/installation-fee', [CustomerAcquisitionController::class, 'updateInstallationFee'])->name('customer-acquisitions.installation-fee.update');
+    });
+
+    // Antrean "Menunggu Verifikasi BD" — pelanggan kategori Bisnis yang
+    // sudah lolos CS (`CustomerVerificationController::finalVerify()`) tapi
+    // belum resmi ACTIVE (lihat BusinessDevelopmentVerificationController).
+    // Halaman detail (bukan modal) — pola aksi #2 CLAUDE.md, mutasi data + input.
+    Route::middleware('permission:business_development_verification.view')->group(function () {
+        Route::get('/business-development-verifications', [BusinessDevelopmentVerificationController::class, 'index'])->name('business-development-verifications.index');
+        Route::get('/business-development-verifications/{customer}', [BusinessDevelopmentVerificationController::class, 'show'])->name('business-development-verifications.show');
+        Route::put('/business-development-verifications/{customer}', [BusinessDevelopmentVerificationController::class, 'verify'])->name('business-development-verifications.verify');
+    });
+
+    // Business Development — Restriksi Paket (Skema 1), Master Agent (Skema 3),
+    // Dashboard Omset Sales (Skema 2). 2026-09-12.
+    Route::middleware('permission:package_restrictions.view')->group(function () {
+        Route::get('/business-development/package-restrictions', [PackageRestrictionController::class, 'index'])->name('business-development.package-restrictions.index');
+    });
+    Route::middleware('permission:package_restrictions.update')->group(function () {
+        Route::put('/business-development/package-restrictions', [PackageRestrictionController::class, 'update'])->name('business-development.package-restrictions.update');
+    });
+
+    // Master Agent - Static Routes First
+    Route::middleware('permission:agents.create|agents.update')->group(function () {
+        Route::get('/business-development/agents/create', [AgentController::class, 'create'])->name('business-development.agents.create');
+        Route::post('/business-development/agents', [AgentController::class, 'store'])->name('business-development.agents.store');
+    });
+    Route::middleware('permission:agents.view')->group(function () {
+        Route::get('/business-development/agents', [AgentController::class, 'index'])->name('business-development.agents.index');
+    });
+    // Master Agent - Dynamic Routes Last
+    Route::middleware('permission:agents.create|agents.update')->group(function () {
+        Route::get('/business-development/agents/{agent}/edit', [AgentController::class, 'edit'])->name('business-development.agents.edit');
+        Route::put('/business-development/agents/{agent}', [AgentController::class, 'update'])->name('business-development.agents.update');
+        Route::post('/business-development/agents/{agent}/toggle', [AgentController::class, 'toggleStatus'])->name('business-development.agents.toggle');
+    });
+
+    Route::middleware('permission:sales_omset_dashboard.view')->group(function () {
+        Route::get('/business-development/sales-omset', [SalesOmsetDashboardController::class, 'index'])->name('business-development.sales-omset.index');
+    });
+
     // Didaftarkan SEBELUM /tickets/{ticket} biar gak ketelan route dinamis.
     Route::middleware('permission:tickets.selesai.view')->group(function () {
         Route::get('/tickets/selesai', [TicketSelesaiController::class, 'index'])->name('tickets.selesai');

@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InventoryTransactionType;
+use App\Enums\MaterialKind;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\FopTaskTeam;
+use App\Models\InventoryTransaction;
 use App\Models\Pop;
 use App\Models\Task;
+use App\Models\TaskMaterial;
+use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskTeamService;
@@ -131,6 +136,44 @@ class FopDashboardController extends Controller
                                 ->where('completed_at', '<', now()->subDays(3));
                         })
                         ->count(),
+                ];
+            }
+        );
+
+        // ── Pemakaian Alat Gudang (ADHOC, 2026-09-10) ───────────────
+        // Backend link Gudang↔Task material udah ada sejak ADHOC-54
+        // (InventoryService::consumeFromCustody()/installSerial()) — ini
+        // cuma nampilinnya di papan FOP biar keluar/terpakai/sisa kelihatan
+        // tanpa buka modul Gudang terpisah. Cache 30 detik, pola sama $stats
+        // di atas (angka skalar, aman di-cache).
+        $gudangCacheKey = sprintf('dashboard:fop:gudang:%d:%s', $user->id, $today->toDateString());
+
+        $gudangStats = Cache::remember(
+            $gudangCacheKey,
+            30,
+            function () use ($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday) {
+                return [
+                    // Keluar dari gudang ke teknisi hari ini — scope dari gudang asal.
+                    'keluar' => (float) InventoryTransaction::where('type', InventoryTransactionType::ISSUE->value)
+                        ->whereBetween('created_at', [$startOfToday, $endOfToday])
+                        ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('from_pop_id', $allowedPopIds))
+                        ->sum('qty'),
+                    // Terpakai (dipasang/dihabiskan) di laporan teknisi hari ini —
+                    // scope lewat POP FopTask, sesuai jalur `TaskMaterial::create()`
+                    // di InventoryService::consumeFromCustody().
+                    'terpakai' => (float) TaskMaterial::where('kind', MaterialKind::TERPAKAI->value)
+                        ->whereBetween('task_materials.created_at', [$startOfToday, $endOfToday])
+                        ->whereHas('fopTask', fn ($q) => $q->when(
+                            ! $hasAllPopAccess,
+                            fn ($qq) => $qq->whereIn('pop_id', $allowedPopIds)
+                        ))
+                        ->sum('qty'),
+                    // Masih di tangan teknisi (belum dipakai/dikembalikan) —
+                    // snapshot posisi sekarang, BUKAN kejadian "hari ini" seperti
+                    // dua angka di atas (custody bisa dibawa lintas hari).
+                    'sisa_di_teknisi' => (float) TechnicianCustody::active()
+                        ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('issued_from_pop_id', $allowedPopIds))
+                        ->sum('qty_remaining'),
                 ];
             }
         );
@@ -295,6 +338,7 @@ class FopDashboardController extends Controller
         return view('fop.dashboard', compact(
             'surveyQueue',
             'stats',
+            'gudangStats',
             'teknisiList',
             'activeTeams',
             'activeFopTeams',

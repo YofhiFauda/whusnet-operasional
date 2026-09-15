@@ -16,9 +16,14 @@
 
     $discountedPrice = max(0, $monthlyPrice - $discount);
     $ppnAmount       = round($discountedPrice * ($ppnPercent / 100), 2);
+    // $otherFee SENGAJA TIDAK ikut $totalBill (2026-09-14) — Tagihan Bulanan
+    // murni harga+PPN, sama seperti GenerateMonthlyInvoicesCommand &
+    // CustomerController::store()/update(). $otherFee (materai dkk) cuma
+    // sekali di Tagihan Awal/Registrasi, ditampilkan terpisah di breakdown
+    // di bawah (tab Billing), bukan ditambah ke total di sini.
     $totalBill       = $customer->customerService
         ? (float)$customer->customerService->total_monthly_bill
-        : ($discountedPrice + $ppnAmount + $otherFee);
+        : ($discountedPrice + $ppnAmount);
 
     $isActive = in_array($customer->status, ['active', 'suspended']) || $customer->data_completeness_status === 'siap_billing';
 ?>
@@ -103,10 +108,10 @@
 
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
             <?php if($isActive && $customer->customerService): ?>
-                <button type="button" onclick="openInvoiceModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
+                <a href="<?php echo e(route('invoices.create', ['customer_id' => $customer->id])); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
                     <i class="fa-solid fa-plus"></i>
                     Buat Tagihan
-                </button>
+                </a>
             <?php endif; ?>
         <?php endif; ?>
 
@@ -502,15 +507,16 @@
                 <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">ID SALES</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->sales_code ?? '-'); ?></span>
+                        
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->salesUser?->name ?? $customer->sales_code ?? '-'); ?></span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">KODE AGENT</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->agent_code ?? '-'); ?></span>
+                        <span class="block text-[9px] font-bold text-slate-400 uppercase">AGENT</span>
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->agent?->name ?? $customer->agent_code ?? '-'); ?></span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">REFERRAL PELANGGAN</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->referral_customer_code ?? '-'); ?></span>
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->referralCustomer?->full_name ?? $customer->referral_customer_code ?? '-'); ?></span>
                     </div>
                 </div>
             </div>
@@ -672,6 +678,75 @@
                     <?php else: ?>
                     <div class="p-4 text-center text-slate-400">
                         Belum ada paket internet yang terpilih.
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if($customer->customerService && auth()->user()->hasPermission('customers.detail.packages.change')): ?>
+                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30" x-data="{ gantiPaketOpen: false }">
+                        <div class="flex items-center justify-between">
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
+                            <template x-if="!gantiPaketOpen">
+                                <button type="button" @click="gantiPaketOpen = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
+                            </template>
+                        </div>
+                        <template x-if="gantiPaketOpen">
+                            <form action="<?php echo e(route('customers.package.update', $customer)); ?>" method="POST" class="mt-3 flex flex-col sm:flex-row gap-2">
+                                <?php echo csrf_field(); ?>
+                                <?php echo method_field('PUT'); ?>
+                                <select name="internet_package_id" required class="flex-1 text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                    <option value="">Pilih paket baru...</option>
+                                    <?php $__currentLoopData = $availablePackages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $package): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($package->id); ?>" <?php if($customer->customerService->internet_package_id === $package->id): echo 'selected'; endif; ?>><?php echo e($package->name); ?> — <?php echo e($package->download_speed_mbps); ?>/<?php echo e($package->upload_speed_mbps); ?> Mbps — Rp <?php echo e(number_format((float) $package->monthly_price, 0, ',', '.')); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Simpan</button>
+                                    <button type="button" @click="gantiPaketOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                </div>
+                            </form>
+                        </template>
+                        <p class="text-[10px] text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
+                    </div>
+                    <?php endif; ?>
+
+                    
+                    <?php if($customer->customerService && auth()->user()->hasPermission('customers.deactivate') && in_array($customer->status, ['active', 'suspended'], true)): ?>
+                    <div id="terminate" class="border border-rose-200 dark:border-rose-900/40 rounded-lg p-4 bg-rose-50/40 dark:bg-rose-950/20"
+                         x-data="{ terminateOpen: <?php echo e($errors->has('reason') ? 'true' : 'false'); ?> }"
+                         x-init="if (window.location.hash === '#terminate' || terminateOpen) {
+                            terminateOpen = true;
+                            switchTab('paket-layanan');
+                            $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+                         }">
+                        <div class="flex items-center justify-between">
+                            <span class="block text-[9px] font-bold text-rose-500 uppercase tracking-wider">PUTUS LANGGANAN</span>
+                            <template x-if="!terminateOpen">
+                                <button type="button" @click="terminateOpen = true" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400">Putus Langganan</button>
+                            </template>
+                        </div>
+                        <template x-if="terminateOpen">
+                            <form action="<?php echo e(route('customers.terminate', $customer)); ?>" method="POST" class="mt-3 space-y-2"
+                                  onsubmit="event.preventDefault(); window.confirmDelete('Yakin memutuskan langganan pelanggan <?php echo e($customer->full_name); ?>? Layanan akan dihentikan permanen dan tidak bisa diaktifkan lagi lewat toggle Isolir.', this);">
+                                <?php echo csrf_field(); ?>
+                                <textarea name="reason" rows="2" required maxlength="500" placeholder="Alasan pemutusan langganan (wajib diisi)..."
+                                          class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200"><?php echo e(old('reason')); ?></textarea>
+                                <?php $__errorArgs = ['reason'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Putuskan Langganan</button>
+                                    <button type="button" @click="terminateOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                </div>
+                            </form>
+                        </template>
+                        <p class="text-[10px] text-rose-500/80 mt-2" x-show="terminateOpen" x-cloak>Tindakan permanen — status pelanggan jadi Terminated/Berhenti. Beda dengan Isolir yang masih bisa diaktifkan kembali.</p>
                     </div>
                     <?php endif; ?>
 
@@ -870,9 +945,9 @@
                 </div>
                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
                     <?php if($isActive && $customer->customerService): ?>
-                        <button type="button" onclick="openInvoiceModal()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold shadow-sm cursor-pointer">
+                        <a href="<?php echo e(route('invoices.create', ['customer_id' => $customer->id])); ?>" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold shadow-sm cursor-pointer">
                             + Buat Tagihan Manual
-                        </button>
+                        </a>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>
@@ -1173,71 +1248,7 @@
 </div>
 
 <!-- MODALS SECTION -->
-<!-- MODAL: Manual Invoice -->
-<?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
-    <?php if($isActive && $customer->customerService): ?>
-        <?php
-            $defaultPeriod = now()->format('Y-m');
-            $defaultIssueDate = now()->format('Y-m-d');
-            $defaultDueDate = now()->addDays(14)->format('Y-m-d');
-            if ($customer->customerService->due_date) {
-                $dueDay = \Carbon\Carbon::parse($customer->customerService->due_date)->day;
-                try {
-                    $defaultDueDate = now()->day($dueDay)->format('Y-m-d');
-                } catch (\Exception $e) {
-                    $defaultDueDate = now()->addDays(14)->format('Y-m-d');
-                }
-            }
-        ?>
-        <div id="manual-invoice-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-            <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
-                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Buat Tagihan Manual</h3>
-                    <button type="button" onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <i class="fa-solid fa-xmark text-base"></i>
-                    </button>
-                </div>
-                <form action="<?php echo e(route('customers.invoices.manual', $customer->id)); ?>" method="POST">
-                    <?php echo csrf_field(); ?>
-                    <div class="p-6 space-y-4 text-xs">
-                        <div class="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
-                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pelanggan: <?php echo e($customer->full_name); ?></span>
-                            <span class="text-xs font-bold text-slate-900 dark:text-slate-100"><?php echo e($customer->customerService->package_name_snapshot); ?> (Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>)</span>
-                        </div>
-                        <div>
-                            <label for="billing_period" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Periode Tagihan</label>
-                            <input type="month" name="billing_period" id="billing_period" value="<?php echo e($defaultPeriod); ?>" required class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tanggal Terbit & Jatuh Tempo</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <input type="date" name="issue_date" id="issue_date" value="<?php echo e($defaultIssueDate); ?>" required class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                                <input type="date" name="due_date" id="due_date" value="<?php echo e($defaultDueDate); ?>" required class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                            </div>
-                        </div>
-                        <div>
-                            <label for="invoice_type" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Jenis Tagihan</label>
-                            <select name="invoice_type" id="invoice_type" required class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-semibold text-xs text-slate-800 dark:text-slate-200">
-                                <option value="bulanan" <?php echo e($customer->invoices->count() > 0 ? 'selected' : ''); ?>>Tagihan Bulanan Rutin</option>
-                                <option value="awal" <?php echo e($customer->invoices->count() === 0 ? 'selected' : ''); ?>>Tagihan Awal (PSB)</option>
-                                <option value="reaktivasi">Tagihan Reaktivasi</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="prorate_amount" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tagihan Prorate (Opsional)</label>
-                            
-                            <input type="text" inputmode="decimal" data-rupiah name="prorate_amount" id="prorate_amount" value="0" oninput="recalcInvoiceTotal()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                        </div>
-                        <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                            <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
-                            <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-sm cursor-pointer">Proses Tagihan</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    <?php endif; ?>
-<?php endif; ?>
+
 
 <!-- MODAL: Document Upload Modal -->
 <?php if(auth()->user()->hasPermission('upload_customer_documents')): ?>
@@ -1555,9 +1566,6 @@
     function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
 
-    function openInvoiceModal() { openModal('manual-invoice-modal'); }
-    function closeInvoiceModal() { closeModal('manual-invoice-modal'); }
-
     // Modal milik partial tab Pemasangan & Perangkat. Sebelumnya fungsi ini HANYA
     // ada di customers/fieldwork.blade.php, jadi tombol "Isi Data Pemasangan" /
     // "Isi Laporan Uji" / "Isi Ubah Data Perangkat" di halaman Detail Pelanggan
@@ -1569,17 +1577,9 @@
     function openDeviceModal() { openModal('device-modal'); }
     function closeDeviceModal() { closeModal('device-modal'); }
 
-    const BASE_NETT = <?php echo e((float)$totalBill); ?>;
-    function recalcInvoiceTotal() {
-        // Kolom prorata bermasking ribuan — parseFloat('50.000') = 50, dan
-        // pratinjau total tagihan akan berbohong tanpa parser ini.
-        const prorateEl = document.getElementById('prorate_amount');
-        const prorate = (prorateEl && window.Rupiah ? window.Rupiah.angka(prorateEl.value) : parseFloat(prorateEl?.value || 0)) || 0;
-        const total   = BASE_NETT + prorate;
-        const fmt = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
-        const totalEl = document.getElementById('preview-total');
-        if (totalEl) totalEl.textContent = fmt(total);
-    }
+    // recalcInvoiceTotal() dihapus bersama modal Buat Tagihan Manual
+    // (ADHOC-60) — pratinjau totalnya sekarang hidup di halaman
+    // `/invoices/create`, menghitung seluruh baris rincian, bukan cuma prorata.
 </script>
 <?php $__env->stopSection(); ?>
 

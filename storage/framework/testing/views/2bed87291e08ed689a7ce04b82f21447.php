@@ -300,15 +300,29 @@
                             <td class="px-3 py-2.5 font-mono text-text-muted"><?php echo e(IndonesianDate::dateTime($ticket->created_at)); ?></td>
                             <td class="px-3 py-2.5">
                                 
-                                <span class="font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline">
-                                    <?php echo e($ticket->ticket_number); ?>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline">
+                                        <?php echo e($ticket->ticket_number); ?>
 
-                                </span>
+                                    </span>
+                                    <?php if($ticket->isBatch()): ?>
+                                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800 shrink-0 inline-flex items-center gap-1"
+                                              title="Insiden Massal (Batch)">
+                                            <span class="w-1 h-1 rounded-full bg-violet-500 animate-pulse"></span>
+                                            BATCH (<?php echo e($ticket->batchMembers->count()); ?>)
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
                                 <span class="block text-[10px] font-mono text-text-muted"><?php echo e($ticket->type->value); ?></span>
                             </td>
                             <td class="px-3 py-2.5">
-                                <span class="font-semibold text-text-main"><?php echo e($ticket->customer->full_name ?? $ticket->customer_name ?? '—'); ?></span>
-                                <span class="block font-mono text-[10px] text-text-muted"><?php echo e($ticket->customer?->display_id ?? '—'); ?></span>
+                                <?php if($ticket->isBatch()): ?>
+                                    <span class="font-bold text-violet-700 dark:text-violet-300">⚡ <?php echo e($ticket->customer_name ?: 'Insiden Massal'); ?></span>
+                                    <span class="block font-mono text-[10px] text-violet-600 dark:text-violet-400"><?php echo e($ticket->batchMembers->count()); ?> Pelanggan Terdampak</span>
+                                <?php else: ?>
+                                    <span class="font-semibold text-text-main"><?php echo e($ticket->customer->full_name ?? $ticket->customer_name ?? '—'); ?></span>
+                                    <span class="block font-mono text-[10px] text-text-muted"><?php echo e($ticket->customer?->display_id ?? '—'); ?></span>
+                                <?php endif; ?>
                             </td>
                             <td class="px-3 py-2.5 font-mono text-text-secondary"><?php echo e($ticket->customer_phone ?? '—'); ?></td>
                             

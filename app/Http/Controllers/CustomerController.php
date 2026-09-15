@@ -13,6 +13,7 @@ use App\Enums\WorkflowTransition;
 use App\Http\Controllers\Concerns\RedirectsToCustomer;
 use App\Http\Controllers\Concerns\RendersCustomerList;
 use App\Http\Requests\CustomerRegistrationRequest;
+use App\Models\Agent;
 use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\Customer;
@@ -34,11 +35,14 @@ use App\Models\Payment;
 use App\Models\Person;
 use App\Models\Pop;
 use App\Models\PopSequence;
+use App\Models\RestrictedPackage;
+use App\Models\Role;
 use App\Models\SubscriptionStatus;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Services\CustomerBalanceService;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
@@ -49,6 +53,8 @@ use App\Services\TicketService;
 use App\Support\IndonesianDate;
 use App\Support\RupiahInput;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -221,6 +227,76 @@ class CustomerController extends Controller
     }
 
     /**
+     * Toggle status layanan pelanggan antara active (aktif) dan suspended (isolir).
+     */
+    public function toggleSuspend(Request $request, Customer $customer): JsonResponse|RedirectResponse
+    {
+        abort_unless(auth()->user()->hasPermission('customers.update'), 403);
+        $this->authorizeCustomerPopScope($customer);
+
+        if (! in_array($customer->status, ['active', 'suspended'], true)) {
+            $msg = 'Layanan hanya dapat diisolir atau diaktifkan untuk pelanggan yang sudah aktif atau terisolir.';
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+
+            return redirect()->back()->with('error', $msg);
+        }
+
+        $isCurrentlyActive = $customer->status === 'active';
+        $newStatus = $isCurrentlyActive ? 'suspended' : 'active';
+        $serviceStatus = $isCurrentlyActive ? 'isolir' : 'aktif';
+        $actionName = $isCurrentlyActive ? 'isolir' : 'aktivasi_kembali';
+        $note = $request->input('note', $isCurrentlyActive ? 'Isolir Layanan' : 'Aktivasi Kembali Layanan');
+
+        DB::transaction(function () use ($customer, $newStatus, $serviceStatus, $actionName, $note) {
+            $oldStatus = $customer->status;
+            $customer->update(['status' => $newStatus]);
+
+            if ($customer->customerService) {
+                $customer->customerService->update(['service_status' => $serviceStatus]);
+            }
+
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'module' => 'customers',
+                'action' => $actionName,
+                'auditable_type' => Customer::class,
+                'auditable_id' => $customer->id,
+                'old_values' => ['status' => $oldStatus],
+                'new_values' => ['status' => $newStatus, 'note' => $note],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'created_at' => now(),
+            ]);
+
+            CustomerStatusLog::create([
+                'customer_id' => $customer->id,
+                'from_status' => $oldStatus,
+                'to_status' => $newStatus,
+                'changed_by' => auth()->id(),
+                'note' => $note,
+            ]);
+        });
+
+        $message = $isCurrentlyActive
+            ? "Layanan pelanggan {$customer->full_name} berhasil diisolir."
+            : "Layanan pelanggan {$customer->full_name} berhasil diaktifkan kembali.";
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'status' => $newStatus,
+                'raw_status' => $newStatus,
+                'status_label' => strtoupper($newStatus === 'suspended' ? 'ISOLIR' : 'ACTIVE'),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
      * Show the form for creating a new customer.
      */
     public function create()
@@ -230,11 +306,27 @@ class CustomerController extends Controller
         // jadi memuat SELURUH district di sini sia-sia (dead weight yang meledak
         // saat wilayah bertambah). $cities dipertahankan — top-level, kecil,
         // memang dirender.
-        $packages = InternetPackage::orderBy('name')->get();
+        $user = request()->user();
+        // Restriksi Paket per Role (Skema 1) — lihat InternetPackage::scopeAvailableFor().
+        $packages = InternetPackage::availableFor($user)->orderBy('name')->get();
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
 
-        return view('customers.create', compact('packages', 'cities', 'pops'));
+        // Skema 3 (2026-09-12) — dropdown ID Sales/Agent di form registrasi.
+        // Diganti dari hardcode role code 'sales' (2026-09-12, koreksi user)
+        // jadi berbasis flag `roles.is_package_restricted` — SATU sumber
+        // kebenaran dipakai dua kali: role yang paketnya dibatasi (Skema 1)
+        // otomatis JUGA jadi "role penjual" yang muncul di dropdown ID Sales
+        // & ke-agregasi Dashboard Omset (Skema 2). Kalau nanti Teknisi diberi
+        // akses registrasi pelanggan, dia otomatis ikut tanpa ubah kode ini.
+        $salesUsers = User::whereHas('role', fn ($q) => $q->where('is_package_restricted', true))->orderBy('name')->get();
+        $agents = $user->hasPermission('agents.view') ? Agent::active()->orderBy('name')->get() : collect();
+        // Nama-nama role yang diatur (2026-09-14, permintaan user) — dipakai
+        // blade buat kasih pesan ke actor DI LUAR role itu, jelasin kenapa
+        // ID Sales gak auto-terisi buat dia.
+        $restrictedRoleNames = Role::where('is_package_restricted', true)->pluck('name');
+
+        return view('customers.create', compact('packages', 'cities', 'pops', 'salesUsers', 'agents', 'restrictedRoleNames'));
     }
 
     /**
@@ -257,6 +349,23 @@ class CustomerController extends Controller
         // (lihat blok 5 di bawah yang di-skip kalau $skipSurvey).
         $validated['status'] = $skipSurvey ? 'waiting_installation' : 'waiting_survey';
         $validated['updated_by'] = auth()->id();
+
+        // Skema 3 (2026-09-12) — ID Sales/Agent/Referral. Actor ber-role
+        // "restricted paket" (lihat komentar di create(), 2026-09-12 —
+        // BUKAN lagi hardcode role code 'sales') TIDAK BOLEH mendaftarkan
+        // pelanggan atas nama orang lain (paksa `sales_user_id` = dirinya
+        // sendiri, abaikan apa pun yang disubmit klien — cegah spoofing
+        // komisi). Role lain (Busdev/admin/owner) pakai nilai dari dropdown
+        // form. `agent_id` cuma berlaku dari actor yang punya akses Master
+        // Agent (Busdev/admin/owner) — Agent gak pernah login, jadi kalau
+        // field ini nyelip dari role lain, abaikan.
+        $user = $request->user();
+        $validated['sales_user_id'] = $user->role?->is_package_restricted
+            ? $user->id
+            : ($validated['sales_user_id'] ?? null);
+        if (! $user->hasPermission('agents.view')) {
+            $validated['agent_id'] = null;
+        }
 
         $statusMapping = [
             'active' => 'aktif',
@@ -290,12 +399,19 @@ class CustomerController extends Controller
         $requestedInstallationDate = $validated['requested_installation_date'] ?? null;
         unset($validated['survey_photo'], $validated['nearest_odp'], $validated['cable_estimation_meter'], $validated['difficulty_level'], $validated['requested_installation_date']);
 
+        // jenis_kontrak bukan kolom customers — punya customer_services
+        // (contract_type). Cabut dari $validated sebelum Customer::create()
+        // supaya gak diam-diam ke-drop lewat filter Fillable (aman, tapi
+        // membingungkan kalau dibiarkan nebeng).
+        $jenisKontrak = $validated['jenis_kontrak'] ?? null;
+        unset($validated['jenis_kontrak']);
+
         // Generate customer_code via POP sequence generator
         $pop = Pop::findOrFail($validated['pop_id']);
         $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate) {
+        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate, $jenisKontrak) {
             // Pendaftaran baru lewat UI = orang baru → person baru berdiri sendiri
             // (tanpa legacy_key). Pencarian "mungkin orang yang sama?" saat
             // registrasi adalah pekerjaan gel.2; di sini cukup jaga invarian
@@ -354,9 +470,20 @@ class CustomerController extends Controller
                 $ppn = (float) ($validated['tax_percent'] ?? 0.00);
                 $otherFee = (float) ($validated['other_fee'] ?? 0.00);
 
-                // Calculate total bill
+                // Calculate total bill — SENGAJA TIDAK ikutkan $otherFee (2026-09-14).
+                // customer_services.total_monthly_bill wajib murni tagihan bulanan
+                // berulang: GenerateMonthlyInvoicesCommand men-generate Tagihan
+                // Bulanan sungguhan cuma dari monthly_price+discount+ppn, TIDAK
+                // PERNAH baca other_fee sama sekali (lihat komentarnya). other_fee
+                // (materai dkk) cuma sekali di Tagihan Awal/Registrasi —
+                // InitialInvoiceService::calculate() docblock eksplisit: "TIDAK
+                // PERNAH ikut tagihan bulanan". Dulu di sini malah di-fold ke
+                // total_monthly_bill, bikin field itu berbohong soal nominal
+                // tagihan bulanan asli (temuan nyata: CID C1X4ARQ000004). Kolom
+                // other_fee TETAP disimpan (baris di bawah), cuma tidak lagi
+                // menambah total_monthly_bill.
                 $discountedPrice = max(0, $monthlyPrice - $discount);
-                $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
+                $totalBill = $discountedPrice * (1 + $ppn / 100);
 
                 $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
                 $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
@@ -382,6 +509,7 @@ class CustomerController extends Controller
                     'billing_cycle' => 'monthly',
                     'service_status' => $serviceStatus,
                     'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
+                    'contract_type' => $jenisKontrak,
                 ]);
             }
 
@@ -529,12 +657,38 @@ class CustomerController extends Controller
         $this->authorizeCustomerPopScope($customer);
 
         // Fase 5.4 — $districts dead weight (form edit pakai cascade async). Buang.
-        $packages = InternetPackage::orderBy('name')->get();
+        $user = request()->user();
+        // Restriksi Paket per Role (Skema 1) — kalau paket pelanggan saat ini
+        // sudah di luar daftar restriksi (data lama), tetap disertakan biar
+        // select tidak diam-diam "mencopot" paket yang sedang dipakai.
+        $packages = InternetPackage::availableFor($user)->orderBy('name')->get();
+        if ($customer->internet_package_id && ! $packages->contains('id', $customer->internet_package_id)) {
+            $current = InternetPackage::find($customer->internet_package_id);
+            if ($current) {
+                $packages->push($current);
+            }
+        }
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
         $distributions = Distribution::orderBy('code')->get();
 
-        return view('customers.edit', compact('customer', 'packages', 'cities', 'pops', 'distributions'));
+        // Skema 3 (2026-09-12) — dropdown ID Sales/Agent di form Detail
+        // Pelanggan. Berbasis `is_package_restricted`, bukan hardcode role
+        // 'sales' — lihat komentar di create().
+        $salesUsers = User::whereHas('role', fn ($q) => $q->where('is_package_restricted', true))->orderBy('name')->get();
+        $agents = $user->hasPermission('agents.view') ? Agent::active()->orderBy('name')->get() : collect();
+        $restrictedRoleNames = Role::where('is_package_restricted', true)->pluck('name');
+
+        // Step 7 (Parameter Teknis) Edit Pelanggan sekarang juga menampilkan &
+        // mengedit detail perangkat/jaringan terstruktur (device_type, SN, WiFi,
+        // ODP/OLT, dst) yang aslinya cuma diisi teknisi lewat Laporan Pemasangan
+        // — lihat CustomerInstallationController::storePemasangan(). Wajib
+        // eager-load: Model::preventLazyLoading() aktif di luar production
+        // (AppServiceProvider), akses $customer->customerDevice tanpa ini
+        // meledak di test & lokal.
+        $customer->load(['customerDevice', 'customerTechnicalDetail']);
+
+        return view('customers.edit', compact('customer', 'packages', 'cities', 'pops', 'distributions', 'salesUsers', 'agents', 'restrictedRoleNames'));
     }
 
     /**
@@ -564,6 +718,7 @@ class CustomerController extends Controller
             'gender' => 'nullable|string|max:20',
             'primary_phone' => 'required|string|max:20',
             'alternative_phone' => 'nullable|string|max:20',
+            'npwp' => 'nullable|string|max:30',
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
             'pop_id' => 'required|exists:pops,id',
@@ -574,28 +729,96 @@ class CustomerController extends Controller
             'city_id' => 'nullable|exists:cities,id',
             'district_id' => 'nullable|exists:districts,id',
             'village_id' => 'nullable|exists:villages,id',
-            'internet_package_id' => 'nullable|exists:internet_packages,id',
+            'internet_package_id' => [
+                'nullable',
+                'exists:internet_packages,id',
+                // Restriksi Paket per Role (Skema 1) — sama seperti
+                // CustomerRegistrationRequest, lihat komentar di sana.
+                function ($attribute, $value, $fail) use ($request) {
+                    // Fail-open selama restricted_packages masih kosong sama
+                    // sekali — lihat InternetPackage::scopeAvailableFor().
+                    if ($value && $request->user()?->role?->is_package_restricted
+                        && RestrictedPackage::query()->exists()
+                        && ! RestrictedPackage::where('package_id', $value)->exists()) {
+                        $fail('Paket yang dipilih tidak termasuk daftar paket yang diizinkan untuk role Anda.');
+                    }
+                },
+            ],
             'contract_period_months' => 'nullable|integer|min:1',
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
             'other_fee' => 'nullable|numeric|min:0',
+            // jenis_kontrak — sama seperti Registrasi, gak pernah divalidasi
+            // sebelum ini (2026-09-12) meski inputnya sudah ada di form
+            // Registrasi. Simpan ke customer_services.contract_type.
+            'jenis_kontrak' => 'nullable|string|in:sewa,beli',
 
-            // Referrals
+            // Referrals — kolom lama (varchar) dipertahankan (data lama),
+            // FK baru (Skema 3) di bawah.
             'sales_code' => 'nullable|string|max:30',
             'agent_code' => 'nullable|string|max:30',
             'referral_customer_code' => 'nullable|string|max:30',
+            'sales_user_id' => 'nullable|exists:users,id',
+            'agent_id' => 'nullable|exists:agents,id',
+            'referral_customer_id' => ['nullable', 'exists:customers,id', Rule::notIn([$customer->id])],
 
-            // Technical specs
-            'ont_sn' => 'nullable|string|max:100',
-            'odp_code' => 'nullable|string|max:50',
-            'olt_code' => 'nullable|string|max:50',
-            'vlan_id' => 'nullable|string|max:20',
+            // ont_sn/odp_code/olt_code/vlan_id (kolom ringan legacy di tabel
+            // customers) SENGAJA DICABUT dari validasi (2026-09-12, atas
+            // permintaan user) — Edit Pelanggan sudah punya penggantinya yang
+            // lebih lengkap: Informasi Perangkat Aktif + Distribusi Jaringan
+            // Detail di bawah (customer_devices/customer_technical_details).
+            // Kalau rule-nya dibiarkan 'nullable' di sini padahal formnya
+            // sudah gak kirim field itu sama sekali, Laravel tetap masukin
+            // key-nya ke $validated sebagai null (rule ada = key ikut
+            // divalidasi walau absen) — $customer->update($validated) lalu
+            // diam-diam nge-null-in kolom lama itu tiap kali Edit disimpan.
+            // Kolom customers-nya SENDIRI tidak dihapus (data lama/import
+            // tetap ada), cuma jalur tulis dari Edit yang dicabut.
+
+            // Detail perangkat & distribusi jaringan TERSTRUKTUR (2026-09-12) —
+            // field yang sama persis dengan Laporan Pemasangan
+            // (CustomerInstallationController::storePemasangan()), ditulis ke
+            // customer_devices & customer_technical_details. SEMUA nullable:
+            // beda dari alur teknisi (wifi_ssid/odp_number dkk wajib di sana
+            // karena syarat gerbang Aktivasi), di sini cuma koreksi data admin
+            // — gak ada gerbang workflow yang perlu ditegakkan.
+            'device_type' => 'nullable|string|in:modem,ont,onu,router,other',
+            'brand' => 'nullable|string|max:100',
+            'model' => 'nullable|string|max:100',
+            'serial_number' => 'nullable|string|max:100',
+            'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
+            'connection_mode' => 'nullable|string|in:bridge,router,pppoe,static,dhcp,other',
+            'pppoe_username' => 'nullable|string|max:150',
+            'pppoe_password' => 'nullable|string|max:150',
+            'wifi_ssid' => 'nullable|string|max:150',
+            'wifi_password' => 'nullable|string|max:150',
+            'odp_number' => 'nullable|string|max:100',
+            'odp_port' => 'nullable|string|max:50',
+            'olt_number' => 'nullable|string|max:50',
+            'olt_slot' => 'nullable|string|max:20',
+            'olt_port' => 'nullable|string|max:50',
+            'vlan' => 'nullable|string|max:20',
+            'router_number' => 'nullable|string|max:50',
+            'initial_attenuation' => 'nullable|numeric',
 
             // Status
             'status' => 'required|string|max:50',
         ]);
 
         $validated['updated_by'] = auth()->id();
+
+        // Skema 3 (2026-09-12) — sama seperti store(): actor ber-role
+        // restricted paket gak boleh pindahkan sales_user_id pelanggan ke
+        // orang lain (berbasis `is_package_restricted`, bukan hardcode
+        // 'sales' — lihat komentar create()), dan agent_id cuma berlaku
+        // dari actor ber-akses Master Agent.
+        $actor = $request->user();
+        if ($actor->role?->is_package_restricted) {
+            $validated['sales_user_id'] = $actor->id;
+        }
+        if (! $actor->hasPermission('agents.view')) {
+            unset($validated['agent_id']);
+        }
 
         $statusMapping = [
             'active' => 'aktif',
@@ -642,6 +865,50 @@ class CustomerController extends Controller
         DB::transaction(function () use ($customer, $validated, $serviceStatus) {
             // 1. Update customer record
             $customer->update($validated);
+
+            // 1a. Update device & detail teknis terstruktur (2026-09-12) — field
+            // ini SEBELUMNYA cuma bisa ditulis teknisi lewat Laporan Pemasangan
+            // (CustomerInstallationController::storePemasangan()); sekarang Edit
+            // Pelanggan juga jadi penulis kedua ke customer_devices &
+            // customer_technical_details. SADAR risikonya: dua controller nulis
+            // ke tabel yang sama — kalau nanti field ini perlu ditarik lagi jadi
+            // read-only di sini, baca balik diskusi di riwayat task ini dulu.
+            // Ditaruh SEBELUM langkah 1b (generate CID) supaya olt_number baru
+            // yang diisi di sini ikut kepakai CID yang di-generate di bawah,
+            // bukan nilai basi dari sebelum submit ini.
+            $deviceFields = [
+                'device_type' => $validated['device_type'] ?? null,
+                'brand' => $validated['brand'] ?? null,
+                'model' => $validated['model'] ?? null,
+                'serial_number' => $validated['serial_number'] ?? null,
+                'mac_address' => $validated['mac_address'] ?? null,
+                'wifi_ssid' => $validated['wifi_ssid'] ?? null,
+                'wifi_password' => $validated['wifi_password'] ?? null,
+                'connection_mode' => $validated['connection_mode'] ?? null,
+                'pppoe_username' => $validated['pppoe_username'] ?? null,
+                'pppoe_password' => $validated['pppoe_password'] ?? null,
+            ];
+            // updateOrCreate cuma nulis kolom yang disebutkan — kolom lain milik
+            // baris ini (ip_address, technical_note, dst) tidak tersentuh. Baris
+            // baru cuma dibuat kalau ADA isian ATAU barisnya sudah ada (biar admin
+            // tetap bisa mengosongkan field yang sudah pernah diisi teknisi).
+            if (array_filter($deviceFields) || CustomerDevice::where('customer_id', $customer->id)->exists()) {
+                $customer->customerDevice()->updateOrCreate(['customer_id' => $customer->id], $deviceFields);
+            }
+
+            $technicalFields = [
+                'odp_number' => $validated['odp_number'] ?? null,
+                'odp_port' => $validated['odp_port'] ?? null,
+                'olt_number' => $validated['olt_number'] ?? null,
+                'olt_slot' => $validated['olt_slot'] ?? null,
+                'olt_port' => $validated['olt_port'] ?? null,
+                'vlan' => $validated['vlan'] ?? null,
+                'router_number' => $validated['router_number'] ?? null,
+                'initial_attenuation' => $validated['initial_attenuation'] ?? null,
+            ];
+            if (array_filter($technicalFields) || CustomerTechnicalDetail::where('customer_id', $customer->id)->exists()) {
+                $customer->customerTechnicalDetail()->updateOrCreate(['customer_id' => $customer->id], $technicalFields);
+            }
 
             // 1b. Auto-generate / update CID berdasarkan status pelanggan
             // Sesuai spesifikasi-pop-distribusi-cid.md:
@@ -710,9 +977,20 @@ class CustomerController extends Controller
                 $ppn = (float) ($validated['tax_percent'] ?? 0.00);
                 $otherFee = (float) ($validated['other_fee'] ?? 0.00);
 
-                // Calculate total bill
+                // Calculate total bill — SENGAJA TIDAK ikutkan $otherFee (2026-09-14).
+                // customer_services.total_monthly_bill wajib murni tagihan bulanan
+                // berulang: GenerateMonthlyInvoicesCommand men-generate Tagihan
+                // Bulanan sungguhan cuma dari monthly_price+discount+ppn, TIDAK
+                // PERNAH baca other_fee sama sekali (lihat komentarnya). other_fee
+                // (materai dkk) cuma sekali di Tagihan Awal/Registrasi —
+                // InitialInvoiceService::calculate() docblock eksplisit: "TIDAK
+                // PERNAH ikut tagihan bulanan". Dulu di sini malah di-fold ke
+                // total_monthly_bill, bikin field itu berbohong soal nominal
+                // tagihan bulanan asli (temuan nyata: CID C1X4ARQ000004). Kolom
+                // other_fee TETAP disimpan (baris di bawah), cuma tidak lagi
+                // menambah total_monthly_bill.
                 $discountedPrice = max(0, $monthlyPrice - $discount);
-                $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
+                $totalBill = $discountedPrice * (1 + $ppn / 100);
 
                 $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
                 $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
@@ -738,6 +1016,7 @@ class CustomerController extends Controller
                     'billing_cycle' => 'monthly',
                     'service_status' => $serviceStatus,
                     'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
+                    'contract_type' => $validated['jenis_kontrak'] ?? null,
                 ]);
             } else {
                 $customer->customerService()->delete();
@@ -955,7 +1234,7 @@ class CustomerController extends Controller
             ],
             [
                 'no' => 2,
-                'title' => 'Survey Lokasi & Jalur Optik',
+                'title' => 'Survey Lokasi',
                 'subtitle' => 'Pemeriksaan Jalur & ODP',
                 'at' => $latestSurvey?->assigned_at,
                 'date_fallback' => $surveyDate ? IndonesianDate::date($surveyDate) : null,
@@ -975,8 +1254,8 @@ class CustomerController extends Controller
             ],
             [
                 'no' => 4,
-                'title' => 'Proses Pemasangan Perangkat & FO',
-                'subtitle' => 'Penarikan Dropcore & ONT',
+                'title' => 'Proses Pemasangan Perangkat',
+                'subtitle' => 'Penarikan Dropcore & Pemasangan ONT',
                 'at' => $latestInstallation?->assigned_at,
                 'date_fallback' => $installationDate ? IndonesianDate::date($installationDate) : null,
                 'pic' => $latestInstallation?->technician?->name ?? $latestInstallation?->technicians,
@@ -1079,6 +1358,9 @@ class CustomerController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // Dropdown "Ganti Paket" di tab Paket & Layanan (CustomerPackageController).
+        $availablePackages = InternetPackage::orderBy('name')->get(['id', 'name', 'monthly_price', 'download_speed_mbps', 'upload_speed_mbps']);
+
         return view('customers.show', compact(
             'customer',
             'displayId',
@@ -1094,7 +1376,8 @@ class CustomerController extends Controller
             'customerTickets',
             'customerFopTasks',
             'availableMiniPops',
-            'availableDistributions'
+            'availableDistributions',
+            'availablePackages'
         ));
     }
 
@@ -1202,6 +1485,13 @@ class CustomerController extends Controller
                 ]];
             });
 
+        $customerBalance = app(CustomerBalanceService::class)->balance($customer);
+        $availableCollectors = User::query()
+            ->whereHas('role', fn ($q) => $q->where('name', 'kolektor')->orWhere('code', 'kolektor'))
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return response()->json([
             'invoice_id' => $latestInvoice ? $latestInvoice->id : null,
             // Target POST form "Catat Pembayaran" di Quick Hub. Dikirim SERVER-SIDE,
@@ -1217,6 +1507,8 @@ class CustomerController extends Controller
             'total_piutang' => (float) $totalPiutang,
             'billing_period' => $latestInvoice ? $latestInvoice->billing_period : null,
             'due_date' => $latestInvoice && $latestInvoice->due_date ? $latestInvoice->due_date->format('d/m/Y') : null,
+            'customer_balance' => (float) $customerBalance,
+            'available_collectors' => $availableCollectors,
             'technical' => [
                 'pppoe_username' => $service?->pppoe_username ?? '-',
                 'onu_sn' => $device?->onu_sn ?? $device?->mac_address ?? '-',
@@ -3391,6 +3683,33 @@ class CustomerController extends Controller
 
         return $this->redirectToCustomer($customer)
             ->with('success', "Layanan pelanggan berhasil diaktifkan! CID: {$customer->cid}");
+    }
+
+    /**
+     * Skema 3 (2026-09-12) — autocomplete "ID Referral Pelanggan" di form
+     * registrasi/edit. Cari pelanggan existing by CID/nama/customer_code,
+     * dipakai buat isi `referral_customer_id`. Gerbang permission sama
+     * dengan form yang memuatnya (customers.create|customers.update).
+     */
+    public function searchReferral(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        if ($q === '') {
+            return response()->json([]);
+        }
+
+        $customers = Customer::query()
+            ->where(function ($query) use ($q) {
+                $query->where('full_name', 'like', "%{$q}%")
+                    ->orWhere('cid', 'like', "%{$q}%")
+                    ->orWhere('customer_code', 'like', "%{$q}%");
+            })
+            ->orderBy('full_name')
+            ->limit(15)
+            ->get(['id', 'customer_code', 'full_name']);
+
+        return response()->json($customers);
     }
 
     /**

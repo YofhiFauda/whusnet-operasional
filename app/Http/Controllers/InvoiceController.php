@@ -140,6 +140,10 @@ class InvoiceController extends Controller
             'customerService',
             'internetPackage',
             'creator',
+            // Rincian per kategori pendapatan (ADHOC-60). Bisa kosong untuk
+            // tagihan yang terbit sebelum fitur ini — view-nya jatuh balik ke
+            // kolom biaya lama, jangan asumsikan selalu terisi.
+            'items',
             'payments' => function ($query) {
                 $query->with(['receiver', 'collector'])->latest('payment_date')->latest('id');
             },

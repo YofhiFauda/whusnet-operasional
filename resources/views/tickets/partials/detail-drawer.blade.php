@@ -241,58 +241,113 @@
                         </p>
                     </div>
 
-                    {{-- Snapshot pelanggan — nilai saat tiket dibuat, bukan data terkini --}}
-                    <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">
-                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border-b border-border pb-2">
-                            Snapshot Pelanggan
-                        </h3>
+                    {{--
+                        Snapshot Pelanggan vs Roster Pelanggan Terdampak (Batch)
+                    --}}
+                    <template x-if="ticket.is_batch">
+                        <div class="rounded-xl border border-violet-300 dark:border-violet-800/80 bg-violet-50/40 dark:bg-violet-950/20 p-4 space-y-3">
+                            <div class="flex items-center justify-between border-b border-violet-200 dark:border-violet-800/60 pb-2.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-violet-500 animate-pulse"></span>
+                                    <h3 class="text-[11px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300">
+                                        Pelanggan Terdampak (Batch)
+                                    </h3>
+                                </div>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700"
+                                      x-text="ticket.batch_members_count + ' Pelanggan'"></span>
+                            </div>
 
-                        <div class="rounded-lg border border-border bg-surface overflow-hidden">
-                            <div class="grid grid-cols-2 border-b border-border">
-                                <div class="p-2.5 border-r border-border">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">Nama</span>
-                                    <span class="font-semibold text-text-main" x-text="ticket.customer.name ?? '—'"></span>
-                                </div>
-                                <div class="p-2.5">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">CID</span>
-                                    <span class="font-bold font-mono text-sky-600 dark:text-sky-400" x-text="ticket.customer.cid ?? '—'"></span>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 border-b border-border">
-                                <div class="p-2.5 border-r border-border">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">No HP</span>
-                                    <template x-if="ticket.customer.phone">
-                                        <a :href="'https://wa.me/' + ticket.customer.phone" target="_blank" rel="noopener"
-                                           class="font-mono text-emerald-600 dark:text-emerald-400 hover:underline" x-text="ticket.customer.phone"></a>
-                                    </template>
-                                    <span x-show="!ticket.customer.phone" class="text-text-muted">—</span>
-                                </div>
-                                <div class="p-2.5">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">Paket</span>
-                                    <span class="font-semibold text-text-secondary" x-text="ticket.customer.package ?? '—'"></span>
-                                </div>
-                            </div>
-                            <div class="p-2.5 border-b border-border">
-                                <span class="block text-[10px] font-bold uppercase text-text-muted">Alamat / Desa</span>
-                                <span class="text-text-secondary" x-text="[ticket.customer.address, ticket.customer.village].filter(Boolean).join(' — ') || '—'"></span>
-                                <template x-if="ticket.customer.maps_url">
-                                    <a :href="ticket.customer.maps_url" target="_blank" rel="noopener"
-                                       class="block mt-1 font-bold text-sky-600 dark:text-sky-400 hover:underline">Buka di Google Maps</a>
+                            <p class="text-[11px] text-text-muted">
+                                Insiden jaringan di POP <strong class="text-text-main" x-text="ticket.customer.pop || '—'"></strong> berdampak pada pelanggan berikut:
+                            </p>
+
+                            <div class="space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                                <template x-for="(m, i) in ticket.batch_members" :key="m.id">
+                                    <div class="p-2 rounded-xl border border-border bg-surface hover:bg-surface-muted/50 transition-colors flex items-center justify-between gap-2 shadow-2xs">
+                                        <div class="min-w-0 flex items-center gap-2">
+                                            <span class="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-900 shrink-0"
+                                                  x-text="m.cid"></span>
+                                            <span class="font-bold text-text-main text-xs truncate" :title="m.customer_name" x-text="m.customer_name"></span>
+                                        </div>
+
+                                        <div class="shrink-0 flex items-center gap-1.5">
+                                            <template x-if="m.phone && m.phone !== '—'">
+                                                <a :href="'https://wa.me/' + m.phone" target="_blank" rel="noopener"
+                                                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 transition-all text-[10px] font-mono font-bold"
+                                                   :title="'WhatsApp ' + m.phone">
+                                                    <svg class="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+                                                    </svg>
+                                                    <span x-text="m.phone"></span>
+                                                </a>
+                                            </template>
+                                            <template x-if="!m.phone || m.phone === '—'">
+                                                <span class="text-text-muted italic text-[10px]">—</span>
+                                            </template>
+                                        </div>
+                                    </div>
                                 </template>
+                                <p x-show="ticket.batch_members.length === 0" class="text-[11px] text-text-muted italic text-center py-2">
+                                    Belum ada pelanggan terdampak yang dicatat.
+                                </p>
                             </div>
-                            <div class="grid grid-cols-2">
-                                <div class="p-2.5 border-r border-border">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">POP / ODP</span>
-                                    <span class="text-text-secondary"
-                                          x-text="(ticket.customer.pop ?? '—') + ' / ' + (ticket.customer.odp ?? '—')"></span>
+                        </div>
+                    </template>
+
+                    {{-- Snapshot pelanggan (Non-Batch) — nilai saat tiket dibuat --}}
+                    <template x-if="!ticket.is_batch">
+                        <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">
+                            <h3 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border-b border-border pb-2">
+                                Snapshot Pelanggan
+                            </h3>
+
+                            <div class="rounded-lg border border-border bg-surface overflow-hidden">
+                                <div class="grid grid-cols-2 border-b border-border">
+                                    <div class="p-2.5 border-r border-border">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">Nama</span>
+                                        <span class="font-semibold text-text-main" x-text="ticket.customer.name ?? '—'"></span>
+                                    </div>
+                                    <div class="p-2.5">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">CID</span>
+                                        <span class="font-bold font-mono text-sky-600 dark:text-sky-400" x-text="ticket.customer.cid ?? '—'"></span>
+                                    </div>
                                 </div>
-                                <div class="p-2.5">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">Perangkat</span>
-                                    <span class="font-mono text-text-secondary" x-text="ticket.customer.device ?? '—'"></span>
+                                <div class="grid grid-cols-2 border-b border-border">
+                                    <div class="p-2.5 border-r border-border">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">No HP</span>
+                                        <template x-if="ticket.customer.phone">
+                                            <a :href="'https://wa.me/' + ticket.customer.phone" target="_blank" rel="noopener"
+                                               class="font-mono text-emerald-600 dark:text-emerald-400 hover:underline" x-text="ticket.customer.phone"></a>
+                                        </template>
+                                        <span x-show="!ticket.customer.phone" class="text-text-muted">—</span>
+                                    </div>
+                                    <div class="p-2.5">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">Paket</span>
+                                        <span class="font-semibold text-text-secondary" x-text="ticket.customer.package ?? '—'"></span>
+                                    </div>
+                                </div>
+                                <div class="p-2.5 border-b border-border">
+                                    <span class="block text-[10px] font-bold uppercase text-text-muted">Alamat / Desa</span>
+                                    <span class="text-text-secondary" x-text="[ticket.customer.address, ticket.customer.village].filter(Boolean).join(' — ') || '—'"></span>
+                                    <template x-if="ticket.customer.maps_url">
+                                        <a :href="ticket.customer.maps_url" target="_blank" rel="noopener"
+                                           class="block mt-1 font-bold text-sky-600 dark:text-sky-400 hover:underline">Buka di Google Maps</a>
+                                    </template>
+                                </div>
+                                <div class="grid grid-cols-2">
+                                    <div class="p-2.5 border-r border-border">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">POP / ODP</span>
+                                        <span class="text-text-secondary"
+                                              x-text="(ticket.customer.pop ?? '—') + ' / ' + (ticket.customer.odp ?? '—')"></span>
+                                    </div>
+                                    <div class="p-2.5">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">Perangkat</span>
+                                        <span class="font-mono text-text-secondary" x-text="ticket.customer.device ?? '—'"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </template>
 
                     {{-- Keluhan & catatan teknis --}}
                     <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">

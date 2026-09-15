@@ -266,23 +266,33 @@ FOP klik chip nama teknisi di tabel /fop-tasks
 
 Panel "Kelola Team" manual **sudah dihapus** — Team gak lagi dibuat/di-edit/dihapus lewat UI terpisah, sepenuhnya derived dari assignment teknisi (lihat bagian 5).
 
-## 8. Antrian Sorting berdasarkan `client_request_date` (Task 8)
+## 8. Antrian Sorting — Tanggal Kerja Dulu, Prioritas Jadi Tie-Breaker (Task 8, direvisi 2026-09-10)
 
-**Baru.** `FopTaskController::index()` sekarang sort 4 CASE berurutan (bukan cuma 2 kayak sebelumnya) — CASE baru ditaruh PALING DEPAN, jadi presedensinya di atas priority/category:
+`FopTaskController::index()` sort 5 klausa berurutan. **Direvisi 2026-09-10 (keputusan eksplisit user)** — urutan lama (prioritas dulu, baru tanggal/kategori) DIBALIK: sekarang `task_date` (tanggal kerja terjadwal) yang menentukan urutan utama, prioritas cuma tie-breaker dalam tanggal yang sama:
 
 ```
 ORDER BY
   1. CASE: client_request_date terisi DAN >= besok?
-       YA  → bucket 1 (Upcoming, di-sink ke BAWAH daftar)
+       YA  → bucket 1 (Upcoming, di-sink ke BAWAH daftar — "belum layak
+             masuk antrean sama sekali", beda konsep dari urutan tanggal/
+             prioritas di bawah)
        TIDAK (kosong, atau <= hari ini) → bucket 0 (ikut sorting normal)
-  2. CASE priority: Urgent(1) → High(2) → Medium(3) → low(4) → else(5)
-  3. CASE category IN (Survey, PSB) → created_at ASC   (yang lama duluan)
-  4. CASE category NOT IN (Survey, PSB) → created_at DESC  (yang baru duluan)
+  2. CASE: task_date IS NULL? → sink ke bawah (harusnya gak pernah kejadian,
+     store()/syncToFopTask() selalu isi nilai, tapi kolomnya nullable di
+     skema — dijaga eksplisit biar gak nyelonong ke atas kalau suatu saat ada)
+  3. task_date ASC — tanggal kerja paling dekat di atas. INI SORT UTAMA.
+  4. CASE priority: Urgent(1) → High(2) → Medium(3) → low(4) → else(5) —
+     cuma dipakai kalau task_date-nya SAMA PERSIS.
+  5. created_at ASC — tie-breaker terakhir (urutan masuk), stabil kalau
+     task_date DAN priority sama-sama sama. Arah SERAGAM buat semua
+     kategori — beda dari rancangan lama yang Survey/PSB ASC, tipe lain
+     DESC; itu dicabut bareng flip ini.
 ```
 
-- Task dengan `client_request_date` di masa depan (besok atau lebih) **selalu** tampil di bawah tiket lain, walau priority-nya Urgent — bucket 1 kalah sama bucket 0 di ORDER BY pertama, gak peduli apa pun nilai CASE sesudahnya.
-- Task dengan `client_request_date` hari ini (atau udah lewat) masuk bucket 0 — ikut aturan sorting normal (priority dulu, baru category/created_at) berbarengan sama task yang gak punya `client_request_date` sama sekali.
+- Task dengan `client_request_date` di masa depan (besok atau lebih) **selalu** tampil di bawah tiket lain, walau priority-nya Urgent DAN task_date-nya paling dekat — bucket 1 kalah sama bucket 0 di ORDER BY pertama, gak peduli apa pun nilai klausa sesudahnya.
+- Task dengan `client_request_date` hari ini (atau udah lewat) masuk bucket 0 — ikut aturan sorting normal (tanggal dulu, baru prioritas/created_at) berbarengan sama task yang gak punya `client_request_date` sama sekali.
 - **Gak ada cron.** Bucket dihitung ulang tiap kali `GET /fop-tasks` di-load — begitu tanggal sistem nyampe/lewat `client_request_date`, task otomatis "naik" ke sorting normal di request berikutnya, tanpa job terjadwal.
+- Test: `tests/Feature/FopTaskSortingTest.php` (`test_earlier_task_date_beats_higher_priority`, `test_priority_breaks_ties_within_same_task_date`, `test_created_at_breaks_ties_within_same_task_date_and_priority`, + test client_request_date bucket yang gak berubah).
 - Badge visual di kolom "Tanggal" (`fop_tasks/index.blade.php`): **"JADWAL HARI INI"** (merah) kalau `client_request_date <= hari ini`, **"Terjadwal — {tanggal}"** (abu-abu) kalau di masa depan.
 - **Sumber isian PSB berubah (2026-07-31):** untuk kategori PSB, `client_request_date` tidak lagi cuma dari alur Pending manual — nilainya diturunkan dari `customer_surveys.requested_installation_date` (diisi teknisi di Laporan Survey) dan di-refresh tiap sync. Perilaku sorting di bagian ini **tidak berubah sama sekali**; yang berubah cuma dari mana datanya datang dan berapa banyak task yang punya nilai itu.
 - **Kolom SLA (2026-07-31):** task PSB yang tanggal request-nya belum tiba **tidak** menampilkan countdown — diganti badge netral **"Dijadwalkan {tanggal}"**. Countdown hijau berdurasi tiga minggu menyesatkan ("santai banget") padahal artinya "belum waktunya". Begitu tanggalnya tiba, countdown normal muncul menuju akhir hari; lewat tengah malam, komponen `x-countdown-timer` masuk state TERLAMBAT dan menampilkan **`−HH:MM:SS`** merah berkedip.

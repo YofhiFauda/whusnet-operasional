@@ -11,6 +11,8 @@ use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
+use App\Models\RevenueCategory;
+use App\Models\RevenueSubcategory;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
@@ -196,24 +198,36 @@ class NominalRupiahBertitikDiterimaTest extends TestCase
     {
         $this->loginAsAdmin();
         $invoice = $this->buatInvoice('C-RPH-7', 150000);
+        $category = RevenueCategory::firstOrCreate(
+            ['code' => 'TEST_CAT'],
+            ['name' => 'Kategori Uji', 'is_active' => true, 'sort_order' => 1]
+        );
+        $subcategory = RevenueSubcategory::firstOrCreate(
+            ['code' => 'SUB_TEST', 'revenue_category_id' => $category->id],
+            ['name' => 'Sub Uji', 'is_active' => true, 'sort_order' => 1]
+        );
 
-        $this->post(route('customers.invoices.manual', $invoice->customer_id), [
+        $this->post(route('invoices.store'), [
+            'customer_id' => $invoice->customer_id,
             'billing_period' => now()->addMonth()->format('Y-m'),
             'issue_date' => now()->toDateString(),
             'due_date' => now()->addDays(10)->toDateString(),
-            'invoice_type' => 'reaktivasi',
-            'prorate_amount' => '50.000',
-            'extra_cable_fee' => '25.000',
+            'invoice_type' => 'insidental',
+            'lines' => [
+                [
+                    'revenue_category_id' => $category->id,
+                    'revenue_subcategory_id' => $subcategory->id,
+                    'custom_name' => 'Jasa Tambahan',
+                    'amount' => '50.000',
+                ],
+            ],
         ])->assertSessionHasNoErrors();
 
         $manual = Invoice::where('customer_id', $invoice->customer_id)
             ->where('id', '!=', $invoice->id)
             ->firstOrFail();
 
-        // Dicek per komponen, bukan cuma totalnya: total juga memuat harga
-        // langganan, jadi salah baca satu komponen bisa tersamar di angka akhir.
-        $this->assertEquals(50000.0, (float) $manual->prorate_amount);
-        $this->assertEquals(25000.0, (float) $manual->extra_cable_fee);
+        $this->assertEquals(50000.0, (float) $manual->total_amount);
     }
 
     private function buatPop(): Pop

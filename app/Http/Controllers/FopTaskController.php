@@ -48,7 +48,7 @@ class FopTaskController extends Controller
             'technicians',
             'task:id,scheduled_at,status,report_deferred,fop_review_status',
             'statusHistories',
-            'customer:id,created_at,updated_at',
+            'customer:id,full_name,primary_phone,cid,address,latitude,longitude,created_at,updated_at',
             'customer.tasks' => function ($q) {
                 $q->where('task_type', TaskType::SURVEY->value)
                     ->where('status', TaskStatus::SELESAI->value)
@@ -65,19 +65,33 @@ class FopTaskController extends Controller
         ])
             ->applyUserScope()
             ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
+            // Urutan papan (keputusan eksplisit user, 2026-09-10 — membalik
+            // rancangan lama di flowchart.md §8/user-flow.md yang urut
+            // prioritas dulu baru tanggal, dua dokumen itu sudah disinkronkan
+            // ke aturan baru ini di komit yang sama): TANGGAL KERJA DULU,
+            // PRIORITAS JADI TIE-BREAKER.
+            //   1. Bucket client_request_date "belum waktunya" (PSB nunggu
+            //      tanggal request pelanggan) TETAP di-sink ke bawah duluan —
+            //      ini bukan soal urutan tanggal/prioritas, tapi "belum layak
+            //      masuk antrean sama sekali" (lihat catatan asli Task 8).
+            //   2. `task_date` ASC — tanggal kerja terjadwal paling dekat di
+            //      atas. NULL (harusnya gak pernah kejadian — store()/
+            //      syncToFopTask() selalu isi nilai — tapi kolomnya nullable
+            //      di skema) sengaja disink ke bawah, bukan nyelonong ke atas
+            //      kayak default ASC NULL-first di MySQL/SQLite.
+            //   3. Prioritas (Urgent→Low) — cuma dipakai kalau `task_date`-nya
+            //      SAMA PERSIS.
+            //   4. `created_at` ASC — tie-breaker terakhir (urutan masuk),
+            //      biar dua task tanggal+prioritas sama tetap stabil urutannya
+            //      antar-request, bukan berubah-ubah ngikut query plan.
             ->orderByRaw('CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END', [now()->addDay()->toDateString()])
+            ->orderByRaw('CASE WHEN task_date IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('task_date', 'asc')
             ->orderByRaw(
                 'CASE priority '.self::priorityOrderCaseSql().' ELSE 5 END',
                 self::priorityOrderBindings()
             )
-            ->orderByRaw(
-                'CASE WHEN category IN ('.implode(',', array_fill(0, count(TaskType::autoOnlyValues()), '?')).') THEN created_at END ASC',
-                TaskType::autoOnlyValues()
-            )
-            ->orderByRaw(
-                'CASE WHEN category NOT IN ('.implode(',', array_fill(0, count(TaskType::autoOnlyValues()), '?')).') THEN created_at END DESC',
-                TaskType::autoOnlyValues()
-            );
+            ->orderBy('created_at', 'asc');
 
         // Search filter
         if ($request->filled('search')) {
@@ -1113,7 +1127,14 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
 
-        $query = FopTask::with(['village', 'technicians', 'task:id,status,report_deferred'])
+        $query = FopTask::with([
+            'village',
+            'technicians',
+            'task:id,status,report_deferred',
+            'ticket:id,ticket_number,customer_name,customer_phone,customer_address,customer_latitude,customer_longitude',
+            'ticket.customer:id,cid',
+            'customer:id,full_name,primary_phone,cid,address,latitude,longitude',
+        ])
             ->applyUserScope()
             ->whereIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->orderBy('updated_at', 'desc');
@@ -1247,7 +1268,12 @@ class FopTaskController extends Controller
             // Kategori Issue (Master Issue) — belum ditampilkan sama sekali
             // di Detail Task, padahal udah ada field-nya sejak Master Issue
             // ditambah (docs/plan/RANCANGAN_MASTER_ISSUE_TICKETING.md).
-            'ticket.issueCategory:id,name',
+            'ticket.issueCategory:id,name,is_batch',
+            // Pelanggan terdampak (tiket batch, mis. ODP LOS) — FOP yang buka
+            // Detail Task dari papan /fop-tasks WAJIB lihat daftar ini juga,
+            // sama kayak teknisi di tasks/show.blade.php (Ticket::isBatch()/
+            // batchMembers()).
+            'ticket.batchMembers',
         ]);
 
         $survey = null;

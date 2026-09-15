@@ -900,7 +900,7 @@ Test suite: `tests/Feature/TaskRescheduleTest.php` 6/6 hijau (5 asli + 1 baru nu
 
 ### Task 8 — Antrian Sorting Berdasarkan `client_request_date`
 
-**Status:** `Done`
+**Status:** `Done` — **urutan priority-lalu-tanggal di bawah ini DIBALIK 2026-09-10** (keputusan eksplisit user: tanggal kerja dulu, prioritas jadi tie-breaker). Catatan di bawah dipertahankan APA ADANYA sebagai jejak keputusan Task 8 asli — rancangan aktif sekarang ada di [flowchart.md § 8](flowchart.md#8-antrian-sorting--tanggal-kerja-dulu-prioritas-jadi-tie-breaker-task-8-direvisi-2026-09-10).
 
 **Tujuan:** Task dengan `client_request_date` di masa depan tampil di bawah (Upcoming), begitu jadwalnya tiba naik otomatis ke atas — sesuai kebutuhan poin 8 (dan poin 13, lihat catatan di Task 13).
 

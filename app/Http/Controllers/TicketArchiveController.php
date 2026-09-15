@@ -62,10 +62,15 @@ abstract class TicketArchiveController extends Controller
                 'creator:id,name',
                 'pop:id,name',
                 'fopTask:id,task_number,status',
-                'issueCategory:id,name',
+                'issueCategory:id,name,is_batch',
                 // Atribusi (siapa buat/selesaikan/kirim ke NOC/kirim ke FOP) —
                 // lihat Ticket::closedBy()/escalatedToNocBy()/escalatedToFopBy().
                 'histories.actor:id,name',
+                // Pelanggan terdampak (tiket batch) — Parent DAN Child sama-sama
+                // wajib kebaca di arsip (Ticket Selesai/Dibatalkan), beda dari
+                // Worksheet Helpdesk yang cuma nge-tampilin ke FOP/NOC Parent-nya
+                // doang (lihat Ticket::isBatch()/batchMembers()).
+                'batchMembers',
             ])
             ->withCount('attachments');
 

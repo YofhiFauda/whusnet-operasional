@@ -6,6 +6,7 @@ use App\Enums\InvoiceType;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Pop;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -35,10 +36,23 @@ class MigrasiLegacyTagihanDobelPerPeriodeTest extends TestCase
         $this->seed(DatabaseSeeder::class);
         $this->loginAsAdmin();
 
+        // Cabang baru dari command wajib nempel ke Pop type=pusat yang sudah
+        // ada — di produksi ini dibuat manual lewat Master POP sebelum import.
+        Pop::create([
+            'code' => 'PST',
+            'pop_code' => 'PST',
+            'name' => 'Pusat',
+            'type' => 'pusat',
+            'status' => 'active',
+            'registration_prefix' => 'RQ',
+            'cid_prefix' => 'P',
+        ]);
+
         $this->artisan('app:import-legacy-sql', [
             'file' => self::FIXTURE,
             '--branch-code' => 'C',
             '--branch-name' => 'Jetis',
+            '--pusat-code' => 'PST',
         ])->assertSuccessful();
     }
 

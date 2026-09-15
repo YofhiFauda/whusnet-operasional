@@ -51,6 +51,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'sales_code',
     'agent_code',
     'referral_customer_code',
+    'sales_user_id',
+    'agent_id',
+    'referral_customer_id',
     'ont_sn',
     'odp_code',
     'olt_code',
@@ -59,6 +62,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'foto_kontrak',
     'created_by',
     'updated_by',
+    'pending_initial_invoice',
 ])]
 class Customer extends Model
 {
@@ -81,6 +85,10 @@ class Customer extends Model
             'rejected_at' => 'datetime',
             'terminated_at' => 'datetime',
             'gender' => Gender::class,
+            // Snapshot Invoice AWAL yang belum terbit (kategori Bisnis,
+            // nunggu BD) — lihat migration
+            // add_pending_initial_invoice_to_customers_table.
+            'pending_initial_invoice' => 'array',
         ];
     }
 
@@ -114,6 +122,39 @@ class Customer extends Model
     public function internetPackage(): BelongsTo
     {
         return $this->belongsTo(InternetPackage::class, 'internet_package_id');
+    }
+
+    /**
+     * Sales (User berrole sales) yang mendaftarkan pelanggan ini — FK asli
+     * sejak Skema 3 (2026-09-12), dipakai untuk agregasi omset Busdev.
+     * `sales_code` (varchar) tetap ada sebagai fallback tampilan data lama.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function salesUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_user_id');
+    }
+
+    /**
+     * Agent (master data, bukan akun login) yang mendaftarkan pelanggan ini
+     * atas bantuan Business Development.
+     *
+     * @return BelongsTo<Agent, $this>
+     */
+    public function agent(): BelongsTo
+    {
+        return $this->belongsTo(Agent::class);
+    }
+
+    /**
+     * Pelanggan existing sumber referral — self-referential.
+     *
+     * @return BelongsTo<Customer, $this>
+     */
+    public function referralCustomer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'referral_customer_id');
     }
 
     /**
@@ -209,6 +250,65 @@ class Customer extends Model
     public function customerService(): HasOne
     {
         return $this->hasOne(CustomerService::class);
+    }
+
+    /**
+     * Baris modul Customer Acquisition (dipakai tim Busdev) — cuma ada
+     * kalau pelanggan ini pernah diverifikasi admin (WorkflowTransition
+     * ACTIVE). Dibuat sekali oleh CustomerObserver.
+     */
+    public function customerAcquisition(): HasOne
+    {
+        return $this->hasOne(CustomerAcquisition::class);
+    }
+
+    /**
+     * Kategori paket pelanggan ini — dipakai di dua tempat yang perlu tau
+     * "kategori paket ini butuh validasi Business Development (BD) atau
+     * tidak" SEBELUM baris `CustomerAcquisition` sempat ada:
+     * `CustomerVerificationController::finalVerify()` (nentuin ACTIVE
+     * langsung atau nyangkut di WAITING_BUSINESS_DEVELOPMENT_VERIFICATION
+     * dulu) dan `BusinessDevelopmentVerificationController` (antrean BD).
+     * Butuh `customerService.internetPackage` sudah di-eager-load — pola
+     * sama `CustomerAcquisition::packageCategory()`.
+     */
+    public function packageCategory(): ?PackageCategory
+    {
+        $categoryName = $this->customerService?->internetPackage?->category;
+
+        if (! $categoryName) {
+            return null;
+        }
+
+        static $cache = [];
+
+        return $cache[$categoryName] ??= PackageCategory::with('installationFeeApprovalRole')->where('name', $categoryName)->first();
+    }
+
+    public function needsBusdevInstallationFeeVerification(): bool
+    {
+        return (bool) $this->packageCategory()?->needsInstallationFeeValidation();
+    }
+
+    /**
+     * Gerbang aksi "Verifikasi & Aktifkan" di
+     * `/business-development-verifications` — pola identik
+     * `CustomerAcquisition::canBeValidatedBy()` (dua jalur: override
+     * permission via Role Matrix, atau role user cocok dengan yang dipilih
+     * admin di Master Kategori Paket). Duplikasi kecil disengaja: dua model
+     * beda siklus hidup (sebelum vs sesudah baris CustomerAcquisition ada),
+     * memaksakan satu sumber lewat relasi/trait di titik ini menambah
+     * coupling yang tidak sepadan buat ~10 baris logic.
+     */
+    public function canInstallationFeeBeValidatedBy(User $user): bool
+    {
+        if ($user->hasPermission('customer_acquisitions.installation_fee.update')) {
+            return true;
+        }
+
+        $requiredRole = $this->packageCategory()?->installationFeeApprovalRole;
+
+        return $requiredRole !== null && $user->role_id === $requiredRole->id;
     }
 
     /**

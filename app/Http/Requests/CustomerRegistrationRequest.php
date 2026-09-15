@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\Gender;
+use App\Models\RestrictedPackage;
 use App\Support\RupiahInput;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -71,16 +72,46 @@ class CustomerRegistrationRequest extends FormRequest
             'city_id' => 'required|exists:cities,id',
             'district_id' => 'required|exists:districts,id',
             'village_id' => 'required|exists:villages,id',
-            'internet_package_id' => 'required|exists:internet_packages,id',
+            'internet_package_id' => [
+                'required',
+                'exists:internet_packages,id',
+                // Restriksi Paket per Role (Skema 1, 2026-09-12) — role
+                // ber-`is_package_restricted` cuma boleh submit paket yang
+                // ada di restricted_packages, TERLEPAS dari apa yang
+                // ditampilkan dropdown (cegah bypass manipulasi request
+                // langsung). Lihat InternetPackage::scopeAvailableFor().
+                function ($attribute, $value, $fail) {
+                    // Fail-open selama restricted_packages masih kosong sama
+                    // sekali — lihat InternetPackage::scopeAvailableFor().
+                    if (auth()->user()?->role?->is_package_restricted
+                        && RestrictedPackage::query()->exists()
+                        && ! RestrictedPackage::where('package_id', $value)->exists()) {
+                        $fail('Paket yang dipilih tidak termasuk daftar paket yang diizinkan untuk role Anda.');
+                    }
+                },
+            ],
             'contract_period_months' => 'required|integer|min:1',
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
             'other_fee' => 'nullable|numeric|min:0',
+            // jenis_kontrak & npwp — input-nya sudah ada di form sejak awal
+            // tapi TIDAK PERNAH divalidasi di sini, jadi keduanya kekirim
+            // percuma (silent drop, npwp bukan kolom yang di-set manapun,
+            // jenis_kontrak gak pernah nyampe customer_services.contract_type).
+            // Ditemukan &amp; diperbaiki 2026-09-12 lewat sisir Edit Pelanggan
+            // vs Registrasi/Laporan Survey/Laporan Pemasangan.
+            'npwp' => 'nullable|string|max:30',
+            'jenis_kontrak' => 'nullable|string|in:sewa,beli',
 
-            // Referrals
+            // Referrals — kolom lama (varchar) dipertahankan buat kompatibilitas
+            // jalur import lama, TAPI form registrasi (Skema 3, 2026-09-12)
+            // sekarang pakai FK di bawah.
             'sales_code' => 'nullable|string|max:30',
             'agent_code' => 'nullable|string|max:30',
             'referral_customer_code' => 'nullable|string|max:30',
+            'sales_user_id' => 'nullable|exists:users,id',
+            'agent_id' => 'nullable|exists:agents,id',
+            'referral_customer_id' => 'nullable|exists:customers,id',
 
             // Technical specs
             'ont_sn' => 'nullable|string|max:100',

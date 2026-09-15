@@ -18,6 +18,8 @@
         "@alpinejs/collapse": "^3.16.1",
         "@alpinejs/focus": "^3.16.1",
         "alpinejs": "^3.16.1",
+        "@zxing/library": "^0.23.0",
+        "chart.js": "^4.5.1",
         "jsqr": "^1.4.0",
         "laravel-echo": "^2.3.7",
         "nprogress": "^0.2.0",

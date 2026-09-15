@@ -64,15 +64,17 @@
 
                     <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-5 mb-3">Rincian Biaya</h4>
                     <div class="space-y-2 text-xs">
-                        <div class="flex justify-between gap-4">
-                            <span class="text-slate-500 dark:text-slate-400">Harga Paket (Subtotal)</span>
+                        <div id="qp-items-list" class="space-y-1.5 hidden border-b border-slate-100 dark:border-slate-800/60 pb-2"></div>
+
+                        <div class="flex justify-between gap-4" id="qp-subtotal-row">
+                            <span class="text-slate-500 dark:text-slate-400">Subtotal (DPP)</span>
                             <span id="qp-subtotal" class="font-mono text-slate-800 dark:text-slate-200">Rp 0</span>
                         </div>
                         <div class="flex justify-between gap-4 text-green-700 dark:text-emerald-400 hidden" id="qp-discount-row">
                             <span>Potongan Diskon</span>
                             <span id="qp-discount" class="font-mono">- Rp 0</span>
                         </div>
-                        <div class="flex justify-between gap-4">
+                        <div class="flex justify-between gap-4" id="qp-ppn-row">
                             <span class="text-slate-500 dark:text-slate-400" id="qp-ppn-label">PPN</span>
                             <span id="qp-ppn" class="font-mono text-slate-800 dark:text-slate-200">Rp 0</span>
                         </div>
@@ -507,30 +509,64 @@
                     if (discount > 0) {
                         document.getElementById('qp-discount-row').classList.remove('hidden');
                         document.getElementById('qp-discount').textContent = '- Rp ' + Math.round(discount).toLocaleString('id-ID');
+                    } else {
+                        document.getElementById('qp-discount-row').classList.add('hidden');
                     }
                     
-                    document.getElementById('qp-ppn-label').textContent = 'PPN (' + Math.round(ppnPercent) + '%)';
-                    document.getElementById('qp-ppn').textContent = 'Rp ' + Math.round(ppnAmount).toLocaleString('id-ID');
-                    
-                    if (prorate > 0) {
-                        document.getElementById('qp-prorate-row').classList.remove('hidden');
-                        document.getElementById('qp-prorate').textContent = 'Rp ' + Math.round(prorate).toLocaleString('id-ID');
+                    if (ppnPercent > 0) {
+                        document.getElementById('qp-ppn-row').classList.remove('hidden');
+                        document.getElementById('qp-ppn-label').textContent = 'PPN (' + Math.round(ppnPercent) + '%)';
+                        document.getElementById('qp-ppn').textContent = 'Rp ' + Math.round(ppnAmount).toLocaleString('id-ID');
+                    } else {
+                        document.getElementById('qp-ppn-row').classList.add('hidden');
                     }
-                    if (extraCable > 0) {
-                        document.getElementById('qp-extra-cable-row').classList.remove('hidden');
-                        document.getElementById('qp-extra-cable').textContent = 'Rp ' + Math.round(extraCable).toLocaleString('id-ID');
-                    }
-                    if (extraInstallation > 0) {
-                        document.getElementById('qp-extra-installation-row').classList.remove('hidden');
-                        document.getElementById('qp-extra-installation').textContent = 'Rp ' + Math.round(extraInstallation).toLocaleString('id-ID');
-                    }
-                    if (extraPole > 0) {
-                        document.getElementById('qp-extra-pole-row').classList.remove('hidden');
-                        document.getElementById('qp-extra-pole').textContent = 'Rp ' + Math.round(extraPole).toLocaleString('id-ID');
-                    }
-                    if (other > 0) {
-                        document.getElementById('qp-other-row').classList.remove('hidden');
-                        document.getElementById('qp-other').textContent = 'Rp ' + Math.round(other).toLocaleString('id-ID');
+
+                    // Render dynamic items (ADHOC-60)
+                    const itemsList = document.getElementById('qp-items-list');
+                    itemsList.innerHTML = '';
+                    if (Array.isArray(data.items) && data.items.length > 0) {
+                        itemsList.classList.remove('hidden');
+                        data.items.forEach(item => {
+                            const row = document.createElement('div');
+                            row.className = 'flex justify-between gap-4 text-slate-600 dark:text-slate-300';
+                            const label = document.createElement('span');
+                            label.className = 'font-medium truncate max-w-[200px]';
+                            label.textContent = item.subcategory_name_snapshot || item.category_name_snapshot || 'Rincian Item';
+                            const val = document.createElement('span');
+                            val.className = 'font-mono text-slate-800 dark:text-slate-200 shrink-0';
+                            val.textContent = 'Rp ' + Math.round(parseFloat(item.amount) || 0).toLocaleString('id-ID');
+                            row.appendChild(label);
+                            row.appendChild(val);
+                            itemsList.appendChild(row);
+                        });
+
+                        document.getElementById('qp-prorate-row').classList.add('hidden');
+                        document.getElementById('qp-extra-cable-row').classList.add('hidden');
+                        document.getElementById('qp-extra-installation-row').classList.add('hidden');
+                        document.getElementById('qp-extra-pole-row').classList.add('hidden');
+                        document.getElementById('qp-other-row').classList.add('hidden');
+                    } else {
+                        itemsList.classList.add('hidden');
+                        if (prorate > 0) {
+                            document.getElementById('qp-prorate-row').classList.remove('hidden');
+                            document.getElementById('qp-prorate').textContent = 'Rp ' + Math.round(prorate).toLocaleString('id-ID');
+                        }
+                        if (extraCable > 0) {
+                            document.getElementById('qp-extra-cable-row').classList.remove('hidden');
+                            document.getElementById('qp-extra-cable').textContent = 'Rp ' + Math.round(extraCable).toLocaleString('id-ID');
+                        }
+                        if (extraInstallation > 0) {
+                            document.getElementById('qp-extra-installation-row').classList.remove('hidden');
+                            document.getElementById('qp-extra-installation').textContent = 'Rp ' + Math.round(extraInstallation).toLocaleString('id-ID');
+                        }
+                        if (extraPole > 0) {
+                            document.getElementById('qp-extra-pole-row').classList.remove('hidden');
+                            document.getElementById('qp-extra-pole').textContent = 'Rp ' + Math.round(extraPole).toLocaleString('id-ID');
+                        }
+                        if (other > 0) {
+                            document.getElementById('qp-other-row').classList.remove('hidden');
+                            document.getElementById('qp-other').textContent = 'Rp ' + Math.round(other).toLocaleString('id-ID');
+                        }
                     }
 
                     const totalAmount = parseFloat(data.total_amount) || 0;

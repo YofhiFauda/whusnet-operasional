@@ -134,6 +134,11 @@ class ActionSeeder extends Seeder
                 'name' => 'Receive',
                 'description' => 'Konfirmasi fisik penerimaan barang (Transfer gudang Pusat ke Cabang)',
             ],
+            [
+                'code' => ActionCode::CHANGE,
+                'name' => 'Change',
+                'description' => 'Ganti paket internet pelanggan aktif, terpisah dari update field umum',
+            ],
         ];
 
         foreach ($actions as $action) {

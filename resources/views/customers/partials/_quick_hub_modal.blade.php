@@ -10,6 +10,13 @@
 @include('customers.partials._network_assignment_modal')
 
 {{-- ────────────────────────────────────────────────────────────
+     MODAL 1b: GANTI PAKET INTERNET
+     Sama alasannya dengan Modal 1 — dipisah dari Quick Hub biar dipakai
+     ulang & aksinya jelas kelihatan (bukan link kecil ketimpa di teks).
+──────────────────────────────────────────────────────────── --}}
+@include('customers.partials._package_change_modal')
+
+{{-- ────────────────────────────────────────────────────────────
      MODAL 2: CUSTOMER QUICK HUB & OPERATIONAL ACTIONS MODAL (4 TABS)
 ──────────────────────────────────────────────────────────── --}}
 <div id="actions-modal" class="fixed inset-0 z-50 overflow-y-auto flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 hidden">
@@ -130,7 +137,7 @@
 
                     <!-- Switch Status Layanan -->
                     <button type="button" onclick="triggerHubToggleConnection()" id="btn-hub-toggle-status" class="flex-1 min-w-[140px] h-11 px-2.5 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-amber-100 transition-all btn-interactive touch-target">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                        <svg id="btn-hub-toggle-status-icon" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
                         <span id="btn-hub-toggle-status-text">Isolir Layanan</span>
                     </button>
 
@@ -141,7 +148,7 @@
                                 class="btn-print-receipt-action flex-1 min-w-[140px] h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold flex items-center justify-center gap-1.5 shadow-sm btn-interactive disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Cetak struk pembayaran terakhir">
                             <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
-                            <span>Cetak Struk</span>
+                            <span class="text-[11px]">Cetak Struk</span>
                         </button>
                     @endif
                 </div>
@@ -187,6 +194,9 @@
                             </h4>
                         </div>
 
+                        <!-- Error Box inside modal -->
+                        <div id="hub-pay-error" class="hidden p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-medium"></div>
+
                         <!-- Notice Badge Saat Belum Ada Tagihan -->
                         <div id="payment-form-notice" class="hidden p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-300 text-[11px] font-medium flex items-center gap-2">
                             <svg class="w-4 h-4 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -195,30 +205,95 @@
 
                         <form id="payment-form" method="POST" action="" class="space-y-3 text-xs">
                             @csrf
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Tanggal</label>
+                                    <input type="date" name="payment_date" id="payment_date" value="{{ date('Y-m-d') }}" max="{{ date('Y-m-d') }}" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all" required>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Metode</label>
+                                    <select name="payment_method" id="payment_method" onchange="hubTogglePaymentMethodFields()" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all" required>
+                                        <option value="cash">Tunai / Kasir</option>
+                                        <option value="transfer">Transfer Bank</option>
+                                        <option value="kolektor">Kolektor</option>
+                                        <option value="qris">QRIS</option>
+                                        <option value="lainnya">Lainnya</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Transfer Fields -->
+                            <div id="hub-pay-transfer-fields" class="hidden grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nama Bank</label>
+                                    <input type="text" name="bank_name" id="hub_bank_name" placeholder="mis. BCA, BRI, Mandiri" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nomer Rekening</label>
+                                    <input type="text" name="account_number" id="hub_account_number" placeholder="No. Rekening" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Collector Fields -->
+                            <div id="hub-pay-collector-fields" class="hidden">
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Petugas Kolektor</label>
+                                <select name="collected_by" id="hub_collected_by" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                                    <option value="">Pilih kolektor...</option>
+                                </select>
+                            </div>
+
                             <div>
-                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nominal Pembayaran (Rp)</label>
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nominal Diterima dari Pelanggan (Rp)</label>
                                 {{-- data-rupiah: 150000 → 150.000 saat diketik,
                                      dinormalkan lagi saat submit (layouts/app). --}}
                                 <input type="text" inputmode="decimal" name="amount" id="payment_amount" data-rupiah class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono font-bold text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all" required>
+                                <p class="text-[10px] text-slate-400 mt-1">Boleh diisi lebih besar dari sisa tagihan — kelebihannya otomatis tercatat sebagai lebih bayar.</p>
+                                
+                                {{-- Hints calculation --}}
+                                <p id="hub-pay-installment-hint" class="hidden text-[10px] font-semibold text-amber-700 dark:text-amber-400 mt-1.5 px-2 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800"></p>
+                                <p id="hub-pay-settle-hint" class="hidden text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 mt-1.5 px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800"></p>
+                                <p id="hub-pay-overpay-hint" class="hidden text-[10px] font-semibold text-sky-700 dark:text-sky-400 mt-1.5 px-2 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800"></p>
                             </div>
+
+                            <!-- Saldo Pelanggan Block -->
+                            <div id="hub-pay-balance-block" class="hidden border border-sky-200 dark:border-sky-800 bg-sky-50/60 dark:bg-sky-950/40 rounded-xl p-3 space-y-2">
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="text-sky-800 dark:text-sky-300 font-semibold">Saldo Pelanggan Tersedia</span>
+                                    <span id="hub-pay-balance-available" class="font-mono font-bold text-sky-800 dark:text-sky-300">Rp 0</span>
+                                </div>
+                                <label class="flex items-center gap-2 text-[11px] text-sky-800 dark:text-sky-300 font-medium cursor-pointer">
+                                    <input type="checkbox" id="hub-pay-use-balance" class="rounded border-sky-300 text-sky-600 focus:ring-sky-500">
+                                    <span>Pakai saldo pelanggan untuk pembayaran ini</span>
+                                </label>
+                                <div id="hub-pay-use-balance-wrap" class="hidden">
+                                    <label class="block text-[10px] font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider mb-1">Nominal Saldo Dipakai</label>
+                                    <input type="text" inputmode="decimal" data-rupiah name="use_balance_amount" id="hub-pay-use-balance-amount" class="w-full h-9 px-3 rounded-lg border border-sky-200 dark:border-sky-800 bg-white dark:bg-slate-800 font-mono text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                                </div>
+                            </div>
+
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Metode</label>
-                                    <select name="payment_method" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all" required>
-                                        <option value="cash">Tunai / Kasir</option>
-                                        <option value="transfer">Transfer Bank</option>
-                                        <option value="qris">QRIS</option>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Alokasi</label>
+                                    <select name="allocation" id="hub_allocation" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                                        <option value="Tagihan Bulanan">Tagihan Bulanan</option>
+                                        <option value="Bayar Piutang">Bayar Piutang</option>
+                                        <option value="Lebih Bayar">Lebih Bayar</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Tanggal</label>
-                                    <input type="date" name="payment_date" id="payment_date" value="{{ date('Y-m-d') }}" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all" required>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Catatan</label>
+                                    <input type="text" name="note" id="hub_note" placeholder="Catatan pembayaran..." class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
                                 </div>
                             </div>
-                            <div class="flex flex-col sm:flex-row items-stretch gap-2">
-                                <button type="submit" class="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 btn-interactive">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    <span>Simpan Pembayaran</span>
+
+                            <div class="flex flex-col sm:flex-row items-stretch gap-2 pt-1">
+                                <button type="submit" id="hub-pay-submit-btn" class="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 btn-interactive">
+                                    <svg id="hub-pay-spinner" class="hidden animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <svg id="hub-pay-submit-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span id="hub-pay-submit-text">Simpan Pembayaran</span>
                                 </button>
                             </div>
                         </form>
@@ -446,9 +521,9 @@
         <!-- Modal Footer -->
         {{-- Footer aksi — DUA versi.
 
-             Mobile & tablet (<lg): satu baris ikon + label pendek, grid 6 kolom —
-             Detail, Edit, WA, Cetak Struk, Isolir/Aktifkan, Putus. Semua aksi sama
-             pentingnya, jadi tidak ada yang disembunyikan di balik menu. Baris ini
+             Mobile & tablet (<lg): satu baris ikon + label pendek, grid 7 kolom —
+             Detail, Edit, Upgrade Paket, WA, Cetak Struk, Isolir/Aktifkan, Putus.
+             Semua aksi sama pentingnya, jadi tidak ada yang disembunyikan di balik menu. Baris ini
              SATU-SATUNYA tempat WA/Struk/Isolir muncul di layar <lg — quick action
              row di tab Ringkasan (di atas) sengaja disembunyikan pada lebar ini
              (hidden lg:flex) supaya tidak dobel. Bentuk tombol berlabel panjang
@@ -461,7 +536,7 @@
              Ringkasan, sisanya (Detail, Edit, Putus) di layout kiri/kanan berikut
              — ruang vertikal longgar, tidak perlu dipadatkan jadi ikon. --}}
         <div class="lg:hidden px-2 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
-            <div class="grid grid-cols-6 gap-1">
+            <div class="grid grid-cols-7 gap-1">
                 <button type="button" onclick="triggerDetail()" title="Detail Full"
                         class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors btn-interactive">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
@@ -476,11 +551,14 @@
                 </button>
                 @endif
 
-                <button type="button" onclick="focusWaTemplates()" data-wa-trigger title="Kirim WhatsApp"
-                        class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors btn-interactive">
-                    <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
-                    <span class="text-[9px] font-semibold leading-none">WA</span>
+                @if(auth()->user()->hasPermission('customers.detail.packages.change'))
+                <button type="button" onclick="triggerPackageChangeFromHub()" title="Upgrade Paket Internet"
+                        class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors btn-interactive">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span class="text-[9px] font-semibold leading-none">Paket</span>
                 </button>
+                @endif
+
 
                 @if(auth()->user()->hasPermission('payments.view'))
                 {{-- Struk yang dicetak = pembayaran TERAKHIR pelanggan ini. Tombol sengaja di luar <form> (type=button) supaya tidak
@@ -517,6 +595,11 @@
                 @if(auth()->user()->hasPermission('customers.update'))
                 <button type="button" onclick="triggerEdit()" class="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors btn-interactive inline-flex items-center justify-center text-center">
                     Edit Master Data
+                </button>
+                @endif
+                @if(auth()->user()->hasPermission('customers.detail.packages.change'))
+                <button type="button" onclick="triggerPackageChangeFromHub()" class="h-10 px-3.5 rounded-xl border border-sky-200 dark:border-sky-800 bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 font-semibold hover:bg-sky-50 dark:hover:bg-slate-700 transition-colors btn-interactive inline-flex items-center justify-center text-center">
+                    Upgrade Paket
                 </button>
                 @endif
             </div>

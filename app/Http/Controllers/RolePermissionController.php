@@ -105,6 +105,7 @@ class RolePermissionController extends Controller
             'name' => 'required|string|max:255|unique:roles,name',
             'code' => ['required', 'string', 'max:50', 'unique:roles,code', 'regex:/^[a-z0-9_]+$/'],
             'description' => 'nullable|string|max:1000',
+            'is_package_restricted' => 'nullable|boolean',
         ], [
             'code.regex' => 'Kode role hanya boleh menggunakan huruf kecil, angka, dan underscore.',
         ]);
@@ -114,6 +115,10 @@ class RolePermissionController extends Controller
             'code' => $request->code,
             'description' => $request->description,
             'is_system' => false,
+            // Restriksi Paket per Role (Skema 1, 2026-09-12) — lihat
+            // InternetPackage::scopeAvailableFor(). Dulu cuma bisa diset
+            // lewat seeder/tinker, sekarang Owner bisa toggle dari form ini.
+            'is_package_restricted' => $request->boolean('is_package_restricted'),
         ]);
 
         return redirect()->route('roles.index')
@@ -136,6 +141,7 @@ class RolePermissionController extends Controller
             'name' => 'required|string|max:255|unique:roles,name,'.$role->id,
             'code' => ['required', 'string', 'max:50', 'unique:roles,code,'.$role->id, 'regex:/^[a-z0-9_]+$/'],
             'description' => 'nullable|string|max:1000',
+            'is_package_restricted' => 'nullable|boolean',
         ], [
             'code.regex' => 'Kode role hanya boleh menggunakan huruf kecil, angka, dan underscore.',
         ]);
@@ -149,6 +155,10 @@ class RolePermissionController extends Controller
             'name' => $request->name,
             'code' => $role->is_system ? $role->code : $request->code,
             'description' => $request->description,
+            // Restriksi Paket per Role (Skema 1, 2026-09-12) — boleh diubah
+            // walau role-nya is_system (Sales/Teknisi is_system=true, dan
+            // justru dua role itu yang paling perlu di-toggle).
+            'is_package_restricted' => $request->boolean('is_package_restricted'),
         ]);
 
         return redirect()->route('roles.index')

@@ -250,7 +250,578 @@
             </div>
             <p class="metric-card-footer">Invoice belum lunas melewati batas</p>
         </div>
+
+        <!-- Net Customer Growth (KPI Strip — Pilar 1) -->
+        <div class="metric-card <?php echo e($stats['net_customer_growth'] >= 0 ? 'status-success' : 'status-error'); ?>">
+            <div>
+                <div class="metric-card-label">
+                    <span>Net Customer Growth</span>
+                </div>
+                <div class="metric-card-value-container">
+                    <p class="metric-card-value"><?php echo e($stats['net_customer_growth'] >= 0 ? '+' : ''); ?><?php echo e(number_format($stats['net_customer_growth'])); ?></p>
+                </div>
+            </div>
+            <p class="metric-card-footer"><?php echo e(number_format($stats['new_active_customers'])); ?> aktif baru &middot; <?php echo e(number_format($stats['terminated_customers'])); ?> putus</p>
+        </div>
+
+        <!-- Collection Rate (KPI Strip — Pilar 1) -->
+        <div class="metric-card <?php echo e(is_null($stats['collection_rate']) ? '' : ($stats['collection_rate'] >= 80 ? 'status-success' : 'status-warning')); ?>">
+            <div>
+                <div class="metric-card-label">
+                    <span>Collection Rate</span>
+                </div>
+                <div class="metric-card-value-container">
+                    <p class="metric-card-value"><?php echo e(is_null($stats['collection_rate']) ? '-' : $stats['collection_rate'].'%'); ?></p>
+                </div>
+            </div>
+            <p class="metric-card-footer">Realisasi kas / omzet tagihan periode</p>
+        </div>
     </div>
+
+    <?php if($canViewCash): ?>
+    <!-- Posisi Keuangan & Arus Kas (Pilar 2) -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <?php if (isset($component)) { $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.card','data' => ['class' => 'p-5 xl:col-span-2']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'p-5 xl:col-span-2']); ?>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-text-main">Posisi Keuangan & Arus Kas</h3>
+                <div class="flex items-center gap-2">
+                    <?php if($stats['cash_deposit_open_difference_count'] > 0): ?>
+                        <?php if (isset($component)) { $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.badge','data' => ['variant' => 'error']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'error']); ?><?php echo e($stats['cash_deposit_open_difference_count']); ?> selisih admin <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4)): ?>
+<?php $attributes = $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4; ?>
+<?php unset($__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4)): ?>
+<?php $component = $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4; ?>
+<?php unset($__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4); ?>
+<?php endif; ?>
+                    <?php endif; ?>
+                    <?php if($stats['collector_shortfall_count'] > 0): ?>
+                        <?php if (isset($component)) { $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.badge','data' => ['variant' => 'error']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'error']); ?><?php echo e($stats['collector_shortfall_count']); ?> kurang setor kolektor <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4)): ?>
+<?php $attributes = $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4; ?>
+<?php unset($__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4)): ?>
+<?php $component = $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4; ?>
+<?php unset($__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4); ?>
+<?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Kas Mengendap di Kasir POP</p>
+                    <p class="text-lg font-semibold text-text-main font-mono"><?php echo e($currency($stats['cash_at_office_amount'])); ?></p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Uang di Tangan Kolektor</p>
+                    <p class="text-lg font-semibold text-text-main font-mono"><?php echo e($currency($stats['cash_with_collector_amount'])); ?></p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Setoran Menunggu Verifikasi</p>
+                    <p class="text-lg font-semibold text-text-main font-mono"><?php echo e($currency($stats['cash_deposit_pending_amount'])); ?></p>
+                    <p class="text-xs text-text-muted mt-0.5"><?php echo e(number_format($stats['cash_deposit_pending_count'])); ?> setoran</p>
+                </div>
+                <div class="rounded-md border p-3 <?php echo e($stats['collector_shortfall_count'] > 0 ? 'border-error-border' : 'border-border'); ?>">
+                    <p class="text-xs text-text-muted mb-1">Kurang Setor Kolektor</p>
+                    <p class="text-lg font-semibold <?php echo e($stats['collector_shortfall_count'] > 0 ? 'text-error' : 'text-text-main'); ?> font-mono"><?php echo e($currency($stats['collector_shortfall_amount'])); ?></p>
+                    <p class="text-xs text-text-muted mt-0.5"><?php echo e(number_format($stats['collector_shortfall_count'])); ?> kolektor</p>
+                </div>
+            </div>
+         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $attributes = $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $component = $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+
+        <!-- Action Center: Setoran Kas Pending (Pilar 6) -->
+        <?php if (isset($component)) { $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.card','data' => ['class' => 'p-5']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'p-5']); ?>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-text-main">Butuh Verifikasi</h3>
+                <?php if(auth()->user()->hasPermission('cash_deposit.view')): ?>
+                    <?php if (isset($component)) { $__componentOriginal606bedd6108050b8303bc7c381e2387c = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal606bedd6108050b8303bc7c381e2387c = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.link','data' => ['href' => ''.e(route('cash-deposits.index')).'','class' => 'text-xs']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.link'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['href' => ''.e(route('cash-deposits.index')).'','class' => 'text-xs']); ?>Lihat Semua <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal606bedd6108050b8303bc7c381e2387c)): ?>
+<?php $attributes = $__attributesOriginal606bedd6108050b8303bc7c381e2387c; ?>
+<?php unset($__attributesOriginal606bedd6108050b8303bc7c381e2387c); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal606bedd6108050b8303bc7c381e2387c)): ?>
+<?php $component = $__componentOriginal606bedd6108050b8303bc7c381e2387c; ?>
+<?php unset($__componentOriginal606bedd6108050b8303bc7c381e2387c); ?>
+<?php endif; ?>
+                <?php endif; ?>
+            </div>
+
+            <div class="space-y-2">
+                <?php $__empty_1 = true; $__currentLoopData = $pendingCashDeposits; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $deposit): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <a href="<?php echo e(route('cash-deposits.index')); ?>" class="flex items-center justify-between rounded-md border border-border p-2.5 text-sm hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <span>
+                            <span class="block font-medium text-text-main"><?php echo e($deposit->pop?->name ?? '-'); ?></span>
+                            <span class="block text-xs text-text-muted"><?php echo e($deposit->depositor?->name ?? '-'); ?></span>
+                        </span>
+                        <span class="font-mono font-semibold text-text-main"><?php echo e($currency($deposit->declared_amount)); ?></span>
+                    </a>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <p class="text-sm text-text-muted">Tidak ada setoran menunggu verifikasi.</p>
+                <?php endif; ?>
+            </div>
+         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $attributes = $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $component = $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <!-- Funnel Akuisisi & Retensi Pelanggan (Pilar 3) -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <?php if (isset($component)) { $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.card','data' => ['class' => 'p-5 xl:col-span-2']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'p-5 xl:col-span-2']); ?>
+            <h3 class="text-sm font-semibold text-text-main mb-4">Funnel Akuisisi Pelanggan Baru</h3>
+
+            <div class="flex flex-col sm:flex-row items-stretch gap-2">
+                <?php $__currentLoopData = [
+                    ['label' => 'Menunggu Survey', 'value' => $stats['funnel_waiting_survey']],
+                    ['label' => 'Menunggu ACC Admin', 'value' => $stats['funnel_waiting_acc']],
+                    ['label' => 'Proses Pemasangan', 'value' => $stats['funnel_waiting_installation']],
+                    ['label' => 'Menunggu Verifikasi Admin', 'value' => $stats['funnel_verification_admin']],
+                ]; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $stage): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <div class="flex-1 rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1"><?php echo e($index + 1); ?>. <?php echo e($stage['label']); ?></p>
+                        <p class="text-xl font-semibold text-text-main font-mono"><?php echo e(number_format($stage['value'])); ?></p>
+                    </div>
+                    <?php if(!$loop->last): ?>
+                        <div class="hidden sm:flex items-center justify-center text-text-disabled">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    <?php endif; ?>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </div>
+            <p class="text-xs text-text-muted mt-3"><?php echo e(number_format($stats['rejected_customers'])); ?> pelanggan gagal/batal pada periode <?php echo e($filters['period_label']); ?>.</p>
+         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $attributes = $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $component = $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+
+        <!-- Retensi & Status Pelanggan (Metric Card kecil) -->
+        <?php if (isset($component)) { $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.card','data' => ['class' => 'p-5']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'p-5']); ?>
+            <h3 class="text-sm font-semibold text-text-main mb-4">Retensi & Status Pelanggan</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Aktif</p>
+                    <p class="text-lg font-semibold text-success font-mono"><?php echo e(number_format($stats['active_customers'])); ?></p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Isolir</p>
+                    <p class="text-lg font-semibold text-warning font-mono"><?php echo e(number_format($stats['suspended_customers'])); ?></p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Putus (Periode Ini)</p>
+                    <p class="text-lg font-semibold text-error font-mono"><?php echo e(number_format($stats['terminated_customers'])); ?></p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Siap Tagih</p>
+                    <p class="text-lg font-semibold text-text-main font-mono"><?php echo e(number_format($stats['ready_billing_customers'])); ?></p>
+                </div>
+            </div>
+         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $attributes = $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $component = $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+    </div>
+
+    <?php if($canViewTickets): ?>
+    <!-- Kualitas Layanan & Gangguan / Ticketing SLA (Pilar 4) -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <?php if (isset($component)) { $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.card','data' => ['class' => 'p-5 xl:col-span-2']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'p-5 xl:col-span-2']); ?>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-text-main">Kualitas Layanan & Gangguan (Ticketing)</h3>
+                <?php if($stats['ticket_sla_breach_count'] > 0): ?>
+                    <?php if (isset($component)) { $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.badge','data' => ['variant' => 'error']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'error']); ?><?php echo e($stats['ticket_sla_breach_count']); ?> breach SLA <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4)): ?>
+<?php $attributes = $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4; ?>
+<?php unset($__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4)): ?>
+<?php $component = $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4; ?>
+<?php unset($__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4); ?>
+<?php endif; ?>
+                <?php endif; ?>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <?php if(auth()->user()->hasPermission('noc_worksheet.view')): ?>
+                    <a href="<?php echo e(route('noc.worksheet')); ?>" class="rounded-md border border-border p-3 text-center hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <p class="text-xs text-text-muted mb-1">Masuk</p>
+                        <p class="text-lg font-semibold text-text-main font-mono"><?php echo e(number_format($stats['ticket_bucket_masuk'])); ?></p>
+                    </a>
+                    <a href="<?php echo e(route('noc.worksheet')); ?>" class="rounded-md border border-border p-3 text-center hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <p class="text-xs text-text-muted mb-1">Diproses</p>
+                        <p class="text-lg font-semibold text-text-main font-mono"><?php echo e(number_format($stats['ticket_bucket_diproses'])); ?></p>
+                    </a>
+                <?php else: ?>
+                    <div class="rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">Masuk</p>
+                        <p class="text-lg font-semibold text-text-main font-mono"><?php echo e(number_format($stats['ticket_bucket_masuk'])); ?></p>
+                    </div>
+                    <div class="rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">Diproses</p>
+                        <p class="text-lg font-semibold text-text-main font-mono"><?php echo e(number_format($stats['ticket_bucket_diproses'])); ?></p>
+                    </div>
+                <?php endif; ?>
+
+                <?php if(auth()->user()->hasPermission('tickets.selesai.view')): ?>
+                    <a href="<?php echo e(route('tickets.selesai')); ?>" class="rounded-md border border-border p-3 text-center hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <p class="text-xs text-text-muted mb-1">Selesai</p>
+                        <p class="text-lg font-semibold text-success font-mono"><?php echo e(number_format($stats['ticket_bucket_selesai'])); ?></p>
+                    </a>
+                <?php else: ?>
+                    <div class="rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">Selesai</p>
+                        <p class="text-lg font-semibold text-success font-mono"><?php echo e(number_format($stats['ticket_bucket_selesai'])); ?></p>
+                    </div>
+                <?php endif; ?>
+
+                <?php if(auth()->user()->hasPermission('tickets.dibatalkan.view')): ?>
+                    <a href="<?php echo e(route('tickets.dibatalkan')); ?>" class="rounded-md border border-border p-3 text-center hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <p class="text-xs text-text-muted mb-1">Dibatalkan</p>
+                        <p class="text-lg font-semibold text-text-muted font-mono"><?php echo e(number_format($stats['ticket_bucket_dibatalkan'])); ?></p>
+                    </a>
+                <?php else: ?>
+                    <div class="rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">Dibatalkan</p>
+                        <p class="text-lg font-semibold text-text-muted font-mono"><?php echo e(number_format($stats['ticket_bucket_dibatalkan'])); ?></p>
+                    </div>
+                <?php endif; ?>
+            </div>
+         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $attributes = $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $component = $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+
+        <!-- Top 5 Kategori Gangguan -->
+        <?php if (isset($component)) { $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.card','data' => ['class' => 'p-5']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'p-5']); ?>
+            <h3 class="text-sm font-semibold text-text-main mb-4">Top Kategori Gangguan (<?php echo e($filters['period_label']); ?>)</h3>
+            <div class="space-y-3">
+                <?php $__empty_1 = true; $__currentLoopData = $topIssueCategories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <div>
+                        <div class="flex justify-between gap-4 text-sm">
+                            <span class="font-medium text-text-secondary"><?php echo e($row->issueCategory?->name ?? 'Tanpa Kategori'); ?></span>
+                            <span class="font-semibold text-text-main font-mono"><?php echo e(number_format($row->total)); ?></span>
+                        </div>
+                        <div class="mt-1.5 h-2 rounded-full bg-surface-muted">
+                            <div class="h-2 rounded-full bg-primary" style="width: <?php echo e(min(100, ((int) $row->total / max(1, (int) $topIssueCategories->max('total'))) * 100)); ?>%"></div>
+                        </div>
+                    </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <p class="text-sm text-text-muted">Tidak ada tiket dengan kategori pada periode ini.</p>
+                <?php endif; ?>
+            </div>
+         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $attributes = $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $component = $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if($canViewFopDelivery): ?>
+    <!-- Efisiensi Delivery Lapangan (Pilar 5) -->
+    <?php if (isset($component)) { $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.card','data' => ['class' => 'p-5']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'p-5']); ?>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-text-main">Efisiensi Delivery Lapangan (<?php echo e($filters['period_label']); ?>)</h3>
+            <?php if (isset($component)) { $__componentOriginal606bedd6108050b8303bc7c381e2387c = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal606bedd6108050b8303bc7c381e2387c = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.link','data' => ['href' => ''.e(route('fop.dashboard')).'','class' => 'text-xs']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.link'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['href' => ''.e(route('fop.dashboard')).'','class' => 'text-xs']); ?>Lihat Dashboard FOP <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal606bedd6108050b8303bc7c381e2387c)): ?>
+<?php $attributes = $__attributesOriginal606bedd6108050b8303bc7c381e2387c; ?>
+<?php unset($__attributesOriginal606bedd6108050b8303bc7c381e2387c); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal606bedd6108050b8303bc7c381e2387c)): ?>
+<?php $component = $__componentOriginal606bedd6108050b8303bc7c381e2387c; ?>
+<?php unset($__componentOriginal606bedd6108050b8303bc7c381e2387c); ?>
+<?php endif; ?>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="rounded-md border border-border p-3">
+                <p class="text-xs text-text-muted mb-1">Survey Selesai</p>
+                <p class="text-lg font-semibold text-text-main font-mono"><?php echo e(number_format($stats['fop_survey_completed_count'])); ?></p>
+            </div>
+            <div class="rounded-md border border-border p-3">
+                <p class="text-xs text-text-muted mb-1">PSB Selesai</p>
+                <p class="text-lg font-semibold text-text-main font-mono"><?php echo e(number_format($stats['fop_psb_completed_count'])); ?></p>
+            </div>
+            <div class="rounded-md border border-border p-3">
+                <p class="text-xs text-text-muted mb-1">Rata-rata Lead Time PSB</p>
+                <p class="text-lg font-semibold text-text-main font-mono"><?php echo e(is_null($stats['fop_psb_avg_lead_time_days']) ? '-' : $stats['fop_psb_avg_lead_time_days'].' hari'); ?></p>
+            </div>
+            <div class="rounded-md border p-3 <?php echo e($stats['fop_overdue_survey_count'] + $stats['fop_overdue_psb_count'] > 0 ? 'border-error-border' : 'border-border'); ?>">
+                <p class="text-xs text-text-muted mb-1">Overdue Antrean</p>
+                <p class="text-lg font-semibold <?php echo e($stats['fop_overdue_survey_count'] + $stats['fop_overdue_psb_count'] > 0 ? 'text-error' : 'text-text-main'); ?> font-mono">
+                    <?php echo e(number_format($stats['fop_overdue_survey_count'])); ?> survey &middot; <?php echo e(number_format($stats['fop_overdue_psb_count'])); ?> PSB
+                </p>
+            </div>
+        </div>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $attributes = $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $component = $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+    <?php endif; ?>
+
+    <?php if($canViewWarehouse): ?>
+    <!-- Alert Stok Kritis POP (Pilar 6) -->
+    <?php if (isset($component)) { $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.card','data' => ['class' => 'p-5']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'p-5']); ?>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-text-main">Alert Stok Kritis POP</h3>
+            <div class="flex items-center gap-2">
+                <?php if($stats['low_stock_count'] > 0): ?>
+                    <?php if (isset($component)) { $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.badge','data' => ['variant' => 'error']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'error']); ?><?php echo e($stats['low_stock_count']); ?> item kritis <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4)): ?>
+<?php $attributes = $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4; ?>
+<?php unset($__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4)): ?>
+<?php $component = $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4; ?>
+<?php unset($__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4); ?>
+<?php endif; ?>
+                <?php endif; ?>
+                <?php if (isset($component)) { $__componentOriginal606bedd6108050b8303bc7c381e2387c = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal606bedd6108050b8303bc7c381e2387c = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.link','data' => ['href' => ''.e(route('warehouse.index')).'','class' => 'text-xs']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.link'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['href' => ''.e(route('warehouse.index')).'','class' => 'text-xs']); ?>Lihat Semua <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal606bedd6108050b8303bc7c381e2387c)): ?>
+<?php $attributes = $__attributesOriginal606bedd6108050b8303bc7c381e2387c; ?>
+<?php unset($__attributesOriginal606bedd6108050b8303bc7c381e2387c); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal606bedd6108050b8303bc7c381e2387c)): ?>
+<?php $component = $__componentOriginal606bedd6108050b8303bc7c381e2387c; ?>
+<?php unset($__componentOriginal606bedd6108050b8303bc7c381e2387c); ?>
+<?php endif; ?>
+            </div>
+        </div>
+
+        <?php if (isset($component)) { $__componentOriginal793d2b22631f88b8a3d00569a12acf88 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal793d2b22631f88b8a3d00569a12acf88 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.table','data' => ['headers' => ['POP', 'Barang', 'Sisa Stok', 'Batas Minimum']]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.table'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['headers' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(['POP', 'Barang', 'Sisa Stok', 'Batas Minimum'])]); ?>
+            <?php $__empty_1 = true; $__currentLoopData = $lowStockItems; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $balance): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                <tr>
+                    <td class="text-left text-text-muted"><?php echo e($balance->pop?->name ?? '-'); ?></td>
+                    <td class="text-left font-medium text-text-main"><?php echo e($balance->item?->name ?? '-'); ?></td>
+                    <td class="data-cell text-left text-error font-semibold"><?php echo e(number_format($balance->qty, 0)); ?> <?php echo e($balance->item?->unit); ?></td>
+                    <td class="data-cell text-left text-text-muted"><?php echo e(number_format($balance->minimum_stock, 0)); ?> <?php echo e($balance->item?->unit); ?></td>
+                </tr>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                <tr>
+                    <td colspan="4" class="py-6 text-center text-text-muted">Tidak ada stok di bawah batas minimum.</td>
+                </tr>
+            <?php endif; ?>
+         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal793d2b22631f88b8a3d00569a12acf88)): ?>
+<?php $attributes = $__attributesOriginal793d2b22631f88b8a3d00569a12acf88; ?>
+<?php unset($__attributesOriginal793d2b22631f88b8a3d00569a12acf88); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal793d2b22631f88b8a3d00569a12acf88)): ?>
+<?php $component = $__componentOriginal793d2b22631f88b8a3d00569a12acf88; ?>
+<?php unset($__componentOriginal793d2b22631f88b8a3d00569a12acf88); ?>
+<?php endif; ?>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $attributes = $__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__attributesOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93)): ?>
+<?php $component = $__componentOriginaldae4cd48acb67888a4631e1ba48f2f93; ?>
+<?php unset($__componentOriginaldae4cd48acb67888a4631e1ba48f2f93); ?>
+<?php endif; ?>
+    <?php endif; ?>
 
     <!-- Details Section Grid -->
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">

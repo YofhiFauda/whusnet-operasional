@@ -85,11 +85,27 @@ class RoleSeeder extends Seeder
                 'name' => 'Teknisi',
                 'description' => 'Teknisi Lapangan dan Jaringan',
                 'is_system' => true,
+                // Restriksi Paket per Role (Skema 1, 2026-09-12).
+                'is_package_restricted' => true,
             ],
             [
                 'code' => 'sales',
                 'name' => 'Sales',
                 'description' => 'Sales dan Pendaftaran',
+                'is_system' => true,
+                // Restriksi Paket per Role (Skema 1, 2026-09-12) — Sales
+                // cuma boleh pilih paket dari `restricted_packages`, diatur
+                // Business Development. Lihat InternetPackage::scopeAvailableFor().
+                'is_package_restricted' => true,
+            ],
+            [
+                // Mengatur daftar paket terbatas Sales & Teknisi + Master
+                // Agent + memantau omset Sales (Skema 1-3, 2026-09-12).
+                // Role BARU (bukan reuse admin/atasan) — keputusan eksplisit
+                // user.
+                'code' => 'business_development',
+                'name' => 'Business Development',
+                'description' => 'Mengatur Restriksi Paket, Master Agent, dan Dashboard Omset Sales',
                 'is_system' => true,
             ],
             [
@@ -119,6 +135,7 @@ class RoleSeeder extends Seeder
                     'guard_name' => 'web',
                     'description' => $roleData['description'],
                     'is_system' => $roleData['is_system'],
+                    'is_package_restricted' => $roleData['is_package_restricted'] ?? false,
                 ]
             );
         }

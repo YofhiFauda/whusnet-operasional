@@ -279,7 +279,7 @@
                                     <?php if($canManage && auth()->user()->hasPermission('roles.update')): ?>
                                         <button
                                             type="button"
-                                            onclick="openEditModal(<?php echo e($role->id); ?>, '<?php echo e(addslashes($role->name)); ?>', '<?php echo e(addslashes($role->code)); ?>', '<?php echo e(addslashes($role->description ?? '')); ?>', <?php echo e($role->is_system ? 'true' : 'false'); ?>)"
+                                            onclick="openEditModal(<?php echo e($role->id); ?>, '<?php echo e(addslashes($role->name)); ?>', '<?php echo e(addslashes($role->code)); ?>', '<?php echo e(addslashes($role->description ?? '')); ?>', <?php echo e($role->is_system ? 'true' : 'false'); ?>, <?php echo e($role->is_package_restricted ? 'true' : 'false'); ?>)"
                                             class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline underline-offset-2 transition-colors"
                                             title="Edit role <?php echo e($role->name); ?>"
                                         >
@@ -500,11 +500,23 @@ endif;
 unset($__errorArgs, $__bag); ?>
             </div>
 
-        </div>
+            
+            <div class="flex items-start gap-2 pt-1">
+                <input type="checkbox" name="is_package_restricted" id="roleIsPackageRestricted" value="1"
+                       class="mt-0.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                <label for="roleIsPackageRestricted" class="text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+                    <span class="font-semibold">Batasi pilihan paket internet</span> — role ini cuma boleh pilih paket dari daftar yang diatur Business Development di
+                    <a href="<?php echo e(route('business-development.package-restrictions.index')); ?>" target="_blank" class="text-sky-600 dark:text-sky-400 underline">Restriksi Paket</a>.
+                    Kalau daftarnya masih kosong, sementara tetap tampil semua paket aktif.
+                </label>
+            </div>
 
-         <?php $__env->slot('footer', null, []); ?> 
-            <div class="flex items-center justify-end gap-2">
-                <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+        </div>
+    </form>
+
+     <?php $__env->slot('footer', null, []); ?> 
+        <div class="flex items-center justify-end gap-2">
+            <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'button','variant' => 'secondary','@click' => 'show = false']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ui.button'); ?>
@@ -514,8 +526,8 @@ unset($__errorArgs, $__bag); ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
 <?php $component->withAttributes(['type' => 'button','variant' => 'secondary','@click' => 'show = false']); ?>
-                    Batal
-                 <?php echo $__env->renderComponent(); ?>
+                Batal
+             <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
 <?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
@@ -525,18 +537,18 @@ unset($__errorArgs, $__bag); ?>
 <?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
 <?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
 <?php endif; ?>
-                <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+            <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','variant' => 'primary','id' => 'modalSubmitBtn']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','form' => 'roleForm','variant' => 'primary','id' => 'modalSubmitBtn']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ui.button'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['type' => 'submit','variant' => 'primary','id' => 'modalSubmitBtn']); ?>
-                    Simpan Role
-                 <?php echo $__env->renderComponent(); ?>
+<?php $component->withAttributes(['type' => 'submit','form' => 'roleForm','variant' => 'primary','id' => 'modalSubmitBtn']); ?>
+                Simpan Role
+             <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
 <?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
@@ -546,9 +558,8 @@ unset($__errorArgs, $__bag); ?>
 <?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
 <?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
 <?php endif; ?>
-            </div>
-         <?php $__env->endSlot(); ?>
-    </form>
+        </div>
+     <?php $__env->endSlot(); ?>
  <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
@@ -624,8 +635,10 @@ unset($__errorArgs, $__bag); ?>
 
         document.getElementById('roleName').value = '';
         document.getElementById('roleCode').value = '';
-        document.getElementById('roleCode').disabled = false;
+        document.getElementById('roleCode').readOnly = false;
+        document.getElementById('roleCode').classList.remove('opacity-50', 'cursor-not-allowed', 'bg-surface-muted');
         document.getElementById('roleDescription').value = '';
+        document.getElementById('roleIsPackageRestricted').checked = false;
 
         document.getElementById('codeHint').innerHTML =
             'Huruf kecil, angka, dan underscore. Contoh: <span class="font-mono text-slate-700 dark:text-slate-300">pop_admin</span>';
@@ -639,7 +652,7 @@ unset($__errorArgs, $__bag); ?>
     }
 
     // ---- Buka modal untuk EDIT role ----
-    function openEditModal(id, name, code, description, isSystem) {
+    function openEditModal(id, name, code, description, isSystem, isPackageRestricted) {
         const form = document.getElementById('roleForm');
         form.action = '<?php echo e(url("roles")); ?>/' + id;
         document.getElementById('formMethod').value = 'PUT';
@@ -647,14 +660,20 @@ unset($__errorArgs, $__bag); ?>
         document.getElementById('roleName').value = name;
         document.getElementById('roleCode').value = code;
         document.getElementById('roleDescription').value = description;
+        document.getElementById('roleIsPackageRestricted').checked = !!isPackageRestricted;
 
         const codeInput = document.getElementById('roleCode');
         const codeHint  = document.getElementById('codeHint');
         if (isSystem) {
-            codeInput.disabled = true;
+            // readonly, BUKAN disabled — input disabled gak ikut ke-submit
+            // browser standar, bikin field "code" kosong pas dikirim dan
+            // nabrak validasi required di server (ADHOC, 2026-09-10).
+            codeInput.readOnly = true;
+            codeInput.classList.add('opacity-50', 'cursor-not-allowed', 'bg-surface-muted');
             codeHint.textContent = 'Kode role sistem tidak dapat diubah.';
         } else {
-            codeInput.disabled = false;
+            codeInput.readOnly = false;
+            codeInput.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-surface-muted');
             codeHint.innerHTML = 'Huruf kecil, angka, dan underscore. Contoh: <span class="font-mono text-slate-700 dark:text-slate-300">pop_admin</span>';
         }
 

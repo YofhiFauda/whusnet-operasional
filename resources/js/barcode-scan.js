@@ -1,3 +1,12 @@
+import {
+    MultiFormatReader,
+    DecodeHintType,
+    BarcodeFormat,
+    RGBLuminanceSource,
+    BinaryBitmap,
+    HybridBinarizer,
+} from '@zxing/library';
+
 /**
  * Scan Barcode 1D (Linear) via kamera — dipakai tab "Scan Masuk" di
  * Lacak Barang/SN (Single Assign & Batch Assign per Kategori), lewat
@@ -21,15 +30,21 @@
  *    QR MAC dalam satu label sempit; decode full-frame gampang kepilih
  *    barcode SEBELAH yang gak dimaksud staf.
  *
- * Native `BarcodeDetector` API DOANG (Chrome/Edge/Android WebView) — TANPA
- * fallback library JS (beda dari jsQR punya `qr-scan.js`). Decode 1D di JS
- * murni berat & kurang akurat buat real-time, dan menambah dependency baru
- * cuma buat fallback butuh persetujuan tersendiri (CLAUDE.md — jangan ubah
- * dependency tanpa approval). Browser tanpa dukungan native (Safari/iOS,
- * sebagian Android lama) diarahkan pakai scanner fisik USB/Bluetooth atau
- * ketik manual — dua-duanya SUDAH jalan lewat kolom input teks biasa
- * (keyboard wedge), jadi degradasi ini bukan fitur hilang, cuma jalur
- * kamera yang gak tersedia di browser itu.
+ * Native `BarcodeDetector` API (Chrome/Edge/Android WebView) DICOBA DULU —
+ * decode di-hardware-accelerate, jauh lebih cepat dari JS murni. Browser
+ * tanpa dukungan native (Safari/iOS — WebKit gak pernah ship API ini, versi
+ * berapa pun) JATUH ke fallback `@zxing/library` (2026-09-11, approval user
+ * eksplisit buat nambah dependency ini — sebelumnya TANPA fallback, laporan
+ * user: layar kamera blank hitam di iPhone karena `start()` `return` lebih
+ * awal begitu `createDetector()` balikin `null`, `openStream()` gak pernah
+ * kepanggil). Pola cek-native-dulu-lalu-fallback ini SAMA persis kayak
+ * `qr-scan.js` (jsQR di sana), bedanya di sini format 1D (bukan QR) jadi
+ * butuh `@zxing/library` yang emang decode 1D+2D, bukan jsQR yang QR-only.
+ *
+ * `detector` di bawah BUKAN instance `BarcodeDetector`/`MultiFormatReader`
+ * langsung lagi — dibungkus jadi objek `{ detect(canvas, ctx) }` seragam
+ * (lihat `createDetector()`) biar `decodeFrame()`/`decodeFullFrame()` gak
+ * perlu tau lagi jalur mana yang lagi aktif.
  */
 
 const SCAN_INTERVAL_MS = 200; // sedikit lebih longgar dari qr-scan.js — 1D decode native tetap ringan, gak perlu se-agresif QR.
@@ -211,7 +226,7 @@ async function enableContinuousAutofocus(track) {
  * semuanya dibungkus try/catch — gagal paling parah jatuh ke fallback
  * "browser gak dukung", bukan diem-diem mati.
  */
-async function createDetector() {
+async function createNativeDetector() {
     if (!('BarcodeDetector' in window)) {
         return null;
     }
@@ -224,7 +239,89 @@ async function createDetector() {
             return null;
         }
 
-        return new window.BarcodeDetector({ formats });
+        const native = new window.BarcodeDetector({ formats });
+
+        // Dibungkus signature seragam `(canvas, ctx)` — lihat docblock atas.
+        // `ctx` gak dipakai jalur native (`detect()` bawaan browser terima
+        // langsung canvas/video element), parameter ke-2 cuma biar cocok
+        // sama jalur zxing di bawah.
+        return { type: 'native', detect: (canvas) => native.detect(canvas) };
+    } catch {
+        return null;
+    }
+}
+
+// Format 1D `BarcodeDetector` (native) → `BarcodeFormat` zxing-js. Dua API
+// beda vendor, penamaan constant-nya juga beda persis — pemetaan manual,
+// gak ada cara "auto-convert" string ke enum zxing.
+const ZXING_FORMAT_MAP = {
+    code_128: BarcodeFormat.CODE_128,
+    code_39: BarcodeFormat.CODE_39,
+    code_93: BarcodeFormat.CODE_93,
+    codabar: BarcodeFormat.CODABAR,
+    ean_13: BarcodeFormat.EAN_13,
+    ean_8: BarcodeFormat.EAN_8,
+    itf: BarcodeFormat.ITF,
+    upc_a: BarcodeFormat.UPC_A,
+    upc_e: BarcodeFormat.UPC_E,
+};
+
+/*
+ * Fallback Safari/iOS (dan browser lain tanpa `BarcodeDetector`). `reader`
+ * satu instance dipakai ULANG tiap frame (bukan bikin baru tiap panggilan)
+ * — `MultiFormatReader` murni CPU (WASM-free, port JS dari ZXing Java),
+ * bikin instance baru tiap ~200ms itu overhead yang gak perlu.
+ *
+ * `reader.reset()` dipanggil abis tiap percobaan (sukses ATAU gagal) —
+ * `MultiFormatReader` nyimpen state binarizer terakhir di dalam, reset
+ * mastiin percobaan berikutnya START BERSIH, gak kebawa cache frame lama.
+ */
+function createZxingReader() {
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, Object.values(ZXING_FORMAT_MAP));
+    hints.set(DecodeHintType.TRY_HARDER, true);
+
+    const reader = new MultiFormatReader();
+    reader.setHints(hints);
+
+    return reader;
+}
+
+function decodeWithZxing(reader, canvas, ctx) {
+    if (canvas.width <= 0 || canvas.height <= 0) {
+        return [];
+    }
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const luminanceSource = new RGBLuminanceSource(imageData.data, canvas.width, canvas.height);
+    const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
+
+    try {
+        const result = reader.decode(binaryBitmap);
+
+        return [{ rawValue: result.getText() }];
+    } catch {
+        // `NotFoundException` (gak ketemu barcode di frame ini) itu NORMAL,
+        // kejadian tiap frame yang belum pas — bukan error buat dilaporkan.
+        // Exception lain (checksum/format) diperlakukan sama: gagal diam,
+        // coba lagi frame berikutnya.
+        return [];
+    } finally {
+        reader.reset();
+    }
+}
+
+async function createDetector() {
+    const native = await createNativeDetector();
+
+    if (native) {
+        return native;
+    }
+
+    try {
+        const reader = createZxingReader();
+
+        return { type: 'zxing', detect: (canvas, ctx) => Promise.resolve(decodeWithZxing(reader, canvas, ctx)) };
     } catch {
         return null;
     }
@@ -404,7 +501,7 @@ function initBarcodeScan({ videoEl, frameEl, statusEl, maskRefs, target, onError
         // `decodeFullFrame()` yang emang udah di-gate di belakang stall
         // 6 detik + interval 400ms sendiri — gak numpang di jalur cepat.
         try {
-            const codes = await detector.detect(cropCanvas);
+            const codes = await detector.detect(cropCanvas, cropCtx);
             const best = codes.find(c => /^[A-Z0-9]{8,}$/.test(c.rawValue)) ?? codes[0];
             return best?.rawValue ?? null;
         } catch { return null; }
@@ -427,7 +524,7 @@ function initBarcodeScan({ videoEl, frameEl, statusEl, maskRefs, target, onError
         maybeStretchContrast(fullFrameCtx, fullFrameCanvas.width, fullFrameCanvas.height);
 
         try {
-            const codes = await detector.detect(fullFrameCanvas);
+            const codes = await detector.detect(fullFrameCanvas, fullFrameCtx);
             const best = codes.find(c => /^[A-Z0-9]{8,}$/.test(c.rawValue)) ?? codes[0];
             return best?.rawValue ?? null;
         } catch {

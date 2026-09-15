@@ -95,6 +95,27 @@
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
+            {{--
+                Rincian per kategori pendapatan (ADHOC-60). Tagihan yang terbit
+                SEBELUM fitur ini tidak punya baris sama sekali, jadi seluruh
+                blok lama di bawah dipertahankan sebagai fallback — jangan
+                dihapus sampai backfill terbukti di produksi dan kolom biaya
+                lama benar-benar dibuang.
+            --}}
+            @if($invoice->items->isNotEmpty())
+                @foreach($invoice->items as $item)
+                <tr>
+                    <td class="py-3 px-3">
+                        <p class="font-bold text-slate-900">{{ $item->subcategory_name_snapshot }}</p>
+                        <p class="text-[11px] text-slate-500">
+                            {{ $item->category_name_snapshot }}@if($item->description) — {{ $item->description }}@endif
+                        </p>
+                    </td>
+                    <td class="py-3 px-3 text-center font-mono">{{ $loop->first ? $invoice->billing_period : '-' }}</td>
+                    <td class="py-3 px-3 text-right font-mono font-bold">Rp {{ number_format((float) $item->amount, 0, ',', '.') }}</td>
+                </tr>
+                @endforeach
+            @else
             <tr>
                 <td class="py-3 px-3">
                     <p class="font-bold text-slate-900">{{ $invoice->customerService->package_name_snapshot ?? $invoice->internetPackage->name ?? 'Paket Internet' }}</p>
@@ -123,6 +144,7 @@
                 <td class="py-2 px-3 text-center font-mono">-</td>
                 <td class="py-2 px-3 text-right font-mono font-semibold">Rp {{ number_format((float) $invoice->other_fee, 0, ',', '.') }}</td>
             </tr>
+            @endif
             @endif
         </tbody>
     </table>
@@ -405,6 +427,10 @@
                         </div>
                         @endif
 
+                        {{-- Fallback kolom biaya lama — cuma untuk tagihan tanpa
+                             baris rincian (terbit sebelum ADHOC-60). Tagihan
+                             baru sudah merincikannya di tabel di atas. --}}
+                        @if($invoice->items->isEmpty())
                         @if((float)($invoice->prorate_amount ?? 0) > 0)
                         <div class="flex justify-between items-center py-2 border-b border-border">
                             <span class="text-text-secondary font-medium">Tagihan Prorate</span>
@@ -424,6 +450,7 @@
                             <span class="text-text-secondary font-medium">Biaya Lain-lain</span>
                             <span class="font-mono font-semibold text-text-main text-sm">Rp {{ number_format((float) $invoice->other_fee, 0, ',', '.') }}</span>
                         </div>
+                        @endif
                         @endif
 
                         <!-- Summary Footer Breakdown -->

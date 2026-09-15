@@ -93,6 +93,21 @@
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
+            
+            <?php if($invoice->items->isNotEmpty()): ?>
+                <?php $__currentLoopData = $invoice->items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <tr>
+                    <td class="py-3 px-3">
+                        <p class="font-bold text-slate-900"><?php echo e($item->subcategory_name_snapshot); ?></p>
+                        <p class="text-[11px] text-slate-500">
+                            <?php echo e($item->category_name_snapshot); ?><?php if($item->description): ?> — <?php echo e($item->description); ?><?php endif; ?>
+                        </p>
+                    </td>
+                    <td class="py-3 px-3 text-center font-mono"><?php echo e($loop->first ? $invoice->billing_period : '-'); ?></td>
+                    <td class="py-3 px-3 text-right font-mono font-bold">Rp <?php echo e(number_format((float) $item->amount, 0, ',', '.')); ?></td>
+                </tr>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            <?php else: ?>
             <tr>
                 <td class="py-3 px-3">
                     <p class="font-bold text-slate-900"><?php echo e($invoice->customerService->package_name_snapshot ?? $invoice->internetPackage->name ?? 'Paket Internet'); ?></p>
@@ -121,6 +136,7 @@
                 <td class="py-2 px-3 text-center font-mono">-</td>
                 <td class="py-2 px-3 text-right font-mono font-semibold">Rp <?php echo e(number_format((float) $invoice->other_fee, 0, ',', '.')); ?></td>
             </tr>
+            <?php endif; ?>
             <?php endif; ?>
         </tbody>
     </table>
@@ -408,6 +424,8 @@
                         </div>
                         <?php endif; ?>
 
+                        
+                        <?php if($invoice->items->isEmpty()): ?>
                         <?php if((float)($invoice->prorate_amount ?? 0) > 0): ?>
                         <div class="flex justify-between items-center py-2 border-b border-border">
                             <span class="text-text-secondary font-medium">Tagihan Prorate</span>
@@ -427,6 +445,7 @@
                             <span class="text-text-secondary font-medium">Biaya Lain-lain</span>
                             <span class="font-mono font-semibold text-text-main text-sm">Rp <?php echo e(number_format((float) $invoice->other_fee, 0, ',', '.')); ?></span>
                         </div>
+                        <?php endif; ?>
                         <?php endif; ?>
 
                         <!-- Summary Footer Breakdown -->

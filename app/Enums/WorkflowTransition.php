@@ -14,6 +14,19 @@ enum WorkflowTransition: string
     case INSTALLED = 'installed';
     case VERIFICATION_ADMIN = 'verification_admin';
     case REVISION_INSTALLATION = 'revision_installation';
+
+    /**
+     * Khusus paket kategori Bisnis (`package_categories.
+     * installation_fee_approval_role_id` terisi) — `finalVerify()` berhenti
+     * di sini (BUKAN langsung ACTIVE) sampai Business Development (BD)
+     * mengisi "Biaya Instalasi" & menekan "Verifikasi & Aktifkan" di modul
+     * `/business-development-verifications`. Paket non-Bisnis (Home dkk)
+     * TIDAK PERNAH singgah di sini — tetap lompat VERIFICATION_ADMIN →
+     * ACTIVE seperti sebelumnya. SENGAJA tanpa jalur tolak (dikonfirmasi
+     * user) — satu-satunya next state adalah ACTIVE.
+     */
+    case WAITING_BUSINESS_DEVELOPMENT_VERIFICATION = 'waiting_business_development_verification';
+
     case ACTIVE = 'active';
     case SUSPENDED = 'suspended';
     case TERMINATED = 'terminated';
@@ -39,8 +52,9 @@ enum WorkflowTransition: string
             self::WAITING_INSTALLATION => [self::INSTALLATION_IN_PROGRESS, self::REJECTED],
             self::INSTALLATION_IN_PROGRESS => [self::VERIFICATION_ADMIN, self::INSTALLED, self::WAITING_INSTALLATION, self::REJECTED],
             self::INSTALLED => [self::VERIFICATION_ADMIN, self::WAITING_INSTALLATION, self::REJECTED],
-            self::VERIFICATION_ADMIN => [self::ACTIVE, self::WAITING_INSTALLATION, self::REVISION_INSTALLATION, self::INSTALLATION_IN_PROGRESS, self::REJECTED],
+            self::VERIFICATION_ADMIN => [self::ACTIVE, self::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION, self::WAITING_INSTALLATION, self::REVISION_INSTALLATION, self::INSTALLATION_IN_PROGRESS, self::REJECTED],
             self::REVISION_INSTALLATION => [self::VERIFICATION_ADMIN, self::INSTALLED, self::WAITING_INSTALLATION, self::REJECTED],
+            self::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION => [self::ACTIVE],
             self::ACTIVE => [self::INSTALLED, self::VERIFICATION_ADMIN, self::REVISION_INSTALLATION, self::SUSPENDED, self::TERMINATED],
             self::SUSPENDED => [self::ACTIVE, self::TERMINATED],
             self::TERMINATED => [],

@@ -87,15 +87,69 @@
                     Material Terpakai
                 </p>
                 <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
-                    Barang yang <b>habis dipakai</b> dan ditinggal di pelanggan — patch cord diganti, splitter diganti, kabel sambungan. Peralatan kerja yang dibawa pulang dicatat terpisah di bawah.
+                    Barang yang <b>habis dipakai</b> dan ditinggal di pelanggan — patch cord diganti, splitter diganti, kabel sambungan. Peralatan kerja yang dibawa pulang dicatat terpisah di bawah. Cuma barang yang beneran ada di custody tim ini (sudah di-<i>issue</i> Gudang) yang bisa dipilih; sisa custody tercantum di tiap baris.
                 </p>
+                {{-- Sengaja TANPA ringkasan statis "Sisa custody tim" (dicoba
+                     2026-09-12, langsung direvisi user hari sama — makan tempat).
+                     Sisa custody per-item CUMA tampil kalau barangnya lagi
+                     dipilih di salah satu baris — lihat itemOptionLabel() &
+                     availableFor() di material-rows.blade.php. --}}
+                @if($eligiblePassiveCustody->isEmpty())
+                    <p class="text-[11px] mb-2 font-semibold" style="color:var(--color-warning,#d97706)">⚠ Tim ini belum punya custody Perangkat Pasif apa pun — ambil barang dari Gudang dulu kalau perbaikan ini butuh material, atau baris di bawah cuma bisa nampilin material yang sudah tersimpan sebelumnya.</p>
+                @endif
                 <x-material-rows
                     name="materials"
-                    :items="$items"
                     :categories="$itemCategories"
                     :rows="$materialRows"
+                    :restrict-to-custody="true"
+                    :custody-options="$eligiblePassiveCustody"
                     empty-label="Belum ada material dicatat. Kalau perbaikan ini tidak memakai material, biarkan kosong."
                 />
+            </div>
+
+            {{-- ── Section 2b: Modem/Perangkat Aktif (Opsional) ────────
+                 Beda dari Laporan Pemasangan: SN di sini OPSIONAL. Maintenance
+                 gak selalu ganti modem — kalau gak bawa/ganti, biarkan
+                 "Tidak ganti modem" (default) dan SN gak akan tersimpan. --}}
+            <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
+                <p class="mb-1" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
+                    Modem/Perangkat Aktif <span class="font-normal normal-case" style="color:var(--color-text-muted)">(opsional)</span>
+                </p>
+                <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
+                    Isi HANYA kalau teknisi membawa &amp; memasang modem/ONT pengganti dari Gudang. Kalau tidak bawa/ganti modem, biarkan kosong.
+                </p>
+                @if($eligibleSerials->isNotEmpty())
+                    @php
+                        // Sisa stok Perangkat Aktif per jenis barang (koreksi lanjutan
+                        // ADHOC-54, 2026-09-12) — sama pola installations/report.blade.php:
+                        // SERIALIZED gak punya qty, jadi dihitung dari JUMLAH SN yang masih
+                        // ISSUED di custody tim, dikelompokkan per nama barang.
+                        $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)
+                            ->map->count();
+                    @endphp
+                    <select name="selected_inventory_serial_id" id="selected_inventory_serial_id" onchange="updateSnStockHint()"
+                            class="w-full rounded-md text-sm"
+                            style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                        <option value="">Tidak ganti modem</option>
+                        @foreach($eligibleSerials as $serial)
+                            <option value="{{ $serial->id }}" data-item-name="{{ $serial->item->name }}" data-available="{{ $serialCountsByItem[$serial->item->name] }}" @selected(old('selected_inventory_serial_id') == $serial->id)>
+                                {{ $serial->item->name }} — SN {{ $serial->serial_number }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Perangkat yang diambil lewat Gudang (custody Anda) — SN yang tersimpan otomatis sama persis dengan yang dipilih di sini.</p>
+                    {{-- Sisa custody CUMA tampil kalau SN-nya lagi dipilih (revisi user
+                         2026-09-12: ringkasan statis makan tempat) — updateSnStockHint() di
+                         <script> bawah file ini, duplikasi persis installations/report.blade.php
+                         (view terpisah, bukan partial/push bersama — sama pola duplikasi
+                         eligibleSerialsForTeam()/eligiblePassiveCustodyForTeam() di controller). --}}
+                    <p id="sn-stock-hint" class="text-[10px] mt-1 font-semibold" style="color:var(--color-success,#059669); {{ old('selected_inventory_serial_id') ? '' : 'display:none' }}"></p>
+                @else
+                    <select disabled class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-surface-muted);color:var(--color-text-muted);padding:10px 12px">
+                        <option>Tidak ada SN di custody Anda</option>
+                    </select>
+                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Anda belum mengambil modem dari Gudang — kalau maintenance ini gak perlu ganti modem, abaikan saja.</p>
+                @endif
             </div>
 
             {{-- ── Section 3: Alat Kerja ───────────────────────────────── --}}
@@ -266,5 +320,29 @@ document.querySelector('form').addEventListener('submit', function() {
     btn.style.opacity = '0.75';
     btn.style.cursor = 'not-allowed';
 });
+
+// Sisa custody Perangkat Aktif — CUMA tampil kalau SN-nya lagi dipilih
+// (revisi user 2026-09-12: ringkasan statis makan tempat). data-available
+// ditulis server-side per <option> (lihat blok Blade @php di atasnya).
+// Duplikasi persis installations/report.blade.php — dua view terpisah.
+function updateSnStockHint() {
+    const select = document.getElementById('selected_inventory_serial_id');
+    const hint = document.getElementById('sn-stock-hint');
+    if (! select || ! hint) return;
+
+    const opt = select.options[select.selectedIndex];
+    const available = opt?.dataset.available;
+
+    if (! opt || ! opt.value || ! available) {
+        hint.style.display = 'none';
+        hint.textContent = '';
+        return;
+    }
+
+    hint.textContent = `Sisa custody tim: ${opt.dataset.itemName} (${available} unit)`;
+    hint.style.display = '';
+}
+
+document.addEventListener('DOMContentLoaded', updateSnStockHint);
 </script>
 @endsection

@@ -16,6 +16,14 @@
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/60">
                     <x-ui.icon name="user-check" class="w-2.5 h-2.5 mr-1.5" /> {{ $customer->full_name }}
                 </span>
+                {{-- CID/REQ ID (permintaan user) — display_id() sudah otomatis pilih
+                     format yang benar sesuai status pelanggan (CID ber-prefix untuk
+                     yang aktif/berjalan, REQ ID murni untuk terminated/failed/dst —
+                     lihat docs/ID_NUMBERING_RULES.md §12.2), jadi jangan query
+                     customer_code manual di sini. --}}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    <x-ui.icon name="file-text" class="w-2.5 h-2.5 mr-1.5" /> {{ $customer->display_id }}
+                </span>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                 Lapor spesifikasi teknis perangkat (ONT/Router), konfigurasi koneksi, foto instalasi, dan hasil uji speedtest.
@@ -463,34 +471,44 @@
                                     </div>
 
                                     @php
-                                        // Dropdown custody jadi SATU-SATUNYA sumber SN kalau device ini
-                                        // ke-track Inventory (ADHOC, fix dual-SN yang gak nyambung ke
-                                        // installSerial()) — field teks manual cuma tampil kalau memang
-                                        // gak ada SN eligible, atau operator eksplisit balik ke "Tidak
-                                        // tercatat Gudang" (revisi data lama yang sudah punya SN manual).
+                                        // Dropdown custody SATU-SATUNYA sumber SN (koreksi lanjutan
+                                        // ADHOC-54, permintaan eksplisit user) — teks manual DICABUT
+                                        // total. Teknisi tanpa SN di custody tidak bisa mengisi SN sama
+                                        // sekali, wajib ambil barang dari Gudang dulu.
                                         $oldSelectedSerialId = old('selected_inventory_serial_id', $installation->selected_inventory_serial_id ?? null);
-                                        $showSerialManual = $eligibleSerials->isEmpty()
-                                            || (filled(old('serial_number', $dev->serial_number ?? '')) && empty($oldSelectedSerialId));
+
+                                        // Sisa stok Perangkat Aktif per jenis barang (koreksi lanjutan
+                                        // ADHOC-54, 2026-09-12 — direvisi user hari sama: JANGAN ringkasan
+                                        // statis makan tempat, tampilkan sisa CUMA kalau barangnya lagi
+                                        // dipilih). SERIALIZED gak punya "qty" kayak Barang Pasif (satu
+                                        // baris = satu unit fisik), jadi "sisa stok" = JUMLAH SN item yang
+                                        // sama yang masih ISSUED di custody tim. Dikirim lewat data-count
+                                        // di tiap <option>, dibaca onchange() (lihat updateSnStockHint() di
+                                        // JS bawah) — bukan query ulang / Alpine baru, select ini emang
+                                        // vanilla, cukup satu listener.
+                                        $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)
+                                            ->map->count();
                                     @endphp
 
-                                    @if($eligibleSerials->isNotEmpty())
                                     <div class="md:col-span-2">
-                                        <label for="selected_inventory_serial_id" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Perangkat Aktif dari Gudang <span class="text-rose-500">*</span></label>
-                                        <select name="selected_inventory_serial_id" id="selected_inventory_serial_id" onchange="toggleSerialManual()" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
-                                            <option value="" data-sn="">— Tidak tercatat Gudang / isi manual —</option>
-                                            @foreach($eligibleSerials as $serial)
-                                                <option value="{{ $serial->id }}" data-sn="{{ $serial->serial_number }}" @selected($oldSelectedSerialId == $serial->id)>
-                                                    {{ $serial->item->name }} — SN {{ $serial->serial_number }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Perangkat yang diambil lewat Gudang (custody Anda) — pilih di sini, SN yang tersimpan otomatis sama persis dengan yang diinstall. Pilih "Tidak tercatat Gudang" kalau device ini belum ke-track Inventory.</p>
-                                    </div>
-                                    @endif
-
-                                    <div id="serial-manual-wrap" class="{{ $showSerialManual ? '' : 'hidden' }}">
-                                        <label for="serial_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Serial Number (SN) @unless($eligibleSerials->isNotEmpty())<span class="text-rose-500">*</span>@endunless</label>
-                                        <input type="text" name="serial_number" id="serial_number" value="{{ old('serial_number', $dev->serial_number ?? '') }}" class="w-full text-xs data-text px-3 py-2 border @error('serial_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ZTEGC1234567">
+                                        <label for="selected_inventory_serial_id" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Serial Number (SN) — Perangkat Aktif dari Gudang <span class="text-rose-500">*</span></label>
+                                        @if($eligibleSerials->isNotEmpty())
+                                            <select name="selected_inventory_serial_id" id="selected_inventory_serial_id" onchange="updateSnStockHint()" class="w-full text-xs data-text px-3 py-2 border @error('selected_inventory_serial_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                                <option value="">— Pilih SN —</option>
+                                                @foreach($eligibleSerials as $serial)
+                                                    <option value="{{ $serial->id }}" data-item-name="{{ $serial->item->name }}" data-available="{{ $serialCountsByItem[$serial->item->name] }}" @selected($oldSelectedSerialId == $serial->id)>
+                                                        {{ $serial->item->name }} — SN {{ $serial->serial_number }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Perangkat yang diambil lewat Gudang (custody Anda) — SN yang tersimpan otomatis sama persis dengan yang dipilih di sini.</p>
+                                            <p id="sn-stock-hint" class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold" style="{{ $oldSelectedSerialId ? '' : 'display:none' }}"></p>
+                                        @else
+                                            <select disabled class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed">
+                                                <option>Tidak ada SN di custody Anda</option>
+                                            </select>
+                                            <p class="text-[11px] text-rose-500 mt-1 leading-relaxed">Anda belum mengambil barang dari Gudang — SN tidak bisa diisi sampai barang diserahkan (Issue) ke Anda. Hubungi Admin/FOP.</p>
+                                        @endif
                                     </div>
 
                                     <div>
@@ -595,7 +613,7 @@
                                  foto+material dilengkapi. --}}
                             <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60">
                                 @unless($pemasanganComplete)
-                                    <button type="button" onclick="attemptActivate()" class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer shadow-sm">
+                                    <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                                         <x-ui.icon name="zap" class="w-3 h-3" /> Aktivasi Laporan Speedtest
                                     </button>
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">Tekan setelah Informasi Perangkat Aktif &amp; Nomor/Port ODP terisi (OLT opsional). Foto &amp; Material Terpakai belum wajib di sini — lengkapi lalu tekan Aktivasi lagi untuk membuka Fase 6 (Laporan Speedtest).</p>
@@ -603,18 +621,52 @@
                                     <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
                                         <x-ui.icon name="check" class="w-3 h-3" /> Sudah Diaktivasi — Fase 6 Terbuka
                                     </div>
+
+                                    {{-- Fase 6 sudah kebuka permanen (gerbang di report() gak pernah balik
+                                         terkunci lagi) — tapi field di step 5 (SN, PPPoE, dst) TETAP bisa
+                                         diedit teknisi di form ini, dan tanpa tombol ini gak ada cara
+                                         nyimpen koreksinya (keluhan nyata: ubah SN/pppoe pasca-aktivasi,
+                                         gak ada tombol buat re-submit — 2026-09-12). attemptActivate() sama
+                                         persis dipakai di sini: aman, karena buildFase6IncompleteWarning()
+                                         cuma bakal muncul kalau teknisi JUSTRU balik menghapus foto/baris
+                                         material yang sudah tersimpan, bukan gara-gara SN/pppoe diubah. --}}
+                                    <div class="mt-2">
+                                        <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded-lg transition-colors text-[11px] font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <x-ui.icon name="save" class="w-3 h-3" /> Simpan Perubahan
+                                        </button>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">Buat menyimpan koreksi SN/PPPoE/data perangkat setelah Fase 6 terbuka — tidak mempengaruhi status Fase 6 yang sudah terbuka.</p>
+                                    </div>
                                 @endunless
                             </div>
 
                             <!-- Sub-section: Material Realita Terpakai -->
                             <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60">
                                 <label class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Perangkat Pasif / Material Terpakai Realita <span class="text-rose-500">*</span></label>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">Material yang <b>benar-benar dipakai</b> pada pemasangan ini — bukan estimasi. Daftar sudah diisi dari estimasi survey; ubah jumlahnya sesuai realita, tambah atau hapus baris bila perlu.</p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">Material yang <b>benar-benar dipakai</b> pada pemasangan ini — bukan estimasi. Cuma barang yang beneran ada di custody tim ini (sudah di-<i>issue</i> Gudang) yang bisa dipilih; sisa custody tercantum di tiap baris. Kalau barang yang dibutuhkan gak muncul, ambil (Issue) dulu dari Gudang.</p>
+                                {{-- Sengaja TANPA ringkasan statis "Sisa custody tim" di sini
+                                     (dicoba 2026-09-12, langsung direvisi user hari sama — makan
+                                     tempat). Sisa custody per-item CUMA tampil kalau barangnya
+                                     lagi dipilih di salah satu baris — lihat itemOptionLabel()
+                                     (label di dalam <option>) & availableFor() (hint di bawah
+                                     select) di material-rows.blade.php. Warning kekosongan
+                                     custody TETAP tampil di awal — itu bukan "sisa stok", itu
+                                     kondisi blocking yang harus ketauan sebelum coba isi baris. --}}
+                                @if($eligiblePassiveCustody->isEmpty())
+                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 mb-2 font-semibold">⚠ Tim ini belum punya custody Perangkat Pasif apa pun — ambil barang dari Gudang dulu, atau baris di bawah cuma bisa nampilin material yang sudah tersimpan sebelumnya.</p>
+                                @endif
+                                @if($droppedFreeformEstimateNames->isNotEmpty())
+                                    {{-- Baris estimasi survey lama ("Lainnya", tanpa item master) gak
+                                         bisa diprefill ke sini lagi (lihat komentar di
+                                         CustomerInstallationController::report()) — beri tahu, jangan
+                                         diam-diam hilang. --}}
+                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 mb-2 font-semibold">⚠ Estimasi survey berikut tidak menunjuk barang master ("Lainnya"), jadi tidak bisa diprefill di sini — catat manual dari custody kalau memang dipakai: {{ $droppedFreeformEstimateNames->implode(', ') }}.</p>
+                                @endif
                                 <x-material-rows
                                     name="materials"
-                                    :items="$items"
                                     :categories="$itemCategories"
                                     :rows="$materialRows"
+                                    :restrict-to-custody="true"
+                                    :custody-options="$eligiblePassiveCustody"
                                     empty-label="Belum ada material dicatat. Klik Tambah Barang."
                                 />
                             </div>
@@ -927,7 +979,7 @@
     // tujuan), bukan syarat menekan Aktivasi. Server (storePemasangan)
     // menegakkan daftar yang sama persis kalau ada yang lolos validasi klien.
     const aktivasiRequiredFields = [
-        'device_type', 'connection_mode', 'serial_number', 'wifi_ssid', 'wifi_password',
+        'device_type', 'connection_mode', 'selected_inventory_serial_id', 'wifi_ssid', 'wifi_password',
         'odp_number', 'odp_port',
     ];
 
@@ -940,34 +992,113 @@
             }
             return;
         }
-        handlePemasanganSubmit();
-    }
 
-    // Dropdown custody (#selected_inventory_serial_id) jadi SATU-SATUNYA
-    // sumber SN begitu ada pilihan aktif — sinkron nilainya ke #serial_number
-    // (readonly, disembunyikan) supaya aktivasiRequiredFields/formFields di
-    // atas TETAP baca field yang sama seperti sebelumnya, gak perlu daftar
-    // required terpisah. Server (storePemasangan) tetap jadi penegak utama —
-    // ini cuma UX, lihat CustomerInstallationController::storePemasangan().
-    function toggleSerialManual() {
-        const select = document.getElementById('selected_inventory_serial_id');
-        const wrap = document.getElementById('serial-manual-wrap');
-        const input = document.getElementById('serial_number');
-        if (! wrap || ! input) {
+        // Disable begitu diklik — mencegah spam-klik numpuk beberapa kali
+        // panggilan attemptActivate() sebelum modal/submit pertama kelar
+        // (teknisi terbiasa mencet berkali-kali kalau UI kelihatan diam
+        // sebentar). Native `disabled` juga menghentikan event click browser
+        // sendiri, jadi ini pagar paling murah — gak perlu flag JS terpisah.
+        // Re-enable HANYA lewat dua jalur (lihat enableAktivasiButton() &
+        // listener form-pemasangan di bawah): data di form diedit lagi, atau
+        // modal peringatan Fase 6 dibatalkan (supaya gak nyangkut nunggu
+        // edit dummy padahal orangnya cuma mau coba ulang).
+        const btn = document.getElementById('btn-aktivasi');
+        if (btn) btn.disabled = true;
+
+        // Foto & material SENGAJA tidak wajib buat menekan tombol ini (ADHOC,
+        // lihat aktivasiRequiredFields di atas) — tapi tanpa keduanya Fase 6
+        // gak akan kebuka, dan sebelumnya gak ada peringatan apa pun di titik
+        // ini: teknisi bisa mengira foto sudah ke-attach padahal <input
+        // type=file> gak bisa dipertahankan browser (reload/back menghapusnya
+        // diam-diam), submit tetap "sukses", dan baru sadar Fase 6 masih
+        // terkunci setelah pencet Aktivasi berkali-kali (kejadian nyata,
+        // 2026-09-12, laporan Siti Nuryani 2). Cegat DI SINI, sebelum submit,
+        // bukan cuma di pesan sukses sesudahnya.
+        //
+        // window.Confirm — komponen modal global (resources/views/components/
+        // dialog.blade.php), BUKAN window.confirm() bawaan browser. Konsisten
+        // sama seluruh dialog konfirmasi lain di sistem (lihat confirmAction/
+        // confirmDelete di layouts/app.blade.php); window.confirm() browser
+        // gak ikut tema & gampang di-block oleh pengaturan browser/WebView.
+        const incompleteWarning = buildFase6IncompleteWarning();
+        if (incompleteWarning) {
+            window.Confirm(
+                'Fase 6 Belum Bisa Dibuka',
+                incompleteWarning
+                    + '\n\nData di atas (device + ODP) tetap akan tersimpan kalau lanjut, tapi Laporan Speedtest (Fase 6) TIDAK akan terbuka sampai ini dilengkapi.'
+                    + '\n\nLanjutkan Aktivasi sekarang?',
+                'warning',
+                () => handlePemasanganSubmit(),
+                () => enableAktivasiButton()
+            );
             return;
         }
 
-        const chosenOption = select ? select.options[select.selectedIndex] : null;
-        const chosenSn = chosenOption ? chosenOption.dataset.sn : '';
+        handlePemasanganSubmit();
+    }
 
-        if (select && chosenSn) {
-            input.value = chosenSn;
-            input.readOnly = true;
-            wrap.classList.add('hidden');
-        } else {
-            input.readOnly = false;
-            wrap.classList.remove('hidden');
+    // Tombol Aktivasi terkunci setelah diklik (lihat attemptActivate()) sampai
+    // teknisi benar-benar mengubah sesuatu di form-pemasangan — dipanggil dari
+    // listener input/change khusus form ini di bawah (DOMContentLoaded), bukan
+    // dari listener gabungan form-pemasangan+form-speedtest yang cuma buat
+    // runLiveProgressUpdates.
+    function enableAktivasiButton() {
+        const btn = document.getElementById('btn-aktivasi');
+        if (btn) btn.disabled = false;
+    }
+
+    // Sisa custody Perangkat Aktif — CUMA tampil kalau SN-nya lagi dipilih
+    // (revisi user 2026-09-12: ringkasan statis makan tempat). data-available
+    // ditulis server-side per <option> (lihat blok Blade @php di atasnya).
+    function updateSnStockHint() {
+        const select = document.getElementById('selected_inventory_serial_id');
+        const hint = document.getElementById('sn-stock-hint');
+        if (! select || ! hint) return;
+
+        const opt = select.options[select.selectedIndex];
+        const available = opt?.dataset.available;
+
+        if (! opt || ! opt.value || ! available) {
+            hint.style.display = 'none';
+            hint.textContent = '';
+            return;
         }
+
+        hint.textContent = `Sisa custody tim: ${opt.dataset.itemName} (${available} unit)`;
+        hint.style.display = '';
+    }
+
+    // Dipanggil attemptActivate() sebelum submit — cek foto (file terpilih ATAU
+    // sudah tersimpan sebelumnya) & minimal satu baris Material Terpakai dengan
+    // qty > 0 (baris qty<=0 dibuang diam-diam oleh TaskMaterialService, lihat
+    // catatan di app/Services/TaskMaterialService.php). Baca langsung dari DOM
+    // (bukan state Alpine materialRows) karena ini vanilla JS di luar x-data-nya
+    // dan Alpine sudah menulis atribut `name` yang reaktif ke elemen sungguhan.
+    function buildFase6IncompleteWarning() {
+        const missingParts = [];
+
+        const photoFields = [
+            ['installation_photo', 'Foto Pemasangan'],
+            ['contract_photo', 'Foto Kontrak'],
+            ['signature_photo', 'Foto TTD Pelanggan'],
+        ];
+        const missingPhotos = photoFields.filter(([field]) => {
+            const el = document.getElementById(field);
+            if (! el) return true;
+            return ! ((el.files && el.files.length > 0) || el.dataset.hasExisting === 'true');
+        }).map(([, label]) => label);
+
+        if (missingPhotos.length > 0) {
+            missingParts.push('Foto belum lengkap: ' + missingPhotos.join(', '));
+        }
+
+        const qtyInputs = document.querySelectorAll('input[name^="materials["][name$="[qty]"]');
+        const hasMaterialRow = Array.from(qtyInputs).some(input => parseFloat(input.value) > 0);
+        if (! hasMaterialRow) {
+            missingParts.push('Material Terpakai: belum ada baris dengan jumlah > 0');
+        }
+
+        return missingParts.length > 0 ? missingParts.join('\n') : null;
     }
 
     function handleSpeedtestSubmit() {
@@ -983,7 +1114,7 @@
     // kecil) — lihat catatan di attemptActivate().
     const formFields = {
         'pemasangan': {
-            required: ['device_type', 'connection_mode', 'serial_number', 'wifi_ssid', 'wifi_password', 'odp_number', 'odp_port', 'installation_photo', 'contract_photo', 'signature_photo'],
+            required: ['device_type', 'connection_mode', 'selected_inventory_serial_id', 'wifi_ssid', 'wifi_password', 'odp_number', 'odp_port', 'installation_photo', 'contract_photo', 'signature_photo'],
             optional: ['brand', 'model', 'mac_address', 'pppoe_username', 'pppoe_password', 'olt_number', 'olt_slot', 'olt_port', 'vlan', 'router_number', 'initial_attenuation', 'installation_note']
         },
         'uji': {
@@ -998,8 +1129,6 @@
     };
 
     document.addEventListener("DOMContentLoaded", function() {
-        toggleSerialManual();
-
         // Dua form terpisah sekarang (form-pemasangan, form-speedtest) — step 6
         // gak selalu ada di DOM (terkunci = cuma placeholder, querySelectorAll
         // aman dapat NodeList kosong).
@@ -1009,14 +1138,31 @@
             input.addEventListener('change', runLiveProgressUpdates);
         });
 
+        // Init sisa custody SN kalau ada value prefilled (old() / resubmit).
+        updateSnStockHint();
+
+        // Re-enable tombol Aktivasi begitu form-pemasangan diedit lagi setelah
+        // sempat dikunci attemptActivate() (lihat enableAktivasiButton()).
+        // Delegasi di form, BUKAN querySelectorAll sekali di atas — baris
+        // Material Terpakai baru (addRow() Alpine) lahir belakangan, snapshot
+        // NodeList di awal gak bakal kebagian listener buat elemen itu.
+        const formPemasangan = document.getElementById('form-pemasangan');
+        if (formPemasangan) {
+            formPemasangan.addEventListener('input', enableAktivasiButton);
+            formPemasangan.addEventListener('change', enableAktivasiButton);
+        }
+
         updateWizardButtons();
         runLiveProgressUpdates();
 
         // Baru saja "Aktivasi" ditekan (redirect balik dengan ?activated=1) —
         // langsung arahkan ke step 6 supaya teknisi gak perlu klik manual.
+        // Kalau Fase 6 belum kebuka (foto/material terpakai belum lengkap),
+        // tetap di step 5 — JANGAN biarkan jatuh ke default currentActiveStep=1,
+        // itu bikin halaman kelihatan "reset" padahal datanya sudah tersimpan.
         const params = new URLSearchParams(window.location.search);
-        if (params.get('activated') === '1' && pemasanganComplete) {
-            goToStep(6);
+        if (params.get('activated') === '1') {
+            goToStep(pemasanganComplete ? 6 : 5);
         }
     });
 
@@ -1230,7 +1376,7 @@
         const labels = {
             device_type: 'Jenis Perangkat',
             connection_mode: 'Mode Koneksi',
-            serial_number: 'Serial Number',
+            selected_inventory_serial_id: 'Serial Number (SN)',
             wifi_ssid: 'SSID WiFi',
             wifi_password: 'Password WiFi',
             odp_number: 'Nomor ODP',
@@ -1257,12 +1403,25 @@
         // lagi alasan buka step 6 sebelum pemasanganComplete true.
         if (stepNumber === 6 && ! pemasanganComplete) {
             const missing = getMissingRequiredFields(5);
+
+            // Semua field step 5 (termasuk foto & Material Terpakai) SUDAH
+            // lengkap di browser, cuma belum ke-submit — submit OTOMATIS
+            // lewat attemptActivate(), bukan cuma warning pasif. Tanpa ini
+            // teknisi yang udah isi semuanya lalu pencet "Lanjut" harus balik
+            // lagi manual pencet Aktivasi cuma buat nyimpen yang udah mereka
+            // isi — kerja dua kali buat hal yang sama (keluhan nyata,
+            // 2026-09-14). attemptActivate() sendiri aman dipanggil di sini:
+            // kalau ternyata ada yang kurang (mis. device/ODP kosong), toast
+            // "Data Aktivasi Belum Lengkap" dari situ yang jalan.
+            if (missing.length === 0) {
+                attemptActivate();
+                return;
+            }
+
             if (window.Toast) {
                 window.Toast.warning(
                     'Fase 6 Masih Terkunci',
-                    missing.length > 0
-                        ? 'Isi dulu Laporan Pemasangan & Perangkat (step 5): ' + missing.join(', ')
-                        : 'Tekan tombol Aktivasi di step 5 (atas section Material Terpakai) terlebih dahulu.'
+                    'Isi dulu Laporan Pemasangan & Perangkat (step 5): ' + missing.join(', ')
                 );
             }
             return;

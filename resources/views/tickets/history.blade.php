@@ -363,10 +363,53 @@
                                 @endif
                             </td>
                         </tr>
+                        {{--
+                            Pelanggan terdampak (tiket batch, mis. ODP LOS) —
+                            History nampilin Parent + SEMUA Child, beda dari
+                            Worksheet Helpdesk yang cuma ngirim Parent ke
+                            NOC/FOP (lihat Ticket::isBatch()/CLAUDE.md §
+                            Sinkronisasi Ticket ↔ FopTask ↔ Task).
+                        --}}
+                        @if($ticket->isBatch() && $ticket->batchMembers->isNotEmpty())
+                            @foreach($ticket->batchMembers as $member)
+                                <tr class="bg-violet-50/50 dark:bg-violet-950/20 text-[11px] border-b border-violet-100 dark:border-violet-900/30">
+                                    <td class="px-3 py-2 text-center text-violet-500 dark:text-violet-400 font-bold">↳</td>
+                                    <td class="px-3 py-2" colspan="2">
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800">
+                                            Child Member
+                                        </span>
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <span class="font-bold text-text-main">{{ $member->customer_name }}</span>
+                                        <span class="block font-mono text-[10px] text-sky-600 dark:text-sky-400">{{ $member->cid ?: '—' }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 font-mono">
+                                        @if($member->phone)
+                                            <a href="https://wa.me/{{ $member->phone }}" target="_blank" rel="noopener" class="text-emerald-600 dark:text-emerald-400 hover:underline">
+                                                {{ $member->phone }}
+                                            </a>
+                                        @else
+                                            <span class="text-text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2" colspan="10">
+                                        <span class="text-[10px] text-text-muted italic">Tergabung dalam Tiket Batch {{ $ticket->ticket_number }}</span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @endif
                     @empty
                         <tr>
-                            <td colspan="15" class="px-3 py-10 text-center text-text-muted">
-                                Tidak ada tiket yang cocok dengan filter ini.
+                            <td colspan="15" class="py-16 px-4 text-center">
+                                <div class="flex flex-col items-center justify-center">
+                                    <div class="w-14 h-14 rounded-2xl bg-surface-muted dark:bg-slate-800/80 border border-border flex items-center justify-center text-text-muted mb-3 shadow-2xs">
+                                        <svg class="h-7 w-7 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" />
+                                        </svg>
+                                    </div>
+                                    <h4 class="text-sm font-semibold text-text-main">Tidak ada riwayat tiket</h4>
+                                    <p class="text-xs text-text-muted mt-1 max-w-sm">Belum ada riwayat tiket yang sesuai dengan kriteria filter atau pencarian saat ini.</p>
+                                </div>
                             </td>
                         </tr>
                     @endforelse

@@ -3,7 +3,6 @@
 namespace Tests\Feature\QrCode;
 
 use App\Enums\ScopeType;
-use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerPortalAccount;
 use App\Models\CustomerPortalToken;

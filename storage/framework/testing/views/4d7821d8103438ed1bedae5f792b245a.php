@@ -66,6 +66,12 @@
                         Jadwal Terlewat
                     </span>
                     <?php endif; ?>
+                    
+                    <?php if($task->fopTask?->ticket?->isBatch()): ?>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-900/50">
+                        <?php echo e($task->fopTask->ticket->batchMembers->count()); ?> Pelanggan
+                    </span>
+                    <?php endif; ?>
                 </div>
                 <span class="font-mono text-[10px] font-semibold text-text-muted shrink-0"><?php echo e($task->task_number); ?></span>
             </div>

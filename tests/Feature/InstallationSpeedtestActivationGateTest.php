@@ -6,10 +6,16 @@ use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
+use App\Models\InventorySerial;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\InventoryIssueService;
+use App\Services\InventoryReceiveService;
+use App\Services\InventoryTransferService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -72,7 +78,7 @@ class InstallationSpeedtestActivationGateTest extends TestCase
      */
     public function test_store_pemasangan_succeeds_without_photos_or_material_but_fase6_stays_locked(): void
     {
-        [$customer, $technician] = $this->setupInProgressInstallation();
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInProgressInstallation();
 
         $response = $this->actingAs($technician)
             ->post(route('customers.installation.pemasangan', $customer->id), [
@@ -80,7 +86,7 @@ class InstallationSpeedtestActivationGateTest extends TestCase
                 'connection_mode' => 'pppoe',
                 'wifi_ssid' => 'WHUSNET_PARTIAL',
                 'wifi_password' => 'password123',
-                'serial_number' => 'ZTEGC0009999',
+                'selected_inventory_serial_id' => $this->issueActiveSerialTo($technician, $pusat, $cabang, 'ZTEGC0009999')->id,
                 'odp_number' => 'ODP-01',
                 'odp_port' => '1',
                 'olt_number' => 'OLT-01',
@@ -139,7 +145,7 @@ class InstallationSpeedtestActivationGateTest extends TestCase
      */
     public function test_store_pemasangan_succeeds_without_olt_fields(): void
     {
-        [$customer, $technician] = $this->setupInProgressInstallation();
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInProgressInstallation();
 
         $response = $this->actingAs($technician)
             ->post(route('customers.installation.pemasangan', $customer->id), [
@@ -147,7 +153,7 @@ class InstallationSpeedtestActivationGateTest extends TestCase
                 'connection_mode' => 'pppoe',
                 'wifi_ssid' => 'WHUSNET_NO_OLT',
                 'wifi_password' => 'password123',
-                'serial_number' => 'ZTEGC0001111',
+                'selected_inventory_serial_id' => $this->issueActiveSerialTo($technician, $pusat, $cabang, 'ZTEGC0001111')->id,
                 'odp_number' => 'ODP-01',
                 'odp_port' => '1',
                 // olt_number, olt_slot, olt_port sengaja kosong.
@@ -162,7 +168,8 @@ class InstallationSpeedtestActivationGateTest extends TestCase
     {
         Storage::fake('public');
 
-        [$customer, $technician, $task] = $this->setupInProgressInstallation();
+        [$customer, $technician, $task, $pusat, $cabang] = $this->setupInProgressInstallation();
+        [$kabel] = $this->issuePassiveQtyTo($technician, $pusat, $cabang, 50);
 
         $response = $this->actingAs($technician)
             ->post(route('customers.installation.pemasangan', $customer->id), [
@@ -170,7 +177,7 @@ class InstallationSpeedtestActivationGateTest extends TestCase
                 'connection_mode' => 'pppoe',
                 'wifi_ssid' => 'WHUSNET_GATE_TEST',
                 'wifi_password' => 'password123',
-                'serial_number' => 'ZTEGC1234567',
+                'selected_inventory_serial_id' => $this->issueActiveSerialTo($technician, $pusat, $cabang, 'ZTEGC1234567')->id,
                 'odp_number' => 'ODP-01',
                 'odp_port' => '1',
                 'olt_number' => 'OLT-01',
@@ -181,8 +188,7 @@ class InstallationSpeedtestActivationGateTest extends TestCase
                 'signature_photo' => UploadedFile::fake()->image('signature.jpg'),
                 'materials' => [
                     [
-                        'item_name' => 'Kabel Dropcore',
-                        'item_type' => 'kabel_dropcore',
+                        'item_id' => $kabel->id,
                         'qty' => 50,
                         'unit' => 'meter',
                     ],
@@ -219,14 +225,15 @@ class InstallationSpeedtestActivationGateTest extends TestCase
     {
         Storage::fake('public');
 
-        [$customer, $technician, $task] = $this->setupInProgressInstallation();
+        [$customer, $technician, $task, $pusat, $cabang] = $this->setupInProgressInstallation();
+        [$kabel] = $this->issuePassiveQtyTo($technician, $pusat, $cabang, 50);
 
         $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), [
             'device_type' => 'ont',
             'connection_mode' => 'pppoe',
             'wifi_ssid' => 'WHUSNET_GATE_TEST',
             'wifi_password' => 'password123',
-            'serial_number' => 'ZTEGC1234567',
+            'selected_inventory_serial_id' => $this->issueActiveSerialTo($technician, $pusat, $cabang, 'ZTEGC1234567')->id,
             'odp_number' => 'ODP-01',
             'odp_port' => '1',
             'olt_number' => 'OLT-01',
@@ -237,8 +244,7 @@ class InstallationSpeedtestActivationGateTest extends TestCase
             'signature_photo' => UploadedFile::fake()->image('signature.jpg'),
             'materials' => [
                 [
-                    'item_name' => 'Kabel Dropcore',
-                    'item_type' => 'kabel_dropcore',
+                    'item_id' => $kabel->id,
                     'qty' => 50,
                     'unit' => 'meter',
                 ],
@@ -265,10 +271,20 @@ class InstallationSpeedtestActivationGateTest extends TestCase
     }
 
     /**
-     * @return array{0: Customer, 1: User, 2: Task}
+     * @return array{0: Customer, 1: User, 2: Task, 3: Pop, 4: Pop}
      */
     private function setupInProgressInstallation(): array
     {
+        $pusat = Pop::create([
+            'code' => 'GATE-PST',
+            'pop_code' => 'GATEP',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP GATE Pusat',
+            'type' => 'pusat',
+            'status' => 'active',
+        ]);
+
         $pop = Pop::create([
             'code' => 'GATE',
             'pop_code' => 'GATE',
@@ -321,6 +337,56 @@ class InstallationSpeedtestActivationGateTest extends TestCase
         ]);
         $task->teamMembers()->create(['user_id' => $technician->id, 'role_in_task' => 'lead']);
 
-        return [$customer, $technician, $task];
+        return [$customer, $technician, $task, $pusat, $pop];
+    }
+
+    /**
+     * Terbitkan satu SN ONT ke custody teknisi (Receive Pusat → Transfer
+     * Cabang → Issue Teknisi) supaya field SN — sekarang wajib dropdown
+     * custody, fallback teks manual dicabut (koreksi lanjutan ADHOC-54) —
+     * punya nilai valid buat submit. SN literal dipertahankan (bukan
+     * di-random) supaya assertion `assertSee('ZTEGC...')` existing tetap valid.
+     */
+    private function issueActiveSerialTo(User $technician, Pop $pusat, Pop $cabang, string $serialNumber): InventorySerial
+    {
+        $catAktif = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $ont = Item::create([
+            'code' => 'ONT-'.$serialNumber, 'name' => 'ONT Gate Test', 'item_category_id' => $catAktif->id,
+            'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable',
+        ]);
+        $admin = User::factory()->create();
+
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($pusat, $ont, [$serialNumber], 250000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $ont->id, 'serial_numbers' => [$serialNumber]]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [$serialNumber], [], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $ont->id, 'serial_numbers' => [$serialNumber]]], $admin);
+
+        return $serial->refresh();
+    }
+
+    /**
+     * Terbitkan qty barang PASIF (kabel dkk) ke custody teknisi — dipakai
+     * fixture "Material Terpakai" di test lain di file ini. Opsi "Lainnya
+     * (isi manual)" DICABUT dari dropdown Material Terpakai (koreksi lanjutan
+     * ADHOC-54, 2026-09-12): baris material sekarang WAJIB `item_id` dari
+     * custody tim, gak boleh lagi `item_name` karangan tanpa dasar sistem.
+     *
+     * @return array{0: Item, 1: int} [$item, $qtyIssued]
+     */
+    private function issuePassiveQtyTo(User $technician, Pop $pusat, Pop $cabang, float $qty): array
+    {
+        $catPasif = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabel = Item::create([
+            'code' => 'KABEL-GATE-'.uniqid(), 'name' => 'Kabel Dropcore', 'item_category_id' => $catPasif->id,
+            'unit' => 'meter', 'tracking_type' => 'quantity',
+        ]);
+        $admin = User::factory()->create();
+
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, $qty, 5000, null, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $kabel->id, 'qty' => $qty]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$kabel->id => $qty], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $kabel->id, 'qty' => $qty]], $admin);
+
+        return [$kabel, $qty];
     }
 }

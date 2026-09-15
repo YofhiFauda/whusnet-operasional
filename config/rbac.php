@@ -154,6 +154,7 @@ return [
         'customers.detail.packages' => [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
+            ActionCode::CHANGE->value,
         ],
 
         'customers.detail.survey' => [
@@ -404,6 +405,16 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Leaderboard performa individu (siapa nutup/eskalasi berapa tiket,
+        // rata-rata solving time, SLA breach per orang) — sub-feature
+        // TERPISAH dari `noc_dashboard.view`, sengaja bukan numpang: data
+        // performa personal dianggap lebih sensitif dari sekadar monitoring
+        // antrean, jadi harus bisa dimatikan independen lewat Role Matrix.
+        // docs/plan/noc-dashboard-analysis.md §2.
+        'noc_dashboard.performance' => [
+            ActionCode::VIEW->value,
+        ],
+
         // DELETE digenerate tapi TIDAK dipasang ke route CRUD — kategori
         // di-toggle is_active, bukan dihapus keras (pola sama dengan packages),
         // biar kategori yang sudah dipakai tiket lama gak kehilangan jejak.
@@ -445,6 +456,33 @@ return [
             ActionCode::CREATE->value,
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
+        ],
+
+        // Modul Customer Acquisition (dipakai tim Busdev) — "Pelanggan
+        // Aktif < 30 Hari Diverifikasi". CUMA VIEW di root: baris kebentuk
+        // otomatis oleh CustomerObserver saat pelanggan diverifikasi admin,
+        // dan "Harga Dikurangi PPN" dihitung live dari Biaya Langganan
+        // (lihat CustomerAcquisition::getHargaDikurangiPpnAttribute()).
+        'customer_acquisitions' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Sub-feature TERPISAH — bukan numpang wildcard `.update` generik:
+        // ini permission yang bakal DIPILIH admin di field
+        // `package_categories.installation_fee_approval_permission` (Master
+        // Kategori Paket), jadi kodenya harus jelas & spesifik ("siapa yang
+        // boleh isi Biaya Instalasi"), bukan permission update serbaguna.
+        'customer_acquisitions.installation_fee' => [
+            ActionCode::UPDATE->value,
+        ],
+
+        // Antrean "Menunggu Verifikasi BD" (pelanggan kategori Bisnis
+        // sebelum resmi ACTIVE) — CUMA VIEW, gerbang akses ke halaman.
+        // Aksi tulis ("Verifikasi & Aktifkan") gerbangnya dinamis per
+        // pelanggan (role dari Master Kategori Paket), bukan permission
+        // statis kedua — lihat BusinessDevelopmentVerificationController.
+        'business_development_verification' => [
+            ActionCode::VIEW->value,
         ],
 
         // Modul Gudang/Inventory (ADHOC-54) — docs/plan/warehouse/rancangan-ui.md §1.2.
@@ -514,6 +552,43 @@ return [
             ActionCode::APPROVE->value,
             ActionCode::REJECT->value,
             ActionCode::CANCEL->value,
+        ],
+
+        // Dashboard Analitik FOP (docs/plan/analisa-dashboard-analitik-fop.md)
+        // — pola & performa lintas periode (alat kerja, wilayah, beban/solving
+        // teknisi, backlog, durasi terlama). Feature SENDIRI, bukan numpang
+        // `task.view.all` (dashboard operasional harian `/fop`) — audiens
+        // beda (dibuka mingguan/bulanan buat evaluasi, bukan tiap shift) dan
+        // harus bisa dimatikan per-role independen. Cuma VIEW, read-only murni.
+        'fop_analytics' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Master Agent (Skema 3, 2026-09-12) — mitra akuisisi pelanggan,
+        // BUKAN akun login. Dikelola Business Development, dipakai sebagai
+        // dropdown saat mendaftarkan pelanggan atas nama Agent.
+        'agents' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+        ],
+
+        // Restriksi Paket per Role (Skema 1, 2026-09-12) — halaman kelola
+        // daftar paket global yang boleh dipilih role ber-
+        // `is_package_restricted` (mis. Sales, Teknisi). Toggle role mana
+        // yang kena restriksi tetap lewat Role Management (roles.update)
+        // yang sudah ada, BUKAN lewat sini.
+        'package_restrictions' => [
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
+        ],
+
+        // Dashboard Omset Sales (Skema 2, 2026-09-12) — Business Development
+        // memantau omset (Biaya Langganan - PPN 11%) per Sales, per periode.
+        // Cuma VIEW: murni agregasi dari CustomerAcquisition, gak ada input
+        // manual sama sekali.
+        'sales_omset_dashboard' => [
+            ActionCode::VIEW->value,
         ],
     ],
 
@@ -646,6 +721,7 @@ return [
         'noc_worksheet.masuk.view' => '[Nonaktif] Tab Ticket Masuk — dilebur ke Worksheet NOC',
         'noc_worksheet.diproses.view' => '[Nonaktif] Tab Ticket Diproses — dilebur ke Worksheet NOC',
         'noc_dashboard.view' => 'Lihat Halaman Dashboard NOC',
+        'noc_dashboard.performance.view' => 'Lihat Leaderboard Performa Individu (Helpdesk/NOC)',
 
         // Modul Kolektor — dua halaman, dua audiens (analisa-alur-kolektor-2.0
         // §9). Labelnya nyebut halamannya biar di Role Matrix kelihatan mana
@@ -664,5 +740,13 @@ return [
         'cash_deposit.create' => 'Menyetorkan Kas ke Owner / Bank',
         'cash_deposit.validate' => 'Periksa & Tutup Setoran Kas Admin',
         'cash_deposit.approve' => 'Tutup Selisih Setoran Kas (kerugian/kelebihan diakui)',
+
+        // Skema 1-3 Business Development (2026-09-12)
+        'agents.view' => 'Lihat Master Agent',
+        'agents.create' => 'Tambah Agent',
+        'agents.update' => 'Ubah Agent',
+        'package_restrictions.view' => 'Lihat Restriksi Paket per Role',
+        'package_restrictions.update' => 'Atur Daftar Paket Restriksi',
+        'sales_omset_dashboard.view' => 'Lihat Dashboard Omset Sales',
     ],
 ];

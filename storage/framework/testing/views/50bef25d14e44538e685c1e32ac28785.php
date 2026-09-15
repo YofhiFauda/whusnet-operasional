@@ -60,7 +60,7 @@ unset($__defined_vars, $__key, $__value); ?>
     aria-labelledby="modal-title" role="dialog" aria-modal="true"
 >
     <!-- Overlay -->
-    <div x-show="show" x-transition.opacity @click="show = false" class="fixed inset-0 bg-text-main/50 transition-opacity"></div>
+    <div x-show="show" x-transition.opacity @click="show = false" class="fixed inset-0 bg-slate-900/50 dark:bg-slate-950/75 backdrop-blur-xs transition-opacity"></div>
 
     <div @click.self="show = false" class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
         <!-- Modal Panel -->

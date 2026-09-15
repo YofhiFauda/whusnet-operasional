@@ -59,8 +59,11 @@ class TicketHistoryController extends Controller
                 'customer.pop:id,name,cid_prefix',
                 'creator:id,name',
                 'pop:id,name',
-                'issueCategory:id,name',
+                'issueCategory:id,name,is_batch',
                 'histories.actor:id,name',
+                // Pelanggan terdampak (tiket batch) — History nampilin Parent
+                // + SEMUA Child, lihat Ticket::isBatch()/batchMembers().
+                'batchMembers',
             ])
             ->latest('created_at')
             ->paginate(50)
@@ -100,6 +103,9 @@ class TicketHistoryController extends Controller
                 'pop:id,name',
                 'issueCategory:id,name',
                 'histories.actor:id,name',
+                // Export xlsx TIDAK menampilkan batchMembers (exportRow() gak
+                // punya kolomnya) — sengaja gak dieager-load di sini, beda
+                // dari index() di atas.
             ])
             ->orderBy('created_at')
             ->chunk(500, function ($tickets) use ($writer) {

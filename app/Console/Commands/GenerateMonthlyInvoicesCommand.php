@@ -7,6 +7,10 @@ use App\Enums\InvoiceType;
 use App\Enums\WorkflowTransition;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\RevenueCategory;
+use App\Models\RevenueSubcategory;
+use App\Services\InvoiceItemBuilder;
+use App\Services\InvoiceNumberGenerator;
 use Carbon\Carbon;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -118,22 +122,13 @@ class GenerateMonthlyInvoicesCommand extends Command
                     $ppnAmount = round($afterDiscount * ($ppnPercent / 100), 2);
                     $totalAmount = $afterDiscount + $ppnAmount;
 
-                    $periodCode = str_replace('-', '', $billingPeriod);
-                    $lastInvoice = Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
-                        ->orderBy('invoice_number', 'desc')
-                        ->lockForUpdate()
-                        ->first();
-
-                    $nextSeq = 1;
-                    if ($lastInvoice) {
-                        $parts = explode('-', $lastInvoice->invoice_number);
-                        if (count($parts) === 3) {
-                            $nextSeq = ((int) $parts[2]) + 1;
-                        }
-                    }
-
-                    Invoice::create([
-                        'invoice_number' => sprintf('INV-%s-%04d', $periodCode, $nextSeq),
+                    // Penomoran dipindah ke InvoiceNumberGenerator (ADHOC-60) —
+                    // sebelumnya salinan identik dari blok ini juga hidup di
+                    // CustomerController::storeManualInvoice, dan keduanya
+                    // menulis ke deret yang sama. Tetap dipanggil DI DALAM
+                    // transaksi supaya lockForUpdate()-nya bermakna.
+                    $invoice = Invoice::create([
+                        'invoice_number' => app(InvoiceNumberGenerator::class)->nextFor($billingPeriod),
                         'invoice_type' => InvoiceType::BULANAN->value,
                         'customer_id' => $customer->id,
                         'pop_id' => $customer->pop_id,
@@ -159,6 +154,17 @@ class GenerateMonthlyInvoicesCommand extends Command
                         'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
                         'created_by' => null,
                     ]);
+
+                    // Tagihan bulanan rutin isinya persis satu komponen:
+                    // langganan sebulan penuh. Nominalnya `subtotal`, BUKAN
+                    // `total_amount` — diskon & PPN berlaku di level tagihan,
+                    // tidak dipecah per baris (lihat InvoiceItemBuilder).
+                    app(InvoiceItemBuilder::class)->rebuildFor($invoice, [[
+                        'category_code' => RevenueCategory::CODE_JASA_LAYANAN_INTERNET,
+                        'subcategory_code' => RevenueSubcategory::CODE_LANGGANAN_BULANAN,
+                        'description' => "Langganan {$billingPeriod}",
+                        'amount' => $subtotal,
+                    ]]);
                 });
 
                 $created++;

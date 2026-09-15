@@ -255,6 +255,28 @@
         </div>
 
         
+        <?php if($ticket->isBatch()): ?>
+        <div class="px-4 pb-4">
+            <p class="text-[10px] font-semibold text-violet-500 dark:text-violet-400 uppercase tracking-wider font-ui mb-2">
+                Pelanggan Terdampak (<?php echo e($ticket->batchMembers->count()); ?>)
+            </p>
+            <?php if($ticket->batchMembers->isEmpty()): ?>
+                <p class="text-[11px] text-amber-600 dark:text-amber-400 font-ui">Belum ada pelanggan terdampak dicatat — cek halaman Worksheet Helpdesk.</p>
+            <?php else: ?>
+            <div class="border border-violet-200 dark:border-violet-800/50 bg-violet-50/60 dark:bg-violet-900/10 rounded p-3 space-y-1.5">
+                <?php $__currentLoopData = $ticket->batchMembers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-ui">
+                    <span class="font-bold text-slate-800 dark:text-slate-200"><?php echo e($member->customer_name); ?></span>
+                    <span class="font-mono text-slate-500 dark:text-slate-400"><?php echo e($member->cid ?: '—'); ?></span>
+                    <span class="font-mono text-slate-500 dark:text-slate-400"><?php echo e($member->phone ?: '—'); ?></span>
+                </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        
         <div class="px-4 pb-4 border-t border-slate-100 dark:border-slate-700/50 pt-3 space-y-3">
             <div class="border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 rounded overflow-hidden">
                 <p class="px-3 py-1.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider font-ui border-b border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20">
@@ -498,8 +520,12 @@
             <?php else: ?>
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan pemasangan.</p>
             <?php endif; ?>
-        <?php elseif($fopTask->category === \App\Enums\TaskType::MAINTENANCE): ?>
+        <?php elseif(in_array($fopTask->category, [\App\Enums\TaskType::MAINTENANCE, \App\Enums\TaskType::CREQ, \App\Enums\TaskType::OREQ, \App\Enums\TaskType::INFR], true)): ?>
+            
             <?php if($maintenance): ?>
+            <?php
+                $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+            ?>
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
@@ -515,6 +541,27 @@
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </div>
                 </div>
+                <?php if($materialTerpakai->isNotEmpty()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Material Terpakai (Gudang)</p>
+                    <?php $__currentLoopData = $materialTerpakai; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400"><?php echo e($material->item_name); ?><?php if($material->note): ?><span class="text-slate-400 dark:text-slate-500"> · <?php echo e($material->note); ?></span><?php endif; ?></span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200"><?php echo e(rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',')); ?> <?php echo e($material->unit); ?></span>
+                    </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </div>
+                <?php endif; ?>
+                <?php if($fopTask->workTools->isNotEmpty()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Alat Kerja Dipinjam</p>
+                    <div class="flex flex-wrap gap-1.5 mt-1">
+                        <?php $__currentLoopData = $fopTask->workTools; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tool): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600"><?php echo e($tool->tool_name); ?></span>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <?php if($maintenance->opm_photo || $maintenance->speedtest_photo): ?>
                 <div class="col-span-2 flex gap-3 flex-wrap">
                     <?php if($maintenance->opm_photo): ?>
@@ -527,7 +574,7 @@
                 <?php endif; ?>
             </div>
             <?php else: ?>
-            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan maintenance.</p>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan <?php echo e($fopTask->category->label()); ?>.</p>
             <?php endif; ?>
         <?php else: ?>
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Tipe task ini tidak punya laporan lapangan terstruktur.</p>

@@ -1,26 +1,105 @@
 <?php $__env->startSection('title', 'Riwayat Task FOP'); ?>
 
 <?php $__env->startSection('content'); ?>
-<div class="px-4 py-6 max-w-12xl mx-auto space-y-5">
+<div x-data="{ filterDrawerOpen: false }" class="px-3 sm:px-4 py-4 sm:py-6 max-w-12xl mx-auto space-y-4 sm:space-y-5 pb-16 md:pb-6">
 
     
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 py-1">
         <div>
-            <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight font-ui">Riwayat Task FOP</h1>
-            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1 font-ui">Daftar task FOP yang telah selesai atau dibatalkan.</p>
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight font-ui">Riwayat Task FOP</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 font-ui">Daftar task FOP yang telah selesai atau dibatalkan.</p>
+        </div>
+        <div>
+            <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-colors shadow-2xs font-ui">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                <span>Task FOP Aktif</span>
+            </a>
         </div>
     </div>
 
+    <?php
+        $activeFiltersCount = count(array_filter(request()->only(['category', 'priority', 'village_id', 'team_id'])));
+        $currentStatus = request('status', '');
+    ?>
+
     
-    <form method="GET" action="<?php echo e(route('fop-tasks.history')); ?>" class="flex flex-col gap-3 pb-3">
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar -mx-1 px-1">
+        <a href="<?php echo e(route('fop-tasks.history', array_merge(request()->except(['status', 'page']), ['status' => '']))); ?>"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-2xs <?php echo e(empty($currentStatus) ? 'bg-sky-600 text-white shadow-sky-600/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'); ?>">
+            <span>Semua Riwayat</span>
+            <span class="text-[10px] px-1.5 py-0.2 rounded-full <?php echo e(empty($currentStatus) ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'); ?> font-mono"><?php echo e($fopTasks->total()); ?></span>
+        </a>
+
+        <a href="<?php echo e(route('fop-tasks.history', array_merge(request()->except(['status', 'page']), ['status' => 'selesai']))); ?>"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-2xs <?php echo e($currentStatus === 'selesai' ? 'bg-green-600 text-white shadow-green-600/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'); ?>">
+            <span class="w-2 h-2 rounded-full bg-green-400"></span>
+            <span>Selesai</span>
+        </a>
+
+        <a href="<?php echo e(route('fop-tasks.history', array_merge(request()->except(['status', 'page']), ['status' => 'dibatalkan']))); ?>"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-2xs <?php echo e($currentStatus === 'dibatalkan' ? 'bg-red-600 text-white shadow-red-600/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'); ?>">
+            <span class="w-2 h-2 rounded-full bg-red-400"></span>
+            <span>Dibatalkan</span>
+        </a>
+    </div>
+
+    
+    <div class="block md:hidden">
+        <form method="GET" action="<?php echo e(route('fop-tasks.history')); ?>" class="flex items-center gap-2">
+            <?php if(request('status')): ?>
+                <input type="hidden" name="status" value="<?php echo e(request('status')); ?>">
+            <?php endif; ?>
+            <?php if(request('category')): ?>
+                <input type="hidden" name="category" value="<?php echo e(request('category')); ?>">
+            <?php endif; ?>
+            <?php if(request('priority')): ?>
+                <input type="hidden" name="priority" value="<?php echo e(request('priority')); ?>">
+            <?php endif; ?>
+            <?php if(request('village_id')): ?>
+                <input type="hidden" name="village_id" value="<?php echo e(request('village_id')); ?>">
+            <?php endif; ?>
+            <?php if(request('team_id')): ?>
+                <input type="hidden" name="team_id" value="<?php echo e(request('team_id')); ?>">
+            <?php endif; ?>
+
+            <div class="relative flex-1">
+                <input type="text" name="search" value="<?php echo e(request('search')); ?>" placeholder="Cari task riwayat..."
+                       class="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none shadow-2xs font-ui">
+                <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+
+            <button type="button" @click="filterDrawerOpen = true"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-colors shadow-2xs shrink-0 cursor-pointer">
+                <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span>Filter</span>
+                <?php if($activeFiltersCount > 0): ?>
+                    <span class="w-4 h-4 rounded-full bg-sky-600 text-white text-[10px] font-bold flex items-center justify-center"><?php echo e($activeFiltersCount); ?></span>
+                <?php endif; ?>
+            </button>
+        </form>
+    </div>
+
+    
+    <form method="GET" action="<?php echo e(route('fop-tasks.history')); ?>" class="hidden md:flex flex-col gap-3 pb-2">
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
             <div>
                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Pencarian</label>
-                <input type="text" name="search" value="<?php echo e(request('search')); ?>" placeholder="Cari Task..." class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder:text-slate-400 dark:text-slate-500 font-ui bg-white dark:bg-slate-800">
+                <input type="text" name="search" value="<?php echo e(request('search')); ?>" placeholder="Cari Task..." class="w-full text-xs border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder:text-slate-400 text-slate-800 dark:text-slate-100 font-ui bg-white dark:bg-slate-800 shadow-2xs">
             </div>
             <div>
                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Kategori</label>
-                <select name="category" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
+                <select name="category" class="w-full text-xs border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-ui shadow-2xs">
                     <option value="">Semua</option>
                     <?php $__currentLoopData = $categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key => $val): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <option value="<?php echo e($key); ?>" <?php echo e(request('category') === $key ? 'selected' : ''); ?>><?php echo e($key); ?></option>
@@ -29,7 +108,7 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Status</label>
-                <select name="status" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
+                <select name="status" class="w-full text-xs border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-ui shadow-2xs">
                     <option value="">Semua</option>
                     <option value="selesai" <?php echo e(request('status') === 'selesai' ? 'selected' : ''); ?>>Selesai</option>
                     <option value="dibatalkan" <?php echo e(request('status') === 'dibatalkan' ? 'selected' : ''); ?>>Dibatalkan</option>
@@ -37,7 +116,7 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Prioritas</label>
-                <select name="priority" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
+                <select name="priority" class="w-full text-xs border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-ui shadow-2xs">
                     <option value="">Semua</option>
                     <option value="low" <?php echo e(request('priority') === 'low' ? 'selected' : ''); ?>>Low</option>
                     <option value="Medium" <?php echo e(request('priority') === 'Medium' ? 'selected' : ''); ?>>Medium</option>
@@ -47,7 +126,7 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Area</label>
-                <select name="village_id" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
+                <select name="village_id" class="w-full text-xs border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-ui shadow-2xs">
                     <option value="">Semua</option>
                     <?php $__currentLoopData = $villages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <option value="<?php echo e($v->id); ?>" <?php echo e(request('village_id') == $v->id ? 'selected' : ''); ?>><?php echo e($v->name); ?></option>
@@ -56,7 +135,7 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Team</label>
-                <select name="team_id" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
+                <select name="team_id" class="w-full text-xs border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-ui shadow-2xs">
                     <option value="">Semua</option>
                     <?php $__currentLoopData = $teams; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <option value="<?php echo e($t['id']); ?>" <?php echo e(request('team_id') == $t['id'] ? 'selected' : ''); ?>><?php echo e($t['name']); ?> (<?php echo e($t['work_date']); ?>)</option>
@@ -65,37 +144,155 @@
             </div>
         </div>
         <div class="flex items-center justify-between mt-1">
-            <span class="text-sm text-slate-500 dark:text-slate-400 font-ui">Menampilkan <span class="font-semibold text-slate-700 dark:text-slate-300 font-data"><?php echo e($fopTasks->count()); ?></span> dari <span class="font-semibold text-slate-700 dark:text-slate-300 font-data"><?php echo e($fopTasks->total()); ?></span> data</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400 font-ui">Menampilkan <span class="font-semibold text-slate-700 dark:text-slate-300 font-data"><?php echo e($fopTasks->count()); ?></span> dari <span class="font-semibold text-slate-700 dark:text-slate-300 font-data"><?php echo e($fopTasks->total()); ?></span> data</span>
             <div class="flex items-center gap-3">
                 <?php if(request()->anyFilled(['search', 'category', 'status', 'priority', 'village_id', 'team_id'])): ?>
-                    <a href="<?php echo e(route('fop-tasks.history')); ?>" class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors font-ui">Reset</a>
+                    <a href="<?php echo e(route('fop-tasks.history')); ?>" class="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors font-ui">Reset</a>
                 <?php endif; ?>
-                <button type="submit" class="bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 text-sm font-medium px-4 py-1.5 rounded transition-colors font-ui">Filter</button>
+                <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 text-xs font-semibold px-4 py-2 rounded-lg transition-colors font-ui shadow-2xs cursor-pointer">Filter</button>
             </div>
         </div>
     </form>
 
     
-    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
+    <div x-show="filterDrawerOpen"
+         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:hidden"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none;">
+        
+        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="filterDrawerOpen = false"></div>
+
+        <div class="bg-surface border-t border-border w-full rounded-t-2xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden"
+             @click.away="filterDrawerOpen = false"
+             x-transition:enter="transition ease-out duration-250"
+             x-transition:enter-start="translate-y-full"
+             x-transition:enter-end="translate-y-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="translate-y-0"
+             x-transition:leave-end="translate-y-full">
+            
+            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0"></div>
+
+            <div class="px-5 py-3 border-b border-border flex items-center justify-between bg-surface-muted shrink-0">
+                <h3 class="text-sm font-bold text-text-main font-ui">Filter Riwayat Task</h3>
+                <button type="button" @click="filterDrawerOpen = false" class="text-text-muted hover:text-text-main p-1">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <form method="GET" action="<?php echo e(route('fop-tasks.history')); ?>" class="flex flex-col flex-1 overflow-hidden font-ui">
+                <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+                    <?php if(request('status')): ?>
+                        <input type="hidden" name="status" value="<?php echo e(request('status')); ?>">
+                    <?php endif; ?>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Pencarian</label>
+                        <input type="text" name="search" value="<?php echo e(request('search')); ?>" placeholder="Cari task riwayat..." class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-surface text-text-main focus:ring-1 focus:ring-primary outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Kategori</label>
+                        <select name="category" class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-surface text-text-main focus:ring-1 focus:ring-primary outline-none">
+                            <option value="">Semua Kategori</option>
+                            <?php $__currentLoopData = $categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key => $val): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <option value="<?php echo e($key); ?>" <?php echo e(request('category') === $key ? 'selected' : ''); ?>><?php echo e($key); ?></option>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Status</label>
+                        <select name="status" class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-surface text-text-main focus:ring-1 focus:ring-primary outline-none">
+                            <option value="">Semua Status</option>
+                            <option value="selesai" <?php echo e(request('status') === 'selesai' ? 'selected' : ''); ?>>Selesai</option>
+                            <option value="dibatalkan" <?php echo e(request('status') === 'dibatalkan' ? 'selected' : ''); ?>>Dibatalkan</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Prioritas</label>
+                        <select name="priority" class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-surface text-text-main focus:ring-1 focus:ring-primary outline-none">
+                            <option value="">Semua Prioritas</option>
+                            <option value="low" <?php echo e(request('priority') === 'low' ? 'selected' : ''); ?>>Low</option>
+                            <option value="Medium" <?php echo e(request('priority') === 'Medium' ? 'selected' : ''); ?>>Medium</option>
+                            <option value="High" <?php echo e(request('priority') === 'High' ? 'selected' : ''); ?>>High</option>
+                            <option value="Urgent" <?php echo e(request('priority') === 'Urgent' ? 'selected' : ''); ?>>Urgent</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Area (Desa)</label>
+                        <select name="village_id" class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-surface text-text-main focus:ring-1 focus:ring-primary outline-none">
+                            <option value="">Semua Area</option>
+                            <?php $__currentLoopData = $villages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <option value="<?php echo e($v->id); ?>" <?php echo e(request('village_id') == $v->id ? 'selected' : ''); ?>><?php echo e($v->name); ?></option>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Team</label>
+                        <select name="team_id" class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-surface text-text-main focus:ring-1 focus:ring-primary outline-none">
+                            <option value="">Semua Team</option>
+                            <?php $__currentLoopData = $teams; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <option value="<?php echo e($t['id']); ?>" <?php echo e(request('team_id') == $t['id'] ? 'selected' : ''); ?>><?php echo e($t['name']); ?> (<?php echo e($t['work_date']); ?>)</option>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-between gap-3 shrink-0">
+                    <a href="<?php echo e(route('fop-tasks.history')); ?>" class="btn-secondary text-xs">Reset</a>
+                    <button type="submit" class="btn-primary text-xs">Terapkan Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    
+    <div class="block md:hidden space-y-3.5">
+        <?php $__empty_1 = true; $__currentLoopData = $fopTasks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $task): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+            <?php echo $__env->make('fop_tasks.partials.mobile-card', ['task' => $task, 'isHistory' => true], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+            <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400">
+                <svg class="w-10 h-10 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <p class="text-xs font-bold text-slate-700 dark:text-slate-300 font-ui">Tidak ada riwayat task FOP.</p>
+                <p class="text-[11px] mt-1 text-slate-400 dark:text-slate-500 font-ui">Silakan sesuaikan filter pencarian.</p>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    
+    <div class="hidden md:block bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-2xs overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider font-ui">
-                        <th class="px-3 py-2">Kategori</th>
-                        <th class="px-3 py-2">Tanggal</th>
-                        <th class="px-3 py-2">Tugas</th>
-                        <th class="px-3 py-2">Area</th>
-                        <th class="px-3 py-2">Issue</th>
-                        <th class="px-3 py-2">Teknisi</th>
-                        <th class="px-3 py-2">Team</th>
-                        <th class="px-3 py-2">Status</th>
-                        <th class="px-3 py-2">Prioritas</th>
-                        <th class="px-3 py-2 text-right">Aksi</th>
+                        <th class="px-3 py-2.5">Kategori</th>
+                        <th class="px-3 py-2.5">Tanggal</th>
+                        <th class="px-3 py-2.5">Tugas</th>
+                        <th class="px-3 py-2.5">Area</th>
+                        <th class="px-3 py-2.5">Issue</th>
+                        <th class="px-3 py-2.5">Teknisi</th>
+                        <th class="px-3 py-2.5">Team</th>
+                        <th class="px-3 py-2.5">Status</th>
+                        <th class="px-3 py-2.5">Prioritas</th>
+                        <th class="px-3 py-2.5 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-[11px] text-slate-700 dark:text-slate-300 font-ui">
                     <?php $__empty_1 = true; $__currentLoopData = $fopTasks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $task): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 transition-colors align-top">
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors align-top">
                             <td class="px-3 py-2 whitespace-nowrap">
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border font-ui <?php echo e($task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'); ?>">
                                     <?php echo e($task->category instanceof \App\Enums\TaskType ? $task->category->value : $task->category); ?>
@@ -108,6 +305,12 @@
                             </td>
                             <td class="px-3 py-2 min-w-[200px] whitespace-normal leading-tight font-ui">
                                 <span class="font-medium text-slate-800 dark:text-slate-200"><?php echo e($task->tugas); ?></span>
+                                <?php if($task->status->value === 'dibatalkan' && $task->cancel_reason): ?>
+                                    <p class="text-[10px] text-red-600 dark:text-red-400 mt-0.5">
+                                        <span class="font-semibold">Alasan Batal:</span> <?php echo e($task->cancel_reason); ?>
+
+                                    </p>
+                                <?php endif; ?>
                             </td>
                             <td class="px-3 py-2 whitespace-normal leading-tight text-slate-600 dark:text-slate-400 min-w-[120px] font-ui">
                                 <?php echo e($task->village?->name ?? '—'); ?>
@@ -155,42 +358,29 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap font-ui">
                                 <?php
+                                    $statusValue = $task->status->value;
                                     $statusLabel = $task->task
                                         ? $task->task->status->displayLabel($task->task->report_deferred)
-                                        : $task->status->displayLabel();
+                                        : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->displayLabel());
                                     $statusClasses = $task->task
                                         ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
-                                        : $task->status->displayBadgeClasses();
+                                        : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
                                 ?>
-                                <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit <?php echo e($statusClasses); ?>"
-                                    title="Status Riwayat sudah final, tidak bisa diubah">
+                                <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border <?php echo e($statusClasses); ?>">
                                     <?php echo e($statusLabel); ?>
 
                                 </span>
-                                <?php if($task->status->value === 'dibatalkan' && $task->cancel_reason): ?>
-                                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 max-w-[160px] truncate" title="<?php echo e($task->cancel_reason); ?>"><?php echo e($task->cancel_reason); ?></p>
-                                <?php endif; ?>
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap font-ui">
-                                <span class="<?php echo \Illuminate\Support\Arr::toCssClasses([
-                                        'inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit',
-                                        'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50' => $task->priority->value === 'low',
-                                        'border-yellow-300 text-yellow-800 bg-yellow-50' => $task->priority->value === 'Medium',
-                                        'border-orange-300 text-orange-800 bg-orange-50' => $task->priority->value === 'High',
-                                        'border-red-300 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 font-bold' => $task->priority->value === 'Urgent',
-                                    ]); ?>"
-                                    title="Prioritas Riwayat sudah final, tidak bisa diubah">
-                                    <?php echo e($task->priority->value); ?>
-
-                                </span>
+                                <span class="font-medium text-[11px]"><?php echo e($task->priority->value); ?></span>
                             </td>
-                            <td class="px-3 py-2 whitespace-nowrap text-right">
+                            <td class="px-3 py-2 whitespace-nowrap text-right font-ui">
                                 <a href="<?php echo e(route('fop-tasks.history.show', $task->id)); ?>"
-                                   class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1.5 rounded text-[11px] font-medium font-ui"
-                                   title="Detail">
-                                    Detail
-                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                   class="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 p-1.5 rounded inline-block"
+                                   title="Detail Riwayat">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                 </a>
                             </td>
@@ -201,8 +391,8 @@
                                 <svg class="w-8 h-8 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
-                                <p class="text-[11px] font-medium font-ui">Tidak ada data riwayat task FOP.</p>
-                                <p class="text-[10px] mt-1 text-slate-400 dark:text-slate-500 font-ui">Silakan buat task baru atau ubah filter pencarian.</p>
+                                <p class="text-[11px] font-medium">Tidak ada data riwayat task FOP.</p>
+                                <p class="text-[10px] mt-1 text-slate-400 dark:text-slate-500">Silakan sesuaikan filter pencarian.</p>
                             </td>
                         </tr>
                     <?php endif; ?>

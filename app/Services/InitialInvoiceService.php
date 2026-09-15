@@ -2,7 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\InvoiceType;
+use App\Models\Customer;
 use App\Models\CustomerService as CustomerServiceModel;
+use App\Models\Invoice;
+use App\Models\RevenueCategory;
+use App\Models\RevenueSubcategory;
 use App\Support\Money;
 use Carbon\Carbon;
 
@@ -116,6 +122,120 @@ class InitialInvoiceService
             'other_fee' => $otherFee,
             'total_amount' => Money::add($afterDiscount, $ppnAmount),
             'next_month_amount' => $nextMonthAmount,
+        ];
+    }
+
+    /**
+     * Menerbitkan Invoice AWAL dari hasil `calculate()` di atas.
+     *
+     * Diekstrak dari `CustomerVerificationController::finalVerify()` supaya
+     * bisa dipanggil dari DUA titik yang beda tanpa duplikasi rumus
+     * nomor/baris invoice:
+     * - CS (`finalVerify()`) — kategori non-Bisnis, terbit LANGSUNG.
+     * - BD (`BusinessDevelopmentVerificationController::verify()`) —
+     *   kategori Bisnis, terbit TERTUNDA (lihat
+     *   `customers.pending_initial_invoice`) sampai BD juga menyetujui.
+     *   `$billing` & `$issueDateStr` di jalur ini adalah snapshot yang
+     *   dititipkan CS, BUKAN dihitung ulang — supaya nominal yang sudah
+     *   dikonfirmasi CS ke pelanggan tidak bergeser walau harga
+     *   paket/diskon berubah di antara dua titik waktu itu.
+     *
+     * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}  $billing
+     */
+    public function issue(Customer $customer, CustomerServiceModel $service, array $billing, string $issueDateStr, int $createdByUserId): Invoice
+    {
+        $issueDate = Carbon::parse($issueDateStr);
+        $billingPeriod = $issueDate->format('Y-m');
+        $dueDate = $issueDate->format('Y-m-d');
+
+        $invoiceNumber = 'INV-'.now()->format('Ymd').'-'.strtoupper(uniqid());
+
+        $invoice = Invoice::create([
+            'invoice_number' => $invoiceNumber,
+            'invoice_type' => InvoiceType::AWAL->value,
+            'customer_id' => $customer->id,
+            'pop_id' => $customer->pop_id,
+            'customer_service_id' => $service->id,
+            'internet_package_id' => $service->internet_package_id,
+            'billing_period' => $billingPeriod,
+            'issue_date' => $issueDateStr,
+            'due_date' => $dueDate,
+            'subtotal' => $billing['subtotal'],
+            'discount' => $billing['discount'],
+            'ppn' => $billing['ppn'],
+            'prorate_amount' => $billing['prorate_amount'],
+            'extra_installation_fee' => $billing['extra_installation_fee'],
+            'extra_cable_fee' => $billing['extra_cable_fee'],
+            'extra_pole_fee' => $billing['extra_pole_fee'],
+            'other_fee' => $billing['other_fee'],
+            'total_amount' => $billing['total_amount'],
+            'remaining_amount' => $billing['total_amount'],
+            'paid_amount' => 0,
+            'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
+            'created_by' => $createdByUserId,
+        ]);
+
+        // Rincian baris per kategori pendapatan (ADHOC-60) — builder menolak
+        // menulis kalau jumlah barisnya tidak sama dengan subtotal, jadi
+        // ketimpangan rumus ketahuan di sini, bukan diam-diam masuk laporan.
+        app(InvoiceItemBuilder::class)->rebuildFor($invoice, $this->lineSpecs($billing));
+
+        return $invoice;
+    }
+
+    /**
+     * Rincian tagihan awal sebagai baris kategori pendapatan (ADHOC-60), siap
+     * diserahkan ke `InvoiceItemBuilder`.
+     *
+     * Dipisah dari `calculate()` supaya bisa diuji tanpa menjalankan seluruh
+     * alur verifikasi aktivasi, dan supaya controller tetap tipis — perakitan
+     * baris adalah keputusan bisnis, bukan urusan controller.
+     *
+     * Lima komponen di sini SAMA PERSIS dengan lima suku yang dijumlahkan jadi
+     * `subtotal` di `calculate()`. Kalau salah satunya ditambah/dikurangi di
+     * sana, daftar ini harus ikut berubah — `InvoiceItemBuilder` akan menolak
+     * menulis kalau jumlahnya tidak sama dengan subtotal, jadi ketimpangannya
+     * ketahuan saat itu juga, bukan diam-diam masuk laporan.
+     *
+     * Materai/biaya lain masuk kategori `lainnya` dengan nama ketikan, karena
+     * kategori itu memang tidak punya sub kategori master.
+     *
+     * @param  array{prorate_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float}  $billing
+     * @return list<array{category_code: string, subcategory_code?: string|null, custom_name?: string|null, description?: string|null, amount: mixed}>
+     */
+    public function lineSpecs(array $billing): array
+    {
+        return [
+            [
+                'category_code' => RevenueCategory::CODE_JASA_LAYANAN_INTERNET,
+                'subcategory_code' => RevenueSubcategory::CODE_PRORATA,
+                'description' => 'Langganan prorata bulan aktivasi',
+                'amount' => $billing['prorate_amount'],
+            ],
+            [
+                'category_code' => RevenueCategory::CODE_JASA_INSTALASI,
+                'subcategory_code' => RevenueSubcategory::CODE_BIAYA_AKTIVASI,
+                'description' => null,
+                'amount' => $billing['extra_installation_fee'],
+            ],
+            [
+                'category_code' => RevenueCategory::CODE_JASA_PERBAIKAN,
+                'subcategory_code' => 'tambah_kabel',
+                'description' => 'Tambahan kabel saat pemasangan',
+                'amount' => $billing['extra_cable_fee'],
+            ],
+            [
+                'category_code' => RevenueCategory::CODE_JASA_PERBAIKAN,
+                'subcategory_code' => 'tambah_tiang',
+                'description' => 'Tambahan tiang saat pemasangan',
+                'amount' => $billing['extra_pole_fee'],
+            ],
+            [
+                'category_code' => RevenueCategory::CODE_LAINNYA,
+                'custom_name' => 'Materai / Biaya Lain',
+                'description' => null,
+                'amount' => $billing['other_fee'],
+            ],
         ];
     }
 }

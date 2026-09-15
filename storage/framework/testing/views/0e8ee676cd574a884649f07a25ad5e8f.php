@@ -29,10 +29,74 @@
     </div>
 
     
+    <div x-show="batchModal.open" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-slate-950/70"
+         @keydown.escape.window="closeBatchModal()">
+        <div @click.outside="closeBatchModal()" class="w-full max-w-md rounded-xl bg-surface border border-border shadow-2xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-border flex items-center justify-between">
+                <h3 class="text-sm font-bold text-text-main">Tambah Pelanggan Terdampak</h3>
+                <button type="button" @click="closeBatchModal()" class="text-text-muted hover:text-text-main cursor-pointer">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-3">
+                <div class="space-y-1.5 relative">
+                    <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">Cari CID / Nama Pelanggan</label>
+                    <input type="text" x-model="batchModal.cidQuery" @input.debounce.300ms="searchBatchCustomer()"
+                           :disabled="batchModal.selected !== null"
+                           placeholder="Ketik CID atau nama..."
+                           class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 disabled:bg-surface-muted transition-all">
+                    <button type="button" x-show="batchModal.selected" x-cloak
+                            @click="batchModal.selected = null; batchModal.cidQuery = ''"
+                            class="absolute right-3 top-8 text-xs font-bold text-sky-600 hover:text-sky-700 underline cursor-pointer">
+                        Ganti
+                    </button>
+                    <div x-show="batchModal.results.length > 0 && !batchModal.selected" x-cloak
+                         class="absolute z-10 mt-1 w-full bg-surface border border-border rounded-lg shadow-xl max-h-48 overflow-y-auto divide-y divide-border">
+                        <template x-for="r in batchModal.results" :key="r.id">
+                            <button type="button" @click="pickBatchCustomer(r)" class="w-full text-left px-3 py-2 text-sm hover:bg-sky-50 dark:hover:bg-slate-800 cursor-pointer">
+                                <div class="font-bold text-text-main" x-text="r.nama"></div>
+                                <div class="text-xs text-text-muted font-mono" x-text="r.cid"></div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-text-muted">Pilih dari pencarian buat auto-isi Nama/No. HP di bawah (tetap bisa diedit), atau isi manual kalau gak ketemu.</p>
+
+                <div class="space-y-1.5">
+                    <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">Nama Pelanggan</label>
+                    <input type="text" x-model="batchModal.customerName"
+                           class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main transition-all">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">No. HP</label>
+                    <input type="text" x-model="batchModal.phone"
+                           class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main transition-all">
+                </div>
+
+                <p x-show="batchModal.error" x-cloak class="text-[11px] font-semibold text-rose-600 dark:text-rose-400" x-text="batchModal.error"></p>
+            </div>
+            <div class="px-4 py-3 border-t border-border flex items-center justify-end gap-2 bg-surface-muted/60 dark:bg-slate-900/40">
+                <button type="button" @click="closeBatchModal()" class="px-3 py-2 rounded-lg text-xs font-bold text-text-muted hover:bg-surface border border-transparent hover:border-border cursor-pointer">
+                    Batal
+                </button>
+                <button type="button" @click="submitBatchMember()" :disabled="batchModal.submitting"
+                        class="px-3 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50 cursor-pointer">
+                    <span x-show="!batchModal.submitting">Tambah</span>
+                    <span x-show="batchModal.submitting" x-cloak>Menyimpan...</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    
     <button type="button" @click="setFormOpen(true)" tabindex="-1"
             :aria-hidden="formOpen ? 'true' : 'false'"
             :tabindex="formOpen ? '-1' : '0'"
-            title="Buka form tiket baru (N)"
+            title="Buka form tiket baru (N / Alt+N)"
             class="group shrink-0 overflow-hidden flex flex-col items-center justify-between py-6 bg-surface border-r border-border hover:bg-sky-50 dark:hover:bg-slate-800/60 cursor-pointer panel-motion"
             :class="[
                 formOpen ? 'w-0 border-r-0 opacity-0 pointer-events-none' : 'w-11 opacity-100',
@@ -71,19 +135,22 @@
     <div class="w-full lg:w-[380px] xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col min-w-0 bg-surface border-r border-border shadow-xl z-10">
 
         
-        <div class="shrink-0 px-4 sm:px-5 py-3.5 border-b border-border bg-surface-muted/60 dark:bg-slate-900/40 flex items-center justify-between gap-3">
+        <div class="shrink-0 px-4 sm:px-5 py-3 border-b border-border bg-surface flex items-center justify-between gap-3">
             <div class="flex items-center gap-2.5 min-w-0">
-                <span class="shrink-0 text-sky-600 dark:text-sky-400">
-                </span>
+                <div class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                </div>
                 <div class="min-w-0">
-                    <h1 class="text-sm font-extrabold text-text-main uppercase tracking-wide truncate">Create Service Ticket</h1>
-                    <p class="text-[11px] text-text-muted truncate">Input tiket baru dengan cepat</p>
+                    <h1 class="text-xs font-bold text-text-main uppercase tracking-wider truncate">Buat Tiket Baru</h1>
+                    <p class="text-[10px] text-text-muted truncate">Worksheet input cepat (Ctrl+Enter)</p>
                 </div>
             </div>
 
             
-            <button type="button" @click="setFormOpen(false)" title="Tutup form (N)"
-                    class="shrink-0 p-1.5 rounded-lg text-text-muted hover:bg-rose-600 hover:text-white active:scale-95 transition-all duration-200 cursor-pointer">
+            <button type="button" @click="setFormOpen(false)" title="Tutup form (Esc / Alt+N)"
+                    class="shrink-0 p-1.5 rounded-lg text-text-muted hover:bg-surface-muted hover:text-text-main active:scale-95 transition-all duration-200 cursor-pointer">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -91,288 +158,453 @@
         </div>
 
         
-        
         <form action="<?php echo e(route('tickets.store')); ?>" method="POST" @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
             <?php echo csrf_field(); ?>
 
-            <div class="flex-1 overflow-y-auto custom-scrollbar">
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3.5">
 
                 
-                <section class="border border-border bg-surface-muted/40 dark:bg-slate-900/30 p-4 space-y-3.5 transition-colors">
-                    <h2 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">SECTION 01: CLASSIFICATION</h2>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div class="space-y-1.5">
-                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                Ticket Type <span class="text-rose-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <select x-model="ticketType" required class="w-full text-[13px] rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all font-mono">
-                                    <option value="" disabled>-- SELECT CLASSIFICATION --</option>
-                                    <?php $__currentLoopData = $typeOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $opt): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                        <option value="<?php echo e($opt['value']); ?>"><?php echo e($opt['value']); ?> — <?php echo e($opt['label']); ?></option>
-                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                </select>
-                                <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div class="space-y-1.5">
-                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                Prioritas <span class="text-rose-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <select x-model="priority" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
-                                    <?php $__currentLoopData = $priorityOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                        <option value="<?php echo e($p->value); ?>"><?php echo e($p->value); ?></option>
-                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                </select>
-                                <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                
-                <section class="border border-border bg-surface-muted/40 dark:bg-slate-900/30 p-4 space-y-3.5 transition-colors">
-                    <div class="flex items-center justify-between gap-2">
-                        <h2 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">SECTION 02: CUSTOMER IDENTITY</h2>
-                        
-                        <span x-show="selected" x-cloak class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Matched</span>
-                    </div>
-
-                    <div class="space-y-1.5 relative">
-                        <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                            Search Customer Data <span class="text-rose-500">*</span>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                            Tipe Tiket <span class="text-rose-500">*</span>
                         </label>
+                        <div class="relative">
+                            <select x-model="ticketType" @change="delete errors.type" required
+                                    class="w-full text-xs font-medium rounded-lg border bg-surface px-2.5 py-2 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-mono"
+                                    :class="errors.type ? 'border-rose-400 bg-rose-50/20' : 'border-border'">
+                                <option value="" disabled>-- Pilih Tipe --</option>
+                                <?php $__currentLoopData = $typeOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $opt): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($opt['value']); ?>"><?php echo e($opt['value']); ?> — <?php echo e($opt['label']); ?></option>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </select>
+                            <svg class="h-3.5 w-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                        <p x-show="errors.type" x-cloak x-text="errors.type" class="text-[10px] text-rose-500 font-semibold"></p>
+                    </div>
 
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                            Prioritas <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <select x-model="priority" required class="w-full text-xs font-medium rounded-lg border border-border bg-surface px-2.5 py-2 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                                <?php $__currentLoopData = $priorityOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($p->value); ?>"><?php echo e($p->value); ?></option>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </select>
+                            <svg class="h-3.5 w-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div class="space-y-1.5 pt-1">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                            Data Pelanggan <span class="text-rose-500">*</span>
+                        </label>
+                        <span x-show="selected" x-cloak class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Terpilih
+                        </span>
+                    </div>
+
+                    
+                    <div class="relative" x-show="!selected">
                         <div class="relative flex items-center">
-                            <svg class="h-4 w-4 absolute left-3 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg class="h-3.5 w-3.5 absolute left-3 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
 
-                            <input type="text" x-ref="searchInput" x-model="cidQuery" @input.debounce.300ms="searchCustomer()"
-                                   :disabled="selected !== null"
-                                   placeholder="ENTER CID OR NAME..."
-                                   class="w-full text-sm font-mono tracking-wide rounded-lg border border-border bg-surface pl-9 pr-16 py-2.5 text-text-main placeholder:text-text-muted placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 disabled:bg-surface-muted disabled:text-text-muted transition-all">
+                            <input type="text" x-ref="searchInput" x-model="cidQuery"
+                                   @input.debounce.300ms="searchCustomer()"
+                                   @keydown.enter.prevent="if (results.length > 0) pick(results[0])"
+                                   placeholder="Ketik CID, nama, atau label batch..."
+                                   class="w-full text-xs rounded-lg border bg-surface pl-8 pr-8 py-2 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-medium"
+                                   :class="errors.cid_query || errors.customer_id ? 'border-rose-400 bg-rose-50/20' : 'border-border'">
 
-                            <button type="button" x-show="selected" x-cloak @click="clearSelection()" class="absolute right-3 text-xs font-bold text-sky-600 hover:text-sky-700 underline cursor-pointer">
-                                Ganti
-                            </button>
-
-                            <button type="button" x-show="cidQuery && !selected" x-cloak @click="cidQuery = ''; results = []" class="absolute right-3 text-text-muted hover:text-text-main transition-colors cursor-pointer">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <button type="button" x-show="cidQuery" x-cloak @click="cidQuery = ''; results = []" class="absolute right-2.5 text-text-muted hover:text-text-main transition-colors cursor-pointer">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
+                        
                         <div x-show="results.length > 0 && !selected" x-cloak
-                             x-transition:enter="transition ease-out duration-200"
-                             x-transition:enter-start="opacity-0 -translate-y-1"
-                             x-transition:enter-end="opacity-100 translate-y-0"
-                             x-transition:leave="transition ease-in duration-150"
-                             x-transition:leave-start="opacity-100 translate-y-0"
-                             x-transition:leave-end="opacity-0 -translate-y-1"
-                             class="absolute z-30 mt-1 w-full bg-surface border border-border rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar divide-y divide-border">
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 -translate-y-1 scale-98"
+                             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                             class="absolute z-30 mt-1 w-full bg-surface border border-border rounded-xl shadow-2xl max-h-56 overflow-y-auto custom-scrollbar divide-y divide-border/30">
+                            <div class="px-2.5 py-1 text-[9px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50/70 dark:bg-sky-950/40 uppercase tracking-wider flex items-center justify-between">
+                                <span>Hasil Pencarian:</span>
+                                <span class="font-normal font-mono text-[9px]">Tekan Enter atau Klik</span>
+                            </div>
                             <template x-for="r in results" :key="r.id">
-                                <button type="button" @click="pick(r)" class="w-full text-left px-4 py-3 text-sm hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-between cursor-pointer group">
-                                    <div>
-                                        <div class="font-bold text-text-main group-hover:text-sky-600 transition-colors" x-text="r.nama"></div>
-                                        <div class="text-xs text-text-muted font-mono" x-text="r.cid"></div>
+                                <button type="button" @click="pick(r)" class="w-full text-left px-3 py-2 text-xs hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-between gap-2 cursor-pointer group">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-bold text-text-main group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate" x-text="r.nama"></div>
+                                        <div class="text-[10px] text-text-muted font-mono" x-text="r.cid"></div>
                                     </div>
-                                    <div class="text-right text-xs">
-                                        <span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 font-bold text-[10px]" x-text="r.pop || 'NO POP'"></span>
-                                    </div>
+                                    <span class="inline-block px-1.5 py-0.5 rounded bg-surface-muted text-text-secondary border border-border font-bold text-[9px] shrink-0" x-text="r.pop || 'NO POP'"></span>
                                 </button>
                             </template>
                         </div>
 
-                        <p x-show="searching" x-cloak class="text-xs text-sky-600 mt-1 flex items-center gap-1">
-                            <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <p x-show="searching" x-cloak class="text-[10px] text-sky-600 dark:text-sky-400 mt-1 flex items-center gap-1 font-medium">
+                            <svg class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            Mencari data pelanggan di database...
+                            Mencari pelanggan...
                         </p>
 
-                        <p x-show="!searching && searched && results.length === 0 && !selected" x-cloak class="text-xs text-rose-500 mt-1 font-medium">
-                            Pelanggan tidak ditemukan. Silakan periksa kembali CID atau Nama.
+                        <p x-show="!searching && searched && results.length === 0 && !selected" x-cloak class="text-[10px] text-sky-600 dark:text-sky-400 mt-1 font-medium">
+                            Pelanggan tidak ditemukan. Teks di atas digunakan sebagai label tiket. Tentukan POP di bawah:
                         </p>
+
+                        <p x-show="errors.cid_query || errors.customer_id" x-cloak x-text="errors.cid_query || errors.customer_id" class="text-[10px] text-rose-500 font-semibold mt-1"></p>
+                    </div>
+
+                    
+                    <div x-show="selected" x-cloak
+                         class="rounded-xl border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/20 dark:bg-sky-950/15 p-2.5 space-y-2 text-xs transition-all shadow-2xs">
+                        
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2 min-w-0 flex-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                <span class="font-bold text-text-main truncate text-xs" x-text="selected?.nama || '—'"></span>
+                                <span class="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-surface px-1.5 py-0.2 rounded border border-sky-200 dark:border-sky-800 shrink-0" x-text="selected?.cid || '—'"></span>
+                            </div>
+                            <button type="button" @click="clearSelection()" class="text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:text-rose-600 hover:underline cursor-pointer shrink-0">
+                                Ganti
+                            </button>
+                        </div>
+
+                        
+                        <div class="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-border/40 text-[10px]">
+                            <template x-if="selected?.no_hp">
+                                <a :href="'https://wa.me/' + selected.no_hp" target="_blank" rel="noopener"
+                                   class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-mono font-bold hover:underline"
+                                   title="Buka WhatsApp">
+                                    <svg class="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+                                    </svg>
+                                    <span x-text="selected.no_hp"></span>
+                                </a>
+                            </template>
+                            <span class="px-1.5 py-0.5 rounded bg-surface text-text-secondary border border-border font-medium truncate" x-text="selected?.paket || 'Tanpa Paket'"></span>
+                            <span class="px-1.5 py-0.5 rounded bg-surface text-text-secondary border border-border font-medium truncate" x-text="(selected?.pop || '—') + ' / ' + (selected?.odp || '—')"></span>
+                        </div>
+
+                        
+                        <div class="flex items-center justify-between gap-2 text-[10px] text-text-muted pt-0.5">
+                            <div class="flex items-center gap-1 min-w-0 truncate" :title="selected?.alamat">
+                                <svg class="h-3 w-3 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span class="truncate" x-text="selected?.alamat || '—'"></span>
+                            </div>
+                            <template x-if="selected?.maps_url">
+                                <a :href="selected.maps_url" target="_blank" rel="noopener" class="text-sky-600 dark:text-sky-400 font-bold hover:underline shrink-0 flex items-center gap-0.5">
+                                    <span>Maps</span>
+                                    <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                </a>
+                            </template>
+                        </div>
+                    </div>
+
+                    
+                    <div class="space-y-1 relative" x-show="!selected && searched && results.length === 0" x-cloak>
+                        <div class="flex items-center justify-between">
+                            <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                                Wilayah Jaringan / POP <span class="text-rose-500">*</span>
+                            </label>
+                            <span class="text-[9px] font-mono text-text-muted" x-text="allowedPops.length + ' POP'"></span>
+                        </div>
+
+                        
+                        <div class="relative">
+                            <button type="button" x-show="!selectedPop" @click="openPopPicker()"
+                                    class="w-full text-left px-2.5 py-2 text-xs rounded-lg border bg-surface flex items-center justify-between gap-2 cursor-pointer transition-all font-medium"
+                                    :class="errors.pop_id ? 'border-rose-400 bg-rose-50/20 text-rose-600' : 'border-border text-text-muted hover:border-sky-500 hover:text-text-main'">
+                                <span class="flex items-center gap-1.5 truncate">
+                                    <svg class="h-3.5 w-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                                    </svg>
+                                    <span>-- Pilih POP / Cabang / Mini POP --</span>
+                                </span>
+                                <svg class="h-3.5 w-3.5 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+
+                            <div x-show="selectedPop" x-cloak
+                                 class="w-full px-2.5 py-1.5 text-xs rounded-lg border bg-surface flex items-center justify-between gap-2 shadow-2xs"
+                                 :class="{
+                                     'border-purple-300 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-950/20': selectedPop?.type === 'pusat',
+                                     'border-sky-300 dark:border-sky-800 bg-sky-50/30 dark:bg-sky-950/20': selectedPop?.type === 'cabang',
+                                     'border-emerald-300 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-950/20': selectedPop?.type === 'mini_pop'
+                                 }">
+                                <div class="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer" @click="openPopPicker()" title="Klik untuk mengganti POP">
+                                    <span class="px-1.5 py-0.2 rounded text-[8px] font-bold uppercase font-mono tracking-wide shrink-0"
+                                          :class="{
+                                              'bg-purple-600 text-white': selectedPop?.type === 'pusat',
+                                              'bg-sky-600 text-white': selectedPop?.type === 'cabang',
+                                              'bg-emerald-600 text-white': selectedPop?.type === 'mini_pop'
+                                          }"
+                                          x-text="selectedPop?.type === 'pusat' ? 'PUSAT' : (selectedPop?.type === 'cabang' ? 'CABANG' : 'MINI POP')">
+                                    </span>
+                                    <span class="font-bold text-text-main truncate text-xs" x-text="selectedPop?.name"></span>
+                                    <span x-show="selectedPop?.code" class="text-[9px] font-mono text-text-muted shrink-0" x-text="'[' + selectedPop?.code + ']'"></span>
+                                </div>
+                                <div class="flex items-center gap-1 shrink-0">
+                                    <button type="button" @click="openPopPicker()" class="px-1.5 py-0.5 text-[10px] font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer">
+                                        Ganti
+                                    </button>
+                                    <button type="button" @click="clearPop()" class="p-1 rounded text-text-muted hover:text-rose-500 cursor-pointer" title="Hapus pilihan">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            
+                            <div x-show="popPickerOpen" x-cloak
+                                 @click.outside="closePopPicker()"
+                                 @keydown="onPopKeydown($event)"
+                                 x-transition:enter="transition ease-out duration-150"
+                                 x-transition:enter-start="opacity-0 translate-y-1 scale-98"
+                                 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                                 class="absolute z-40 top-full left-0 right-0 mt-1 rounded-xl border border-border bg-surface p-2 space-y-1.5 shadow-2xl ring-1 ring-black/5 dark:ring-white/10">
+                                
+                                <div class="space-y-1.5">
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-text-muted">
+                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                            </svg>
+                                        </div>
+                                        <input type="text" x-ref="popSearchInput" x-model="popSearchQuery"
+                                               @input="popHighlightedIndex = 0"
+                                               placeholder="Ketik nama POP, kode, cabang, atau mini pop..."
+                                               class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-border bg-background text-text-main placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-sky-500 font-medium">
+                                        <button type="button" x-show="popSearchQuery" @click="popSearchQuery = ''; popHighlightedIndex = 0"
+                                                class="absolute inset-y-0 right-0 pr-2 flex items-center text-text-muted hover:text-text-main cursor-pointer">
+                                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    <div class="flex items-center gap-1 bg-surface-muted/60 dark:bg-slate-900/60 p-0.5 rounded-lg text-[10px] font-bold">
+                                        <button type="button" @click="popTypeFilter = 'all'; popHighlightedIndex = 0"
+                                                :class="popTypeFilter === 'all' ? 'bg-surface text-text-main shadow-2xs' : 'text-text-muted hover:text-text-main'"
+                                                class="flex-1 py-0.5 px-1 rounded text-center transition-all cursor-pointer">
+                                            Semua
+                                        </button>
+                                        <button type="button" @click="popTypeFilter = 'cabang'; popHighlightedIndex = 0"
+                                                :class="popTypeFilter === 'cabang' ? 'bg-surface text-sky-600 dark:text-sky-400 shadow-2xs' : 'text-text-muted hover:text-text-main'"
+                                                class="flex-1 py-0.5 px-1 rounded text-center transition-all cursor-pointer">
+                                            Cabang
+                                        </button>
+                                        <button type="button" @click="popTypeFilter = 'mini_pop'; popHighlightedIndex = 0"
+                                                :class="popTypeFilter === 'mini_pop' ? 'bg-surface text-emerald-600 dark:text-emerald-400 shadow-2xs' : 'text-text-muted hover:text-text-main'"
+                                                class="flex-1 py-0.5 px-1 rounded text-center transition-all cursor-pointer">
+                                            Mini POP
+                                        </button>
+                                        <button type="button" @click="popTypeFilter = 'pusat'; popHighlightedIndex = 0"
+                                                :class="popTypeFilter === 'pusat' ? 'bg-surface text-purple-600 dark:text-purple-400 shadow-2xs' : 'text-text-muted hover:text-text-main'"
+                                                class="flex-1 py-0.5 px-1 rounded text-center transition-all cursor-pointer">
+                                            Pusat
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="max-h-52 overflow-y-auto custom-scrollbar divide-y divide-border/20 pr-0.5">
+                                    <template x-for="(item, idx) in displayPopList" :key="item.id">
+                                        <div>
+                                            <template x-if="item.is_header">
+                                                <div class="text-[9px] font-extrabold uppercase tracking-wider text-text-muted px-2 pt-2 pb-1 bg-surface-muted/30 flex items-center gap-1.5 select-none"
+                                                     x-text="item.header_title"></div>
+                                            </template>
+
+                                            <template x-if="!item.is_header">
+                                                <button type="button"
+                                                        :id="'pop-opt-' + selectablePops.findIndex(p => p.id === item.id)"
+                                                        @click="selectPop(item)"
+                                                        @mouseenter="popHighlightedIndex = selectablePops.findIndex(p => p.id === item.id)"
+                                                        class="w-full text-left px-2 py-1.5 rounded-md transition-all flex items-center justify-between gap-2 cursor-pointer group"
+                                                        :class="{
+                                                            'pl-5': item.indent,
+                                                            'bg-sky-50 dark:bg-sky-950/60 ring-1 ring-sky-400/50 dark:ring-sky-600/50': selectablePops[popHighlightedIndex]?.id === item.id,
+                                                            'hover:bg-surface-muted dark:hover:bg-slate-800/60': selectablePops[popHighlightedIndex]?.id !== item.id,
+                                                            'border-l-2 border-purple-500': item.type === 'pusat' && !item.indent,
+                                                            'border-l-2 border-sky-500': item.type === 'cabang' && !item.indent,
+                                                            'border-l-2 border-emerald-500': item.type === 'mini_pop' && !item.indent
+                                                        }">
+                                                    <div class="flex items-center gap-1.5 min-w-0">
+                                                        <span x-show="item.indent" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono select-none">↳</span>
+                                                        <span class="px-1.5 py-0.2 rounded text-[8px] font-bold uppercase font-mono tracking-wider shrink-0"
+                                                              :class="{
+                                                                  'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300': item.type === 'pusat',
+                                                                  'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300': item.type === 'cabang',
+                                                                  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300': item.type === 'mini_pop'
+                                                              }"
+                                                              x-text="item.type_label || (item.type === 'pusat' ? 'PUSAT' : (item.type === 'cabang' ? 'CABANG' : 'MINI POP'))">
+                                                        </span>
+                                                        <span class="text-xs font-semibold text-text-main group-hover:text-sky-600 dark:group-hover:text-sky-400 truncate"
+                                                              :class="{'font-bold': item.type === 'pusat' || item.type === 'cabang'}"
+                                                              x-text="item.name"></span>
+                                                        <span x-show="item.code" class="text-[9px] font-mono text-text-muted shrink-0" x-text="'[' + item.code + ']'"></span>
+                                                    </div>
+
+                                                    <div class="flex items-center gap-1 shrink-0">
+                                                        <span x-show="String(item.id) === String(popId)" class="text-emerald-600 text-[10px] font-bold">✓ Aktif</span>
+                                                        <span x-show="String(item.id) !== String(popId)" class="text-[10px] text-sky-600 dark:text-sky-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Pilih ❯</span>
+                                                    </div>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <div class="pt-1 border-t border-border/40 flex items-center justify-between text-[9px] text-text-muted px-1">
+                                    <span>Gunakan <kbd class="px-1 py-0.2 bg-surface-muted rounded border border-border font-mono">↑</kbd><kbd class="px-1 py-0.2 bg-surface-muted rounded border border-border font-mono">↓</kbd> &amp; <kbd class="px-1 py-0.2 bg-surface-muted rounded border border-border font-mono">Enter</kbd></span>
+                                    <span class="font-mono" x-text="selectablePops.length + ' pilihan'"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p x-show="errors.pop_id" x-text="errors.pop_id" class="text-[10px] text-rose-500 font-medium"></p>
+                    </div>
+
+                    
+                    <div class="space-y-1 pt-0.5">
+                        <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                            No. HP Pelapor <span class="normal-case font-normal text-text-muted">(opsional jika beda kontak)</span>
+                        </label>
+                        <input type="text" x-model="reporterPhone"
+                               placeholder="Kosongkan = pakai No. HP pelanggan"
+                               class="w-full text-xs rounded-lg border border-border bg-surface px-2.5 py-1.5 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-medium">
                     </div>
 
                     
                     <div x-show="selected && duplicateTickets.length > 0" x-cloak
-                         x-transition:enter="transition ease-out duration-200"
-                         x-transition:enter-start="opacity-0 -translate-y-1"
-                         x-transition:enter-end="opacity-100 translate-y-0"
-                         class="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                         class="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                         <svg class="h-4 w-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
-                        <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                            Pelanggan ini masih punya <span x-text="duplicateTickets.length"></span> tiket open:
+                        <p class="text-[11px] font-semibold text-amber-700 dark:text-amber-300 leading-tight">
+                            Pelanggan punya <span x-text="duplicateTickets.length"></span> tiket aktif:
                             <template x-for="d in duplicateTickets" :key="d.id">
-                                <span class="font-mono" x-text="d.code + ' (' + bucketLabel(d.bucket) + ')  '"></span>
+                                <span class="font-mono font-bold" x-text="d.code + ' '"></span>
                             </template>
                         </p>
                     </div>
-
-                    
-                    <div class="border border-border rounded-lg bg-surface p-3 space-y-2.5 shadow-xs">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="min-w-0">
-                                <div class="text-sm font-bold text-text-main truncate" x-text="selected?.nama || '—'"></div>
-                                <div class="flex items-center gap-2 text-[11px] font-mono text-text-muted mt-0.5 truncate">
-                                    <span class="px-1 rounded bg-surface-muted dark:bg-slate-800 font-bold text-sky-600 dark:text-sky-400" x-text="selected?.cid || '—'"></span>
-                                    <span>•</span>
-                                    <span x-text="selected?.no_hp || '—'"></span>
-                                </div>
-                            </div>
-                            <span x-show="selected" x-cloak class="shrink-0 px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded bg-emerald-500 text-white">Active</span>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-border">
-                            <div class="min-w-0">
-                                <span class="block text-[9px] font-bold text-text-muted uppercase tracking-wider">Paket Aktif</span>
-                                <div class="text-xs font-semibold text-text-main truncate" x-text="selected?.paket || '—'"></div>
-                            </div>
-                            <div class="min-w-0">
-                                <span class="block text-[9px] font-bold text-text-muted uppercase tracking-wider">POP / ODP</span>
-                                <div class="text-xs font-semibold text-text-main truncate" x-text="(selected?.pop || '—') + ' / ' + (selected?.odp || '—')"></div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-start gap-1.5 text-[11px] text-text-muted">
-                            <svg class="h-3.5 w-3.5 text-rose-500 shrink-0 mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span class="truncate" x-text="selected?.alamat || '—'"></span>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-1.5 pt-2 border-t border-border">
-                            <div class="min-w-0">
-                                <span class="block text-[9px] font-bold text-text-muted uppercase tracking-wider">Perangkat (ONT/Router)</span>
-                                <div class="text-[11px] font-mono text-text-main truncate" x-text="selected?.perangkat || '—'"></div>
-                            </div>
-                            <div class="min-w-0">
-                                <span class="block text-[9px] font-bold text-text-muted uppercase tracking-wider">GPS Coordinates</span>
-                                <div class="text-[11px] font-mono text-sky-600 dark:text-sky-400 truncate">
-                                    <template x-if="selected?.maps_url">
-                                        <a :href="selected.maps_url" target="_blank" rel="noopener" class="hover:underline font-bold" x-text="selected.koordinat"></a>
-                                    </template>
-                                    <template x-if="!selected?.maps_url">
-                                        <span class="text-text-muted">—</span>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                </div>
 
                 
-                <section class="border border-border bg-surface-muted/40 dark:bg-slate-900/30 p-4 space-y-3.5 transition-colors">
-                    <h2 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">SECTION 03: COMPLAINT &amp; NOTES</h2>
-
-                    
-                    <div class="space-y-1.5">
-                        <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                            Kategori Issue <span class="text-rose-500">*</span>
-                        </label>
+                <div class="space-y-3 pt-1 border-t border-border/60">
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                                Kategori Issue <span class="text-rose-500">*</span>
+                            </label>
+                            <span x-show="selectedCategorySlaSource" x-cloak class="text-[9px] font-semibold text-sky-600 dark:text-sky-400">
+                                SLA: <span x-text="selectedCategorySlaSource === 'paket' ? 'Paket Internet' : 'Prioritas'"></span>
+                            </span>
+                        </div>
                         <div class="relative">
-                            <select x-model="issueCategoryId" @change="onIssueCategoryChange()" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
-                                <option value="" disabled>-- PILIH KATEGORI ISSUE --</option>
+                            <select x-model="issueCategoryId" @change="onIssueCategoryChange()" required class="w-full text-xs font-medium rounded-lg border border-border bg-surface px-2.5 py-2 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                                <option value="" disabled>-- Pilih Kategori Issue --</option>
                                 <template x-for="c in issueCategories" :key="c.id">
                                     <option :value="c.id" x-text="c.name"></option>
                                 </template>
                                 <option value="lainnya">Lainnya (isi manual)</option>
                             </select>
-                            <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg class="h-3.5 w-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                             </svg>
                         </div>
-                        <p class="text-[10px] text-text-muted">Pilih kategori otomatis isi Prioritas. Pilih "Lainnya" kalau issue belum ada di master.</p>
-                        <p x-show="selectedCategorySlaSource" x-cloak class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-600 dark:text-sky-400">
-                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 16v-4m0-4h.01"></path></svg>
-                            SLA kategori ini: <span x-text="selectedCategorySlaSource === 'paket' ? 'sesuai Paket Internet pelanggan' : 'sesuai Prioritas di atas'"></span>
-                        </p>
                     </div>
 
-                    <div class="space-y-1.5">
-                        <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                            Detail Keluhan (Customer Complaint) <span class="text-rose-500">*</span>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                            Detail Keluhan <span class="text-rose-500">*</span>
                         </label>
-                        <textarea x-model="detailKeluhan" @input="delete errors.detail_keluhan" rows="4" required maxlength="2000"
-                                  placeholder="Describe the issue reported by the customer (misal: Koneksi LOS merah, internet lambat jam tertentu, dsb)..."
-                                  :class="errors.detail_keluhan ? 'border-rose-400 focus:ring-rose-500/30 focus:border-rose-500' : 'border-border focus:ring-sky-500/30 focus:border-sky-500'"
-                                  class="w-full text-sm rounded-lg border bg-background p-3 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 transition-all resize-none"></textarea>
-                        <p x-show="errors.detail_keluhan" x-cloak class="text-[11px] font-semibold text-rose-600 dark:text-rose-400" x-text="errors.detail_keluhan"></p>
+                        <textarea x-model="detailKeluhan" @input="delete errors.detail_keluhan" rows="3" required maxlength="2000"
+                                  placeholder="Jelaskan kendala yang dilaporkan (mis. LOS merah, internet lambat, dsb)..."
+                                  :class="errors.detail_keluhan ? 'border-rose-400 bg-rose-50/20' : 'border-border'"
+                                  class="w-full text-xs rounded-lg border bg-surface p-2.5 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all resize-none"></textarea>
+                        <p x-show="errors.detail_keluhan" x-cloak class="text-[10px] font-semibold text-rose-500" x-text="errors.detail_keluhan"></p>
                     </div>
 
-                    <button type="button" @click="showExtra = !showExtra" class="flex items-center gap-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer">
-                        <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="showExtra ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
-                        </svg>
-                        <span x-text="showExtra ? 'Sembunyikan Detail Tambahan' : 'Tampilkan Detail Tambahan (Catatan Teknis & Lampiran, Opsional)'"></span>
-                    </button>
+                    
+                    <div class="pt-0.5">
+                        <button type="button" @click="showExtra = !showExtra" class="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer">
+                            <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="showExtra ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
+                            </svg>
+                            <span x-text="showExtra ? 'Sembunyikan Detail Tambahan' : '+ Catatan Teknis & Lampiran (Opsional)'"></span>
+                        </button>
 
-                    <div x-show="showExtra" x-cloak
-                         x-transition:enter="transition ease-out duration-200"
-                         x-transition:enter-start="opacity-0 -translate-y-2"
-                         x-transition:enter-end="opacity-100 translate-y-0"
-                         x-transition:leave="transition ease-in duration-150"
-                         x-transition:leave-start="opacity-100 translate-y-0"
-                         x-transition:leave-end="opacity-0 -translate-y-2"
-                         class="space-y-4">
-                        <div class="space-y-1.5">
-                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                Catatan Teknis
-                            </label>
-                            <textarea x-model="catatanTeknis" rows="3" maxlength="2000"
-                                      placeholder="NOC assessment, ping results, optical power checks (-dBm), redaman OPM, atau petunjuk awal untuk teknisi FOP..."
-                                      class="w-full font-mono text-xs rounded-lg border border-border bg-slate-900/5 dark:bg-slate-900/40 p-3 text-text-main italic placeholder:text-text-muted placeholder:not-italic focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all resize-none"></textarea>
-                        </div>
+                        <div x-show="showExtra" x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 -translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="space-y-3 pt-2">
+                            <div class="space-y-1">
+                                <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                                    Catatan Teknis (NOC / FOP)
+                                </label>
+                                <textarea x-model="catatanTeknis" rows="2" maxlength="2000"
+                                          placeholder="Hasil ping, redaman OPM (-dBm), atau catatan untuk teknisi..."
+                                          class="w-full font-mono text-xs rounded-lg border border-border bg-surface-muted/30 p-2 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all resize-none"></textarea>
+                            </div>
 
-                        <div class="space-y-1.5">
-                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                Lampiran (Evidence / OPM Screenshot)
-                            </label>
-                            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-border border-dashed rounded-lg cursor-pointer bg-surface-muted/50 dark:bg-slate-900/20 hover:bg-sky-50/60 dark:hover:bg-slate-800/50 hover:border-sky-400 transition-colors">
-                                <div class="flex flex-col items-center justify-center pt-3 pb-3">
-                                    <svg class="w-6 h-6 mb-1 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                    </svg>
-                                    <p class="text-xs text-text-secondary font-medium"><span class="font-bold text-sky-600">Klik untuk upload file</span> atau drag &amp; drop</p>
-                                    <p class="text-[10px] text-text-muted mt-0.5">Maks. 5 file, tiap file maks. 5 MB (JPG, PNG, WEBP, PDF)</p>
-                                </div>
-                                <input type="file" x-ref="fileInput" @change="attachments = Array.from($event.target.files)" multiple accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden">
-                            </label>
-                            <p x-show="attachments.length > 0" x-cloak class="text-[10px] text-text-muted" x-text="attachments.length + ' file dipilih'"></p>
+                            <div class="space-y-1">
+                                <label class="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                                    Lampiran Foto / File
+                                </label>
+                                <label class="flex flex-col items-center justify-center w-full h-16 border-2 border-border border-dashed rounded-lg cursor-pointer bg-surface hover:bg-sky-50/50 dark:hover:bg-slate-800/40 hover:border-sky-400 transition-colors">
+                                    <div class="flex items-center gap-2 text-text-muted">
+                                        <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        </svg>
+                                        <span class="text-[11px] font-medium text-text-secondary"><span class="font-bold text-sky-600">Pilih file</span> (Maks. 5 file, @5MB)</span>
+                                    </div>
+                                    <input type="file" x-ref="fileInput" @change="attachments = Array.from($event.target.files)" multiple accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden">
+                                </label>
+                                <p x-show="attachments.length > 0" x-cloak class="text-[10px] text-text-muted font-mono" x-text="attachments.length + ' file dipilih'"></p>
+                            </div>
                         </div>
                     </div>
-                </section>
+                </div>
             </div>
 
             
-            <div class="shrink-0 px-3 sm:px-4 py-3 border-t border-border bg-surface-muted/60 dark:bg-slate-900/40 flex items-center justify-between gap-2">
-                <button type="button" @click="resetForm()" class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-bold text-text-muted hover:text-text-main hover:bg-surface border border-transparent hover:border-border active:scale-95 transition-all duration-200 cursor-pointer">
-                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <div class="shrink-0 px-4 py-2.5 border-t border-border bg-surface flex items-center justify-between gap-2">
+                <button type="button" @click="resetForm()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-text-muted hover:text-text-main hover:bg-surface-muted active:scale-95 transition-all cursor-pointer">
+                    <svg class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    <span>DISCARD</span> <span class="hidden sm:inline opacity-60 normal-case font-normal">(Esc)</span>
+                    <span>Batal</span> <span class="hidden sm:inline opacity-60 font-normal font-mono text-[10px]">(Esc)</span>
                 </button>
 
-                <button type="submit" :disabled="!selected || submitting" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-lg shadow-sky-600/25 hover:shadow-sky-600/40 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100">
-                    <span x-show="!submitting">CREATE TICKET <span class="hidden sm:inline opacity-70 normal-case font-normal">(Ctrl+Enter)</span></span>
-                    <span x-show="submitting" x-cloak>MENYIMPAN...</span>
-                    <svg x-show="!submitting" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <button type="submit" :disabled="submitting" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 text-white text-xs font-bold hover:bg-sky-700 shadow-sm hover:shadow active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span x-show="!submitting">Buat Tiket <span class="hidden sm:inline opacity-80 font-normal font-mono text-[10px]">(Ctrl+Enter)</span></span>
+                    <span x-show="submitting" x-cloak>Menyimpan...</span>
+                    <svg x-show="!submitting" class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
-                    <svg x-show="submitting" x-cloak class="h-4 w-4 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg x-show="submitting" x-cloak class="h-3.5 w-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
@@ -455,16 +687,30 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
+                <button type="button" onclick="openHelp('keys')" title="Pintasan Keyboard & Bantuan (?)"
+                        class="p-1.5 rounded-lg text-text-muted hover:text-sky-600 dark:hover:text-sky-400 hover:bg-surface-muted dark:hover:bg-slate-900 transition-colors cursor-pointer">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
         <div class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-3">
             <template x-if="filteredTasks.length === 0">
-                <p class="text-xs text-text-muted text-center py-10">Belum ada tiket di tab ini.</p>
+                <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+                    <div class="w-14 h-14 rounded-2xl bg-surface-muted dark:bg-slate-800/80 border border-border flex items-center justify-center text-text-muted mb-3 shadow-2xs">
+                        <svg class="h-7 w-7 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-sm font-bold text-text-main">Belum ada tiket di tab ini.</h3>
+                    <p class="text-xs text-text-muted mt-1 max-w-sm" x-text="searchQuery || filterPriority !== 'ALL' ? 'Tidak ada tiket yang cocok dengan kata kunci pencarian atau filter yang dipilih.' : 'Antrean tiket pada tab ini sedang kosong atau semua tiket sudah diproses.'"></p>
+                </div>
             </template>
 
             
-            <div x-show="activeViewMode === 'table'" class="border border-border bg-surface overflow-hidden shadow-xs">
+            <div x-show="activeViewMode === 'table' && filteredTasks.length > 0" class="border border-border bg-surface overflow-hidden shadow-xs">
                 
                 
                 <div class="overflow-x-auto 2xl:overflow-x-hidden custom-scrollbar">
@@ -501,11 +747,12 @@
                                 <th class="py-2.5 px-3 text-right w-[26%] 2xl:w-[19%] whitespace-nowrap">Quick Dispatch Actions</th>
                             </tr>
                         </thead>
+                        
+                        <template x-for="task in sortedTasks" :key="task.id">
                         <tbody class="divide-y divide-border">
-                            <template x-for="task in sortedTasks" :key="task.id">
-                                <tr class="hover:bg-surface-muted/60 dark:hover:bg-slate-800/40 transition-colors align-top group"
-                                    :data-ticket-row="task.id"
-                                    :class="task.id === focusedTicketId ? 'bg-sky-50/60 dark:bg-sky-950/30 ring-1 ring-inset ring-sky-400/60' : ''">
+                            <tr class="hover:bg-surface-muted/60 dark:hover:bg-slate-800/40 transition-colors align-top group"
+                                :data-ticket-row="task.id"
+                                :class="task.id === focusedTicketId ? 'bg-sky-50/60 dark:bg-sky-950/30 ring-1 ring-inset ring-sky-400/60' : ''">
 
                                     
                                     <td class="py-2.5 px-3">
@@ -540,12 +787,22 @@
                                     
                                     <td class="py-2.5 px-3">
                                         <div class="font-bold text-text-main truncate" :title="task.customer_name" x-text="task.customer_name"></div>
-                                        <div class="mt-0.5 flex items-center gap-1.5 text-[11px] font-mono text-text-muted min-w-0">
-                                            <span class="font-bold text-text-secondary truncate" x-text="task.cid"></span>
-                                            <span class="shrink-0">•</span>
-                                            <a :href="'https://wa.me/' + task.customer_phone" target="_blank" rel="noopener"
-                                               class="text-emerald-600 dark:text-emerald-400 hover:underline truncate" x-text="task.customer_phone"></a>
-                                        </div>
+                                        <template x-if="!task.is_batch">
+                                            <div class="mt-0.5 flex items-center gap-1.5 text-[11px] font-mono text-text-muted min-w-0">
+                                                <span class="font-bold text-text-secondary truncate" x-text="task.cid"></span>
+                                                <span class="shrink-0">•</span>
+                                                <a :href="'https://wa.me/' + task.customer_phone" target="_blank" rel="noopener"
+                                                   class="text-emerald-600 dark:text-emerald-400 hover:underline truncate" x-text="task.customer_phone"></a>
+                                            </div>
+                                        </template>
+                                        <template x-if="task.is_batch">
+                                            <div class="mt-0.5 flex items-center gap-1.5 text-[10px] min-w-0">
+                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-bold font-mono bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800">
+                                                    ⚡ BATCH
+                                                </span>
+                                                <span class="text-violet-600 dark:text-violet-400 font-bold font-mono" x-text="(task.batch_members ? task.batch_members.length : 0) + ' Pelanggan'"></span>
+                                            </div>
+                                        </template>
                                         
                                         <div class="2xl:hidden mt-0.5 text-[10px] text-text-muted truncate" :title="task.pop + ' / ' + task.odp + ' — ' + task.address"
                                              x-text="task.pop + ' / ' + task.odp"></div>
@@ -594,17 +851,93 @@
                                                     class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-slate-600 text-white hover:bg-slate-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer shrink-0 shadow-2xs">
                                                 Kembalikan
                                             </button>
+                                            
+                                            <button type="button" x-show="task.is_batch"
+                                                    @click="toggleBatchExpand(task)"
+                                                    class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-violet-600 text-white hover:bg-violet-700 active:scale-95 transition-all duration-200 cursor-pointer shrink-0 shadow-2xs inline-flex items-center gap-1">
+                                                <svg class="h-3 w-3 shrink-0 transition-transform" :class="expandedBatchTicketId === task.id ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
+                                                </svg>
+                                                Tambah
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
-                            </template>
+
+                                
+                                <template x-if="task.is_batch && expandedBatchTicketId === task.id">
+                                    <tr class="bg-violet-50/50 dark:bg-violet-950/20 border-b border-violet-200/60 dark:border-violet-900/40">
+                                        <td colspan="6" class="px-4 py-3">
+                                            <div class="pl-3 border-l-2 border-violet-500 dark:border-violet-400 space-y-2.5">
+                                                <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-[11px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
+                                                            <span class="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"></span>
+                                                            Pelanggan Terdampak
+                                                        </span>
+                                                        <span class="px-2 py-0.2 rounded-full text-[10px] font-bold font-mono bg-violet-100 dark:bg-violet-900/70 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700"
+                                                              x-text="(task.batch_members ? task.batch_members.length : 0) + ' Pelanggan'"></span>
+                                                    </div>
+                                                    <button type="button" @click="openBatchModal(task)"
+                                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-violet-600 text-white hover:bg-violet-700 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                                        + Tambah Pelanggan
+                                                    </button>
+                                                </div>
+
+                                                
+                                                <div class="space-y-1.5 pt-0.5" x-show="task.batch_members && task.batch_members.length > 0">
+                                                    <template x-for="(m, idx) in task.batch_members" :key="m.id">
+                                                        <div class="p-2 px-3 rounded-xl border border-border bg-surface hover:bg-violet-50/40 dark:hover:bg-violet-950/30 transition-colors flex items-center justify-between gap-3 shadow-2xs">
+                                                            <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                                                <span class="text-[10px] font-mono font-bold text-text-muted w-4 text-center shrink-0" x-text="idx + 1"></span>
+                                                                
+                                                                
+                                                                <span class="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-900 shrink-0 select-all"
+                                                                      x-text="m.cid || '—'"></span>
+
+                                                                
+                                                                <span class="font-bold text-text-main text-xs truncate" :title="m.customer_name" x-text="m.customer_name"></span>
+
+                                                                
+                                                                <span x-show="m.package && m.package !== '—'" class="text-[10px] text-text-muted hidden md:inline truncate" x-text="'• ' + m.package"></span>
+                                                                <span x-show="m.address && m.address !== '—'" class="text-[10px] text-text-muted hidden lg:inline truncate max-w-xs" :title="m.address" x-text="'• ' + m.address"></span>
+                                                            </div>
+
+                                                            
+                                                            <div class="shrink-0 flex items-center gap-2">
+                                                                <template x-if="m.phone && m.phone !== '—'">
+                                                                    <a :href="'https://wa.me/' + m.phone" target="_blank" rel="noopener"
+                                                                       class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 transition-all text-xs font-mono font-bold shadow-2xs"
+                                                                       :title="'WhatsApp ' + m.phone">
+                                                                        <svg class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                                                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+                                                                        </svg>
+                                                                        <span x-text="m.phone"></span>
+                                                                    </a>
+                                                                </template>
+                                                                <template x-if="!m.phone || m.phone === '—'">
+                                                                    <span class="text-text-muted italic text-[11px]">—</span>
+                                                                </template>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                                <p x-show="!task.batch_members || task.batch_members.length === 0" class="text-[11px] text-text-muted italic py-1">
+                                                    Belum ada pelanggan terdampak yang dicatat untuk tiket batch ini.
+                                                </p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
                         </tbody>
+                        </template>
                     </table>
                 </div>
             </div>
 
             
-            <div x-show="activeViewMode === 'cards'" class="space-y-2">
+            <div x-show="activeViewMode === 'cards' && filteredTasks.length > 0" class="space-y-2">
                 <template x-for="(task, index) in sortedTasks" :key="task.id">
                     
                     <div class="ticket-card flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5 p-3 2xl:py-2.5 rounded-xl border border-l-2 border-border bg-surface hover:border-sky-500/60 hover:shadow-md transition-[transform,box-shadow,border-color,background-color] duration-200 group"
@@ -671,16 +1004,23 @@
                             
                             <div class="min-w-0 2xl:w-auto 2xl:min-w-[190px] 2xl:max-w-[240px] 2xl:shrink-0">
                                 <div class="text-xs font-bold text-text-main group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate" x-text="task.customer_name"></div>
-                                <div class="flex items-center gap-2 text-[11px] text-text-muted mt-0.5 flex-wrap">
-                                    <span class="font-mono text-sky-600 dark:text-sky-400 font-semibold" x-text="'CID: ' + task.cid"></span>
-                                    <span class="text-text-muted">•</span>
-                                    <span class="flex items-center gap-1 font-mono text-[10px]">
-                                        <svg class="h-3 w-3 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                        </svg>
-                                        <span x-text="task.customer_phone"></span>
-                                    </span>
-                                </div>
+                                <template x-if="!task.is_batch">
+                                    <div class="flex items-center gap-2 text-[11px] text-text-muted mt-0.5 flex-wrap">
+                                        <span class="font-mono text-sky-600 dark:text-sky-400 font-semibold" x-text="'CID: ' + task.cid"></span>
+                                        <span class="text-text-muted">•</span>
+                                        <span class="flex items-center gap-1 font-mono text-[10px]">
+                                            <svg class="h-3 w-3 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                            </svg>
+                                            <span x-text="task.customer_phone"></span>
+                                        </span>
+                                    </div>
+                                </template>
+                                <template x-if="task.is_batch">
+                                    <div class="flex items-center gap-1.5 text-[10px] text-violet-600 dark:text-violet-400 font-bold font-mono mt-0.5">
+                                        <span x-text="(task.batch_members ? task.batch_members.length : 0) + ' Pelanggan Terdampak'"></span>
+                                    </div>
+                                </template>
                                 
                                 <div class="2xl:hidden mt-0.5 flex items-center gap-1 text-[10px] text-text-muted min-w-0">
                                     <svg class="h-3 w-3 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -698,6 +1038,12 @@
                                 <div class="flex items-center gap-2 min-w-0">
                                     <template x-if="task.issue_category">
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-muted dark:bg-slate-800 text-text-secondary border border-border shrink-0 truncate max-w-[60%]" x-text="task.issue_category"></span>
+                                    </template>
+                                    <template x-if="task.is_batch">
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800 shrink-0 inline-flex items-center gap-1">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"></span>
+                                            <span x-text="'BATCH (' + (task.batch_members ? task.batch_members.length : 0) + ')'"></span>
+                                        </span>
                                     </template>
                                     <h4 x-show="task.title && task.title !== task.issue_category"
                                         class="text-xs font-bold text-text-main truncate" x-text="task.title"></h4>
@@ -726,32 +1072,96 @@
                         </div>
 
                         
-                        <div x-show="task.actions && (task.actions.can_close || task.actions.can_escalate_noc || task.actions.can_escalate_fop || task.actions.can_return_to_helpdesk)"
+                        <div x-show="(task.actions && (task.actions.can_close || task.actions.can_escalate_noc || task.actions.can_escalate_fop || task.actions.can_return_to_helpdesk)) || task.is_batch"
                              class="pt-2 2xl:pt-0 border-t 2xl:border-t-0 border-border/60 flex items-center justify-end gap-2 w-full 2xl:w-auto">
                             
                             
-                            <div class="flex items-center gap-1.5 w-full sm:w-auto justify-stretch sm:justify-end">
-                                <button type="button" x-show="task.actions.can_close" :disabled="actionLoadingId === task.id"
+                            <div class="flex items-center gap-1.5 w-full sm:w-auto justify-stretch sm:justify-end flex-wrap">
+                                <button type="button" x-show="task.is_batch"
+                                        @click="toggleBatchExpand(task)"
+                                        class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-violet-600 text-white hover:bg-violet-700 active:scale-95 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
+                                    <svg class="h-3 w-3 shrink-0 transition-transform" :class="expandedBatchTicketId === task.id ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
+                                    </svg>
+                                    <span x-text="expandedBatchTicketId === task.id ? 'Tutup' : 'Pelanggan (' + (task.batch_members ? task.batch_members.length : 0) + ')'"></span>
+                                </button>
+                                <button type="button" x-show="task.actions?.can_close" :disabled="actionLoadingId === task.id"
                                         @click="closeTicket(task)"
                                         class="flex-1 sm:flex-initial text-center justify-center inline-flex items-center px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
                                     Selesai
                                 </button>
-                                <button type="button" x-show="task.actions.can_escalate_noc" :disabled="actionLoadingId === task.id"
+                                <button type="button" x-show="task.actions?.can_escalate_noc" :disabled="actionLoadingId === task.id"
                                         @click="escalateTicket(task, 'noc')"
                                         class="flex-1 sm:flex-initial text-center justify-center inline-flex items-center px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-600 text-white hover:bg-amber-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
                                     Ke NOC
                                 </button>
-                                <button type="button" x-show="task.actions.can_escalate_fop" :disabled="actionLoadingId === task.id"
+                                <button type="button" x-show="task.actions?.can_escalate_fop" :disabled="actionLoadingId === task.id"
                                         @click="escalateTicket(task, 'fop')"
                                         class="flex-1 sm:flex-initial text-center justify-center inline-flex items-center px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-sky-600 text-white hover:bg-sky-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
                                     Ke FOP
                                 </button>
-                                <button type="button" x-show="task.actions.can_return_to_helpdesk" :disabled="actionLoadingId === task.id"
+                                <button type="button" x-show="task.actions?.can_return_to_helpdesk" :disabled="actionLoadingId === task.id"
                                         @click="returnTicketToHelpdesk(task)"
                                         class="flex-1 sm:flex-initial text-center justify-center inline-flex items-center px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-slate-600 text-white hover:bg-slate-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
                                     Kembalikan
                                 </button>
                             </div>
+                        </div>
+
+                        
+                        <div x-show="task.is_batch && expandedBatchTicketId === task.id" x-cloak
+                             class="w-full pt-3 mt-2 border-t border-violet-200/80 dark:border-violet-900/50 bg-violet-50/40 dark:bg-violet-950/20 -mx-3 -mb-3 p-3 rounded-b-xl space-y-2.5">
+                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                <span class="text-[11px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"></span>
+                                    Daftar Pelanggan Terdampak (<span x-text="task.batch_members ? task.batch_members.length : 0"></span>)
+                                </span>
+                                <button type="button" @click="openBatchModal(task)"
+                                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-violet-600 text-white hover:bg-violet-700 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                    + Tambah Pelanggan
+                                </button>
+                            </div>
+                            <div class="space-y-1.5 pt-0.5" x-show="task.batch_members && task.batch_members.length > 0">
+                                <template x-for="(m, idx) in task.batch_members" :key="m.id">
+                                    <div class="p-2 px-3 rounded-xl border border-border bg-surface hover:bg-violet-50/40 dark:hover:bg-violet-950/30 transition-colors flex items-center justify-between gap-3 shadow-2xs">
+                                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                            <span class="text-[10px] font-mono font-bold text-text-muted w-4 text-center shrink-0" x-text="idx + 1"></span>
+                                            
+                                            
+                                            <span class="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-900 shrink-0 select-all"
+                                                  x-text="m.cid || '—'"></span>
+
+                                            
+                                            <span class="font-bold text-text-main text-xs truncate" :title="m.customer_name" x-text="m.customer_name"></span>
+
+                                            
+                                            <span x-show="m.package && m.package !== '—'" class="text-[10px] text-text-muted hidden md:inline truncate" x-text="'• ' + m.package"></span>
+                                            <span x-show="m.address && m.address !== '—'" class="text-[10px] text-text-muted hidden lg:inline truncate max-w-xs" :title="m.address" x-text="'• ' + m.address"></span>
+                                        </div>
+
+                                        
+                                        <div class="shrink-0 flex items-center gap-2">
+                                            <template x-if="m.phone && m.phone !== '—'">
+                                                <a :href="'https://wa.me/' + m.phone" target="_blank" rel="noopener"
+                                                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 transition-all text-xs font-mono font-bold shadow-2xs"
+                                                   :title="'WhatsApp ' + m.phone">
+                                                    <svg class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+                                                    </svg>
+                                                    <span x-text="m.phone"></span>
+                                                </a>
+                                            </template>
+                                            <template x-if="!m.phone || m.phone === '—'">
+                                                <span class="text-text-muted italic text-[11px]">—</span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                            <p x-show="!task.batch_members || task.batch_members.length === 0" class="text-[11px] text-text-muted italic py-1">
+                                Belum ada pelanggan terdampak yang dicatat untuk tiket batch ini.
+                            </p>
                         </div>
                     </div>
                 </template>
@@ -788,11 +1198,26 @@
             selected: null,
             searching: false,
             searched: false,
-            ticketType: '',
+            ticketType: 'MTN',
             priority: 'Medium',
             issueCategoryId: '',
             detailKeluhan: '',
             catatanTeknis: '',
+            // Revisi Worksheet Helpdesk poin 1-3: kategori ber-checklist Batch
+            // (mis. "ODP LOS") bikin Search Customer Data jadi label bebas
+            // (bukan wajib match CID) + POP dipilih manual + No. HP Pelapor
+            // opsional. `popId`/`reporterPhone` cuma dipakai dua mode itu
+            // kalau relevan — lihat selectedCategoryIsBatch & submitForm().
+            popId: '',
+            popPickerOpen: false,
+            popSearchQuery: '',
+            popTypeFilter: 'all',
+            popHighlightedIndex: 0,
+            reporterPhone: '',
+            // Daftar POP buat dropdown manual — {id, name}, disuplai server
+            // (Pop::forUser()), beda dari allowedPopIds yang cuma ID buat
+            // subscribe channel realtime.
+            allowedPops: <?php echo json_encode($allowedPops, 15, 512) ?>,
             attachments: [],
             showExtra: false,
             toast: { show: false, type: 'success', message: '' },
@@ -819,6 +1244,28 @@
             // (lihat komentar di listener open-ticket-drawer/close-ticket-drawer
             // di root elemen) — di-toggle lewat event, bukan baca DOM drawer.
             drawerOpen: false,
+
+            // Batch (revisi Worksheet Helpdesk poin 4) — id tiket yang lagi
+            // expand baris child-nya di List Task (null = semua collapsed).
+            expandedBatchTicketId: null,
+
+            // Modal "Tambah Pelanggan Terdampak" — SENGAJA modal + submit AJAX
+            // (bukan halaman create terpisah, pola default aksi mutasi data),
+            // override sadar: validasi gagal balik JSON langsung dibaca modal
+            // (TicketController::storeBatchMember()), gak numpang
+            // back()->withErrors() yang bisa nutup modal & nampilin List
+            // kosong tanpa pesan (ADHOC-20) — makanya aman dipakai di sini.
+            batchModal: {
+                open: false,
+                ticket: null,
+                cidQuery: '',
+                results: [],
+                selected: null,
+                customerName: '',
+                phone: '',
+                submitting: false,
+                error: null,
+            },
 
             // Panel kanan: tabel (default) atau kartu. Disimpan di localStorage
             // sama kayak formOpen — dibaca sebelum render pertama biar gak
@@ -958,6 +1405,143 @@
             get selectedCategorySlaSource() {
                 if (!this.issueCategoryId || this.issueCategoryId === 'lainnya') return null;
                 return this.issueCategories.find(c => c.id == this.issueCategoryId)?.sla_source || null;
+            },
+
+            // Kategori "Batch" (Master Issue, mis. "ODP LOS") — Search Customer
+            // Data boleh jadi label bebas + POP dipilih manual (revisi
+            // Worksheet Helpdesk poin 1-2). false selama belum pilih kategori
+            // atau pilih "Lainnya".
+            get selectedCategoryIsBatch() {
+                if (!this.issueCategoryId || this.issueCategoryId === 'lainnya') return false;
+                return !!this.issueCategories.find(c => c.id == this.issueCategoryId)?.is_batch;
+            },
+
+            // ── POP Hierarchical Picker Helpers & Getters ──
+            get selectedPop() {
+                if (!this.popId) return null;
+                return this.allowedPops.find(p => String(p.id) === String(this.popId)) || null;
+            },
+
+            // Single unified flat list with headers for high-density, space-efficient rendering
+            get displayPopList() {
+                const q = (this.popSearchQuery || '').toLowerCase().trim();
+                const type = this.popTypeFilter;
+                const pops = this.allowedPops || [];
+
+                // Filter / Search mode
+                if (q !== '' || type !== 'all') {
+                    const filtered = pops.filter(p => {
+                        if (type !== 'all' && p.type !== type) return false;
+                        if (!q) return true;
+                        const name = (p.name || '').toLowerCase();
+                        const code = (p.code || '').toLowerCase();
+                        const parent = (p.parent_name || '').toLowerCase();
+                        const typeLabel = (p.type_label || '').toLowerCase();
+                        return name.includes(q) || code.includes(q) || parent.includes(q) || typeLabel.includes(q);
+                    });
+                    return filtered.map(p => ({
+                        ...p,
+                        is_header: false,
+                        indent: false,
+                    }));
+                }
+
+                // Default natural hierarchy stream
+                const list = [];
+                const pusatList = pops.filter(p => p.type === 'pusat');
+                const cabangList = pops.filter(p => p.type === 'cabang');
+                const standaloneMiniList = pops.filter(p => p.type === 'mini_pop' && (!p.parent_id || !cabangList.some(c => c.id === p.parent_id)));
+
+                if (pusatList.length > 0) {
+                    list.push({ is_header: true, header_title: 'Kantor Pusat', id: 'hdr-pusat' });
+                    pusatList.forEach(p => list.push({ ...p, is_header: false, indent: false }));
+                }
+
+                if (cabangList.length > 0) {
+                    list.push({ is_header: true, header_title: 'Cabang & Mini POP', id: 'hdr-cabang' });
+                    cabangList.forEach(c => {
+                        list.push({ ...c, is_header: false, indent: false, is_cabang: true });
+                        const children = pops.filter(p => p.type === 'mini_pop' && p.parent_id === c.id);
+                        children.forEach(ch => {
+                            list.push({ ...ch, is_header: false, indent: true, is_mini: true });
+                        });
+                    });
+                }
+
+                if (standaloneMiniList.length > 0) {
+                    list.push({ is_header: true, header_title: 'Mini POP Mandiri', id: 'hdr-standalone' });
+                    standaloneMiniList.forEach(s => list.push({ ...s, is_header: false, indent: false, is_mini: true }));
+                }
+
+                return list;
+            },
+
+            get selectablePops() {
+                return this.displayPopList.filter(item => !item.is_header);
+            },
+
+            openPopPicker() {
+                this.popPickerOpen = true;
+                this.popSearchQuery = '';
+                this.popTypeFilter = 'all';
+                this.popHighlightedIndex = 0;
+                this.$nextTick(() => {
+                    this.$refs.popSearchInput?.focus();
+                });
+            },
+
+            closePopPicker() {
+                this.popPickerOpen = false;
+            },
+
+            onPopKeydown(e) {
+                const items = this.selectablePops;
+                if (!items.length) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.popHighlightedIndex = (this.popHighlightedIndex + 1) % items.length;
+                    this.scrollToHighlightedPop();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.popHighlightedIndex = (this.popHighlightedIndex - 1 + items.length) % items.length;
+                    this.scrollToHighlightedPop();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (items[this.popHighlightedIndex]) {
+                        this.selectPop(items[this.popHighlightedIndex]);
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.closePopPicker();
+                }
+            },
+
+            scrollToHighlightedPop() {
+                this.$nextTick(() => {
+                    const el = document.getElementById('pop-opt-' + this.popHighlightedIndex);
+                    if (el) {
+                        el.scrollIntoView({ block: 'nearest' });
+                    }
+                });
+            },
+
+            selectPop(pop) {
+                this.popId = pop.id;
+                this.closePopPicker();
+                if (this.errors.pop_id) delete this.errors.pop_id;
+            },
+
+            clearPop() {
+                this.popId = '';
+                this.openPopPicker();
+            },
+
+            // Form boleh disubmit kalau: (a) pelanggan sungguhan terpilih
+            // atau (b) label tiket diisi + POP dipilih manual.
+            get canSubmit() {
+                if (this.selected) return true;
+                return this.cidQuery.trim() !== '' && this.popId !== '';
             },
 
             setViewMode(mode) {
@@ -1330,6 +1914,8 @@
                 this.selected = customer;
                 this.cidQuery = customer.label;
                 this.results = [];
+                this.popPickerOpen = false;
+                this.popId = '';
                 this.checkDuplicates(customer.id);
             },
 
@@ -1339,6 +1925,10 @@
                 this.results = [];
                 this.searched = false;
                 this.duplicateTickets = [];
+                this.popPickerOpen = false;
+                this.popSearchQuery = '';
+                this.popTypeFilter = 'all';
+                this.popId = '';
             },
 
             // Kategori issue auto-fill prioritas — user tetap bisa override manual.
@@ -1348,6 +1938,104 @@
                 if (cat) this.priority = cat.default_priority;
             },
 
+            // ── Batch: expand/collapse + modal Tambah Pelanggan Terdampak ──
+            // (revisi Worksheet Helpdesk poin 4)
+
+            toggleBatchExpand(task) {
+                this.expandedBatchTicketId = this.expandedBatchTicketId === task.id ? null : task.id;
+            },
+
+            openBatchModal(task) {
+                this.batchModal = {
+                    open: true,
+                    ticket: task,
+                    cidQuery: '',
+                    results: [],
+                    selected: null,
+                    customerName: '',
+                    phone: '',
+                    submitting: false,
+                    error: null,
+                };
+            },
+
+            closeBatchModal() {
+                this.batchModal.open = false;
+            },
+
+            async searchBatchCustomer() {
+                const q = this.batchModal.cidQuery.trim();
+                if (q.length < 2) {
+                    this.batchModal.results = [];
+                    return;
+                }
+                try {
+                    const res = await fetch(`<?php echo e(route('tickets.lookup-customer')); ?>?q=${encodeURIComponent(q)}`, {
+                        headers: { 'Accept': 'application/json' },
+                    });
+                    this.batchModal.results = res.ok ? await res.json() : [];
+                } catch (e) {
+                    this.batchModal.results = [];
+                }
+            },
+
+            pickBatchCustomer(customer) {
+                this.batchModal.selected = customer;
+                this.batchModal.cidQuery = customer.label;
+                this.batchModal.results = [];
+                // Auto-isi Nama/No. HP dari data master — TETAP bisa diedit
+                // manual sebelum submit (input gak di-disable), lihat
+                // TicketService::addBatchMember() (input yang diketik menang
+                // atas data master).
+                this.batchModal.customerName = customer.nama || '';
+                this.batchModal.phone = customer.no_hp || '';
+            },
+
+            async submitBatchMember() {
+                if (this.batchModal.submitting) return;
+                if (! this.batchModal.selected && ! this.batchModal.customerName.trim()) {
+                    this.batchModal.error = 'Pilih pelanggan dari pencarian, atau isi nama manual.';
+                    return;
+                }
+                this.batchModal.submitting = true;
+                this.batchModal.error = null;
+
+                try {
+                    // URL dirender server-side (batch_members_store_url dari
+                    // worksheetCardPayload), BUKAN dirakit di klien dari
+                    // ticket.id — lihat CLAUDE.md § Konvensi Kode (ADHOC-20).
+                    const res = await fetch(this.batchModal.ticket.batch_members_store_url, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        },
+                        body: JSON.stringify({
+                            customer_id: this.batchModal.selected?.id ?? null,
+                            customer_name: this.batchModal.customerName || null,
+                            phone: this.batchModal.phone || null,
+                        }),
+                    });
+
+                    const body = await res.json();
+
+                    if (!res.ok) {
+                        this.batchModal.error = body?.message || 'Gagal menambahkan pelanggan.';
+                        return;
+                    }
+
+                    const task = this.tasks.find(t => t.id === this.batchModal.ticket.id);
+                    if (task) task.batch_members.push(body.member);
+                    this.showToast('Pelanggan terdampak ditambahkan.');
+                    this.closeBatchModal();
+                } catch (e) {
+                    this.batchModal.error = 'Gagal menambahkan pelanggan — periksa koneksi internet.';
+                } finally {
+                    this.batchModal.submitting = false;
+                }
+            },
+
             showToast(message, type = 'success') {
                 this.toast = { show: true, type, message };
                 setTimeout(() => { this.toast.show = false; }, 3000);
@@ -1355,7 +2043,7 @@
 
             resetForm() {
                 this.clearSelection();
-                this.ticketType = '';
+                this.ticketType = 'MTN';
                 this.priority = 'Medium';
                 this.issueCategoryId = '';
                 this.detailKeluhan = '';
@@ -1363,32 +2051,76 @@
                 this.attachments = [];
                 this.showExtra = false;
                 this.errors = {};
+                this.popId = '';
+                this.reporterPhone = '';
+                this.popPickerOpen = false;
+                this.popSearchQuery = '';
+                this.popTypeFilter = 'all';
                 if (this.$refs.fileInput) this.$refs.fileInput.value = '';
                 this.$nextTick(() => this.$refs.searchInput?.focus());
             },
 
             handleShortcut(e) {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                    e.preventDefault();
-                    if (this.selected && !this.submitting) this.submitForm();
+                // Abaikan jika dialog konfirmasi aksi tiket sedang terbuka
+                if (window.Dialog && window.Dialog.isOpen) {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        window.Dialog.close();
+                    }
                     return;
                 }
+
+                // Abaikan jika modal batch sedang terbuka
+                if (this.batchModal && this.batchModal.open) {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.closeBatchModal();
+                    }
+                    return;
+                }
+
+                // Abaikan jika popup picker POP sedang terbuka
+                if (this.popPickerOpen) {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.closePopPicker();
+                    }
+                    return;
+                }
+
+                // Ctrl+Enter / Cmd+Enter: Submit form tiket baru dari mana saja
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    if (!this.submitting) this.submitForm();
+                    return;
+                }
+
+                // Alt+N / Option+N: Universal toggle buka/tutup form tiket baru dari mana saja
+                if ((e.key === 'n' || e.key === 'N') && (e.altKey || (e.ctrlKey && e.altKey))) {
+                    e.preventDefault();
+                    this.setFormOpen(!this.formOpen);
+                    return;
+                }
+
                 if (e.key === 'Escape') {
-                    // Drawer detail punya listener Escape SENDIRI (lihat
-                    // x-on:keydown.escape.window="close()" di
-                    // detail-drawer.blade.php) — kalau drawer lagi kebuka,
-                    // biarin drawer itu doang yang nanganin, JANGAN ikut
-                    // resetForm() di sini. Sebelumnya dua-duanya nembak
-                    // bareng: drawer ketutup TAPI form ikut kereset dan
-                    // fokus kepaksa pindah ke search box, jadi row-navigasi
-                    // (Arrow/C/V/B) kececer gak bisa dipake abis nutup
-                    // drawer pakai Escape.
+                    // Drawer detail punya listener Escape SENDIRI
                     if (this.drawerOpen) return;
+
+                    // Jika form sedang terbuka, Escape akan menutup form panel
+                    if (this.formOpen) {
+                        e.preventDefault();
+                        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                            document.activeElement.blur();
+                        }
+                        this.setFormOpen(false);
+                        return;
+                    }
+
                     this.resetForm();
                     return;
                 }
-                // "N" buka/lipat panel form — cuma waktu fokus TIDAK di field
-                // input, biar gak ketelan waktu user lagi ngetik keluhan.
+
+                // "N" tunggal buka/tutup panel form — cuma waktu fokus TIDAK di field input
                 if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !e.altKey) {
                     if (this.isTypingTarget(e)) return;
                     e.preventDefault();
@@ -1473,14 +2205,53 @@
             },
 
             async submitForm() {
-                if (!this.selected || this.submitting) return;
-                this.submitting = true;
+                if (this.submitting) return;
                 this.errors = {};
+
+                // Validasi Proaktif Sisi Klien
+                if (!this.ticketType) {
+                    this.errors.type = 'Pilih klasifikasi ticket (MTN / C-REQ).';
+                    this.showToast('Pilih Ticket Type terlebih dahulu.', 'error');
+                    return;
+                }
+
+                if (!this.selected && (!this.cidQuery.trim() || !this.popId)) {
+                    if (!this.cidQuery.trim()) {
+                        this.errors.cid_query = 'Cari data pelanggan atau masukkan label tiket.';
+                        this.showToast('Cari data pelanggan terlebih dahulu.', 'error');
+                        this.$refs.searchInput?.focus();
+                        return;
+                    }
+                    if (!this.popId) {
+                        this.errors.pop_id = 'Pilih Wilayah Jaringan / POP terlebih dahulu.';
+                        this.showToast('Tentukan Wilayah Jaringan / POP.', 'error');
+                        this.openPopPicker();
+                        return;
+                    }
+                }
+
+                if (!this.detailKeluhan.trim()) {
+                    this.errors.detail_keluhan = 'Detail keluhan wajib diisi.';
+                    this.showToast('Isi detail keluhan terlebih dahulu.', 'error');
+                    return;
+                }
+
+                this.submitting = true;
 
                 const formData = new FormData();
                 formData.append('type', this.ticketType);
                 formData.append('priority', this.priority);
-                formData.append('customer_id', this.selected.id);
+                // Mode batch (revisi poin 1-2/4): gak ada pelanggan tunggal —
+                // kirim label bebas + POP manual. Mode normal: customer_id
+                // dari hasil pick(). Dua mode ini saling eksklusif, lihat
+                // canSubmit getter & TicketService::create().
+                if (this.selected) {
+                    formData.append('customer_id', this.selected.id);
+                } else {
+                    formData.append('search_label', this.cidQuery);
+                    formData.append('pop_id', this.popId);
+                }
+                if (this.reporterPhone) formData.append('reporter_phone', this.reporterPhone);
                 if (this.issueCategoryId && this.issueCategoryId !== 'lainnya') {
                     formData.append('issue_category_id', this.issueCategoryId);
                 }

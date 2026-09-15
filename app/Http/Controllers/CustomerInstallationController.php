@@ -8,6 +8,7 @@ use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Enums\TrackingType;
 use App\Enums\WorkflowTransition;
 use App\Events\InstallationActivated;
 use App\Events\InstallationCompleted;
@@ -18,6 +19,7 @@ use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Task;
+use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\CustomerWorkflowService;
@@ -31,6 +33,7 @@ use App\Services\TelegramBotService;
 use App\Support\SafeUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -157,6 +160,80 @@ class CustomerInstallationController extends Controller
         return redirect()->back()->with('success', 'Pemasangan pelanggan berhasil dibatalkan: tidak layak lanjut.');
     }
 
+    /**
+     * SN Perangkat Aktif yang boleh dipasang ke pelanggan ini — custody
+     * anggota tim task yang sedang berjalan, status ISSUED, item-nya
+     * installable (bukan company_asset kayak OTDR). SATU-SATUNYA sumber SN
+     * yang boleh disimpan (koreksi lanjutan ADHOC-54, permintaan eksplisit
+     * user): teknisi TANPA SN di custody TIDAK BISA mengisi SN sama sekali
+     * lagi — fallback teks manual yang dulu ada buat device belum ke-track
+     * Inventory sengaja DICABUT, supaya SN yang tersimpan selalu bisa
+     * ditelusuri balik ke barang yang benar-benar diserahkan Gudang.
+     * Dipakai report() (render dropdown) & storePemasangan() (validasi
+     * keanggotaan) — satu query, dua pemakai, biar gak menyimpang.
+     */
+    private function eligibleSerialsForTeam(?Task $task)
+    {
+        $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
+
+        return $teamTechnicianIds === []
+            ? collect()
+            : InventorySerial::query()
+                ->whereIn('current_technician_id', $teamTechnicianIds)
+                ->where('status', SerialStatus::ISSUED->value)
+                ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
+                ->with('item')
+                ->get();
+    }
+
+    /**
+     * Padanan `eligibleSerialsForTeam()` buat barang PASIF (kabel, RJ45, dst)
+     * — versi QUANTITY/BATCH dari custody, bukan SN per-unit. Dikelompokkan
+     * per item, sisa custody digabung SELURUH anggota tim (sama prinsipnya
+     * dengan FIFO lintas anggota di `InventoryService::consumeFromCustody()`
+     * — siapa pun di tim boleh submit laporan, jadi sisa custody yang
+     * ditampilkan pun gabungan tim, bukan per-orang).
+     *
+     * Cuma pagar UI/UX (nunjuk barang mana yang ADA di custody + sisanya
+     * berapa, supaya ketauan dari awal kalau cabang belum nge-issue kabel/RJ
+     * ke teknisi) — penegakan SEBENARNYA tetap di
+     * `InventoryService::consumeFromCustody()` saat `storeSpeedtest()`
+     * (lihat komentar di sana kenapa potongnya di titik itu, bukan di sini).
+     *
+     * @return Collection<int, array{item_id:int, code:?string, name:string, unit:string, type:?string, available:float}>
+     */
+    private function eligiblePassiveCustodyForTeam(?Task $task)
+    {
+        $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
+
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        return TechnicianCustody::query()
+            ->whereIn('technician_id', $teamTechnicianIds)
+            ->active()
+            ->with('item.category')
+            ->get()
+            ->filter(fn (TechnicianCustody $custody) => $custody->item
+                && $custody->item->tracking_type !== TrackingType::SERIALIZED
+                && $custody->item->effective_equipment_class === EquipmentClass::PASIF)
+            ->groupBy('item_id')
+            ->map(function ($rows) {
+                $item = $rows->first()->item;
+
+                return [
+                    'item_id' => $item->id,
+                    'code' => $item->code,
+                    'name' => $item->name,
+                    'unit' => $item->unit,
+                    'type' => $item->category?->code,
+                    'available' => (float) $rows->sum('qty_remaining'),
+                ];
+            })
+            ->values();
+    }
+
     public function report(Customer $customer, Request $request)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
@@ -209,17 +286,19 @@ class CustomerInstallationController extends Controller
 
         // Dropdown "Perangkat Aktif" — SN yang lagi di custody anggota tim
         // task ini, item-nya boleh dipasang ke pelanggan (bukan company_asset
-        // kayak OTDR). Kosong = wajar buat instalasi yang device-nya belum
-        // ke-track Inventory (mayoritas data existing) — field tetap opsional.
-        $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
-        $eligibleSerials = $teamTechnicianIds === []
-            ? collect()
-            : InventorySerial::query()
-                ->whereIn('current_technician_id', $teamTechnicianIds)
-                ->where('status', SerialStatus::ISSUED->value)
-                ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
-                ->with('item')
-                ->get();
+        // kayak OTDR). Kosong = teknisi belum ambil barang dari Gudang —
+        // storePemasangan() menolak submit-nya, lihat eligibleSerialsForTeam().
+        $eligibleSerials = $this->eligibleSerialsForTeam($task);
+
+        // Material Terpakai (Perangkat Pasif) — SEKARANG dibatasi custody tim
+        // ini juga, sama prinsipnya dengan SN Perangkat Aktif di atas (ADHOC,
+        // 2026-09-12: sebelumnya dropdown ini nampilin SEMUA item master PASIF
+        // tanpa peduli teknisi beneran pegang barangnya atau tidak, jadi
+        // laporan bisa diklaim biarpun cabang belum nge-issue kabel/RJ ke
+        // teknisi — ketauannya baru di storeSpeedtest() lewat
+        // InsufficientCustodyException, telat & bikin teknisi harus ngulang
+        // dari step 5). Lihat eligiblePassiveCustodyForTeam().
+        $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($task);
 
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
         // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
@@ -233,6 +312,20 @@ class CustomerInstallationController extends Controller
         $sourceRows = $existingUsage->isNotEmpty()
             ? $existingUsage
             : $materialService->estimatesForCustomer($customer);
+
+        // Baris freeform ("Lainnya" — item_id null) TIDAK BISA di-prefill lagi
+        // ke sini (koreksi lanjutan ADHOC-54, 2026-09-12) — dropdown Material
+        // Terpakai udah gak punya opsi "Lainnya", jadi baris begini bakal
+        // ke-render dengan Barang KOSONG/gak kepilih di layar tapi qty-nya
+        // TETAP ke-submit diam-diam (input hidden di belakang dropdown yang
+        // gak match), lolos ke request tanpa disadari teknisi — nabrak
+        // validasi `item_id required_with:qty` walau teknisi belum nyentuh
+        // section ini sama sekali (bug nyata, ketemu 2026-09-14: submit
+        // Aktivasi gagal padahal cuma isi device+ODP). Estimasi survey lama
+        // yang gak nunjuk item master emang gak bisa diwakili custody — biar
+        // hilang dari prefill daripada diam-diam gagal.
+        $droppedFreeformEstimateNames = $sourceRows->whereNull('item_id')->pluck('item_name')->filter()->values();
+        $sourceRows = $sourceRows->whereNotNull('item_id');
 
         $materialRows = $sourceRows->map(fn ($row) => [
             'item_id' => $row->item_id,
@@ -265,7 +358,7 @@ class CustomerInstallationController extends Controller
             && $installFopTask
             && $installFopTask->materials()->terpakai()->exists();
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials'));
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'droppedFreeformEstimateNames'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -617,6 +710,12 @@ class CustomerInstallationController extends Controller
             'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
         );
 
+        // SN Perangkat Aktif dihitung SEBELUM $request->validate() supaya
+        // aturan 'selected_inventory_serial_id' bisa dibatasi ke custody tim
+        // ini (Rule::in) — lihat eligibleSerialsForTeam(). Ambil dari task
+        // yang sama dengan $assignmentTask di atas, bukan query baru.
+        $eligibleSerialIds = $this->eligibleSerialsForTeam($assignmentTask)->pluck('id');
+
         $validated = $request->validate([
             // Informasi Perangkat Aktif + Nomor/Port ODP — SATU-SATUNYA syarat
             // wajib buat tombol Aktivasi (ADHOC). Nomor/Slot/Port OLT sengaja
@@ -628,11 +727,11 @@ class CustomerInstallationController extends Controller
             'device_type' => 'required|string|in:modem,ont,onu,router,other',
             'brand' => 'nullable|string|max:100',
             'model' => 'nullable|string|max:100',
-            // required_without selected_inventory_serial_id: begitu operator
-            // pilih SN dari custody Gudang, teks manual gak wajib diisi lagi
-            // (dropdown jadi satu-satunya sumber, lihat override di bawah) —
-            // manual cuma jadi fallback buat device yang belum ke-track Inventory.
-            'serial_number' => 'required_without:selected_inventory_serial_id|nullable|string|max:100',
+            // Teks manual DICABUT (koreksi lanjutan ADHOC-54) — klien tidak
+            // boleh lagi ngirim SN sendiri, SN cuma boleh datang dari
+            // selected_inventory_serial_id (override di bawah). 'prohibited'
+            // jaga-jaga kalau ada jalur lama yang masih ngirim field ini.
+            'serial_number' => 'prohibited',
             'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
             'wifi_ssid' => 'required|string|max:150',
             'wifi_password' => 'required|string|max:150',
@@ -648,11 +747,13 @@ class CustomerInstallationController extends Controller
             'vlan' => 'nullable|string|max:20',
             'initial_attenuation' => 'nullable|string|max:50',
 
-            // Draft pointer SN Perangkat Aktif dari custody (ADHOC-54) —
-            // OPSIONAL, cuma buat device yang ke-track Inventory. Aksi
-            // INSTALL sungguhan baru jalan di storeSpeedtest(), lihat
-            // komentar di sana.
-            'selected_inventory_serial_id' => 'nullable|integer|exists:inventory_serials,id',
+            // WAJIB & dibatasi ke custody tim ini (koreksi lanjutan ADHOC-54)
+            // — kalau $eligibleSerialIds kosong (teknisi belum ambil barang
+            // dari Gudang), Rule::in([]) selalu gagal: submit ditolak dengan
+            // pesan custom di bawah, bukan cuma "format salah". Draft
+            // pointer doang — aksi INSTALL sungguhan baru jalan di
+            // storeSpeedtest(), lihat komentar di sana.
+            'selected_inventory_serial_id' => ['required', 'integer', Rule::in($eligibleSerialIds)],
 
             'installation_photo' => 'nullable|image|max:2048',
             'contract_photo' => 'nullable|image|max:2048',
@@ -661,8 +762,19 @@ class CustomerInstallationController extends Controller
 
             'started_at' => 'nullable|date',
 
-            'materials' => 'nullable|array',
-            'materials.*.item_id' => 'nullable|integer|exists:items,id',
+            // Opsi "Lainnya (isi manual)" DICABUT dari dropdown Material
+            // Terpakai (koreksi lanjutan ADHOC-54, 2026-09-12) — sama alasan
+            // serial_number di atas: barang yang dipakai musti bisa ditelusuri
+            // balik ke custody Gudang, gak boleh lagi ada nama karangan tanpa
+            // dasar sistem. `required_with:qty`, BUKAN `required` polos — form
+            // repeatable selalu menyisakan satu baris kosong terakhir (lihat
+            // catatan di material-rows.blade.php), baris itu harus tetap boleh
+            // lolos validasi (dibuang diam-diam belakangan oleh normalizeRow()
+            // di TaskMaterialService, bukan digagalkan di sini). Kecukupan
+            // sisa custody per-item dicek SETELAH validate() ini lolos (butuh
+            // agregasi qty per item lintas baris, gak bisa satu Rule::in()),
+            // lihat blok setelah $validated.
+            'materials.*.item_id' => 'nullable|required_with:materials.*.qty|integer|exists:items,id',
             'materials.*.item_name' => 'nullable|string|max:150',
             'materials.*.item_type' => ['nullable', 'string', Rule::exists('item_categories', 'code')->where('is_active', true)],
             'materials.*.qty' => 'nullable|numeric|min:0',
@@ -673,16 +785,59 @@ class CustomerInstallationController extends Controller
             'work_tools_manual' => 'nullable|array',
             'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
             'work_tools_manual.*.note' => 'nullable|string|max:255',
+        ], [
+            // Pesan sama buat 'required' maupun 'in' (Rule::in([]) gagal
+            // dengan kode 'in', bukan 'required', begitu custody kosong) —
+            // dari sudut pandang teknisi keduanya berarti sama: gak ada SN
+            // yang bisa dipilih, harus ambil barang dari Gudang dulu.
+            'selected_inventory_serial_id.required' => 'SN Perangkat Aktif wajib dipilih dari Gudang. Anda tidak memiliki SN di custody — ambil barang (Issue) dari Gudang terlebih dahulu sebelum bisa mengisi Laporan Pemasangan.',
+            'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
         ]);
 
-        // Dropdown custody (selected_inventory_serial_id) jadi SATU-SATUNYA
-        // sumber SN begitu dipilih — timpa apapun yang diketik manual di
-        // field teks. Mencegah dua sumber kebenaran: installSerial() di
-        // storeSpeedtest() jalan dari selected_inventory_serial_id, sementara
-        // customer_technical_details/customer_devices dulu nyimpen teks
-        // klien apa adanya — bisa beda dari SN yang beneran diinstall.
-        if (! empty($validated['selected_inventory_serial_id'])) {
-            $validated['serial_number'] = InventorySerial::findOrFail($validated['selected_inventory_serial_id'])->serial_number;
+        // selected_inventory_serial_id sudah divalidasi wajib & anggota
+        // custody tim ini di atas — SN yang disimpan SELALU berasal dari sini,
+        // gak ada lagi teks manual yang bisa menyimpang. Mencegah dua sumber
+        // kebenaran: installSerial() di storeSpeedtest() jalan dari
+        // selected_inventory_serial_id yang sama persis.
+        $validated['serial_number'] = InventorySerial::findOrFail($validated['selected_inventory_serial_id'])->serial_number;
+
+        // Sisa custody Material Terpakai (koreksi lanjutan ADHOC-54,
+        // 2026-09-12) — CUMA peringatan informasional di flash message, BUKAN
+        // gerbang blocking. Sempat ditulis pakai throw ValidationException
+        // (koreksi 2026-09-12 versi awal), tapi itu SALAH & langsung bikin 2
+        // bug nyata (2026-09-14): (1) Aktivasi jadi bisa gagal gara-gara
+        // Material Terpakai, padahal aturan tegasnya "Aktivasi cuma butuh
+        // Informasi Perangkat Aktif + Distribusi Jaringan (ODP/OLT) — foto,
+        // material, alat kerja itu syarat BUKA STEP 6, bukan syarat submit
+        // step 5" (ditegaskan user dua kali); (2) baris material LAMA (SN
+        // Perangkat Aktif yang salah ke-klasifikasi PASIF di master, atau
+        // custody yang sudah berubah sejak submit sebelumnya) yang ke-resubmit
+        // otomatis lewat prefill bikin Aktivasi ke-block PADAHAL teknisi belum
+        // nyentuh Material Terpakai sama sekali — dan gagal validasi bikin
+        // redirect balik TANPA ?activated=1, jadi wizard keliatan "reset ke
+        // step 1". Penegakan SUNGGUHAN tetap di
+        // `InventoryService::consumeFromCustody()` (storeSpeedtest(), lock+FIFO
+        // beneran) — di sini cuma info dini, TIDAK menghentikan penyimpanan.
+        // Qty digabung per item_id dulu (satu barang bisa muncul di lebih dari
+        // satu baris).
+        $custodyWarnings = [];
+        $requestedQtyByItem = collect($validated['materials'] ?? [])
+            ->filter(fn ($row) => ! empty($row['item_id']) && (float) ($row['qty'] ?? 0) > 0)
+            ->groupBy('item_id')
+            ->map(fn ($rows) => (float) $rows->sum('qty'));
+
+        if ($requestedQtyByItem->isNotEmpty()) {
+            $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($assignmentTask)->keyBy('item_id');
+
+            foreach ($requestedQtyByItem as $itemId => $qtyRequested) {
+                $available = (float) ($eligiblePassiveCustody[$itemId]['available'] ?? 0);
+
+                if ($qtyRequested > $available) {
+                    $itemName = $eligiblePassiveCustody[$itemId]['name'] ?? Item::find($itemId)?->name ?? "Barang #{$itemId}";
+
+                    $custodyWarnings[] = "{$itemName} (diklaim ".number_format($qtyRequested, 2).', tersedia '.number_format($available, 2).')';
+                }
+            }
         }
 
         $installation = $customer->installations()->latest()->first();
@@ -805,19 +960,47 @@ class CustomerInstallationController extends Controller
             // harus balik lagi upload foto & catat material). Hitung ulang di
             // sini (bukan pakai $pemasanganComplete dari report(), request beda)
             // — logika sama persis, lihat catatan di report().
+            $hasMaterialTerpakai = $installFopTask && $installFopTask->materials()->terpakai()->exists();
             $fase6Unlocked = $installation->installation_photo
                 && $installation->contract_photo
                 && $installation->signature_photo
-                && $installFopTask
-                && $installFopTask->materials()->terpakai()->exists();
+                && $hasMaterialTerpakai;
+
+            // Kasus nyata (2026-09-12, laporan Siti Nuryani 2): teknisi menekan
+            // Aktivasi berkali-kali yakin sudah isi foto+material, tapi
+            // hasFile()/materials-nya kosong tiap kali — flash generik "lengkapi
+            // foto & material" gak nunjuk mana yang sebenarnya belum nyangkut,
+            // jadi teknisi gak sadar submit-nya gak membawa apa-apa. Sebutkan
+            // persis yang kosong di sini supaya ketauan dari pesan sukses ini
+            // sendiri, bukan cuma dari status "Fase 6 terkunci" yang generik.
+            if (! $fase6Unlocked) {
+                $missingParts = array_filter([
+                    ! $installation->installation_photo ? 'Foto Pemasangan' : null,
+                    ! $installation->contract_photo ? 'Foto Kontrak' : null,
+                    ! $installation->signature_photo ? 'Foto TTD Pelanggan' : null,
+                    ! $hasMaterialTerpakai ? 'Material Terpakai (minimal 1 baris, jumlah > 0)' : null,
+                ]);
+
+                $message = 'Data Pemasangan & Perangkat tersimpan, TAPI belum lengkap untuk membuka Laporan Speedtest — belum tersimpan: '
+                    .implode(', ', $missingParts)
+                    .'. Cek lagi isian di atas (foto harus dipilih ulang, file tidak bisa dipertahankan otomatis oleh browser), lalu tekan Aktivasi lagi.';
+            } else {
+                $message = 'Laporan Pemasangan & Perangkat tersimpan. Laporan Speedtest sudah bisa diisi.';
+            }
+
+            // Info sisa custody (non-blocking, lihat komentar di atas
+            // $custodyWarnings) — ditempel di message SUKSES yang sama, bukan
+            // flash 'error' terpisah: submit ini tetap berhasil, ini cuma
+            // ngingetin sebelum kejadian beneran ketolak di storeSpeedtest().
+            if (! empty($custodyWarnings)) {
+                $message .= ' ⚠ Sisa custody tim mungkin tidak cukup untuk: '.implode('; ', $custodyWarnings).' — perbaiki sebelum menyelesaikan Laporan Speedtest, kalau tidak submit itu akan ditolak.';
+            }
 
             return redirect()->route('customers.installation.report', [
                 'customer' => $customer->id,
                 'return_to' => $request->input('return_to'),
                 'activated' => 1,
-            ])->with('success', $fase6Unlocked
-                ? 'Laporan Pemasangan & Perangkat tersimpan. Laporan Speedtest sudah bisa diisi.'
-                : 'Data Pemasangan & Perangkat tersimpan. Lengkapi foto & material terpakai lalu tekan Aktivasi lagi untuk membuka Laporan Speedtest.');
+            ])->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
 

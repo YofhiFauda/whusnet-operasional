@@ -194,13 +194,13 @@
                         <div class="inline-flex p-1 bg-slate-100 dark:bg-slate-900/80 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
                             <button type="button" @click="assistantMode = assistantMode === 'camera' ? '' : 'camera'"
                                     :class="assistantMode === 'camera' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 font-semibold hover:text-slate-900 dark:hover:text-slate-200'"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all cursor-pointer">
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors duration-150 cursor-pointer">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.174C3.244 7.54 2.5 8.352 2.5 9.318v9.132a2.25 2.25 0 002.25 2.25h14.5a2.25 2.25 0 002.25-2.25V9.318c0-.966-.744-1.778-1.552-1.914a48.11 48.11 0 00-1.134-.174 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/></svg>
                                 <span>Scan Kamera</span>
                             </button>
                             <button type="button" @click="assistantMode = assistantMode === 'bulk' ? '' : 'bulk'"
                                     :class="assistantMode === 'bulk' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 font-semibold hover:text-slate-900 dark:hover:text-slate-200'"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all cursor-pointer">
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors duration-150 cursor-pointer">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 <span>Bulk Paste</span>
                             </button>
@@ -214,12 +214,12 @@
                     </div>
 
                     {{-- Collapsible Assistant Drawer Container --}}
-                    <div x-show="assistantMode !== ''" x-collapse.duration.300ms class="mt-3.5 pt-3.5 border-t border-slate-100 dark:border-slate-700/60">
+                    <div x-show="assistantMode !== ''" x-cloak x-collapse.duration.200ms class="mt-3.5 pt-3.5 border-t border-slate-100 dark:border-slate-700/60">
                         {{-- Drawer Mode 1: Scan Kamera --}}
                         <div x-show="assistantMode === 'camera'"
-                             x-transition:enter="transition ease-out duration-200"
-                             x-transition:enter-start="opacity-0 translate-y-1"
-                             x-transition:enter-end="opacity-100 translate-y-0"
+                             x-transition:enter="transition-opacity ease-out duration-150"
+                             x-transition:enter-start="opacity-0"
+                             x-transition:enter-end="opacity-100"
                              class="space-y-3">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 <div>
@@ -249,9 +249,9 @@
 
                         {{-- Drawer Mode 2: Bulk Paste --}}
                         <div x-show="assistantMode === 'bulk'"
-                             x-transition:enter="transition ease-out duration-200"
-                             x-transition:enter-start="opacity-0 translate-y-1"
-                             x-transition:enter-end="opacity-100 translate-y-0"
+                             x-transition:enter="transition-opacity ease-out duration-150"
+                             x-transition:enter-start="opacity-0"
+                             x-transition:enter-end="opacity-100"
                              class="space-y-3">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 <div>
