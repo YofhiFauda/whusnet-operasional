@@ -72,7 +72,7 @@ class WarehouseCustodyAndTraceabilityTest extends TestCase
         $this->teknisiA = User::factory()->create(['role_id' => $teknisiRole->id, 'name' => 'Teknisi CTT A']);
         $this->teknisiB = User::factory()->create(['role_id' => $teknisiRole->id, 'name' => 'Teknisi CTT B']);
 
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 300, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 300, 5000, $this->owner);
 
         $t1 = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabangA, [['item_id' => $this->kabel->id, 'qty' => 100]], $this->owner);
         app(InventoryTransferService::class)->receiveTransfer($t1, [], [$this->kabel->id => 100], $this->owner);

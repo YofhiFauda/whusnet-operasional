@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\InventoryTransactionType;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
+use App\Enums\TransferStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
+use App\Models\InventoryTransfer;
 use App\Models\Item;
 use App\Models\Pop;
 use App\Models\User;
@@ -70,6 +74,7 @@ class WarehouseIssueController extends Controller
             'lines.*.qty' => 'nullable|numeric|min:0.01',
             'lines.*.lot_no' => 'nullable|string|max:50',
             'lines.*.serial_numbers' => 'nullable|string',
+            'lines.*.roll_codes' => 'nullable|string',
         ]);
 
         $cabang = Pop::findOrFail($validated['cabang_pop_id']);
@@ -105,6 +110,17 @@ class WarehouseIssueController extends Controller
         $validated = $request->validate(['pop_id' => 'required|integer|exists:pops,id']);
         $this->assertPopIdInScope((int) $validated['pop_id'], auth()->user(), $access);
 
+        // Gap ketauan 2026-09-18: staf transfer Pusat→Cabang, langsung
+        // buka Issue buat serahkan ke teknisi, stoknya 0 — bukan bug data,
+        // barang emang baru nambah ke Cabang begitu fase Konfirmasi Terima
+        // (bukan pas dispatch). Tanpa sinyal ini, halaman cuma nampilin
+        // "stok kosong" polos, gak ketauan kalau sebenernya ada kiriman
+        // yang nunggu dikonfirmasi di /warehouse/transfers/pending.
+        $pendingTransferCount = InventoryTransfer::query()
+            ->where('to_pop_id', $validated['pop_id'])
+            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->count();
+
         $balanceItems = InventoryBalance::query()
             ->where('pop_id', $validated['pop_id'])
             ->where('qty', '>', 0)
@@ -127,6 +143,12 @@ class WarehouseIssueController extends Controller
         $serialItems = InventorySerial::query()
             ->where('current_pop_id', $validated['pop_id'])
             ->where('status', SerialStatus::AVAILABLE->value)
+            // SN bekas belum dicek fisik gak boleh nongol di dropdown Issue
+            // — sama gate yang ditegakkan `InventoryIssueService::issueSerialized()`
+            // (analisa-gap-kondisi-barang.md rancangan poin 4). Ditulis
+            // langsung sebagai kondisi query (bukan filter koleksi) karena
+            // ini query DB biasa, bukan lewat model yang di-load satu-satu.
+            ->where(fn ($q) => $q->where('condition', 'new')->orWhereNull('condition')->orWhereNotNull('condition_checked_at'))
             ->with('item')
             ->get()
             ->groupBy('item_id')
@@ -143,7 +165,29 @@ class WarehouseIssueController extends Controller
             })
             ->values();
 
-        return response()->json(['items' => $balanceItems->concat($serialItems)->values()]);
+        $rollItems = InventoryRoll::query()
+            ->where('current_pop_id', $validated['pop_id'])
+            ->where('status', RollStatus::AVAILABLE->value)
+            ->with('item')
+            ->get()
+            ->groupBy('item_id')
+            ->map(function ($rows) {
+                $item = $rows->first()->item;
+
+                return [
+                    'item_id' => $item->id,
+                    'name' => $item->name,
+                    'unit' => $item->unit,
+                    'tracking_type' => $item->tracking_type->value,
+                    'rolls' => $rows->map(fn ($r) => ['roll_code' => $r->roll_code, 'length_remaining' => (float) $r->length_remaining])->values(),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'items' => $balanceItems->concat($serialItems)->concat($rollItems)->values(),
+            'pending_transfer_count' => $pendingTransferCount,
+        ]);
     }
 
     public function show(string $reference, EffectiveAccessService $access): View
@@ -151,7 +195,7 @@ class WarehouseIssueController extends Controller
         $transactions = InventoryTransaction::query()
             ->where('reference_number', $reference)
             ->where('type', InventoryTransactionType::ISSUE->value)
-            ->with(['item.category', 'serial', 'fromPop', 'toTechnician', 'createdBy'])
+            ->with(['item.category', 'serial', 'roll', 'fromPop', 'toTechnician', 'createdBy'])
             ->get();
 
         abort_if($transactions->isEmpty(), 404);
@@ -167,7 +211,7 @@ class WarehouseIssueController extends Controller
      * `WarehouseTransferController::normalizeLines()` buat alasan lengkap.
      *
      * @param  array<int, array<string, mixed>>  $rows
-     * @return list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>}>
+     * @return list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, roll_codes?:list<string>}>
      */
     private function normalizeLines(array $rows): array
     {
@@ -176,9 +220,9 @@ class WarehouseIssueController extends Controller
 
         return collect($rows)->map(function (array $row) use ($trackingTypes) {
             $itemId = (int) $row['item_id'];
-            $isSerialized = ($trackingTypes[$itemId] ?? null) === TrackingType::SERIALIZED;
+            $trackingType = $trackingTypes[$itemId] ?? null;
 
-            if ($isSerialized) {
+            if ($trackingType === TrackingType::SERIALIZED) {
                 $serials = collect(preg_split('/[\r\n,]+/', (string) ($row['serial_numbers'] ?? '')))
                     ->map(fn ($s) => trim($s))
                     ->filter()
@@ -190,6 +234,20 @@ class WarehouseIssueController extends Controller
                 }
 
                 return ['item_id' => $itemId, 'serial_numbers' => $serials];
+            }
+
+            if ($trackingType === TrackingType::ROLL) {
+                $rollCodes = collect(preg_split('/[\r\n,]+/', (string) ($row['roll_codes'] ?? '')))
+                    ->map(fn ($s) => trim($s))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                if ($rollCodes === []) {
+                    throw new InvalidArgumentException("Barang #{$itemId} bertipe Roll Kabel — daftar Roll ID wajib diisi, gak boleh kosong.");
+                }
+
+                return ['item_id' => $itemId, 'roll_codes' => $rollCodes];
             }
 
             if (filled($row['serial_numbers'] ?? null)) {

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Enums\CashDepositStatus;
 use App\Enums\DepositStatus;
-use App\Enums\InvoiceStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
@@ -147,17 +146,18 @@ class DashboardController extends Controller
                         ->count(),
                     'total_invoices_amount' => $totalInvoiceAmount,
                     'total_payments_amount' => $totalPaymentAmount,
-                    'total_unpaid_amount' => (float) (clone $periodInvoiceQuery)
-                        ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
+                    // "Tunggakan" = piutang = sisa tagihan periode SEBELUM bulan
+                    // berjalan (Invoice::scopePiutang). Sengaja TIDAK ikut filter
+                    // periode dashboard: piutang adalah saldo posisi saat ini,
+                    // bukan arus periode. Tagihan bulan ini yang belum dibayar
+                    // belum tunggakan.
+                    'total_unpaid_amount' => (float) (clone $invoiceQuery)
+                        ->piutang()
                         ->sum('remaining_amount'),
-                    'due_invoices_count' => (clone $invoiceQuery)
-                        ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
-                        // whereDate() membungkus kolom jadi DATE(due_date) dan mematikan
-                        // index. endOfDay() wajib: sqlite menyimpan kolom date sebagai
-                        // '2026-07-22 00:00:00', jadi `<= '2026-07-22'` membuang tagihan
-                        // yang jatuh tempo hari ini.
-                        ->where('due_date', '<=', now()->endOfDay())
-                        ->count(),
+                    // Piutang = tagihan periode lalu yang belum lunas, BUKAN
+                    // `due_date <= hari ini` (tanggal 10 cuma label UI; batas riil
+                    // akhir bulan). Lihat Invoice::scopePiutang().
+                    'due_invoices_count' => (clone $invoiceQuery)->piutang()->count(),
 
                     // Collection Rate = efektivitas penagihan periode berjalan
                     // (docs/plan/analisa-dashboard-owner-statistik.md Pilar 1).
@@ -190,8 +190,8 @@ class DashboardController extends Controller
 
         $dueInvoices = (clone $invoiceQuery)
             ->with(['customer', 'pop'])
-            ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
-            ->where('due_date', '<=', now()->endOfDay())
+            ->piutang()
+            ->orderBy('billing_period')
             ->orderBy('due_date')
             ->limit(10)
             ->get();

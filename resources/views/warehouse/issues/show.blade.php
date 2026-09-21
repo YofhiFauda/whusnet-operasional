@@ -76,12 +76,26 @@
                                 @else
                                 <span class="font-bold">SN: {{ $line->serial->serial_number }}</span>
                                 @endif
+                            @elseif($line->roll)
+                                @if(auth()->user()->hasPermission('warehouse_traceability.view'))
+                                <a href="{{ route('warehouse.traceability.index', ['roll' => $line->roll->roll_code]) }}" class="text-amber-600 dark:text-amber-400 font-bold hover:underline print:text-slate-800">
+                                    Roll: {{ $line->roll->roll_code }}
+                                </a>
+                                @else
+                                <span class="font-bold">Roll: {{ $line->roll->roll_code }}</span>
+                                @endif
                             @else
                                 <span class="text-slate-400">{{ $line->lot_no ? "Lot: {$line->lot_no}" : '-' }}</span>
                             @endif
                         </td>
                         <td class="px-6 py-3.5 text-right font-mono text-sm font-bold text-slate-800 dark:text-slate-200">
-                            {{ $line->serial ? '1 unit' : rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',').' '.$line->item->unit }}
+                            @if($line->serial)
+                                1 unit
+                            @elseif($line->roll)
+                                {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} meter
+                            @else
+                                {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',').' '.$line->item->unit }}
+                            @endif
                         </td>
                     </tr>
                     @endforeach

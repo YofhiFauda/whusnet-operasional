@@ -26,7 +26,7 @@ Satu baris = satu pelanggan yang pertama kali ACTIVE. Dibuat otomatis `CustomerO
 | `periode` | string(7), index | `YYYY-MM` bulan verifikasi — dasar "reset tanggal 1" |
 | `verified_at` | datetime | |
 | `installation_fee` | decimal(?,2), nullable | Diisi BD saat `verify()` (kategori butuh gate) atau lewat fallback `updateInstallationFee()` |
-| `installation_fee_invoice_id` | FK `invoices`, nullable, `nullOnDelete` | Invoice Biaya Instalasi (INSIDENTAL) — begitu terisi, baris **terkunci** dari edit lanjutan |
+| `installation_fee_invoice_id` | FK `invoices`, nullable, `nullOnDelete` | Invoice yang mencatat Biaya Instalasi — begitu terisi, baris **terkunci** dari edit lanjutan. **Jalur gate BD**: sama dengan Invoice AWAL pelanggan itu (satu invoice, digabung — lihat business-logic.md §3.2/§3.3). **Jalur fallback** (`CustomerAcquisitionController::updateInstallationFee()`, pelanggan lama): invoice INSIDENTAL terpisah |
 | `created_at`/`updated_at` | timestamps | |
 
 Accessor (dihitung live, bukan kolom): `harga_dikurangi_ppn` (Biaya Langganan × 89%, monitoring biaya net Busdev), `omset_sales` (Biaya Langganan × 11%, komisi Sales — metrik terpisah, jangan disatukan).

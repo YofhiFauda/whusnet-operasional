@@ -94,7 +94,7 @@ class WarehouseReportAdjustmentSummaryTest extends TestCase
     #[Test]
     public function rekap_penyesuaian_pop_balance_teratribusi_ke_gudang_dengan_benar(): void
     {
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, $this->owner);
 
         app(InventoryAdjustmentService::class)->adjustPopBalance($this->pusat, $this->kabel->id, -5, 'rusak_gudang', $this->owner);
 
@@ -111,7 +111,7 @@ class WarehouseReportAdjustmentSummaryTest extends TestCase
     #[Test]
     public function transaksi_di_luar_periode_tidak_ikut_teragregasi(): void
     {
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, $this->owner);
         app(InventoryAdjustmentService::class)->adjustPopBalance($this->pusat, $this->kabel->id, -5, 'rusak_gudang', $this->owner);
 
         InventoryTransaction::query()->where('type', 'adjustment')->update(['created_at' => now()->subMonth()]);

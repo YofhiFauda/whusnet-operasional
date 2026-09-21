@@ -70,7 +70,13 @@ dependensi baru yang perlu disetujui untuk API 2.
   benar.
 - Portal menyimpan token di sesi server-side HttpOnly, **bukan** localStorage.
 - Pelanggan `terminated` → akun dinonaktifkan dan token dicabut lewat
-  `CustomerObserver`.
+  `CustomerObserver`. Akun `disabled` **ditolak di `login()`** (dijawab identik
+  dengan password salah) — sebelum ADHOC-85 pelanggan putus masih bisa login
+  ulang dengan password lama karena `login()` tidak membaca status akun.
+- Pelanggan "Langganan Lagi" (`terminated` → `active`) → akun `disabled` turun ke
+  `pending_claim` (bukan `active`; password lama ditimpa acak), QR + PIN baru
+  diterbitkan. Pelanggan klaim ulang lewat kartu baru. Detail:
+  [`../../plan/billing/rancangan-terminate-reactivate-state-machine.md`](../../plan/billing/rancangan-terminate-reactivate-state-machine.md).
 
 ## Aktivasi akun: PIN, bukan password dari admin
 

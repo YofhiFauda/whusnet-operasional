@@ -24,6 +24,8 @@ Dua aturan yang gampang tertukar, keduanya disengaja:
 
 **Jendela ini BUKAN pencegah "nagih 2× ke pelanggan sama".** Dobel tagih sudah tertutup struktural: bayar → `remaining_amount` turun → lunas → invoice keluar dari daftar; ditambah penolakan di `CollectorPaymentService::validateRows()` untuk invoice `lunas`/`batal` dan nominal melebihi sisa. Yang dicegah jendela adalah **nagih terlalu awal**.
 
+> **Jangan tertukar dengan piutang (2026-09-21).** Jendela tagih hanya soal *kapan kolektor mendatangi pelanggan* dan memakai `due_date`. Status **piutang** ditentukan lain: `billing_period` < bulan berjalan (`Invoice::isPiutang()`), karena `due_date` tanggal 10 hanya formalitas dan kas admin ditutup tanggal 1. Di tabel bayar kolektor, penanda merah "Piutang" mengikuti `isPiutang()`, bukan `due_date`.
+
 **Worksheet Admin sengaja TANPA jendela** — admin bukan pengetuk pintu, dia butuh gambaran penuh untuk cross check.
 
 ---

@@ -71,7 +71,7 @@ enum InventoryTransactionType: string
             self::RECEIVE => 'Barang Masuk (Pengadaan)',
             self::TRANSFER => 'Transfer Antar Gudang',
             self::ISSUE => 'Keluar ke Teknisi',
-            self::RETURN => 'Pengembalian ke Gudang',
+            self::RETURN => 'Pengembalian ke Gudang(Return)',
             self::ADJUSTMENT => 'Penyesuaian Stok',
             self::TRANSFER_CUSTODY => 'Alih Custody Teknisi',
             self::STOCK_OPNAME => 'Stok Opname',

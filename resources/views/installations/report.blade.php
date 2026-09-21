@@ -511,6 +511,33 @@
                                         @endif
                                     </div>
 
+                                    @php
+                                        // Roll kabel — OPSIONAL (koreksi ADHOC kabel-per-roll), sejalan
+                                        // dropdown SN di atas tapi gak wajib: gak semua pemasangan pakai
+                                        // kabel yang ke-track per-roll.
+                                        $oldSelectedRollId = old('selected_inventory_roll_id', $installation->selected_inventory_roll_id ?? null);
+                                    @endphp
+
+                                    <div class="md:col-span-2">
+                                        <label for="selected_inventory_roll_id" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Roll Kabel (Opsional) — Sisa Meter dari Gudang</label>
+                                        @if($eligibleRolls->isNotEmpty())
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                <select name="selected_inventory_roll_id" id="selected_inventory_roll_id" class="w-full text-xs data-text px-3 py-2 border @error('selected_inventory_roll_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                                    <option value="">— Tidak Pakai Roll Kabel —</option>
+                                                    @foreach($eligibleRolls as $roll)
+                                                        <option value="{{ $roll->id }}" @selected($oldSelectedRollId == $roll->id)>
+                                                            {{ $roll->item->name ?? '(barang dihapus)' }} — {{ $roll->roll_code }} (sisa {{ rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') }} m)
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                <input type="number" step="0.01" min="0.01" name="roll_meters_used" id="roll_meters_used" value="{{ old('roll_meters_used', $installation->roll_meters_used ?? '') }}" placeholder="Meter terpakai" class="w-full text-xs data-text px-3 py-2 border @error('roll_meters_used') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                            </div>
+                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Pilih roll yang lagi di custody Anda, isi berapa meter dipakai — sisa roll otomatis berkurang saat Aktivasi disimpan.</p>
+                                        @else
+                                            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Tidak ada roll kabel di custody Anda — lewati kalau kabel yang dipakai belum ke-track per-roll.</p>
+                                        @endif
+                                    </div>
+
                                     <div>
                                         <label for="mac_address" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">MAC Address</label>
                                         <input type="text" name="mac_address" id="mac_address" value="{{ old('mac_address', $dev->mac_address ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="00:11:22:33:44:55">

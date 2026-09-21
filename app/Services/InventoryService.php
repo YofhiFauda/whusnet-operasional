@@ -6,11 +6,13 @@ use App\Enums\CustodyStatus;
 use App\Enums\InventoryTransactionType;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Exceptions\InsufficientCustodyException;
 use App\Models\Customer;
 use App\Models\FopTask;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -197,6 +199,68 @@ class InventoryService
     }
 
     /**
+     * Potong sebagian meter dari roll kabel (App\Enums\TrackingType::ROLL) —
+     * partial, BUKAN atomik seperti `installSerial()`: roll TETAP di custody
+     * teknisi (status ISSUED/IN_USE) sampai `length_remaining` habis, cuma
+     * transisi ke DEPLETED kalau sisa 0. Sejalan `consumeFromCustody()` soal
+     * gak nulis baris ledger — cukup `TaskMaterial` (kind=terpakai,
+     * `lot_no`=roll_code, `unit`=meter, `unit_price_snapshot` disalin dari
+     * roll — lihat docblock `InventoryRoll`).
+     */
+    public function consumeFromRoll(
+        InventoryRoll $roll,
+        float $metersUsed,
+        iterable $technicians,
+        FopTask $fopTask,
+        ?Customer $customer,
+        User $actor,
+    ): TaskMaterial {
+        if ($metersUsed <= 0) {
+            throw new InvalidArgumentException('Meter terpakai harus lebih besar dari nol.');
+        }
+
+        $technicianIds = Collection::make($technicians)->pluck('id')->all();
+
+        return DB::transaction(function () use ($roll, $metersUsed, $technicianIds, $fopTask, $customer, $actor) {
+            $roll = InventoryRoll::query()->with('item')->lockForUpdate()->findOrFail($roll->id);
+
+            if (! in_array($roll->status, [RollStatus::ISSUED, RollStatus::IN_USE], true)) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} statusnya '{$roll->status->value}', bukan ISSUED/IN_USE — gak bisa dipotong.");
+            }
+
+            if (! in_array($roll->current_technician_id, $technicianIds, true)) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} bukan custody tim ini.");
+            }
+
+            if ($metersUsed > (float) $roll->length_remaining) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} sisa ".$roll->length_remaining." meter, diminta {$metersUsed} meter.");
+            }
+
+            $newRemaining = (float) $roll->length_remaining - $metersUsed;
+
+            $roll->update([
+                'length_remaining' => $newRemaining,
+                'status' => $newRemaining <= 0 ? RollStatus::DEPLETED : RollStatus::IN_USE,
+            ]);
+
+            return TaskMaterial::create([
+                'fop_task_id' => $fopTask->id,
+                'customer_id' => $customer?->id,
+                'kind' => MaterialKind::TERPAKAI,
+                'item_id' => $roll->item_id,
+                'item_category_id' => $roll->item?->item_category_id,
+                'item_type' => $roll->item?->category?->code,
+                'item_name' => $roll->item?->name,
+                'lot_no' => $roll->roll_code,
+                'qty' => $metersUsed,
+                'unit' => 'meter',
+                'unit_price_snapshot' => $roll->unit_price_snapshot,
+                'recorded_by' => $actor->id,
+            ]);
+        });
+    }
+
+    /**
      * Reconcile baris `task_materials` Pasif generik (ditulis
      * `TaskMaterialService::sync()` — item/qty apa adanya dari form, tanpa
      * lot/harga) ke custody Gudang teknisi. Dipakai `CustomerInstallationController`
@@ -229,7 +293,7 @@ class InventoryService
             foreach ($rows->groupBy('item_id') as $itemId => $itemRows) {
                 $item = Item::find($itemId);
 
-                if (! $item || $item->tracking_type === TrackingType::SERIALIZED) {
+                if (! $item || $item->tracking_type === TrackingType::SERIALIZED || $item->tracking_type === TrackingType::ROLL) {
                     continue;
                 }
 

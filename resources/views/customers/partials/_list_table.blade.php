@@ -96,7 +96,7 @@
                         <td class="py-3.5 px-2 xl:px-3 font-mono text-[11px] hidden 2xl:table-cell">
                             @if($customer->latestInvoice)
                                 @php
-                                    $isOverdue = $customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast() && $customer->latestInvoice->invoice_status !== \App\Enums\InvoiceStatus::LUNAS;
+                                    $isOverdue = $customer->latestInvoice->isPiutang();
                                 @endphp
                                 <span class="{{ $isOverdue ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-600 dark:text-slate-400' }}">
                                     {{ \App\Support\IndonesianDate::date($customer->latestInvoice->due_date) }}
@@ -110,13 +110,13 @@
                             @if($customer->latestInvoice)
                                 @php
                                     $isPaid = $customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS;
-                                    $isOverdue = !$isPaid && $customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast();
+                                    $isOverdue = !$isPaid && $customer->latestInvoice->isPiutang();
                                 @endphp
                                 <span class="font-bold {{ $isPaid ? 'text-emerald-600 dark:text-emerald-400' : ($isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white') }}">
                                     Rp {{ number_format($customer->latestInvoice->total_amount, 0, ',', '.') }}
                                 </span>
                                 <span class="block text-[10px] font-sans font-semibold {{ $isPaid ? 'text-emerald-500' : ($isOverdue ? 'text-rose-500' : 'text-slate-400') }}">
-                                    {{ $isPaid ? 'Lunas' : ($isOverdue ? 'Lewat Tempo' : 'Belum Bayar') }}
+                                    {{ $isPaid ? 'Lunas' : ($isOverdue ? 'Piutang' : 'Belum Bayar') }}
                                 </span>
                             @else
                                 <span class="text-slate-400">-</span>

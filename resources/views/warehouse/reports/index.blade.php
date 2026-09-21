@@ -27,6 +27,10 @@
             <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer">
                 <span>Terapkan</span>
             </button>
+            <a href="{{ route('warehouse.reports.export', ['period' => $period, 'pop_id' => $popFilter]) }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>Download Excel</span>
+            </a>
         </form>
 
         <!-- Segmented Tab Switcher -->
@@ -48,7 +52,7 @@
 
     <!-- KPI Ringkasan Periode — hitung JUMLAH TRANSAKSI, bukan qty (lihat
          komentar WarehouseReportController::index() soal kenapa). -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-xs">
             <span class="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Barang Masuk</span>
             <div class="mt-1 flex items-baseline gap-1.5">
@@ -77,6 +81,12 @@
                 <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">kejadian</span>
             </div>
         </div>
+        <div class="bg-white dark:bg-slate-800/90 border {{ $kpi['total_loss_value'] > 0 ? 'border-rose-200 dark:border-rose-900/60' : 'border-slate-200/80 dark:border-slate-700/80' }} rounded-lg p-4 shadow-xs">
+            <span class="block text-[11px] font-bold {{ $kpi['total_loss_value'] > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500' }} uppercase tracking-wider">Nilai Rugi (Rusak+Hilang)</span>
+            <div class="mt-1 flex items-baseline gap-1.5">
+                <span class="text-lg font-extrabold {{ $kpi['total_loss_value'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-100' }}">Rp {{ number_format($kpi['total_loss_value'], 0, ',', '.') }}</span>
+            </div>
+        </div>
     </div>
 
     <!-- TAB 1: PERGERAKAN BARANG -->
@@ -103,12 +113,14 @@
                 <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                     <thead class="bg-slate-50 dark:bg-slate-800/60">
                         <tr>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gudang</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Barang</th>
-                            <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Masuk</th>
-                            <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Transfer Masuk</th>
-                            <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Transfer Keluar</th>
-                            <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Keluar ke Teknisi</th>
+                            <th class="px-5 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gudang</th>
+                            <th class="px-5 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Barang</th>
+                            <th class="px-5 py-3.5 text-right text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider bg-amber-50/50 dark:bg-amber-950/20">Stok Awal</th>
+                            <th class="px-5 py-3.5 text-right text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Masuk</th>
+                            <th class="px-5 py-3.5 text-right text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">Trf Masuk</th>
+                            <th class="px-5 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Trf Keluar</th>
+                            <th class="px-5 py-3.5 text-right text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Teknisi</th>
+                            <th class="px-5 py-3.5 text-right text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider bg-purple-50/50 dark:bg-purple-950/20">Stok Akhir</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -117,15 +129,45 @@
                         @foreach($row['items'] as $i => $item)
                         <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-700/30">
                             @if($i === 0)
-                            <td class="px-6 py-3.5 text-sm font-semibold text-slate-800 dark:text-slate-200 align-top" rowspan="{{ $itemCount }}">
+                            <td class="px-5 py-3.5 text-sm font-semibold text-slate-800 dark:text-slate-200 align-top" rowspan="{{ $itemCount }}">
                                 {{ $row['pop']->name }} <span class="block text-[10px] uppercase text-slate-400 font-normal">{{ $row['pop']->type }}</span>
                             </td>
                             @endif
-                            <td class="px-6 py-3.5 text-sm text-slate-700 dark:text-slate-300">{{ $item['item_name'] }}</td>
-                            <td class="px-6 py-3.5 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">{{ $item['receive'] > 0 ? rtrim(rtrim(number_format($item['receive'], 2, ',', '.'), '0'), ',').' '.$item['unit'] : '—' }}</td>
-                            <td class="px-6 py-3.5 text-right font-mono text-sm text-sky-600 dark:text-sky-400">{{ $item['transfer_in'] > 0 ? rtrim(rtrim(number_format($item['transfer_in'], 2, ',', '.'), '0'), ',').' '.$item['unit'] : '—' }}</td>
-                            <td class="px-6 py-3.5 text-right font-mono text-sm text-slate-500 dark:text-slate-400">{{ $item['transfer_out'] > 0 ? rtrim(rtrim(number_format($item['transfer_out'], 2, ',', '.'), '0'), ',').' '.$item['unit'] : '—' }}</td>
-                            <td class="px-6 py-3.5 text-right font-mono text-sm text-indigo-600 dark:text-indigo-400">{{ $item['issue'] > 0 ? rtrim(rtrim(number_format($item['issue'], 2, ',', '.'), '0'), ',').' '.$item['unit'] : '—' }}</td>
+                            <td class="px-5 py-3.5 text-sm text-slate-700 dark:text-slate-300 font-medium">
+                                {{ $item['item_name'] }}
+                            </td>
+                            <td class="px-5 py-3.5 text-right font-mono text-sm bg-amber-50/30 dark:bg-amber-950/10">
+                                @if(($item['stok_awal_qty'] ?? 0) > 0)
+                                    <span class="font-bold text-amber-700 dark:text-amber-400">{{ rtrim(rtrim(number_format($item['stok_awal_qty'], 2, ',', '.'), '0'), ',') }} {{ $item['unit'] }}</span>
+                                    @if(($item['stok_awal_nilai'] ?? 0) > 0)
+                                        <span class="block text-[10px] text-slate-400 font-normal">Rp {{ number_format($item['stok_awal_nilai'], 0, ',', '.') }}</span>
+                                    @endif
+                                @else
+                                    <span class="text-slate-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-5 py-3.5 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400 font-semibold">
+                                {{ $item['receive'] > 0 ? rtrim(rtrim(number_format($item['receive'], 2, ',', '.'), '0'), ',').' '.$item['unit'] : '—' }}
+                            </td>
+                            <td class="px-5 py-3.5 text-right font-mono text-sm text-sky-600 dark:text-sky-400">
+                                {{ $item['transfer_in'] > 0 ? rtrim(rtrim(number_format($item['transfer_in'], 2, ',', '.'), '0'), ',').' '.$item['unit'] : '—' }}
+                            </td>
+                            <td class="px-5 py-3.5 text-right font-mono text-sm text-slate-500 dark:text-slate-400">
+                                {{ $item['transfer_out'] > 0 ? rtrim(rtrim(number_format($item['transfer_out'], 2, ',', '.'), '0'), ',').' '.$item['unit'] : '—' }}
+                            </td>
+                            <td class="px-5 py-3.5 text-right font-mono text-sm text-indigo-600 dark:text-indigo-400">
+                                {{ $item['issue'] > 0 ? rtrim(rtrim(number_format($item['issue'], 2, ',', '.'), '0'), ',').' '.$item['unit'] : '—' }}
+                            </td>
+                            <td class="px-5 py-3.5 text-right font-mono text-sm bg-purple-50/30 dark:bg-purple-950/10">
+                                @if(($item['stok_akhir_qty'] ?? 0) > 0)
+                                    <span class="font-bold text-purple-700 dark:text-purple-400">{{ rtrim(rtrim(number_format($item['stok_akhir_qty'], 2, ',', '.'), '0'), ',') }} {{ $item['unit'] }}</span>
+                                    @if(($item['stok_akhir_nilai'] ?? 0) > 0)
+                                        <span class="block text-[10px] text-slate-400 font-normal">Rp {{ number_format($item['stok_akhir_nilai'], 0, ',', '.') }}</span>
+                                    @endif
+                                @else
+                                    <span class="text-slate-400">—</span>
+                                @endif
+                            </td>
                         </tr>
                         @endforeach
                         @endforeach
@@ -165,6 +207,7 @@
                             <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Barang</th>
                             <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Jumlah Transaksi</th>
                             <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Qty</th>
+                            <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nilai Rugi (Rp)</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -175,12 +218,13 @@
                             <td class="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{{ $row['item_name'] }}</td>
                             <td class="px-6 py-3.5 text-right font-mono text-sm text-slate-700 dark:text-slate-300">{{ $row['count'] }}</td>
                             <td class="px-6 py-3.5 text-right font-mono text-sm text-rose-600 dark:text-rose-400">{{ rtrim(rtrim(number_format($row['total_qty'], 2, ',', '.'), '0'), ',') }} {{ $row['unit'] }}</td>
+                            <td class="px-6 py-3.5 text-right font-mono text-sm text-rose-600 dark:text-rose-400">{{ $row['loss_value'] !== null ? 'Rp '.number_format($row['loss_value'], 0, ',', '.') : '—' }}</td>
                         </tr>
                         @endforeach
                     </tbody>
                 </table>
             </div>
-            <p class="px-6 py-3 text-[11px] text-slate-400 border-t border-slate-100 dark:border-slate-700/60">"— (Custody Teknisi)" = kerugian dilaporkan saat barang di tangan teknisi, bukan di gudang manapun saat itu — gak bisa diatribusi ke cabang tertentu, tapi tetap tercatat & dipantau di sini.</p>
+            <p class="px-6 py-3 text-[11px] text-slate-400 border-t border-slate-100 dark:border-slate-700/60">"— (Custody Teknisi)" = kerugian dilaporkan saat barang di tangan teknisi, bukan di gudang manapun saat itu — gak bisa diatribusi ke cabang tertentu, tapi tetap tercatat & dipantau di sini. Nilai Rugi cuma dihitung buat kategori Rusak & Hilang (harga dari input RECEIVE terakhir barang itu) — "—" berarti belum pernah ada RECEIVE berharga buat barang itu, atau kategorinya bukan Rusak/Hilang.</p>
             @endif
         </div>
     </div>

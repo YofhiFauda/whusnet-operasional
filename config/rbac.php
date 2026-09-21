@@ -513,6 +513,19 @@ return [
             ActionCode::RECEIVE->value, // Cabang konfirmasi terima (§2.3)
         ],
 
+        // Cetak Invoice Transfer (rancangan-invoice-surat-jalan-transfer.md,
+        // §7 keputusan #5) — root TERPISAH dari `warehouse_transfer`, BUKAN
+        // action baru di root itu. Invoice py harga satuan tiap barang;
+        // `warehouse_transfer.view` juga dipegang pop_admin cabang (buat
+        // liat Surat Jalan-nya sendiri) — kalau invoice numpang action di
+        // root yang sama, cabang otomatis ikut liat harga barang Pusat.
+        // Surat Jalan SENGAJA TIDAK dapat root sendiri — dia reuse
+        // `warehouse_transfer.view` apa adanya (gak ada data sensitif buat
+        // disembunyikan dari sisi manapun).
+        'warehouse_transfer_invoice' => [
+            ActionCode::VIEW->value,
+        ],
+
         'warehouse_issue' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value, // Cabang → Teknisi (§2.4)

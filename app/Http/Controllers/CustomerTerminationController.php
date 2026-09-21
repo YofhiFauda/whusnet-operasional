@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Enums\NotificationType;
+use App\Enums\WorkflowTransition;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Services\CustomerWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -28,13 +30,23 @@ class CustomerTerminationController extends Controller
             'reason' => 'required|string|max:500',
         ]);
 
-        DB::transaction(function () use ($customer, $request) {
-            // Update customer status. terminated_at (Fase 5.1) diisi supaya tab
-            // "Putus Langganan" bisa ORDER BY kolom, bukan subquery JSON audit.
-            $customer->update([
-                'status' => 'terminated',
-                'terminated_at' => now(),
-            ]);
+        // Guard state machine. Sebelumnya endpoint ini update() status langsung
+        // tanpa cek apa pun — POST manual bisa memutus pelanggan yang masih
+        // waiting_survey / rejected, atau memutus ulang yang sudah terminated
+        // (menimpa terminated_at & menambah baris audit). Pre-check di sini,
+        // bukan menangkap Exception dari transition(), supaya error DB/lain
+        // tidak ikut tertelan jadi pesan "status tidak valid".
+        $oldStatus = (string) $customer->status;
+
+        if (! WorkflowTransition::tryFrom($oldStatus)?->canTransitionTo(WorkflowTransition::TERMINATED)) {
+            return redirect()->back()->with('error', "Pelanggan berstatus '{$oldStatus}' tidak bisa diputus langganan. Hanya pelanggan aktif atau terisolir.");
+        }
+
+        DB::transaction(function () use ($customer, $request, $oldStatus) {
+            // Lewat state machine: transition() mengisi terminated_at (Fase
+            // 5.1, supaya tab "Putus Langganan" bisa ORDER BY kolom), menulis
+            // customer_status_logs, dan audit 'Customer Workflow'.
+            app(CustomerWorkflowService::class)->transition($customer, WorkflowTransition::TERMINATED, $request->reason);
 
             // Update service status if it exists
             if ($customer->customerService) {
@@ -43,14 +55,20 @@ class CustomerTerminationController extends Controller
                 ]);
             }
 
-            // Log activity
+            // Audit 'customers'/'terminate' TETAP ditulis walau transition()
+            // sudah menulis audit sendiri: RendersCustomerList membaca alasan
+            // Putus Langganan dari baris ini (module=customers,
+            // action=terminate), begitu juga import legacy yang menulis baris
+            // sintetis dengan format sama. Dihapus = kolom Alasan di list
+            // kosong. old_values = status SEBENARNYA (bukan hardcode 'active'
+            // seperti dulu — pelanggan isolir tercatat "dari active").
             AuditLog::create([
                 'user_id' => auth()->id(),
                 'module' => 'customers',
                 'action' => 'terminate',
                 'auditable_type' => Customer::class,
                 'auditable_id' => $customer->id,
-                'old_values' => ['status' => 'active'],
+                'old_values' => ['status' => $oldStatus],
                 'new_values' => ['status' => 'terminated', 'reason' => $request->reason],
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),

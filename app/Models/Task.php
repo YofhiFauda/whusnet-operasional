@@ -114,6 +114,15 @@ class Task extends Model
         return $this->hasOne(TaskReport::class);
     }
 
+    /**
+     * Laporan task Ambil Modem (DEAC) — ADHOC-86. Hanya terisi untuk
+     * `task_type = DEAC`.
+     */
+    public function deviceRetrieval(): HasOne
+    {
+        return $this->hasOne(TaskDeviceRetrieval::class);
+    }
+
     // ─── Helper Methods ─────────────────────────────────────────
 
     /**

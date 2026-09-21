@@ -25,7 +25,7 @@ enum InvoiceType: string
     public function label(): string
     {
         return match ($this) {
-            self::AWAL => 'Tagihan Awal (PSB)',
+            self::AWAL => 'Aktivasi',
             self::BULANAN => 'Tagihan Bulanan Rutin',
             self::REAKTIVASI => 'Tagihan Reaktivasi',
             self::INSIDENTAL => 'Tagihan Lain-lain',

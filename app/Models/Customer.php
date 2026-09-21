@@ -484,6 +484,17 @@ class Customer extends Model
     }
 
     /**
+     * Riwayat pengambilan modem dari pelanggan ini (ADHOC-88). Tetap utuh
+     * walau `customer_devices.device_retrieved_at` direset saat Langganan Lagi.
+     *
+     * @return HasMany<DeviceRetrievalLog, $this>
+     */
+    public function deviceRetrievalLogs(): HasMany
+    {
+        return $this->hasMany(DeviceRetrievalLog::class)->orderByDesc('retrieved_at');
+    }
+
+    /**
      * @return HasOne<CustomerTechnicalDetail, $this>
      */
     public function customerTechnicalDetail(): HasOne

@@ -9,6 +9,7 @@ use App\Events\InvoiceStatusUpdated;
 use App\Models\Concerns\RecordsAuditLogs;
 use App\Support\Money;
 use App\Traits\HasPopScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -216,6 +217,46 @@ class Invoice extends Model
         // Satu titik broadcast buat semua jalur payment (single, bulk,
         // batch kolektor, reject) — lihat InvoiceStatusUpdated.
         InvoiceStatusUpdated::dispatch($this);
+    }
+
+    /**
+     * Status yang masih punya sisa tagihan. BATAL & LUNAS tidak pernah piutang.
+     *
+     * @var list<string>
+     */
+    public const OUTSTANDING_STATUSES = [
+        InvoiceStatus::BELUM_DIBAYAR->value,
+        InvoiceStatus::SEBAGIAN->value,
+    ];
+
+    /**
+     * SATU-SATUNYA definisi "piutang" / "terlambat" untuk tagihan.
+     *
+     * `due_date` (mis. tanggal 10) hanya formalitas & label UI — pelanggan
+     * masih boleh bayar sampai akhir bulan tanpa konsekuensi apa pun. Batas
+     * riil adalah pergantian bulan: pembukuan bulan lalu sudah tutup, jadi
+     * tagihan `billing_period` < bulan berjalan yang belum lunas = piutang.
+     *
+     * Jangan bandingkan `due_date` dengan hari ini untuk menentukan terlambat
+     * di tempat lain; pakai scope ini / isPiutang() supaya dashboard, list
+     * pelanggan, dan tabel kolektor tidak menyimpang satu sama lain.
+     * `billing_period` berformat 'Y-m', jadi perbandingan string aman.
+     *
+     * @param  Builder<Invoice>  $query
+     * @return Builder<Invoice>
+     */
+    public function scopePiutang(Builder $query): Builder
+    {
+        return $query
+            ->whereIn('invoice_status', self::OUTSTANDING_STATUSES)
+            ->where('billing_period', '<', now()->format('Y-m'));
+    }
+
+    public function isPiutang(): bool
+    {
+        return in_array($this->invoice_status?->value, self::OUTSTANDING_STATUSES, true)
+            && $this->billing_period !== null
+            && $this->billing_period < now()->format('Y-m');
     }
 
     /**

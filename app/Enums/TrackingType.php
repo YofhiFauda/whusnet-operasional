@@ -9,11 +9,13 @@ namespace App\Enums;
  * docs/plan/warehouse/warehouse_inventory_asset_traceability_analysis_advanced
  * §16.1.
  *
- * SENGAJA cuma 3 nilai, bukan 7 (draf awal sempat usul
- * Serialized/Batch/Quantity/Asset/Consumable/Sparepart/Returnable) —
- * Consumable/Sparepart/Returnable itu properti PEMAKAIAN barang, bukan cara
- * hitung stoknya. "Asset" juga bukan tipe ke-4: itu SERIALIZED +
- * `OwnershipMode::COMPANY_ASSET`, bukan mekanisme stok yang beda.
+ * SENGAJA cuma 3 nilai. `BATCH` (lot_no manual diketik staf) DIHAPUS
+ * 2026-09-16 (ADHOC-75) — 0 item pernah pakainya, dan begitu dicek pembukuan
+ * real (`docs/plan/warehouse/laporan/LAPORAN ADMIN GUDANG PER AGST 26.xlsx`)
+ * polanya BUKAN lot bebas ala BATCH, cuma persis 2 slot harga (Lama/Baru) per
+ * barang. Mekanisme itu sekarang jadi bawaan `QUANTITY` (auto, staf gak
+ * pernah isi lot manual) — lihat `InventoryReceiveService::resolveQuantityLot()`.
+ * Rancangan: `docs/plan/warehouse/analisa-2-slot-harga-quantity.md`.
  */
 enum TrackingType: string
 {
@@ -24,26 +26,31 @@ enum TrackingType: string
     case SERIALIZED = 'serialized';
 
     /**
-     * Dikelola berdasar jumlah polos — RJ45, cable tie, baut. Gak ada
-     * identitas per-unit yang berguna dilacak.
+     * Dikelola berdasar jumlah polos — RJ45, cable tie, baut, splitter,
+     * connector. Gak ada identitas per-unit yang berguna dilacak, TAPI kalau
+     * harga beli berubah, sistem otomatis pecah jadi maksimal 2 baris
+     * `inventory_balances` (lot bertag harga Lama/Baru, `lot_no` digenerate
+     * sistem — staf gak pernah ketik) — lihat
+     * `InventoryReceiveService::resolveQuantityLot()`.
      */
     case QUANTITY = 'quantity';
 
     /**
-     * QUANTITY + tag `lot_no` opsional (drum/roll kabel fiber) — BUKAN
-     * genealogy batch penuh ala farmasi/food (split/merge/expiry). Cukup
-     * jawab "drum LOT-2026-001 sisa berapa meter". Lihat
-     * `rancangan-ui.md` §3.8 buat alur lengkap (ISSUE multi-lot, FIFO saat
-     * konsumsi, harga per-lot).
+     * SERIALIZED + qty per-unit — identitas unik PER-ROLL (bukan vendor SN,
+     * digenerate sistem) + `length_remaining` yang berkurang sebagian-sebagian
+     * (bukan atomik seperti SERIALIZED). Dipakai khusus kabel (drum/roll fiber
+     * atau UTP) yang butuh dilacak "roll mana dipakai di mana, sisa berapa
+     * meter". Tabel `inventory_rolls`, status `App\Enums\RollStatus`. Lihat
+     * docs/TASKS.md ADHOC kabel-per-roll.
      */
-    case BATCH = 'batch';
+    case ROLL = 'roll';
 
     public function label(): string
     {
         return match ($this) {
             self::SERIALIZED => 'Bernomor Seri (Per Unit)',
             self::QUANTITY => 'Kuantitas (Qty)',
-            self::BATCH => 'Batch/Lot',
+            self::ROLL => 'Roll Kabel (Per Roll, Meter)',
         };
     }
 }

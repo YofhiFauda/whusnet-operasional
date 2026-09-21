@@ -382,7 +382,7 @@ class InstallationSpeedtestActivationGateTest extends TestCase
         ]);
         $admin = User::factory()->create();
 
-        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, $qty, 5000, null, $admin);
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, $qty, 5000, $admin);
         $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $kabel->id, 'qty' => $qty]], $admin);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$kabel->id => $qty], $admin);
         app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $kabel->id, 'qty' => $qty]], $admin);

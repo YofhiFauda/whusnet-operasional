@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
+use App\Models\DeviceRetrievalLog;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Pop;
 use App\Models\TechnicianCustody;
@@ -69,12 +72,61 @@ class WarehouseCustodyController extends Controller
             ->with(['item.category', 'currentTechnician', 'issuedFromPop'])
             ->get();
 
+        // Roll kabel (App\Enums\TrackingType::ROLL) aktif di custody teknisi
+        // — status ISSUED (belum dipotong) atau IN_USE (sisa sebagian).
+        // DEPLETED sengaja gak muncul di sini (custody-nya sendiri udah
+        // habis, gak ada lagi yang perlu dipantau).
+        $rolls = InventoryRoll::query()
+            ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+            ->when(! $hasAllAccess, fn ($q) => $q->whereIn('issued_from_pop_id', $allowedPopIds))
+            ->when($technicianFilter, fn ($q) => $q->where('current_technician_id', $technicianFilter))
+            ->when($popFilter, fn ($q) => $q->where('issued_from_pop_id', $popFilter))
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('roll_code', 'like', "%{$search}%")
+                        ->orWhereHas('item', fn ($iq) => $iq->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
+                });
+            })
+            ->with(['item.category', 'currentTechnician', 'issuedFromPop'])
+            ->get();
+
+        // Return dari pelanggan (ADHOC-88): modem hasil pengambilan alat (DEAC)
+        // yang MASIH dipegang teknisi — status `RETURNED` (transit), belum
+        // diterima gudang. Terpisah dari tab "Perangkat Serial Number" (ISSUED,
+        // barang yang DIBAWA teknisi ke lapangan) karena arahnya berlawanan:
+        // ini barang yang dibawa PULANG dan menunggu konfirmasi gudang di
+        // Terima Retur. Scope lewat `issued_from_pop_id` = gudang tujuan.
+        $returned = InventorySerial::query()
+            ->status(SerialStatus::RETURNED)
+            ->when(! $hasAllAccess, fn ($q) => $q->whereIn('issued_from_pop_id', $allowedPopIds))
+            ->when($technicianFilter, fn ($q) => $q->where('current_technician_id', $technicianFilter))
+            ->when($popFilter, fn ($q) => $q->where('issued_from_pop_id', $popFilter))
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('serial_number', 'like', "%{$search}%")
+                        ->orWhereHas('item', fn ($iq) => $iq->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                        ->orWhereHas('customer', fn ($cq) => $cq->where('full_name', 'like', "%{$search}%"));
+                });
+            })
+            ->with(['item.category', 'currentTechnician', 'issuedFromPop', 'customer'])
+            ->orderBy('updated_at')
+            ->get();
+
+        // Tanggal pengambilan per SN dari log (yang belum diterima) — kolom
+        // `updated_at` SN bisa berubah karena hal lain, log tidak.
+        $returnedRetrievedAt = DeviceRetrievalLog::query()
+            ->whereIn('serial_id', $returned->pluck('id'))
+            ->whereNull('received_at')
+            ->orderBy('retrieved_at')
+            ->get(['serial_id', 'retrieved_at'])
+            ->pluck('retrieved_at', 'serial_id');
+
         // Dropdown filter teknisi — cuma yang KEBETULAN lagi py custody dalam
         // scope, biar gak nawarin nama yang query-nya bakal kosong. Dihitung
         // dari query TANPA filter teknisi (technician_id sengaja gak dioper
         // ke sini) supaya daftar dropdown gak menyusut begitu 1 teknisi
         // dipilih — filter POP/search tetap ikut biar konsisten sama tabel.
-        $technicianIds = $custodies->pluck('technician_id')->merge($serials->pluck('current_technician_id'))->unique()->filter();
+        $technicianIds = $custodies->pluck('technician_id')->merge($serials->pluck('current_technician_id'))->merge($rolls->pluck('current_technician_id'))->merge($returned->pluck('current_technician_id'))->unique()->filter();
         $technicians = User::whereIn('id', $technicianIds)->orderBy('name')->get();
 
         // KPI ringkasan (rancangan-layout.md §8.1) — SENGAJA dipisah per
@@ -89,13 +141,14 @@ class WarehouseCustodyController extends Controller
 
         $kpi = [
             'serial_count' => $serials->count(),
-            'meter_total' => (float) $meterCustodies->sum('qty_remaining'),
+            'meter_total' => (float) $meterCustodies->sum('qty_remaining') + (float) $rolls->sum('length_remaining'),
             'material_batch_count' => $nonMeterCustodies->count(),
-            'technician_count' => $custodies->pluck('technician_id')->merge($serials->pluck('current_technician_id'))->unique()->filter()->count(),
+            'roll_count' => $rolls->count(),
+            'technician_count' => $custodies->pluck('technician_id')->merge($serials->pluck('current_technician_id'))->merge($rolls->pluck('current_technician_id'))->merge($returned->pluck('current_technician_id'))->unique()->filter()->count(),
         ];
 
         return view('warehouse.custody.index', compact(
-            'custodies', 'serials', 'technicians', 'technicianFilter', 'pops', 'popFilter', 'search', 'kpi'
+            'custodies', 'serials', 'rolls', 'returned', 'returnedRetrievedAt', 'technicians', 'technicianFilter', 'pops', 'popFilter', 'search', 'kpi'
         ));
     }
 }

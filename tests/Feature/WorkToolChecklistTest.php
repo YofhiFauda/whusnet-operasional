@@ -194,7 +194,7 @@ class WorkToolChecklistTest extends TestCase
         $patchCord = Item::create(['code' => 'PC-WT-001', 'name' => 'Patch Cord SC/UPC', 'item_category_id' => $catPatchCord->id, 'unit' => 'pcs', 'tracking_type' => 'quantity']);
 
         $admin = User::factory()->create();
-        app(InventoryReceiveService::class)->receiveQuantity($pusat, $patchCord, 10, 15000, null, $admin);
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $patchCord, 10, 15000, $admin);
         $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $this->pop, [['item_id' => $patchCord->id, 'qty' => 10]], $admin);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$patchCord->id => 10], $admin);
         app(InventoryIssueService::class)->issue($this->pop, $this->actor, [['item_id' => $patchCord->id, 'qty' => 5]], $admin);

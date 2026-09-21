@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\NotificationType;
 use App\Enums\ScopeType;
-use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Events\TaskCompleted;
@@ -15,7 +14,6 @@ use App\Models\AuditLog;
 use App\Models\CustomerInstallation;
 use App\Models\CustomerSurvey;
 use App\Models\FopTask;
-use App\Models\InventorySerial;
 use App\Models\Task;
 use App\Models\TaskTeam;
 use App\Models\User;
@@ -237,6 +235,18 @@ class TaskService
             'Syarat penyelesaian task belum terpenuhi.'
         );
 
+        // Task Ambil Modem (DEAC) TIDAK boleh selesai tanpa laporan DEAC
+        // (ADHOC-86). Sebelumnya endpoint POST /tasks/{task}/complete
+        // (TaskStatusController) bisa menutup DEAC tanpa satu pun catatan
+        // alat — `device_retrieved_at` terisi tanpa bukti apa pun. Dicek
+        // SEBELUM update status supaya gagalnya tidak meninggalkan task
+        // setengah selesai.
+        abort_if(
+            $task->task_type === TaskType::AMBIL_MODEM && ! $task->deviceRetrieval()->exists(),
+            422,
+            'Isi laporan pengambilan alat dulu sebelum menyelesaikan task Ambil Modem.'
+        );
+
         $task->update([
             'status' => TaskStatus::SELESAI->value,
             'fop_review_status' => 'pending',
@@ -247,33 +257,22 @@ class TaskService
 
         $task = $task->refresh();
 
-        // Task Ambil Modem (DEAC) selesai → alat otomatis ditandai diambil.
-        // Ini pengganti klik manual "Ambil Alat" jaman FopTask belum dibuat
-        // (lihat CustomerController::retrieveDevice() & TicketService::createDeviceRetrievalTask()).
-        if ($task->task_type === TaskType::AMBIL_MODEM && $task->customer_id) {
+        // Task Ambil Modem (DEAC) selesai → alat ditandai diambil HANYA kalau
+        // teknisi melaporkan hasil "diambil" (minimal satu SN, dijamin
+        // DeviceRetrievalController::store()). "Tidak ditemukan"/"ditolak"
+        // selesai tanpa mengisi `device_retrieved_at` — badge "Sudah Diambil"
+        // di List Putus Langganan tidak boleh berbohong ketika alat masih di
+        // pelanggan, dan tombol "Ambil Alat" muncul lagi untuk dicoba ulang.
+        //
+        // Gerak inventori (SN → RETURNED, transit ke gudang) sudah terjadi di
+        // form laporan lewat InventoryReassignService::pickupSerialFromCustomer(),
+        // bukan di sini: butuh SN yang teknisi input, bukan tebakan "semua SN
+        // INSTALLED milik pelanggan" seperti sebelum ADHOC-86 (yang mengabaikan
+        // modem legacy dan tidak pernah memverifikasi apa yang benar-benar dibawa).
+        if ($task->task_type === TaskType::AMBIL_MODEM && $task->customer_id && $task->deviceRetrieval?->outcome->isRetrieved()) {
             $device = $task->customer?->customerDevice;
             if ($device && ! $device->device_retrieved_at) {
                 $device->update(['device_retrieved_at' => $task->completed_at]);
-            }
-
-            // Tutup siklus InventorySerial juga — sebelumnya cuma
-            // customer_devices (legacy) yang ke-update, InventorySerial
-            // permanen macet di INSTALLED walau device fisik udah balik ke
-            // gudang (gap ketauan lewat pertanyaan user, 2026-09-03). SN yang
-            // gak pernah lewat modul Inventory (data lama/manual, gak ada
-            // customer_id ke-set) otomatis diabaikan — query di bawah
-            // kosong, gak ada yang diloop.
-            $installedSerials = InventorySerial::query()
-                ->where('customer_id', $task->customer_id)
-                ->where('status', SerialStatus::INSTALLED->value)
-                ->get();
-
-            foreach ($installedSerials as $serial) {
-                app(InventoryReassignService::class)->returnInstalledSerialFromCustomer(
-                    $serial,
-                    "Pengambilan alat — Task {$task->task_number} (putus langganan).",
-                    $actor,
-                );
             }
         }
 

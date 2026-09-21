@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Enums\InventoryTransactionType;
+use App\Enums\ItemCondition;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -26,17 +29,18 @@ use InvalidArgumentException;
 class InventoryReceiveService
 {
     /**
-     * Terima barang QUANTITY/BATCH (RJ45, kabel per drum). `lotNo` WAJIB
-     * diisi kalau `item.tracking_type === BATCH`, dan HARUS kosong buat
-     * QUANTITY biasa — dua axis ini gampang ketuker kalau gak divalidasi di
-     * titik masuk.
+     * Terima barang QUANTITY (RJ45, splitter, connector, kabel per drum
+     * non-roll). Gak ada parameter lot_no — staf gak pernah isi lot manual
+     * (ADHOC-75, 2026-09-16). Sistem otomatis nentuin lot lewat
+     * `resolveQuantityLot()`: maksimal 2 lot aktif per (gudang, barang) —
+     * satu per harga (Lama/Baru), niru pola pembukuan real admin gudang
+     * (`docs/plan/warehouse/analisa-2-slot-harga-quantity.md`).
      */
     public function receiveQuantity(
         Pop $pusat,
         Item $item,
         float $qty,
         float $unitPrice,
-        ?string $lotNo = null,
         ?User $actor = null,
         ?string $notes = null,
         ?string $referenceNumber = null,
@@ -44,10 +48,11 @@ class InventoryReceiveService
         $this->assertPusat($pusat);
         $this->assertPositiveQty($qty);
         $this->assertPositivePrice($unitPrice);
-        $this->assertQuantityOrBatchTracking($item);
-        $lotNo = $this->normalizeLotNo($item, $lotNo);
+        $this->assertQuantityTracking($item);
 
-        return DB::transaction(function () use ($pusat, $item, $qty, $unitPrice, $lotNo, $actor, $notes, $referenceNumber) {
+        return DB::transaction(function () use ($pusat, $item, $qty, $unitPrice, $actor, $notes, $referenceNumber) {
+            $lotNo = $this->resolveQuantityLot($pusat, $item, $unitPrice);
+
             $balance = InventoryBalance::query()
                 ->firstOrCreate(
                     ['pop_id' => $pusat->id, 'item_id' => $item->id, 'lot_no' => $lotNo],
@@ -76,6 +81,11 @@ class InventoryReceiveService
      * rancangan-ui.md) bisa nunjukin RECEIVE sebagai titik pertama riwayat
      * SN itu.
      *
+     * `$item->auto_generate_serial=true` (ODP, Splitter — gak punya SN
+     * vendor) WAJIB manggil ini lewat `receiveSerializedAuto()`, bukan di
+     * sini langsung — guard di bawah nolak biar gak ketuker sumbernya diam-
+     * diam. Lihat docs/plan/warehouse/analisa-generate-id-barang-non-serial.md.
+     *
      * @param  list<string>  $serialNumbers
      * @return list<InventorySerial>
      */
@@ -93,6 +103,10 @@ class InventoryReceiveService
 
         if ($item->tracking_type !== TrackingType::SERIALIZED) {
             throw new InvalidArgumentException("Item {$item->name} bukan tracking_type SERIALIZED.");
+        }
+
+        if ($item->auto_generate_serial) {
+            throw new InvalidArgumentException("Item {$item->name} SN-nya digenerate sistem — pakai receiveSerializedAuto(), bukan kirim daftar SN manual.");
         }
 
         if ($serialNumbers === []) {
@@ -118,6 +132,7 @@ class InventoryReceiveService
                     'item_id' => $item->id,
                     'serial_number' => $serialNumber,
                     'status' => SerialStatus::AVAILABLE,
+                    'condition' => ItemCondition::NEW,
                     'current_pop_id' => $pusat->id,
                 ]);
 
@@ -141,6 +156,156 @@ class InventoryReceiveService
     }
 
     /**
+     * Terima barang SERIALIZED yang GAK punya SN vendor (ODP, Splitter) —
+     * `$item->auto_generate_serial=true`. Beda dari `receiveSerialized()`:
+     * input-nya cuma "berapa unit" (bukan daftar SN), ID digenerate sistem
+     * lewat `generateSerialCode()` (pola sama `generateRollCode()`), biar
+     * tiap unit tetap ketrace individual + bisa dicetak barcode-nya kayak
+     * roll kabel. Lihat
+     * docs/plan/warehouse/analisa-generate-id-barang-non-serial.md.
+     *
+     * @return list<InventorySerial>
+     */
+    public function receiveSerializedAuto(
+        Pop $pusat,
+        Item $item,
+        int $count,
+        float $unitPrice,
+        ?User $actor = null,
+        ?string $notes = null,
+        ?string $referenceNumber = null,
+    ): array {
+        $this->assertPusat($pusat);
+        $this->assertPositivePrice($unitPrice);
+
+        if ($item->tracking_type !== TrackingType::SERIALIZED) {
+            throw new InvalidArgumentException("Item {$item->name} bukan tracking_type SERIALIZED.");
+        }
+
+        if (! $item->auto_generate_serial) {
+            throw new InvalidArgumentException("Item {$item->name} SN-nya manual — pakai receiveSerialized(), bukan receiveSerializedAuto().");
+        }
+
+        if ($count < 1) {
+            throw new InvalidArgumentException('Jumlah unit harus minimal 1.');
+        }
+
+        return DB::transaction(function () use ($pusat, $item, $count, $unitPrice, $actor, $notes, $referenceNumber) {
+            $serials = [];
+
+            for ($i = 0; $i < $count; $i++) {
+                $serial = InventorySerial::create([
+                    'item_id' => $item->id,
+                    'serial_number' => $this->generateSerialCode($item),
+                    'status' => SerialStatus::AVAILABLE,
+                    'condition' => ItemCondition::NEW,
+                    'current_pop_id' => $pusat->id,
+                ]);
+
+                InventoryTransaction::create([
+                    'type' => InventoryTransactionType::RECEIVE,
+                    'reference_number' => $referenceNumber,
+                    'item_id' => $item->id,
+                    'serial_id' => $serial->id,
+                    'qty' => 1,
+                    'unit_price_snapshot' => $unitPrice,
+                    'to_pop_id' => $pusat->id,
+                    'notes' => $notes,
+                    'created_by' => $actor?->id,
+                ]);
+
+                $serials[] = $serial;
+            }
+
+            return $serials;
+        });
+    }
+
+    /**
+     * Terima kabel per-roll (App\Enums\TrackingType::ROLL) — beda dari
+     * `receiveSerialized()`: ID roll BUKAN dari vendor, digenerate sistem di
+     * sini (`generateRollCode()`), jadi input-nya cuma "berapa roll" +
+     * vendor + harga, bukan daftar ID. Tiap roll = 1 `InventoryRoll` +
+     * 1 baris ledger (qty = panjang roll, snapshot `item->meter_per_roll`
+     * saat ini — bukan dibaca ulang belakangan).
+     *
+     * @return list<InventoryRoll>
+     */
+    public function receiveRoll(
+        Pop $pusat,
+        Item $item,
+        int $rollCount,
+        ?string $vendor,
+        float $unitPrice,
+        ?User $actor = null,
+        ?string $notes = null,
+        ?string $referenceNumber = null,
+    ): array {
+        $this->assertPusat($pusat);
+        $this->assertPositivePrice($unitPrice);
+
+        if ($item->tracking_type !== TrackingType::ROLL) {
+            throw new InvalidArgumentException("Item {$item->name} bukan tracking_type ROLL.");
+        }
+
+        if ($rollCount < 1) {
+            throw new InvalidArgumentException('Jumlah roll harus minimal 1.');
+        }
+
+        $meterPerRoll = (float) $item->meter_per_roll;
+        if ($meterPerRoll <= 0) {
+            throw new InvalidArgumentException("Item {$item->name} belum py meter_per_roll di Master Barang — isi dulu sebelum Receive.");
+        }
+
+        // `$unitPrice` yang diinput staf itu HARGA BELI PER ROLL (mis.
+        // Rp 777.000/roll @ 1.000 meter) — tapi `unit_price_snapshot` di
+        // seluruh sistem (InventoryRoll, tiap InventoryTransaction turunan,
+        // TaskMaterial pas consumeFromRoll()) SELALU dipasangkan sama qty
+        // BER-SATUAN METER (bukan roll). Simpan mentah harga-per-roll ke
+        // kolom yang dikali qty-meter bikin nilai kekali `meterPerRoll`
+        // (di kasus 1.000 meter/roll, 1000x lipat) di SETIAP kalkulasi nilai
+        // hilir — custody, nilai rugi Adjustment, Laporan Bulanan, Invoice.
+        // Dikonversi ke harga-per-meter DI SINI, satu-satunya titik masuk
+        // roll ke ledger, biar seluruh rantai hilir otomatis benar tanpa
+        // perlu tau soal konversi roll↔meter sama sekali.
+        $pricePerMeter = $unitPrice / $meterPerRoll;
+
+        return DB::transaction(function () use ($pusat, $item, $rollCount, $vendor, $pricePerMeter, $meterPerRoll, $actor, $notes, $referenceNumber) {
+            $rolls = [];
+
+            for ($i = 0; $i < $rollCount; $i++) {
+                $roll = InventoryRoll::create([
+                    'item_id' => $item->id,
+                    'roll_code' => $this->generateRollCode($item),
+                    'vendor' => $vendor,
+                    'length_total' => $meterPerRoll,
+                    'length_remaining' => $meterPerRoll,
+                    'unit_price_snapshot' => $pricePerMeter,
+                    'status' => RollStatus::AVAILABLE,
+                    'current_pop_id' => $pusat->id,
+                    'received_at' => now(),
+                ]);
+
+                InventoryTransaction::create([
+                    'type' => InventoryTransactionType::RECEIVE,
+                    'reference_number' => $referenceNumber,
+                    'item_id' => $item->id,
+                    'roll_id' => $roll->id,
+                    'qty' => $meterPerRoll,
+                    'unit_price_snapshot' => $pricePerMeter,
+                    'to_pop_id' => $pusat->id,
+                    'notes' => $notes,
+                    'created_by' => $actor?->id,
+                ]);
+
+                $rolls[] = $roll;
+            }
+
+            return $rolls;
+        });
+    }
+
+    /**
      * Satu event Barang Masuk bisa berisi banyak item sekaligus (mis. 100 SN
      * modem ZTE + 500m kabel dalam satu faktur/surat jalan) — dibungkus SATU
      * `reference_number` (RCV-...) biar bisa direview lagi sebagai satu bon,
@@ -149,7 +314,7 @@ class InventoryReceiveService
      * per-item (dipakai langsung oleh test existing) — method ini cuma
      * orkestrasi tambahan, bukan pengganti.
      *
-     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, unit_price:float}>  $lines
+     * @param  list<array{item_id:int, qty?:float, serial_numbers?:list<string>, serial_count?:int, roll_count?:int, vendor?:?string, unit_price:float}>  $lines
      * @return string reference_number buat halaman show()
      */
     public function receiveBatch(Pop $pusat, array $lines, User $actor, ?string $notes = null): string
@@ -174,8 +339,12 @@ class InventoryReceiveService
 
                 if (isset($line['serial_numbers'])) {
                     $this->receiveSerialized($pusat, $item, $line['serial_numbers'], (float) $line['unit_price'], $actor, $notes, $referenceNumber);
+                } elseif (isset($line['serial_count'])) {
+                    $this->receiveSerializedAuto($pusat, $item, (int) $line['serial_count'], (float) $line['unit_price'], $actor, $notes, $referenceNumber);
+                } elseif (isset($line['roll_count'])) {
+                    $this->receiveRoll($pusat, $item, (int) $line['roll_count'], $line['vendor'] ?? null, (float) $line['unit_price'], $actor, $notes, $referenceNumber);
                 } else {
-                    $this->receiveQuantity($pusat, $item, (float) ($line['qty'] ?? 0), (float) $line['unit_price'], $line['lot_no'] ?? null, $actor, $notes, $referenceNumber);
+                    $this->receiveQuantity($pusat, $item, (float) ($line['qty'] ?? 0), (float) $line['unit_price'], $actor, $notes, $referenceNumber);
                 }
             }
 
@@ -203,6 +372,50 @@ class InventoryReceiveService
             ->max() ?? 0;
 
         return sprintf('RCV-%s-%06d', $today, $lastNum + 1);
+    }
+
+    /**
+     * `{item.code}-{YYYYMMDD}-{6 digit}` — prefix = kode barang (identitas
+     * jenis kabelnya), tanggal penuh buat dibaca manusia, counter per BULAN
+     * per prefix (sama pola `generateReferenceNumber()` di atas, keputusan
+     * 2026-09-03 dipakai ulang di sini biar konsisten satu modul). Race
+     * kondisi MAX+1 gak locked — risiko diterima SENGAJA sama seperti nomor
+     * referensi lain di seluruh Gudang (unique constraint `roll_code` jadi
+     * jaring pengaman terakhir).
+     */
+    private function generateRollCode(Item $item): string
+    {
+        $prefix = $item->code;
+        $yearMonth = date('Ym');
+        $today = date('Ymd');
+
+        $lastNum = InventoryRoll::where('roll_code', 'like', "{$prefix}-{$yearMonth}%")
+            ->pluck('roll_code')
+            ->map(fn ($code) => (int) substr($code, strrpos($code, '-') + 1))
+            ->max() ?? 0;
+
+        return sprintf('%s-%s-%06d', $prefix, $today, $lastNum + 1);
+    }
+
+    /**
+     * `{item.code}-{YYYYMMDD}-{6 digit}` — pola sama persis `generateRollCode()`
+     * di bawah, counter per bulan per prefix TAPI dicek ke `inventory_serials`
+     * (bukan `inventory_rolls`). Race MAX+1 gak locked, sama alasan
+     * `generateRollCode()` — unique constraint `serial_number` jaring
+     * pengaman terakhir.
+     */
+    private function generateSerialCode(Item $item): string
+    {
+        $prefix = $item->code;
+        $yearMonth = date('Ym');
+        $today = date('Ymd');
+
+        $lastNum = InventorySerial::where('serial_number', 'like', "{$prefix}-{$yearMonth}%")
+            ->pluck('serial_number')
+            ->map(fn ($code) => (int) substr($code, strrpos($code, '-') + 1))
+            ->max() ?? 0;
+
+        return sprintf('%s-%s-%06d', $prefix, $today, $lastNum + 1);
     }
 
     private function assertPusat(Pop $pop): void
@@ -265,32 +478,109 @@ class InventoryReceiveService
         }
     }
 
-    private function assertQuantityOrBatchTracking(Item $item): void
+    private function assertQuantityTracking(Item $item): void
     {
         if ($item->tracking_type === TrackingType::SERIALIZED) {
             throw new InvalidArgumentException("Item {$item->name} SERIALIZED — pakai receiveSerialized(), bukan receiveQuantity().");
         }
+
+        if ($item->tracking_type === TrackingType::ROLL) {
+            throw new InvalidArgumentException("Item {$item->name} ROLL — pakai receiveRoll(), bukan receiveQuantity().");
+        }
     }
 
     /**
-     * BATCH wajib py lot_no (drum/roll), QUANTITY biasa wajib KOSONG (sentinel
-     * string kosong — lihat komentar unique constraint di migration
-     * `create_inventory_balances_table`, kenapa bukan null).
+     * Inti ADHOC-75 (2026-09-16) — auto-tentuin `lot_no` buat RECEIVE
+     * QUANTITY, staf gak pernah isi manual. Maksimal 2 lot AKTIF (qty>0) per
+     * (gudang, barang) sekaligus, niru persis pola pembukuan real admin
+     * gudang: satu lot "Harga Lama", satu lot "Harga Baru" — bukan genealogy
+     * lot tak terbatas ala BATCH lama (lihat
+     * docs/plan/warehouse/analisa-2-slot-harga-quantity.md §3-4).
+     *
+     * - 0 lot aktif → lot sentinel `''` (barang pertama kali diterima —
+     *   TIDAK generate kode, sengaja SAMA PERSIS perilaku lama, supaya
+     *   mayoritas barang berharga stabil — kaos, mug, baut — gak pernah
+     *   kelihatan py "kode lot" sama sekali, cuma numpuk 1 baris polos kayak
+     *   sebelum ADHOC-75).
+     * - 1-2 lot aktif, salah satunya harganya SAMA persis `$unitPrice` → nimbun
+     *   ke lot itu (bukan bikin lot baru cuma gara-gara kedatangan ke-2/3
+     *   kalau harganya kebetulan gak berubah).
+     * - 1 lot aktif, harga beda → lot BARU digenerate (lot lama — entah `''`
+     *   atau kode — otomatis jadi "Harga Lama", lot baru ini jadi "Harga
+     *   Baru" — TANPA mindahin data, dua baris `inventory_balances` ini emang
+     *   udah kepisah sejak awal).
+     * - 2 lot aktif, harga beda dari KEDUANYA → DITOLAK. Kedatangan harga
+     *   ke-3 sebelum salah satu slot habis belum pernah terjadi di data real
+     *   (dikonfirmasi user 2026-09-16) — sengaja belum didukung, daripada
+     *   diam-diam salah hitung. Habiskan salah satu lot (Issue/Adjustment)
+     *   dulu sebelum RECEIVE harga baru lagi.
      */
-    private function normalizeLotNo(Item $item, ?string $lotNo): string
+    private function resolveQuantityLot(Pop $pusat, Item $item, float $unitPrice): string
     {
-        if ($item->tracking_type === TrackingType::BATCH) {
-            if (blank($lotNo)) {
-                throw new InvalidArgumentException("Item {$item->name} tracking_type BATCH — lot_no wajib diisi (nomor drum/roll).");
+        $activeLots = InventoryBalance::query()
+            ->where('pop_id', $pusat->id)
+            ->where('item_id', $item->id)
+            ->where('qty', '>', 0)
+            ->orderBy('id')
+            ->pluck('lot_no');
+
+        if ($activeLots->isEmpty()) {
+            return '';
+        }
+
+        foreach ($activeLots as $lotNo) {
+            if ($this->priceForLot($item, $lotNo) === $unitPrice) {
+                return $lotNo;
             }
-
-            return $lotNo;
         }
 
-        if (filled($lotNo)) {
-            throw new InvalidArgumentException("Item {$item->name} bukan BATCH — lot_no harus kosong.");
+        if ($activeLots->count() >= 2) {
+            $hargaAktif = $activeLots->map(fn ($lotNo) => $this->priceForLot($item, $lotNo))->filter()->implode(', ');
+
+            throw new InvalidArgumentException(
+                "Item {$item->name} sudah punya 2 harga aktif di {$pusat->name} ({$hargaAktif}) — sistem belum mendukung harga ke-3 sebelum salah satu lot habis. Habiskan salah satu lot (Issue/Transfer/Adjustment) dulu sebelum menerima harga baru."
+            );
         }
 
-        return '';
+        return $this->generateQuantityLotCode($item);
+    }
+
+    /**
+     * Harga sebuah lot = harga RECEIVE TERAKHIR ke lot itu (last-cost per
+     * lot, pola sama `resolveLastCost()` di Issue/Transfer Service).
+     * `inventory_transactions.lot_no` NULL buat lot sentinel `''`
+     * (`inventory_balances.lot_no` NOT NULL default '' — lihat komentar
+     * migration `create_inventory_balances_table` kenapa beda dari ledger).
+     */
+    private function priceForLot(Item $item, string $lotNo): ?float
+    {
+        $price = InventoryTransaction::query()
+            ->where('item_id', $item->id)
+            ->where('type', InventoryTransactionType::RECEIVE->value)
+            ->where('lot_no', $lotNo === '' ? null : $lotNo)
+            ->latest('id')
+            ->value('unit_price_snapshot');
+
+        return $price !== null ? (float) $price : null;
+    }
+
+    /**
+     * `{item.code}-{YYYYMMDD}-{6 digit}` — pola sama persis
+     * `generateRollCode()` di bawah (konsisten satu modul), scoped ke barang
+     * (bukan gudang) karena lot QUANTITY bisa lintas-pop lewat Transfer.
+     */
+    private function generateQuantityLotCode(Item $item): string
+    {
+        $prefix = $item->code;
+        $yearMonth = date('Ym');
+        $today = date('Ymd');
+
+        $lastNum = InventoryBalance::where('item_id', $item->id)
+            ->where('lot_no', 'like', "{$prefix}-{$yearMonth}%")
+            ->pluck('lot_no')
+            ->map(fn ($code) => (int) substr($code, strrpos($code, '-') + 1))
+            ->max() ?? 0;
+
+        return sprintf('%s-%s-%06d', $prefix, $today, $lastNum + 1);
     }
 }

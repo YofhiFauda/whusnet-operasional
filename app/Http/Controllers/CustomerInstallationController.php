@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\EquipmentClass;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
@@ -15,6 +16,7 @@ use App\Events\InstallationCompleted;
 use App\Events\InstallationStarted;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -234,6 +236,29 @@ class CustomerInstallationController extends Controller
             ->values();
     }
 
+    /**
+     * Padanan `eligibleSerialsForTeam()` buat roll kabel
+     * (App\Enums\TrackingType::ROLL) — list INDIVIDUAL roll (bukan agregat
+     * kayak `eligiblePassiveCustodyForTeam()`), karena teknisi harus milih
+     * roll FISIK mana yang dipotong (tiap roll punya `length_remaining`
+     * sendiri, gak bisa digabung kayak custody QUANTITY/BATCH). Penegakan
+     * sebenarnya tetap di `InventoryService::consumeFromRoll()` saat
+     * `storeSpeedtest()`, sama pola `eligiblePassiveCustodyForTeam()`.
+     */
+    private function eligibleRollsForTeam(?Task $task)
+    {
+        $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
+
+        return $teamTechnicianIds === []
+            ? collect()
+            : InventoryRoll::query()
+                ->whereIn('current_technician_id', $teamTechnicianIds)
+                ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+                ->where('length_remaining', '>', 0)
+                ->with('item')
+                ->get();
+    }
+
     public function report(Customer $customer, Request $request)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
@@ -300,6 +325,10 @@ class CustomerInstallationController extends Controller
         // dari step 5). Lihat eligiblePassiveCustodyForTeam().
         $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($task);
 
+        // Dropdown "Roll Kabel" — sama prinsip eligibleSerials di atas, roll
+        // INDIVIDUAL (bukan agregat) yang lagi di custody tim ini.
+        $eligibleRolls = $this->eligibleRollsForTeam($task);
+
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
         // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
         // Tanpa prefill teknisi cenderung mengosongkan seksi ini, dan
@@ -358,7 +387,7 @@ class CustomerInstallationController extends Controller
             && $installFopTask
             && $installFopTask->materials()->terpakai()->exists();
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'droppedFreeformEstimateNames'));
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -716,6 +745,11 @@ class CustomerInstallationController extends Controller
         // yang sama dengan $assignmentTask di atas, bukan query baru.
         $eligibleSerialIds = $this->eligibleSerialsForTeam($assignmentTask)->pluck('id');
 
+        // Roll kabel — OPSIONAL (beda dari SN Perangkat Aktif yang wajib):
+        // gak semua pemasangan pakai kabel yang ke-track per-roll, jadi
+        // submit tanpa pilih roll tetap harus jalan biasa.
+        $eligibleRollIds = $this->eligibleRollsForTeam($assignmentTask)->pluck('id');
+
         $validated = $request->validate([
             // Informasi Perangkat Aktif + Nomor/Port ODP — SATU-SATUNYA syarat
             // wajib buat tombol Aktivasi (ADHOC). Nomor/Slot/Port OLT sengaja
@@ -755,6 +789,12 @@ class CustomerInstallationController extends Controller
             // storeSpeedtest(), lihat komentar di sana.
             'selected_inventory_serial_id' => ['required', 'integer', Rule::in($eligibleSerialIds)],
 
+            // OPSIONAL — sama pola draft pointer di atas (dibatasi custody
+            // tim ini), aksi potong-meter sungguhan (consumeFromRoll()) baru
+            // jalan di storeSpeedtest().
+            'selected_inventory_roll_id' => ['nullable', 'integer', Rule::in($eligibleRollIds)],
+            'roll_meters_used' => ['nullable', 'numeric', 'min:0.01', 'required_with:selected_inventory_roll_id'],
+
             'installation_photo' => 'nullable|image|max:2048',
             'contract_photo' => 'nullable|image|max:2048',
             'signature_photo' => 'nullable|image|max:2048',
@@ -792,6 +832,8 @@ class CustomerInstallationController extends Controller
             // yang bisa dipilih, harus ambil barang dari Gudang dulu.
             'selected_inventory_serial_id.required' => 'SN Perangkat Aktif wajib dipilih dari Gudang. Anda tidak memiliki SN di custody — ambil barang (Issue) dari Gudang terlebih dahulu sebelum bisa mengisi Laporan Pemasangan.',
             'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
+            'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
+            'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
         ]);
 
         // selected_inventory_serial_id sudah divalidasi wajib & anggota
@@ -867,6 +909,10 @@ class CustomerInstallationController extends Controller
             // Draft pointer doang — resubmit-safe, gak ada side effect ke
             // inventory_serials di sini (cuma nunjuk, belum diinstall).
             $installation->selected_inventory_serial_id = $validated['selected_inventory_serial_id'] ?? null;
+            // Roll kabel — draft pointer sama, konsumsi sungguhan (potong
+            // meter) baru jalan di storeSpeedtest().
+            $installation->selected_inventory_roll_id = $validated['selected_inventory_roll_id'] ?? null;
+            $installation->roll_meters_used = $validated['roll_meters_used'] ?? null;
 
             // Status TETAP in_progress di sini — completed baru ditetapkan di
             // storeSpeedtest(), begitu Laporan Speedtest ikut tersimpan.
@@ -1130,6 +1176,14 @@ class CustomerInstallationController extends Controller
                 if ($installation->selected_inventory_serial_id) {
                     $serial = InventorySerial::findOrFail($installation->selected_inventory_serial_id);
                     app(InventoryService::class)->installSerial($serial, $customer, $installFopTask, $teamTechnicians, auth()->user());
+                }
+
+                // Roll kabel — draft pointer dari storePemasangan() dieksekusi
+                // jadi potong-meter beneran DI SINI, sama alasan Perangkat
+                // Aktif di atas (titik penyelesaian tunggal, resubmit-safe).
+                if ($installation->selected_inventory_roll_id && $installation->roll_meters_used) {
+                    $roll = InventoryRoll::findOrFail($installation->selected_inventory_roll_id);
+                    app(InventoryService::class)->consumeFromRoll($roll, (float) $installation->roll_meters_used, $teamTechnicians, $installFopTask, $customer, auth()->user());
                 }
             }
 

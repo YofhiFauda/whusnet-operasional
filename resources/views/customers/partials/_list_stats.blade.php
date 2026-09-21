@@ -40,7 +40,7 @@
     <!-- Lewat Tempo -->
     <div class="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between card-interactive min-w-0">
         <div class="min-w-0 flex-1 pr-2">
-            <p class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate">Lewat Tempo</p>
+            <p class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate">Piutang</p>
             <h3 class="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">{{ number_format($overdueCount ?? 0) }}</h3>
             <p class="text-[10px] text-slate-500 mt-0.5 truncate">Menunggu pembayaran</p>
         </div>

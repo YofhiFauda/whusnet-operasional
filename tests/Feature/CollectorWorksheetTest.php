@@ -147,7 +147,7 @@ class CollectorWorksheetTest extends TestCase
         $responseDefault->assertOk();
         // String khas tab Pembayaran — bukan sekadar kata "Pembayaran" yang
         // juga muncul di menu sidebar.
-        $responseDefault->assertSee('Seluruh tunggakan kolektor ini');
+        $responseDefault->assertSee('Seluruh tagihan belum dibayar kolektor ini');
 
         $responseAssign = $this->actingAs($admin)->get(route('collector-worksheet.show', ['collector' => $kolektor->id, 'tab' => 'assign']));
         $responseAssign->assertOk();

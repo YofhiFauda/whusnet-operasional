@@ -61,7 +61,7 @@ class WarehouseTransferAndIssueTest extends TestCase
         $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
         $this->kabel = Item::create(['code' => 'WT-KABEL', 'name' => 'Dropcore WT', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
 
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 300, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 300, 5000, $this->owner);
     }
 
     #[Test]
@@ -77,7 +77,13 @@ class WarehouseTransferAndIssueTest extends TestCase
         // WarehouseReceiveTest::halaman_create_bisa_dibuka_tanpa_error().
         $this->actingAs($this->owner)->get(route('warehouse.transfers.create'))
             ->assertOk()
-            ->assertSee('Stok Siap Kirim');
+            ->assertSee('Stok Siap Kirim')
+            // Guard cabang ROLL KABEL ke-render di template Alpine (bug
+            // 2026-09-16: halaman ini punya Alpine manager sendiri, BUKAN
+            // <x-inventory-line-rows>, jadi field roll_codes gak otomatis
+            // ikut ke-fix waktu komponen shared diupdate).
+            ->assertSee('roll_codes', false)
+            ->assertSee('Daftar Roll ID yang Ditransfer');
     }
 
     #[Test]
@@ -85,7 +91,9 @@ class WarehouseTransferAndIssueTest extends TestCase
     {
         $this->actingAs($this->owner)->get(route('warehouse.issues.create'))
             ->assertOk()
-            ->assertSee('Stok di Cabang Ini');
+            ->assertSee('Stok di Cabang Ini')
+            ->assertSee('roll_codes', false)
+            ->assertSee('Daftar Roll ID yang Diserahkan');
     }
 
     #[Test]

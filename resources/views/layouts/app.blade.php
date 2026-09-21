@@ -708,11 +708,17 @@
                                 {{-- Riwayat Mutasi (2026-09-07) — sebelumnya cuma reachable dari tab
                                      x-warehouse.header, gak ada di sidebar utama sama sekali. --}}
                                 <a href="{{ route('warehouse.history.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/history*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Riwayat Mutasi</a>
+                                {{-- Riwayat Pengambilan Alat (ADHOC-88) — log siapa teknisi yang menarik modem --}}
+                                <a href="{{ route('warehouse.retrievals.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/retrievals*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Riwayat Ambil Alat</a>
                                 {{-- Scan Barang (2026-09-07, mode scan-first) --}}
                                 <a href="{{ route('warehouse.scan.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/scan*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Scan Barang</a>
                                 @endif
                                 @if(auth()->user()->hasPermission('warehouse_custody.view'))
                                 <a href="{{ route('warehouse.custody.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Barang di Tangan Teknisi</a>
+                                @endif
+                                {{-- Terima Retur (ADHOC-86) — konfirmasi gudang atas modem hasil DEAC --}}
+                                @if(auth()->user()->hasPermission('warehouse_reassign.create'))
+                                <a href="{{ route('warehouse.returns.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/returns*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Terima Retur</a>
                                 @endif
                                 @if(auth()->user()->hasPermission('warehouse_traceability.view'))
                                 <a href="{{ route('warehouse.traceability.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/traceability*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Lacak Barang / SN</a>

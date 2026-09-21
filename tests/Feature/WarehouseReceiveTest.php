@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -73,14 +75,13 @@ class WarehouseReceiveTest extends TestCase
     }
 
     #[Test]
-    public function receive_batch_campuran_serialized_quantity_batch_tercatat_benar(): void
+    public function receive_batch_campuran_serialized_dan_quantity_tercatat_benar(): void
     {
         $catAktif = ItemCategory::where('code', 'media_converter')->firstOrFail();
         $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
 
         $modem = Item::create(['code' => 'WR-MODEM', 'name' => 'Modem WR', 'item_category_id' => $catAktif->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
         $kabel = Item::create(['code' => 'WR-KABEL', 'name' => 'Kabel WR', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
-        $drum = Item::create(['code' => 'WR-DRUM', 'name' => 'Drum WR', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'batch']);
 
         $store = $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
             'pop_id' => $this->pusat->id,
@@ -88,7 +89,6 @@ class WarehouseReceiveTest extends TestCase
             'lines' => [
                 ['item_id' => $modem->id, 'serial_numbers' => "WR-SN-001\nWR-SN-002", 'unit_price' => 250000],
                 ['item_id' => $kabel->id, 'qty' => 150, 'unit_price' => 5000],
-                ['item_id' => $drum->id, 'qty' => 300, 'lot_no' => 'LOT-WR-01', 'unit_price' => 4500],
             ],
         ]);
 
@@ -100,13 +100,51 @@ class WarehouseReceiveTest extends TestCase
         $this->assertEquals(['WR-SN-001', 'WR-SN-002'], InventorySerial::where('item_id', $modem->id)->orderBy('serial_number')->pluck('serial_number')->all());
 
         $this->assertEquals(150, InventoryBalance::where('pop_id', $this->pusat->id)->where('item_id', $kabel->id)->where('lot_no', '')->value('qty'));
-        $this->assertEquals(300, InventoryBalance::where('pop_id', $this->pusat->id)->where('item_id', $drum->id)->where('lot_no', 'LOT-WR-01')->value('qty'));
 
-        $this->assertEquals(4, InventoryTransaction::where('reference_number', $reference)->where('type', 'receive')->count(), '2 SN + 1 baris qty + 1 baris batch = 4 baris ledger');
+        $this->assertEquals(3, InventoryTransaction::where('reference_number', $reference)->where('type', 'receive')->count(), '2 SN + 1 baris qty = 3 baris ledger');
 
         $this->actingAs($this->owner)->get(route('warehouse.receive.show', $reference))
             ->assertOk()
             ->assertSee('WR-SN-001');
+    }
+
+    /**
+     * ADHOC-75 (2026-09-16) — barang QUANTITY yang diterima 2x dengan harga
+     * beda otomatis pecah jadi 2 lot (lot pertama tetap sentinel '', lot
+     * kedua digenerate sistem), BUKAN numpuk ke satu saldo yang bikin harga
+     * lama-baru gak kepisah. Lihat docs/plan/warehouse/analisa-2-slot-harga-quantity.md.
+     */
+    #[Test]
+    public function receive_quantity_harga_beda_otomatis_pecah_jadi_2_lot(): void
+    {
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $dropcore = Item::create(['code' => 'WR-DC4', 'name' => 'Dropcore 4 Core WR', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
+
+        $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'lines' => [['item_id' => $dropcore->id, 'qty' => 12, 'unit_price' => 250000]],
+        ])->assertSessionHas('success');
+
+        $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'lines' => [['item_id' => $dropcore->id, 'qty' => 10, 'unit_price' => 260000]],
+        ])->assertSessionHas('success');
+
+        $balances = InventoryBalance::where('pop_id', $this->pusat->id)->where('item_id', $dropcore->id)->orderBy('id')->get();
+        $this->assertCount(2, $balances, 'harga beda wajib bikin 2 baris balance, bukan numpuk ke 1');
+        $this->assertEquals('', $balances[0]->lot_no);
+        $this->assertEquals(12, $balances[0]->qty);
+        $this->assertStringStartsWith('WR-DC4-', $balances[1]->lot_no);
+        $this->assertEquals(10, $balances[1]->qty);
+
+        // Harga ke-3 sebelum salah satu lot habis — DITOLAK (guard, belum
+        // pernah terjadi di data real, keputusan user 2026-09-16).
+        $store = $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'lines' => [['item_id' => $dropcore->id, 'qty' => 5, 'unit_price' => 270000]],
+        ]);
+        $store->assertSessionHas('error');
+        $this->assertCount(2, InventoryBalance::where('pop_id', $this->pusat->id)->where('item_id', $dropcore->id)->get(), 'ditolak — tetap 2 lot, gak nambah lot ke-3');
     }
 
     #[Test]
@@ -232,6 +270,170 @@ class WarehouseReceiveTest extends TestCase
 
         $store->assertSessionHasErrors('lines.0.unit_price');
         $this->assertEquals(0, InventoryBalance::where('item_id', $kabel->id)->count());
+    }
+
+    #[Test]
+    public function receive_roll_kabel_generate_n_roll_dengan_id_unik(): void
+    {
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabel = Item::create([
+            'code' => 'WR-ROLL-FO',
+            'name' => 'Kabel FO WR',
+            'item_category_id' => $catKabel->id,
+            'unit' => 'meter',
+            'tracking_type' => 'roll',
+            'meter_per_roll' => 1000,
+        ]);
+
+        $store = $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'notes' => 'Faktur WR-ROLL-001',
+            'lines' => [
+                ['item_id' => $kabel->id, 'roll_count' => 3, 'vendor' => 'PT Fiber Nusantara', 'unit_price' => 2500000],
+            ],
+        ]);
+
+        $reference = InventoryTransaction::where('type', 'receive')->value('reference_number');
+        $store->assertRedirect(route('warehouse.receive.show', $reference));
+
+        $rolls = InventoryRoll::where('item_id', $kabel->id)->orderBy('id')->get();
+        $this->assertCount(3, $rolls);
+        $this->assertEquals(3, $rolls->pluck('roll_code')->unique()->count(), 'roll_code wajib unik antar roll');
+
+        $today = date('Ymd');
+        foreach ($rolls as $roll) {
+            $this->assertStringStartsWith("WR-ROLL-FO-{$today}-", $roll->roll_code);
+            $this->assertEquals(1000, $roll->length_total);
+            $this->assertEquals(1000, $roll->length_remaining);
+            $this->assertEquals('PT Fiber Nusantara', $roll->vendor);
+            // Input form "Harga Beli per Roll" 2.500.000 @ meter_per_roll=1000
+            // — disimpan PER METER (2.500), bukan mentah per-roll (koreksi
+            // 2026-09-18: qty di ledger SELALU meter, harga-per-roll yang
+            // gak dikonversi bikin nilai kekali 1000x di semua kalkulasi
+            // hilir, lihat InventoryReceiveService::receiveRoll()).
+            $this->assertEquals(2500, $roll->unit_price_snapshot);
+            $this->assertEquals(RollStatus::AVAILABLE, $roll->status);
+            $this->assertEquals($this->pusat->id, $roll->current_pop_id);
+        }
+
+        $this->assertEquals(3, InventoryTransaction::where('reference_number', $reference)->where('type', 'receive')->whereNotNull('roll_id')->count());
+    }
+
+    #[Test]
+    public function receive_roll_tanpa_meter_per_roll_di_master_ditolak_ramah(): void
+    {
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabel = Item::create(['code' => 'WR-ROLL-NOLEN', 'name' => 'Kabel FO Tanpa Konversi', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'roll']);
+
+        $store = $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'lines' => [
+                ['item_id' => $kabel->id, 'roll_count' => 2, 'unit_price' => 2000000],
+            ],
+        ]);
+
+        $store->assertSessionHas('error');
+        $this->assertEquals(0, InventoryRoll::count());
+    }
+
+    #[Test]
+    public function receive_roll_kabel_menerima_format_rupiah_bertitik_dari_form(): void
+    {
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabel = Item::create([
+            'code' => 'WR-ROLL-DOT',
+            'name' => 'Kabel FO Bertitik',
+            'item_category_id' => $catKabel->id,
+            'unit' => 'meter',
+            'tracking_type' => 'roll',
+            'meter_per_roll' => 1000,
+        ]);
+
+        $store = $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'notes' => 'Faktur WR-ROLL-DOT-001',
+            'lines' => [
+                ['item_id' => $kabel->id, 'roll_count' => 2, 'vendor' => 'PT Fiber Nusantara', 'unit_price' => '120.000'],
+            ],
+        ]);
+
+        $reference = InventoryTransaction::where('type', 'receive')->value('reference_number');
+        $store->assertRedirect(route('warehouse.receive.show', $reference));
+
+        $rolls = InventoryRoll::where('item_id', $kabel->id)->get();
+        $this->assertCount(2, $rolls);
+        foreach ($rolls as $roll) {
+            // 120.000/roll @ meter_per_roll=1000 → 120/meter tersimpan.
+            $this->assertEquals(120.0, (float) $roll->unit_price_snapshot);
+        }
+    }
+
+    /**
+     * ADHOC (2026-09-17) — item SERIALIZED `auto_generate_serial=true` (ODP,
+     * Splitter — gak punya SN vendor): staf isi jumlah unit doang, sistem
+     * generate SN + baris ledger per unit sendiri. Lihat
+     * docs/plan/warehouse/analisa-generate-id-barang-non-serial.md.
+     */
+    #[Test]
+    public function receive_serialized_auto_generate_serial_dari_jumlah_unit(): void
+    {
+        $catAktif = ItemCategory::where('code', 'media_converter')->firstOrFail();
+        $odp = Item::create([
+            'code' => 'WR-ODP',
+            'name' => 'ODP WR',
+            'item_category_id' => $catAktif->id,
+            'unit' => 'pcs',
+            'tracking_type' => 'serialized',
+            'auto_generate_serial' => true,
+        ]);
+
+        $store = $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'notes' => 'Faktur WR-ODP-001',
+            'lines' => [
+                ['item_id' => $odp->id, 'serial_count' => 5, 'unit_price' => 75000],
+            ],
+        ]);
+
+        $reference = InventoryTransaction::where('type', 'receive')->value('reference_number');
+        $store->assertRedirect(route('warehouse.receive.show', $reference));
+
+        $serials = InventorySerial::where('item_id', $odp->id)->orderBy('id')->get();
+        $this->assertCount(5, $serials);
+        $this->assertEquals(5, $serials->pluck('serial_number')->unique()->count(), 'serial_number wajib unik antar unit');
+
+        $today = date('Ymd');
+        foreach ($serials as $serial) {
+            $this->assertStringStartsWith("WR-ODP-{$today}-", $serial->serial_number);
+            $this->assertEquals(SerialStatus::AVAILABLE, $serial->status);
+            $this->assertEquals($this->pusat->id, $serial->current_pop_id);
+        }
+
+        $this->assertEquals(5, InventoryTransaction::where('reference_number', $reference)->where('type', 'receive')->whereNotNull('serial_id')->count());
+    }
+
+    #[Test]
+    public function receive_serialized_auto_generate_tanpa_jumlah_unit_ditolak_ramah(): void
+    {
+        $catAktif = ItemCategory::where('code', 'media_converter')->firstOrFail();
+        $odp = Item::create([
+            'code' => 'WR-ODP-2',
+            'name' => 'ODP WR 2',
+            'item_category_id' => $catAktif->id,
+            'unit' => 'pcs',
+            'tracking_type' => 'serialized',
+            'auto_generate_serial' => true,
+        ]);
+
+        $store = $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'lines' => [
+                ['item_id' => $odp->id, 'unit_price' => 75000],
+            ],
+        ]);
+
+        $store->assertSessionHas('error');
+        $this->assertEquals(0, InventorySerial::where('item_id', $odp->id)->count());
     }
 
     #[Test]

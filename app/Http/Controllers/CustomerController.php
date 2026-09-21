@@ -164,10 +164,15 @@ class CustomerController extends Controller
             return redirect()->back()->with('error', 'Pelanggan ini tidak dalam status putus langganan.');
         }
 
-        $device = $customer->customerDevice;
-        if (! $device) {
-            return redirect()->back()->with('error', 'Data alat pelanggan tidak ditemukan.');
-        }
+        // Pelanggan legacy yang masih aktif saat migrasi TIDAK punya baris
+        // `customer_devices` — baris itu hanya dibuat untuk yang sudah putus
+        // (BackfillDeviceRetrievedStatusCommand) atau lewat alur instalasi
+        // sistem baru. Di data dev: 1.957 pelanggan, cuma 229 punya baris, jadi
+        // ~1.700 pelanggan akan mentok di sini begitu diputus. Baris ini tempat
+        // `device_retrieved_at` disimpan, jadi dibuatkan placeholder yang sama
+        // dengan import/backfill legacy — bukan menolak tombol Ambil Alat.
+        $device = $customer->customerDevice
+            ?? $customer->customerDevice()->create(['device_type' => CustomerDevice::LEGACY_DEVICE_TYPE]);
 
         if ($device->device_retrieved_at) {
             return redirect()->back()->with('error', 'Alat pelanggan ini sudah ditandai diambil.');
@@ -204,24 +209,27 @@ class CustomerController extends Controller
         }
 
         DB::transaction(function () use ($customer) {
-            $customer->update(['status' => 'active']);
+            // Lewat state machine (TERMINATED → ACTIVE diizinkan enum sejak
+            // ADHOC-85) — jejaknya masuk customer_status_logs + audit
+            // 'Customer Workflow' dengan note 'Langganan Lagi'. Audit khusus
+            // action 'reactivate' dihapus: tidak ada pembacanya di kode, dan
+            // baris lamanya di audit_logs tetap utuh. terminated_at SENGAJA
+            // tidak dikosongkan — dipakai DashboardController::growthStats
+            // untuk churn per periode; dikosongkan = churn bulan lalu ikut
+            // terhapus. Akun portal & QR dipulihkan CustomerObserver.
+            app(CustomerWorkflowService::class)->transition($customer, WorkflowTransition::ACTIVE, 'Langganan Lagi');
 
             if ($customer->customerService) {
                 $customer->customerService->update(['service_status' => 'aktif']);
             }
 
-            AuditLog::create([
-                'user_id' => auth()->id(),
-                'module' => 'customers',
-                'action' => 'reactivate',
-                'auditable_type' => Customer::class,
-                'auditable_id' => $customer->id,
-                'old_values' => ['status' => 'terminated'],
-                'new_values' => ['status' => 'active', 'note' => 'Langganan Lagi'],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-                'created_at' => now(),
-            ]);
+            // Pelanggan yang Langganan Lagi akan dipasangi modem baru, jadi
+            // flag "alat sudah diambil" dari masa langganan lama dicabut —
+            // kalau tidak, badge menyesatkan dan tombol Ambil Alat menolak
+            // pemutusan berikutnya ("sudah diambil"). Riwayat pengambilan yang
+            // sudah terjadi TIDAK hilang: ia tersimpan di `device_retrieval_logs`
+            // (tampil di tab Perangkat), bukan di flag ini (ADHOC-88).
+            $customer->customerDevice?->update(['device_retrieved_at' => null]);
         });
 
         return redirect()->back()->with('success', 'Pelanggan berhasil diaktifkan kembali.');
@@ -1447,9 +1455,11 @@ class CustomerController extends Controller
             ->latest('issue_date')
             ->first();
 
-        // Hitung total piutang (sum dari remaining_amount semua invoice yang belum lunas)
+        // Total piutang = sisa tagihan belum lunas dari periode SEBELUM bulan
+        // berjalan. Tagihan bulan ini yang belum dibayar bukan piutang (due_date
+        // tanggal 10 cuma label UI) — lihat Invoice::scopePiutang().
         $totalPiutang = $customer->invoices()
-            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
+            ->piutang()
             ->sum('remaining_amount');
 
         // Recent payments (3 pembayaran terakhir)

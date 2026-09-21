@@ -235,20 +235,20 @@
                     <p class="metric-card-value text-2xl"><?php echo e($currency($stats['total_unpaid_amount'])); ?></p>
                 </div>
             </div>
-            <p class="metric-card-footer">Invoice belum lunas pada filter</p>
+            <p class="metric-card-footer">Sisa piutang periode sebelum bulan ini</p>
         </div>
 
-        <!-- Tagihan Jatuh Tempo (Operational Status Card - Danger) -->
+        <!-- Piutang Tagihan (Operational Status Card - Danger) -->
         <div class="metric-card status-error">
             <div>
                 <div class="metric-card-label">
-                    <span>Tagihan Jatuh Tempo</span>
+                    <span>Piutang Tagihan</span>
                 </div>
                 <div class="metric-card-value-container">
                     <p class="metric-card-value"><?php echo e(number_format($stats['due_invoices_count'])); ?></p>
                 </div>
             </div>
-            <p class="metric-card-footer">Invoice belum lunas melewati batas</p>
+            <p class="metric-card-footer">Belum lunas dari periode sebelum bulan ini</p>
         </div>
 
         <!-- Net Customer Growth (KPI Strip — Pilar 1) -->
@@ -897,7 +897,7 @@
 <?php endif; ?>
 <?php $component->withAttributes(['class' => 'p-5 xl:col-span-2']); ?>
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-semibold text-text-main">Tagihan Jatuh Tempo</h3>
+                <h3 class="text-sm font-semibold text-text-main">Piutang Tagihan</h3>
                 <?php if(auth()->user()->hasPermission('view_invoices')): ?>
                     <?php if (isset($component)) { $__componentOriginal606bedd6108050b8303bc7c381e2387c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal606bedd6108050b8303bc7c381e2387c = $attributes; } ?>
@@ -923,25 +923,25 @@
 
             <?php if (isset($component)) { $__componentOriginal793d2b22631f88b8a3d00569a12acf88 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal793d2b22631f88b8a3d00569a12acf88 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.table','data' => ['headers' => ['Invoice', 'Pelanggan', 'POP', 'Jatuh Tempo', 'Sisa Tagihan']]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.table','data' => ['headers' => ['Invoice', 'Pelanggan', 'POP', 'Periode', 'Sisa Tagihan']]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ui.table'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['headers' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(['Invoice', 'Pelanggan', 'POP', 'Jatuh Tempo', 'Sisa Tagihan'])]); ?>
+<?php $component->withAttributes(['headers' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(['Invoice', 'Pelanggan', 'POP', 'Periode', 'Sisa Tagihan'])]); ?>
                 <?php $__empty_1 = true; $__currentLoopData = $dueInvoices; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $invoice): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                     <tr>
                         <td class="data-cell text-left font-medium text-text-main"><?php echo e($invoice->invoice_number); ?></td>
                         <td class="text-left text-text-secondary"><?php echo e($invoice->customer?->full_name ?? '-'); ?></td>
                         <td class="text-left text-text-muted"><?php echo e($invoice->pop?->name ?? '-'); ?></td>
-                        <td class="data-cell text-left text-error font-semibold"><?php echo e(optional($invoice->due_date)->format('d/m/Y')); ?></td>
+                        <td class="data-cell text-left text-error font-semibold"><?php echo e($invoice->billing_period); ?></td>
                         <td class="data-cell text-right font-semibold text-text-main"><?php echo e($currency($invoice->remaining_amount)); ?></td>
                     </tr>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <tr>
-                        <td colspan="5" class="py-6 text-center text-text-muted">Tidak ada tagihan jatuh tempo.</td>
+                        <td colspan="5" class="py-6 text-center text-text-muted">Tidak ada piutang tagihan.</td>
                     </tr>
                 <?php endif; ?>
              <?php echo $__env->renderComponent(); ?>

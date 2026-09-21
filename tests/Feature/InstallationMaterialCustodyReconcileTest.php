@@ -244,7 +244,7 @@ class InstallationMaterialCustodyReconcileTest extends TestCase
         $kabel = Item::create(['code' => 'KABEL-RC', 'name' => 'Dropcore Reconcile', 'item_category_id' => $catPasif->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
 
         $admin = User::factory()->create();
-        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, null, $admin);
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, $admin);
         $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $kabel->id, 'qty' => 100]], $admin);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$kabel->id => 100], $admin);
         app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $kabel->id, 'qty' => 80]], $admin);
@@ -299,7 +299,7 @@ class InstallationMaterialCustodyReconcileTest extends TestCase
         $kabel = Item::create(['code' => 'KABEL-RC2', 'name' => 'Dropcore Reconcile 2', 'item_category_id' => $catPasif->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
 
         $admin = User::factory()->create();
-        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, null, $admin);
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, $admin);
         $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $kabel->id, 'qty' => 100]], $admin);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$kabel->id => 100], $admin);
         // SENGAJA cuma issue 10m, tapi teknisi klaim 30m di laporan — overclaim.
@@ -361,7 +361,7 @@ class InstallationMaterialCustodyReconcileTest extends TestCase
         $kabel = Item::create(['code' => 'KABEL-RC3', 'name' => 'Dropcore Reconcile 3', 'item_category_id' => $catPasif->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
 
         $admin = User::factory()->create();
-        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, null, $admin);
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, $admin);
         $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $kabel->id, 'qty' => 100]], $admin);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$kabel->id => 100], $admin);
         // Custody CUKUP (30) pas step 5 disubmit.

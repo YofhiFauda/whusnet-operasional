@@ -60,6 +60,7 @@ use App\Http\Controllers\QrTicketController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SalesOmsetDashboardController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskDeviceRetrievalController;
 use App\Http\Controllers\TaskMaintenanceController;
 use App\Http\Controllers\TaskStatusController;
 use App\Http\Controllers\TaskTeamController;
@@ -71,12 +72,17 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Warehouse\WarehouseAdjustmentController;
 use App\Http\Controllers\Warehouse\WarehouseController;
 use App\Http\Controllers\Warehouse\WarehouseCustodyController;
+use App\Http\Controllers\Warehouse\WarehouseCustomerReturnController;
 use App\Http\Controllers\Warehouse\WarehouseHistoryController;
 use App\Http\Controllers\Warehouse\WarehouseIssueController;
 use App\Http\Controllers\Warehouse\WarehouseReassignController;
 use App\Http\Controllers\Warehouse\WarehouseReceiveController;
 use App\Http\Controllers\Warehouse\WarehouseReportController;
+use App\Http\Controllers\Warehouse\WarehouseRetrievalHistoryController;
+use App\Http\Controllers\Warehouse\WarehouseReturnReceiveController;
+use App\Http\Controllers\Warehouse\WarehouseRollController;
 use App\Http\Controllers\Warehouse\WarehouseScanController;
+use App\Http\Controllers\Warehouse\WarehouseSerialController;
 use App\Http\Controllers\Warehouse\WarehouseStockController;
 use App\Http\Controllers\Warehouse\WarehouseStockRequestController;
 use App\Http\Controllers\Warehouse\WarehouseTraceabilityController;
@@ -618,6 +624,7 @@ Route::middleware('auth')->group(function () {
         // Transfer/Issue tapi cuma buat 1 kombinasi pop+item (bukan seluruh
         // gudang), reuse permission warehouse.view (masih cuma VIEW).
         Route::get('/warehouse/stock/serials', [WarehouseStockController::class, 'serials'])->name('warehouse.stock.serials');
+        Route::get('/warehouse/stock/rolls', [WarehouseStockController::class, 'rolls'])->name('warehouse.stock.rolls');
         // Scan Barang (2026-09-07, mode "scan-first") — lookup status SN
         // dulu, baru nawarin aksi yang relevan. Cuma VIEW + JSON lookup, gak
         // nulis apa pun ke DB, reuse permission warehouse.view.
@@ -628,6 +635,9 @@ Route::middleware('auth')->group(function () {
         // pas create/konfirmasi; begitu ditinggal, dokumennya "hilang" gak
         // ke-reach lagi (laporan user: list/detail tersembunyi).
         Route::get('/warehouse/history', [WarehouseHistoryController::class, 'index'])->name('warehouse.history.index');
+
+        // Riwayat Pengambilan Alat (ADHOC-88) — view-only, reuse warehouse.view.
+        Route::get('/warehouse/retrievals', [WarehouseRetrievalHistoryController::class, 'index'])->name('warehouse.retrievals.index');
     });
 
     // Ambang Stok Rendah (2026-09-03) — reuse permission warehouse_adjustment.create,
@@ -658,8 +668,23 @@ Route::middleware('auth')->group(function () {
 
     // Gudang/Inventory - Dynamic Routes Last
     Route::middleware('permission:warehouse_transfer.view')->group(function () {
+        Route::get('/warehouse/transfers/pending', [WarehouseTransferController::class, 'pending'])->name('warehouse.transfers.pending');
         Route::get('/warehouse/receive/{reference}', [WarehouseReceiveController::class, 'show'])->name('warehouse.receive.show');
+        Route::get('/warehouse/receive/{reference}/rolls/print', [WarehouseRollController::class, 'printBatch'])->name('warehouse.receive.rolls.print');
+        Route::get('/warehouse/receive/{reference}/serials/print', [WarehouseSerialController::class, 'printBatch'])->name('warehouse.receive.serials.print');
         Route::get('/warehouse/transfers/{transfer}', [WarehouseTransferController::class, 'show'])->name('warehouse.transfers.show');
+        // Surat Jalan (tanpa harga) — reuse permission ini apa adanya, lihat
+        // docs/plan/warehouse/rancangan-invoice-surat-jalan-transfer.md §4.2.
+        Route::get('/warehouse/transfers/{transfer}/surat-jalan', [WarehouseTransferController::class, 'suratJalan'])->name('warehouse.transfers.surat-jalan');
+        Route::get('/warehouse/rolls/{roll}/print', [WarehouseRollController::class, 'print'])->name('warehouse.rolls.print');
+        Route::get('/warehouse/serials/{serial}/print', [WarehouseSerialController::class, 'print'])->name('warehouse.serials.print');
+    });
+
+    // Invoice (berharga) — root permission TERPISAH dari warehouse_transfer.view
+    // di atas, sengaja gak dipegang pop_admin cabang. Lihat §4.1/§7 keputusan #5
+    // rancangan-invoice-surat-jalan-transfer.md.
+    Route::middleware('permission:warehouse_transfer_invoice.view')->group(function () {
+        Route::get('/warehouse/transfers/{transfer}/invoice', [WarehouseTransferController::class, 'invoice'])->name('warehouse.transfers.invoice');
     });
 
     Route::middleware('permission:warehouse_transfer.receive')->group(function () {
@@ -689,18 +714,41 @@ Route::middleware('auth')->group(function () {
         Route::post('/warehouse/adjustments/custody/{custody}', [WarehouseAdjustmentController::class, 'storeCustody'])->name('warehouse.adjustments.custody.store');
         Route::get('/warehouse/adjustments/serial/{serial}/create', [WarehouseAdjustmentController::class, 'createSerial'])->name('warehouse.adjustments.serial.create');
         Route::post('/warehouse/adjustments/serial/{serial}', [WarehouseAdjustmentController::class, 'storeSerial'])->name('warehouse.adjustments.serial.store');
+        Route::get('/warehouse/adjustments/roll/{roll}/create', [WarehouseAdjustmentController::class, 'createRoll'])->name('warehouse.adjustments.roll.create');
+        Route::post('/warehouse/adjustments/roll/{roll}', [WarehouseAdjustmentController::class, 'storeRoll'])->name('warehouse.adjustments.roll.store');
     });
 
     Route::middleware('permission:warehouse_reassign.create')->group(function () {
+        // Terima Retur (ADHOC-86) — konfirmasi gudang atas modem hasil DEAC.
+        // Static `/warehouse/returns` sebelum yang ber-{serial}.
+        Route::get('/warehouse/returns', [WarehouseReturnReceiveController::class, 'index'])->name('warehouse.returns.index');
+        // Modem diantar pelanggan tanpa task (ADHOC-88) — static, sebelum {serial}.
+        Route::get('/warehouse/returns/from-customer', [WarehouseCustomerReturnController::class, 'create'])->name('warehouse.returns.from-customer.create');
+        Route::post('/warehouse/returns/from-customer', [WarehouseCustomerReturnController::class, 'store'])->name('warehouse.returns.from-customer.store');
+        Route::get('/warehouse/returns/{serial}/receive', [WarehouseReturnReceiveController::class, 'create'])->name('warehouse.returns.receive.create');
+        Route::post('/warehouse/returns/{serial}/receive', [WarehouseReturnReceiveController::class, 'store'])->name('warehouse.returns.receive.store');
+
         Route::get('/warehouse/reassign/custody/{custody}/create', [WarehouseReassignController::class, 'createCustody'])->name('warehouse.reassign.custody.create');
         Route::post('/warehouse/reassign/custody/{custody}', [WarehouseReassignController::class, 'storeCustody'])->name('warehouse.reassign.custody.store');
         Route::get('/warehouse/reassign/serial/{serial}/create', [WarehouseReassignController::class, 'createSerial'])->name('warehouse.reassign.serial.create');
         Route::post('/warehouse/reassign/serial/{serial}', [WarehouseReassignController::class, 'storeSerial'])->name('warehouse.reassign.serial.store');
+        Route::get('/warehouse/reassign/roll/{roll}/create', [WarehouseReassignController::class, 'createRoll'])->name('warehouse.reassign.roll.create');
+        Route::post('/warehouse/reassign/roll/{roll}', [WarehouseReassignController::class, 'storeRoll'])->name('warehouse.reassign.roll.store');
+
+        // "Sudah Dicek" (analisa-gap-kondisi-barang.md rancangan poin 5) —
+        // reuse permission warehouse_reassign.create, satu payung sama
+        // returnInstalledSerialFromCustomer() yang men-set kondisi awal
+        // "belum dicek". Inline toggle di halaman Lacak Barang (pola-3
+        // CLAUDE.md, sudah di halaman Detail SN spesifik).
+        Route::post('/warehouse/traceability/serial/{serial}/condition-check', [WarehouseTraceabilityController::class, 'checkCondition'])->name('warehouse.traceability.serial.condition-check');
     });
 
     // Laporan Gudang — agregat periodik (Fase 2 P2)
     Route::middleware('permission:warehouse_report.view')->group(function () {
         Route::get('/warehouse/reports', [WarehouseReportController::class, 'index'])->name('warehouse.reports.index');
+        // Download Excel (ADHOC-79) — sama filter periode/POP persis index(),
+        // cuma nulis ulang data yang sama ke file, bukan sumber angka baru.
+        Route::get('/warehouse/reports/export', [WarehouseReportController::class, 'export'])->name('warehouse.reports.export');
     });
 
     // Permintaan Stok Cabang→Pusat (2026-09-03)
@@ -907,6 +955,10 @@ Route::middleware('auth')->group(function () {
     // Maintenance Report
     Route::get('/tasks/{task}/maintenance-report', [TaskMaintenanceController::class, 'report'])->name('tasks.maintenance.report');
     Route::post('/tasks/{task}/maintenance-report', [TaskMaintenanceController::class, 'store'])->name('tasks.maintenance.store');
+
+    // Laporan Ambil Modem (DEAC) — form khusus, ADHOC-86.
+    Route::get('/tasks/{task}/device-retrieval-report', [TaskDeviceRetrievalController::class, 'report'])->name('tasks.device-retrieval.report');
+    Route::post('/tasks/{task}/device-retrieval-report', [TaskDeviceRetrievalController::class, 'store'])->name('tasks.device-retrieval.store');
 
     Route::middleware('permission:task.execute')->group(function () {
         Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');

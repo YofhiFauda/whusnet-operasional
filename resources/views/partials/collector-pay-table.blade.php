@@ -78,10 +78,11 @@
                                 <div class="flex items-center justify-between text-xs gap-2 border-t border-slate-200/60 dark:border-slate-700/40 pt-1.5">
                                     <span class="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">Jatuh Tempo</span>
                                     <div class="shrink-0 text-right">
-                                        @if ($invoice->due_date && $invoice->due_date->isPast())
+                                        {{-- Merah hanya kalau piutang (periode lalu). due_date hanya label. --}}
+                                        @if ($invoice->isPiutang())
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                                {{ $invoice->due_date->format('d/m/Y') }} (Terlewat)
+                                                {{ $invoice->due_date?->format('d/m/Y') ?? '-' }} (Piutang)
                                             </span>
                                         @else
                                             <span class="text-xs font-semibold text-slate-700 dark:text-slate-300 font-mono">
@@ -106,10 +107,10 @@
 
                         {{-- 4. Due Date (Desktop Table View) --}}
                         <td class="hidden xl:table-cell px-3 xl:px-4 py-3 whitespace-nowrap text-xs xl:min-w-[95px]">
-                            @if ($invoice->due_date && $invoice->due_date->isPast())
+                            @if ($invoice->isPiutang())
                                 <span class="inline-flex items-center gap-1 px-1.5 xl:px-2 py-0.5 rounded-lg text-[10px] xl:text-[11px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
                                     <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                    {{ $invoice->due_date->format('d/m/Y') }}
+                                    {{ $invoice->due_date?->format('d/m/Y') ?? '-' }}
                                 </span>
                             @else
                                 <span class="text-slate-600 dark:text-slate-300 font-medium">

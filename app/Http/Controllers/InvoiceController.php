@@ -78,9 +78,11 @@ class InvoiceController extends Controller
 
         // Ringkasan tunggakan (independen dari filter/search di atas), supaya
         // admin lihat total nunggak AWAL vs BULANAN tanpa hitung manual per baris.
+        // Tunggakan = piutang (periode sebelum bulan berjalan), bukan semua yang
+        // belum dibayar — lihat Invoice::scopePiutang().
         $unpaidBase = Invoice::query()
             ->applyUserScope()
-            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value]);
+            ->piutang();
 
         $unpaidAwalTotal = (clone $unpaidBase)
             ->whereIn('invoice_type', ['awal', 'reaktivasi'])

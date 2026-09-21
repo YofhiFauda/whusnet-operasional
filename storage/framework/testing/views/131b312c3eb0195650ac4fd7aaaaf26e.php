@@ -682,10 +682,16 @@
                                 
                                 <a href="<?php echo e(route('warehouse.history.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/history*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Riwayat Mutasi</a>
                                 
+                                <a href="<?php echo e(route('warehouse.retrievals.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/retrievals*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Riwayat Ambil Alat</a>
+                                
                                 <a href="<?php echo e(route('warehouse.scan.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/scan*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Scan Barang</a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_custody.view')): ?>
                                 <a href="<?php echo e(route('warehouse.custody.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Barang di Tangan Teknisi</a>
+                                <?php endif; ?>
+                                
+                                <?php if(auth()->user()->hasPermission('warehouse_reassign.create')): ?>
+                                <a href="<?php echo e(route('warehouse.returns.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/returns*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Terima Retur</a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_traceability.view')): ?>
                                 <a href="<?php echo e(route('warehouse.traceability.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/traceability*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Lacak Barang / SN</a>

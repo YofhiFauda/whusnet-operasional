@@ -116,7 +116,7 @@
                 <!-- Toggle Tunggakan -->
                 <div class="flex items-center">
                     <input id="show_tunggakan" type="checkbox" name="show_tunggakan" value="1" <?php if($showTunggakan): echo 'checked'; endif; ?> class="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
-                    <label for="show_tunggakan" class="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">Hanya Tampilkan Tunggakan (Sisa > 0)</label>
+                    <label for="show_tunggakan" class="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">Hanya Tampilkan Tunggakan (Piutang: periode sebelum bulan ini)</label>
                 </div>
 
                 <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
@@ -162,7 +162,7 @@
                         <th class="px-6 py-3 text-center">Tanggal</th>
                         <th class="px-6 py-3 text-right">Tagihan</th>
                         <th class="px-6 py-3 text-right">Terbayar</th>
-                        <th class="px-6 py-3 text-right">Tunggakan</th>
+                        <th class="px-6 py-3 text-right">Sisa Tagihan</th>
                         <th class="px-6 py-3 text-center">Status</th>
                     </tr>
                 </thead>

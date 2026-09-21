@@ -9,6 +9,7 @@ use App\Enums\StockRequestStatus;
 use App\Enums\TransferStatus;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
@@ -65,6 +66,16 @@ class WarehouseController extends Controller
             ->whereIn('pop_id', $popIds)
             ->lowStock()
             ->with(['item.category', 'pop'])
+            ->get();
+
+        // Roll kabel "Sisa Kecil" (docs/plan/warehouse/analisa-gap-roll-kabel.md
+        // §8) — roll bisa lagi di gudang (`current_pop_id`) ATAU di custody
+        // teknisi (`issued_from_pop_id`, current_pop_id null), dua-duanya
+        // discope ke $popIds biar pop_admin cuma liat cabangnya sendiri.
+        $lowRolls = InventoryRoll::query()
+            ->lowRemaining()
+            ->where(fn ($q) => $q->whereIn('inventory_rolls.current_pop_id', $popIds)->orWhereIn('inventory_rolls.issued_from_pop_id', $popIds))
+            ->with(['item.category', 'currentPop', 'currentTechnician'])
             ->get();
 
         // Transfer lagi in-transit dalam scope (asal ATAU tujuan) — dua sisi
@@ -261,6 +272,7 @@ class WarehouseController extends Controller
         $stats = [
             'total_gudang' => $pops->count(),
             'low_stock_count' => $lowStock->count(),
+            'low_roll_count' => $lowRolls->count(),
             'serial_tersedia' => InventorySerial::query()
                 ->whereIn('current_pop_id', $popIds)
                 ->where('status', SerialStatus::AVAILABLE->value)
@@ -297,7 +309,7 @@ class WarehouseController extends Controller
         $recentReceives = InventoryTransaction::query()
             ->whereIn('to_pop_id', $popIds)
             ->where('type', InventoryTransactionType::RECEIVE->value)
-            ->with(['item.category', 'serial', 'createdBy'])
+            ->with(['item.category', 'serial', 'roll', 'createdBy'])
             ->latest('id')
             ->limit(50)
             ->get()
@@ -329,7 +341,7 @@ class WarehouseController extends Controller
         $recentTransfers = InventoryTransaction::query()
             ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)->orWhereIn('to_pop_id', $popIds))
             ->where('type', InventoryTransactionType::TRANSFER->value)
-            ->with(['item.category', 'fromPop', 'toPop', 'transfer.toPop', 'serial', 'createdBy'])
+            ->with(['item.category', 'fromPop', 'toPop', 'transfer.toPop', 'serial', 'roll', 'createdBy'])
             ->latest('id')
             ->limit(60)
             ->get();
@@ -369,7 +381,7 @@ class WarehouseController extends Controller
         $recentIssues = InventoryTransaction::query()
             ->whereIn('from_pop_id', $popIds)
             ->where('type', InventoryTransactionType::ISSUE->value)
-            ->with(['item.category', 'toTechnician', 'serial', 'createdBy'])
+            ->with(['item.category', 'toTechnician', 'serial', 'roll', 'createdBy'])
             ->latest('id')
             ->limit(50)
             ->get()
@@ -433,13 +445,13 @@ class WarehouseController extends Controller
         $recentLedger = InventoryTransaction::query()
             ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)->orWhereIn('to_pop_id', $popIds))
             ->whereNotIn('type', [InventoryTransactionType::TRANSFER_CUSTODY->value])
-            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial', 'createdBy', 'transfer.toPop'])
+            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial', 'roll', 'createdBy', 'transfer.toPop'])
             ->latest('id')
             ->limit(25)
             ->get();
 
         return view('warehouse.index', compact(
-            'pops', 'displayPops', 'popCards', 'lowStock', 'stats', 'recentLedger',
+            'pops', 'displayPops', 'popCards', 'lowStock', 'lowRolls', 'stats', 'recentLedger',
             'transitTransfers', 'topCustodyTechnicians', 'opnameDueList',
             'selectedPopId', 'activePop', 'canActAsPusat', 'canActAsCabang'
         ));

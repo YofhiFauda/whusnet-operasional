@@ -278,11 +278,16 @@ class BusinessDevelopmentVerificationGateTest extends TestCase
 
     /**
      * Invoice AWAL kategori Bisnis baru sah terbit setelah BD verifikasi —
-     * bukan lagi di titik CS (`finalVerify()`). Nominalnya harus PERSIS
-     * sama dengan yang sudah dikonfirmasi CS ke pelanggan (dari snapshot
-     * `pending_initial_invoice`), bukan dihitung ulang.
+     * bukan lagi di titik CS (`finalVerify()`). Koreksi 2026-09-16 (laporan
+     * user — "kenapa muncul 2 tagihan pada 1 pelanggan"): sebelumnya BD
+     * menerbitkan INVOICE KEDUA terpisah (INSIDENTAL) buat Biaya Instalasi,
+     * niat aslinya SATU invoice yang mencatat biaya CS *dan* biaya BD
+     * sekaligus. Sekarang cuma SATU invoice AWAL — `extra_installation_fee`-nya
+     * nominal BD (bukan 0), `total_amount` dihitung ulang dengan nominal itu
+     * (bukan cuma dijumlah dari snapshot CS + fee BD mentah — PPN ikut
+     * dihitung ulang di atas subtotal barunya).
      */
-    public function test_business_development_verify_issues_the_pending_initial_invoice(): void
+    public function test_business_development_verify_issues_one_merged_initial_invoice(): void
     {
         $bdRole = Role::where('code', 'business_development')->firstOrFail();
         $bdUser = User::factory()->create(['status' => 'active', 'role_id' => $bdRole->id]);
@@ -299,16 +304,23 @@ class BusinessDevelopmentVerificationGateTest extends TestCase
         ]);
         $response->assertRedirect(route('business-development-verifications.index'));
 
+        // Cuma SATU invoice buat pelanggan ini — bukan dua.
+        $this->assertEquals(1, Invoice::where('customer_id', $customer->id)->count());
+
         $invoice = Invoice::where('customer_id', $customer->id)->where('invoice_type', 'awal')->firstOrFail();
-        $this->assertEquals($pendingBilling['total_amount'], (float) $invoice->total_amount);
-        $this->assertEquals(0, (float) $invoice->extra_installation_fee);
+        $this->assertEquals(300000, (float) $invoice->extra_installation_fee);
+
+        // Total = (prorata + 300rb Biaya Instalasi + 0 kabel/tiang/lain) - diskon(0),
+        // lalu PPN 11% (sama formula InitialInvoiceService::calculate()/withInstallationFee()).
+        $expectedSubtotal = $pendingBilling['prorate_amount'] + 300000;
+        $expectedTotal = round($expectedSubtotal * 1.11, 2);
+        $this->assertEquals($expectedTotal, (float) $invoice->total_amount);
+
         $this->assertNull($customer->fresh()->pending_initial_invoice);
 
-        // Biaya Instalasi tetap kena PPN layanan (11%, lihat CustomerService
-        // di createCustomerWithCategory) — INSIDENTAL cuma dikecualikan dari
-        // diskon, bukan dari PPN (lihat ManualInvoiceService::create()).
-        $installationInvoice = Invoice::where('customer_id', $customer->id)->where('invoice_type', 'insidental')->firstOrFail();
-        $this->assertEquals(333000, (float) $installationInvoice->total_amount);
+        $ca = CustomerAcquisition::where('customer_id', $customer->id)->firstOrFail();
+        $this->assertEquals(300000, $ca->installation_fee);
+        $this->assertEquals($invoice->id, $ca->installation_fee_invoice_id);
     }
 
     /**
@@ -423,7 +435,9 @@ class BusinessDevelopmentVerificationGateTest extends TestCase
         $ca = CustomerAcquisition::where('customer_id', $customer->id)->firstOrFail();
         $this->assertEquals(1500000, $ca->installation_fee);
         $this->assertNotNull($ca->installation_fee_invoice_id);
-        $this->assertEquals('insidental', $ca->installationFeeInvoice->invoice_type->value);
+        // SATU invoice AWAL yang sudah menyatukan biaya CS + BD (koreksi
+        // 2026-09-16) — bukan INSIDENTAL terpisah lagi.
+        $this->assertEquals('awal', $ca->installationFeeInvoice->invoice_type->value);
     }
 
     public function test_verifying_an_already_active_customer_is_rejected(): void

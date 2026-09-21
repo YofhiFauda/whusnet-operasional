@@ -618,6 +618,16 @@ class TaskController extends Controller
             ]);
             AuditLog::log($task, 'rejected', $oldValues, $task->toArray());
 
+            // DEAC ditolak → task kembali In Progress, jadi "alat sudah diambil"
+            // harus ikut dicabut (ADHOC-86, G7). SN yang sudah RETURNED
+            // SENGAJA tidak dibalik: modem itu benar-benar ada di tangan
+            // teknisi, dan pengiriman ulang laporan idempoten untuk SN yang
+            // sama (InventoryReassignService::pickupSerialFromCustomer()).
+            // Membalik ledger append-only dari sini justru menambah jejak palsu.
+            if ($task->task_type === TaskType::AMBIL_MODEM) {
+                $task->customer?->customerDevice?->update(['device_retrieved_at' => null]);
+            }
+
             // Revert customer status
             if ($task->customer) {
                 if ($task->task_type === TaskType::SURVEY) {

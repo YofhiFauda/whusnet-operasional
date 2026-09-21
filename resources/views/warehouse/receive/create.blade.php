@@ -30,6 +30,7 @@
         'name' => $item->name,
         'label' => "{$item->code} — {$item->name}",
         'tracking_type' => $item->tracking_type->value,
+        'auto_generate_serial' => (bool) $item->auto_generate_serial,
         'unit' => $item->unit,
         'category_id' => $item->item_category_id,
         'category_name' => $item->category?->name ?? 'Tanpa Kategori',
@@ -343,14 +344,14 @@
                                                 SERIAL NUMBER
                                             </span>
                                         </template>
-                                        <template x-if="row.tracking_type === 'batch'">
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                                                LOT KABEL
-                                            </span>
-                                        </template>
                                         <template x-if="row.tracking_type === 'quantity'">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-800">
                                                 REGULER
+                                            </span>
+                                        </template>
+                                        <template x-if="row.tracking_type === 'roll'">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                                ROLL KABEL
                                             </span>
                                         </template>
                                     </div>
@@ -386,8 +387,8 @@
                                     </div>
                                 </div>
 
-                                {{-- Form Serialized --}}
-                                <template x-if="row.tracking_type === 'serialized'">
+                                {{-- Form Serialized manual (barang punya SN vendor asli) --}}
+                                <template x-if="row.tracking_type === 'serialized' && !row.auto_generate_serial">
                                     <div class="bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-lg p-3 space-y-2.5">
                                         <div class="flex items-center justify-between">
                                             <label class="text-[10px] font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300">
@@ -407,7 +408,7 @@
                                                 <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Harga Beli Satuan (Rp) <span class="text-rose-500">*</span></label>
                                                 <div class="relative">
                                                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">Rp</span>
-                                                    <input type="number" step="1" min="1" :name="`lines[${index}][unit_price]`" x-model="row.unit_price" required placeholder="250000"
+                                                    <input type="text" inputmode="decimal" data-rupiah :name="`lines[${index}][unit_price]`" x-model="row.unit_price" required placeholder="250.000"
                                                            class="w-full min-h-[42px] pl-9 pr-3 py-2 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
                                                 </div>
                                             </div>
@@ -420,8 +421,74 @@
                                     </div>
                                 </template>
 
+                                {{-- Form Serialized auto-generate (ODP, Splitter — gak punya SN vendor).
+                                     Staf cukup isi jumlah unit, SN + label barcode dibuatkan sistem
+                                     setelah Receive tersimpan. Lihat
+                                     docs/plan/warehouse/analisa-generate-id-barang-non-serial.md. --}}
+                                <template x-if="row.tracking_type === 'serialized' && row.auto_generate_serial">
+                                    <div class="bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-lg p-3 space-y-2.5">
+                                        <p class="text-[10px] text-emerald-800 dark:text-emerald-300">SN barang ini digenerate sistem — cukup isi jumlah unit, label barcode siap dicetak setelah tersimpan.</p>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-end">
+                                            <div>
+                                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Jumlah Unit <span class="text-rose-500">*</span></label>
+                                                <input type="number" step="1" min="1" :name="`lines[${index}][serial_count]`" x-model="row.serial_count" required placeholder="10"
+                                                       class="w-full min-h-[42px] px-3 py-2 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                                            </div>
+                                            <div>
+                                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Harga Beli Satuan (Rp) <span class="text-rose-500">*</span></label>
+                                                <div class="relative">
+                                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">Rp</span>
+                                                    <input type="text" inputmode="decimal" data-rupiah :name="`lines[${index}][unit_price]`" x-model="row.unit_price" required placeholder="25.000"
+                                                           class="w-full min-h-[42px] pl-9 pr-3 py-2 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900/30 flex items-center justify-between min-h-[42px]">
+                                            <span class="text-[10px] font-semibold text-slate-400">Subtotal:</span>
+                                            <span class="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300" x-text="'Rp ' + formatRupiah(lineSubtotal(row))"></span>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                {{-- Form Roll Kabel — ID roll digenerate sistem, staf cukup isi jumlah
+                                     roll + vendor. Konversi ke meter (`meter_per_roll`) dibaca dari
+                                     Master Barang, gak diinput ulang di sini. --}}
+                                <template x-if="row.tracking_type === 'roll'">
+                                    <div class="bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded-lg p-3 space-y-2.5">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Jumlah Roll <span class="text-rose-500">*</span></label>
+                                                <input type="number" step="1" min="1" :name="`lines[${index}][roll_count]`" x-model="row.roll_count" required placeholder="3"
+                                                       class="w-full min-h-[42px] px-3 py-2 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                                            </div>
+                                            <div>
+                                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Vendor</label>
+                                                <input type="text" :name="`lines[${index}][vendor]`" x-model="row.vendor" placeholder="mis. PT Fiber Nusantara"
+                                                       class="w-full min-h-[42px] px-3 py-2 text-xs font-mono border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                                            </div>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-end">
+                                            <div>
+                                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Harga Beli per Roll (Rp) <span class="text-rose-500">*</span></label>
+                                                <div class="relative">
+                                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">Rp</span>
+                                                    <input type="text" inputmode="decimal" data-rupiah :name="`lines[${index}][unit_price]`" x-model="row.unit_price" required placeholder="120.000"
+                                                           class="w-full min-h-[42px] pl-9 pr-3 py-2 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                                                </div>
+                                            </div>
+
+                                            <div class="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-lg border border-amber-100 dark:border-amber-900/30 flex items-center justify-between min-h-[42px]">
+                                                <span class="text-[10px] font-semibold text-slate-400">Subtotal:</span>
+                                                <span class="font-mono text-xs font-bold text-amber-700 dark:text-amber-300" x-text="'Rp ' + formatRupiah(lineSubtotal(row))"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+
                                 {{-- Form Quantity & Batch --}}
-                                <template x-if="row.tracking_type !== 'serialized' && row.tracking_type !== ''">
+                                <template x-if="row.tracking_type !== 'serialized' && row.tracking_type !== 'roll' && row.tracking_type !== ''">
                                     <div class="bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/60 rounded-lg p-3 space-y-2.5">
                                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end">
                                             <div>
@@ -432,19 +499,11 @@
                                                        class="w-full min-h-[42px] px-3 py-2 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
                                             </div>
 
-                                            <template x-if="row.tracking_type === 'batch'">
-                                                <div>
-                                                    <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">No. Lot / Drum</label>
-                                                    <input type="text" :name="`lines[${index}][lot_no]`" x-model="row.lot_no" placeholder="mis. LOT-001"
-                                                           class="w-full min-h-[42px] px-3 py-2 text-xs font-mono border border-purple-200 dark:border-purple-800 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500">
-                                                </div>
-                                            </template>
-
                                             <div>
                                                 <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Harga Satuan (Rp) <span class="text-rose-500">*</span></label>
                                                 <div class="relative">
                                                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">Rp</span>
-                                                    <input type="number" step="1" min="1" :name="`lines[${index}][unit_price]`" x-model="row.unit_price" required placeholder="5000"
+                                                    <input type="text" inputmode="decimal" data-rupiah :name="`lines[${index}][unit_price]`" x-model="row.unit_price" required placeholder="5.000"
                                                            class="w-full min-h-[42px] pl-9 pr-3 py-2 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
                                                 </div>
                                             </div>
@@ -542,7 +601,7 @@
         </div>
 
         {{-- ========================================================
-             MOBILE FIRST FIXED BOTTOM COMMAND BAR & BOTTOM SHEET
+             MOBILE & TABLET FIXED BOTTOM COMMAND BAR & BOTTOM SHEET
              Tampilan Simpel, Ringkas, Namun Sangat Fungsional
              ======================================================== --}}
         <div class="lg:hidden" x-data="{ openMobileSheet: false }">
@@ -556,9 +615,9 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0"
-                 class="fixed inset-0 md:left-64 bg-slate-900/60 backdrop-blur-xs z-50"></div>
+                 class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50"></div>
 
-            {{-- Mobile / Tablet Bottom Sheet Drawer --}}
+            {{-- Mobile / Tablet Bottom Sheet Drawer (Full Width) --}}
             <div x-show="openMobileSheet" x-cloak
                  x-transition:enter="transition ease-out duration-250 transform"
                  x-transition:enter-start="translate-y-full"
@@ -566,7 +625,7 @@
                  x-transition:leave="transition ease-in duration-200 transform"
                  x-transition:leave-start="translate-y-0"
                  x-transition:leave-end="translate-y-full"
-                 class="fixed inset-x-0 md:left-64 md:right-0 bottom-0 max-h-[85vh] bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-700 p-5 z-50 overflow-y-auto scroll-smooth space-y-4 shadow-2xl">
+                 class="fixed inset-x-0 bottom-0 w-full max-h-[85vh] bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-700 p-5 z-50 overflow-y-auto scroll-smooth space-y-4 shadow-2xl">
                 
                 <div class="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-2"></div>
                 
@@ -627,8 +686,8 @@
                 </div>
             </div>
 
-            {{-- Floating Bottom Bar (Simple, Sleek, Glassmorphism - Offset on Tablet md:left-64) --}}
-            <div class="fixed bottom-3 inset-x-3 md:left-64 md:right-0 md:px-6 z-40 pointer-events-none">
+            {{-- Floating Bottom Bar (Simple, Sleek, Glassmorphism) --}}
+            <div class="fixed bottom-3 inset-x-3 z-40 pointer-events-none">
                 <div class="bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white rounded-lg shadow-2xl p-2.5 flex items-center justify-between gap-3 max-w-lg mx-auto pointer-events-auto">
                     
                     {{-- Tapable Summary Area --}}
@@ -675,11 +734,15 @@ function warehouseReceiveManager(itemOptions, categoryOptions, oldRows) {
                         item_id: old.item_id || '',
                         category_id: '',
                         tracking_type: '',
+                        auto_generate_serial: false,
                         unit: '',
                         qty: old.qty || '',
                         lot_no: old.lot_no || '',
                         serial_numbers: old.serial_numbers || '',
-                        unit_price: old.unit_price || '',
+                        serial_count: old.serial_count || '',
+                        roll_count: old.roll_count || '',
+                        vendor: old.vendor || '',
+                        unit_price: old.unit_price ? (window.Rupiah ? window.Rupiah.formatDariServer(old.unit_price) : old.unit_price) : '',
                     });
                     this.onItemChange(i);
                 });
@@ -709,10 +772,14 @@ function warehouseReceiveManager(itemOptions, categoryOptions, oldRows) {
                 item_id: '',
                 category_id: '',
                 tracking_type: '',
+                auto_generate_serial: false,
                 unit: '',
                 qty: '',
                 lot_no: '',
                 serial_numbers: '',
+                serial_count: '',
+                roll_count: '',
+                vendor: '',
                 unit_price: ''
             });
         },
@@ -732,12 +799,16 @@ function warehouseReceiveManager(itemOptions, categoryOptions, oldRows) {
 
             if (opt) {
                 row.tracking_type = opt.tracking_type;
+                row.auto_generate_serial = !!opt.auto_generate_serial;
                 row.unit = opt.unit;
                 row.category_id = opt.category_id ?? '';
             }
         },
 
         serialCount(row) {
+            if (row.auto_generate_serial) {
+                return parseInt(row.serial_count, 10) || 0;
+            }
             return (row.serial_numbers || '')
                 .split(/[\r\n,]+/)
                 .map(s => s.trim())
@@ -745,10 +816,22 @@ function warehouseReceiveManager(itemOptions, categoryOptions, oldRows) {
                 .length;
         },
 
+        parsePrice(val) {
+            if (window.Rupiah && typeof window.Rupiah.angka === 'function') {
+                const num = window.Rupiah.angka(val);
+                return isNaN(num) ? 0 : num;
+            }
+            const clean = String(val || '').replace(/[^\d]/g, '');
+            return parseFloat(clean) || 0;
+        },
+
         lineSubtotal(row) {
-            const price = parseFloat(row.unit_price) || 0;
+            const price = this.parsePrice(row.unit_price);
             if (row.tracking_type === 'serialized') {
                 return this.serialCount(row) * price;
+            }
+            if (row.tracking_type === 'roll') {
+                return (parseFloat(row.roll_count) || 0) * price;
             }
             const qty = parseFloat(row.qty) || 0;
             return qty * price;
@@ -776,7 +859,7 @@ function warehouseReceiveManager(itemOptions, categoryOptions, oldRows) {
 
         get isPriceComplete() {
             if (this.validItemCount === 0) return false;
-            return this.rows.every(r => !r.item_id || (parseFloat(r.unit_price) > 0));
+            return this.rows.every(r => !r.item_id || (this.parsePrice(r.unit_price) > 0));
         },
 
         get isFormValid() {
@@ -784,9 +867,10 @@ function warehouseReceiveManager(itemOptions, categoryOptions, oldRows) {
             if (this.validItemCount === 0) return false;
             return this.rows.every(r => {
                 if (!r.item_id) return true;
-                if (!r.unit_price || parseFloat(r.unit_price) <= 0) return false;
+                if (!r.unit_price || this.parsePrice(r.unit_price) <= 0) return false;
                 if (r.tracking_type === 'serialized' && this.serialCount(r) === 0) return false;
-                if (r.tracking_type !== 'serialized' && (!r.qty || parseFloat(r.qty) <= 0)) return false;
+                if (r.tracking_type === 'roll' && (!r.roll_count || parseFloat(r.roll_count) <= 0)) return false;
+                if (r.tracking_type !== 'serialized' && r.tracking_type !== 'roll' && (!r.qty || parseFloat(r.qty) <= 0)) return false;
                 return true;
             });
         },

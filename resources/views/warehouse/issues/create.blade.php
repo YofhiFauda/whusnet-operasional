@@ -55,6 +55,7 @@
      )"
      @pick-serial.window="onPickSerial($event.detail)"
      @pick-qty.window="onPickQty($event.detail)"
+     @pick-roll.window="onPickRoll($event.detail)"
      @barcode-detected.window="$event.detail.target === 'issue-dispatch' && onScan($event.detail.code)"
      class="space-y-4 pb-0 sm:pb-0 lg:pb-8">
 
@@ -290,14 +291,14 @@
                                                 SERIAL NUMBER
                                             </span>
                                         </template>
-                                        <template x-if="row.tracking_type === 'batch'">
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                                                LOT KABEL
-                                            </span>
-                                        </template>
                                         <template x-if="row.tracking_type === 'quantity'">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                                                 REGULER
+                                            </span>
+                                        </template>
+                                        <template x-if="row.tracking_type === 'roll'">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                                ROLL KABEL
                                             </span>
                                         </template>
                                     </div>
@@ -352,9 +353,13 @@
                                     </div>
                                 </template>
 
-                                {{-- Mode 2: Quantity & Batch Item --}}
-                                <template x-if="row.tracking_type !== 'serialized' && row.tracking_type !== ''">
+                                {{-- Mode 2: Quantity Item. `lot_no` HIDDEN (bukan diketik staf,
+                                     ADHOC-75) — auto-pilih di `onItemChange()` kalau cuma 1 lot
+                                     aktif, atau diisi lewat klik chip lot di panel "Stok Tersedia"
+                                     kalau barangnya lagi punya 2 lot (harga Lama/Baru). --}}
+                                <template x-if="row.tracking_type !== 'serialized' && row.tracking_type !== 'roll' && row.tracking_type !== ''">
                                     <div class="bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/60 rounded-lg p-3 space-y-2.5">
+                                        <input type="hidden" :name="`lines[${index}][lot_no]`" x-model="row.lot_no">
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-end">
                                             <div>
                                                 <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
@@ -364,14 +369,31 @@
                                                        class="w-full min-h-[42px] px-3 py-2 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                                             </div>
 
-                                            <template x-if="row.tracking_type === 'batch'">
-                                                <div>
-                                                    <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">No. Lot / Drum</label>
-                                                    <input type="text" :name="`lines[${index}][lot_no]`" x-model="row.lot_no" placeholder="mis. LOT-001"
-                                                           class="w-full min-h-[42px] px-3 py-2 text-xs font-mono border border-purple-200 dark:border-purple-800 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500">
+                                            <template x-if="row.lot_no">
+                                                <div class="text-[10px] text-slate-500 dark:text-slate-400 self-center">
+                                                    Lot: <span class="font-mono font-bold text-slate-700 dark:text-slate-300" x-text="row.lot_no"></span>
                                                 </div>
                                             </template>
                                         </div>
+                                    </div>
+                                </template>
+
+                                {{-- Mode 3: Roll Kabel — pilih roll EXISTING (udah AVAILABLE di
+                                     cabang ini), tempel Roll ID dari label cetak/scan, sejalan SN. --}}
+                                <template x-if="row.tracking_type === 'roll'">
+                                    <div class="bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded-lg p-3 space-y-2.5">
+                                        <div class="flex items-center justify-between">
+                                            <label class="text-[10px] font-bold uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                                                Daftar Roll ID yang Diserahkan (1 Baris per Roll)
+                                            </label>
+                                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full"
+                                                  :class="rollCount(row) > 0 ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'"
+                                                  x-text="rollCount(row) + ' Roll'"></span>
+                                        </div>
+
+                                        <textarea :name="`lines[${index}][roll_codes]`" x-model="row.roll_codes" rows="2" required
+                                                  placeholder="WR-ROLL-FO-20260915-000001"
+                                                  class="w-full text-xs font-mono px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"></textarea>
                                     </div>
                                 </template>
                             </div>
@@ -479,8 +501,23 @@
                         </div>
                     </template>
 
+                    {{--
+                        Stok kosong TAPI ada transfer `in_transit` ke gudang ini
+                        (2026-09-18, gap laporan user) — sebelumnya cuma nampilin
+                        "Stok kosong" polos, gak ketauan kalau barangnya udah
+                        dikirim dari Pusat tapi belum dikonfirmasi terima (stok
+                        Cabang baru nambah SETELAH fase Konfirmasi Terima, bukan
+                        pas dispatch — lihat docs/warehouse/business-logic.md §4).
+                    --}}
+                    <template x-if="cabangPopId && !loadingStock && availableStockItems.length === 0 && pendingTransferCount > 0">
+                        <div class="py-3 px-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+                            <span class="font-bold" x-text="pendingTransferCount"></span> transfer belum dikonfirmasi terima ke gudang ini — stok baru masuk setelah dikonfirmasi.
+                            <a href="{{ route('warehouse.transfers.pending') }}" class="font-bold underline hover:text-amber-900 dark:hover:text-amber-200">Konfirmasi di sini →</a>
+                        </div>
+                    </template>
+
                     {{-- Empty State --}}
-                    <template x-if="cabangPopId && !loadingStock && availableStockItems.length === 0">
+                    <template x-if="cabangPopId && !loadingStock && availableStockItems.length === 0 && pendingTransferCount === 0">
                         <p class="py-4 text-center text-xs text-slate-400 italic">Stok kosong di cabang ini.</p>
                     </template>
 
@@ -521,6 +558,21 @@
                                         </div>
                                     </div>
                                 </template>
+
+                                {{-- Roll Kabel: Chip Roll ID + sisa meter --}}
+                                <template x-if="item.rolls && item.rolls.length > 0">
+                                    <div class="mt-1.5">
+                                        <div class="flex flex-wrap gap-1">
+                                            <template x-for="roll in item.rolls" :key="roll.roll_code">
+                                                <button type="button" @click="$dispatch('pick-roll', { itemId: item.item_id, rollCode: roll.roll_code })"
+                                                    class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-600 hover:text-white transition-colors cursor-pointer"
+                                                    title="Klik untuk memasukkan Roll ID ini">
+                                                    <span x-text="roll.roll_code"></span> <span x-text="'(' + roll.length_remaining + ' m)'"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                         </template>
                     </div>
@@ -537,7 +589,6 @@
 
         {{-- ========================================================
              MOBILE & TABLET FIXED BOTTOM COMMAND BAR & BOTTOM SHEET
-             Offset pada tablet (md:left-64) agar tidak menutupi sidebar
              ======================================================== --}}
         <div class="lg:hidden" x-data="{ openMobileSheet: false }">
             
@@ -550,9 +601,9 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0"
-                 class="fixed inset-0 md:left-64 bg-slate-900/60 backdrop-blur-xs z-50"></div>
+                 class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50"></div>
 
-            {{-- Mobile / Tablet Bottom Sheet Drawer --}}
+            {{-- Mobile / Tablet Bottom Sheet Drawer (Full Width) --}}
             <div x-show="openMobileSheet" x-cloak
                  x-transition:enter="transition ease-out duration-250 transform"
                  x-transition:enter-start="translate-y-full"
@@ -560,7 +611,7 @@
                  x-transition:leave="transition ease-in duration-200 transform"
                  x-transition:leave-start="translate-y-0"
                  x-transition:leave-end="translate-y-full"
-                 class="fixed inset-x-0 md:left-64 md:right-0 bottom-0 max-h-[85vh] bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-700 p-5 z-50 overflow-y-auto scroll-smooth space-y-4 shadow-2xl">
+                 class="fixed inset-x-0 bottom-0 w-full max-h-[85vh] bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-700 p-5 z-50 overflow-y-auto scroll-smooth space-y-4 shadow-2xl">
                 
                 <div class="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-2"></div>
                 
@@ -638,8 +689,8 @@
                 </div>
             </div>
 
-            {{-- Floating Bottom Bar (Simple, Sleek, Glassmorphism - Offset on Tablet md:left-64) --}}
-            <div class="fixed bottom-3 inset-x-3 md:left-64 md:right-0 md:px-6 z-40 pointer-events-none">
+            {{-- Floating Bottom Bar (Simple, Sleek, Glassmorphism) --}}
+            <div class="fixed bottom-3 inset-x-3 z-40 pointer-events-none">
                 <div class="bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white rounded-lg shadow-2xl p-2.5 flex items-center justify-between gap-3 max-w-lg mx-auto pointer-events-auto">
                     
                     {{-- Tapable Summary Area --}}
@@ -678,6 +729,7 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
         technicianId: initialTechnicianId || '',
         loadingStock: false,
         availableStockItems: [],
+        pendingTransferCount: 0,
         stockSearchQuery: '',
         mismatches: [],
         rows: [],
@@ -694,8 +746,9 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
                         qty: old.qty || '',
                         lot_no: old.lot_no || '',
                         serial_numbers: old.serial_numbers || '',
+                        roll_codes: old.roll_codes || '',
                     });
-                    this.onItemChange(i);
+                    this.onItemChange(i, false);
                 });
             } else {
                 // 2. Baca query string shortcut
@@ -707,7 +760,7 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
                 if (itemId) {
                     this.rows[0].item_id = itemId;
                     this.rows[0].lot_no = params.get('lot_no') || '';
-                    this.onItemChange(0);
+                    this.onItemChange(0, false);
 
                     const serial = params.get('serial');
                     if (serial && this.rows[0].tracking_type === 'serialized') {
@@ -731,14 +784,18 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
 
             if (! popId) {
                 this.availableStockItems = [];
+                this.pendingTransferCount = 0;
                 return;
             }
 
             this.loadingStock = true;
             fetch(`${this.stockEndpoint}?pop_id=${popId}`, { headers: { 'Accept': 'application/json' } })
                 .then(r => r.json())
-                .then(data => { this.availableStockItems = data.items || []; })
-                .catch(() => { this.availableStockItems = []; })
+                .then(data => {
+                    this.availableStockItems = data.items || [];
+                    this.pendingTransferCount = data.pending_transfer_count || 0;
+                })
+                .catch(() => { this.availableStockItems = []; this.pendingTransferCount = 0; })
                 .finally(() => { this.loadingStock = false; });
         },
 
@@ -764,6 +821,7 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
                 qty: '',
                 lot_no: '',
                 serial_numbers: '',
+                roll_codes: '',
             });
         },
 
@@ -776,7 +834,11 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
             return this.itemOptions.filter(o => String(o.category_id) === String(row.category_id));
         },
 
-        onItemChange(index) {
+        // `resolveLot=false` dipakai pemanggil yang UDAH nentuin `row.lot_no`
+        // sendiri sebelum manggil ini (rehydrate old()/query-param
+        // `?lot_no=`) — jangan ditimpa. Default `true` buat pemanggil normal
+        // (staf ganti pilihan barang lewat dropdown/klik chip Stok Tersedia).
+        onItemChange(index, resolveLot = true) {
             const row = this.rows[index];
             const opt = this.itemOptions.find(o => String(o.id) === String(row.item_id));
 
@@ -785,10 +847,31 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
                 row.unit = opt.unit;
                 row.category_id = opt.category_id ?? '';
             }
+
+            if (! resolveLot) {
+                return;
+            }
+
+            // Barang QUANTITY bisa py 2 lot aktif (harga Lama/Baru, ADHOC-75)
+            // — auto-pilih kalau cuma 1 lot ada stoknya, biar staf yang milih
+            // barang lewat dropdown (bukan klik chip di panel "Stok
+            // Tersedia") tetap ke-submit lot_no yang bener, gak nembak lot
+            // kosong. Kalau lotnya 2, DIBIARKAN kosong — staf wajib klik
+            // salah satu chip lot di panel biar jelas ambil dari yang mana.
+            const stock = this.availableStockItems.find(i => String(i.item_id) === String(row.item_id));
+            row.lot_no = (stock && Array.isArray(stock.lots) && stock.lots.length === 1) ? (stock.lots[0].lot_no || '') : '';
         },
 
         serialCount(row) {
             return (row.serial_numbers || '')
+                .split(/[\r\n,]+/)
+                .map(s => s.trim())
+                .filter(s => s.length > 0)
+                .length;
+        },
+
+        rollCount(row) {
+            return (row.roll_codes || '')
                 .split(/[\r\n,]+/)
                 .map(s => s.trim())
                 .filter(s => s.length > 0)
@@ -816,7 +899,8 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
             return this.rows.every(r => {
                 if (!r.item_id) return true;
                 if (r.tracking_type === 'serialized' && this.serialCount(r) === 0) return false;
-                if (r.tracking_type !== 'serialized' && (!r.qty || parseFloat(r.qty) <= 0)) return false;
+                if (r.tracking_type === 'roll' && this.rollCount(r) === 0) return false;
+                if (r.tracking_type !== 'serialized' && r.tracking_type !== 'roll' && (!r.qty || parseFloat(r.qty) <= 0)) return false;
                 return true;
             });
         },
@@ -878,6 +962,30 @@ function warehouseIssueManager(itemOptions, categoryOptions, oldRows, stockEndpo
 
             row.lot_no = detail.lotNo || '';
             row.qty = detail.qty;
+        },
+
+        onPickRoll(detail) {
+            let row = this.rows.find(r => String(r.item_id) === String(detail.itemId));
+
+            if (! row) {
+                row = this.findEmptyRow();
+                if (! row) {
+                    this.addRow();
+                    row = this.rows[this.rows.length - 1];
+                }
+                row.item_id = detail.itemId;
+                this.onItemChange(this.rows.indexOf(row));
+            }
+
+            const existing = (row.roll_codes || '')
+                .split(/[\r\n,]+/)
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            if (! existing.includes(detail.rollCode)) {
+                existing.push(detail.rollCode);
+                row.roll_codes = existing.join('\n');
+            }
         },
 
         onScan(code) {

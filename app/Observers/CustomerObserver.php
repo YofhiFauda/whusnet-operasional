@@ -7,6 +7,7 @@ use App\Events\CustomerVerificationStatusChanged;
 use App\Models\Customer;
 use App\Models\CustomerAcquisition;
 use App\Models\CustomerPortalToken;
+use App\Services\CustomerPortal\PortalAuthService;
 use App\Services\CustomerQrTokenService;
 
 class CustomerObserver
@@ -39,6 +40,18 @@ class CustomerObserver
             // rancangan-qr-pelanggan-final.md §7.3 Kasus 6).
             if ($customer->status === WorkflowTransition::TERMINATED->value) {
                 $this->revokeActiveQrToken($customer, 'Pelanggan terminated');
+            }
+
+            // Kebalikan dua blok di atas — "Langganan Lagi" (TERMINATED →
+            // ACTIVE). Ditaruh di observer, bukan di controller, dengan
+            // alasan yang sama seperti penonaktifannya: invariant "akun
+            // portal & QR mengikuti status pelanggan" harus jalan dari semua
+            // jalur masuk (transition(), tinker, import), bukan cuma dari
+            // tombol di List Putus Langganan. getOriginal() di hook updated
+            // masih berisi nilai SEBELUM save.
+            if ($customer->status === WorkflowTransition::ACTIVE->value
+                && $customer->getOriginal('status') === WorkflowTransition::TERMINATED->value) {
+                app(PortalAuthService::class)->restoreAfterReactivation($customer, auth()->user());
             }
 
             // Modul Customer Acquisition (List Pelanggan <30 hari, dipakai

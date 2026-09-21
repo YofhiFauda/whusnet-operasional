@@ -14,10 +14,10 @@ Salah catat dilawan dengan baris koreksi baru (`ADJUSTMENT`/`STOCK_OPNAME`), buk
 |---|---|---|
 | `Item` / `ItemCategory` | `items`, `item_categories` | Master barang, 3 axis klasifikasi independen (lihat [business-logic.md](business-logic.md)) |
 | `InventoryBalance` | `inventory_balances` | Stok saat ini per `(gudang, item, lot)` — proyeksi |
-| `InventorySerial` | `inventory_serials` | Satu baris per unit fisik SN, status kanonik (`SerialStatus`) |
+| `InventorySerial` | `inventory_serials` | Satu baris per unit fisik SN, status kanonik (`SerialStatus`) + kondisi fisik (`ItemCondition`, axis independen — lihat [business-logic.md §12](business-logic.md#12-kondisi-fisik-barang-serialized-adhoc-80)) |
 | `InventoryTransaction` | `inventory_transactions` | Ledger append-only — sumber kebenaran |
 | `InventoryTransfer` | `inventory_transfers` | Header mutable Transfer Pusat→Cabang (2 fase) |
-| `TechnicianCustody` | `technician_custody` | Custody barang QUANTITY/BATCH yang dipegang teknisi |
+| `TechnicianCustody` | `technician_custody` | Custody barang QUANTITY yang dipegang teknisi |
 | `StockRequest` / `StockRequestItem` | `stock_requests`, `stock_request_items` | Tiket permintaan stok Cabang→Pusat (bukan ledger) |
 
 Gudang **direpresentasikan lewat `pops`** (`type` = `pusat`/`cabang`) — sengaja tidak ada tabel `warehouses` terpisah.
@@ -56,7 +56,7 @@ Riwayat rancangan (historis, bukan dokumentasi final) ada di `docs/plan/warehous
 
 ## Stack Relevan
 
-- Enum: `App\Enums\{InventoryTransactionType,SerialStatus,CustodyStatus,TransferStatus,StockRequestStatus,TrackingType,OwnershipMode,EquipmentClass}`
+- Enum: `App\Enums\{InventoryTransactionType,SerialStatus,ItemCondition,CustodyStatus,TransferStatus,StockRequestStatus,TrackingType,RollStatus,OwnershipMode,EquipmentClass}`
 - Service: `app/Services/Inventory{Receive,Transfer,Issue,Adjustment,Reassign}Service.php`, `StockRequestService.php`, `InventoryService.php` (jembatan ke Task Teknisi)
 - Controller: `app/Http/Controllers/Warehouse/*` (13 file) + trait `Concerns\AuthorizesWarehousePop`
 - Observer: `app/Observers/InventoryTransactionObserver.php` (block update/delete)

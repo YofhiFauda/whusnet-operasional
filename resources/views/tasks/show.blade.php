@@ -665,6 +665,8 @@
                         </div>
                     </div>
 
+                    {{-- Instruksi sebelum laporan; setelah teknisi melapor digantikan blok "Laporan Pengambilan Alat" di bawah. --}}
+                    @unless($task->deviceRetrieval)
                     <div class="pt-3.5 border-t border-border space-y-2">
                         <span class="block text-[10px] text-text-main font-bold uppercase font-ui tracking-wider select-none">Aset ISP yang Wajib Ditarik</span>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -683,6 +685,7 @@
                             </div>
                         </div>
                     </div>
+                    @endunless
                 </div>
 
                 @elseif($task->task_type === \App\Enums\TaskType::CREQ)
@@ -948,6 +951,10 @@
             </div>
             @endif
 
+            @elseif($task->task_type->value === \App\Enums\TaskType::AMBIL_MODEM->value)
+            {{-- Ambil Modem (DEAC) punya format laporan sendiri — bukan blok Maintenance di bawah (ADHOC-88). --}}
+            @include('tasks.partials.device-retrieval-report', ['task' => $task])
+
             @else
             @php
                 $maintenanceFopTask = app(\App\Services\TaskWorkToolService::class)->resolveTaskFor($task);
@@ -1186,11 +1193,13 @@
                 $reportUrl = match(true) {
                     $task->task_type->value === \App\Enums\TaskType::SURVEY->value => route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]),
                     $task->task_type->value === \App\Enums\TaskType::PEMASANGAN->value => route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]),
+                    $task->task_type->value === \App\Enums\TaskType::AMBIL_MODEM->value => route('tasks.device-retrieval.report', $task),
                     default => route('tasks.maintenance.report', $task),
                 };
                 $reportLabel = match(true) {
                     $task->task_type->value === \App\Enums\TaskType::SURVEY->value => 'Laporan Survey',
                     $task->task_type->value === \App\Enums\TaskType::PEMASANGAN->value => 'Laporan Pemasangan',
+                    $task->task_type->value === \App\Enums\TaskType::AMBIL_MODEM->value => 'Laporan Ambil Alat',
                     default => 'Isi Laporan',
                 };
             @endphp

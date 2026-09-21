@@ -38,7 +38,7 @@ Migrasi sumber: `2026_06_12_132728_create`, `2026_06_15_000002_add_legacy_ids`, 
 | `internet_package_id` | FK → `internet_packages.id`, cascade delete | | |
 | `billing_period` | string(50) | | Format `Y-m`, e.g. `2026-07` |
 | `issue_date` | date | | Tanggal terbit |
-| `due_date` | date | | Tanggal jatuh tempo |
+| `due_date` | date | | Tanggal jatuh tempo — **hanya label UI/formalitas** (bulanan: tanggal 10 periode). Bukan penentu terlambat/piutang; lihat catatan di bawah |
 | `subtotal` | decimal(12,2) | | |
 | `discount` | decimal(12,2), default 0 | | |
 | `ppn` | decimal(5,2), default 0 | | Persentase PPN |
@@ -53,6 +53,8 @@ Migrasi sumber: `2026_06_12_132728_create`, `2026_06_15_000002_add_legacy_ids`, 
 | `invoice_status` | string(50), default `belum_dibayar` | | `belum_dibayar`, `sebagian`, `lunas`, `batal` |
 | `created_by` | FK → `users.id`, null on delete | ✔ | Null kalau dibuat via command (`billing:generate-monthly-invoices`) |
 | `created_at` / `updated_at` | timestamp | | |
+
+**Catatan piutang (2026-09-21):** `due_date` (tanggal 10) tidak dipakai menentukan "terlambat". Batas riil pembayaran = akhir bulan `billing_period`; kas admin ditutup selalu tanggal 1, jadi tagihan `belum_dibayar`/`sebagian` dengan `billing_period` < bulan berjalan = **piutang**. Satu-satunya definisi: `Invoice::scopePiutang()` / `Invoice::isPiutang()`. Jangan menulis `where('due_date', '<', now())` untuk menandai tunggakan. Aturan lengkap: `docs/BUSINESS_RULES.md` §7 poin 4.
 
 **Catatan `invoice_type`:** kolom ini sempat punya default DB `'bulanan'` — dihapus lewat migrasi `remove_default_from_invoice_type_column` karena default diam-diam itu yang bikin invoice salah tag pas migrasi data legacy. Sekarang: `InvoiceObserver::creating()` juga menolak insert kalau `invoice_type` kosong (lapis aplikasi, redundant dengan constraint DB).
 

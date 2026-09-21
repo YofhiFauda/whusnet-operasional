@@ -1,139 +1,123 @@
 # Analisa & Rancangan: Tagihan Manual (Detail Pelanggan + Halaman Tagihan)
 
-**Status:** Terbuka — analisa selesai 2026-09-15, implementasi belum mulai. Di luar sprint aktif, dicatat sebagai ADHOC-70 di `docs/TASKS.md`.
+**Status:** Terbuka — ditulis ulang 2026-09-19 murni dari studi kasus user, implementasi belum mulai. Dicatat sebagai ADHOC-70 di `docs/TASKS.md`, di luar sprint aktif.
 
-**Sumber ide awal:** permintaan user (chat 2026-09-15) — dua pintu masuk Tagihan Manual: modal di Detail Pelanggan, dan Halaman Tagihan (dengan search by CID/Nama).
+> **Revisi 2026-09-19.** Versi sebelumnya bertumpu pada rancangan lama ADHOC-60 (master kategori pendapatan, subkategori, `invoice_items`, `ManualInvoiceService`, tipe `INSIDENTAL`). Itu **kode lama** yang implementasinya sudah dihapus user dan konsepnya sudah berubah. Dokumen ini **tidak** memakai satupun dari itu. Versi lama ada di riwayat git.
 
-**Konteks penting:** ada rancangan lama, `docs/plan/analisa-tagihan-kategori-pendapatan.md` (ADHOC-60, 2026-09-09), yang merancang **persis** konsep master kategori pendapatan buat kebutuhan ini. Implementasinya **dieksekusi cuma separuh jalan lalu sebagian dihapus user** (kualitasnya jelek) — sisanya sekarang jadi infrastruktur dorman: ada di DB & kode, tapi tidak dipakai user manapun. Dokumen ini **bukan pengganti** ADHOC-60, tapi lanjutannya + revisi di titik yang perlu direvisi (§3.2).
-
-**Terkait:** `docs/plan/upgrade-downgrade/analisa-upgrade-downgrade-paket.md`, `docs/plan/billing/analisa-rancangan-putus-langganan.md` — tiga rancangan billing ini disatukan user sebelum eksekusi, urutan pengerjaan ditentukan belakangan.
+**Terkait:** `docs/plan/billing/analisa-rancangan-putus-langganan.md`, `docs/plan/billing/upgrade-downgrade/analisa-upgrade-downgrade-paket.md`, `docs/plan/billing/analisa-skema-alokasi-pembayaran-dan-saldo.md` (konfirmasi lebih bayar dipakai ulang di form ini). Urutan pengerjaan: lihat dokumen Alokasi & TASKS.md.
 
 ---
 
-## 1. Ringkasan Putusan
+## 1. Studi Kasus (sumber kebenaran, dari user)
 
-Permintaan user match dengan apa yang **sudah dirancang** (kategori Perbaikan/Instalasi/Lainnya + rincian bebas + nominal manual), tapi:
-- Implementasinya **kepotong** — cuma layer data (migrasi, model, service) yang selamat, UI-nya tidak pernah selesai / sudah dihapus.
-- **Modal ditolak** untuk kedua pintu masuk (Detail Pelanggan sudah ada modal lama yang perlu diganti; Halaman Tagihan direncanakan modal juga di request awal) — dikoreksi jadi **halaman create tersendiri**, konsisten dengan keputusan lama ADHOC-60 §7 dan aturan CLAUDE.md 2026-09-07 (mutasi data ≠ modal, alasan: `back()->withErrors()` balik ke *referer*, modal-di-atas-List bikin gagal-validasi kehilangan pesan error).
-- Satu revisi terhadap keputusan lama: kategori pendapatan **tidak lagi kaku terkunci di 4** — bisa nambah kategori besar baru (lihat §3.2).
+**Tagihan Pelanggan Manual — dari Detail Pelanggan.** Jenis pendapatan yang bisa ditagihkan:
+- Pendapatan Perbaikan
+- Pendapatan Lainnya (nama diisi manual — contoh: over kabel, Pendapatan A, Pendapatan B)
+- Pendapatan Pindah Lokasi
 
----
+Deskripsi tagihan diisi sendiri. Nominal tagihan diisi sendiri. Metode pembayaran: Cash atau TF.
 
-## 2. Gap Terhadap Kode Nyata
+**Dari Halaman Tagihan** — strukturnya sama seperti di atas, tapi pelanggan dicari lewat **CID atau Nama**.
 
-### 2.1 Infrastruktur ADHOC-60 — sebagian ada, sebagian tidak
-
-**Masih ada (dipertahankan, tinggal dipakai):**
-- `revenue_categories` / `revenue_subcategories` (tabel + model `RevenueCategory`/`RevenueSubcategory`).
-- `invoice_items` (tabel + model `InvoiceItem`), relasi `Invoice::items()`.
-- `App\Services\InvoiceItemBuilder`, `App\Services\ManualInvoiceService`, `App\Services\InvoiceNumberGenerator`.
-- `InvoiceType::INSIDENTAL` (`app/Enums/InvoiceType.php`).
-- Satu pemakai nyata: `CustomerAcquisitionController::updateInstallationFee()` — memanggil `ManualInvoiceService::create()` untuk menerbitkan invoice biaya instalasi (kategori `jasa_instalasi`/`biaya_aktivasi`).
-
-**Tidak ada / sudah dihapus (perlu dibangun):**
-- Halaman Master Kategori Pendapatan (`Master\RevenueCategoryController`, view, route, menu sidebar) — dicek, nihil di `app/Http/Controllers/Master/`, `routes/web.php`, `resources/views/`.
-- Permission `revenue_categories.*` — nihil di `config/rbac.php`.
-- Feature seeder-nya — nihil.
-- Halaman `/invoices/create` — nihil, `InvoiceController` tidak punya method `create()`/`store()`, route `web.php` cuma punya index/lunas/belum-lunas/show untuk `/invoices`.
-- `RevenueBreakdownService` (breakdown kategori di laporan) — nihil.
-- `BackfillInvoiceItemsCommand` — nihil.
-
-### 2.2 Modal lama di Detail Pelanggan masih pakai kolom flat, bukan kategori
-
-`resources/views/customers/show.blade.php:1249` (`#manual-invoice-modal`) submit ke `CustomerController::storeManualInvoice()` (`app/Http/Controllers/CustomerController.php:3719`) — validasi & simpan masih pakai kolom lama `invoices.prorate_amount`/`extra_cable_fee`/`extra_installation_fee`/`extra_pole_fee`, **tidak** menyentuh `revenue_categories`/`invoice_items` sama sekali. Ini yang akan diganti.
-
-### 2.3 Halaman Tagihan belum punya fitur "Buat Tagihan" apapun
-
-`InvoiceController::index()` (`/invoices`) cuma listing + search (`app/Http/Controllers/InvoiceController.php:19-51`, sudah bisa cari by nama/CID/nomor invoice — pola pencariannya bisa **direuse** buat search pelanggan di form create). Tidak ada tombol/aksi bikin tagihan baru dari halaman ini sama sekali sekarang.
-
-### 2.4 "Metode Pembayaran" — enum sudah pas, tinggal disambung ke alur invoice+payment sekaligus
-
-`App\Enums\PaymentMethod` sudah punya `CASH`/`TRANSFER`/`QRIS`/`KOLEKTOR`/`LAINNYA` — persis "Cash atau TF" yang diminta, **tidak perlu enum baru**. Yang belum ada: jalur yang menerbitkan invoice **dan** payment dalam satu submit form (sekarang dua aksi terpisah — invoice dulu via `ManualInvoiceService`, payment nyusul lewat `/invoices/{id}/payments` via `PaymentController::store()`/`PaymentService`).
+**Batas cakupan (dikonfirmasi user 2026-09-19):** Tagihan Manual **hanya** tiga jenis di atas. Aktivasi, Bulanan, dan Reaktivasi adalah jenis tagihan lain dan bukan bagian dari fitur ini. Tagihan manual lama di Detail Pelanggan **dihapus bersih** (§4 butir 6).
 
 ---
 
-## 3. Keputusan (2026-09-15)
+## 2. Kondisi Kode Saat Ini (dicek 2026-09-19)
 
-### 3.1 Modal → Halaman create tersendiri (kedua pintu masuk)
+- **Detail Pelanggan** punya modal lama `#manual-invoice-modal` (`resources/views/customers/show.blade.php:1249`) → `CustomerController::storeManualInvoice()` (route `customers.invoices.manual`, `routes/web.php:298`, permission `invoices.create`). Modal ini **bukan** yang diminta: ia menerbitkan tagihan **langganan** (`invoice_type` `awal`/`bulanan`/`reaktivasi`, selalu memuat harga bulanan paket + biaya tambahan flat `prorate_amount`/`extra_cable_fee`/`extra_installation_fee`/`extra_pole_fee`), butuh `customerService` aktif, tanpa deskripsi, tanpa pembayaran.
+- **Halaman Tagihan** (`/invoices`, `InvoiceController::index()`) hanya listing + search (sudah bisa cari nama/CID/nomor invoice — pola pencariannya bisa dipakai ulang). Tidak ada `/invoices/create` dan tidak ada tombol "Buat Tagihan".
+- **Metode pembayaran:** `App\Enums\PaymentMethod` sudah punya `CASH` dan `TRANSFER` (+ `QRIS`/`KOLEKTOR`/`LAINNYA`) — tidak perlu enum baru, cukup batasi pilihan di form jadi Cash/TF. Aturan `requiresBankDetails()` untuk transfer sudah ada.
+- **Pembayaran** dicatat lewat `PaymentService::record()` (auto-split cicilan/lebih bayar sudah benar, menjumlahkan tunai + saldo).
 
-- **Detail Pelanggan:** tombol "Buat Tagihan Manual" jadi link ke `/invoices/create?customer_id=...` (customer sudah ter-prefill & terkunci — pola sama dengan rencana ADHOC-60 lama), modal `#manual-invoice-modal` dihapus.
-- **Halaman Tagihan:** tombol "Buat Tagihan" link ke `/invoices/create` polos, dengan search pelanggan (CID/Nama) di dalam form itu sendiri — pola pencarian reuse dari `InvoiceController::index()` (`orWhereHas('customer', ...)` by `full_name`/`cid`/`customer_code`) atau endpoint typeahead yang sudah ada polanya (`customers.search-referral`, `app/Http/Controllers/CustomerController.php`) — pilih salah satu pola existing, jangan bikin mekanisme pencarian ketiga.
+---
 
-Satu halaman `/invoices/create` melayani dua pintu masuk (beda cuma ada/tidaknya `?customer_id=` prefill) — sama seperti rancangan ADHOC-60 lama.
+## 3. Keputusan Rancangan
 
-### 3.2 Kategori pendapatan: dibuka, tidak lagi terkunci di 4 (revisi ADHOC-60)
+### 3.1 Halaman create tersendiri, bukan modal
+Mutasi data → halaman `/invoices/create` (aturan CLAUDE.md 2026-09-07: `back()->withErrors()` balik ke *referer*, modal-di-atas-List kehilangan pesan error saat validasi gagal). Satu halaman melayani dua pintu masuk:
+- **Detail Pelanggan:** tombol "Buat Tagihan Manual" → `/invoices/create?customer_id=…` (pelanggan ter-prefill & terkunci).
+- **Halaman Tagihan:** tombol "Buat Tagihan" → `/invoices/create` polos, dengan pencarian pelanggan by CID/Nama di dalam form (pakai salah satu pola existing: `whereHas` seperti `InvoiceController::index()` atau typeahead seperti `customers.search-referral` — jangan bikin mekanisme pencarian ketiga).
 
-Rancangan lama mengunci kategori level atas di 4 baris tetap, admin cuma boleh nambah/ubah **sub**kategori. Keputusan sekarang: **"Pindah Lokasi" naik jadi kategori besar sendiri**, sejajar Perbaikan/Instalasi/Lainnya — bukan lagi subkategori di bawah "Jasa Perbaikan".
+### 3.2 Taksonomi jenis tagihan (dikonfirmasi user 2026-09-19)
 
-Konsekuensi ke desain lama:
-- **Dua kode yang tetap terkunci** (tidak bisa diubah/dihapus, perilaku spesial di kode): `jasa_layanan_internet` (nominal dari `customer_services`, penentu guard satu-langganan-per-periode) dan `lainnya` (baris nama ketik-bebas, tanpa subkategori — lihat §3.3). Ini yang beneran "dirujuk kode" (`RevenueCategory::CODE_JASA_LAYANAN_INTERNET`, `CODE_LAINNYA`).
-- **Kategori lain (`jasa_instalasi`, `jasa_perbaikan`, dan kategori baru seperti `pindah_lokasi`) berperilaku sama** — baris biasa, nominal manual/`default_amount`, tidak ada logic bercabang berdasarkan `code`-nya. Kategori jenis ini **boleh ditambah admin** lewat halaman Master (bukan lagi hardcode migrasi doang).
-- Aturan hapus kategori/subkategori: **sama seperti master alasan putus-langganan** (`docs/plan/billing/analisa-rancangan-putus-langganan.md` §3.4, konsisten satu pola across master data di sistem ini) — **tidak bisa dihapus kalau masih dipakai** minimal satu `invoice_items`, **bisa dihapus permanen kalau tidak dipakai siapa pun**. FK `invoice_items.revenue_category_id`/`revenue_subcategory_id` pakai `restrictOnDelete()` (bukan `nullOnDelete()`), dicek dulu di controller sebelum DELETE biar errornya jelas bukan raw SQL violation.
+```
+Jenis Tagihan
+├─ Aktivasi            (invoice_type `awal`, sudah ada)
+├─ Bulanan             (invoice_type `bulanan`, sudah ada)
+├─ Reaktivasi          (invoice_type `reaktivasi`, sudah ada — pelanggan putus lalu berlangganan lagi)
+└─ Tagihan Manual      (invoice_type BARU — dokumen ini)
+     ├─ Tagihan Perbaikan
+     ├─ Tagihan Lainnya      (sub-nama diisi sendiri: over kabel, Pendapatan A, B, dst)
+     └─ Tagihan Pindah Lokasi
+```
 
-**Migrasi data:** kategori `pindah_lokasi` yang sekarang ada sebagai **sub**kategori di bawah `jasa_perbaikan` (id lihat `revenue_subcategories`) dipromosikan jadi kategori baru level atas. Karena fiturnya belum pernah benar-benar dipakai user (satu-satunya pemakai `ManualInvoiceService` sekarang cuma `jasa_instalasi`/`biaya_aktivasi` untuk installation fee), migrasi ini kemungkinan besar **tidak perlu mikirin data invoice existing** yang mereferensikannya — tapi **wajib dicek dulu** saat implementasi (`SELECT COUNT(*) FROM invoice_items WHERE revenue_subcategory_id = <id pindah_lokasi>`) sebelum menghapus/mengubah baris subkategori lama, ikuti aturan §3.2 di atas (restrict kalau ternyata terpakai).
+- **Tagihan Manual = satu `invoice_type` baru** (nilai `manual`, label "Tagihan Manual"), di luar `Invoice::SUBSCRIPTION_TYPES` (alasan teknis: §3.3). Tiga anaknya bukan tipe invoice sendiri, melainkan **jenis** di dalam tagihan manual.
+- Jenis = satu enum PHP dengan tiga nilai (`Perbaikan`, `Lainnya`, `Pindah Lokasi`). **Bukan** tabel master, **bukan** subkategori berjenjang, **bukan** `invoice_items`.
+- **Lainnya:** wajib diketik nama sub-nya (over kabel, A, B, dst — nama ketikan bebas, bukan daftar baku).
+- **Label:** `InvoiceType::AWAL` berlabel **"Aktivasi"** (diputuskan & diubah 2026-09-19 di `InvoiceType::label()` + opsi filter `invoices/index.blade.php`; nilai `awal` di DB tidak berubah). Teks "Tagihan Awal" lain di UI (KPI, judul grup di Detail Pelanggan, teks bantuan verifikasi) belum diubah.
+- Semua jenis: **deskripsi** (teks bebas) dan **nominal** (diketik, format rupiah via `RupiahInput`) diisi manual.
+- Kalau kelak butuh jenis baru yang bisa ditambah admin, dibahas terpisah — tidak dirancang sekarang (jangan overengineered).
 
-### 3.3 Kategori "Lainnya": tetap ketik bebas, contoh yang disebutkan bukan sub baku
+### 3.3 Tipe invoice non-langganan: kebutuhan teknis, kode lama tidak dipakai
+Tagihan manual boleh terbit di bulan yang sama dengan tagihan bulanan pelanggan. Tapi `InvoiceObserver::rejectSecondSubscriptionInvoice()` menolak invoice kedua bertipe langganan (`Invoice::SUBSCRIPTION_TYPES`, `app/Models/Invoice.php:33`) untuk pelanggan + periode yang sama, dan unique index sengaja tidak dipasang (lihat migrasi `2026_07_21_164556`). Akibatnya tagihan manual **tidak boleh** bertipe `awal`/`bulanan`; ia butuh satu nilai `invoice_type` di luar `SUBSCRIPTION_TYPES`.
 
-"Pendapatan over kabel" / "Pendapatan A" / "Pendapatan B" yang disebut user adalah **contoh nama yang diketik bebas** saat membuat tagihan di kategori Lainnya — bukan permintaan bikin daftar subkategori tetap. Desain lama tetap berlaku: kategori `lainnya` **tanpa** subkategori master, form-nya jadi input teks bebas untuk nama baris. Tidak ada perubahan skema di titik ini.
+- Ini kebutuhan teknis dari guard yang sudah ada, bukan sisa rancangan lama.
+- **Kode lama `INSIDENTAL` tidak dipakai** (instruksi user 2026-09-19). Tipe barunya **`manual` / "Tagihan Manual"** (§3.2) — case baru di `InvoiceType`, di luar `SUBSCRIPTION_TYPES`. Bentuk penyimpanan jenis / nama sub / deskripsi di tabel `invoices` (kolom baru vs kolom catatan yang sudah ada) diputuskan saat implementasi — cek kolom existing dulu sebelum menambah.
+- Kode ADHOC-60 yang masih ada di repo (`RevenueCategory`, `RevenueSubcategory`, `InvoiceItem`, `ManualInvoiceService`, `InvoiceItemBuilder`) **tidak dipakai dan tidak diubah** oleh pekerjaan ini. `ManualInvoiceService` masih dipanggil `CustomerAcquisitionController::updateInstallationFee()` (biaya instalasi Busdev) — nasibnya (dihapus/dibiarkan) di luar scope dokumen ini.
 
-### 3.4 Invoice + Payment sekaligus dalam satu submit
+> **Catatan lintas-dokumen (2026-09-19):** Tagihan Manual jenis Lainnya punya **produsen kedua** di luar form ini — denda putus langganan (ADHOC-69, sub "Denda Putus Langganan" diisi sistem). Produsen itu menerbitkan invoice **tanpa Payment** (`belum_dibayar`). Karena itu pembayaran di bawah wajib hanya di **form** `/invoices/create`; Service pembuat invoice-nya harus bisa jalan tanpa Payment. Lihat `analisa-rancangan-putus-langganan.md` §2.1.
 
-Form Tagihan Manual submit **satu kali** menghasilkan **dua record**: `Invoice` (via `ManualInvoiceService::create()`, tipe otomatis — `insidental` untuk tagihan non-langganan, sesuai §"Revisi 2026-09-09" di ADHOC-60) **dan** `Payment` (via jalur yang sama dipakai `PaymentController::store()`/`PaymentService`, bukan ditulis ulang) — dalam **satu `DB::transaction()`**.
+### 3.4 Invoice + pembayaran dalam satu submit
+Studi kasus menyebut metode pembayaran ada di form, jadi satu submit menghasilkan **dua record**: `Invoice` dan `Payment` (lewat `PaymentService::record()`, bukan ditulis ulang), dalam **satu `DB::transaction()`**. Payment gagal → invoice ikut rollback (tidak ada invoice yatim `belum_dibayar`).
 
-Field form tambahan yang perlu ada:
-- **Metode Pembayaran** — dropdown `PaymentMethod::CASH`/`TRANSFER` (dua opsi sesuai permintaan; `QRIS`/`KOLEKTOR`/`LAINNYA` di enum tidak usah ditampilkan di form ini kecuali dibutuhkan nanti — enum-nya tidak perlu diubah, cukup dibatasi pilihan di level form/validasi).
-- **Nominal Dibayar** — default = total invoice (asumsi lunas penuh saat itu juga, sesuai skenario "cash/TF di tempat"), tapi **tetap field terpisah yang bisa diedit** (bukan otomatis dikunci sama total) supaya kasus bayar sebagian tetap bisa dicatat lewat form yang sama — reuse logic pemisahan bayar/lebih-bayar yang sudah ada di `PaymentService`, jangan bikin cabang baru.
-- Field pendukung metode transfer (`bank_name`, `account_number`) — ikut aturan existing `PaymentMethod::requiresBankDetails()`.
-
-**Kalau payment gagal disimpan** (misal validasi nominal), invoice yang baru dibuat **ikut di-rollback** (satu transaksi) — bukan invoice nyangkut ke-generate tapi paymentnya gagal diam-diam.
+Field pembayaran:
+- **Metode:** Cash atau Transfer. Transfer wajib `bank_name` & `account_number` (aturan existing `PaymentMethod::requiresBankDetails()`).
+- **Nominal dibayar:** default = total tagihan, tetap bisa diedit (bayar sebagian → invoice `sebagian`; bayar lebih → `overpay_amount` jadi saldo, dengan **konfirmasi lebih bayar** yang sama dengan ADHOC-84 §2.3).
 
 ---
 
 ## 4. Rancangan Implementasi
 
-### 4.1 Skema DB — perubahan dari ADHOC-60
-
-- Tambah kategori baru `pindah_lokasi` di `revenue_categories` (bukan lagi baris di `revenue_subcategories`).
-- `revenue_categories.is_system` dipertahankan, tapi maknanya diperjelas: cuma `jasa_layanan_internet` & `lainnya` yang `is_system = true` (dirujuk kode). `jasa_instalasi`, `jasa_perbaikan`, `pindah_lokasi`, dan kategori baru admin ke depan = `is_system = false`.
-- FK `invoice_items.revenue_category_id` & `revenue_subcategory_id`: pastikan `restrictOnDelete()` (§3.2) — cek migrasi existing, kemungkinan sudah begini, tinggal diverifikasi masih konsisten setelah kategori dibuka buat ditambah admin.
-- Tidak ada tabel baru di luar yang sudah dirancang ADHOC-60 (`revenue_categories`, `revenue_subcategories`, `invoice_items`) — cukup direvisi isi datanya + dibuka aksi tambahnya.
-
-### 4.2 Halaman & Controller
-
-1. **`Master\RevenueCategoryController`** (baru, sesuai rencana ADHOC-60 yang belum jadi) — CRUD kategori (sekarang termasuk **tambah** kategori baru, bukan cuma sub) + sub, toggle aktif, guard hapus (§3.2). Permission `revenue_categories.view|create|update|delete` (delete ditambah dari rencana lama, karena sekarang hapus permanen dimungkinkan kalau tidak dipakai).
-2. **`InvoiceController::create()`/`store()`** (baru) — halaman `/invoices/create`:
-   - Terima `?customer_id=` opsional (prefill dari Detail Pelanggan) atau search CID/Nama (dari Halaman Tagihan, §3.1).
-   - Baris rincian (kategori→sub cascading, tombol Tambah Cepat) — reuse pola `<x-invoice-line-rows>` dari rancangan ADHOC-60 kalau filenya masih ada, atau dibuat ulang kalau sudah ikut terhapus.
-   - Field Metode Pembayaran + Nominal Dibayar (§3.4).
-   - `store()`: `DB::transaction()` → `ManualInvoiceService::create()` → langsung susul `PaymentService`-nya untuk payment → redirect `invoices.show` (PRG, sesuai konvensi).
-3. **Modal lama di `customers/show.blade.php`** dihapus, tombol "Buat Tagihan Manual" diganti link ke `/invoices/create?customer_id=...`. Route `customers.invoices.manual` + `CustomerController::storeManualInvoice()` **dihapus** (bukan dibiarkan nyangkut sebagai kode mati).
-4. **Halaman Tagihan (`/invoices` index)** — tambah tombol "Buat Tagihan" yang link ke `/invoices/create`.
-
-### 4.3 Test yang wajib ada
-
-- `/invoices/create` dari Detail Pelanggan (customer terkunci dari `?customer_id=`) — invoice + payment lunas terbit sekaligus, kategori & nominal sesuai input.
-- `/invoices/create` dari Halaman Tagihan — search customer by CID & by Nama, submit menghasilkan invoice untuk customer yang benar (bukan tertukar hasil search lain).
-- Kategori `lainnya` — wajib nama ketik bebas, tidak menampilkan dropdown subkategori.
-- Kategori `jasa_layanan_internet` — nominal tetap dari server (`customer_services.monthly_price`), bukan dari input klien (regresi aturan lama).
-- Payment gagal (nominal invalid) → invoice yang baru dibuat ikut rollback, tidak nyangkut sebagai invoice `belum_dibayar` yatim.
-- Nominal dibayar < total invoice → invoice `sebagian`, bukan otomatis dipaksa lunas.
-- Nominal dibayar > total invoice → kelebihan masuk `overpay_amount`/saldo pelanggan (reuse `PaymentService`, regresi bukan fitur baru).
-- Master Kategori Pendapatan: tambah kategori baru (mis. `pindah_lokasi`) → langsung muncul di dropdown form create.
-- Master Kategori Pendapatan: hapus kategori/sub yang masih dipakai ≥1 invoice → ditolak, pesan jelas.
-- Master Kategori Pendapatan: hapus kategori/sub yang tidak dipakai → berhasil permanen.
-- Modal lama & route `customers.invoices.manual` sudah tidak ada (regresi — pastikan tidak ada view/test lain yang masih mereferensikannya).
-- POP scope: form create & search customer tunduk `applyUserScope()` (tidak bisa bikin tagihan untuk pelanggan di luar POP yang diizinkan).
-
-### 4.4 Yang belum diputuskan / perlu dicek saat implementasi
-
-1. Apakah komponen Blade dari rencana ADHOC-60 (`<x-invoice-line-rows>`) masih ada file-nya (sebagian "dihapus karena jelek") atau perlu ditulis ulang dari nol — cek dulu sebelum mulai coding, jangan asumsi.
-2. Pola search customer di form create — pakai gaya `InvoiceController::index()` (`whereHas` langsung di server, submit form biasa) atau bikin endpoint typeahead AJAX terpisah (pola `customers.search-referral`)? Pilih yang paling konsisten dengan UX form lain di app ini.
-3. Kalau `QRIS`/`KOLEKTOR`/`LAINNYA` ternyata dibutuhkan juga di form ini nanti (bukan cuma Cash/TF) — tidak perlu perubahan enum, cukup buka pilihan di form.
+1. **`InvoiceController::create()`/`store()`** (baru) — halaman `/invoices/create`; `store()`: `DB::transaction()` → buat invoice → `PaymentService::record()` → redirect `invoices.show` (PRG). Permission: pakai `invoices.create` yang sudah ada (tidak menambah permission baru). Route statis `/invoices/create` **sebelum** route dinamis `/invoices/{invoice}`.
+2. **`InvoiceType::MANUAL`** (case baru, di luar `SUBSCRIPTION_TYPES`) + **enum jenis tagihan manual** (3 nilai) + migrasi kolom di `invoices` (§3.3).
+3. **Detail Pelanggan:** tombol "Buat Tagihan Manual" jadi link ke `/invoices/create?customer_id=…`.
+4. **Halaman Tagihan:** tombol "Buat Tagihan" → `/invoices/create`.
+5. **POP scope:** pencarian pelanggan & submit tunduk `applyUserScope()`.
+6. **Hapus bersih tagihan manual lama di Detail Pelanggan** (keputusan §5.1) — tidak boleh ada kode mati atau rujukan yang tersisa:
+   - `routes/web.php:297-299` — grup `permission:invoices.create` berisi hanya route `customers.invoices.manual`; hapus route + grupnya (permission `invoices.create` **dipertahankan**, dipakai ulang untuk `/invoices/create`).
+   - `CustomerController::storeManualInvoice()` (± `:3734` s.d. akhir method) + import yang jadi tidak terpakai.
+   - `resources/views/customers/show.blade.php`: tombol pembuka modal (± `:107-109` dan `:934-936`, beserta `@can` pembungkusnya — ganti jadi link ke `/invoices/create?customer_id=…`, §3.1), blok modal `#manual-invoice-modal` (± `:1234-1295`), dan JS `openInvoiceModal()`/`closeInvoiceModal()` (± `:1599-1600`).
+   - `tests/Feature/InvoiceCreateTest.php` — seluruh isinya menembak route yang dihapus (`customers.invoices.manual`). Tes yang menjaga aturan yang **masih berlaku** (POP scope, anti-dobel per periode) dipindahkan ke tes fitur baru, bukan hilang. Penghapusan/penggantian file tes ini **minta persetujuan user dulu** saat implementasi.
+   - Komentar yang masih menyebut `storeManualInvoice`: `GenerateMonthlyInvoicesCommand.php:127`, `InvoiceNumberGenerator.php:10`, `ManualInvoiceService.php:20`.
+   - Dokumentasi: `docs/billing-pembayaran/README.md` (`:43`, `:85`, `:100`), `flowchart.md:9`, `database-schema.md:59`, dan tabel di `docs/TASKS.md:493`. Catatan `README.md:85` menyebut guard anti-dobel invoice "ditegakkan di `storeManualInvoice`" — setelah dihapus, guard itu tinggal di `InvoiceObserver`; tulis ulang kalimatnya, jangan sekadar dicoret.
 
 ---
 
-## 5. Dampak ke Modul Lain
+## 5. Belum Diputuskan
 
-- `InvoiceObserver::creating()` — pastikan invoice `insidental` dari jalur baru ini tunduk guard dedup yang sama (customer+type+billing_period+total_amount dalam 5 menit) tanpa false-positive untuk kasus wajar (dua tagihan insidental beda kejadian, nominal sama, di hari yang sama — mungkin perlu dicek datanya).
-- Laporan (`InvoiceReportController`, `PaymentReportController`) — breakdown kategori pendapatan (`RevenueBreakdownService` dari rancangan ADHOC-60) belum ada; kalau mau laporan per-kategori jalan, itu pekerjaan tambahan di luar scope dokumen ini (dicatat sebagai follow-up, bukan bagian wajib rancangan Tagihan Manual).
-- `docs/billing-pembayaran/` — begitu diimplementasi, update README/business-logic sesuai `docs/DEFINITION_OF_DONE.md`.
+1. ~~Nasib modal lama + `storeManualInvoice()` + route `customers.invoices.manual`.~~ **Diputuskan user 2026-09-19: dihapus bersih** (daftar penghapusan: §4 butir 6). Tagihan Manual hanya terdiri dari Perbaikan / Lainnya / Pindah Lokasi; Aktivasi, Bulanan, dan Reaktivasi adalah **jenis tagihan lain**, bukan bagian dari Tagihan Manual.
+   - **Dampak yang perlu diketahui:** dicek 2026-09-19, **tidak ada jalur otomatis yang menerbitkan invoice Reaktivasi** — hanya modal lama ini (Aktivasi terbit dari `InitialInvoiceService`, Bulanan dari `billing:generate-monthly-invoices`). Setelah modal dihapus, tagihan Reaktivasi tidak bisa diterbitkan sama sekali sampai ada fitur tersendiri untuknya. Itu di luar scope ADHOC-70; dicatat sebagai follow-up (pelanggan putus lalu berlangganan lagi — `CustomerController::reactivate()` sekarang tidak menerbitkan invoice).
+2. Bentuk penyimpanan jenis / nama sub / deskripsi di tabel `invoices` (§3.3) — cek kolom catatan existing dulu.
+3. Pola pencarian pelanggan: server-side `whereHas` (submit form biasa) atau typeahead AJAX — pilih yang paling konsisten dengan form lain.
+
+---
+
+## 6. Test yang Wajib Ada
+
+- `/invoices/create?customer_id=…` — pelanggan terkunci; invoice + payment terbit sekaligus dengan jenis, deskripsi, nominal, metode sesuai input.
+- `/invoices/create` polos — cari by CID & by Nama; submit menghasilkan invoice untuk pelanggan yang benar (bukan tertukar hasil pencarian lain).
+- Jenis **Lainnya** wajib nama ketikan; jenis lain tidak.
+- Tagihan manual **bisa terbit di periode yang sama** dengan tagihan bulanan pelanggan (regresi guard `rejectSecondSubscriptionInvoice`).
+- Payment gagal (nominal invalid) → invoice ikut rollback.
+- Nominal dibayar < total → `sebagian`; > total → `overpay_amount` masuk saldo.
+- Metode Transfer tanpa bank/rekening → ditolak; Cash tidak butuh.
+- POP scope: tidak bisa membuat tagihan untuk pelanggan di luar POP yang diizinkan.
+- Route `customers.invoices.manual` dan modal lama sudah tidak ada; `grep` `storeManualInvoice|invoices.manual|manual-invoice-modal` di `app/ routes/ resources/ tests/ docs/billing-pembayaran/` bersih (§4 butir 6).
+
+---
+
+## 7. Dampak ke Modul Lain
+- `InvoiceObserver::creating()` — guard dedup (customer+type+billing_period+total_amount dalam 5 menit) jangan false-positive untuk dua tagihan manual sah dengan nominal sama di hari yang sama (mis. dua perbaikan berbeda); cek saat implementasi.
+- Laporan (`InvoiceReportController`, `PaymentReportController`) — breakdown per jenis pendapatan tidak termasuk scope ini (follow-up).
+- `docs/billing-pembayaran/` — update README/business-logic setelah selesai, sesuai `docs/DEFINITION_OF_DONE.md`.

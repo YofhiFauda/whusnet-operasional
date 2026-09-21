@@ -351,7 +351,7 @@ Fokus MVP:
 - Total tagihan bulan ini.
 - Total pembayaran bulan ini.
 - Total tunggakan.
-- Tagihan jatuh tempo.
+- Piutang tagihan (belum lunas dari periode sebelum bulan berjalan; tanggal jatuh tempo 10 hanya label UI).
 - Pelanggan yang perlu dilengkapi.
 
 ### 13. Laporan

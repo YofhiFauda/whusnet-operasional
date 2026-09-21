@@ -2,7 +2,7 @@
 
 **Status:** Terbuka — analisa selesai 2026-09-15, implementasi belum mulai. Di luar Sprint 8.10 (aktif), dicatat sebagai ADHOC-68 di `docs/TASKS.md`.
 
-**Sumber ide awal:** `docs/plan/Skema-downgrade-dan-upgrade.md` (skema matematis dari user). Dokumen ini adalah hasil review terhadap skema tsb + gap analysis terhadap kode nyata + rancangan implementasi.
+**Sumber ide awal:** `docs/plan/billing/upgrade-downgrade/Skema-downgrade-dan-upgrade.md` (skema matematis dari user). Dokumen ini adalah hasil review terhadap skema tsb + gap analysis terhadap kode nyata + rancangan implementasi.
 
 ---
 

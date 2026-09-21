@@ -514,3 +514,65 @@
     </div>
 </div>
 @endcan
+
+{{--
+    Riwayat Pengambilan Alat (ADHOC-88). Dibaca dari `device_retrieval_logs`,
+    BUKAN dari `customer_devices.device_retrieved_at` — flag itu direset saat
+    pelanggan "Langganan Lagi", sedangkan pengambilan yang sudah terjadi harus
+    tetap tercatat rapi. Kartu disembunyikan kalau pelanggan belum pernah
+    diambil modemnya.
+--}}
+@php
+    $retrievalLogs = $customer->deviceRetrievalLogs()
+        ->with(['item', 'retrievedBy', 'receivedBy', 'warehousePop', 'task.deviceRetrieval'])
+        ->get();
+@endphp
+@if($retrievalLogs->isNotEmpty())
+<div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+    <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+        <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Riwayat Pengambilan Alat</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+            <thead class="text-[10px] uppercase tracking-wider text-slate-400">
+                <tr>
+                    <th class="text-left px-5 py-2.5 font-bold">Tanggal</th>
+                    <th class="text-left px-5 py-2.5 font-bold">SN / Model</th>
+                    <th class="text-left px-5 py-2.5 font-bold">Diambil Oleh</th>
+                    <th class="text-left px-5 py-2.5 font-bold">Status</th>
+                    <th class="text-left px-5 py-2.5 font-bold">Kondisi</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                @foreach($retrievalLogs as $log)
+                <tr>
+                    <td class="px-5 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">{{ $log->retrieved_at->translatedFormat('d M Y') }}</td>
+                    <td class="px-5 py-3">
+                        <span class="block font-mono font-bold text-slate-800 dark:text-slate-100">{{ $log->serial_number }}</span>
+                        <span class="text-slate-500 dark:text-slate-400">{{ $log->item?->name ?? '-' }}</span>
+                    </td>
+                    <td class="px-5 py-3 text-slate-700 dark:text-slate-200">
+                        {{ $log->retrievedBy?->name ?? '-' }}
+                        <span class="block text-slate-500 dark:text-slate-400">{{ $log->source->label() }}</span>
+                    </td>
+                    <td class="px-5 py-3">
+                        @if($log->isReceived())
+                        <span class="font-bold text-emerald-600 dark:text-emerald-400">Diterima</span>
+                        <span class="block text-slate-500 dark:text-slate-400">{{ $log->warehousePop?->name }} · {{ $log->received_at->translatedFormat('d M Y') }}</span>
+                        @else
+                        <span class="font-bold text-amber-600 dark:text-amber-400">Transit (di teknisi)</span>
+                        @endif
+                    </td>
+                    <td class="px-5 py-3 text-slate-700 dark:text-slate-200">
+                        {{ $log->condition?->label() ?? '-' }}
+                        @if($log->photoPath())
+                        <a href="{{ Storage::disk('public')->url($log->photoPath()) }}" target="_blank" rel="noopener" class="ml-2 font-bold text-sky-600 dark:text-sky-400">Foto</a>
+                        @endif
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif

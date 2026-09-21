@@ -107,7 +107,7 @@ class MaintenanceMaterialCustodyReconcileTest extends TestCase
         $kabel = Item::create(['code' => 'KABEL-MTN', 'name' => 'Dropcore Maintenance', 'item_category_id' => $catPasif->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
 
         $admin = User::factory()->create();
-        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, null, $admin);
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, $admin);
         $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $pop, [['item_id' => $kabel->id, 'qty' => 100]], $admin);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$kabel->id => 100], $admin);
         app(InventoryIssueService::class)->issue($pop, $technician, [['item_id' => $kabel->id, 'qty' => 40]], $admin);

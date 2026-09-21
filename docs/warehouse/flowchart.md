@@ -8,16 +8,22 @@ flowchart TD
     B -- tidak --> X1[Ditolak: RECEIVE hanya di Pusat]
     B -- ya --> C[Input baris item]
     C --> D{tracking_type}
-    D -- SERIALIZED --> E[Textarea SN + harga satuan]
-    D -- QUANTITY/BATCH --> F[Qty + lot_no jika BATCH + harga satuan]
+    D -- "SERIALIZED (manual)" --> E[Textarea SN + harga satuan]
+    D -- "SERIALIZED (auto_generate_serial)" --> E2[Jumlah unit + harga satuan]
+    D -- QUANTITY --> F[Qty + harga satuan, lot otomatis]
+    D -- ROLL --> F2[Jumlah roll + vendor + harga satuan]
     E --> G{SN dobel/sudah ada?}
     G -- ya --> X2[Ditolak: pesan spesifik per kasus]
     G -- tidak --> H[Buat InventorySerial AVAILABLE + ledger RECEIVE]
+    E2 --> H2[Generate N serial_number sistem + N InventorySerial AVAILABLE + ledger RECEIVE]
     F --> I{harga > 0?}
     I -- tidak --> X3[Ditolak: harga wajib > 0]
     I -- ya --> J[Increment InventoryBalance + ledger RECEIVE]
+    F2 --> J2[Generate N roll_code sistem + N InventoryRoll AVAILABLE + ledger RECEIVE]
     H --> K[Satu reference_number RCV-... untuk semua baris]
+    H2 --> K
     J --> K
+    J2 --> K
     K --> L[Redirect ke Receive show]
 ```
 
@@ -30,7 +36,7 @@ flowchart TD
         A2 -- tidak --> XA[Ditolak]
         A2 -- ya --> A3[Buat InventoryTransfer status=in_transit]
         A3 --> A4[SERIALIZED: SN lockForUpdate AVAILABLE→TRANSFERRED, current_pop_id=null]
-        A3 --> A5[QUANTITY/BATCH: decrement InventoryBalance Pusat]
+        A3 --> A5[QUANTITY: decrement InventoryBalance Pusat]
         A4 --> A6[Ledger TRANSFER: from_pop_id + inventory_transfer_id]
         A5 --> A6
     end
@@ -62,7 +68,7 @@ flowchart TD
     B -- ya --> C[Pilih teknisi + baris item]
     C --> D{tracking_type}
     D -- SERIALIZED --> E[SN lock AVAILABLE→ISSUED, current_technician_id, issued_from_pop_id]
-    D -- QUANTITY/BATCH --> F[decrement InventoryBalance Cabang]
+    D -- QUANTITY --> F[decrement InventoryBalance Cabang]
     F --> G[Buat baris TechnicianCustody BARU status=ISSUED]
     E --> H[Ledger ISSUE: from_pop_id + to_technician_id, satu ref ISS-...]
     G --> H
@@ -106,7 +112,10 @@ stateDiagram-v2
     ISSUED --> AVAILABLE: RETURN (returnSerialToWarehouse)
     ISSUED --> INSTALLED: INSTALL (installSerial, guard OwnershipMode::INSTALLABLE)
     ISSUED --> ISSUED: TRANSFER_CUSTODY (pindah antar teknisi)
-    INSTALLED --> AVAILABLE: RETURN (returnInstalledSerialFromCustomer, ke issued_from_pop_id)
+    INSTALLED --> AVAILABLE: RETURN (returnInstalledSerialFromCustomer, ke issued_from_pop_id — TIDAK dipanggil task DEAC lagi sejak ADHOC-86)
+    INSTALLED --> RETURNED: RETURN (pickupSerialFromCustomer, form laporan DEAC — transit, dipegang teknisi)
+    [*] --> RETURNED: RETURN (pickupSerialFromCustomer, SN legacy didaftarkan otomatis)
+    RETURNED --> AVAILABLE: RETURN (confirmReturnedSerial, Terima Retur di gudang cabang, kondisi dinilai staf)
     AVAILABLE --> LOST: ADJUSTMENT (evidence wajib)
     AVAILABLE --> DAMAGED: ADJUSTMENT (evidence wajib)
     AVAILABLE --> QUARANTINE: ADJUSTMENT (tanpa evidence)
@@ -119,7 +128,25 @@ stateDiagram-v2
     SCRAPPED --> [*]: final, tidak bisa diubah lagi
 ```
 
-Catatan: `RESERVED`/`IN_USE`/`RETURNED` ada di enum tapi belum punya jalur transisi eksplisit di Service saat ini (dicadangkan untuk kebutuhan mendatang).
+Catatan: `RESERVED`/`IN_USE` ada di enum tapi belum punya jalur transisi eksplisit di Service saat ini (dicadangkan untuk kebutuhan mendatang). `RETURNED` dipakai sejak ADHOC-86 sebagai status **transit** modem hasil pengambilan alat (DEAC): dipegang teknisi, belum stok gudang, sampai gudang cabang menerimanya.
+
+### 5.1 Kondisi Fisik (`ItemCondition`) — axis terpisah, ADHOC-80
+
+`ItemCondition` **bukan** state di diagram atas — dia berjalan paralel di kolom `condition`, independen dari `SerialStatus`. Cuma relevan buat SN yang balik dari `INSTALLED` (poin `INSTALLED --> AVAILABLE: RETURN (returnInstalledSerialFromCustomer...)` di atas):
+
+```mermaid
+stateDiagram-v2
+    [*] --> new: RECEIVE (receiveSerialized/Auto)
+    new --> used_good: RETURN (returnInstalledSerialFromCustomer) — condition_checked_at=null
+    used_good --> used_good: "Sudah Dicek" hasil Kondisi Baik — condition_checked_at terisi
+    used_good --> used_damaged: "Sudah Dicek" hasil Rusak — condition_checked_at terisi
+    note right of used_good
+        condition_checked_at NULL = gate Issue nolak
+        (InventorySerial::isClearedForIssue())
+    end note
+```
+
+`new` tidak pernah butuh "Sudah Dicek" — `markSerialConditionChecked()` menolak eksplisit kalau `serial.condition=new`.
 
 ## 6. Guard POP Scope (Controller Detail/Mutasi)
 

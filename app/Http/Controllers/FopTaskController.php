@@ -1259,6 +1259,10 @@ class FopTaskController extends Controller
             'task.report',
             'task.teamMembers.user:id,name',
             'task.maintenanceReport',
+            // Laporan Ambil Modem (DEAC) — ADHOC-88; tanpa ini kategori itu jatuh
+            // ke "tidak punya laporan lapangan terstruktur" di Riwayat Task FOP.
+            'task.deviceRetrieval',
+            'task.completedBy:id,name',
             // MTN & C-REQ yang asalnya dari Ticketing — detail keluhan/catatan
             // teknis/data pelanggan/lampiran/riwayat harus mengikuti apa yang
             // dilihat di /tickets, bukan cuma issue 255 char yang kepotong.

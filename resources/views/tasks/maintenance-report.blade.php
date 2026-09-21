@@ -152,6 +152,38 @@
                 @endif
             </div>
 
+            {{-- ── Section 2c: Roll Kabel (Opsional) ─────────────────────
+                 Sama pola Modem/Perangkat Aktif di atas — OPSIONAL, teknisi
+                 gak selalu potong kabel dari roll ter-track saat maintenance. --}}
+            <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
+                <p class="mb-1" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
+                    Roll Kabel <span class="font-normal normal-case" style="color:var(--color-text-muted)">(opsional)</span>
+                </p>
+                <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
+                    Isi HANYA kalau teknisi potong kabel dari roll yang ke-track per-roll. Kalau tidak, biarkan kosong.
+                </p>
+                @if($eligibleRolls->isNotEmpty())
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <select name="selected_inventory_roll_id" id="selected_inventory_roll_id"
+                                class="w-full rounded-md text-sm"
+                                style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                            <option value="">Tidak pakai roll kabel</option>
+                            @foreach($eligibleRolls as $roll)
+                                <option value="{{ $roll->id }}" @selected(old('selected_inventory_roll_id') == $roll->id)>
+                                    {{ $roll->item->name ?? '(barang dihapus)' }} — {{ $roll->roll_code }} (sisa {{ rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') }} m)
+                                </option>
+                            @endforeach
+                        </select>
+                        <input type="number" step="0.01" min="0.01" name="roll_meters_used" id="roll_meters_used" value="{{ old('roll_meters_used') }}" placeholder="Meter terpakai"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                    </div>
+                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Pilih roll yang lagi di custody Anda, isi berapa meter dipakai.</p>
+                @else
+                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Tidak ada roll kabel di custody Anda — abaikan kalau gak perlu.</p>
+                @endif
+            </div>
+
             {{-- ── Section 3: Alat Kerja ───────────────────────────────── --}}
             <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
                 <x-work-tool-checklist

@@ -27,7 +27,7 @@ Empat sub-fitur beda tujuan, satu submenu sidebar **"Business Development"**:
 **Satu kolom jadi saklar utama:** `package_categories.installation_fee_approval_role_id`.
 
 - **NULL** (mis. kategori "Home Broadband") → pelanggan lewat jalur LAMA, gak berubah sama sekali: CS verifikasi (`finalVerify()`) → Invoice Awal langsung terbit → pelanggan langsung ACTIVE.
-- **Diisi role tertentu** (mis. "Bisnis Broadband" → role `business_development`) → pelanggan lewat gate: CS verifikasi → **Invoice Awal BELUM terbit** → nyangkut status `waiting_business_development_verification` → BD isi Biaya Instalasi & tekan "Verifikasi & Aktifkan" → **di titik itu** Invoice Awal + Invoice Biaya Instalasi dua-duanya terbit → ACTIVE.
+- **Diisi role tertentu** (mis. "Bisnis Broadband" → role `business_development`) → pelanggan lewat gate: CS verifikasi → **Invoice Awal BELUM terbit** → nyangkut status `waiting_business_development_verification` → BD isi Biaya Instalasi & tekan "Verifikasi & Aktifkan" → **di titik itu** SATU Invoice Awal terbit, sudah mencatat biaya CS + biaya BD sekaligus → ACTIVE.
 
 Diatur admin lewat **Master Kategori Paket** (`/master/package-categories`, dropdown pilih Role) — bukan hardcode "kategori Bisnis" di kode, dan bukan dropdown permission mentah (terlalu teknis buat admin non-developer).
 
@@ -40,7 +40,7 @@ Diatur admin lewat **Master Kategori Paket** (`/master/package-categories`, drop
 | Gate "Menunggu Verifikasi BD" | `app/Http/Controllers/BusinessDevelopmentVerificationController.php`, `app/Enums/WorkflowTransition.php` (`WAITING_BUSINESS_DEVELOPMENT_VERIFICATION`) |
 | Verifikasi CS (titik keputusan gate) | `app/Http/Controllers/CustomerVerificationController.php@finalVerify` |
 | Invoice Awal (bisa langsung/tertunda) | `app/Services/InitialInvoiceService.php` |
-| Invoice Biaya Instalasi | `app/Services/InstallationFeeInvoiceService.php` |
+| Invoice Biaya Instalasi (fallback pelanggan lama, invoice terpisah) | `app/Services/InstallationFeeInvoiceService.php` |
 | View verifikasi (dipakai CS **dan** BD, satu file) | `resources/views/verifications/admin.blade.php`, `app/Services/CustomerVerificationDetailService.php` |
 | Restriksi Paket (Skema 1) | `app/Models/RestrictedPackage.php`, `app/Http/Controllers/PackageRestrictionController.php`, `InternetPackage::scopeAvailableFor()` |
 | Dashboard Omset Sales (Skema 2) | `app/Http/Controllers/SalesOmsetDashboardController.php` |
@@ -55,4 +55,4 @@ Diatur admin lewat **Master Kategori Paket** (`/master/package-categories`, drop
 
 ---
 
-**Last updated:** 2026-09-14 — Invoice Awal kategori Bisnis ditunda sampai BD verifikasi (sebelumnya terbit duluan di CS, cuma status pelanggan yang ketunda)
+**Last updated:** 2026-09-16 — 2 invoice terpisah (Invoice Awal + Biaya Instalasi) digabung jadi SATU invoice di jalur gate BD (laporan user: "kenapa muncul 2 tagihan pada 1 pelanggan"). Riwayat sebelumnya: 2026-09-14, Invoice Awal kategori Bisnis ditunda sampai BD verifikasi (sebelumnya terbit duluan di CS, cuma status pelanggan yang ketunda)

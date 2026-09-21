@@ -150,6 +150,23 @@ class FileUploadService
     }
 
     /**
+     * Foto kondisi modem hasil pengambilan alat (task DEAC, ADHOC-86).
+     * Folder: device-retrieval/. Pola nama sama `uploadMaintenancePhoto()`.
+     */
+    public static function uploadDeviceRetrievalPhoto(UploadedFile $file, ?Customer $customer): string
+    {
+        $customerId = self::getCustomerIdentifier($customer);
+        $customerName = self::getCustomerName($customer);
+        $ext = $file->getClientOriginalExtension();
+
+        $folder = 'device-retrieval';
+        $baseName = "kondisi-alat_{$customerId}_{$customerName}";
+        $fileName = self::getUniqueFileName($folder, $baseName, $ext);
+
+        return $file->storeAs($folder, $fileName, 'public');
+    }
+
+    /**
      * 6. Bukti Transfer Pembayaran
      * Aturan folder: payments/{id_pelanggan}/{awal|bulanan|reaktivasi}
      * Contoh format:

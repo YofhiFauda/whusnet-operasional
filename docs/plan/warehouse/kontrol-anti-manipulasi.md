@@ -56,6 +56,8 @@ Ini kontrol yang **nempel di alur existing**, bukan alur baru. Poin "pemakaian m
 - Teknisi login sendiri, buka halaman Issue yang ditujukan ke dia, klik "Saya terima barang ini" — tercatat `received_ack_by` + timestamp, beda dari `issued_by` (admin gudang yang keluarin).
 - Kalau ada selisih pas ambil fisik (admin bilang kasih 5, teknisi cuma pegang 3), teknisi punya opsi "Tolak sebagian" saat ack — bukan cuma terima-semua-atau-tidak-sama-sekali. Selisih ini otomatis tercatat sebagai diskrepansi, bukan disembunyikan salah satu pihak.
 
+**Amandemen 2026-09-18 (keputusan eksplisit user) — cuma buat sisi Transfer→Cabang:** "Tolak sebagian" di atas tadinya diwujudkan sebagai checkbox per-SN/roll + input qty per baris (`warehouse.transfers.show`, dipasang 2026-09-04). Di kiriman ratusan/ribuan item itu jadi beban, bukan kontrol yang kepake — **dihapus**, diganti satu tombol "Konfirmasi & Terima Semua Barang" + modal warning eksplisit (bukan `confirm()` browser, WAJIB baca sebelum submit). Konsekuensinya: **partial-receive dari form ini sekarang mustahil** — semua baris dispatch otomatis dianggap cocok 100%. Selisih fisik yang ketauan belakangan lewat jalur Adjustment/opname terpisah (§5 di bawah), bukan lagi lewat form konfirmasi. Sisi **Issue→Teknisi** (`received_ack_by`, opsi tolak sebagian di paragraf ini) TIDAK kena — itu belum pernah diimplementasi sama sekali (masih murni rancangan), gak tersentuh perubahan ini.
+
 ---
 
 ## 5. Stock Opname Sesuai Kebutuhan — Bukan Jadwal Kalender Tetap

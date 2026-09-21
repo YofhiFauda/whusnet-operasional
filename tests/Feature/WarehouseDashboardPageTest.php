@@ -86,7 +86,7 @@ class WarehouseDashboardPageTest extends TestCase
             'code' => 'DC-1C-1000',
             'name' => 'Dropcore 1 Core 1000M',
             'unit' => 'Meter',
-            'tracking_type' => 'batch',
+            'tracking_type' => 'quantity',
             'is_active' => true,
         ]);
     }

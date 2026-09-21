@@ -17,7 +17,7 @@ Semua peran ber-permission `warehouse.view`. Kartu KPI (low stock, transit, cust
 **Halaman create** (`warehouse.receive.create` → `warehouse.receive.show`), bukan modal — form input majemuk (multi-item, textarea SN) butuh `back()->withErrors()->withInput()` yang aman dari refresh/double-submit.
 
 1. Pilih Gudang Pusat (kalau akses lebih dari satu).
-2. Tambah baris per item: qty+harga (QUANTITY/BATCH+lot_no) atau textarea SN (SERIALIZED)+harga.
+2. Tambah baris per item, bentuk form ikut `tracking_type` barangnya: qty+harga (QUANTITY), textarea SN+harga (SERIALIZED manual), jumlah unit+harga (SERIALIZED auto-generate — ODP/Splitter), atau jumlah roll+vendor+harga (ROLL).
 3. Submit → `POST /warehouse/receive` → redirect ke `warehouse.receive.show` (pola PRG) menampilkan ringkasan satu `reference_number` (`RCV-...`).
 
 ## 3. Transfer Pusat → Cabang (2 halaman, 2 aktor)
@@ -67,11 +67,13 @@ Dua sub-form halaman create, permission `warehouse_reassign.create`, dipicu dari
 
 ## 9. Traceability (`warehouse.traceability.index`)
 
-**View-only** — cari 1 SN, tampilkan seluruh ledger `inventory_transactions` terurut kronologis. Di luar jangkauan POP aktor → tampil "tidak ditemukan" (bukan 403), supaya keberadaan SN di cabang lain tidak bocor.
+**View-only** + satu aksi inline — cari 1 SN, tampilkan seluruh ledger `inventory_transactions` terurut kronologis. Di luar jangkauan POP aktor → tampil "tidak ditemukan" (bukan 403), supaya keberadaan SN di cabang lain tidak bocor.
+
+Badge kondisi fisik (`ItemCondition`, ADHOC-80) tampil di samping badge status. Kalau SN berkondisi bekas & belum dicek, muncul tombol **"Tandai Sudah Dicek"** (inline toggle, bukan halaman baru — `POST warehouse.traceability.serial.condition-check`) — staf pilih hasil cek fisik (Kondisi Baik/Rusak), langsung ke-redirect balik ke halaman ini dengan badge terupdate. SN yang belum dicek tidak bisa di-Issue lagi sampai aksi ini dilakukan — lihat [business-logic.md §12](business-logic.md#12-kondisi-fisik-barang-serialized-adhoc-80).
 
 ## 10. Riwayat / History (`warehouse.history.index`)
 
-**View-only** — ledger terpaginasi (30/halaman) + filter type/pop/search/date. Reuse permission `warehouse.view`.
+**View-only** — ledger terpaginasi (30/halaman) + filter type/pop/search/date/**kondisi**/**alasan** (2 filter terakhir ditambah ADHOC-80 — kondisi baca `serial.condition`, alasan baca `resulting_status` khusus baris `adjustment`). Reuse permission `warehouse.view`.
 
 ## 11. Laporan (`warehouse.reports.index`)
 

@@ -144,20 +144,20 @@
                     <p class="metric-card-value text-2xl">{{ $currency($stats['total_unpaid_amount']) }}</p>
                 </div>
             </div>
-            <p class="metric-card-footer">Invoice belum lunas pada filter</p>
+            <p class="metric-card-footer">Sisa piutang periode sebelum bulan ini</p>
         </div>
 
-        <!-- Tagihan Jatuh Tempo (Operational Status Card - Danger) -->
+        <!-- Piutang Tagihan (Operational Status Card - Danger) -->
         <div class="metric-card status-error">
             <div>
                 <div class="metric-card-label">
-                    <span>Tagihan Jatuh Tempo</span>
+                    <span>Piutang Tagihan</span>
                 </div>
                 <div class="metric-card-value-container">
                     <p class="metric-card-value">{{ number_format($stats['due_invoices_count']) }}</p>
                 </div>
             </div>
-            <p class="metric-card-footer">Invoice belum lunas melewati batas</p>
+            <p class="metric-card-footer">Belum lunas dari periode sebelum bulan ini</p>
         </div>
 
         <!-- Net Customer Growth (KPI Strip — Pilar 1) -->
@@ -473,24 +473,24 @@
         <!-- Due Invoices Table -->
         <x-ui.card class="p-5 xl:col-span-2">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-semibold text-text-main">Tagihan Jatuh Tempo</h3>
+                <h3 class="text-sm font-semibold text-text-main">Piutang Tagihan</h3>
                 @if(auth()->user()->hasPermission('view_invoices'))
                     <x-ui.link href="{{ route('invoices.index') }}" class="text-xs">Lihat Semua</x-ui.link>
                 @endif
             </div>
 
-            <x-ui.table :headers="['Invoice', 'Pelanggan', 'POP', 'Jatuh Tempo', 'Sisa Tagihan']">
+            <x-ui.table :headers="['Invoice', 'Pelanggan', 'POP', 'Periode', 'Sisa Tagihan']">
                 @forelse($dueInvoices as $invoice)
                     <tr>
                         <td class="data-cell text-left font-medium text-text-main">{{ $invoice->invoice_number }}</td>
                         <td class="text-left text-text-secondary">{{ $invoice->customer?->full_name ?? '-' }}</td>
                         <td class="text-left text-text-muted">{{ $invoice->pop?->name ?? '-' }}</td>
-                        <td class="data-cell text-left text-error font-semibold">{{ optional($invoice->due_date)->format('d/m/Y') }}</td>
+                        <td class="data-cell text-left text-error font-semibold">{{ $invoice->billing_period }}</td>
                         <td class="data-cell text-right font-semibold text-text-main">{{ $currency($invoice->remaining_amount) }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="py-6 text-center text-text-muted">Tidak ada tagihan jatuh tempo.</td>
+                        <td colspan="5" class="py-6 text-center text-text-muted">Tidak ada piutang tagihan.</td>
                     </tr>
                 @endforelse
             </x-ui.table>

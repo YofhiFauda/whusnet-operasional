@@ -225,6 +225,12 @@ class RolePermissionSeeder extends Seeder
                 // gudang (beda dari atasan yang cuma view/monitor di atas).
                 'warehouse.view',
                 'warehouse_transfer.*',
+                // Invoice Transfer (harga satuan barang) — root terpisah,
+                // sengaja TIDAK ikut wildcard warehouse_transfer.* di atas
+                // (root beda). Admin = "admin Gudang Pusat", satu-satunya
+                // sisi yang boleh liat harga (pop_admin cabang cuma dapat
+                // Surat Jalan lewat warehouse_transfer.view).
+                'warehouse_transfer_invoice.view',
                 'warehouse_issue.*',
                 'warehouse_custody.view',
                 'warehouse_traceability.view',

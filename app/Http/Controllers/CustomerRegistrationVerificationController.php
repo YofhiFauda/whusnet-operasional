@@ -68,7 +68,10 @@ class CustomerRegistrationVerificationController extends Controller
 
     public function show(Request $request, Customer $customer): View
     {
-        $customer->loadMissing(['pop', 'customerAddress', 'customerService.internetPackage', 'documents', 'village.district']);
+        // internetPackage + city + village.district dimuat karena dipakai
+        // partial verifications.partials._registration-info (di-share dengan
+        // verifications/admin.blade.php, lihat komentar partial-nya).
+        $customer->loadMissing(['pop', 'customerAddress', 'customerService.internetPackage', 'internetPackage', 'documents', 'city', 'village.district']);
 
         abort_unless($customer->status === WorkflowTransition::REGISTERED->value, 404, 'Pelanggan ini tidak sedang menunggu Verifikasi Registrasi.');
 

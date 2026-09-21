@@ -110,7 +110,7 @@
                         <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Harga Beli Satuan (Rp) — Berlaku per SN</label>
                         <div class="relative">
                             <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">Rp</span>
-                            <input type="number" step="1" min="1" :name="`${fieldName}[${index}][unit_price]`" x-model="row.unit_price" required placeholder="mis. 250000"
+                            <input type="text" inputmode="decimal" data-rupiah :name="`${fieldName}[${index}][unit_price]`" x-model="row.unit_price" required placeholder="mis. 250.000"
                                 class="w-full min-h-[44px] pl-9 pr-3 py-1.5 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                         </div>
                     </div>
@@ -118,8 +118,56 @@
                 </div>
             </template>
 
+            <!-- Roll Kabel Mode — Receive (generate roll baru, jumlah+vendor)
+                 vs Issue (pilih roll EXISTING yang udah AVAILABLE di cabang,
+                 tempel Roll ID hasil scan/cetak, textarea sejalan SERIALIZED).
+                 Transfer roll BELUM dibangun (fase 7), tracking_type=roll gak
+                 akan muncul di form itu sampai fase itu digarap. -->
+            @if($withPrice)
+            <template x-if="row.tracking_type === 'roll'">
+                <div class="bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded-xl p-3.5 space-y-2.5">
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                        ID roll digenerate otomatis sistem — cukup isi jumlah roll & vendor
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Jumlah Roll</label>
+                            <input type="number" step="1" min="1" :name="`${fieldName}[${index}][roll_count]`" x-model="row.roll_count" required placeholder="mis. 3"
+                                class="w-full min-h-[44px] px-3 py-1.5 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Vendor</label>
+                            <input type="text" :name="`${fieldName}[${index}][vendor]`" x-model="row.vendor" placeholder="mis. PT Fiber Nusantara"
+                                class="w-full min-h-[44px] px-3 py-1.5 text-xs font-mono border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                        </div>
+                    </div>
+                    <div class="w-full sm:w-64 pt-1">
+                        <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Harga Beli per Roll (Rp)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">Rp</span>
+                            <input type="text" inputmode="decimal" data-rupiah :name="`${fieldName}[${index}][unit_price]`" x-model="row.unit_price" required placeholder="mis. 120.000"
+                                class="w-full min-h-[44px] pl-9 pr-3 py-1.5 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                        </div>
+                    </div>
+                </div>
+            </template>
+            @else
+            <template x-if="row.tracking_type === 'roll'">
+                <div class="bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded-xl p-3.5 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                            Roll ID (Tempel banyak sekaligus, 1 baris per roll — dari label cetak/scan)
+                        </label>
+                        <span class="text-[11px] font-bold font-mono px-2 py-0.5 rounded-full" :class="rollCount(row) > 0 ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'" x-text="rollCount(row) + ' Roll Terdeteksi'"></span>
+                    </div>
+                    <textarea :name="`${fieldName}[${index}][roll_codes]`" x-model="row.roll_codes" rows="3" placeholder="Contoh:&#10;WR-ROLL-FO-20260915-000001&#10;WR-ROLL-FO-20260915-000002"
+                        class="w-full text-xs font-mono px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 leading-relaxed"></textarea>
+                </div>
+            </template>
+            @endif
+
             <!-- Quantity / Batch Mode -->
-            <template x-if="row.tracking_type !== 'serialized' && row.tracking_type !== ''">
+            <template x-if="row.tracking_type !== 'serialized' && row.tracking_type !== 'roll' && row.tracking_type !== ''">
                 <div class="bg-slate-50/70 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/60 rounded-xl p-3.5">
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                         <div>
@@ -143,7 +191,7 @@
                             <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Harga Satuan (Rp)</label>
                             <div class="relative">
                                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-bold text-slate-400">Rp</span>
-                                <input type="number" step="1" min="1" :name="`${fieldName}[${index}][unit_price]`" x-model="row.unit_price" required placeholder="mis. 5000"
+                                <input type="text" inputmode="decimal" data-rupiah :name="`${fieldName}[${index}][unit_price]`" x-model="row.unit_price" required placeholder="mis. 5.000"
                                     class="w-full min-h-[44px] pl-9 pr-3 py-1.5 text-xs font-mono font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                             </div>
                         </div>
@@ -197,7 +245,10 @@ function inventoryLineRows(itemOptions, categoryOptions, fieldName, oldRows) {
                         qty: old.qty || old.qty_requested || '',
                         lot_no: old.lot_no || '',
                         serial_numbers: old.serial_numbers || '',
-                        unit_price: old.unit_price || '',
+                        roll_count: old.roll_count || '',
+                        roll_codes: old.roll_codes || '',
+                        vendor: old.vendor || '',
+                        unit_price: old.unit_price ? (window.Rupiah ? window.Rupiah.formatDariServer(old.unit_price) : old.unit_price) : '',
                     });
                     this.onItemChange(i);
                 });
@@ -226,7 +277,7 @@ function inventoryLineRows(itemOptions, categoryOptions, fieldName, oldRows) {
         },
 
         addRow() {
-            this.rows.push({ item_id: '', category_id: '', tracking_type: '', unit: '', qty: '', lot_no: '', serial_numbers: '', unit_price: '' });
+            this.rows.push({ item_id: '', category_id: '', tracking_type: '', unit: '', qty: '', lot_no: '', serial_numbers: '', roll_count: '', roll_codes: '', vendor: '', unit_price: '' });
         },
 
         removeRow(index) {
@@ -264,6 +315,14 @@ function inventoryLineRows(itemOptions, categoryOptions, fieldName, oldRows) {
 
         serialCount(row) {
             return (row.serial_numbers || '')
+                .split(/[\r\n,]+/)
+                .map(s => s.trim())
+                .filter(s => s.length > 0)
+                .length;
+        },
+
+        rollCount(row) {
+            return (row.roll_codes || '')
                 .split(/[\r\n,]+/)
                 .map(s => s.trim())
                 .filter(s => s.length > 0)

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\Pop;
@@ -235,5 +237,51 @@ class WarehouseAdjustmentController extends Controller
         }
 
         return redirect()->route('warehouse.custody.index')->with('success', "SN {$serial->serial_number} ditandai {$validated['new_status']}.");
+    }
+
+    /**
+     * Padanan `createSerial()`/`storeSerial()` buat roll kabel —
+     * `length_remaining` TIDAK diubah (lihat docblock
+     * `InventoryAdjustmentService::adjustRollStatus()`), cuma status +
+     * evidence.
+     */
+    public function createRoll(InventoryRoll $roll, EffectiveAccessService $access): View
+    {
+        $this->assertPopIdInScope($roll->issued_from_pop_id ?? $roll->current_pop_id, auth()->user(), $access);
+
+        $roll->load(['item', 'currentTechnician', 'currentPop']);
+
+        return view('warehouse.adjustments.roll', compact('roll'));
+    }
+
+    public function storeRoll(Request $request, InventoryRoll $roll, InventoryAdjustmentService $service, EffectiveAccessService $access): RedirectResponse
+    {
+        $this->assertPopIdInScope($roll->issued_from_pop_id ?? $roll->current_pop_id, auth()->user(), $access);
+
+        $validated = $request->validate([
+            'new_status' => ['required', Rule::in(['lost', 'damaged', 'scrapped', 'quarantine'])],
+            'reason' => 'required|string|max:255',
+            'notes' => 'nullable|string|max:500',
+            'evidence' => ['required_if:new_status,lost,damaged,scrapped', 'nullable', 'image', 'max:4096'],
+        ]);
+
+        $evidencePath = $request->hasFile('evidence')
+            ? FileUploadService::uploadWarehouseEvidence($request->file('evidence'), $validated['new_status'])
+            : null;
+
+        try {
+            $service->adjustRollStatus(
+                $roll,
+                RollStatus::from($validated['new_status']),
+                $validated['reason'],
+                auth()->user(),
+                $validated['notes'] ?? null,
+                $evidencePath,
+            );
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('warehouse.custody.index')->with('success', "Roll {$roll->roll_code} ditandai {$validated['new_status']}.");
     }
 }

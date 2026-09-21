@@ -184,6 +184,50 @@ class InitialInvoiceService
     }
 
     /**
+     * Menyuntikkan nominal "Biaya Instalasi" yang divalidasi BD ke snapshot
+     * `calculate()` yang sudah disimpan CS (`customers.pending_initial_invoice`),
+     * lalu menghitung ulang `subtotal`/`ppn_amount`/`total_amount` — dipakai
+     * `BusinessDevelopmentVerificationController::verify()` supaya Invoice
+     * Awal kategori Bisnis terbit sebagai **SATU invoice** yang mencatat
+     * biaya yang diverifikasi CS *dan* biaya yang divalidasi BD sekaligus
+     * (bukan dua invoice terpisah — koreksi 2026-09-16, sebelumnya BD
+     * menerbitkan invoice INSIDENTAL kedua lewat `InstallationFeeInvoiceService`,
+     * hasilnya satu pelanggan punya dua tagihan nyangkut di satu aktivasi).
+     *
+     * Aman digabung DI SINI karena Invoice Awal BELUM PERNAH terbit sebelum
+     * titik ini (§3.1 business-logic.md) — beda dari
+     * `CustomerAcquisitionController::updateInstallationFee()` (fallback buat
+     * pelanggan yang Invoice Awal-nya SUDAH terbit lama & mungkin sudah
+     * lunas), yang WAJIB tetap pakai invoice terpisah supaya tidak menimpa
+     * tagihan yang sudah ada.
+     *
+     * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}  $billing
+     * @return array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}
+     */
+    public function withInstallationFee(array $billing, float $installationFee): array
+    {
+        $billing['extra_installation_fee'] = Money::atLeastZero($installationFee);
+
+        // Sama persis lima suku yang dijumlahkan di calculate() — cuma
+        // extra_installation_fee-nya sekarang bukan 0 lagi.
+        $billing['subtotal'] = Money::sum([
+            $billing['prorate_amount'],
+            $billing['extra_installation_fee'],
+            $billing['extra_cable_fee'],
+            $billing['extra_pole_fee'],
+            $billing['other_fee'],
+        ]);
+
+        $afterDiscount = Money::atLeastZero(Money::sub($billing['subtotal'], $billing['discount']));
+        $ppnAmount = Money::of($afterDiscount * ($billing['ppn'] / 100));
+
+        $billing['ppn_amount'] = $ppnAmount;
+        $billing['total_amount'] = Money::add($afterDiscount, $ppnAmount);
+
+        return $billing;
+    }
+
+    /**
      * Rincian tagihan awal sebagai baris kategori pendapatan (ADHOC-60), siap
      * diserahkan ke `InvoiceItemBuilder`.
      *

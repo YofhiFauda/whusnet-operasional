@@ -48,6 +48,17 @@
                         default => '-',
                     };
                     $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
+                    // "Sedang Diproses" = task Ambil Alat sudah dibuat tapi belum
+                    // selesai. Penanda buat FOP (mana yang sudah dijadwalkan), dan
+                    // tombol Ambil Alat disembunyikan selama status ini (juga saat
+                    // "Sudah Diambil") supaya tidak dijadwalkan dua kali.
+                    $isDeviceInProgress = ! $isDeviceRetrieved && (bool) ($customer->device_retrieval_in_progress ?? false);
+                    $deviceBadgeTone = $isDeviceRetrieved
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                        : ($isDeviceInProgress
+                            ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60'
+                            : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60');
+                    $deviceBadgeLabel = $isDeviceRetrieved ? 'Sudah Diambil' : ($isDeviceInProgress ? 'Sedang Diproses' : 'Belum Diambil');
                 @endphp
                 <tr class="hover:bg-sky-50/40 dark:hover:bg-sky-950/20 transition-colors">
                     <td class="px-5 py-3.5 font-mono font-semibold text-sky-600 dark:text-sky-400 whitespace-nowrap">
@@ -69,8 +80,8 @@
                         {{ $customer->terminated_at ? \App\Support\IndonesianDate::date($customer->terminated_at) : '-' }}
                     </td>
                     <td class="px-4 py-3.5 text-center">
-                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full border {{ $isDeviceRetrieved ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60' }}">
-                            {{ $isDeviceRetrieved ? 'Sudah Diambil' : 'Belum Diambil' }}
+                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full border {{ $deviceBadgeTone }}">
+                            {{ $deviceBadgeLabel }}
                         </span>
                     </td>
                     <td class="px-5 py-3.5 text-right whitespace-nowrap">
@@ -79,7 +90,8 @@
                                class="px-2.5 py-1 text-xs font-medium text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors">
                                 Detail
                             </a>
-                            @if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
+                            {{-- Tombol hanya untuk status "Belum Diambil": sudah diambil atau task-nya sedang berjalan → disembunyikan (server juga menolak duplikat). --}}
+                            @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                             <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
                                   onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">
                                 @csrf
@@ -120,6 +132,14 @@
                     default => '-',
                 };
                 $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
+                // Sama dengan tabel desktop di atas: penanda "Sedang Diproses" untuk FOP.
+                $isDeviceInProgress = ! $isDeviceRetrieved && (bool) ($customer->device_retrieval_in_progress ?? false);
+                $deviceBadgeTone = $isDeviceRetrieved
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                    : ($isDeviceInProgress
+                        ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60'
+                        : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60');
+                $deviceBadgeLabel = $isDeviceRetrieved ? 'Sudah Diambil' : ($isDeviceInProgress ? 'Sedang Diproses' : 'Belum Diambil');
             @endphp
             <article class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3.5 shadow-sm hover:border-sky-300 dark:hover:border-sky-700/60 transition-all duration-200 hover:shadow-md">
                 <div class="flex items-start justify-between gap-3">
@@ -129,8 +149,8 @@
                         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ $customer->pop->name ?? '-' }}</p>
                     </div>
                     <div class="shrink-0">
-                        <span class="inline-flex items-center px-2 py-0.5 text-[9px] font-bold rounded-full border {{ $isDeviceRetrieved ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60' }}">
-                            {{ $isDeviceRetrieved ? 'Sudah Diambil' : 'Belum Diambil' }}
+                        <span class="inline-flex items-center px-2 py-0.5 text-[9px] font-bold rounded-full border {{ $deviceBadgeTone }}">
+                            {{ $deviceBadgeLabel }}
                         </span>
                     </div>
                 </div>
@@ -157,7 +177,7 @@
                        class="flex-1 sm:flex-none h-10 px-3.5 text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors flex items-center justify-center cursor-pointer">
                         Detail
                     </a>
-                    @if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
+                    @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                     <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
                           class="flex-1 sm:flex-none flex"
                           onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">

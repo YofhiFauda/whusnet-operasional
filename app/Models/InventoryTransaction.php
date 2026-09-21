@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'item_id',
     'lot_no',
     'serial_id',
+    'roll_id',
     'qty',
     'unit_price_snapshot',
     'from_pop_id',
@@ -38,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'reason',
     'notes',
     'evidence_file_path',
+    'resulting_status',
     'created_by',
 ])]
 class InventoryTransaction extends Model
@@ -67,6 +69,11 @@ class InventoryTransaction extends Model
     public function serial(): BelongsTo
     {
         return $this->belongsTo(InventorySerial::class, 'serial_id');
+    }
+
+    public function roll(): BelongsTo
+    {
+        return $this->belongsTo(InventoryRoll::class, 'roll_id');
     }
 
     public function fromPop(): BelongsTo

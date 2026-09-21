@@ -3,14 +3,17 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\InventoryTransactionType;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
 use Illuminate\Http\JsonResponse;
@@ -69,6 +72,8 @@ class WarehouseStockController extends Controller
         };
 
         $popFilter = $request->integer('pop_id') ?: null;
+        $categoryFilter = $request->integer('category_id') ?: null;
+        $itemFilter = $request->integer('item_id') ?: null;
         $search = trim((string) $request->query('search', ''));
         $lowStockOnly = $request->boolean('low_stock_only');
         $trackingFilter = $request->query('tracking_type');
@@ -80,6 +85,10 @@ class WarehouseStockController extends Controller
             ->whereIn('pop_id', $popIds) // scope dulu, baru filter user — pop_id di luar scope otomatis gak match
             ->when($popFilter, fn ($q) => $q->where('pop_id', $popFilter))
             ->where('qty', '>', 0)
+            ->when($itemFilter, fn ($q) => $q->where('item_id', $itemFilter))
+            ->when($categoryFilter, function ($q) use ($categoryFilter) {
+                $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
+            })
             ->when($search !== '', function ($q) use ($search) {
                 $q->whereHas('item', function ($itemQuery) use ($search) {
                     $itemQuery->where('name', 'like', "%{$search}%")
@@ -111,6 +120,10 @@ class WarehouseStockController extends Controller
                 ->whereIn('current_pop_id', $popIds)
                 ->when($popFilter, fn ($q) => $q->where('current_pop_id', $popFilter))
                 ->where('status', SerialStatus::AVAILABLE->value)
+                ->when($itemFilter, fn ($q) => $q->where('item_id', $itemFilter))
+                ->when($categoryFilter, function ($q) use ($categoryFilter) {
+                    $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
+                })
                 ->when($search !== '', function ($q) use ($search) {
                     $q->whereHas('item', function ($itemQuery) use ($search) {
                         $itemQuery->where('name', 'like', "%{$search}%")
@@ -160,12 +173,78 @@ class WarehouseStockController extends Controller
             }
         }
 
-        // Gabung dua sumber jadi SATU list — ini yang bikin item serialized
-        // AKHIRNYA muncul di Kelola Stok. Paginasi di-handle manual di PHP
-        // (bukan DB::paginate() lagi) karena datanya sekarang gabungan 2
-        // query beda tabel — wajar buat skala jumlah SKU gudang ISP lokal
-        // (puluhan-ratusan per gudang, bukan jutaan baris).
-        $merged = $quantityBalances->concat($serializedBalances)
+        // Barang ROLL (kabel per-roll via `InventoryReceiveService::receiveRoll()`)
+        // — sama gap persis yang dulu kejadian ke SERIALIZED (2026-09-07):
+        // `receiveRoll()` CUMA nulis ke `inventory_rolls`, gak pernah nyentuh
+        // `inventory_balances`, jadi barang yang UDAH diterima ke Gudang Pusat
+        // gak pernah muncul di Kelola Stok (laporan user 2026-09-16). Pola
+        // SAMA persis $serializedBalances: agregat SINTETIS per pop+item,
+        // qty = SUM(length_remaining) dalam METER (bukan hitung roll) — biar
+        // "Jumlah Tersedia" langsung kebaca sebagai stok fisik kabel, bukan
+        // "berapa roll". Cuma roll yang MASIH DI GUDANG (current_pop_id
+        // keisi, status AVAILABLE/RECEIVED) yang ikut dihitung — roll yang
+        // lagi di custody teknisi bukan stok gudang lagi.
+        $rollBalances = collect();
+        if ($trackingFilter === null || $trackingFilter === TrackingType::ROLL->value) {
+            $rollGroups = InventoryRoll::query()
+                ->whereIn('current_pop_id', $popIds)
+                ->when($popFilter, fn ($q) => $q->where('current_pop_id', $popFilter))
+                ->whereIn('status', [RollStatus::AVAILABLE->value, RollStatus::RECEIVED->value])
+                ->when($itemFilter, fn ($q) => $q->where('item_id', $itemFilter))
+                ->when($categoryFilter, function ($q) use ($categoryFilter) {
+                    $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
+                })
+                ->when($search !== '', function ($q) use ($search) {
+                    $q->whereHas('item', function ($itemQuery) use ($search) {
+                        $itemQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+                })
+                ->selectRaw('current_pop_id as pop_id, item_id, SUM(length_remaining) as qty')
+                ->groupBy('current_pop_id', 'item_id')
+                ->get();
+
+            if ($rollGroups->isNotEmpty()) {
+                $itemsById = Item::with('category')->whereIn('id', $rollGroups->pluck('item_id')->unique())->get()->keyBy('id');
+                $popsById = $pops->keyBy('id');
+
+                $thresholds = InventoryBalance::query()
+                    ->whereIn('pop_id', $rollGroups->pluck('pop_id')->unique())
+                    ->whereIn('item_id', $rollGroups->pluck('item_id')->unique())
+                    ->where('lot_no', '')
+                    ->get(['pop_id', 'item_id', 'minimum_stock', 'maximum_stock'])
+                    ->keyBy(fn ($row) => $row->pop_id.'-'.$row->item_id);
+
+                $rollBalances = $rollGroups->map(function ($group) use ($itemsById, $popsById, $thresholds) {
+                    $key = $group->pop_id.'-'.$group->item_id;
+                    $threshold = $thresholds->get($key);
+
+                    $balance = new InventoryBalance([
+                        'pop_id' => $group->pop_id,
+                        'item_id' => $group->item_id,
+                        'lot_no' => '',
+                        'qty' => $group->qty,
+                        'minimum_stock' => $threshold?->minimum_stock,
+                        'maximum_stock' => $threshold?->maximum_stock,
+                    ]);
+                    $balance->setRelation('item', $itemsById->get($group->item_id));
+                    $balance->setRelation('pop', $popsById->get($group->pop_id));
+
+                    return $balance;
+                });
+
+                if ($lowStockOnly) {
+                    $rollBalances = $rollBalances->filter(fn ($b) => $b->isLowStock())->values();
+                }
+            }
+        }
+
+        // Gabung TIGA sumber jadi SATU list — ini yang bikin item serialized/
+        // roll AKHIRNYA muncul di Kelola Stok. Paginasi di-handle manual di
+        // PHP (bukan DB::paginate() lagi) karena datanya sekarang gabungan
+        // beberapa query beda tabel — wajar buat skala jumlah SKU gudang ISP
+        // lokal (puluhan-ratusan per gudang, bukan jutaan baris).
+        $merged = $quantityBalances->concat($serializedBalances)->concat($rollBalances)
             ->sortBy([['pop_id', 'asc'], ['item_id', 'asc']])
             ->values();
 
@@ -204,8 +283,70 @@ class WarehouseStockController extends Controller
             }
         }
 
+        // Harga per lot barang QUANTITY (ADHOC-75, 2026-09-16) — Kelola Stok
+        // sebelumnya cuma nunjuk qty polos, jadi 2 baris lot (Harga Lama/Baru)
+        // gak bisa dibedain staf sama sekali dari tampilan. Last-cost per
+        // `(item_id, lot_no)` dari ledger RECEIVE, dibatasi ke item yang
+        // KEBETULAN tampil di halaman ini — pola sama `$lastOpnameByKey` di
+        // atas, bukan full-table scan.
+        $lastPriceByKey = [];
+        $multiLotPopItemKeys = [];
+        if ($balances->isNotEmpty()) {
+            $quantityRows = $balances->getCollection()
+                ->filter(fn ($b) => $b->item->tracking_type === TrackingType::QUANTITY);
+
+            // Label "Harga Lama"/"Harga Baru" cuma masuk akal kalau barang
+            // itu BENERAN lagi punya 2 lot aktif di gudang yang sama —
+            // barang yang cuma py 1 lot (belum pernah ganti harga) tampil
+            // harga polos aja, gak usah dilabel "Lama" (nyesatkan, kesannya
+            // ada "Baru" yang lain padahal enggak).
+            $multiLotPopItemKeys = $quantityRows
+                ->countBy(fn ($b) => $b->pop_id.'-'.$b->item_id)
+                ->filter(fn ($count) => $count > 1)
+                ->keys()->flip()->all();
+
+            $quantityItemIds = $quantityRows->pluck('item_id')->unique();
+
+            if ($quantityItemIds->isNotEmpty()) {
+                $priceRows = InventoryTransaction::query()
+                    ->where('type', InventoryTransactionType::RECEIVE->value)
+                    ->whereIn('item_id', $quantityItemIds)
+                    ->whereNotNull('unit_price_snapshot')
+                    ->orderBy('id')
+                    ->get(['item_id', 'lot_no', 'unit_price_snapshot']);
+
+                foreach ($priceRows as $row) {
+                    // Diurutkan ASC lalu ditimpa terus — baris TERAKHIR yang
+                    // ke-assign menang, itu last-cost per lot yang bener.
+                    $lastPriceByKey[$row->item_id.'-'.($row->lot_no ?? '')] = (float) $row->unit_price_snapshot;
+                }
+            }
+        }
+
+        $categories = ItemCategory::active()->ordered()->get();
+        $items = Item::query()
+            ->where(function ($q) use ($popIds, $itemFilter) {
+                $q->whereHas('inventoryBalances', fn ($b) => $b->whereIn('pop_id', $popIds)->where('qty', '>', 0))
+                    ->orWhereHas('inventorySerials', fn ($s) => $s->whereIn('current_pop_id', $popIds)->where('status', SerialStatus::AVAILABLE->value))
+                    ->orWhereHas('inventoryRolls', fn ($r) => $r->whereIn('current_pop_id', $popIds)->whereIn('status', [RollStatus::AVAILABLE->value, RollStatus::RECEIVED->value]));
+
+                if ($itemFilter) {
+                    $q->orWhere('id', $itemFilter);
+                }
+            })
+            ->when($categoryFilter, fn ($q) => $q->where('item_category_id', $categoryFilter))
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
+            })
+            ->with('category')
+            ->orderBy('name')
+            ->get();
+
         return view('warehouse.stock.index', compact(
-            'pops', 'balances', 'popFilter', 'search', 'lowStockOnly', 'trackingFilter', 'lastOpnameByKey',
+            'pops', 'categories', 'items', 'balances', 'popFilter', 'categoryFilter', 'itemFilter', 'search', 'lowStockOnly', 'trackingFilter', 'lastOpnameByKey', 'lastPriceByKey', 'multiLotPopItemKeys',
             'canActAsPusat', 'canActAsCabang', 'lockedSinglePop', 'modeLabel'
         ));
     }
@@ -237,9 +378,77 @@ class WarehouseStockController extends Controller
             ->where('status', SerialStatus::AVAILABLE->value)
             ->orderBy('serial_number')
             ->limit(200) // pengaman tampilan — bukan pagination, cukup buat quick-look
-            ->pluck('serial_number');
+            ->get(['id', 'serial_number', 'created_at', 'condition', 'condition_checked_at']);
 
-        return response()->json(['serials' => $serials]);
+        // Harga per SN gak disimpan di `inventory_serials` sendiri (cuma
+        // snapshot di ledger) — diambil dari baris RECEIVE pertama SN itu,
+        // sejalan `resolveLastCost()` di Service (last-cost dari ledger,
+        // bukan tabel harga terpisah).
+        $prices = InventoryTransaction::query()
+            ->whereIn('serial_id', $serials->pluck('id'))
+            ->where('type', InventoryTransactionType::RECEIVE->value)
+            ->pluck('unit_price_snapshot', 'serial_id');
+
+        $result = $serials->map(fn ($s) => [
+            'serial_number' => $s->serial_number,
+            'unit_price_snapshot' => $prices->get($s->id) !== null ? (float) $prices->get($s->id) : null,
+            'received_at' => $s->created_at?->translatedFormat('d M Y'),
+            // Badge Kondisi (analisa-gap-kondisi-barang.md poin 8) — SN
+            // gak lolos Issue kalau bekas & belum dicek, jadi admin gudang
+            // perlu lihat ini dari daftar quick-look sebelum ngarahin staf.
+            'condition' => $s->condition?->value ?? 'new',
+            'condition_checked' => $s->condition_checked_at !== null,
+        ])->values();
+
+        return response()->json(['serials' => $result]);
+    }
+
+    /**
+     * Padanan `serials()` buat roll kabel — dipicu badge "ROLL KABEL" di
+     * baris Kelola Stok. Balikin `roll_code`+`length_remaining` (bukan cuma
+     * kode doang kayak SN) karena sisa meter per roll itu informasinya,
+     * bukan cuma identitas.
+     */
+    public function rolls(Request $request, EffectiveAccessService $access): JsonResponse
+    {
+        $validated = $request->validate([
+            'pop_id' => 'required|integer|exists:pops,id',
+            'item_id' => 'required|integer|exists:items,id',
+        ]);
+
+        $pop = Pop::findOrFail($validated['pop_id']);
+        $this->assertPopInScope($pop, auth()->user(), $access);
+
+        $item = Item::findOrFail($validated['item_id']);
+        $meterPerRoll = (float) $item->meter_per_roll;
+
+        $rolls = InventoryRoll::query()
+            ->where('current_pop_id', $pop->id)
+            ->where('item_id', $validated['item_id'])
+            ->whereIn('status', [RollStatus::AVAILABLE->value, RollStatus::RECEIVED->value])
+            ->orderBy('roll_code')
+            ->limit(200)
+            ->get(['roll_code', 'length_remaining', 'length_total', 'unit_price_snapshot', 'vendor', 'received_at'])
+            ->map(function ($roll) use ($meterPerRoll) {
+                $pricePerMeter = $roll->unit_price_snapshot !== null ? (float) $roll->unit_price_snapshot : null;
+                $pricePerRoll = $pricePerMeter !== null && $meterPerRoll > 0 ? $pricePerMeter * $meterPerRoll : null;
+                $totalValue = $pricePerMeter !== null ? (float) $roll->length_remaining * $pricePerMeter : null;
+
+                return [
+                    'roll_code' => $roll->roll_code,
+                    'length_remaining' => (float) $roll->length_remaining,
+                    'length_total' => (float) $roll->length_total,
+                    'meter_per_roll' => $meterPerRoll,
+                    'unit_price_snapshot' => $pricePerMeter,
+                    'price_per_meter' => $pricePerMeter,
+                    'price_per_roll' => $pricePerRoll,
+                    'total_value' => $totalValue,
+                    'vendor' => $roll->vendor,
+                    'received_at' => $roll->received_at?->translatedFormat('d M Y'),
+                ];
+            });
+
+        return response()->json(['rolls' => $rolls]);
     }
 
     /**

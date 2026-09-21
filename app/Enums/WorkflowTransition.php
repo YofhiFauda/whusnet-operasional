@@ -57,7 +57,14 @@ enum WorkflowTransition: string
             self::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION => [self::ACTIVE],
             self::ACTIVE => [self::INSTALLED, self::VERIFICATION_ADMIN, self::REVISION_INSTALLATION, self::SUSPENDED, self::TERMINATED],
             self::SUSPENDED => [self::ACTIVE, self::TERMINATED],
-            self::TERMINATED => [],
+            // TERMINATED → ACTIVE = "Langganan Lagi" (CustomerController::
+            // reactivate). Dulu [] (terminal) sementara tombolnya ada dan
+            // mem-bypass state machine lewat update() langsung — enum bilang
+            // "final", kode bilang sebaliknya, dan jalur bypass itu tidak
+            // menulis customer_status_logs. Sekarang diresmikan supaya lewat
+            // CustomerWorkflowService::transition(). Cuma ke ACTIVE: pelanggan
+            // putus tidak boleh loncat ke tahap survey/pemasangan/isolir.
+            self::TERMINATED => [self::ACTIVE],
             self::REJECTED => [],
         };
     }

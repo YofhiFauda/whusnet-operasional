@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Warehouse;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Pop;
 use App\Models\TechnicianCustody;
@@ -120,5 +121,56 @@ class WarehouseReassignController extends Controller
         }
 
         return redirect()->route('warehouse.custody.index')->with('success', "SN {$serial->serial_number} berhasil dialihkan.");
+    }
+
+    /**
+     * Padanan `createSerial()` buat roll kabel — beda dari SN: roll balik
+     * BAWA SISA METERNYA (bukan "utuh"), lihat docblock
+     * `InventoryReassignService::returnRollToWarehouse()`.
+     */
+    public function createRoll(InventoryRoll $roll, EffectiveAccessService $access): View
+    {
+        $user = auth()->user();
+        $this->assertPopIdInScope($roll->issued_from_pop_id ?? $roll->current_pop_id, $user, $access);
+
+        $roll->load(['item', 'currentTechnician']);
+        $cabangPops = Pop::where('type', 'cabang')
+            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
+            ->orderBy('name')->get();
+        $technicians = User::whereHas('role', fn ($q) => $q->whereIn('code', ['teknisi', 'fop']))
+            ->where('id', '!=', $roll->current_technician_id)
+            ->orderBy('name')
+            ->get();
+
+        return view('warehouse.reassign.roll', compact('roll', 'cabangPops', 'technicians'));
+    }
+
+    public function storeRoll(Request $request, InventoryRoll $roll, InventoryReassignService $service, EffectiveAccessService $access): RedirectResponse
+    {
+        $user = auth()->user();
+        $this->assertPopIdInScope($roll->issued_from_pop_id ?? $roll->current_pop_id, $user, $access);
+
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['return', 'transfer'])],
+            'cabang_pop_id' => 'required_if:action,return|nullable|integer|exists:pops,id',
+            'new_technician_id' => 'required_if:action,transfer|nullable|integer|exists:users,id',
+            'reason' => 'required|string|max:255',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            if ($validated['action'] === 'return') {
+                $cabang = Pop::findOrFail($validated['cabang_pop_id']);
+                $this->assertPopInScope($cabang, $user, $access);
+                $service->returnRollToWarehouse($roll, $cabang, $validated['reason'], auth()->user(), $validated['notes'] ?? null);
+            } else {
+                $newTechnician = User::findOrFail($validated['new_technician_id']);
+                $service->transferRollToTechnician($roll, $newTechnician, $validated['reason'], auth()->user(), $validated['notes'] ?? null);
+            }
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('warehouse.custody.index')->with('success', "Roll {$roll->roll_code} berhasil dialihkan.");
     }
 }

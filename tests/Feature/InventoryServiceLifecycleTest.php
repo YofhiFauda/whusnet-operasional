@@ -61,7 +61,7 @@ class InventoryServiceLifecycleTest extends TestCase
         $catPasif = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
 
         $this->modem = Item::create(['code' => 'MODEM', 'name' => 'ZTE F670L', 'item_category_id' => $catAktif->id, 'unit' => 'pcs', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable']);
-        $this->kabel = Item::create(['code' => 'KABEL', 'name' => 'Dropcore 1 Core', 'item_category_id' => $catPasif->id, 'unit' => 'meter', 'tracking_type' => 'batch']);
+        $this->kabel = Item::create(['code' => 'KABEL', 'name' => 'Dropcore 1 Core', 'item_category_id' => $catPasif->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
 
         $this->admin = User::factory()->create();
         $this->teknisiA = User::factory()->create();
@@ -73,7 +73,7 @@ class InventoryServiceLifecycleTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        app(InventoryReceiveService::class)->receiveQuantity($this->cabang, $this->kabel, 100, 5000, 'LOT-001', $this->admin);
+        app(InventoryReceiveService::class)->receiveQuantity($this->cabang, $this->kabel, 100, 5000, $this->admin);
     }
 
     #[Test]
@@ -91,24 +91,32 @@ class InventoryServiceLifecycleTest extends TestCase
         $this->assertCount(2, $serials);
         $this->assertSame(SerialStatus::AVAILABLE, $serials[0]->status);
 
-        $receiveSvc->receiveQuantity($this->pusat, $this->kabel, 500, 5000, 'LOT-001', $this->admin);
-        $receiveSvc->receiveQuantity($this->pusat, $this->kabel, 300, 5500, 'LOT-002', $this->admin);
+        // Lot pertama SELALU '' (sentinel, sama kayak sebelum ADHOC-75). Harga
+        // kedua (5500, beda dari lot '' yang 5000) bikin sistem OTOMATIS
+        // generate lot baru — gak ada lagi lot_no manual diketik.
+        $receiveSvc->receiveQuantity($this->pusat, $this->kabel, 500, 5000, $this->admin);
+        $receiveSvc->receiveQuantity($this->pusat, $this->kabel, 300, 5500, $this->admin);
+
+        $lotLama = '';
+        $lotBaru = InventoryBalance::where('pop_id', $this->pusat->id)->where('item_id', $this->kabel->id)->where('lot_no', '!=', '')->value('lot_no');
+        $this->assertNotNull($lotBaru, 'Harga kedua (5500, beda dari lot lama 5000) wajib otomatis bikin lot baru (ADHOC-75)');
+        $this->assertStringStartsWith('KABEL-', $lotBaru);
 
         // 2. TRANSFER dispatch.
         $transfer = $transferSvc->createTransfer($this->pusat, $this->cabang, [
             ['item_id' => $this->modem->id, 'serial_numbers' => ['ZTE001', 'ZTE002']],
-            ['item_id' => $this->kabel->id, 'qty' => 200, 'lot_no' => 'LOT-001'],
-            ['item_id' => $this->kabel->id, 'qty' => 100, 'lot_no' => 'LOT-002'],
+            ['item_id' => $this->kabel->id, 'qty' => 200, 'lot_no' => $lotLama],
+            ['item_id' => $this->kabel->id, 'qty' => 100, 'lot_no' => $lotBaru],
         ], $this->admin);
 
         $this->assertSame(TransferStatus::IN_TRANSIT, $transfer->status);
-        $this->assertEquals(300, InventoryBalance::where('pop_id', $this->pusat->id)->where('item_id', $this->kabel->id)->where('lot_no', 'LOT-001')->value('qty'));
+        $this->assertEquals(300, InventoryBalance::where('pop_id', $this->pusat->id)->where('item_id', $this->kabel->id)->where('lot_no', $lotLama)->value('qty'));
 
         // 3. TRANSFER confirm — PARTIAL (ZTE002 hilang di jalan).
         $transfer = $transferSvc->receiveTransfer(
             $transfer,
             ['ZTE001'],
-            [$this->kabel->id => ['LOT-001' => 200, 'LOT-002' => 100]],
+            [$this->kabel->id => [$lotLama => 200, $lotBaru => 100]],
             $this->admin,
         );
 
@@ -119,14 +127,18 @@ class InventoryServiceLifecycleTest extends TestCase
         // 4. ISSUE ke teknisi A — dua lot beda harga.
         $issueSvc->issue($this->cabang, $this->teknisiA, [
             ['item_id' => $this->modem->id, 'serial_numbers' => ['ZTE001']],
-            ['item_id' => $this->kabel->id, 'qty' => 150, 'lot_no' => 'LOT-001'],
+            ['item_id' => $this->kabel->id, 'qty' => 150, 'lot_no' => $lotLama],
         ], $this->admin);
         $issueSvc->issue($this->cabang, $this->teknisiA, [
-            ['item_id' => $this->kabel->id, 'qty' => 100, 'lot_no' => 'LOT-002'],
+            ['item_id' => $this->kabel->id, 'qty' => 100, 'lot_no' => $lotBaru],
         ], $this->admin);
 
-        $custodyLot1 = TechnicianCustody::where('technician_id', $this->teknisiA->id)->where('lot_no', 'LOT-001')->firstOrFail();
-        $custodyLot2 = TechnicianCustody::where('technician_id', $this->teknisiA->id)->where('lot_no', 'LOT-002')->firstOrFail();
+        // `technician_custody.lot_no`/`task_materials.lot_no` NULLABLE ngikutin
+        // konvensi ledger (beda dari `inventory_balances.lot_no` yang NOT
+        // NULL default '') — lot lama (sentinel '') tersimpan NULL di sini,
+        // jadi query-nya `whereNull()`, bukan `where('lot_no', '')`.
+        $custodyLot1 = TechnicianCustody::where('technician_id', $this->teknisiA->id)->whereNull('lot_no')->firstOrFail();
+        $custodyLot2 = TechnicianCustody::where('technician_id', $this->teknisiA->id)->where('lot_no', $lotBaru)->firstOrFail();
         $this->assertEquals(5000, $custodyLot1->unit_price_snapshot);
         $this->assertEquals(5500, $custodyLot2->unit_price_snapshot);
 
@@ -139,8 +151,8 @@ class InventoryServiceLifecycleTest extends TestCase
         $this->assertSame(CustodyStatus::PARTIALLY_USED, $custodyLot2->fresh()->status);
         $this->assertEquals(70, $custodyLot2->fresh()->qty_remaining);
 
-        $tm1 = TaskMaterial::where('fop_task_id', $fopTask->id)->where('lot_no', 'LOT-001')->firstOrFail();
-        $tm2 = TaskMaterial::where('fop_task_id', $fopTask->id)->where('lot_no', 'LOT-002')->firstOrFail();
+        $tm1 = TaskMaterial::where('fop_task_id', $fopTask->id)->whereNull('lot_no')->firstOrFail();
+        $tm2 = TaskMaterial::where('fop_task_id', $fopTask->id)->where('lot_no', $lotBaru)->firstOrFail();
         $this->assertEquals(5000, $tm1->unit_price_snapshot);
         $this->assertEquals(5500, $tm2->unit_price_snapshot, 'harga per-lot, bukan harga flat item');
 
@@ -152,13 +164,13 @@ class InventoryServiceLifecycleTest extends TestCase
     #[Test]
     public function reassign_wajib_reason_dan_transfer_custody_tidak_sentuh_stok_gudang(): void
     {
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, 'LOT-001', $this->admin);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, $this->admin);
         $transfer = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabang, [
-            ['item_id' => $this->kabel->id, 'qty' => 100, 'lot_no' => 'LOT-001'],
+            ['item_id' => $this->kabel->id, 'qty' => 100, 'lot_no' => ''],
         ], $this->admin);
-        app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$this->kabel->id => ['LOT-001' => 100]], $this->admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$this->kabel->id => ['' => 100]], $this->admin);
         app(InventoryIssueService::class)->issue($this->cabang, $this->teknisiA, [
-            ['item_id' => $this->kabel->id, 'qty' => 100, 'lot_no' => 'LOT-001'],
+            ['item_id' => $this->kabel->id, 'qty' => 100, 'lot_no' => ''],
         ], $this->admin);
 
         $custody = TechnicianCustody::where('technician_id', $this->teknisiA->id)->firstOrFail();
@@ -173,9 +185,9 @@ class InventoryServiceLifecycleTest extends TestCase
     #[Test]
     public function adjustment_menolak_stok_jadi_negatif(): void
     {
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 50, 5000, 'LOT-001', $this->admin);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 50, 5000, $this->admin);
 
         $this->expectException(InvalidArgumentException::class);
-        app(InventoryAdjustmentService::class)->adjustPopBalance($this->pusat, $this->kabel->id, -999, 'shrinkage_on_return', $this->admin, 'LOT-001');
+        app(InventoryAdjustmentService::class)->adjustPopBalance($this->pusat, $this->kabel->id, -999, 'shrinkage_on_return', $this->admin, '');
     }
 }

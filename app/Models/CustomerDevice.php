@@ -30,6 +30,13 @@ class CustomerDevice extends Model
 {
     use RecordsAuditLogs;
 
+    /**
+     * `device_type` wajib diisi; baris untuk pelanggan hasil migrasi (yang tak
+     * pernah lewat alur instalasi sistem baru) diberi placeholder ini. Sama
+     * dengan literal di import pelanggan & BackfillDeviceRetrievedStatusCommand.
+     */
+    public const LEGACY_DEVICE_TYPE = 'Data Migrasi Legacy';
+
     protected string $auditModule = 'Data Teknis';
 
     protected array $auditEvents = ['created', 'updated', 'deleted'];

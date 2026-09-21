@@ -52,37 +52,41 @@ Titik keputusan: `Customer::needsBusdevInstallationFeeVerification()`, dipanggil
 
 | | Kategori TIDAK butuh gate | Kategori butuh gate (Bisnis) |
 |---|---|---|
-| Invoice Awal terbit | **Di CS**, `finalVerify()`, langsung | **Di BD**, `verify()`, setelah BD approve |
-| `extra_installation_fee` di Invoice Awal | Sesuai input CS | **Selalu 0** (dipaksa server) — biaya instalasi kategori ini ditagih terpisah oleh BD |
+| Invoice Awal terbit | **Di CS**, `finalVerify()`, langsung | **Di BD**, `verify()`, setelah BD approve — **satu invoice**, sudah termasuk Biaya Instalasi |
+| `extra_installation_fee` di Invoice Awal | Sesuai input CS | **0 di snapshot CS**, disuntik jadi nominal BD saat invoice terbit (§3.2) |
 | Status pelanggan setelah CS submit | `ACTIVE` | `WAITING_BUSINESS_DEVELOPMENT_VERIFICATION` |
 
 Mekanisme penundaan:
 
-1. `finalVerify()` tetap **menghitung** tagihan penuh (`InitialInvoiceService::calculate()`) — nominalnya sudah final dan sudah ditunjukkan/dikonfirmasi ke pelanggan di layar CS.
-2. Kalau kategori butuh gate, hasil hitungan itu **disimpan sebagai snapshot** (bukan invoice sungguhan) ke `customers.pending_initial_invoice` (JSON: `{billing: {...}, issue_date: "..."}"`). Invoice **tidak dibuat** di titik ini.
-3. `BusinessDevelopmentVerificationController::verify()` membaca snapshot itu dan menerbitkan Invoice Awal dengan **angka PERSIS yang sama** (`InitialInvoiceService::issue()`) — bukan dihitung ulang, supaya harga paket/diskon yang mungkin berubah di antara dua titik waktu tidak menggeser nominal yang sudah dikonfirmasi CS ke pelanggan.
+1. `finalVerify()` tetap **menghitung** tagihan penuh (`InitialInvoiceService::calculate()`) — nominalnya sudah final dan sudah ditunjukkan/dikonfirmasi ke pelanggan di layar CS. `extra_installation_fee` kategori ini dipaksa 0 di sini (BD yang akan mengisinya).
+2. Kalau kategori butuh gate, hasil hitungan itu **disimpan sebagai snapshot** (bukan invoice sungguhan) ke `customers.pending_initial_invoice` (JSON: `{billing: {...}, issue_date: "..."}`). Invoice **tidak dibuat** di titik ini.
+3. `BusinessDevelopmentVerificationController::verify()` membaca snapshot itu, menyuntikkan nominal Biaya Instalasi yang diisi BD ke snapshot (`InitialInvoiceService::withInstallationFee()` — subtotal/PPN/total dihitung ULANG dengan nominal itu, bukan cuma dijumlah mentah), lalu menerbitkan **satu** Invoice Awal (`InitialInvoiceService::issue()`) yang sudah mencatat kedua komponen biaya.
 4. Snapshot ditimpa `null` setelah invoice terbit.
 5. Kalau `verify()` dipanggil tapi snapshot kosong (data cacat/dimanipulasi di luar alur normal) — ditolak `422`.
 
 `InitialInvoiceService::issue()` jadi **satu-satunya** tempat penerbitan Invoice AWAL (rumus baris & nomor invoice), dipanggil dari dua titik (CS langsung, BD tertunda) — mencegah dua rumus menyimpang.
 
-### 3.2 Aksi BD — Satu Tombol, Tiga Efek
+### 3.2 Aksi BD — Satu Tombol, Dua Efek
 
 `BusinessDevelopmentVerificationController::verify()`, **satu transaksi DB**:
 
-1. Terbitkan Invoice Awal yang ditunda (§3.1) — via `InitialInvoiceService::issue()`.
-2. Terbitkan Invoice Biaya Instalasi — via `InstallationFeeInvoiceService::issue()`, **invoice TERPISAH** dari Invoice Awal (lihat §4 kenapa dua invoice, bukan satu).
-3. `customers.status` → `ACTIVE` — memicu `CustomerObserver` bikin baris `customer_acquisitions` (§1) seperti biasa; baris itu **langsung** diisi `installation_fee`/`installation_fee_invoice_id` di request yang sama, jadi tidak pernah nongol "Menunggu Validasi" buat pelanggan yang lewat gate ini.
+1. Terbitkan **satu** Invoice Awal yang ditunda (§3.1) — nominal Biaya Instalasi BD disuntikkan ke snapshot CS lebih dulu (`InitialInvoiceService::withInstallationFee()`), baru diterbitkan (`InitialInvoiceService::issue()`). **Bukan dua invoice** — koreksi 2026-09-16 (laporan user: "kenapa muncul 2 tagihan pada 1 pelanggan"), lihat §3.3.
+2. `customers.status` → `ACTIVE` — memicu `CustomerObserver` bikin baris `customer_acquisitions` (§1) seperti biasa; baris itu **langsung** diisi `installation_fee` + `installation_fee_invoice_id` (**invoice yang sama** dengan Invoice Awal) di request yang sama, jadi tidak pernah nongol "Menunggu Validasi" buat pelanggan yang lewat gate ini.
 
 Gerbang akses: `Customer::canInstallationFeeBeValidatedBy()` (dua lapis, sama seperti §2.1) + wajib POP scope (`EffectiveAccessService`). Permission `business_development_verification.view` cuma buka HALAMAN (index/show) — aksi tulis gerbangnya dinamis per pelanggan, bukan permission statis kedua.
 
-### 3.3 Kenapa Dua Invoice, Bukan Satu
+### 3.3 Satu Invoice, Bukan Dua — dan Kenapa Ini Aman
 
-`extra_installation_fee` (CS, Invoice Awal) dan `installation_fee` (BD, Invoice Biaya Instalasi) sengaja **TETAP DUA FIELD & DUA INVOICE TERPISAH**, walau dua-duanya sekarang sama-sama menerbitkan tagihan sungguhan:
+**Koreksi 2026-09-16.** Desain SEBELUMNYA (2026-09-14) menerbitkan Invoice Biaya Instalasi sebagai invoice KEDUA yang terpisah (`InstallationFeeInvoiceService`, tipe INSIDENTAL) — user menandai ini sebagai bug: satu aktivasi pelanggan menghasilkan dua tagihan nyangkut (`INV-...-PSB` "Tagihan Awal" + `INV-...` "Tagihan Lain-lain"), padahal niat aslinya SATU tagihan yang mencatat biaya yang diverifikasi CS **dan** biaya yang divalidasi BD sekaligus.
 
-- Invoice Awal **kadang sudah lunas** (dibayar di tempat saat aktivasi) sebelum BD sempat verifikasi kalau digabung risikonya mengubah nominal invoice yang mungkin sudah direkonsiliasi.
-- Permission validasi keduanya memang beda dari awal (Role Matrix): `customers.detail.installation.validate` (CS) vs `customer_acquisitions.installation_fee.update`/gate role (BD) — tanda dua tim beda yang bertanggung jawab.
-- Kategori "Jasa Instalasi" tetap sama (`RevenueCategory::CODE_JASA_INSTALASI` / `RevenueSubcategory::CODE_BIAYA_AKTIVASI`) di laporan pendapatan — cuma nomor invoicenya beda, bukan kategorinya.
+Fix: `extra_installation_fee` (CS) dan `installation_fee` (BD) **tetap dua FIELD/tahap validasi berbeda** (permission/role beda, sesuai desain awal), tapi bermuara ke **SATU invoice** — `InitialInvoiceService::withInstallationFee()` menyuntikkan nominal BD ke `extra_installation_fee` snapshot CS (yang tadinya 0) sebelum `issue()` dipanggil.
+
+Ini **aman** khusus buat jalur gate BD, karena beda kondisi dari kekhawatiran yang melahirkan desain 2-invoice sebelumnya:
+
+- **Jalur gate BD** (bab ini): Invoice Awal **belum pernah terbit** sebelum BD verifikasi (§3.1) — menggabungkan biaya di sini bukan "menimpa invoice yang sudah ada", tapi menerbitkan satu invoice BARU dengan angka yang sudah lengkap.
+- **Jalur fallback `CustomerAcquisitionController::updateInstallationFee()`** (pelanggan lama yang Invoice Awal-nya SUDAH terbit lama, mungkin sudah lunas, sebelum modul gate ini ada) — **TETAP** menerbitkan invoice terpisah lewat `InstallationFeeInvoiceService`, TIDAK berubah. Di jalur ini menggabungkan justru berbahaya: berarti mengubah nominal invoice yang mungkin sudah direkonsiliasi/lunas.
+
+Kategori "Jasa Instalasi" (`RevenueCategory::CODE_JASA_INSTALASI` / `RevenueSubcategory::CODE_BIAYA_AKTIVASI`) tetap sama di laporan pendapatan — cuma sekarang jadi salah satu baris di invoice yang sama, bukan invoice terpisah.
 
 ### 3.4 Tampilan Halaman BD — Reuse View CS
 
@@ -124,4 +128,5 @@ Kolom tabel utama: Sales | Role | Jumlah Pelanggan | Total Biaya Langganan | Tot
 - 2026-09-11 — modul Customer Acquisition (§1) & Master Kategori Paket dasar (§2) lahir.
 - 2026-09-12 — Skema 1-3 (§4-6), koreksi formula Omset Sales (§5).
 - 2026-09-13/14 — gate "Menunggu Verifikasi BD" jadi state machine sungguhan (§3), rename penuh "Busdev"→"Business Development" di kode (UI tetap "BD").
-- 2026-09-14 — koreksi Master Kategori Paket dari permission-picker ke role-picker (§2.1), Invoice Biaya Instalasi jadi tagihan sungguhan (§3.3), halaman BD reuse view CS (§3.4), **Invoice Awal kategori Bisnis ditunda sampai BD verifikasi (§3.1)**.
+- 2026-09-14 — koreksi Master Kategori Paket dari permission-picker ke role-picker (§2.1), Invoice Biaya Instalasi jadi tagihan sungguhan (2 invoice terpisah — desain awal), halaman BD reuse view CS (§3.4), Invoice Awal kategori Bisnis ditunda sampai BD verifikasi (§3.1).
+- 2026-09-16 — **koreksi: 2 invoice terpisah DIGABUNG jadi SATU invoice** (§3.2, §3.3) — user menandai 2-invoice sebagai bug ("kenapa muncul 2 tagihan pada 1 pelanggan"), niat aslinya satu tagihan mencatat biaya CS + biaya BD sekaligus. Jalur fallback pelanggan lama (`CustomerAcquisitionController::updateInstallationFee()`) TETAP 2 invoice terpisah — beda kondisi (Invoice Awal-nya sudah lama terbit, mungkin sudah lunas).

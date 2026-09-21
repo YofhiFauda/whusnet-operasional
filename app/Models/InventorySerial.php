@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ItemCondition;
 use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -26,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'serial_number',
     'mac_address',
     'status',
+    'condition',
+    'condition_checked_at',
+    'condition_checked_by',
     'current_pop_id',
     'current_technician_id',
     'issued_from_pop_id',
@@ -42,6 +46,8 @@ class InventorySerial extends Model
     {
         return [
             'status' => SerialStatus::class,
+            'condition' => ItemCondition::class,
+            'condition_checked_at' => 'datetime',
             'installed_at' => 'datetime',
         ];
     }
@@ -80,6 +86,24 @@ class InventorySerial extends Model
     public function fopTask(): BelongsTo
     {
         return $this->belongsTo(FopTask::class);
+    }
+
+    public function conditionCheckedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'condition_checked_by');
+    }
+
+    /**
+     * Gate `InventoryIssueService::issueSerialized()` (analisa-gap-kondisi-barang.md
+     * rancangan poin 4) — SN `new` gak pernah butuh cek ulang. SN bekas
+     * (`used_good`/`used_damaged`) BOLEH diissue lagi kalau SUDAH dicek
+     * fisik (`condition_checked_at` terisi, gak peduli hasil akhirnya baik
+     * atau rusak — itu keputusan staf lewat aksi "Sudah Dicek", bukan
+     * dihakimi otomatis di sini).
+     */
+    public function isClearedForIssue(): bool
+    {
+        return ($this->condition ?? ItemCondition::NEW) === ItemCondition::NEW || $this->condition_checked_at !== null;
     }
 
     public function scopeStatus($query, SerialStatus $status)

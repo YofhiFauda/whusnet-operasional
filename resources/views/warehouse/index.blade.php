@@ -324,6 +324,49 @@
         </div>
     </div>
 
+    {{-- Roll Kabel Sisa Kecil (docs/plan/warehouse/analisa-gap-roll-kabel.md
+         §8) — jawaban langsung "roll sisa dikit numpuk nganggur, gimana
+         sistem nanganin": tetap tercatat stok, cuma di-flag di sini, gak
+         auto-write-off. --}}
+    @if($lowRolls->isNotEmpty())
+    <div class="bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/60 rounded-lg p-5 shadow-2xs">
+        <div class="flex items-center justify-between pb-3.5 border-b border-amber-100 dark:border-amber-900/40">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                <h3 class="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
+                    Roll Kabel Sisa Kecil
+                </h3>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+                {{ $stats['low_roll_count'] }} Roll
+            </span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3.5">
+            @foreach($lowRolls->take(6) as $roll)
+            <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-700/30 border border-slate-200/70 dark:border-slate-700/60 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[65%]">{{ $roll->item->name ?? '(barang dihapus)' }}</span>
+                    <span class="font-mono text-[11px] text-rose-600 dark:text-rose-400 font-bold">
+                        {{ rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') }} m
+                    </span>
+                </div>
+                <div class="flex items-center justify-between mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span class="font-mono">{{ $roll->roll_code }}</span>
+                    <span>{{ $roll->currentPop->name ?? $roll->currentTechnician->name ?? '-' }}</span>
+                </div>
+            </div>
+            @endforeach
+        </div>
+        @if($lowRolls->count() > 6)
+        <div class="pt-3 mt-1 border-t border-slate-100 dark:border-slate-700/60">
+            <a href="{{ route('warehouse.custody.index') }}" class="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline">
+                + {{ $lowRolls->count() - 6 }} roll sisa kecil lainnya →
+            </a>
+        </div>
+        @endif
+    </div>
+    @endif
+
     {{-- ═══════════════════════════════════════════════════════
          ZONA 3 : AUDIT & KONTROL INTERNAL (6 / 6 Grid)
          Stock Opname Jatuh Tempo (Left) & Custody Teknisi & Karantina (Right)

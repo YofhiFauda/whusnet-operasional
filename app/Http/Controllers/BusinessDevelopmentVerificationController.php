@@ -12,7 +12,6 @@ use App\Notifications\AppNotification;
 use App\Services\CustomerVerificationDetailService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
-use App\Services\InstallationFeeInvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,23 +27,29 @@ use Illuminate\View\View;
  * Business Development (BD) mengisi "Biaya Instalasi" & menekan
  * "Verifikasi & Aktifkan" di sini.
  *
- * SATU aksi, TIGA efek sekaligus (dikonfirmasi user, TANPA jalur tolak):
+ * SATU aksi, DUA efek sekaligus (dikonfirmasi user, TANPA jalur tolak):
  *   1. Menerbitkan Invoice AWAL yang DITUNDA CS (`finalVerify()` cuma
- *      menitipkan snapshot hitungannya ke `customers.pending_initial_invoice`
- *      — lihat `InitialInvoiceService::issue()`). Tagihan pertama pelanggan
- *      Bisnis baru sah terbit di titik INI, bukan saat CS verifikasi
- *      (ditandai user sebagai bug 2026-09-14: sebelumnya terbit lebih awal
- *      walau BD belum menyetujui).
- *   2. Menerbitkan tagihan Biaya Instalasi (`InstallationFeeInvoiceService`
- *      — SAMA persis dipakai `CustomerAcquisitionController::
- *      updateInstallationFee()`, jangan duplikasi logikanya). Invoice
- *      TERPISAH dari Invoice Awal di atas — jangan digabung.
- *   3. Transisi status pelanggan ke ACTIVE — `CustomerObserver` otomatis
+ *      menitipkan snapshot hitungannya ke `customers.pending_initial_invoice`)
+ *      — **SATU invoice** yang mencatat biaya yang diverifikasi CS *dan*
+ *      biaya yang divalidasi BD sekaligus (`InitialInvoiceService::
+ *      withInstallationFee()` menyuntikkan nominal BD ke snapshot CS SEBELUM
+ *      `issue()` dipanggil). Koreksi 2026-09-16: sebelumnya di sini
+ *      diterbitkan DUA invoice terpisah (Invoice Awal + Invoice Biaya
+ *      Instalasi lewat `InstallationFeeInvoiceService`) — ditandai user
+ *      sebagai bug ("kenapa muncul 2 tagihan pada 1 pelanggan"), niat
+ *      aslinya memang SATU tagihan yang mencatat kedua komponen biaya.
+ *      Aman digabung di sini karena Invoice Awal BELUM PERNAH terbit
+ *      sebelum titik ini — beda dari `CustomerAcquisitionController::
+ *      updateInstallationFee()` (fallback buat pelanggan yang Invoice
+ *      Awal-nya SUDAH terbit lama & mungkin sudah lunas, di situ TETAP
+ *      wajib invoice terpisah lewat `InstallationFeeInvoiceService`, JANGAN
+ *      disatukan juga — beda kondisi, bukan inkonsistensi).
+ *   2. Transisi status pelanggan ke ACTIVE — `CustomerObserver` otomatis
  *      membuat baris `CustomerAcquisition` (modul Busdev lama,
  *      `/customer-acquisitions`) tepat di titik ini, lalu baris itu
- *      LANGSUNG diisi nominal & invoice-nya di request yang sama (tidak
- *      pernah kosong/"Menunggu Validasi" di modul lama buat pelanggan yang
- *      lewat jalur ini).
+ *      LANGSUNG diisi nominal & invoice-nya (invoice yang SAMA dengan #1)
+ *      di request yang sama (tidak pernah kosong/"Menunggu Validasi" di
+ *      modul lama buat pelanggan yang lewat jalur ini).
  */
 class BusinessDevelopmentVerificationController extends Controller
 {
@@ -90,7 +95,7 @@ class BusinessDevelopmentVerificationController extends Controller
         return view('verifications.admin', array_merge(['customer' => $customer], $detail));
     }
 
-    public function verify(Request $request, Customer $customer, InstallationFeeInvoiceService $installationFeeInvoiceService, InitialInvoiceService $initialInvoiceService): RedirectResponse
+    public function verify(Request $request, Customer $customer, InitialInvoiceService $initialInvoiceService): RedirectResponse
     {
         $customer->loadMissing('customerService.internetPackage', 'pop');
 
@@ -112,22 +117,23 @@ class BusinessDevelopmentVerificationController extends Controller
             'installation_fee' => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        DB::transaction(function () use ($customer, $validated, $installationFeeInvoiceService, $initialInvoiceService) {
+        DB::transaction(function () use ($customer, $validated, $initialInvoiceService) {
             $pending = $customer->pending_initial_invoice;
 
-            // 1. Invoice AWAL yang ditunda CS — terbit BARU di titik ini,
-            // pakai angka PERSIS yang sudah dikonfirmasi CS ke pelanggan
-            // (bukan dihitung ulang, lihat docblock kelas ini).
+            // Suntik nominal BD ke snapshot CS (biaya CS di snapshot masih 0,
+            // lihat CustomerVerificationController::finalVerify()), lalu
+            // terbitkan SATU invoice yang sudah mencatat kedua komponen —
+            // bukan dihitung dari nol, angka CS-nya tetap yang sudah
+            // dikonfirmasi ke pelanggan (lihat docblock kelas ini).
+            $billing = $initialInvoiceService->withInstallationFee($pending['billing'], (float) $validated['installation_fee']);
+
             $initialInvoice = $initialInvoiceService->issue(
                 $customer,
                 $customer->customerService,
-                $pending['billing'],
+                $billing,
                 $pending['issue_date'],
                 auth()->id()
             );
-
-            // 2. Invoice Biaya Instalasi — TERPISAH dari Invoice Awal di atas.
-            $installationInvoice = $installationFeeInvoiceService->issue($customer, (float) $validated['installation_fee']);
 
             $oldStatus = $customer->status;
             $customer->update([
@@ -144,7 +150,9 @@ class BusinessDevelopmentVerificationController extends Controller
                 ->first()
                 ?->update([
                     'installation_fee' => $validated['installation_fee'],
-                    'installation_fee_invoice_id' => $installationInvoice->id,
+                    // Sama dengan initial_invoice_id — bukan invoice
+                    // terpisah lagi, lihat docblock kelas ini.
+                    'installation_fee_invoice_id' => $initialInvoice->id,
                 ]);
 
             AuditLog::create([
@@ -168,7 +176,7 @@ class BusinessDevelopmentVerificationController extends Controller
             if ($creator && $creator->id !== auth()->id()) {
                 $creator->notify(new AppNotification(
                     title: 'Pelanggan Aktif: '.$customer->full_name,
-                    message: "Pelanggan {$customer->full_name} resmi aktif — tagihan awal ({$initialInvoice->invoice_number}) & Biaya Instalasi ({$installationInvoice->invoice_number}) sudah terbit.",
+                    message: "Pelanggan {$customer->full_name} resmi aktif — tagihan awal ({$initialInvoice->invoice_number}, termasuk Biaya Instalasi) sudah terbit.",
                     actionUrl: route('customers.show', $customer->id),
                     type: NotificationType::SUCCESS
                 ));
@@ -177,6 +185,6 @@ class BusinessDevelopmentVerificationController extends Controller
 
         return redirect()
             ->route('business-development-verifications.index')
-            ->with('success', "Pelanggan {$customer->full_name} berhasil diverifikasi, tagihan awal & biaya instalasi terbit, pelanggan resmi aktif.");
+            ->with('success', "Pelanggan {$customer->full_name} berhasil diverifikasi, tagihan awal (termasuk Biaya Instalasi) terbit, pelanggan resmi aktif.");
     }
 }

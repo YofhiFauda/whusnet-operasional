@@ -153,12 +153,12 @@
         {{-- ============ TAB: PEMBAYARAN ============ --}}
         <div class="space-y-4">
             <div class="p-4 bg-sky-50/60 dark:bg-sky-500/10 border border-sky-200/60 dark:border-sky-500/20 rounded-2xl text-xs text-sky-800 dark:text-sky-300">
-                Seluruh tunggakan kolektor ini — tanpa filter jatuh tempo, supaya cross check melihat gambaran penuh. Jendela tagih hanya berlaku di Worklist kolektor.
+                Seluruh tagihan belum dibayar kolektor ini — tanpa filter jatuh tempo, supaya cross check melihat gambaran penuh. Jendela tagih hanya berlaku di Worklist kolektor.
             </div>
 
             @include('partials.collector-pay-table', [
                 'invoices' => $invoices,
-                'emptyMessage' => 'Kolektor ini tidak memiliki pelanggan dengan tunggakan aktif.',
+                'emptyMessage' => 'Kolektor ini tidak memiliki pelanggan dengan tagihan belum dibayar.',
             ])
 
             @push('scripts')
@@ -166,7 +166,7 @@
                     'storeUrl' => route('payment-batches.store', $collector->id),
                     'keyPrefix' => 'admin-batch-' . $collector->id,
                     'colspan' => 9,
-                    'emptyMessage' => 'Kolektor ini tidak memiliki pelanggan dengan tunggakan aktif.',
+                    'emptyMessage' => 'Kolektor ini tidak memiliki pelanggan dengan tagihan belum dibayar.',
                 ])
             @endpush
         </div>
@@ -452,7 +452,7 @@
                         <thead>
                             <tr class="bg-slate-50/50 dark:bg-slate-700/50 border-b border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold text-[11px]">
                                 <th class="px-5 py-3">PELANGGAN</th>
-                                <th class="px-5 py-3 text-right">TOTAL TUNGGAKAN</th>
+                                <th class="px-5 py-3 text-right">TOTAL BELUM DIBAYAR</th>
                                 <th class="px-5 py-3 text-center">KUNJUNGAN GAGAL</th>
                                 <th class="px-5 py-3 text-center">TOTAL KUNJUNGAN</th>
                                 <th class="px-5 py-3">TERAKHIR DIKUNJUNGI</th>

@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Enums\InventoryTransactionType;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Enums\TransferStatus;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
@@ -64,11 +66,11 @@ class InventoryTransferService
             foreach ($lines as $line) {
                 $item = Item::findOrFail($line['item_id']);
 
-                if ($item->tracking_type === TrackingType::SERIALIZED) {
-                    $this->dispatchSerialized($transfer, $fromPusat, $item, $line['serial_numbers'] ?? [], $actor);
-                } else {
-                    $this->dispatchQuantity($transfer, $fromPusat, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor);
-                }
+                match ($item->tracking_type) {
+                    TrackingType::SERIALIZED => $this->dispatchSerialized($transfer, $fromPusat, $item, $line['serial_numbers'] ?? [], $actor),
+                    TrackingType::ROLL => $this->dispatchRoll($transfer, $fromPusat, $item, $line['roll_codes'] ?? [], $actor),
+                    default => $this->dispatchQuantity($transfer, $fromPusat, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor),
+                };
             }
 
             return $transfer;
@@ -115,13 +117,61 @@ class InventoryTransferService
         }
     }
 
+    /**
+     * Dispatch roll kabel — mirror `dispatchSerialized()`: lock 1 roll,
+     * transisi AVAILABLE→TRANSFERRED, `current_pop_id=null`. Qty ledger =
+     * `length_remaining` roll SAAT dispatch (roll baru dari Receive biasanya
+     * = `length_total`, tapi roll yang sempat dipotong sebagian sebelum
+     * ditransfer balik ke gudang bawa sisa meternya).
+     */
+    private function dispatchRoll(InventoryTransfer $transfer, Pop $fromPusat, Item $item, array $rollCodes, ?User $actor): void
+    {
+        if ($rollCodes === []) {
+            throw new InvalidArgumentException("Item {$item->name} ROLL — daftar roll ID wajib diisi.");
+        }
+
+        foreach ($rollCodes as $rollCode) {
+            $roll = InventoryRoll::query()
+                ->where('item_id', $item->id)
+                ->where('roll_code', $rollCode)
+                ->where('status', RollStatus::AVAILABLE->value)
+                ->where('current_pop_id', $fromPusat->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $roll) {
+                throw new InvalidArgumentException("Roll {$rollCode} tidak tersedia di {$fromPusat->name} (sudah dipakai/dipindah/salah lokasi).");
+            }
+
+            $roll->update([
+                'status' => RollStatus::TRANSFERRED,
+                'current_pop_id' => null,
+            ]);
+
+            InventoryTransaction::create([
+                'type' => InventoryTransactionType::TRANSFER,
+                'reference_number' => $transfer->reference_number,
+                'inventory_transfer_id' => $transfer->id,
+                'item_id' => $item->id,
+                'roll_id' => $roll->id,
+                'qty' => $roll->length_remaining,
+                'unit_price_snapshot' => $roll->unit_price_snapshot,
+                'from_pop_id' => $fromPusat->id,
+                'created_by' => $actor?->id,
+            ]);
+        }
+    }
+
     private function dispatchQuantity(InventoryTransfer $transfer, Pop $fromPusat, Item $item, float $qty, ?string $lotNo, ?User $actor): void
     {
         if ($qty <= 0) {
             throw new InvalidArgumentException("Qty transfer {$item->name} harus lebih besar dari nol.");
         }
 
-        $lotNo = $this->normalizeLotNo($item, $lotNo);
+        // Sama alasan `InventoryIssueService::issueQuantity()` — lotNo datang
+        // dari row spesifik yang diklik di panel "Stok Tersedia", bukan
+        // diketik bebas (ADHOC-75).
+        $lotNo = $lotNo ?? '';
 
         $balance = InventoryBalance::query()
             ->where('pop_id', $fromPusat->id)
@@ -155,22 +205,25 @@ class InventoryTransferService
      * cocok diterima (subset dari yang dikirim — sisanya otomatis dianggap
      * mismatch/hilang, TETAP berstatus TRANSFERRED, gak nyasar jadi AVAILABLE
      * di Cabang begitu saja). `$confirmedQuantities` = qty aktual diterima
-     * per item (+lot kalau BATCH), format `[item_id => qty]` buat non-lot
-     * atau `[item_id => [lot_no => qty]]` kalau item itu py lot di dispatch.
+     * per item (+lot kalau QUANTITY punya 2 lot aktif), format
+     * `[item_id => qty]` buat non-lot atau `[item_id => [lot_no => qty]]`
+     * kalau item itu py lot di dispatch.
      *
      * Partial diperbolehkan (§2.3 rancangan-ui.md) — TIDAK block seluruh
      * transfer, cuma ditandai `RECEIVED_PARTIAL`.
      *
      * @param  list<string>  $confirmedSerialNumbers
      * @param  array<int, float|array<string, float>>  $confirmedQuantities
+     * @param  list<string>  $confirmedRollCodes
      */
     public function receiveTransfer(
         InventoryTransfer $transfer,
         array $confirmedSerialNumbers,
         array $confirmedQuantities,
         User $actor,
+        array $confirmedRollCodes = [],
     ): InventoryTransfer {
-        return DB::transaction(function () use ($transfer, $confirmedSerialNumbers, $confirmedQuantities, $actor) {
+        return DB::transaction(function () use ($transfer, $confirmedSerialNumbers, $confirmedQuantities, $actor, $confirmedRollCodes) {
             // Re-fetch + lockForUpdate() DI DALAM transaction, cek status
             // dari hasil fetch ini (bukan parameter $transfer yang bisa
             // stale) — dobel-klik "Terima"/2 request bersamaan sebelumnya
@@ -182,7 +235,7 @@ class InventoryTransferService
                 throw new InvalidArgumentException("Transfer {$transfer->reference_number} sudah dikonfirmasi sebelumnya ({$transfer->status->label()}).");
             }
 
-            $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with('serial')->get();
+            $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll'])->get();
             $isPartial = false;
 
             foreach ($dispatchLines as $line) {
@@ -207,6 +260,35 @@ class InventoryTransferService
                         'item_id' => $line->item_id,
                         'serial_id' => $line->serial_id,
                         'qty' => 1,
+                        'unit_price_snapshot' => $line->unit_price_snapshot,
+                        'to_pop_id' => $transfer->to_pop_id,
+                        'created_by' => $actor->id,
+                    ]);
+
+                    continue;
+                }
+
+                if ($line->roll_id !== null) {
+                    $matched = in_array($line->roll->roll_code, $confirmedRollCodes, true);
+
+                    if (! $matched) {
+                        $isPartial = true;
+
+                        continue; // Roll tetap TRANSFERRED — limbo, butuh investigasi manual.
+                    }
+
+                    $line->roll->update([
+                        'status' => RollStatus::AVAILABLE,
+                        'current_pop_id' => $transfer->to_pop_id,
+                    ]);
+
+                    InventoryTransaction::create([
+                        'type' => InventoryTransactionType::TRANSFER,
+                        'reference_number' => $transfer->reference_number,
+                        'inventory_transfer_id' => $transfer->id,
+                        'item_id' => $line->item_id,
+                        'roll_id' => $line->roll_id,
+                        'qty' => $line->qty,
                         'unit_price_snapshot' => $line->unit_price_snapshot,
                         'to_pop_id' => $transfer->to_pop_id,
                         'created_by' => $actor->id,
@@ -271,23 +353,6 @@ class InventoryTransferService
         });
     }
 
-    private function normalizeLotNo(Item $item, ?string $lotNo): string
-    {
-        if ($item->tracking_type === TrackingType::BATCH) {
-            if (blank($lotNo)) {
-                throw new InvalidArgumentException("Item {$item->name} tracking_type BATCH — lot_no wajib diisi.");
-            }
-
-            return $lotNo;
-        }
-
-        if (filled($lotNo)) {
-            throw new InvalidArgumentException("Item {$item->name} bukan BATCH — lot_no harus kosong.");
-        }
-
-        return '';
-    }
-
     /**
      * Harga terakhir tercatat buat item ini (+lot kalau diisi) — "last-**purchase**-cost",
      * dibaca dari ledger, BUKAN tabel harga terpisah (§16.4/§29.8). Null kalau
@@ -305,17 +370,16 @@ class InventoryTransferService
      */
     private function resolveLastCost(Item $item, ?string $lotNo): ?float
     {
-        $query = InventoryTransaction::query()
+        // `$lotNo` SELALU jadi filter (bukan "null = skip filter") — sama
+        // bug & alasan persis `InventoryIssueService::resolveLastCost()`,
+        // baca docblock di sana (ADHOC-75, 2026-09-16).
+        $price = InventoryTransaction::query()
             ->where('item_id', $item->id)
             ->where('type', InventoryTransactionType::RECEIVE->value)
             ->whereNotNull('unit_price_snapshot')
-            ->latest('id');
-
-        if ($lotNo !== null) {
-            $query->where('lot_no', $lotNo);
-        }
-
-        $price = $query->value('unit_price_snapshot');
+            ->where('lot_no', $lotNo)
+            ->latest('id')
+            ->value('unit_price_snapshot');
 
         return $price !== null ? (float) $price : null;
     }

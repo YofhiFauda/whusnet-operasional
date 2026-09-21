@@ -56,7 +56,7 @@ class WarehouseStockOpnameTest extends TestCase
         $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
         $this->kabel = Item::create(['code' => 'OPN-KABEL', 'name' => 'Kabel Opname Test', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
 
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, $this->owner);
     }
 
     #[Test]

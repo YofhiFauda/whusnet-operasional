@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\EquipmentClass;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Enums\TransferStatus;
 use App\Http\Controllers\Controller;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -124,10 +126,23 @@ class WarehouseScanController extends Controller
             ->first();
 
         if (! $serial) {
+            // Fallback roll kabel (App\Enums\TrackingType::ROLL) — namespace
+            // beda (roll_code vs serial_number), gak akan pernah collide,
+            // aman dicoba sesudah lookup SN gagal daripada bikin endpoint
+            // scan terpisah.
+            $roll = InventoryRoll::query()
+                ->where('roll_code', $sn)
+                ->with(['item', 'currentPop', 'issuedFromPop', 'currentTechnician'])
+                ->first();
+
+            if ($roll) {
+                return $this->lookupRoll($roll, $access, $user);
+            }
+
             return response()->json([
                 'found' => false,
                 'sn' => $sn,
-                'message' => 'SN ini belum tercatat di sistem — kemungkinan barang baru dari pengadaan.',
+                'message' => 'SN/Roll ini belum tercatat di sistem — kemungkinan barang baru dari pengadaan.',
                 'actions' => $user->hasPermission('warehouse_transfer.create') ? [
                     ['label' => 'Catat sebagai Barang Masuk', 'url' => route('warehouse.receive.create', ['sn' => $sn]), 'style' => 'primary'],
                 ] : [],
@@ -161,10 +176,60 @@ class WarehouseScanController extends Controller
             'in_scope' => true,
             'item_name' => $serial->item->name ?? '(barang dihapus)',
             'status_label' => $serial->status->label(),
+            // Badge Kondisi (analisa-gap-kondisi-barang.md poin 8) — staf
+            // scan SN bekas belum-dicek perlu tahu SEBELUM ngarahin ke
+            // Issue, yang bakal ditolak Service (`isClearedForIssue()`).
+            'condition_label' => match (true) {
+                ($serial->condition?->value ?? 'new') === 'new' => 'Baru',
+                $serial->condition?->value === 'used_damaged' => 'Bekas — Rusak',
+                $serial->condition_checked_at !== null => 'Bekas — Sudah Dicek',
+                default => 'Bekas — Belum Dicek',
+            },
             'location' => $this->resolveLocationLabel($serial),
             'message' => $message,
             'actions' => $actions,
         ]);
+    }
+
+    /**
+     * Lookup roll kabel — shape JSON SAMA (`found/in_scope/message/actions`)
+     * biar JS Scan Barang gak perlu cabang render baru. Sejalan
+     * `resolveActions()` (SN) — Transfer/Issue/Reassign/Adjust roll semua
+     * udah ada (fase 7 kabel-per-roll).
+     */
+    private function lookupRoll(InventoryRoll $roll, EffectiveAccessService $access, User $user): JsonResponse
+    {
+        $relevantPopId = $roll->current_pop_id ?? $roll->issued_from_pop_id;
+        $hasAllAccess = $access->hasAllPopAccess($user);
+        $inScope = $hasAllAccess || $relevantPopId === null || in_array($relevantPopId, $access->getAllowedPopIds($user), true);
+
+        if (! $inScope) {
+            return response()->json([
+                'found' => true,
+                'sn' => $roll->roll_code,
+                'in_scope' => false,
+                'message' => 'Roll ditemukan, tapi di luar jangkauan gudang yang Anda kelola.',
+                'actions' => [],
+            ]);
+        }
+
+        [$message, $actions] = $this->resolveRollActions($roll, $user);
+
+        return response()->json([
+            'found' => true,
+            'sn' => $roll->roll_code,
+            'in_scope' => true,
+            'item_name' => $roll->item->name ?? '(barang dihapus)',
+            'status_label' => $roll->status->label(),
+            'location' => $this->resolveRollLocationLabel($roll),
+            'message' => $message,
+            'actions' => $actions,
+        ]);
+    }
+
+    private function formatMeter(mixed $value): string
+    {
+        return rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',');
     }
 
     /**
@@ -285,6 +350,105 @@ class WarehouseScanController extends Controller
             $serial->currentPop !== null => $serial->currentPop->name,
             $serial->currentTechnician !== null => $serial->currentTechnician->name.' (Teknisi)',
             $serial->customer_id !== null => 'Pelanggan',
+            default => '—',
+        };
+    }
+
+    /**
+     * Padanan `resolveActions()` buat roll kabel — struktur SAMA (switch per
+     * status, tombol Transfer/Issue di gudang, Reassign/Adjust di custody),
+     * roll gak py cabang INSTALLED (gak pernah "terpasang" atomik).
+     *
+     * @return array{0: string, 1: list<array{label: string, url: string, style: string}>}
+     */
+    private function resolveRollActions(InventoryRoll $roll, User $user): array
+    {
+        $actions = [];
+
+        $canTransfer = $user->hasPermission('warehouse_transfer.create');
+        $canViewTransfer = $user->hasPermission('warehouse_transfer.view');
+        $canIssue = $user->hasPermission('warehouse_issue.create');
+        $canReassign = $user->hasPermission('warehouse_reassign.create');
+        $canAdjust = $user->hasPermission('warehouse_adjustment.create');
+        $canTrace = $user->hasPermission('warehouse_traceability.view');
+
+        switch ($roll->status) {
+            case RollStatus::AVAILABLE:
+            case RollStatus::RECEIVED:
+                $pop = $roll->currentPop;
+                $message = $pop
+                    ? 'Tersedia di '.$pop->name.', sisa '.$this->formatMeter($roll->length_remaining).' dari '.$this->formatMeter($roll->length_total).' meter.'
+                    : 'Tersedia di gudang, sisa '.$this->formatMeter($roll->length_remaining).' dari '.$this->formatMeter($roll->length_total).' meter.';
+
+                if ($pop?->type === 'pusat' && $canTransfer) {
+                    $actions[] = ['label' => 'Kirim Transfer ke Cabang', 'url' => route('warehouse.transfers.create', ['pop_id' => $pop->id, 'item_id' => $roll->item_id]), 'style' => 'primary'];
+                }
+                if ($pop?->type === 'cabang' && $canIssue) {
+                    $actions[] = ['label' => 'Serahkan ke Teknisi', 'url' => route('warehouse.issues.create', ['pop_id' => $pop->id, 'item_id' => $roll->item_id]), 'style' => 'primary'];
+                }
+                break;
+
+            case RollStatus::ISSUED:
+            case RollStatus::IN_USE:
+                $techName = $roll->currentTechnician->name ?? 'teknisi';
+                $message = "Lagi dipegang {$techName} di lapangan, sisa ".$this->formatMeter($roll->length_remaining).' meter.';
+
+                if ($canReassign) {
+                    $actions[] = ['label' => 'Alihkan Custody', 'url' => route('warehouse.reassign.roll.create', $roll), 'style' => 'primary'];
+                }
+                if ($canAdjust) {
+                    $actions[] = ['label' => 'Lapor BAP / Rusak', 'url' => route('warehouse.adjustments.roll.create', $roll), 'style' => 'danger'];
+                }
+                break;
+
+            case RollStatus::DEPLETED:
+                $message = 'Roll ini sudah habis — gak ada aksi gudang buat roll ini.';
+                break;
+
+            case RollStatus::TRANSFERRED:
+                $message = 'Lagi dalam perjalanan Transfer antar gudang, belum dikonfirmasi diterima.';
+
+                if ($canViewTransfer) {
+                    $pendingTransaction = InventoryTransaction::query()
+                        ->where('roll_id', $roll->id)
+                        ->whereNotNull('inventory_transfer_id')
+                        ->whereHas('transfer', fn ($q) => $q->where('status', TransferStatus::IN_TRANSIT->value))
+                        ->latest('id')
+                        ->first();
+
+                    if ($pendingTransaction) {
+                        $actions[] = ['label' => 'Konfirmasi Penerimaan Transfer', 'url' => route('warehouse.transfers.show', $pendingTransaction->inventory_transfer_id), 'style' => 'primary'];
+                    }
+                }
+                break;
+
+            case RollStatus::DAMAGED:
+            case RollStatus::LOST:
+            case RollStatus::SCRAPPED:
+            case RollStatus::QUARANTINE:
+                $message = 'Status: '.$roll->status->label().' — sudah final/menunggu tindak lanjut BAP, gak ada aksi cepat dari sini.';
+                break;
+
+            default:
+                $message = 'Status: '.$roll->status->label().'.';
+        }
+
+        if ($roll->isLowRemaining()) {
+            $message .= ' ⚠ Sisa kecil (di bawah ambang '.$this->formatMeter($roll->item->minimum_length).' meter) — pertimbangkan gabung/habiskan roll ini dulu.';
+        }
+
+        if ($canTrace) {
+            $actions[] = ['label' => 'Lihat Riwayat Lengkap', 'url' => route('warehouse.traceability.index', ['roll' => $roll->roll_code]), 'style' => 'ghost'];
+        }
+
+        return [$message, $actions];
+    }
+
+    private function resolveRollLocationLabel(InventoryRoll $roll): string
+    {
+        return match (true) {
+            $roll->currentPop !== null => $roll->currentPop->name,
+            $roll->currentTechnician !== null => $roll->currentTechnician->name.' (Teknisi)',
             default => '—',
         };
     }

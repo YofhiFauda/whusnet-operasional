@@ -49,15 +49,16 @@ class DatabaseSeeder extends Seeder
 
         // $this->call(CustomerSeeder::class);
         // $this->call(MasterPopSeeder::class);
-        $this->call(TechnicianSeeder::class);
-        $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
-        $this->call(BusinessDevelopmentSeeder::class); // Data demo Busdev: Restriksi Paket, Master Agent, Omset Sales (Skema 1-3) — reuse Sales/Teknisi di atas, WAJIB setelah keduanya
-        $this->call(FopSeeder::class);
-        $this->call(KolektorSeeder::class);
-        $this->call(AdminGudangPusatSeeder::class);
-        $this->call(AdminGudangCabangSeeder::class);
-        $this->call(NocSeeder::class);
-        $this->call(HelpdeskSeeder::class);
+
+        // $this->call(TechnicianSeeder::class);
+        // $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
+        // $this->call(BusinessDevelopmentSeeder::class); // Data demo Busdev: Restriksi Paket, Master Agent, Omset Sales (Skema 1-3) — reuse Sales/Teknisi di atas, WAJIB setelah keduanya
+        // $this->call(FopSeeder::class);
+        // $this->call(KolektorSeeder::class);
+        // $this->call(AdminGudangPusatSeeder::class);
+        // $this->call(AdminGudangCabangSeeder::class);
+        // $this->call(NocSeeder::class);
+        // $this->call(HelpdeskSeeder::class);
 
         // User::factory(10)->create();
 

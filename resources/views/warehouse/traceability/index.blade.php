@@ -74,6 +74,25 @@
                         </div>
                     </div>
                 </form>
+
+                {{-- Pencarian Roll Kabel (App\Enums\TrackingType::ROLL) — form
+                     terpisah biar 2 identitas beda namespace (SN modem vs
+                     roll_code kabel) gak nyampur di 1 input. --}}
+                <form action="{{ route('warehouse.traceability.index') }}" method="GET" class="mt-3">
+                    <div class="flex flex-col sm:flex-row gap-2.5">
+                        <div class="relative flex-1">
+                            <input type="text"
+                                   name="roll"
+                                   value="{{ $rollCode }}"
+                                   placeholder="Atau ketik / scan Roll ID kabel (mis. WR-ROLL-FO-20260915-000001)..."
+                                   class="w-full pl-4 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm font-mono font-semibold border border-amber-200 dark:border-amber-900/60 rounded-lg bg-amber-50/40 dark:bg-amber-950/20 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all min-h-[44px]">
+                        </div>
+                        <button type="submit"
+                                class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-lg text-xs sm:text-sm font-semibold shadow-xs transition-all min-h-[44px] cursor-pointer">
+                            <span>Lacak Roll</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -86,10 +105,14 @@
                 </svg>
             </div>
             <h4 class="text-sm font-bold text-amber-900 dark:text-amber-200">
-                Serial Number "<span class="font-mono">{{ $serialNumber }}</span>" tidak ditemukan
+                @if($rollCode !== '')
+                    Roll ID "<span class="font-mono">{{ $rollCode }}</span>" tidak ditemukan
+                @else
+                    Serial Number "<span class="font-mono">{{ $serialNumber }}</span>" tidak ditemukan
+                @endif
             </h4>
             <p class="text-xs text-amber-700/90 dark:text-amber-400 mt-1.5 max-w-md mx-auto leading-relaxed">
-                Pastikan nomor seri diketik dengan benar atau periksa apakah perangkat ini berada dalam POP Scope akses Anda.
+                Pastikan {{ $rollCode !== '' ? 'roll ID' : 'nomor seri' }} diketik dengan benar atau periksa apakah barang ini berada dalam POP Scope akses Anda.
             </p>
         </div>
         @endif
@@ -167,7 +190,45 @@
                             <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $statusConfig['badge'] }}">
                                 {{ $statusConfig['label'] }}
                             </span>
+
+                            {{-- Badge Kondisi Fisik (analisa-gap-kondisi-barang.md
+                                 poin 8) — axis independen dari status di atas. --}}
+                            @php
+                                $conditionVal = $serial->condition?->value ?? 'new';
+                                $conditionBadge = match(true) {
+                                    $conditionVal === 'new' => ['label' => 'Baru', 'class' => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'],
+                                    $conditionVal === 'used_damaged' => ['label' => 'Bekas — Rusak', 'class' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'],
+                                    $serial->condition_checked_at !== null => ['label' => 'Bekas — Sudah Dicek', 'class' => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'],
+                                    default => ['label' => 'Bekas — Belum Dicek', 'class' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'],
+                                };
+                            @endphp
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $conditionBadge['class'] }}">
+                                {{ $conditionBadge['label'] }}
+                            </span>
                         </div>
+
+                        {{-- Aksi "Sudah Dicek" — cuma muncul buat SN bekas yang
+                             belum dicek (poin 5 rancangan), inline toggle di
+                             halaman Detail SN ini sendiri (pola-3 CLAUDE.md). --}}
+                        @if(($serial->condition?->value ?? 'new') !== 'new' && $serial->condition_checked_at === null && auth()->user()->hasPermission('warehouse_reassign.create'))
+                        <div class="mt-2" x-data="{ open: false }">
+                            <button type="button" @click="open = !open"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors cursor-pointer">
+                                Tandai Sudah Dicek
+                            </button>
+                            <div x-show="open" x-cloak class="mt-2 p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 rounded-lg max-w-sm">
+                                <p class="text-[11px] text-amber-800 dark:text-amber-300 mb-2">Hasil cek fisik SN ini:</p>
+                                <form action="{{ route('warehouse.traceability.serial.condition-check', $serial) }}" method="POST" class="flex flex-col sm:flex-row gap-2">
+                                    @csrf
+                                    <select name="condition" required class="flex-1 px-2 py-1.5 text-xs border border-amber-200 dark:border-amber-800 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+                                        <option value="used_good">Kondisi Baik</option>
+                                        <option value="used_damaged">Rusak</option>
+                                    </select>
+                                    <button type="submit" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg cursor-pointer">Simpan</button>
+                                </form>
+                            </div>
+                        </div>
+                        @endif
                         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
                             Model: <strong class="text-slate-800 dark:text-slate-200">{{ $serial->item->name }}</strong>
                             <span class="font-mono text-[11px] text-slate-400">({{ $serial->item->code }})</span>
@@ -336,6 +397,147 @@
 
                             <div class="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/40 flex items-center justify-between text-[11px] text-slate-400">
                                 <span>Diverifikasi oleh: <strong class="text-slate-600 dark:text-slate-300">{{ $event->createdBy->name ?? 'Sistem' }}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        @endif
+
+        <!-- State Found: Roll Kabel Detail & Timeline -->
+        @if($roll)
+        @php
+            $rollStatus = $roll->status->value ?? '';
+            $rollStatusConfig = match($rollStatus) {
+                'available' => ['label' => 'Tersedia di Gudang', 'badge' => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800', 'icon_bg' => 'bg-emerald-500'],
+                'issued' => ['label' => 'Dipegang Teknisi (Custody)', 'badge' => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800', 'icon_bg' => 'bg-sky-500'],
+                'in_use' => ['label' => 'Sedang Dipakai (Sisa Sebagian)', 'badge' => 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800', 'icon_bg' => 'bg-indigo-500'],
+                'depleted' => ['label' => 'Habis', 'badge' => 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200', 'icon_bg' => 'bg-slate-500'],
+                'transferred' => ['label' => 'Dalam Transfer', 'badge' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800', 'icon_bg' => 'bg-amber-500'],
+                'damaged', 'lost', 'scrapped' => ['label' => strtoupper($rollStatus), 'badge' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800', 'icon_bg' => 'bg-rose-500'],
+                default => ['label' => $roll->status->label(), 'badge' => 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200', 'icon_bg' => 'bg-slate-500'],
+            };
+        @endphp
+
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-6 shadow-xs space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-700/60">
+                <div class="flex items-start gap-3.5">
+                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-lg {{ $rollStatusConfig['icon_bg'] }} text-white flex items-center justify-center shadow-md shadow-slate-900/10 shrink-0">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a1 1 0 001-1v-4a1 1 0 00-1-1H9a1 1 0 00-1 1v4a1 1 0 001 1zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tight break-all">
+                                {{ $roll->roll_code }}
+                            </h3>
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $rollStatusConfig['badge'] }}">
+                                {{ $rollStatusConfig['label'] }}
+                            </span>
+                            @if($roll->isLowRemaining())
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">Sisa Kecil</span>
+                            @endif
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            {{ $roll->item->name ?? '(barang dihapus)' }}
+                            <span class="font-mono text-[11px] text-slate-400">Vendor: {{ $roll->vendor ?? '—' }}</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50/80 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700/60 rounded-lg p-3 text-xs w-full md:w-auto">
+                    <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sisa Panjang</span>
+                    <div class="font-bold text-slate-800 dark:text-slate-100 mt-1 font-mono">
+                        {{ rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') }} / {{ rtrim(rtrim(number_format((float) $roll->length_total, 2, ',', '.'), '0'), ',') }} meter
+                    </div>
+                    <p class="text-[10px] text-slate-400 font-normal mt-0.5">
+                        @if($roll->current_technician_id)
+                            Teknisi: {{ $roll->currentTechnician->name ?? '-' }}
+                        @elseif($roll->current_pop_id)
+                            Gudang: {{ $roll->currentPop->name ?? '-' }}
+                        @else
+                            {{ $roll->status->label() }}
+                        @endif
+                    </p>
+                </div>
+            </div>
+
+            <!-- Quick Info Specs Grid for Roll -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3.5 pt-1 text-xs">
+                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                    <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Kategori Barang</span>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300 mt-0.5 block truncate">{{ $roll->item->category?->name ?? '-' }}</span>
+                </div>
+                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                    <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Harga per Roll</span>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300 mt-0.5 block">
+                        @if($roll->unit_price_snapshot && (float) $roll->item?->meter_per_roll > 0)
+                            Rp {{ number_format((float) $roll->unit_price_snapshot * (float) $roll->item->meter_per_roll, 0, ',', '.') }}
+                            <span class="text-[10px] font-normal text-slate-400">(Rp {{ number_format((float) $roll->unit_price_snapshot, 0, ',', '.') }}/m)</span>
+                        @else
+                            -
+                        @endif
+                    </span>
+                </div>
+                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                    <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Nilai Sisa Fisik</span>
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block font-mono">
+                        @if($roll->unit_price_snapshot)
+                            Rp {{ number_format((float) $roll->unit_price_snapshot * (float) $roll->length_remaining, 0, ',', '.') }}
+                        @else
+                            -
+                        @endif
+                    </span>
+                </div>
+                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                    <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Mutasi Ledger</span>
+                    <span class="font-bold text-amber-600 dark:text-amber-400 font-mono mt-0.5 block">{{ $ledger->count() }} Peristiwa</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60">
+                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Riwayat Ledger Roll (RECEIVE/TRANSFER/ISSUE/RETURN/ADJUSTMENT)</h4>
+                <p class="text-[11px] text-slate-400 mt-0.5">Pemakaian harian (potong meter) TIDAK masuk ledger ini — cukup tercatat di Laporan Task teknisi.</p>
+            </div>
+            <div class="p-4 sm:p-8">
+                <div class="relative pl-5 sm:pl-8 border-l-2 border-amber-200 dark:border-amber-900/60 space-y-6 sm:space-y-8 ml-2 sm:ml-4">
+                    @foreach($ledger as $event)
+                    <div class="relative group">
+                        <div class="absolute -left-[27px] sm:-left-[39px] top-1.5 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-white dark:bg-slate-800 border-2 border-amber-500 flex items-center justify-center shadow-xs group-hover:scale-125 transition-transform">
+                            <div class="w-1.5 h-1.5 rounded-full bg-amber-500 @if($loop->last) animate-pulse @endif"></div>
+                        </div>
+                        <div class="bg-slate-50/80 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/60 rounded-lg p-3.5 sm:p-4">
+                            @php
+                                $rollFromLabel = $event->fromPop->name ?? $event->fromTechnician->name ?? $event->transfer?->fromPop?->name ?? null;
+                                $rollToLabel = $event->toPop->name ?? $event->toTechnician->name ?? $event->transfer?->toPop?->name ?? null;
+                            @endphp
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">{{ $event->type->label() }}</span>
+                                    @if($event->reference_number)
+                                    <span class="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">#{{ $event->reference_number }}</span>
+                                    @endif
+                                </div>
+                                <time class="text-[11px] sm:text-xs text-slate-400 font-medium">{{ $event->created_at->translatedFormat('d M Y • H:i') }} WIB</time>
+                            </div>
+
+                            @if($rollFromLabel || $rollToLabel)
+                            <div class="text-xs text-slate-700 dark:text-slate-300 font-medium mt-1 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                                <span class="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold break-all">{{ $rollFromLabel ?? 'Pengadaan (Baru)' }}</span>
+                                <svg class="w-3.5 h-3.5 text-amber-500 shrink-0 self-center sm:rotate-0 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                                <span class="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold break-all">{{ $rollToLabel ?? '-' }}</span>
+                            </div>
+                            @endif
+
+                            <div class="mt-2 text-xs font-mono text-slate-500 dark:text-slate-400">Qty: {{ rtrim(rtrim(number_format((float) $event->qty, 2, ',', '.'), '0'), ',') }} meter</div>
+
+                            <div class="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/40 text-[11px] text-slate-400">
+                                Diverifikasi oleh: <strong class="text-slate-600 dark:text-slate-300">{{ $event->createdBy->name ?? 'Sistem' }}</strong>
                             </div>
                         </div>
                     </div>

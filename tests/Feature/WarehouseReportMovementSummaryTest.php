@@ -66,7 +66,7 @@ class WarehouseReportMovementSummaryTest extends TestCase
     #[Test]
     public function agregat_movement_benar_per_gudang_di_bulan_berjalan(): void
     {
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, $this->owner);
 
         $transfer = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabang, [['item_id' => $this->kabel->id, 'qty' => 40]], $this->owner);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$this->kabel->id => 40], $this->owner);
@@ -93,7 +93,7 @@ class WarehouseReportMovementSummaryTest extends TestCase
     #[Test]
     public function transaksi_di_luar_periode_tidak_ikut_teragregasi(): void
     {
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, $this->owner);
 
         // Backdate ke bulan lalu — pola query-builder update() sengaja gak
         // ke-tangkep InventoryTransactionObserver (dokumentasi limitation-nya
@@ -121,7 +121,7 @@ class WarehouseReportMovementSummaryTest extends TestCase
     #[Test]
     public function filter_pop_id_cuma_nampilin_gudang_terpilih(): void
     {
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, $this->owner);
 
         $transfer = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabang, [['item_id' => $this->kabel->id, 'qty' => 40]], $this->owner);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$this->kabel->id => 40], $this->owner);
@@ -136,7 +136,7 @@ class WarehouseReportMovementSummaryTest extends TestCase
     #[Test]
     public function pop_admin_cuma_lihat_gudang_dalam_scope(): void
     {
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 100, 5000, $this->owner);
         $transfer = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabang, [['item_id' => $this->kabel->id, 'qty' => 40]], $this->owner);
         app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$this->kabel->id => 40], $this->owner);
 

@@ -59,10 +59,11 @@ class ItemSeeder extends Seeder
             ['code' => 'ODP-16', 'name' => 'ODP 16 Port', 'category' => 'splitter_odp', 'unit' => 'pcs'],
             ['code' => 'ODC-24', 'name' => 'ODC 24 Port', 'category' => 'splitter_odp', 'unit' => 'pcs'],
 
-            // ── Kabel Dropcore — passive, quantity/batch ────────────────
+            // ── Kabel Dropcore — passive, quantity (2 slot harga otomatis
+            // kalau harga beli berubah, ADHOC-75 — bukan BATCH manual lagi) ──
             ['code' => 'DC-1C', 'name' => 'Kabel Dropcore 1 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter'],
             ['code' => 'DC-2C', 'name' => 'Kabel Dropcore 2 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter'],
-            ['code' => 'KBL-FEEDER-12C', 'name' => 'Kabel Fiber Optik Feeder 12 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter', 'tracking_type' => 'batch'],
+            ['code' => 'KBL-FEEDER-12C', 'name' => 'Kabel Fiber Optik Feeder 12 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter'],
 
             // ── Patch Cord — passive, quantity ──────────────────────────
             ['code' => 'PC-SCUPC-1M', 'name' => 'Patch Cord SC/UPC 1 Meter', 'category' => 'patch_cord', 'unit' => 'pcs'],
@@ -78,6 +79,11 @@ class ItemSeeder extends Seeder
             ['code' => 'ONT-ZTE-F660', 'name' => 'Modem ONT ZTE F660', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
             ['code' => 'ONT-HUAWEI-8245H', 'name' => 'Modem ONT Huawei HG8245H', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
             ['code' => 'ONT-FIBERHOME-5506', 'name' => 'Modem ONT Fiberhome AN5506', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
+            // Placeholder untuk modem legacy hasil pengambilan alat (DEAC,
+            // ADHOC-86): data lama pelanggan cuma punya SN, tanpa nama barang,
+            // sedangkan `inventory_serials.item_id` wajib. Staf Gudang
+            // mengoreksi ke model sebenarnya saat "Terima Retur".
+            ['code' => 'MODEM-LEGACY', 'name' => 'Modem Legacy (Belum Teridentifikasi)', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
 
             // ── Media Converter — kategori BAWAAN, dipersempit ke media
             //    converter murni (kotak fiber-ke-ethernet tanpa WiFi/router).

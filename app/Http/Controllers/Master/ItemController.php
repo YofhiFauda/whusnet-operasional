@@ -134,9 +134,52 @@ class ItemController extends Controller
         if (! $locked) {
             $rules['tracking_type'] = ['required', Rule::enum(TrackingType::class)];
             $rules['ownership_mode'] = ['nullable', Rule::enum(OwnershipMode::class)];
+
+            // Sub-konfigurasi identitas SERIALIZED, dikunci bareng tracking_type
+            // (bukan operasional lepas kayak meter_per_roll) — begitu barang
+            // udah punya pergerakan, sumber SN-nya (manual vs auto-generate)
+            // gak boleh ganti diam-diam.
+            $rules['auto_generate_serial'] = $request->input('tracking_type') === TrackingType::SERIALIZED->value
+                ? ['required', 'boolean']
+                : ['prohibited'];
+        }
+
+        // Konversi Roll→Meter + ambang "Sisa Kecil" — cuma relevan buat
+        // tracking_type=roll, TAPI kedua kolom TETAP boleh diedit walau
+        // tracking_type-nya udah locked (ini konfigurasi operasional, bukan
+        // sumbu cara-hitung-stok yang dikunci `$locked`). `meter_per_roll`
+        // WAJIB begitu tracking_type roll dipilih — tanpa ini
+        // `InventoryReceiveService::receiveRoll()` bakal nolak generate roll
+        // sama sekali (ketauan gap 2026-09-15: kolom+service udah ada dari
+        // awal fitur ROLL dibangun, tapi form Master Barang gak pernah kasih
+        // jalan buat ngisinya). `minimum_length` OPSIONAL — ambang "roll sisa
+        // kecil nganggur" baru berarti kalau admin tau angka yang masuk akal
+        // buat jenis kabel itu, gak dipaksa.
+        $isRollType = $locked
+            ? $item?->tracking_type === TrackingType::ROLL
+            : ($request->input('tracking_type') === TrackingType::ROLL->value);
+
+        if ($isRollType) {
+            $rules['meter_per_roll'] = ['required', 'numeric', 'min:0.01'];
+            $rules['minimum_length'] = ['nullable', 'numeric', 'min:0.01', 'lt:meter_per_roll'];
+        } else {
+            $rules['meter_per_roll'] = ['prohibited'];
+            $rules['minimum_length'] = ['prohibited'];
         }
 
         $validated = $request->validate($rules);
+
+        // Server-side, jangan cuma percaya field `unit` disabled di klien
+        // (bisa diakalin lewat devtools) — roll SELALU meter, gak ada jalan
+        // lain (koreksi 2026-09-16, akar laporan "tampilan 1.000 roll
+        // seharusnya 1.000 meter": item lama sempat kesimpen unit="roll"
+        // gara-gara placeholder form yang dulu nyaranin itu).
+        if ($isRollType) {
+            $validated['unit'] = 'meter';
+        } else {
+            $validated['meter_per_roll'] = null;
+            $validated['minimum_length'] = null;
+        }
 
         if (! $locked) {
             // Qty/Batch gak relevan sama sumbu kepemilikan (cuma SERIALIZED yang
@@ -146,6 +189,13 @@ class ItemController extends Controller
             $validated['ownership_mode'] = $trackingType === TrackingType::SERIALIZED
                 ? ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value)
                 : OwnershipMode::INSTALLABLE->value;
+
+            // Non-SERIALIZED gak punya konsep sumber SN sama sekali — paksa
+            // false, bukan cuma andalkan `prohibited` (kolom tetap kudu keisi
+            // buat `Item::create()`/`update()`).
+            $validated['auto_generate_serial'] = $trackingType === TrackingType::SERIALIZED
+                ? (bool) $validated['auto_generate_serial']
+                : false;
         }
 
         return $validated;

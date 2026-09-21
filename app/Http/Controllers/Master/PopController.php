@@ -235,17 +235,23 @@ class PopController extends Controller
     }
 
     /**
-     * Recursively fetch all descendant IDs for a given POP.
+     * Recursively fetch all descendant IDs for a given POP without lazy loading relations.
      */
     private function getDescendantIds(Pop $pop): array
     {
-        $ids = [];
-        foreach ($pop->children as $child) {
-            $ids[] = $child->id;
-            $ids = array_merge($ids, $this->getDescendantIds($child));
+        $descendants = [];
+        $frontier = [$pop->id];
+
+        while (! empty($frontier)) {
+            $childrenIds = Pop::whereIn('parent_id', $frontier)->pluck('id')->all();
+            if (empty($childrenIds)) {
+                break;
+            }
+            $descendants = array_merge($descendants, $childrenIds);
+            $frontier = $childrenIds;
         }
 
-        return $ids;
+        return $descendants;
     }
 
     /**

@@ -1,3 +1,5 @@
+# PARTIAL - SEBAGIAN BELUM DI KERJAKAN
+
 # Analisa Fitur Broadcast + Lonceng Notifikasi (Audit Fungsional)
 
 **Tanggal audit:** 2026-09-15

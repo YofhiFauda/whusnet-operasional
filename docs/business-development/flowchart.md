@@ -23,8 +23,8 @@ flowchart TD
     N -->|TIDAK| O[403 Forbidden]
     N -->|YA| P[Transaksi DB BusinessDevelopmentVerificationController::verify]
 
-    P --> P1[1. InitialInvoiceService::issue dari snapshot<br/>Invoice AWAL terbit, angka PERSIS sama dgn snapshot CS]
-    P1 --> P2[2. InstallationFeeInvoiceService::issue<br/>Invoice Biaya Instalasi INSIDENTAL terbit — TERPISAH]
+    P --> P1[1. withInstallationFee suntik nominal BD ke snapshot CS<br/>subtotal/PPN/total dihitung ULANG]
+    P1 --> P2[2. InitialInvoiceService::issue<br/>SATU Invoice AWAL terbit — sudah termasuk Biaya Instalasi]
     P2 --> P3[3. customers.status = ACTIVE<br/>pending_initial_invoice ditimpa null]
     P3 --> F
 ```
@@ -40,6 +40,8 @@ flowchart LR
 
 ## Kenapa Dua Cabang Ini Penting
 
-Sebelum fix 2026-09-14, cabang kanan (kategori Bisnis) langsung menerbitkan Invoice AWAL di titik **B**, sama seperti cabang kiri — cuma statusnya yang mampir ke `WAITING_BUSINESS_DEVELOPMENT_VERIFICATION`. Efeknya: pelanggan sudah punya tagihan resmi walau BD belum menyetujui apa pun. Sekarang titik penerbitan invoice untuk cabang kanan pindah ke **P1**, setelah BD ikut menyetujui — konsisten dengan makna "gate".
+Sebelum fix 2026-09-14, cabang kanan (kategori Bisnis) langsung menerbitkan Invoice AWAL di titik **B**, sama seperti cabang kiri — cuma statusnya yang mampir ke `WAITING_BUSINESS_DEVELOPMENT_VERIFICATION`. Efeknya: pelanggan sudah punya tagihan resmi walau BD belum menyetujui apa pun. Sekarang titik penerbitan invoice untuk cabang kanan pindah ke **P2**, setelah BD ikut menyetujui — konsisten dengan makna "gate".
+
+Sebelum fix 2026-09-16, **P1-P2 dulu dua langkah terpisah yang masing-masing menerbitkan invoice sendiri** (Invoice Awal + Invoice Biaya Instalasi INSIDENTAL) — satu pelanggan berakhir dengan dua tagihan nyangkut di satu aktivasi. Sekarang **P1 cuma menyuntik angka, P2 satu-satunya titik yang menerbitkan invoice** — hasilnya satu invoice yang mencatat kedua komponen biaya.
 
 Lihat juga [business-logic.md §3](business-logic.md#3-gate-menunggu-verifikasi-bd--state-machine) untuk penjelasan tiap langkah, dan [docs/customer-lifecycle/flowchart.md](../customer-lifecycle/flowchart.md) untuk alur registrasi→survey→pemasangan sebelum titik **A**.

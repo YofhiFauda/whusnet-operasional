@@ -576,6 +576,95 @@
             <?php else: ?>
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan <?php echo e($fopTask->category->label()); ?>.</p>
             <?php endif; ?>
+        <?php elseif($fopTask->category === \App\Enums\TaskType::AMBIL_MODEM): ?>
+            
+            <?php
+                $retrieval = $fopTask->task?->deviceRetrieval;
+                $retrievalLogs = $retrieval
+                    ? \App\Models\DeviceRetrievalLog::where('task_id', $fopTask->task_id)
+                        ->with(['item', 'receivedBy', 'warehousePop'])
+                        ->orderBy('id')
+                        ->get()
+                    : collect();
+                $retrievalOutcome = $retrieval?->outcome;
+                $retrievalPhotoUrl = $retrieval ? foto_publik($retrieval->condition_photo) : null;
+            ?>
+            <?php if($retrieval): ?>
+            <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
+                <div>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Hasil di Lapangan</p>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border <?php echo e($retrievalOutcome->isRetrieved() ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'); ?>"><?php echo e($retrievalOutcome->label()); ?></span>
+                </div>
+                <div>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Dilaporkan Oleh</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200"><?php echo e($fopTask->task?->completedBy?->name ?? '—'); ?>
+
+                        <?php if($retrieval->updated_at): ?><span class="text-slate-400 dark:text-slate-500 font-normal font-mono"> · <?php echo e($retrieval->updated_at->format('d/m/Y H:i')); ?></span><?php endif; ?>
+                    </p>
+                </div>
+
+                <?php if($retrievalOutcome->isRetrieved()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Modem yang Dibawa</p>
+                    <?php $__empty_1 = true; $__currentLoopData = $retrievalLogs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $log): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <div class="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-1.5">
+                        <span class="text-slate-600 dark:text-slate-400 min-w-0">
+                            <?php echo e($log->item?->name ?? 'Modem'); ?>
+
+                            <span class="block font-mono font-semibold text-slate-800 dark:text-slate-200 select-all">SN: <?php echo e($log->serial_number); ?></span>
+                        </span>
+                        <span class="text-right shrink-0">
+                            <?php if($log->isReceived()): ?>
+                            <span class="font-semibold text-emerald-600 dark:text-emerald-400">Diterima gudang</span>
+                            <span class="block text-slate-400 dark:text-slate-500"><?php echo e($log->warehousePop?->name); ?> · <?php echo e($log->receivedBy?->name ?? '—'); ?> · <?php echo e($log->received_at->format('d/m/Y')); ?></span>
+                            <?php if($log->condition): ?><span class="block text-slate-400 dark:text-slate-500">Kondisi: <?php echo e($log->condition->label()); ?></span><?php endif; ?>
+                            <?php else: ?>
+                            <span class="font-semibold text-amber-600 dark:text-amber-400">Transit — di teknisi</span>
+                            <span class="block text-slate-400 dark:text-slate-500">Menunggu diterima gudang</span>
+                            <?php endif; ?>
+                        </span>
+                    </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <p class="text-slate-400 dark:text-slate-500 italic">Belum ada SN tercatat untuk laporan ini.</p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kelengkapan yang Ikut Dibawa</p>
+                    <div class="flex flex-wrap gap-1.5 mt-1">
+                        <?php $__empty_1 = true; $__currentLoopData = ($retrieval->accessories ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $accessory): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100"><?php echo e(\App\Models\TaskDeviceRetrieval::ACCESSORY_OPTIONS[$accessory] ?? $accessory); ?></span>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                        <span class="text-slate-400 dark:text-slate-500">Tidak ada kelengkapan dicatat.</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if($retrieval->notes): ?>
+                <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5"><?php echo e($retrievalOutcome->isRetrieved() ? 'Catatan Teknisi' : 'Alasan Alat Tidak Diambil'); ?></p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line break-words [word-break:break-word]"><?php echo e($retrieval->notes); ?></p>
+                </div>
+                <?php endif; ?>
+
+                <?php if($retrievalPhotoUrl): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Foto Kondisi Alat</p>
+                    <a href="<?php echo e($retrievalPhotoUrl); ?>" target="_blank" class="inline-block">
+                        <img src="<?php echo e($retrievalPhotoUrl); ?>" alt="Foto Kondisi Alat" class="h-28 w-28 object-cover rounded border border-slate-200 dark:border-slate-700">
+                    </a>
+                    <a href="<?php echo e($retrievalPhotoUrl); ?>" target="_blank" class="block mt-1 text-blue-600 hover:underline">Foto Kondisi Alat →</a>
+                </div>
+                <?php elseif($retrieval->condition_photo): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 italic">Foto kondisi alat tercatat, tetapi filenya tidak ditemukan di penyimpanan.</p>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php else: ?>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan pengambilan alat.</p>
+            <?php endif; ?>
         <?php else: ?>
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Tipe task ini tidak punya laporan lapangan terstruktur.</p>
         <?php endif; ?>

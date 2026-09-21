@@ -11,7 +11,9 @@ use App\Services\CustomerQrTokenService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Business logic auth portal pelanggan (docs/api/api-portal-pelanggan/,
@@ -142,6 +144,79 @@ class PortalAuthService
     }
 
     /**
+     * Kebalikan dari penonaktifan di `CustomerObserver` saat pelanggan
+     * terminated — dipanggil begitu pelanggan "Langganan Lagi"
+     * (TERMINATED → ACTIVE). Tanpa ini pelanggan yang berlangganan lagi
+     * terkunci permanen dari portal: akun tetap `disabled`, `claim()` menolak
+     * `disabled` sebagai `invalid`, token QR sudah dicabut sehingga PIN pun
+     * tidak ada.
+     *
+     * SENGAJA turun ke `pending_claim`, BUKAN balik ke `active` dengan
+     * password lama: pelanggan yang sudah putus + password lama yang masih
+     * tersimpan = kredensial yang seharusnya sudah mati hidup lagi tanpa ada
+     * yang membuktikan identitas ulang. Pola sama `resetToPendingClaim()` —
+     * password ditimpa placeholder acak, pelanggan klaim ulang lewat PIN dari
+     * kartu QR baru (kartu lama tidak berlaku, tokennya sudah dicabut).
+     *
+     * Idempoten & aman dipanggil untuk pelanggan tanpa akun (data legacy yang
+     * terminated sebelum akun portal dibuat): akun `pending_claim` dibuat oleh
+     * `ensureAccountExists()`. Kegagalan penerbitan QR (`customer_code`/
+     * `pop_id` belum lengkap) TIDAK boleh menggagalkan Langganan Lagi — admin
+     * bisa terbitkan manual dari halaman QR pelanggan.
+     */
+    public function restoreAfterReactivation(Customer $customer, ?User $actor = null): void
+    {
+        $account = $customer->portalAccount;
+
+        if ($account && $account->status === 'disabled') {
+            DB::transaction(function () use ($account, $actor) {
+                $account->forceFill([
+                    'status' => 'pending_claim',
+                    'password_hash' => Hash::make(Str::random(40)),
+                    'password_changed_at' => now(),
+                    'failed_attempts' => 0,
+                    'locked_until' => null,
+                ])->save();
+
+                // Sudah dicabut saat terminate — dicabut ulang murni sabuk
+                // pengaman kalau ada token yang lahir di antara dua peristiwa itu.
+                CustomerPortalToken::revokeAllForCustomer($account->customer_id);
+
+                // Audit MANUAL, alasan sama seperti resetToPendingClaim().
+                AuditLog::create([
+                    'user_id' => $actor?->id,
+                    'module' => 'Portal Pelanggan',
+                    'action' => 'account_restored_after_reactivation',
+                    'auditable_type' => CustomerPortalAccount::class,
+                    'auditable_id' => $account->id,
+                    'old_values' => null,
+                    'new_values' => null,
+                    'ip_address' => request()?->ip(),
+                    'user_agent' => substr((string) request()?->userAgent(), 0, 255),
+                ]);
+            });
+        }
+
+        $this->ensureAccountExists($customer);
+
+        try {
+            $token = $this->qrTokens->issue($customer, $actor);
+
+            // PIN cuma diterbitkan kalau token BENAR-BENAR baru — issuePin()
+            // selalu menghasilkan PIN baru dan mematikan yang lama (lihat
+            // catatan di CustomerWorkflowService untuk WAITING_INSTALLATION).
+            if ($token->wasRecentlyCreated) {
+                $this->qrTokens->issuePin($token, $actor);
+            }
+        } catch (RuntimeException $e) {
+            Log::warning('QR/PIN auto-issue gagal saat Langganan Lagi', [
+                'customer_id' => $customer->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Resolusi QR pelanggan → `login_id` + status akun, dipakai Portal
      * (app terpisah) buat pre-fill halaman klaim begitu pelanggan scan QR
      * (2026-08-27, keputusan: scan QR SELALU ke Portal, gerbang tagihan
@@ -192,6 +267,16 @@ class PortalAuthService
         // — pesan "akun belum diaktifkan" membocorkan bahwa login_id itu
         // valid, dan seluruh guna throttle hilang (flowchart.md §1).
         if (! $account) {
+            return ['outcome' => 'invalid_credentials'];
+        }
+
+        // Akun `disabled` (pelanggan terminated) HARUS ditolak di sini. Tanpa
+        // guard ini cuma token lama yang dicabut oleh CustomerObserver —
+        // pelanggan putus masih bisa login ulang pakai password lama dan
+        // dapat pasangan token baru (middleware EnsurePortalCustomerToken
+        // cuma memeriksa token, bukan status akun). Dijawab identik dengan
+        // password salah, tanpa menghitung percobaan gagal.
+        if ($account->status === 'disabled') {
             return ['outcome' => 'invalid_credentials'];
         }
 

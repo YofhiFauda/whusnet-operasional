@@ -71,8 +71,8 @@ class InvoiceReportController extends Controller
         }
 
         if ($showTunggakan) {
-            $query->where('remaining_amount', '>', 0)
-                ->where('invoice_status', '!=', InvoiceStatus::BATAL->value);
+            // Tunggakan = piutang (periode sebelum bulan berjalan).
+            $query->piutang();
         }
 
         // Clone query untuk menghitung agregat ringkasan sebelum dipaginasi
@@ -80,8 +80,10 @@ class InvoiceReportController extends Controller
         $totalAmountSum = $summaryQuery->sum('total_amount');
         $totalPaidSum = $summaryQuery->sum('paid_amount');
 
-        // Sisa tunggakan dihitung dari invoice yang tidak batal
-        $totalTunggakanSum = $summaryQuery->where('invoice_status', '!=', InvoiceStatus::BATAL->value)->sum('remaining_amount');
+        // Total tunggakan = sisa piutang saja (periode sebelum bulan berjalan),
+        // bukan semua sisa tagihan — tagihan bulan ini yang belum dibayar belum
+        // tunggakan. Lihat Invoice::scopePiutang().
+        $totalTunggakanSum = (clone $summaryQuery)->piutang()->sum('remaining_amount');
 
         // Dapatkan data terpaginasi
         $invoices = $query->orderByDesc('issue_date')
@@ -161,8 +163,7 @@ class InvoiceReportController extends Controller
         }
 
         if ($showTunggakan) {
-            $query->where('remaining_amount', '>', 0)
-                ->where('invoice_status', '!=', InvoiceStatus::BATAL->value);
+            $query->piutang();
         }
 
         // Sengaja TIDAK di-`get()` di sini. Query dieksekusi di dalam closure

@@ -32,8 +32,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'unit',
     'is_active',
     'tracking_type',
+    'auto_generate_serial',
     'ownership_mode',
     'equipment_class_override',
+    'meter_per_roll',
+    'minimum_length',
 ])]
 class Item extends Model
 {
@@ -45,8 +48,11 @@ class Item extends Model
         return [
             'is_active' => 'boolean',
             'tracking_type' => TrackingType::class,
+            'auto_generate_serial' => 'boolean',
             'ownership_mode' => OwnershipMode::class,
             'equipment_class_override' => EquipmentClass::class,
+            'meter_per_roll' => 'decimal:2',
+            'minimum_length' => 'decimal:2',
         ];
     }
 
@@ -73,6 +79,11 @@ class Item extends Model
     public function inventorySerials(): HasMany
     {
         return $this->hasMany(InventorySerial::class);
+    }
+
+    public function inventoryRolls(): HasMany
+    {
+        return $this->hasMany(InventoryRoll::class);
     }
 
     public function technicianCustodies(): HasMany

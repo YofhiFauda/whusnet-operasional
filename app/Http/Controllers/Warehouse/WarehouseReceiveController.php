@@ -10,6 +10,7 @@ use App\Models\Item;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryReceiveService;
+use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -42,14 +43,25 @@ class WarehouseReceiveController extends Controller
 
     public function store(Request $request, InventoryReceiveService $service): RedirectResponse
     {
+        if ($request->has('lines') && is_array($request->input('lines'))) {
+            $request->merge([
+                'lines' => array_map(
+                    fn ($row) => is_array($row) ? RupiahInput::parseKeys($row, 'unit_price') : $row,
+                    $request->input('lines')
+                ),
+            ]);
+        }
+
         $validated = $request->validate([
             'pop_id' => 'required|integer|exists:pops,id',
             'notes' => 'nullable|string|max:500',
             'lines' => 'required|array|min:1',
             'lines.*.item_id' => 'required|integer|exists:items,id',
             'lines.*.qty' => 'nullable|numeric|min:0.01',
-            'lines.*.lot_no' => 'nullable|string|max:50',
             'lines.*.serial_numbers' => 'nullable|string',
+            'lines.*.serial_count' => 'nullable|integer|min:1',
+            'lines.*.roll_count' => 'nullable|integer|min:1',
+            'lines.*.vendor' => 'nullable|string|max:150',
             'lines.*.unit_price' => 'required|numeric|min:1',
         ]);
 
@@ -73,34 +85,101 @@ class WarehouseReceiveController extends Controller
         $transactions = InventoryTransaction::query()
             ->where('reference_number', $reference)
             ->where('type', InventoryTransactionType::RECEIVE->value)
-            ->with(['item.category', 'serial', 'toPop', 'createdBy'])
+            ->with(['item.category', 'serial', 'roll', 'toPop', 'createdBy'])
             ->get();
 
         abort_if($transactions->isEmpty(), 404);
 
-        return view('warehouse.receive.show', ['reference' => $reference, 'transactions' => $transactions]);
+        $grandTotal = $transactions->sum(fn ($line) => (float) $line->qty * (float) $line->unit_price_snapshot);
+
+        // Ringkasan per barang & harga — sejalan dengan Invoice TRF (WarehouseTransferController::invoice)
+        // Barang ROLL dikonversi ke satuan ROLL (dengan harga beli per roll),
+        // sedangkan daftar per-unit SN / Roll ID tetap tersedia di $transactions
+        $summaryLines = $transactions
+            ->groupBy(fn ($line) => $line->item_id.'|'.$line->unit_price_snapshot)
+            ->map(function ($group) {
+                $item = $group->first()->item;
+
+                if ($item->tracking_type === TrackingType::ROLL) {
+                    $meterPerRoll = (float) $item->meter_per_roll;
+                    $unitPricePerRoll = (float) $group->first()->unit_price_snapshot * $meterPerRoll;
+                    $rollCount = $group->count();
+                    $meterTotal = (float) $group->sum('qty');
+
+                    return (object) [
+                        'item' => $item,
+                        'qty' => $rollCount,
+                        'unit' => 'roll',
+                        'meter_total' => $meterTotal,
+                        'meter_per_roll' => $meterPerRoll,
+                        'unit_price_snapshot' => $unitPricePerRoll,
+                        'price_per_meter' => (float) $group->first()->unit_price_snapshot,
+                        'subtotal' => (float) $rollCount * $unitPricePerRoll,
+                    ];
+                }
+
+                $qty = (float) $group->sum('qty');
+                $unitPrice = (float) $group->first()->unit_price_snapshot;
+
+                return (object) [
+                    'item' => $item,
+                    'qty' => $qty,
+                    'unit' => $item->unit,
+                    'meter_total' => null,
+                    'meter_per_roll' => null,
+                    'unit_price_snapshot' => $unitPrice,
+                    'price_per_meter' => null,
+                    'subtotal' => $qty * $unitPrice,
+                ];
+            })
+            ->values();
+
+        return view('warehouse.receive.show', [
+            'reference' => $reference,
+            'transactions' => $transactions,
+            'summaryLines' => $summaryLines,
+            'grandTotal' => $grandTotal,
+        ]);
     }
 
     /**
-     * Baris form (item_id + qty/lot_no ATAU serial_numbers teks multi-baris,
+     * Baris form (item_id + qty ATAU serial_numbers teks multi-baris,
      * + unit_price) → bentuk array yang diharapkan `InventoryReceiveService`.
      * Cabang diputuskan dari `tracking_type` BARANG-nya — lihat docblock
      * `WarehouseTransferController::normalizeLines()` buat alasan lengkap.
+     * Gak ada `lot_no` di sini lagi (ADHOC-75) — `InventoryReceiveService`
+     * yang nentuin lot QUANTITY otomatis.
+     *
+     * SERIALIZED pecah dua sub-cabang lagi berdasar `auto_generate_serial`
+     * item-nya: manual (daftar SN diketik) vs auto (jumlah unit doang, SN
+     * digenerate sistem) — lihat
+     * docs/plan/warehouse/analisa-generate-id-barang-non-serial.md.
      *
      * @param  array<int, array<string, mixed>>  $rows
-     * @return list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, unit_price:float}>
+     * @return list<array{item_id:int, qty?:float, serial_numbers?:list<string>, serial_count?:int, roll_count?:int, vendor?:?string, unit_price:float}>
      */
     private function normalizeLines(array $rows): array
     {
         $itemIds = collect($rows)->pluck('item_id')->map(fn ($id) => (int) $id)->unique();
-        $trackingTypes = Item::whereIn('id', $itemIds)->pluck('tracking_type', 'id');
+        $items = Item::whereIn('id', $itemIds)->get(['id', 'tracking_type', 'auto_generate_serial'])->keyBy('id');
 
-        return collect($rows)->map(function (array $row) use ($trackingTypes) {
+        return collect($rows)->map(function (array $row) use ($items) {
             $itemId = (int) $row['item_id'];
             $unitPrice = (float) $row['unit_price'];
-            $isSerialized = ($trackingTypes[$itemId] ?? null) === TrackingType::SERIALIZED;
+            $item = $items[$itemId] ?? null;
+            $trackingType = $item?->tracking_type;
 
-            if ($isSerialized) {
+            if ($trackingType === TrackingType::SERIALIZED && $item->auto_generate_serial) {
+                $serialCount = (int) ($row['serial_count'] ?? 0);
+
+                if ($serialCount < 1) {
+                    throw new InvalidArgumentException("Barang #{$itemId} SN-nya digenerate sistem — jumlah unit wajib diisi, minimal 1.");
+                }
+
+                return ['item_id' => $itemId, 'serial_count' => $serialCount, 'unit_price' => $unitPrice];
+            }
+
+            if ($trackingType === TrackingType::SERIALIZED) {
                 $serials = collect(preg_split('/[\r\n,]+/', (string) ($row['serial_numbers'] ?? '')))
                     ->map(fn ($s) => trim($s))
                     ->filter()
@@ -114,6 +193,16 @@ class WarehouseReceiveController extends Controller
                 return ['item_id' => $itemId, 'serial_numbers' => $serials, 'unit_price' => $unitPrice];
             }
 
+            if ($trackingType === TrackingType::ROLL) {
+                $rollCount = (int) ($row['roll_count'] ?? 0);
+
+                if ($rollCount < 1) {
+                    throw new InvalidArgumentException("Barang #{$itemId} bertipe Roll Kabel — jumlah roll wajib diisi, minimal 1.");
+                }
+
+                return ['item_id' => $itemId, 'roll_count' => $rollCount, 'vendor' => $row['vendor'] ?? null, 'unit_price' => $unitPrice];
+            }
+
             if (filled($row['serial_numbers'] ?? null)) {
                 throw new InvalidArgumentException("Barang #{$itemId} bukan tipe Serial Number — kosongkan kolom Serial Number, isi Qty.");
             }
@@ -121,7 +210,6 @@ class WarehouseReceiveController extends Controller
             return [
                 'item_id' => $itemId,
                 'qty' => (float) ($row['qty'] ?? 0),
-                'lot_no' => $row['lot_no'] ?? null,
                 'unit_price' => $unitPrice,
             ];
         })->all();

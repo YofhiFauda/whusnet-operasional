@@ -78,7 +78,7 @@
             <label for="invoice_type" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">JENIS TAGIHAN</label>
             <select name="invoice_type" id="invoice_type" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
                 <option value="">Semua Jenis</option>
-                <option value="awal" {{ ($invoiceType ?? '') === 'awal' ? 'selected' : '' }}>Tagihan Awal (PSB)</option>
+                <option value="awal" {{ ($invoiceType ?? '') === 'awal' ? 'selected' : '' }}>Aktivasi</option>
                 <option value="bulanan" {{ ($invoiceType ?? '') === 'bulanan' ? 'selected' : '' }}>Tagihan Bulanan Rutin</option>
                 <option value="reaktivasi" {{ ($invoiceType ?? '') === 'reaktivasi' ? 'selected' : '' }}>Tagihan Reaktivasi</option>
             </select>

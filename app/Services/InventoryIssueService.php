@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Enums\CustodyStatus;
 use App\Enums\InventoryTransactionType;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -22,7 +24,7 @@ use InvalidArgumentException;
  * pertama, §3.7 rancangan-ui.md — dua neraca beda: stok gudang vs custody
  * teknisi).
  *
- * SETIAP issue barang QUANTITY/BATCH bikin baris `technician_custody` BARU —
+ * SETIAP issue barang QUANTITY bikin baris `technician_custody` BARU —
  * gak digabung ke baris existing teknisi yang sama buat item yang sama,
  * biar FIFO consumption (`InventoryService::consumeFromCustody()`) bisa
  * jalan per-lot per-waktu-ambil (lihat docblock `TechnicianCustody`).
@@ -30,7 +32,7 @@ use InvalidArgumentException;
 class InventoryIssueService
 {
     /**
-     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>}>  $lines
+     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
      * @return list<InventoryTransaction>
      */
     public function issue(Pop $cabang, User $technician, array $lines, User $actor): array
@@ -54,9 +56,11 @@ class InventoryIssueService
             foreach ($lines as $line) {
                 $item = Item::findOrFail($line['item_id']);
 
-                $transactions[] = $item->tracking_type === TrackingType::SERIALIZED
-                    ? $this->issueSerialized($referenceNumber, $cabang, $technician, $item, $line['serial_numbers'] ?? [], $actor)
-                    : $this->issueQuantity($referenceNumber, $cabang, $technician, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor);
+                $transactions[] = match ($item->tracking_type) {
+                    TrackingType::SERIALIZED => $this->issueSerialized($referenceNumber, $cabang, $technician, $item, $line['serial_numbers'] ?? [], $actor),
+                    TrackingType::ROLL => $this->issueRoll($referenceNumber, $cabang, $technician, $item, $line['roll_codes'] ?? [], $actor),
+                    default => $this->issueQuantity($referenceNumber, $cabang, $technician, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor),
+                };
             }
 
             return array_merge(...$transactions);
@@ -92,6 +96,16 @@ class InventoryIssueService
                 throw new InvalidArgumentException("SN {$serialNumber} tidak tersedia di {$cabang->name}.");
             }
 
+            // Gate kondisi (analisa-gap-kondisi-barang.md rancangan poin 4)
+            // — SN bekas balik dari pelanggan (`used_good`/`used_damaged`)
+            // yang BELUM dicek fisik gak boleh lolos Issue, walau statusnya
+            // udah AVAILABLE lagi. Ditegakkan DI SINI (Service), bukan cuma
+            // exclude dari dropdown UI, biar gak bisa dilewat lewat SN
+            // manual/scan.
+            if (! $serial->isClearedForIssue()) {
+                throw new InvalidArgumentException("SN {$serialNumber} bekas balik dari pemakaian dan belum dicek fisik — lakukan aksi \"Sudah Dicek\" di Lacak Barang dulu sebelum diissue ulang.");
+            }
+
             $serial->update([
                 'status' => SerialStatus::ISSUED,
                 'current_pop_id' => null,
@@ -116,6 +130,60 @@ class InventoryIssueService
     }
 
     /**
+     * Issue roll kabel (App\Enums\TrackingType::ROLL) — pick roll UTUH yang
+     * masih AVAILABLE di cabang, lock (sama alasan `issueSerialized()`: cegah
+     * 2 issue bersamaan ngerebut roll fisik yang sama), transisi ke ISSUED.
+     * Qty ledger = `length_remaining` roll SAAT diissue (biasanya =
+     * `length_total`, roll baru belum pernah dipotong).
+     *
+     * @param  list<string>  $rollCodes
+     * @return list<InventoryTransaction>
+     */
+    private function issueRoll(string $referenceNumber, Pop $cabang, User $technician, Item $item, array $rollCodes, User $actor): array
+    {
+        if ($rollCodes === []) {
+            throw new InvalidArgumentException("Item {$item->name} ROLL — daftar roll ID wajib diisi.");
+        }
+
+        $transactions = [];
+
+        foreach ($rollCodes as $rollCode) {
+            $roll = InventoryRoll::query()
+                ->where('item_id', $item->id)
+                ->where('roll_code', $rollCode)
+                ->where('status', RollStatus::AVAILABLE->value)
+                ->where('current_pop_id', $cabang->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $roll) {
+                throw new InvalidArgumentException("Roll {$rollCode} tidak tersedia di {$cabang->name}.");
+            }
+
+            $roll->update([
+                'status' => RollStatus::ISSUED,
+                'current_pop_id' => null,
+                'current_technician_id' => $technician->id,
+                'issued_from_pop_id' => $cabang->id,
+            ]);
+
+            $transactions[] = InventoryTransaction::create([
+                'type' => InventoryTransactionType::ISSUE,
+                'reference_number' => $referenceNumber,
+                'item_id' => $item->id,
+                'roll_id' => $roll->id,
+                'qty' => $roll->length_remaining,
+                'unit_price_snapshot' => $roll->unit_price_snapshot,
+                'from_pop_id' => $cabang->id,
+                'to_technician_id' => $technician->id,
+                'created_by' => $actor->id,
+            ]);
+        }
+
+        return $transactions;
+    }
+
+    /**
      * @return list<InventoryTransaction>
      */
     private function issueQuantity(string $referenceNumber, Pop $cabang, User $technician, Item $item, float $qty, ?string $lotNo, User $actor): array
@@ -124,7 +192,12 @@ class InventoryIssueService
             throw new InvalidArgumentException("Qty issue {$item->name} harus lebih besar dari nol.");
         }
 
-        $lotNo = $this->normalizeLotNo($item, $lotNo);
+        // `lotNo` datang dari row spesifik yang diklik staf di Kelola
+        // Stok/panel "Stok Tersedia" (setiap lot QUANTITY tampil sebagai
+        // baris terpisah sejak ADHOC-75) — bukan diketik bebas, jadi gak
+        // perlu divalidasi terhadap tracking_type di sini. Lot yang salah/gak
+        // ada otomatis kena guard "stok tidak cukup" di bawah.
+        $lotNo = $lotNo ?? '';
 
         $balance = InventoryBalance::query()
             ->where('pop_id', $cabang->id)
@@ -166,43 +239,32 @@ class InventoryIssueService
         ])];
     }
 
-    private function normalizeLotNo(Item $item, ?string $lotNo): string
-    {
-        if ($item->tracking_type === TrackingType::BATCH) {
-            if (blank($lotNo)) {
-                throw new InvalidArgumentException("Item {$item->name} tracking_type BATCH — lot_no wajib diisi.");
-            }
-
-            return $lotNo;
-        }
-
-        if (filled($lotNo)) {
-            throw new InvalidArgumentException("Item {$item->name} bukan BATCH — lot_no harus kosong.");
-        }
-
-        return '';
-    }
-
     /**
      * Sama persis `InventoryTransferService::resolveLastCost()` (baca
      * docblock di sana buat alasan filter `type=RECEIVE`) — duplikasi sadar
      * (dua pemanggil, belum sepadan diabstraksi jadi service/trait baru —
      * YAGNI). Kalau nanti muncul pemanggil ketiga, baru pantas ditarik jadi
      * satu tempat.
+     *
+     * `$lotNo` SELALU jadi filter (bukan "null = skip filter" kayak
+     * sebelumnya) — ketauan bug 2026-09-16 (ADHOC-75): begitu 1 barang
+     * QUANTITY bisa py 2 lot aktif harga beda, "skip filter kalau null"
+     * bikin issue dari lot Lama (`lot_no=''`→`null`) malah kebaca harga lot
+     * Baru (RECEIVE TERAKHIR overall, bukan RECEIVE TERAKHIR ke lot itu).
+     * Aman buat SERIALIZED (`resolveLastCost($item, null)` dari
+     * `issueSerialized()`) karena RECEIVE serial emang gak pernah nulis
+     * `lot_no` (selalu NULL by design) — filter `whereNull` di situ setara
+     * "gak difilter" tanpa efek samping.
      */
     private function resolveLastCost(Item $item, ?string $lotNo): ?float
     {
-        $query = InventoryTransaction::query()
+        $price = InventoryTransaction::query()
             ->where('item_id', $item->id)
             ->where('type', InventoryTransactionType::RECEIVE->value)
             ->whereNotNull('unit_price_snapshot')
-            ->latest('id');
-
-        if ($lotNo !== null) {
-            $query->where('lot_no', $lotNo);
-        }
-
-        $price = $query->value('unit_price_snapshot');
+            ->where('lot_no', $lotNo)
+            ->latest('id')
+            ->value('unit_price_snapshot');
 
         return $price !== null ? (float) $price : null;
     }

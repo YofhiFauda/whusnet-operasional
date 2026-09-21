@@ -67,7 +67,7 @@ class WarehouseStockPageTest extends TestCase
         $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
         $this->kabel = Item::create(['code' => 'WS-KABEL', 'name' => 'Kabel WS', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
 
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 300, 5000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $this->kabel, 300, 5000, $this->owner);
 
         $t1 = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabangA, [['item_id' => $this->kabel->id, 'qty' => 100]], $this->owner);
         app(InventoryTransferService::class)->receiveTransfer($t1, [], [$this->kabel->id => 100], $this->owner);
@@ -103,7 +103,7 @@ class WarehouseStockPageTest extends TestCase
     public function filter_search_cuma_nampilin_barang_yang_cocok(): void
     {
         $lain = Item::create(['code' => 'WS-LAIN', 'name' => 'Barang Lain WS', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'quantity']);
-        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $lain, 10, 1000, null, $this->owner);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $lain, 10, 1000, $this->owner);
 
         $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['search' => 'Kabel WS']));
 
@@ -128,6 +128,47 @@ class WarehouseStockPageTest extends TestCase
         $balances = $response->viewData('balances');
         $this->assertTrue($balances->contains(fn ($b) => $b->id === $balanceA->id));
         $this->assertFalse($balances->contains(fn ($b) => $b->id === $balanceB->id));
+    }
+
+    /**
+     * ADHOC-75 (2026-09-16) — Kelola Stok sebelumnya cuma nunjuk qty polos
+     * buat barang QUANTITY, jadi 2 baris lot (Harga Lama/Baru) gak bisa
+     * dibedain staf sama sekali. Regresi laporan user: "pathcore berhasil
+     * kepisah 2 baris, tapi gimana bedain harga lama-baru, Kelola Stok gak
+     * nampilin harga".
+     */
+    #[Test]
+    public function kelola_stok_nampilin_label_dan_harga_per_lot_barang_quantity(): void
+    {
+        $item = Item::create(['code' => 'WS-2LOT', 'name' => 'Barang 2 Lot WS', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'quantity']);
+        $receiveSvc = app(InventoryReceiveService::class);
+
+        $receiveSvc->receiveQuantity($this->pusat, $item, 12, 250000, $this->owner);
+        $receiveSvc->receiveQuantity($this->pusat, $item, 10, 260000, $this->owner);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['search' => 'Barang 2 Lot WS']));
+
+        $response->assertOk()
+            ->assertSee('Harga Lama')
+            ->assertSee('Harga Baru')
+            ->assertSee('Rp 250.000')
+            ->assertSee('Rp 260.000');
+    }
+
+    /**
+     * Barang QUANTITY yang cuma py 1 lot (belum pernah ganti harga) TETAP
+     * nampilin harga polos, TAPI TANPA label "Harga Lama" — gak ada "Baru"
+     * buat dibandingin, jadi label itu nyesatkan kalau dipaksa muncul.
+     */
+    #[Test]
+    public function kelola_stok_barang_quantity_satu_lot_tampil_harga_tanpa_label_lama(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['search' => 'Kabel WS']));
+
+        $response->assertOk()
+            ->assertSee('Rp 5.000')
+            ->assertDontSee('Harga Lama')
+            ->assertDontSee('Harga Baru');
     }
 
     #[Test]
@@ -232,5 +273,75 @@ class WarehouseStockPageTest extends TestCase
         $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index'));
 
         $response->assertOk()->assertDontSee('Modem WS Cabang A');
+    }
+
+    #[Test]
+    public function filter_category_id_cuma_nampilin_barang_kategori_tersebut(): void
+    {
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $catModem = ItemCategory::where('code', 'media_converter')->firstOrFail();
+
+        $modem = Item::create(['code' => 'WS-MODEM-CAT', 'name' => 'Modem Kategori Test', 'item_category_id' => $catModem->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
+        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WS-CAT-001'], 300000, $this->owner);
+
+        // Filter kategori kabel: kabel muncul, modem tidak
+        $responseKabel = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['category_id' => $catKabel->id]));
+        $responseKabel->assertOk();
+        $balancesKabel = $responseKabel->viewData('balances');
+        $this->assertTrue($balancesKabel->contains(fn ($b) => $b->item_id === $this->kabel->id));
+        $this->assertFalse($balancesKabel->contains(fn ($b) => $b->item_id === $modem->id));
+
+        // Filter kategori modem: modem muncul, kabel tidak
+        $responseModem = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['category_id' => $catModem->id]));
+        $responseModem->assertOk();
+        $balancesModem = $responseModem->viewData('balances');
+        $this->assertTrue($balancesModem->contains(fn ($b) => $b->item_id === $modem->id));
+        $this->assertFalse($balancesModem->contains(fn ($b) => $b->item_id === $this->kabel->id));
+    }
+
+    #[Test]
+    public function filter_item_id_cuma_nampilin_barang_spesifik(): void
+    {
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabelLain = Item::create(['code' => 'WS-KABEL-2', 'name' => 'Kabel 2 Test', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $kabelLain, 50, 4000, $this->owner);
+
+        // Filter spesifik kabel 1
+        $response1 = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['item_id' => $this->kabel->id]));
+        $response1->assertOk();
+        $balances1 = $response1->viewData('balances');
+        $this->assertTrue($balances1->contains(fn ($b) => $b->item_id === $this->kabel->id));
+        $this->assertFalse($balances1->contains(fn ($b) => $b->item_id === $kabelLain->id));
+
+        // Filter spesifik kabel 2
+        $response2 = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['item_id' => $kabelLain->id]));
+        $response2->assertOk();
+        $balances2 = $response2->viewData('balances');
+        $this->assertTrue($balances2->contains(fn ($b) => $b->item_id === $kabelLain->id));
+        $this->assertFalse($balances2->contains(fn ($b) => $b->item_id === $this->kabel->id));
+    }
+
+    #[Test]
+    public function filter_kombinasi_kategori_dan_pop_id(): void
+    {
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $catModem = ItemCategory::where('code', 'media_converter')->firstOrFail();
+
+        $modem = Item::create(['code' => 'WS-MODEM-KOMBI', 'name' => 'Modem Kombi Test', 'item_category_id' => $catModem->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
+        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WS-KM-001'], 300000, $this->owner);
+
+        $t = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabangA, [['item_id' => $modem->id, 'serial_numbers' => ['WS-KM-001']]], $this->owner);
+        app(InventoryTransferService::class)->receiveTransfer($t, ['WS-KM-001'], [], $this->owner);
+
+        // Filter Cabang A + Kategori Modem
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', [
+            'pop_id' => $this->cabangA->id,
+            'category_id' => $catModem->id,
+        ]));
+
+        $response->assertOk();
+        $balances = $response->viewData('balances');
+        $this->assertTrue($balances->contains(fn ($b) => $b->item_id === $modem->id && $b->pop_id === $this->cabangA->id));
+        $this->assertFalse($balances->contains(fn ($b) => $b->item_id === $this->kabel->id));
     }
 }

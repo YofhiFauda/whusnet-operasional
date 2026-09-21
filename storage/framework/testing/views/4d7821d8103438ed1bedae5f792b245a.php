@@ -254,6 +254,7 @@
                         $reportUrl = match(true) {
                             $task->task_type->value === 'SURVEY' => route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),
                             $task->task_type->value === 'PSB' => route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),
+                            $task->task_type->value === \App\Enums\TaskType::AMBIL_MODEM->value => route('tasks.device-retrieval.report', $task),
                             default => route('tasks.maintenance.report', $task),
                         };
                     ?>

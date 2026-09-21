@@ -25,7 +25,7 @@
    - Kalau badge **"Belum Terbit"** (amber) — invoice belum ada, angka yang tampil (Tanggal Aktivasi, Prorata, Biaya Pemasangan CS = 0, Total Tagihan Awal) adalah estimasi dari hitungan CS, bukan tagihan resmi.
    - Kalau badge **Lunas/Belum Dibayar** — invoice sudah pernah terbit (kasus edit ulang / kategori tanpa gate diakses lewat route BD), ada link "Lihat Detail Tagihan Awal".
 4. Isi field **Biaya Instalasi** (sudah terprefill dari harga bawaan paket — Master Paket Internet — boleh diubah kalau nego harga per klien).
-5. Klik **"Verifikasi & Aktifkan"** — **satu tombol, tanpa jalur tolak**. Efek langsung: Invoice Awal terbit (angka dari snapshot CS), Invoice Biaya Instalasi terbit (invoice terpisah), pelanggan resmi ACTIVE.
+5. Klik **"Verifikasi & Aktifkan"** — **satu tombol, tanpa jalur tolak**. Efek langsung: SATU Invoice Awal terbit — mencatat biaya yang sudah diverifikasi CS *dan* Biaya Instalasi yang baru diisi, bukan dua tagihan terpisah — pelanggan resmi ACTIVE.
 6. Kalau BD bukan role yang dikonfigurasi kategori itu (dan tidak punya permission override) — halaman menampilkan pesan read-only "Anda tidak punya izin memverifikasi pelanggan kategori paket ini", tanpa form.
 
 ## BD — Monitoring "Pelanggan Aktif < 30 Hari"

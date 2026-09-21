@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Enums\InvoiceStatus;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\District;
+use App\Models\FopTask;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Pop;
@@ -237,11 +239,24 @@ trait RendersCustomerList
                 ->unique('auditable_id')
                 ->keyBy('auditable_id');
 
+            // Badge "Sedang Diproses" (hanya penanda untuk FOP): pelanggan yang
+            // task Ambil Alat-nya sudah dibuat tapi belum selesai/dibatalkan.
+            // Definisi "belum selesai" SAMA dengan penjaga di
+            // CustomerController::retrieveDevice() supaya badge dan penolakan
+            // tombol tidak saling bertentangan. Satu kueri untuk seluruh halaman.
+            $customersWithOpenRetrieval = FopTask::query()
+                ->whereIn('customer_id', $customerIds)
+                ->where('category', TaskType::AMBIL_MODEM->value)
+                ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+                ->pluck('customer_id')
+                ->flip();
+
             foreach ($customers as $customer) {
                 $log = $terminateLogs->get($customer->id);
                 $customer->termination_reason = $log?->new_values['reason'] ?? '-';
                 $customer->terminated_at = $log?->created_at;
                 $customer->device_retrieved_at = $customer->customerDevice?->device_retrieved_at;
+                $customer->device_retrieval_in_progress = $customersWithOpenRetrieval->has($customer->id);
             }
         }
 
@@ -282,12 +297,12 @@ trait RendersCustomerList
         // Total is active + suspended customers
         $totalCustomers = ($statusCounts['active'] ?? 0) + ($statusCounts['suspended'] ?? 0);
 
-        // Jumlah pelanggan aktif dengan invoice lewat tempo (untuk summary strip)
+        // Jumlah tagihan piutang (periode lalu belum lunas) milik pelanggan aktif
+        // (untuk summary strip). Bukan `due_date < now()` — lihat Invoice::scopePiutang().
         $overdueCount = Invoice::whereHas('customer', function ($q) {
             $q->applyUserScope()->where('status', 'active');
         })
-            ->where('invoice_status', '!=', InvoiceStatus::LUNAS->value)
-            ->where('due_date', '<', now())
+            ->piutang()
             ->count();
 
         return view($view, compact(

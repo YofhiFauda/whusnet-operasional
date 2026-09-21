@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Enums\EquipmentClass;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TrackingType;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -94,6 +96,26 @@ class TaskMaintenanceController extends Controller
             ->values();
     }
 
+    /**
+     * Padanan `CustomerInstallationController::eligibleRollsForTeam()` —
+     * duplikasi sengaja, sama pola dua method di atas (`eligibleSerialsForTeam`/
+     * `eligiblePassiveCustodyForTeam`). OPSIONAL sama seperti SN Perangkat
+     * Aktif di controller ini.
+     */
+    private function eligibleRollsForTeam(Task $task)
+    {
+        $teamTechnicianIds = $task->teamMembers->pluck('user_id')->all();
+
+        return $teamTechnicianIds === []
+            ? collect()
+            : InventoryRoll::query()
+                ->whereIn('current_technician_id', $teamTechnicianIds)
+                ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+                ->where('length_remaining', '>', 0)
+                ->with('item')
+                ->get();
+    }
+
     public function report(Task $task)
     {
         $this->authorize('statusComplete', $task);
@@ -105,6 +127,13 @@ class TaskMaintenanceController extends Controller
         // Pastikan bukan task survey atau pemasangan (yang punya form laporan khusus)
         if (in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN])) {
             return redirect()->route('tasks.show', $task)->with('error', 'Gunakan form laporan khusus untuk Survey / Pemasangan.');
+        }
+
+        // DEAC (ADHOC-86): punya form sendiri. Form Maintenance menuntut foto
+        // OPM/speedtest dan menawarkan "pasang modem" — keduanya salah untuk
+        // pencabutan alat. URL lama (bookmark/tombol lama) dialihkan, bukan 404.
+        if ($task->task_type === TaskType::AMBIL_MODEM) {
+            return redirect()->route('tasks.device-retrieval.report', $task);
         }
 
         $workToolService = app(TaskWorkToolService::class);
@@ -137,13 +166,20 @@ class TaskMaintenanceController extends Controller
         $task->loadMissing('teamMembers');
         $eligibleSerials = $this->eligibleSerialsForTeam($task);
         $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($task);
+        $eligibleRolls = $this->eligibleRollsForTeam($task);
 
-        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody'));
+        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
     {
         $this->authorize('statusComplete', $task);
+
+        // Sama alasan `report()`: POST langsung ke sini untuk task DEAC tidak
+        // boleh menyelesaikan task tanpa laporan alat.
+        if ($task->task_type === TaskType::AMBIL_MODEM) {
+            return redirect()->route('tasks.device-retrieval.report', $task);
+        }
 
         $task->loadMissing('teamMembers');
 
@@ -152,6 +188,7 @@ class TaskMaintenanceController extends Controller
         // CustomerInstallationController::storePemasangan(), tapi field ini
         // NULLABLE di sini (lihat eligibleSerialsForTeam()).
         $eligibleSerialIds = $this->eligibleSerialsForTeam($task)->pluck('id');
+        $eligibleRollIds = $this->eligibleRollsForTeam($task)->pluck('id');
 
         $validated = $request->validate([
             'kendala_teknis' => 'required|string',
@@ -173,6 +210,9 @@ class TaskMaintenanceController extends Controller
             // sekali. Kalau diisi, wajib dari custody tim ini (Rule::in) —
             // SATU-SATUNYA sumber, gak ada teks manual (pola sama ADHOC-54).
             'selected_inventory_serial_id' => ['nullable', 'integer', Rule::in($eligibleSerialIds)],
+            // Roll kabel — OPSIONAL sama seperti SN di atas.
+            'selected_inventory_roll_id' => ['nullable', 'integer', Rule::in($eligibleRollIds)],
+            'roll_meters_used' => ['nullable', 'numeric', 'min:0.01', 'required_with:selected_inventory_roll_id'],
             // Material terpakai — bentuk payload sama persis dengan Laporan
             // Survey & Pemasangan supaya satu komponen form bisa dipakai tiga
             // halaman dan agregasinya membandingkan hal yang setara.
@@ -198,6 +238,8 @@ class TaskMaintenanceController extends Controller
             'work_tools_manual.*.note' => 'nullable|string|max:255',
         ], [
             'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
+            'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
+            'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
         ]);
 
         // Sisa custody Material Terpakai (koreksi lanjutan ADHOC-54,
@@ -302,6 +344,13 @@ class TaskMaintenanceController extends Controller
                     if (! empty($validated['selected_inventory_serial_id'])) {
                         $serial = InventorySerial::findOrFail($validated['selected_inventory_serial_id']);
                         app(InventoryService::class)->installSerial($serial, $task->customer, $fopTask, $teamTechnicians, auth()->user());
+                    }
+
+                    // Roll kabel — OPSIONAL sama pola SN di atas, one-shot
+                    // langsung potong-meter di sini (gak ada draft pointer).
+                    if (! empty($validated['selected_inventory_roll_id']) && ! empty($validated['roll_meters_used'])) {
+                        $roll = InventoryRoll::findOrFail($validated['selected_inventory_roll_id']);
+                        app(InventoryService::class)->consumeFromRoll($roll, (float) $validated['roll_meters_used'], $teamTechnicians, $fopTask, $task->customer, auth()->user());
                     }
                 }
             }

@@ -78,6 +78,32 @@
                 <input type="date" name="date_to" id="date_to" value="{{ $dateTo }}" class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
             </div>
 
+            <!-- Filter Kondisi (SERIALIZED, analisa-gap-kondisi-barang.md poin 6) -->
+            <div class="md:col-span-2">
+                <label for="condition" class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Kondisi</label>
+                <select name="condition" id="condition" class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                    <option value="">— Semua Kondisi —</option>
+                    <option value="new" {{ $conditionFilter === 'new' ? 'selected' : '' }}>Baru</option>
+                    <option value="unchecked" {{ $conditionFilter === 'unchecked' ? 'selected' : '' }}>Bekas — Belum Dicek</option>
+                    <option value="checked_good" {{ $conditionFilter === 'checked_good' ? 'selected' : '' }}>Bekas — Sudah Dicek</option>
+                    <option value="damaged" {{ $conditionFilter === 'damaged' ? 'selected' : '' }}>Bekas — Rusak</option>
+                </select>
+            </div>
+
+            <!-- Filter Alasan (cuma relevan buat type=adjustment, poin 7) -->
+            <div class="md:col-span-2" x-show="currentType === 'adjustment'" x-cloak>
+                <label for="adjustment_reason" class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Alasan</label>
+                <select name="adjustment_reason" id="adjustment_reason" class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                    <option value="">— Semua Alasan —</option>
+                    <option value="lost" {{ $adjustmentReasonFilter === 'lost' ? 'selected' : '' }}>Hilang</option>
+                    <option value="damaged" {{ $adjustmentReasonFilter === 'damaged' ? 'selected' : '' }}>Rusak</option>
+                    <option value="scrapped" {{ $adjustmentReasonFilter === 'scrapped' ? 'selected' : '' }}>Scrap</option>
+                    <option value="quarantine" {{ $adjustmentReasonFilter === 'quarantine' ? 'selected' : '' }}>Karantina</option>
+                    <option value="shrinkage_on_return" {{ $adjustmentReasonFilter === 'shrinkage_on_return' ? 'selected' : '' }}>Selisih Saat Return</option>
+                    <option value="other" {{ $adjustmentReasonFilter === 'other' ? 'selected' : '' }}>Lainnya / Tidak Diketahui</option>
+                </select>
+            </div>
+
             <!-- Filter Buttons -->
             <div class="md:col-span-1 flex items-center gap-2 justify-end">
                 <button type="submit" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer" title="Terapkan Filter">
@@ -85,7 +111,7 @@
                     <span>Filter</span>
                 </button>
 
-                @if($typeFilter || $popFilter || $search || $dateFrom || $dateTo)
+                @if($typeFilter || $popFilter || $search || $dateFrom || $dateTo || $conditionFilter || $adjustmentReasonFilter)
                 <a href="{{ route('warehouse.history.index') }}" class="inline-flex items-center justify-center p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors shrink-0" title="Reset Filter">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
                 </a>
@@ -133,10 +159,15 @@
                 </tr>
             </thead>
             <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
-                @foreach($ledger as $txn)
+                @foreach($ledger as $group)
                 @php
+                    $txn = $group->representative;
                     $rowColor = $typeColor[$txn->type->value ?? ''] ?? $defaultColor;
 
+                    // Satu dokumen (Input/Transfer/Serah Terima) bisa punya
+                    // puluhan baris ledger — dikelompokkan jadi 1 kartu di
+                    // sini, kliknya masuk ke halaman detail yang SUDAH nampilin
+                    // rincian per barang (lihat docblock WarehouseHistoryController).
                     $detailRoute = match($txn->type->value ?? '') {
                         'receive' => auth()->user()->hasPermission('warehouse_transfer.view') && $txn->reference_number
                             ? route('warehouse.receive.show', $txn->reference_number) : null,
@@ -146,28 +177,33 @@
                             ? route('warehouse.issues.show', $txn->reference_number) : null,
                         default => null,
                     };
-
-                    // Transfer nulis 2 baris ledger per pergerakan (dispatch +
-                    // confirm) pake reference_number SAMA — badge generik bikin
-                    // keliatan kayak duplikat (laporan user 2026-09-03). Dibedain.
-                    $typeLabel = match(true) {
-                        $txn->type->value === 'transfer' && $txn->from_pop_id !== null => 'Transfer Dikirim',
-                        $txn->type->value === 'transfer' && $txn->to_pop_id !== null => 'Transfer Diterima',
-                        default => $txn->type->label(),
-                    };
                 @endphp
                 <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors {{ $detailRoute ? 'cursor-pointer' : '' }}" @if($detailRoute) onclick="window.location='{{ $detailRoute }}'" @endif>
                     <td class="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
-                        <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $txn->created_at->translatedFormat('d M Y') }}</span>
-                        <span class="text-slate-400">{{ $txn->created_at->format('H:i') }}</span>
+                        <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $group->createdAt->translatedFormat('d M Y') }}</span>
+                        <span class="text-slate-400">{{ $group->createdAt->format('H:i') }}</span>
                     </td>
                     <td class="px-6 py-3.5 whitespace-nowrap">
                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border {{ $rowColor['bg'] }} {{ $rowColor['text'] }} {{ $rowColor['border'] }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ $rowColor['dot'] }}"></span>
-                            {{ $typeLabel }}
+                            {{ $group->typeLabel }}
                         </span>
                     </td>
                     <td class="px-6 py-3.5">
+                        @if($group->lineCount > 1)
+                        {{-- Digabung 1 kartu (ADHOC 2026-09-16) — klik buat lihat
+                             rincian tiap barang di halaman dokumennya. --}}
+                        <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                            @if($detailRoute)
+                            <a href="{{ $detailRoute }}" class="hover:underline hover:text-sky-600 dark:hover:text-sky-400">{{ $group->itemCount }} Jenis Barang</a>
+                            @else
+                            {{ $group->itemCount }} Jenis Barang
+                            @endif
+                        </div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                            {{ $group->lines->pluck('item.name')->unique()->take(2)->implode(', ') }}{{ $group->itemCount > 2 ? ', +'.($group->itemCount - 2).' lainnya' : '' }}
+                        </div>
+                        @else
                         <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">
                             @if($detailRoute)
                             <a href="{{ $detailRoute }}" class="hover:underline hover:text-sky-600 dark:hover:text-sky-400">{{ $txn->item->name }}</a>
@@ -183,8 +219,19 @@
                             <span>SN: {{ $txn->serial->serial_number }}</span>
                             @endif
                         </div>
+                        @php
+                            $serialConditionVal = $txn->serial?->condition?->value ?? 'new';
+                            $conditionBadge = match(true) {
+                                $serialConditionVal === 'new' => ['label' => 'Baru', 'class' => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
+                                $serialConditionVal === 'used_damaged' => ['label' => 'Bekas — Rusak', 'class' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800'],
+                                $txn->serial?->condition_checked_at !== null => ['label' => 'Bekas — Sudah Dicek', 'class' => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800'],
+                                default => ['label' => 'Bekas — Belum Dicek', 'class' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'],
+                            };
+                        @endphp
+                        <span class="inline-flex mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold border {{ $conditionBadge['class'] }}">{{ $conditionBadge['label'] }}</span>
                         @elseif($txn->lot_no)
                         <div class="text-xs font-mono text-slate-400 mt-0.5">Lot: {{ $txn->lot_no }}</div>
+                        @endif
                         @endif
                     </td>
                     <td class="px-6 py-3.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
@@ -202,8 +249,12 @@
                         </div>
                     </td>
                     <td class="px-6 py-3.5 whitespace-nowrap text-right font-mono text-sm font-bold text-slate-800 dark:text-slate-200">
+                        @if($group->lineCount > 1)
+                        {{ $group->lineCount }} <span class="text-xs font-normal text-slate-400">baris</span>
+                        @else
                         {{ $txn->serial ? '1 unit' : rtrim(rtrim(number_format((float) $txn->qty, 2, ',', '.'), '0'), ',') }}
                         <span class="text-xs font-normal text-slate-400">{{ $txn->serial ? '' : $txn->item->unit }}</span>
+                        @endif
                     </td>
                     <td class="px-6 py-3.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
                         {{ $txn->createdBy?->name ?? '-' }}

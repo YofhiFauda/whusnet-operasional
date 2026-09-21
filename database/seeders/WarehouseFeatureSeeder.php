@@ -67,6 +67,11 @@ class WarehouseFeatureSeeder extends Seeder
             ['code' => 'warehouse_reassign', 'name' => 'Reassign Custody Teknisi', 'sort_order' => 19],
             ['code' => 'warehouse_report', 'name' => 'Laporan Gudang (Agregat Periodik)', 'sort_order' => 20],
             ['code' => 'warehouse_stock_request', 'name' => 'Permintaan Stok Cabang', 'sort_order' => 21],
+            // Cetak Invoice Transfer (rancangan-invoice-surat-jalan-transfer.md)
+            // — root TERPISAH dari `warehouse_transfer` karena py data harga
+            // satuan barang, audience-nya lebih sempit (Gudang Pusat doang,
+            // BUKAN pop_admin cabang yang juga pegang `warehouse_transfer.view`).
+            ['code' => 'warehouse_transfer_invoice', 'name' => 'Invoice Transfer Gudang', 'sort_order' => 22],
         ];
 
         foreach ($roots as $root) {
@@ -84,6 +89,6 @@ class WarehouseFeatureSeeder extends Seeder
 
         app(PermissionGeneratorService::class)->generate();
 
-        $this->command?->info('WarehouseFeatureSeeder: 9 feature gudang digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
+        $this->command?->info('WarehouseFeatureSeeder: 10 feature gudang digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
     }
 }

@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Enums\CustodyStatus;
 use App\Enums\InventoryTransactionType;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Models\InventoryBalance;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Pop;
@@ -237,6 +239,58 @@ class InventoryAdjustmentService
                 'reason' => $reason,
                 'notes' => $notes,
                 'evidence_file_path' => $evidenceFilePath,
+                'resulting_status' => $newStatus->value,
+                'created_by' => $actor->id,
+            ]);
+        });
+    }
+
+    /**
+     * Padanan `adjustSerialStatus()` buat roll kabel — SENGAJA cuma 4 tujuan
+     * yang sama (LOST/DAMAGED/SCRAPPED/QUARANTINE), bukan DEPLETED (itu
+     * transisi otomatis `InventoryService::consumeFromRoll()`, bukan koreksi
+     * manual). `length_remaining` TIDAK diubah — kerugian dicatat lewat
+     * status + evidence, bukan nge-nolkan sisa meter (beda dari
+     * `adjustCustody()` yang qty-delta based, roll gak punya konsep itu).
+     */
+    public function adjustRollStatus(InventoryRoll $roll, RollStatus $newStatus, string $reason, User $actor, ?string $notes = null, ?string $evidenceFilePath = null): InventoryTransaction
+    {
+        $this->assertReason($reason);
+
+        $allowed = [RollStatus::LOST, RollStatus::DAMAGED, RollStatus::SCRAPPED, RollStatus::QUARANTINE];
+
+        if (! in_array($newStatus, $allowed, true)) {
+            throw new InvalidArgumentException('adjustRollStatus() cuma buat LOST/DAMAGED/SCRAPPED/QUARANTINE — transisi status lain lewat Service masing-masing.');
+        }
+
+        $evidenceRequiredStatuses = [RollStatus::LOST, RollStatus::DAMAGED, RollStatus::SCRAPPED];
+        if (in_array($newStatus, $evidenceRequiredStatuses, true) && blank($evidenceFilePath)) {
+            throw new InvalidArgumentException("Transisi ke {$newStatus->label()} wajib disertai bukti fisik (foto kondisi barang / BAP kehilangan) — kontrol-anti-manipulasi.md §2.");
+        }
+
+        if ($roll->status === RollStatus::SCRAPPED) {
+            throw new InvalidArgumentException("Roll {$roll->roll_code} udah SCRAPPED (write-off final) — gak bisa diubah status lagi.");
+        }
+
+        if ($roll->status === $newStatus) {
+            throw new InvalidArgumentException("Roll {$roll->roll_code} udah berstatus {$newStatus->value} — gak ada perubahan buat dicatat.");
+        }
+
+        return DB::transaction(function () use ($roll, $newStatus, $reason, $actor, $notes, $evidenceFilePath) {
+            $roll->update(['status' => $newStatus]);
+
+            return InventoryTransaction::create([
+                'type' => InventoryTransactionType::ADJUSTMENT,
+                'reference_number' => $this->generateReferenceNumber(),
+                'item_id' => $roll->item_id,
+                'roll_id' => $roll->id,
+                'qty' => -$roll->length_remaining,
+                'from_pop_id' => $roll->current_pop_id,
+                'from_technician_id' => $roll->current_technician_id,
+                'reason' => $reason,
+                'notes' => $notes,
+                'evidence_file_path' => $evidenceFilePath,
+                'resulting_status' => $newStatus->value,
                 'created_by' => $actor->id,
             ]);
         });

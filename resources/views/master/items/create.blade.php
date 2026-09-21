@@ -62,14 +62,29 @@
                 @enderror
             </div>
 
-            <!-- Satuan -->
+            <!-- Satuan — dikunci ke "meter" buat tracking_type=roll (koreksi
+                 2026-09-16: placeholder lama nyaranin "roll" sebagai satuan,
+                 padahal sisa/jumlah roll SELALU dilacak dalam meter di semua
+                 layar — ketik "roll" di sini bikin tampilan salah baca
+                 "1.000 roll" padahal maksudnya 1.000 meter). -->
             <div>
-                <label for="unit" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Satuan <span class="text-rose-500">*</span></label>
-                <input type="text" name="unit" id="unit" value="{{ old('unit', 'pcs') }}" required placeholder="meter / pcs / roll"
-                       class="w-full px-3 py-2 border @error('unit') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1">
+                <label for="unit" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Satuan <span class="text-rose-500" x-show="trackingType !== 'roll'">*</span></label>
+                {{-- :disabled (bukan readonly) — field disabled TIDAK ikut
+                     ke-submit browser, jadi gak bentrok sama hidden input
+                     "meter" di bawah pas tracking_type roll. --}}
+                <input type="text" name="unit" id="unit" value="{{ old('unit', 'pcs') }}"
+                       :disabled="trackingType === 'roll'" :required="trackingType !== 'roll'"
+                       placeholder="meter / pcs"
+                       class="w-full px-3 py-2 border @error('unit') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 disabled:bg-slate-50 dark:disabled:bg-slate-900/40 disabled:text-slate-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed">
                 @error('unit')
                     <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
                 @enderror
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1" x-show="trackingType === 'roll'" x-cloak>Roll kabel selalu dilacak dalam meter — satuan gak bisa diganti.</p>
+                {{-- x-if (bukan x-show) — beneran ilang dari DOM begitu bukan
+                     roll, biar gak dobel `name="unit"` bentrok pas submit. --}}
+                <template x-if="trackingType === 'roll'">
+                    <input type="hidden" name="unit" value="meter">
+                </template>
             </div>
 
             <!-- Status -->
@@ -105,12 +120,42 @@
 
         <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kepemilikan</label>
-            <select name="ownership_mode" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <select name="ownership_mode" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
                 @foreach($ownershipModes as $om)
                 <option value="{{ $om->value }}" {{ old('ownership_mode', 'installable') === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
                 @endforeach
             </select>
             <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — gak pernah tercatat terpasang ke pelanggan, cuma dipinjam-pakaikan lalu wajib balik.</p>
+
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5 mt-4">Sumber Serial Number</label>
+            <select name="auto_generate_serial" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                <option value="0" {{ old('auto_generate_serial', '0') === '0' ? 'selected' : '' }}>Manual (barang punya SN asli dari vendor — modem, ONT, router)</option>
+                <option value="1" {{ old('auto_generate_serial') === '1' ? 'selected' : '' }}>Digenerate Sistem (barang gak punya SN — ODP, Splitter, dll)</option>
+            </select>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Digenerate Sistem: staf cukup isi jumlah unit pas Barang Masuk, SN + label barcode dibuatkan otomatis.</p>
+        </div>
+
+        <div x-show="trackingType === 'roll'" x-cloak class="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="meter_per_roll" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Panjang per Roll (meter) <span class="text-rose-500">*</span></label>
+                <input type="number" step="0.01" min="0.01" name="meter_per_roll" id="meter_per_roll" value="{{ old('meter_per_roll') }}" placeholder="mis. 1000"
+                       :disabled="trackingType !== 'roll'"
+                       class="w-full px-3 py-2 border @error('meter_per_roll') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1">
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Konversi Roll→Meter tetap — di-snapshot ke tiap roll saat Receive, ubah nilai ini gak nyeret roll lama.</p>
+                @error('meter_per_roll')
+                    <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+                @enderror
+            </div>
+            <div>
+                <label for="minimum_length" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Ambang "Sisa Kecil" (meter, opsional)</label>
+                <input type="number" step="0.01" min="0.01" name="minimum_length" id="minimum_length" value="{{ old('minimum_length') }}" placeholder="mis. 50"
+                       :disabled="trackingType !== 'roll'"
+                       class="w-full px-3 py-2 border @error('minimum_length') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1">
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Roll dengan sisa di bawah ini di-flag "Sisa Kecil" di Custody/Dashboard — tetap tercatat stok, gak otomatis dihapus.</p>
+                @error('minimum_length')
+                    <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+                @enderror
+            </div>
         </div>
 
         <!-- Submit Actions -->
