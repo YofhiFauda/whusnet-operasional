@@ -101,6 +101,31 @@ class CustomerRegistrationVerificationTest extends TestCase
         $this->assertDatabaseMissing('fop_tasks', ['customer_id' => $customer->id]);
     }
 
+    public function test_buka_task_fop_tidak_membuat_foptask_survey_untuk_pelanggan_yang_masih_verifikasi_registrasi(): void
+    {
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'status' => 'registered']);
+        $this->loginAsAdmin();
+
+        // index() menjalankan autoSyncAndCalculatePriority() — dulu jaring
+        // pengaman ini ikut memproses status `registered`.
+        $this->get(route('fop-tasks.index'))->assertOk();
+        $this->get(route('fop.dashboard'))->assertOk();
+
+        $this->assertDatabaseMissing('fop_tasks', ['customer_id' => $customer->id]);
+    }
+
+    public function test_antrean_survey_dashboard_fop_tidak_menghitung_pelanggan_verifikasi_registrasi(): void
+    {
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        Customer::factory()->create(['pop_id' => $pop->id, 'status' => 'registered']);
+        $this->loginAsAdmin();
+
+        $response = $this->get(route('fop.dashboard'))->assertOk();
+
+        $this->assertCount(0, $response->viewData('surveyQueue'));
+    }
+
     public function test_approve_membuat_task_dan_foptask_lalu_pindah_ke_waiting_survey(): void
     {
         $pop = Pop::factory()->create(['type' => 'cabang']);

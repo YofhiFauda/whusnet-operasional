@@ -50,7 +50,11 @@ Migrasi sumber: `2026_06_12_132728_create`, `2026_06_15_000002_add_legacy_ids`, 
 | `total_amount` | decimal(12,2) | | |
 | `paid_amount` | decimal(12,2), default 0 | | Akumulasi `payments.amount` VALID — dihitung `Invoice::recalculateFromPayments()`, tak pernah melebihi `total_amount` |
 | `remaining_amount` | decimal(12,2) | | `total_amount - paid_amount`, floor 0 |
-| `invoice_status` | string(50), default `belum_dibayar` | | `belum_dibayar`, `sebagian`, `lunas`, `batal` |
+| `invoice_status` | string(50), default `belum_dibayar` | | `belum_dibayar`, `sebagian`, `lunas`, `batal`, `tak_tertagih` (hapus buku piutang, ADHOC-90) |
+| `written_off_at` | timestamp | ✔ | Kapan piutang dihapus buku. Dasar kolom "Piutang tak Tertagih" laporan bulanan |
+| `written_off_by` | FK → `users.id`, null on delete | ✔ | |
+| `written_off_amount` | decimal(15,2) | ✔ | Snapshot `remaining_amount` saat dihapus buku (`remaining_amount` sendiri tidak diubah) |
+| `write_off_reason` | string(500) | ✔ | Alasan wajib |
 | `created_by` | FK → `users.id`, null on delete | ✔ | Null kalau dibuat via command (`billing:generate-monthly-invoices`) |
 | `created_at` / `updated_at` | timestamp | | |
 
@@ -59,6 +63,22 @@ Migrasi sumber: `2026_06_12_132728_create`, `2026_06_15_000002_add_legacy_ids`, 
 **Catatan `invoice_type`:** kolom ini sempat punya default DB `'bulanan'` — dihapus lewat migrasi `remove_default_from_invoice_type_column` karena default diam-diam itu yang bikin invoice salah tag pas migrasi data legacy. Sekarang: `InvoiceObserver::creating()` juga menolak insert kalau `invoice_type` kosong (lapis aplikasi, redundant dengan constraint DB).
 
 **Catatan unique index (2026-07-21):** migrasi `add_invoice_period_unique_index_to_invoices` SENGAJA kosong (no-op) — unique index `(customer_id, invoice_type, billing_period)` gagal dipasang karena invoice `batal` tetap menempati slot periode (MySQL tak punya partial index) dan memblokir tagihan pengganti yang sah. Anti-dobel invoice tetap murni layer aplikasi (`InvoiceObserver` + `CustomerController::storeManualInvoice`), dipantau `billing:audit-duplicate-invoices`. Jangan coba pasang index ini lagi tanpa membaca catatan lengkap di file migrasinya.
+
+## Tabel `period_closings` (ADHOC-90)
+
+Snapshot beku Laporan Bulanan Admin Collector. Tanpa baris = periode masih terbuka (laporan dihitung live).
+
+| Kolom | Tipe | Null | Catatan |
+|---|---|---|---|
+| `id` | bigint PK | | |
+| `period` | char(7) | | `YYYY-MM` |
+| `pop_id` | FK → `pops.id` | | POP pusat/cabang (mini-POP sudah dilipat ke induk) |
+| `figures` | json | | 4 blok angka (`tagihan`, `piutang_lalu`, `pelanggan`, `uang_diterima`) |
+| `closed_by` | FK → `users.id`, null on delete | ✔ | |
+| `closed_at` | timestamp | | |
+| `created_at` / `updated_at` | timestamp | | |
+
+Unique `(period, pop_id)`. Buka ulang = hapus baris (alasan + angka yang dibuang tercatat di `audit_logs`).
 
 ## Tabel `payments`
 
@@ -78,9 +98,9 @@ Migrasi sumber: `2026_06_13_000001_create`, `2026_06_15_000002_add_legacy_ids`, 
 | `pop_id` | FK → `pops.id`, cascade delete | | |
 | `payment_date` | date | | Tanggal posting/validasi kantor |
 | `collected_date` | date | ✔ | Tanggal uang diterima DI LAPANGAN — beda dari `payment_date`, mencegah pendapatan lintas-bulan salah potong saat kolektor telat setor |
-| `payment_method` | string(50) | | `cash`, `transfer`, `qris`, `lainnya` |
+| `payment_method` | string(50) | | `cash`, `transfer`, `kolektor`, `lainnya` (`PaymentMethod` enum). `qris` DIHAPUS (2026-09-22, tak pernah dipakai operasional) — jangan hidupkan lagi. `lainnya` wajib mengisi `note` (keterangan metode apa persisnya, mis. "OVO") — `PaymentMethod::requiresDescription()`, divalidasi `required_if:payment_method,lainnya` |
 | `amount` | decimal(12,2) | | Bagian yang DITERAPKAN ke tagihan — wajib > 0 (`PaymentObserver::creating()`), tak pernah melebihi `remaining_amount` invoice saat insert. **TOTAL uang diterima dari pelanggan boleh lebih besar** — sisanya otomatis dipisah ke `overpay_amount`, bukan masuk ke `amount` (§ lihat catatan lebih bayar di bawah) |
-| `overpay_amount` | decimal(12,2) | ✔ | Kelebihan uang fisik yang diserahkan pelanggan di atas sisa tagihan. **Catatan informatif, BUKAN saldo kredit** — tak punya sisi debit, tak pernah dipakai otomatis untuk tagihan berikutnya. `PaymentController::store()` yang menghitung otomatis (`total_received - min(total_received, remaining)`), admin tak perlu hitung manual |
+| `overpay_amount` | decimal(12,2) | ✔ | Kelebihan uang fisik yang diserahkan pelanggan di atas sisa tagihan. Sejak ADHOC-38 kelebihan ini **dicatat juga sebagai credit** di ledger `customer_balance_mutations` (saldo pelanggan diturunkan dari SUM(credit) − SUM(debit), tanpa kolom `customers.balance`); kolom ini tetap sebagai jejak per payment. Auto-pakai ke tagihan bulanan **belum ada** (rancangan ADHOC-92: kolom `payments.balance_used_amount`, `PaymentMethod::SALDO`, `customer_balance_mutations.source` — belum dimigrasi). `PaymentController::store()` yang menghitung otomatis (`total_received - min(total_received, remaining)`), admin tak perlu hitung manual |
 | `received_by` | FK → `users.id`, null on delete | ✔ | Kasir/admin yang mem-validasi pembayaran di sistem |
 | `collected_by` | FK → `users.id`, null on delete | ✔ | Kolektor yang FAKTANYA menagih — snapshot BEKU, TIDAK disalin otomatis dari `customers.collector_id` (kalau disalin buta, laporan kolektor mencatat uang yang tak pernah dia tagih). Null untuk jalur non-kolektor |
 | `proof_file` | string | ✔ | Path bukti transfer/foto |

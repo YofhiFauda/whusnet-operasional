@@ -54,7 +54,12 @@ trait RecordsCollectorBatch
             'rows' => 'required|array|min:1',
             'rows.*.invoice_id' => 'required|integer',
             'rows.*.amount' => 'required|numeric|min:1',
-            'rows.*.payment_method' => 'required|in:cash,transfer,qris,lainnya',
+            'rows.*.payment_method' => 'required|in:cash,transfer,lainnya',
+            // Metode Lainnya wajib menjelaskan metode apa persisnya (mis.
+            // "OVO") — dicek lagi di CollectorPaymentService::validateRows()
+            // supaya konsisten dengan pesan gagal per baris yang sudah ada,
+            // bukan validasi generik Laravel.
+            'rows.*.note' => 'nullable|string|max:1000',
             // Batas atas WAJIB. Tanpa `before_or_equal:today`, kolektor bisa
             // mengirim `2030-01-01`: nilainya mendarat di
             // `payments.collected_date` (merusak pemotongan pendapatan per

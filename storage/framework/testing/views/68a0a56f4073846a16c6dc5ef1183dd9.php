@@ -135,7 +135,6 @@
                             <option value="cash">Cash</option>
                             <option value="transfer">Transfer</option>
                             <option value="kolektor">Kolektor</option>
-                            <option value="qris">QRIS</option>
                             <option value="lainnya">Lainnya</option>
                         </select>
                     </div>
@@ -205,7 +204,8 @@
                     </div>
 
                     <div>
-                        <label for="qp-note" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Catatan</label>
+                        <label for="qp-note" id="qp-note-label" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Catatan</label>
+                        
                         <input type="text" id="qp-note" placeholder="Tulis catatan jika ada..."
                                class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
                     </div>
@@ -237,7 +237,7 @@
             let qpNextInstallment = 1;
             let qpCustomerBalance = 0;
 
-            const qpMethodLabels = { cash: 'Cash', transfer: 'Transfer Bank', kolektor: 'Kolektor', qris: 'QRIS', lainnya: 'Lainnya' };
+            const qpMethodLabels = { cash: 'Cash', transfer: 'Transfer Bank', kolektor: 'Kolektor', lainnya: 'Lainnya' };
 
             /** Tampilkan/sembunyikan field pendukung sesuai metode dipilih,
              *  dan geser `required` supaya field tersembunyi tak memblokir
@@ -252,6 +252,7 @@
 
                 const isTransfer = method === 'transfer';
                 const isKolektor = method === 'kolektor';
+                const isLainnya = method === 'lainnya';
 
                 transferFields.classList.toggle('hidden', !isTransfer);
                 bankName.required = isTransfer;
@@ -259,6 +260,12 @@
 
                 collectorFields.classList.toggle('hidden', !isKolektor);
                 collector.required = isKolektor;
+
+                const note = document.getElementById('qp-note');
+                const noteLabel = document.getElementById('qp-note-label');
+                note.required = isLainnya;
+                note.placeholder = isLainnya ? 'Jelaskan metode pembayaran (mis. OVO, Dana, GoPay)...' : 'Tulis catatan jika ada...';
+                noteLabel.textContent = isLainnya ? 'Keterangan Metode (wajib)' : 'Catatan';
 
                 document.getElementById('qp-summary-method').textContent = qpMethodLabels[method] || method;
             }
@@ -639,6 +646,16 @@
                 if (method === 'kolektor' && !document.getElementById('qp-collector').value) {
                     errorBox.textContent = 'Pilih kolektor untuk metode Kolektor.';
                     errorBox.classList.remove('hidden');
+                    return;
+                }
+                // 'note' yang dikirim ke server SELALU terisi (diawali label
+                // Alokasi, lihat konstruksi payload di bawah), jadi
+                // `required_if` server tak pernah menolaknya sendirian —
+                // isi Catatan-nya sendiri yang wajib dicek di sini.
+                if (method === 'lainnya' && !document.getElementById('qp-note').value.trim()) {
+                    errorBox.textContent = 'Jelaskan metode pembayarannya di kolom Catatan untuk metode Lainnya.';
+                    errorBox.classList.remove('hidden');
+                    document.getElementById('qp-note').focus();
                     return;
                 }
 

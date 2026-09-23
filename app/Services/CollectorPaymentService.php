@@ -56,7 +56,7 @@ class CollectorPaymentService
      * cuma karena batas harinya lewat tengah malam saat form masih terbuka.
      * Otorisasi yang sesungguhnya = kepemilikan pelanggan, dicek di bawah.
      *
-     * @param  array<int, array{invoice_id: int, amount: float|string, payment_method: string, collected_date: string}>  $rows
+     * @param  array<int, array{invoice_id: int, amount: float|string, payment_method: string, collected_date: string, note?: string}>  $rows
      * @return array<int, array{invoice_id?: mixed, reason: string}>
      */
     public function validateRows(User $collector, array $rows, User $viewer): array
@@ -91,7 +91,7 @@ class CollectorPaymentService
                 continue;
             }
 
-            if (in_array($invoice->invoice_status->value, ['lunas', 'batal'], true)) {
+            if (in_array($invoice->invoice_status->value, ['lunas', 'batal', 'tak_tertagih'], true)) {
                 $failures[] = [
                     'invoice_id' => $row['invoice_id'],
                     'reason' => "{$invoice->invoice_number}: sudah {$invoice->invoice_status->label()}.",
@@ -114,6 +114,15 @@ class CollectorPaymentService
                 $failures[] = [
                     'invoice_id' => $row['invoice_id'],
                     'reason' => "{$invoice->invoice_number}: nominal Rp".number_format($amount, 0, ',', '.').' melebihi sisa Rp'.number_format((float) $invoice->remaining_amount, 0, ',', '.').'.',
+                ];
+            }
+
+            // Metode Lainnya wajib menjelaskan metode apa persisnya —
+            // PaymentMethod::requiresDescription().
+            if (($row['payment_method'] ?? null) === 'lainnya' && trim((string) ($row['note'] ?? '')) === '') {
+                $failures[] = [
+                    'invoice_id' => $row['invoice_id'],
+                    'reason' => "{$invoice->invoice_number}: metode Lainnya wajib diisi keterangannya.",
                 ];
             }
         }
@@ -139,7 +148,7 @@ class CollectorPaymentService
      * Simpan satu batch. Melempar \RuntimeException kalau ada baris yang gagal
      * di dalam transaksi — pemanggil menerjemahkannya jadi response 422.
      *
-     * @param  array<int, array{invoice_id: int, amount: float|string, payment_method: string, collected_date: string}>  $rows
+     * @param  array<int, array{invoice_id: int, amount: float|string, payment_method: string, collected_date: string, note?: string}>  $rows
      * @return array{already_processed: bool, batch_id: int, processed: int, results: array<int, array<string, mixed>>}
      */
     public function record(User $collector, User $actor, string $idempotencyKey, array $rows): array
@@ -185,13 +194,26 @@ class CollectorPaymentService
                 // membatalkan invoice di antara dua fase, payment tetap
                 // tersimpan, invoice tetap `batal`, dan uangnya masuk saldo
                 // kolektor menempel pada tagihan yang sudah mati.
-                if (in_array($lockedInvoice->invoice_status->value, ['lunas', 'batal'], true)) {
+                if (in_array($lockedInvoice->invoice_status->value, ['lunas', 'batal', 'tak_tertagih'], true)) {
                     throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: sudah {$lockedInvoice->invoice_status->label()} (berubah sejak form dibuka).");
                 }
 
                 $amount = Money::of($row['amount']);
                 if (Money::greaterThan($amount, $lockedInvoice->remaining_amount)) {
                     throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: nominal melebihi sisa tagihan (kemungkinan berubah sejak form dibuka).");
+                }
+
+                $description = trim((string) ($row['note'] ?? ''));
+                if ($row['payment_method'] === 'lainnya' && $description === '') {
+                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: metode Lainnya wajib diisi keterangannya.");
+                }
+
+                // 'Batch kolektor: ...' dipertahankan sebagai penanda sumber
+                // (dipakai pembaca lain yang mengharap format ini) — keterangan
+                // Lainnya ditambahkan sesudahnya, bukan menggantikannya.
+                $note = 'Batch kolektor: '.$collector->name;
+                if ($description !== '') {
+                    $note .= ' — '.$description;
                 }
 
                 $payment = Payment::create([
@@ -207,7 +229,7 @@ class CollectorPaymentService
                     'received_by' => $actor->id,
                     'collected_by' => $collector->id,
                     'payment_status' => PaymentStatus::VALID->value,
-                    'note' => 'Batch kolektor: '.$collector->name,
+                    'note' => $note,
                 ]);
 
                 $lockedInvoice->recalculateFromPayments();

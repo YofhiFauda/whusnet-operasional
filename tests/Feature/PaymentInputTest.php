@@ -134,7 +134,7 @@ class PaymentInputTest extends TestCase
             'customer_id' => $invoice->customer_id,
             'pop_id' => $pop->id,
             'payment_date' => '2026-06-13',
-            'payment_method' => 'qris',
+            'payment_method' => 'transfer',
             'amount' => 150000,
             'received_by' => $owner->id,
             'payment_status' => 'valid',
@@ -145,7 +145,7 @@ class PaymentInputTest extends TestCase
         $response->assertOk();
         $response->assertSee('PAY-202606-9001');
         $response->assertSee('INV-202606-8003');
-        $response->assertSee('QRIS');
+        $response->assertSee('TRANSFER');
     }
 
     public function test_user_without_payment_permission_cannot_record_payment(): void

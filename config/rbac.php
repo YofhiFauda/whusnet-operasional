@@ -240,6 +240,9 @@ return [
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
             ActionCode::PRINT->value,
+            // Hapus buku piutang → Tak Tertagih (ADHOC-90). Mengubah angka
+            // Laporan Bulanan Admin Collector, jadi bukan bagian `update`.
+            ActionCode::APPROVE->value,
         ],
 
         'payments' => [
@@ -300,6 +303,14 @@ return [
             // kwitansi tak otomatis berwenang menutup setoran, dan sebaliknya.
             ActionCode::PRINT->value,
             ActionCode::UPLOAD->value,
+            // Admin menyetorkan SELURUH saldo kolektor ke dirinya sendiri —
+            // khusus kolektor yang tak bisa mengakses Worklist-nya sendiri
+            // (HP rusak, cuti mendadak). Pakai action DEPOSIT yang sudah ada
+            // (`kolektor.deposit`), konsisten artinya: "menyerahkan hasil
+            // tagihan", cuma pelakunya berbeda. Permission SENDIRI, terpisah
+            // dari VALIDATE — supaya hak "setor atas nama" bisa dicabut tanpa
+            // ikut mencabut hak cross check & verifikasi setoran.
+            ActionCode::DEPOSIT->value,
         ],
 
         // Setoran Kas Admin — uang kolektor yang sudah diverifikasi + tunai
@@ -324,6 +335,22 @@ return [
             ActionCode::VIEW->value,
             ActionCode::EXPORT->value,
             ActionCode::PRINT->value,
+        ],
+
+        // Laporan Bulanan Admin Collector (ADHOC-90). APPROVE = tutup periode
+        // (dibekukan); CANCEL = buka ulang periode yang sudah ditutup —
+        // sengaja hanya owner (lewat `*`), tidak diberikan ke role lain.
+        'collector_report' => [
+            ActionCode::VIEW->value,
+            ActionCode::EXPORT->value,
+            ActionCode::APPROVE->value,
+            ActionCode::CANCEL->value,
+        ],
+
+        // Laporan Bayar Kolektor — daftar transaksi per kolektor (ADHOC-90).
+        'collector_payment_report' => [
+            ActionCode::VIEW->value,
+            ActionCode::EXPORT->value,
         ],
 
         'audit_logs' => [
@@ -616,6 +643,13 @@ return [
         'sales_omset_dashboard' => [
             ActionCode::VIEW->value,
         ],
+
+        // List Pelanggan Bisnis — daftar pelanggan kategori paket Bisnis
+        // (harga, alat ditinggalkan, biaya instalasi, tgl aktivasi). Cuma
+        // VIEW: murni turunan data pelanggan/paket/gudang, tanpa input manual.
+        'business_customers' => [
+            ActionCode::VIEW->value,
+        ],
     ],
 
     /*
@@ -762,10 +796,19 @@ return [
         'collector_worksheet.approve' => 'Hapus Buku Selisih Setoran (kerugian diakui)',
         'collector_worksheet.print' => 'Cetak Kwitansi Pembayaran (ber-QR)',
         'collector_worksheet.upload' => 'Upload & Cocokkan Kwitansi',
+        'collector_worksheet.deposit' => 'Setor Atas Nama Kolektor (kolektor tidak bisa akses)',
         'cash_deposit.view' => 'Akses Halaman Setoran Kas (Admin)',
         'cash_deposit.create' => 'Menyetorkan Kas ke Owner / Bank',
         'cash_deposit.validate' => 'Periksa & Tutup Setoran Kas Admin',
         'cash_deposit.approve' => 'Tutup Selisih Setoran Kas (kerugian/kelebihan diakui)',
+
+        'invoices.approve' => 'Hapus Buku Piutang (Tak Tertagih)',
+        'collector_report.view' => 'Lihat Laporan Bulanan Admin',
+        'collector_report.export' => 'Ekspor Laporan Bulanan Admin ke Excel',
+        'collector_report.approve' => 'Tutup Periode Pembukuan (Bekukan Angka Bulanan)',
+        'collector_report.cancel' => 'Buka Ulang Periode Pembukuan yang Sudah Ditutup',
+        'collector_payment_report.view' => 'Lihat Laporan Bayar Kolektor (tabel bayar per kolektor)',
+        'collector_payment_report.export' => 'Ekspor Laporan Bayar Kolektor ke Excel',
 
         // Skema 1-3 Business Development (2026-09-12)
         'agents.view' => 'Lihat Master Agent',
@@ -774,5 +817,6 @@ return [
         'package_restrictions.view' => 'Lihat Restriksi Paket per Role',
         'package_restrictions.update' => 'Atur Daftar Paket Restriksi',
         'sales_omset_dashboard.view' => 'Lihat Dashboard Omset Sales',
+        'business_customers.view' => 'Lihat List Pelanggan Bisnis',
     ],
 ];

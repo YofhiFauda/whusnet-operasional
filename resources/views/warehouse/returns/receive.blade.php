@@ -53,7 +53,7 @@
                 <option value="{{ $item->id }}" @selected((string) old('item_id') === (string) $item->id)>{{ $item->name }}</option>
                 @endforeach
             </select>
-            <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Isi kalau modem tercatat sebagai "Modem Legacy" atau salah model.</p>
+            <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Isi kalau modem tercatat sebagai "Modem Pelanggan Lama" atau salah model.</p>
             @if($legacyHint && $legacyHint['label'])
             <p class="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
                 Data lama pelanggan mencatat perangkat: "{{ $legacyHint['label'] }}"

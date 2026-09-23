@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabel Paket Bisnis</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar for Table */
+        .table-scroll::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .table-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .table-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header & Stats -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">Manajemen Paket Bisnis</h1>
+                <p class="text-slate-500 text-sm mt-1">Sistem pencatatan dan monitoring aktivasi layanan pelanggan</p>
+            </div>
+            <button onclick="toggleModal(true)" class="inline-flex items-center justify-center px-4 py-2.5 bg-brand-700 hover:bg-brand-800 text-white font-medium rounded-xl transition duration-200 shadow-sm shadow-brand-700/30 gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Tambah Pelanggan
+            </button>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div class="flex flex-col sm:flex-row gap-3 justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div class="relative w-full sm:w-80">
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Cari nama pelanggan / alat..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent">
+                <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            <div class="text-xs text-slate-500 font-medium self-end sm:self-center">
+                Total Data: <span id="totalRows" class="font-bold text-slate-700">7</span> Pelanggan
+            </div>
+        </div>
+
+        <!-- Main Table Card -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto table-scroll">
+                <table class="w-full text-left text-xs whitespace-nowrap" id="businessTable">
+                    <thead>
+                        <tr class="bg-brand-900 text-white font-semibold uppercase tracking-wider">
+                            <th class="py-3.5 px-4 text-center border-b border-brand-800">NO</th>
+                            <th class="py-3.5 px-4 border-b border-brand-800">NAMA PELANGGAN</th>
+                            <th class="py-3.5 px-4 border-b border-brand-800">TIPE PAKET</th>
+                            <th class="py-3.5 px-4 border-b border-brand-800">HARGA PAKET</th>
+                            <th class="py-3.5 px-4 border-b border-brand-800">HARGA (PPN)</th>
+                            <th class="py-3.5 px-4 border-b border-brand-800 text-center">STATUS</th>
+                            <th class="py-3.5 px-4 border-b border-brand-800">ALAT YANG DITINGGALKAN</th>
+                            <th class="py-3.5 px-4 border-b border-brand-800">BIAYA INSTALASI</th>
+                            <th class="py-3.5 px-4 border-b border-brand-800">TANGGAL AKTIVASI</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200" id="tableBody">
+                        <!-- Row 1 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 text-center font-medium text-slate-500">1</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">PT. ANJALIS GROUP INDONESIA</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-full font-semibold text-[11px]">BROADBAND BISNIS</span>
+                            </td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp5.500.000,00</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp5.500.000,00</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="px-2.5 py-1 bg-purple-900 text-white rounded-md font-semibold text-[10px] tracking-wide">SUDAH SELESAI</span>
+                            </td>
+                            <td class="py-3 px-4 text-slate-600 max-w-xs truncate" title="1pcs ONT F670L, 1pcs Mikrotik L009UiGS, 3 pcs TpLink Omada AX1800">
+                                1pcs ONT F670L, 1pcs Mikrotik L009UiGS, 3 pcs TpLink Omada AX1800
+                            </td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp2.500.000,00</td>
+                            <td class="py-3 px-4 text-slate-600">7 Mei 2026</td>
+                        </tr>
+                        <!-- Row 2 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 text-center font-medium text-slate-500">2</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">KOS THE COZY (DUTA MAHARDIKA)</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-full font-semibold text-[11px]">BROADBAND BISNIS</span>
+                            </td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp1.190.000,00</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp1.190.000,00</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="px-2.5 py-1 bg-purple-900 text-white rounded-md font-semibold text-[10px] tracking-wide">SUDAH SELESAI</span>
+                            </td>
+                            <td class="py-3 px-4 text-slate-600">6 AP FiberHome</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp0,00</td>
+                            <td class="py-3 px-4 text-slate-600">12 Mei 2026</td>
+                        </tr>
+                        <!-- Row 3 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 text-center font-medium text-slate-500">3</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">WARUNG KOPI CANGKIR KUMPUL</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold text-[11px]">BISNIS KECIL/UKM</span>
+                            </td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp390.000,00</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp433.000,00</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="px-2.5 py-1 bg-purple-900 text-white rounded-md font-semibold text-[10px] tracking-wide">SUDAH SELESAI</span>
+                            </td>
+                            <td class="py-3 px-4 text-slate-600">1 ONT F670L, 1 AP archer ax 12</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp0,00</td>
+                            <td class="py-3 px-4 text-slate-600">20 Mei 2026</td>
+                        </tr>
+                        <!-- Row 4 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 text-center font-medium text-slate-500">4</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">TEDUH ALAMI RESTO FAMILY & CAFE</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold text-[11px]">BISNIS KECIL/UKM</span>
+                            </td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp390.000,00</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp433.000,00</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="px-2.5 py-1 bg-purple-900 text-white rounded-md font-semibold text-[10px] tracking-wide">SUDAH SELESAI</span>
+                            </td>
+                            <td class="py-3 px-4 text-slate-600">1 ONT F670L, 1 TpLink Omada AX1800</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp0,00</td>
+                            <td class="py-3 px-4 text-slate-600">15 Mei 2026</td>
+                        </tr>
+                        <!-- Row 5 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 text-center font-medium text-slate-500">5</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">SPPG BALONG</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold text-[11px]">BISNIS KECIL/UKM</span>
+                            </td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp390.000,00</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp433.000,00</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="px-2.5 py-1 bg-purple-900 text-white rounded-md font-semibold text-[10px] tracking-wide">SUDAH SELESAI</span>
+                            </td>
+                            <td class="py-3 px-4 text-slate-600">2 ONT F670L</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp250.000,00</td>
+                            <td class="py-3 px-4 text-slate-600">12 Mei 2026</td>
+                        </tr>
+                        <!-- Row 6 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 text-center font-medium text-slate-500">6</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">SAVE PLUS GREBEG SURO</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-full font-semibold text-[11px]">BROADBAND BISNIS</span>
+                            </td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp1.500.000,00</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp1.665.000,00</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="px-2.5 py-1 bg-purple-900 text-white rounded-md font-semibold text-[10px] tracking-wide">SUDAH SELESAI</span>
+                            </td>
+                            <td class="py-3 px-4 text-slate-600">1 ONT F670 (sudah didismantle)</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp500.000,00</td>
+                            <td class="py-3 px-4 text-slate-600">6 Juni 2026</td>
+                        </tr>
+                        <!-- Row 7 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 text-center font-medium text-slate-500">7</td>
+                            <td class="py-3 px-4 font-bold text-slate-900">TAMAN JATIMORI</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold text-[11px]">BISNIS KECIL/UKM</span>
+                            </td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp250.000,00</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp277.500,00</td>
+                            <td class="py-3 px-4 text-center">
+                                <span class="px-2.5 py-1 bg-purple-900 text-white rounded-md font-semibold text-[10px] tracking-wide">SUDAH SELESAI</span>
+                            </td>
+                            <td class="py-3 px-4 text-slate-600">1 AP WiFi6</td>
+                            <td class="py-3 px-4 font-medium text-slate-700">Rp500.000,00</td>
+                            <td class="py-3 px-4 text-slate-600">13 Agustus 2026</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Form Tambah Data -->
+    <div id="addModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden flex justify-center items-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-800 text-lg">Tambah Data Pelanggan Baru</h3>
+                <button onclick="toggleModal(false)" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form id="newCustomerForm" onsubmit="addRow(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Nama Pelanggan</label>
+                    <input type="text" id="inputNama" required class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600 outline-none">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-medium text-slate-700 mb-1">Tipe Paket</label>
+                        <select id="inputTipe" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600 outline-none">
+                            <option value="BROADBAND BISNIS">BROADBAND BISNIS</option>
+                            <option value="BISNIS KECIL/UKM">BISNIS KECIL/UKM</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700 mb-1">Harga Paket (Rp)</label>
+                        <input type="number" id="inputHarga" required placeholder="500000" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600 outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-medium text-slate-700 mb-1">Biaya Instalasi (Rp)</label>
+                        <input type="number" id="inputInstalasi" required placeholder="0" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700 mb-1">Tanggal Aktivasi</label>
+                        <input type="text" id="inputTanggal" placeholder="12 Mei 2026" required class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Alat Yang Ditinggalkan</label>
+                    <textarea id="inputAlat" rows="2" placeholder="1 ONT F670L..." class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600 outline-none"></textarea>
+                </div>
+
+                <div class="pt-3 flex justify-end gap-2">
+                    <button type="button" onclick="toggleModal(false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium transition">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-lg font-medium transition">Simpan Data</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleModal(show) {
+            const modal = document.getElementById('addModal');
+            if (show) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function filterTable() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#tableBody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(input) ? '' : 'none';
+            });
+        }
+
+        function formatRupiah(number) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(number).replace('Rp', 'Rp');
+        }
+
+        function addRow(e) {
+            e.preventDefault();
+            
+            const tbody = document.getElementById('tableBody');
+            const rowCount = tbody.children.length + 1;
+            
+            const nama = document.getElementById('inputNama').value;
+            const tipe = document.getElementById('inputTipe').value;
+            const harga = parseFloat(document.getElementById('inputHarga').value) || 0;
+            const instalasi = parseFloat(document.getElementById('inputInstalasi').value) || 0;
+            const tanggal = document.getElementById('inputTanggal').value;
+            const alat = document.getElementById('inputAlat').value || '-';
+
+            // Hitung estimasi PPN (11% jika UKM)
+            const hargaPPN = tipe === 'BISNIS KECIL/UKM' ? harga * 1.11 : harga;
+
+            const badgeClass = tipe === 'BROADBAND BISNIS' 
+                ? 'bg-sky-100 text-sky-800' 
+                : 'bg-purple-100 text-purple-800';
+
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 transition';
+            tr.innerHTML = `
+                <td class="py-3 px-4 text-center font-medium text-slate-500">${rowCount}</td>
+                <td class="py-3 px-4 font-bold text-slate-900">${nama.toUpperCase()}</td>
+                <td class="py-3 px-4">
+                    <span class="px-2.5 py-1 ${badgeClass} rounded-full font-semibold text-[11px]">${tipe}</span>
+                </td>
+                <td class="py-3 px-4 font-medium text-slate-700">${formatRupiah(harga)}</td>
+                <td class="py-3 px-4 font-medium text-slate-700">${formatRupiah(hargaPPN)}</td>
+                <td class="py-3 px-4 text-center">
+                    <span class="px-2.5 py-1 bg-purple-900 text-white rounded-md font-semibold text-[10px] tracking-wide">SUDAH SELESAI</span>
+                </td>
+                <td class="py-3 px-4 text-slate-600 max-w-xs truncate" title="${alat}">${alat}</td>
+                <td class="py-3 px-4 font-medium text-slate-700">${formatRupiah(instalasi)}</td>
+                <td class="py-3 px-4 text-slate-600">${tanggal}</td>
+            `;
+
+            tbody.appendChild(tr);
+            document.getElementById('totalRows').innerText = rowCount;
+            document.getElementById('newCustomerForm').reset();
+            toggleModal(false);
+        }
+    </script>
+</body>
+</html>

@@ -155,6 +155,83 @@ class CollectorWorksheetTest extends TestCase
     }
 
     /**
+     * `invoice_search` tab Pembayaran — cross check admin butuh cari satu
+     * pelanggan tertentu dari ratusan tunggakan kolektor tanpa scroll seluruh
+     * daftar. Nama DAN CID keduanya harus bisa jadi kata kunci.
+     */
+    public function test_pembayaran_tab_invoice_search_filters_by_name_and_cid(): void
+    {
+        $pop = $this->createPop('HUB9');
+        $admin = $this->createAdmin($pop);
+        $kolektor = $this->createKolektorWithScope($pop);
+
+        $package = InternetPackage::query()->firstOrFail();
+
+        $budi = $this->createCustomer($pop, 'C-HUB-BUDI', $kolektor->id);
+        $budi->update(['full_name' => 'Budi Santoso', 'cid' => 'CIDBUDI01']);
+        $siti = $this->createCustomer($pop, 'C-HUB-SITI', $kolektor->id);
+        $siti->update(['full_name' => 'Siti Aminah', 'cid' => 'CIDSITI01']);
+
+        foreach ([$budi, $siti] as $customer) {
+            $service = CustomerService::create([
+                'customer_id' => $customer->id,
+                'internet_package_id' => $package->id,
+                'package_name_snapshot' => $package->name,
+                'monthly_price' => 150000,
+                'discount' => 0,
+                'ppn' => 0,
+                'total_monthly_bill' => 150000,
+                'activation_date' => '2026-06-01',
+                'due_date' => '2026-06-15',
+                'service_status' => 'aktif',
+                'billing_status' => 'active',
+            ]);
+            Invoice::create([
+                'invoice_number' => 'INV-HUB-'.$customer->id,
+                'invoice_type' => 'bulanan',
+                'customer_id' => $customer->id,
+                'pop_id' => $pop->id,
+                'customer_service_id' => $service->id,
+                'internet_package_id' => $package->id,
+                'billing_period' => '2026-06',
+                'issue_date' => '2026-06-01',
+                'due_date' => '2026-06-15',
+                'subtotal' => 150000,
+                'discount' => 0,
+                'ppn' => 0,
+                'total_amount' => 150000,
+                'paid_amount' => 0,
+                'remaining_amount' => 150000,
+                'invoice_status' => 'belum_dibayar',
+            ]);
+        }
+
+        // Cari lewat nama.
+        $byName = $this->actingAs($admin)->get(route('collector-worksheet.show', [
+            'collector' => $kolektor->id, 'tab' => 'pembayaran', 'invoice_search' => 'Budi',
+        ]));
+        $byName->assertOk();
+        $byName->assertSee('Budi Santoso');
+        $byName->assertDontSee('Siti Aminah');
+
+        // Cari lewat CID.
+        $byCid = $this->actingAs($admin)->get(route('collector-worksheet.show', [
+            'collector' => $kolektor->id, 'tab' => 'pembayaran', 'invoice_search' => 'CIDSITI01',
+        ]));
+        $byCid->assertOk();
+        $byCid->assertSee('Siti Aminah');
+        $byCid->assertDontSee('Budi Santoso');
+
+        // Tanpa filter, keduanya tampil.
+        $noFilter = $this->actingAs($admin)->get(route('collector-worksheet.show', [
+            'collector' => $kolektor->id, 'tab' => 'pembayaran',
+        ]));
+        $noFilter->assertOk();
+        $noFilter->assertSee('Budi Santoso');
+        $noFilter->assertSee('Siti Aminah');
+    }
+
+    /**
      * Panel kanan index cuma boleh memuat pelanggan tanpa kolektor DAN dalam
      * POP scope admin. Tanpa applyUserScope() panel ini jadi jalur bocor
      * paling gampang: isinya "semua pelanggan yang belum di-assign", lintas

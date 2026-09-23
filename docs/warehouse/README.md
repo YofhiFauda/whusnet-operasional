@@ -19,6 +19,7 @@ Salah catat dilawan dengan baris koreksi baru (`ADJUSTMENT`/`STOCK_OPNAME`), buk
 | `InventoryTransfer` | `inventory_transfers` | Header mutable Transfer Pusat→Cabang (2 fase) |
 | `TechnicianCustody` | `technician_custody` | Custody barang QUANTITY yang dipegang teknisi |
 | `StockRequest` / `StockRequestItem` | `stock_requests`, `stock_request_items` | Tiket permintaan stok Cabang→Pusat (bukan ledger) |
+| `DeviceRetrievalLog` | `device_retrieval_logs` | Jejak pengambilan modem dari pelanggan, satu baris per SN (teknisi pengambil, penerima gudang, transit/diterima) — ADHOC-86/88, lihat [business-logic.md §12a](business-logic.md#12a-ambil-modem-deac--terima-retur-adhoc-86) |
 
 Gudang **direpresentasikan lewat `pops`** (`type` = `pusat`/`cabang`) — sengaja tidak ada tabel `warehouses` terpisah.
 
@@ -26,7 +27,7 @@ Gudang **direpresentasikan lewat `pops`** (`type` = `pusat`/`cabang`) — sengaj
 
 - **Admin Gudang Pusat** — Receive (barang masuk dari distributor), dispatch Transfer ke Cabang, kelola Stock Request masuk.
 - **Admin Gudang Cabang** (`pop_admin`, scoped ke POP-nya) — confirm Transfer, Issue ke teknisi, adjustment/opname, reassign custody, ajukan Stock Request ke Pusat.
-- **Teknisi** — pemegang custody (tidak punya akses UI Gudang); custody-nya dikonsumsi otomatis lewat integrasi ke Task Teknisi (`InventoryService::consumeFromCustody()` / `installSerial()`) saat submit laporan pemasangan/maintenance.
+- **Teknisi** — pemegang custody (tidak punya akses UI Gudang); custody-nya dikonsumsi otomatis lewat integrasi ke Task Teknisi (`InventoryService::consumeFromCustody()` / `installSerial()`) saat submit laporan pemasangan/maintenance. Pada task **Ambil Modem (DEAC)** teknisi menginput SN modem yang dicabut lewat form laporan khusus; modem itu jadi `RETURNED` (transit) sampai gudang cabang menerimanya (§12a).
 - **Owner/atasan** — dashboard KPI, laporan, traceability lintas cabang (kalau scope-nya `all_pop`).
 
 ## Entry Point per Peran
@@ -39,7 +40,10 @@ Gudang **direpresentasikan lewat `pops`** (`type` = `pusat`/`cabang`) — sengaj
 - Adjustment: `warehouse.adjustments.{balance,opname,custody,serial}.create`
 - Reassign custody: `warehouse.reassign.{custody,serial}.create`
 - Permintaan Stok Cabang→Pusat: `warehouse.stock-requests.*`
-- Custody aktif (read-only): `warehouse.custody.index`
+- Custody aktif (read-only): `warehouse.custody.index` — termasuk tab **Return dari Pelanggan** (modem transit di tangan teknisi)
+- Terima Retur (konfirmasi modem hasil task Ambil Modem): `warehouse.returns.index` → `warehouse.returns.receive.create`
+- Terima modem dari pelanggan (diantar sendiri, tanpa task): `warehouse.returns.from-customer.create`
+- Riwayat Pengambilan Alat (log teknisi per SN): `warehouse.retrievals.index`
 - Traceability per SN: `warehouse.traceability.index`
 - Riwayat ledger: `warehouse.history.index`
 - Laporan bulanan: `warehouse.reports.index`

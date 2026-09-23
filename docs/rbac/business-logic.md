@@ -51,6 +51,20 @@ Studi kasus: fitur "Ambil Alat" di List Putus Langganan (`CustomerController::re
 
 Role yang di-assign buat `customers.detail.devices.retrieve`: `admin`, `noc`, `fop` (eksplisit) + `pop_admin` (otomatis lewat wildcard `customers.detail.*`, gak perlu eksplisit) + `owner` (bypass `*`, gak lewat DB). `teknisi`/`sales`/`atasan`/`helpdesk` sengaja TIDAK dapet — Ambil Alat itu keputusan admin/FOP/NOC, bukan kerjaan teknisi lapangan atau sales.
 
+**Permission alur pengambilan modem (ADHOC-86/88, 2026-09-21) — SENGAJA tidak menambah feature/permission baru**, semuanya reuse yang sudah ada supaya tidak menambah baris di Role Matrix:
+
+| Aksi | Route | Permission | Catatan |
+|---|---|---|---|
+| Tombol Ambil Alat (membuat task DEAC) | `customers.retrieve-device` | `customers.detail.devices.retrieve` | tidak berubah |
+| Teknisi mengisi Laporan Ambil Alat | `tasks.device-retrieval.{report,store}` | policy `TaskPolicy::statusComplete` (anggota tim task) | sama seperti laporan Maintenance |
+| Terima Retur (konfirmasi gudang) | `warehouse.returns.*` | `warehouse_reassign.create` | satu payung dengan "Sudah Dicek" & Reassign (keputusan user 2026-09-19); scope POP lewat gudang tujuan |
+| Terima modem dari pelanggan (tanpa task) | `warehouse.returns.from-customer.*` | `warehouse_reassign.create` | hanya pelanggan `terminated` dalam scope POP |
+| Riwayat Pengambilan Alat | `warehouse.retrievals.index` | `warehouse.view` | view-only, scope POP gudang tujuan |
+| Tab "Return dari Pelanggan" | `warehouse.custody.index` | `warehouse_custody.view` | tombol Terima hanya tampil untuk `warehouse_reassign.create` |
+| Kartu riwayat di Detail Pelanggan | tab Perangkat | `customers.detail.devices.view` | |
+
+Konsekuensinya: siapa pun yang boleh **Reassign** custody otomatis boleh **Terima Retur** dan **Terima modem dari pelanggan**. Kalau kelak perlu dipisah (mis. hanya staf yang menerima fisik), tambahkan feature baru lewat `features` × `actions` (langkah §3.1) — bukan hardcode role.
+
 ## 4. Precedence Cek Permission (`EffectiveAccessService::userCan()`)
 
 Urutan match, berhenti di match pertama:

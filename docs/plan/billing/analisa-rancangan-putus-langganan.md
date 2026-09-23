@@ -1,6 +1,6 @@
 # Analisa & Rancangan: Putus Langganan (Termination)
 
-**Status:** Terbuka — analisa selesai 2026-09-15, implementasi belum mulai. Di luar sprint aktif, dicatat sebagai ADHOC-69 di `docs/TASKS.md`.
+**Status:** Terbuka — analisa selesai 2026-09-15, direvisi 2026-09-22 (aturan denda + kolom siapa-registrasi diklarifikasi ulang user, lihat §2.1/§2.2), implementasi belum mulai. Di luar sprint aktif, dicatat sebagai ADHOC-69 di `docs/TASKS.md`.
 
 **Sumber ide awal:** `docs/plan/billing/skema-putus-langganan.md` (skema dari user). Dokumen ini hasil review + gap analysis terhadap kode nyata + rancangan implementasi + keputusan hasil diskusi.
 
@@ -26,22 +26,31 @@ Skema (invoice + denda terbit otomatis saat putus, kolom "siapa yang registrasi"
 
 > **Revisi 2026-09-19:** rancangan sebelumnya memakai `InvoiceType::INSIDENTAL` + `ManualInvoiceService`/`InvoiceItemBuilder` (kode lama ADHOC-60). **Tidak dipakai** — instruksi user. Taksonomi jenis tagihan sekarang (dikonfirmasi user): Aktivasi, Bulanan, Reaktivasi, dan Tagihan Manual (Perbaikan / Lainnya dengan sub diketik / Pindah Lokasi) — lihat `analisa-rancangan-tagihan-manual.md` §3.2. Putus langganan **tidak punya jenis sendiri** di daftar itu, jadi bentuk invoicenya belum diputuskan. **KEPUTUSAN 2026-09-19 (user): denda = Tagihan Manual, jenis Lainnya, sub "Denda Putus Langganan"** (`InvoiceType::MANUAL` rancangan `analisa-rancangan-tagihan-manual.md` §3.2–§3.3, di luar `SUBSCRIPTION_TYPES` sehingga tidak bentrok dengan `rejectSecondSubscriptionInvoice()` walau terbit di periode yang sama dengan tagihan Bulanan). Konsekuensi:
 > - **Sub-nama diisi sistem, bukan diketik.** Di form Tagihan Manual jenis Lainnya, sub diketik bebas oleh admin; untuk denda putus langganan nilainya konstanta "Denda Putus Langganan" yang diisi Service. Pakai satu konstanta bersama, jangan diketik ulang di dua tempat, supaya laporan yang mengelompokkan per sub tidak terpecah oleh salah ketik.
-> - **Bergantung pada ADHOC-70 (Tagihan Manual).** `InvoiceType::MANUAL`, enum jenis, dan kolom penyimpanan jenis/sub/deskripsi **belum ada di kode**. Bagian denda ADHOC-69 tidak bisa diimplementasi sebelum itu ada; bagian lain (master alasan, kolom "didaftarkan oleh", aturan ≤/> 1 tahun) tidak bergantung dan boleh jalan duluan.
+> - **Bergantung pada ADHOC-70 (Tagihan Manual).** `InvoiceType::MANUAL`, enum jenis, dan kolom penyimpanan jenis/sub/deskripsi **belum ada di kode**. Bagian denda ADHOC-69 tidak bisa diimplementasi sebelum itu ada. **Keputusan urutan kerja (user, 2026-09-22): ADHOC-69 dikerjakan utuh SEKALIGUS setelah ADHOC-70 kelar** — bukan dipecah, walau secara teknis bagian master alasan/kolom siapa-registrasi/aturan ≤1 tahun sendiri tidak bergantung ADHOC-70 dan bisa saja jalan lebih dulu. Alasan: satu fitur, satu rilis, hindari List Putus tampil separuh-jadi (alasan & kolom siapa sudah ada tapi denda belum bisa disubmit).
 > - **Tidak ada pembayaran saat terbit.** Rancangan Tagihan Manual §3.4 membuat Invoice **dan** Payment dalam satu submit (bayar langsung). Denda putus langganan justru tagihan yang belum dibayar: terbit `belum_dibayar`, ditagih kemudian. Jadi lapisan Service pembuat invoice manual **harus bisa jalan tanpa Payment** (pembayaran opsional di level Service, wajib hanya di form `/invoices/create`), bukan memaksa denda lewat alur bayar-langsung. Ini perlu masuk ke rancangan ADHOC-70 sebelum ia dikodekan, supaya tidak perlu dirombak.
 >
 > **KEPUTUSAN 2026-09-19 (user): pelanggan putus langganan TIDAK dikenai prorate.** Yang berarti:
-> - Invoice Bulanan periode berjalan (terbit penuh tiap tanggal 1 oleh `billing:generate-monthly-invoices`) **dibiarkan apa adanya** — tidak dihitung ulang, tidak dibatalkan, tidak diganti. Pelanggan yang putus tanggal 15 tetap menanggung satu bulan penuh.
-> - Tidak ada invoice pemakaian baru saat putus. **Satu-satunya invoice yang lahir dari putus langganan adalah denda** (§3.1), dan hanya kalau nominalnya > 0.
+> - Invoice Bulanan periode berjalan (terbit penuh tiap tanggal 1 oleh `billing:generate-monthly-invoices`) **dibiarkan apa adanya** — tidak dihitung ulang, tidak dibatalkan, tidak diganti. Pelanggan yang putus tanggal 15 tetap menanggung satu bulan penuh (**"pemakaian bulan berjalan"** — istilah dari `skema-putus-langganan.md` bullet 1, dikonfirmasi user 2026-09-22 maksudnya invoice Bulanan biasa ini, **bukan** invoice prorate baru).
 > - Pertanyaan terbuka sebelumnya ("hitung ulang atau terbit invoice baru", risiko tagih dobel) **gugur**: tidak ada perhitungan ulang, jadi tidak ada kelebihan bayar, tidak ada keputusan deposit/refund, dan tidak ada soal siapa berhak mengubah nominal tagihan terbit.
-> - Prorate hanya berlaku di upgrade/downgrade paket. Tidak ada helper prorate bersama.
+> - Prorate hanya berlaku di upgrade/downgrade paket (ADHOC-68). Tidak ada helper prorate bersama — dua rancangan ini sengaja terpisah (dikonfirmasi ulang user 2026-09-22, sempat disangka tercampur).
 >
 > **Batasan yang perlu diketahui:** pelanggan aktif yang periode berjalannya *belum* punya invoice (cron tanggal 1 gagal/terlewat, atau `--period` belum ditambal) lalu diputus **tidak akan tertagih pemakaian bulan itu sama sekali** — sebelumnya rancangan prorate menutup celah ini. Diterima sebagai konsekuensi keputusan; penangkalnya operasional (pastikan cron tanggal 1 jalan), bukan kode putus langganan.
+>
+> **KEPUTUSAN 2026-09-22 (user, menggantikan sebagian §3.1 lama): denda cuma berlaku untuk pelanggan dengan masa langganan ≤ 1 tahun/12 bulan.** Pelanggan masa langganan **> 1 tahun tidak dikenakan denda sama sekali** — apapun alasan putusnya, tidak ada invoice denda yang terbit, cukup invoice pemakaian bulan berjalan (poin di atas) yang tetap jalan seperti biasa. Ini **bukan** cuma soal "default alasan tidak dipakai" seperti keputusan 2026-09-15 sebelumnya (§3.1a lama) — sekarang ambang 1 tahun menentukan **ada/tidaknya** denda, bukan cuma sumber nominalnya. Detail & konsekuensi ke `default_penalty_amount`: §3.1 (direvisi).
 
-### 2.2 Kolom "pelanggan siapa" belum ditampilkan
+### 2.2 Kolom "pelanggan siapa" belum ditampilkan (koreksi 2026-09-22: kolomnya sudah ada, tinggal ditampilkan)
 
-`customers.created_by` sudah ada (dipakai `CustomerTerminationController.php:64` untuk notif internal), tapi tidak pernah muncul sebagai kolom di List Putus (`resources/views/customers/terminated.blade.php`). Perlu ditambahkan.
+**Revisi total dari analisa 2026-09-15.** Klaim sebelumnya di dokumen ini ("sistem cuma punya `created_by` tunggal, tidak ada `sales_id`/`teknisi_id` terpisah") **salah** — sudah ketinggalan zaman saat ditulis. Dicek ulang 2026-09-22:
 
-**Catatan:** sistem cuma punya `created_by` tunggal — tidak ada kolom `sales_id`/`teknisi_id` terpisah di `customers` maupun `CustomerAcquisition`. Kalau "siapa yang registrasi" cukup diwakili satu orang (siapa yang input data awal pelanggan), `created_by` sudah cukup. Kalau perlu breakdown Sales vs Teknisi Survei sebagai dua peran berbeda, itu perubahan skema data lebih besar di luar scope putus-langganan — **belum diputuskan, dianggap `created_by` cukup untuk sekarang** kecuali user bilang lain.
+- **Sales** — `customers.sales_user_id` (FK ke `users`, nullable) sudah ada sejak migration `2026_09_12_090115_add_sales_agent_referral_fk_to_customers_table.php`. Komentar migration eksplisit bilang kolom ini **memang dirancang untuk hitung komisi** ("ID Sales/Agent/Referral naik level dari varchar bebas jadi FK asli, supaya bisa dipakai hitung komisi & agregasi omset") — persis kebutuhan yang disebut user (2026-09-22): "yang registrasinya perlu ditrace ... karena untuk komisi". Autofill dari user login kalau yang input Sales sendiri.
+- **Teknisi Survei** — `customer_surveys.technician_id` (+ `surveyor_2_id`/`surveyor_3_id` untuk tim multi-petugas, `app/Models/CustomerSurvey.php`) sudah ada sejak S9-T002 (`docs/TASKS.md`).
+
+**Klarifikasi user (2026-09-22):** kolom "siapa yang registrasi" **bukan** permintaan tambah field baru — user cuma menunjuk 2 pihak yang **saat ini** perlu ditrace demi komisi (Sales & Teknisi Survei). Kalau nanti nambah pihak lain yang perlu ditrace, itu perubahan terpisah di luar scope ADHOC-69 (bukan didesain sekarang, biar tidak overengineered).
+
+**Konsekuensi ke rancangan:** tidak perlu kolom baru, tidak perlu migrasi skema tambahan untuk kebutuhan ini. Cukup:
+1. List Putus (`resources/views/customers/terminated.blade.php` / `RendersCustomerList.php`) menampilkan `customer->salesUser->name` (relasi `Customer::salesUser()`, `Customer.php:134`) dan teknisi survei dari `customer->latestSurvey->technician->name` (relasi `Customer::latestSurvey()` `:465` → `CustomerSurvey::technician()` `:68`, ambil survei terbaru; survei tim 1-3 petugas, tampilkan minimal petugas utama `technician_id`; detail lengkap tim tetap ada di tab Survey Detail Pelanggan, tidak perlu diduplikasi ke List Putus).
+2. `created_by` (dipakai sebelumnya di §2.2 lama untuk notif internal, `CustomerTerminationController.php:64`) **tetap dipertahankan apa adanya** untuk keperluan notifikasi — bukan diganti, cuma bukan lagi satu-satunya sumber "siapa yang registrasi" di tampilan List Putus.
+3. Query List Putus perlu eager-load relasi sales & survey (`with(['salesUser', 'latestSurvey.technician'])`) supaya tidak N+1 — cek pola eager-load existing di `RendersCustomerList.php`.
 
 ### 2.3 Alasan putus = teks bebas di AuditLog, bukan master data
 
@@ -55,30 +64,22 @@ Skema (invoice + denda terbit otomatis saat putus, kolom "siapa yang registrasi"
 
 ## 3. Keputusan (2026-09-15)
 
-### 3.1 Denda: manual bebas + default per alasan
+### 3.1 Denda: cuma untuk masa langganan ≤ 1 tahun, manual dengan prefill opsional (direvisi 2026-09-22)
 
-Setiap `CustomerTerminationReason` punya kolom `default_penalty_amount` (nullable/0 = tidak ada default). Saat form putus langganan dibuka, nominal denda **di-prefill** dari default alasan yang dipilih, tapi **admin tetap bisa mengubahnya manual** sebelum submit (bukan dikunci). Field submit tetap satu: nominal denda final (apapun asalnya, default terpakai atau override manual) — sistem tidak perlu tahu/membedakan "ini default" vs "ini override" di baris invoice, cukup catat nominal final yang terbit.
+> **Revisi total 2026-09-22.** Versi 2026-09-15 di bawah ini salah kerangka: menganggap ambang 1 tahun cuma menentukan *sumber nominal* (default vs manual), padahal keputusan user (§2.1) adalah ambang 1 tahun menentukan **ada/tidaknya denda itu sendiri**. Aturan final:
 
-Behavior spesifik: alasan "Kompetitor" defaultnya bisa diisi X rupiah (denda kontrak), alasan "Meninggal" defaultnya 0 (gratis) — keduanya cuma beda nilai default di master, mekanismenya sama.
+- **Masa langganan** = `customer_services.activation_date` s.d. tanggal putus diajukan (hari form putus disubmit). Tepat 1 tahun **masih** dianggap ≤ 1 tahun (inklusif). `activation_date` NULL (data legacy/belum lengkap) → **diperlakukan ≤ 1 tahun** (jalur paling aman, sistem tidak menagih/membebaskan otomatis dari data yang tidak lengkap).
+- **Masa ≤ 1 tahun** → denda **berlaku**. Nominal **wajib diisi manual** oleh admin/CS saat submit (angka 0 sah — artinya sengaja dibebaskan meski eligible — tapi field tidak boleh kosong). Form boleh **prefill** nominal dari `default_penalty_amount` alasan terpilih sebagai titik awal (kenyamanan UI, JS ringan), tapi admin tetap **wajib mengonfirmasi/mengubahnya** sebelum submit — bukan langsung terpakai tanpa disentuh. Field submit tetap satu: nominal denda final, sistem tidak perlu tahu/membedakan "ini dari prefill" vs "ini diketik ulang".
+- **Masa > 1 tahun** → **denda tidak berlaku sama sekali**. Form putus langganan **tidak menampilkan field nominal denda** untuk kasus ini (bukan field kosong/nonaktif — dihilangkan, supaya admin tidak mengira masih bisa diisi). Tidak ada invoice denda yang terbit, apapun alasan putusnya.
+- Batas 1 tahun dihitung di **server** (Service), bukan cuma di JS form — kalau JS form menyimpang (mis. race, bug tampilan), server yang menang dan menolak nominal denda untuk pelanggan > 1 tahun.
 
-#### 3.1a Masa langganan ≤ 1 tahun: default denda alasan TIDAK dipakai (aturan tambahan, 2026-09-19)
-
-Sumber: bullet ke-4 `docs/plan/billing/skema-putus-langganan.md`. Aturan ini **menggantikan** prefill §3.1 untuk pelanggan yang putus dini — bukan tambahan di atas denda alasan.
-
-- **Masa langganan** = `customer_services.activation_date` s.d. tanggal putus diajukan (hari form putus disubmit).
-- **Masa ≤ 1 tahun** → `default_penalty_amount` alasan **tidak** di-prefill dan **tidak** dipakai sebagai nilai otomatis; admin/CS mengisi nominal denda manual per kasus saat submit.
-- **Masa > 1 tahun** → perilaku §3.1 tetap (prefill dari default alasan, boleh di-override).
-- Batas dihitung di **server** (Service), bukan cuma di JS form — prefill di form hanya kenyamanan UI. Kalau dua sisi menyimpang, server yang menang.
-- Konsekuensi ke master: `default_penalty_amount` sekarang efektif cuma berlaku untuk pelanggan > 1 tahun. Label field di form Master Alasan perlu jelas soal ini supaya admin tidak mengira default itu selalu terpakai.
-
-**Keputusan (user, 2026-09-19):**
-1. Masa langganan dihitung `activation_date` → tanggal putus diajukan; tepat 1 tahun **masih** dianggap ≤ 1 tahun (inklusif, sesuai teks "≤ 1 tahun").
-2. Masa ≤ 1 tahun → nominal denda **wajib diisi manual** (angka 0 sah, tapi tidak boleh kosong). Masa > 1 tahun → tidak wajib manual, default alasan dipakai (§3.1).
-3. `activation_date` NULL (data legacy/belum lengkap) → **diperlakukan ≤ 1 tahun** (manual). Alasan: jalur paling aman, sistem tidak menagih otomatis dari data yang tidak lengkap.
+**Konsekuensi ke `default_penalty_amount` di master alasan:** kolom ini **dipertahankan** di skema (§4.1), tapi perannya berubah — sekarang murni **angka prefill/titik awal** untuk form manual pelanggan ≤ 1 tahun (§3.1 di atas), **tidak pernah** dipakai otomatis untuk pelanggan > 1 tahun (karena field dendanya sendiri tidak tampil). Behavior spesifik: alasan "Kompetitor" bisa diisi default X rupiah (denda kontrak) sebagai titik awal buat kasus ≤ 1 tahun; alasan "Meninggal" defaultnya 0. Label field di form Master Alasan perlu jelas soal ini ("nilai awal untuk pelanggan ≤ 1 tahun") supaya admin tidak mengira default itu otomatis terpakai untuk semua pelanggan.
 
 ### 3.2 Alat belum kembali: dicatat, TIDAK ada denda
 
 Tidak ada perubahan dari mekanisme existing: `device_retrieved_at` + tombol "Ambil Alat" (`terminated.blade.php:78-88`) sudah cukup — itu murni status tracking, bukan billing. Fitur invoice/denda baru **tidak boleh** ikut menyentuh alur ini; pastikan cuma ditest sebagai regresi (badge status alat tetap tampil & tombol tetap berfungsi setelah perubahan form putus langganan).
+
+> **Update 2026-09-21 (ADHOC-86/88) — semantik alur alat berubah, uji regresi di atas tetap berlaku:** (1) tombol "Ambil Alat" hanya **membuat task DEAC**; `device_retrieved_at` terisi setelah teknisi melapor hasil "diambil" dan **dikosongkan lagi saat Langganan Lagi**; (2) badge status alat kini 3 keadaan (**Sudah Diambil** > **Sedang Diproses** > **Belum Diambil**) dan tombol hilang saat Sedang Diproses/Sudah Diambil; (3) pelanggan tanpa baris `customer_devices` tidak lagi ditolak (dibuatkan placeholder `Data Migrasi Legacy`); (4) `terminated.blade.php` & `RendersCustomerList` sekarang membawa `device_retrieval_in_progress`. Implementasi ADHOC-69 wajib mempertahankan keempat perilaku ini. Kolom alasan putus (`termination_reason_id`) yang dibangun ADHOC-69 bisa dibawa ke `description` task DEAC (sekarang teks generik) — belum dikerjakan. Detail: [`docs/warehouse/business-logic.md §12a`](../../warehouse/business-logic.md#12a-ambil-modem-deac--terima-retur-adhoc-86).
 
 ### 3.3 Tunggakan lama: dipisah, TIDAK digabung ke invoice putus
 
@@ -150,36 +151,34 @@ Menu sidebar: masuk grup Master (sejajar `Master Alat Kerja`, `Kategori Material
 
 `CustomerTerminationController` (atau service baru `CustomerTerminationService` — sebaiknya dipisah dari controller karena logikanya sudah cukup berat: aturan denda ≤/> 1 tahun + invoice + audit, ikuti aturan CLAUDE.md "semua business logic di Service"):
 
-1. Validasi: `termination_reason_id` wajib (dari master, bukan lagi `reason` teks bebas), `termination_note` opsional, `penalty_amount` (prefill dari `default_penalty_amount` alasan terpilih, editable — **kecuali masa langganan ≤ 1 tahun**, lihat §3.1a: tanpa prefill, diisi manual).
-2. Hitung nominal denda final di **server** (§3.1/§3.1a: masa langganan ≤ 1 tahun → wajib input manual, > 1 tahun → boleh default alasan). **Tidak ada langkah hitung prorate** (§2.1).
+1. Validasi: `termination_reason_id` wajib (dari master, bukan lagi `reason` teks bebas), `termination_note` opsional. `penalty_amount` **cuma divalidasi/diterima kalau masa langganan ≤ 1 tahun** (§3.1) — wajib diisi (0 sah), boleh diprefill dari `default_penalty_amount` alasan terpilih. **Masa > 1 tahun → `penalty_amount` diabaikan sepenuhnya di server** meski klien mengirim nilai (§3.1, guard anti tamper).
+2. Hitung masa langganan & tentukan eligibilitas denda di **server** (§3.1: ≤ 1 tahun → denda wajib manual; > 1 tahun → tidak ada denda sama sekali). **Tidak ada langkah hitung prorate** (§2.1).
 3. `DB::transaction()`:
    - Update `customers.status = terminated`, `terminated_at`, `termination_reason_id`, `termination_note`.
    - Update `customer_services.service_status = berhenti`.
-   - Terbitkan invoice denda: Tagihan Manual / Lainnya / sub "Denda Putus Langganan", status `belum_dibayar`, **tanpa Payment** (§2.1) — hanya kalau denda > 0; denda 0 → tidak ada invoice yang terbit. Periode tagihan = bulan tanggal putus. Bergantung pada ADHOC-70.
+   - **Hanya untuk masa ≤ 1 tahun dengan `penalty_amount` > 0:** terbitkan invoice denda — Tagihan Manual / Lainnya / sub "Denda Putus Langganan", status `belum_dibayar`, **tanpa Payment** (§2.1). Periode tagihan = bulan tanggal putus. Bergantung pada ADHOC-70. Masa > 1 tahun, atau ≤ 1 tahun dengan denda 0 → tidak ada invoice yang terbit sama sekali.
    - `AuditLog` seperti sekarang (tetap dicatat, tapi bukan lagi satu-satunya sumber alasan).
-4. Notifikasi ke `created_by` seperti sekarang, sebut nominal invoice yang terbit di pesannya.
+4. Notifikasi ke `created_by` seperti sekarang; sebut nominal invoice denda kalau terbit, atau sebut "tidak ada denda (masa langganan > 1 tahun)" kalau tidak.
 
 ### 4.4 Test yang wajib ada
 
-- Putus langganan tengah bulan → invoice Bulanan periode berjalan **tidak berubah** (nominal, status, pembayaran utuh) dan **tidak ada invoice pemakaian/prorate baru**; satu-satunya invoice baru adalah denda (regresi keputusan tanpa prorate, §2.1).
-- Denda terisi default dari alasan terpilih, tapi bisa di-override manual sebelum submit — override yang tersimpan, bukan default.
-- Masa langganan ≤ 1 tahun (§3.1a) → default denda alasan **tidak** dipakai; nominal yang tersimpan = input manual. Batas tepat 1 tahun (inklusif → masih manual) dan `activation_date` NULL (→ manual) ikut diuji sesuai keputusan §3.1a. Submit ≤ 1 tahun dengan nominal denda kosong → ditolak validasi.
-- Masa langganan > 1 tahun → default denda alasan tetap dipakai (prefill, boleh override) — regresi §3.1.
-- Server menolak/mengabaikan nominal default yang dikirim klien untuk pelanggan ≤ 1 tahun (batas dihitung di Service, bukan JS).
-- Denda final = 0 (mis. alasan "Meninggal", atau input manual 0) → **tidak ada invoice yang terbit sama sekali** (bukan invoice Rp0), karena tanpa prorate denda adalah satu-satunya isi invoice putus langganan.
+- Putus langganan tengah bulan → invoice Bulanan periode berjalan **tidak berubah** (nominal, status, pembayaran utuh) dan **tidak ada invoice pemakaian/prorate baru** — cuma invoice denda (kalau eligible) yang baru (regresi keputusan tanpa prorate, §2.1).
+- Masa langganan ≤ 1 tahun → field denda tampil di form, wajib diisi manual (0 sah, tapi tidak boleh kosong); boleh diprefill dari `default_penalty_amount` alasan terpilih sebagai titik awal, tapi nilai yang tersimpan = yang dikonfirmasi/diketik admin, bukan otomatis dari default tanpa disentuh. Batas tepat 1 tahun (inklusif → masih ≤ 1 tahun) dan `activation_date` NULL (→ diperlakukan ≤ 1 tahun) ikut diuji (§3.1).
+- Masa langganan **> 1 tahun** → **tidak ada invoice denda yang terbit sama sekali**, apapun alasan putus & apapun `default_penalty_amount` alasan itu; server mengabaikan `penalty_amount` walau klien mengirimnya (guard anti tamper, §3.1).
+- Denda (masa ≤ 1 tahun) final = 0 → **tidak ada invoice yang terbit** (bukan invoice Rp0) — sama seperti kasus > 1 tahun, cuma beda alasan.
 - Putus langganan TIDAK menyentuh invoice tunggakan lama — invoice periode sebelumnya tetap `belum_dibayar`/`sebagian` apa adanya, nominalnya tidak berubah (regresi §3.3).
 - Alat belum dikembalikan saat putus — badge & tombol "Ambil Alat" tetap berfungsi setelah perubahan (regresi §3.2).
+- List Putus menampilkan nama Sales (`customer->salesUser->name`) & Teknisi Survei (`customer->latestSurvey->technician->name`) dari relasi existing, termasuk kasus null (pelanggan tanpa sales/survei tercatat → tampil "-", bukan error) — regresi/verifikasi §2.2 (koreksi 2026-09-22, bukan kolom baru).
 - Master alasan: hapus alasan yang masih dipakai ≥1 pelanggan → ditolak dengan pesan jelas, bukan 500 dari FK violation.
 - Master alasan: hapus alasan yang tidak dipakai siapa pun → berhasil.
 - Master alasan: CRUD dasar (create/update/toggle) — pola sama pengujian `TicketIssueCategory` yang sudah ada: unique name, toggle aktif/nonaktif menghilangkan dari dropdown form putus tapi data lama tetap utuh.
 - Master alasan: gate permission `termination_reasons.view|create|update|delete` terpisah dari `customers.deactivate` — role yang cuma pegang `customers.deactivate` bisa lihat dropdown alasan tapi tidak bisa akses halaman Master-nya.
 - List Putus: filter & sort berdasarkan `termination_reason_id` bekerja di level query (bukan di memori setelah fetch) — regresi terhadap performa/pagination.
-- Kolom "Didaftarkan Oleh" (`created_by`) tampil benar di List Putus.
 - POP scope: `CustomerTerminatedController`/list tetap tunduk scope existing (regresi, bukan test baru).
 
 ### 4.5 Migrasi data lama
 
-Data pelanggan `terminated` yang sudah ada sekarang alasannya cuma ada di `AuditLog.new_values.reason` (teks bebas, tidak terstruktur). Perlu diputuskan (belum, saat implementasi nanti): apakah data lama dibiarkan `termination_reason_id = NULL` (tampil "-" di kolom baru), atau di-backfill manual/semi-otomatis (mapping teks bebas → master baru, butuh review manusia karena variasi penulisan tidak seragam — lihat pola masalah serupa di `docs/billing-pembayaran/analisa-duplikasi-tagihan-pembayaran-migrasi-legacy.md` soal data legacy yang tidak seragam).
+**Keputusan (user, 2026-09-22): Opsi A — dibiarkan kosong.** Data pelanggan `terminated` yang sudah ada sekarang alasannya cuma ada di `AuditLog.new_values.reason` (teks bebas, tidak terstruktur). `termination_reason_id` data lama **dibiarkan `NULL`** (tampil "-" di kolom Alasan pada List Putus & filter). **Tidak ada backfill/mapping manual** dari teks bebas lama ke master alasan baru — laporan/filter alasan cuma akurat untuk pelanggan yang putus **setelah** fitur ini live; data historis sebelum itu tetap "-" selamanya, tidak dikejar retroaktif.
 
 ---
 

@@ -263,6 +263,21 @@ class PaymentController extends Controller
                 ->withErrors(['amount' => 'Tagihan yang batal tidak dapat menerima pembayaran.']);
         }
 
+        // Piutang yang sudah dihapus buku tidak menerima pembayaran sebelum
+        // hapus bukunya dibatalkan — kalau tidak, uangnya masuk ke invoice
+        // yang statusnya tak dihitung di laporan mana pun.
+        if ($invoice->invoice_status === InvoiceStatus::TAK_TERTAGIH) {
+            $pesan = 'Tagihan ini sudah dihapus buku (tak tertagih). Batalkan hapus buku dulu sebelum mencatat pembayaran.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $pesan], 422);
+            }
+
+            return redirect()
+                ->route('invoices.show', $invoice->id)
+                ->withErrors(['amount' => $pesan]);
+        }
+
         // Submit ulang dengan kunci yang sama TIDAK menyimpan payment kedua.
         // Dicek sebelum validasi, sama seperti jalur kolektor: pada submit
         // ulang tagihannya sudah lunas dari submit pertama, jadi validasi pasti
@@ -338,7 +353,10 @@ class PaymentController extends Controller
             // pembayaran-kolektor.md §D-5).
             'amount' => 'required|numeric|min:1|max:99999999.99',
             'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
-            'note' => 'nullable|string|max:1000',
+            // Metode Lainnya wajib menjelaskan metode apa persisnya — lihat
+            // PaymentMethod::requiresDescription(). Dipakai juga sebagai
+            // catatan umum untuk metode lain, jadi tetap satu kolom `note`.
+            'note' => 'required_if:payment_method,lainnya|nullable|string|max:1000',
         ]);
 
         $proofPath = null;

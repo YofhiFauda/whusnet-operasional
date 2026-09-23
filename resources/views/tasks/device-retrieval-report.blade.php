@@ -6,11 +6,11 @@
 @php
     $existing = $task->deviceRetrieval;
     $initialOutcome = old('outcome', $existing?->outcome->value ?? 'diambil');
-    $legacyItemId = $items->firstWhere('code', 'MODEM-LEGACY')?->id;
+    $legacyItemId = $items->firstWhere('code', 'MODEM-PELANGGAN-LAMA')?->id;
 
     // Baris SN awal: (1) isian sebelumnya kalau validasi gagal, (2) SN yang
     // tercatat terpasang di pelanggan ini, (3) SN dari data lama pelanggan
-    // (modem legacy) dengan item "Modem Legacy" terpilih, (4) satu baris kosong.
+    // (modem pelanggan lama) dengan item "Modem Pelanggan Lama" terpilih, (4) satu baris kosong.
     $initialRows = collect(old('serials', []))->map(fn ($row) => [
         'serial_number' => $row['serial_number'] ?? '',
         'item_id' => $row['item_id'] ?? '',
@@ -25,7 +25,7 @@
 
     if ($initialRows->isEmpty() && $legacySerial !== '') {
         // Model dipilih otomatis kalau merek di data lama jelas (mis. "ZTE F609");
-        // selain itu "Modem Legacy". Hanya tebakan awal — teknisi bisa mengubahnya.
+        // selain itu "Modem Pelanggan Lama". Hanya tebakan awal — teknisi bisa mengubahnya.
         $initialRows = collect([['serial_number' => $legacySerial, 'item_id' => $legacyHint['item']?->id ?? $legacyItemId ?? '']]);
     }
 
@@ -147,7 +147,7 @@
                         Modem yang Dibawa
                     </h2>
                     <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-ui">
-                        Isi nomor seri (SN) sesuai <strong class="text-slate-700 dark:text-slate-300 font-semibold">yang tertera di perangkat fisik</strong>, bukan dari data sistem. Pilih model jika SN belum pernah tercatat (modem legacy) — jika tidak tahu modelnya, pilih "Modem Legacy". Staf Gudang akan mengoreksinya saat menerima.
+                        Isi nomor seri (SN) sesuai <strong class="text-slate-700 dark:text-slate-300 font-semibold">yang tertera di perangkat fisik</strong>, bukan dari data sistem. Pilih model jika SN belum pernah tercatat (modem pelanggan lama) — jika tidak tahu modelnya, pilih "Modem Pelanggan Lama". Staf Gudang akan mengoreksinya saat menerima.
                     </p>
                 </div>
 

@@ -17,7 +17,7 @@ use App\Models\Item;
  * Label itu berantakan (di data lokal: `ZTE F609`, `ZTE f660`, `router GPON`,
  * `ZTE`, bahkan `1`), jadi pemetaan ke master barang SENGAJA ketat: hanya
  * kalau tepat SATU barang ber-SN yang cocok. Label generik/ambigu/sampah tidak
- * dipetakan — pemakainya tetap memilih model sendiri atau "Modem Legacy".
+ * dipetakan — pemakainya tetap memilih model sendiri atau "Modem Pelanggan Lama".
  */
 class LegacyDeviceHintService
 {

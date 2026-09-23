@@ -251,7 +251,7 @@ class CollectorWorksheetController extends Controller
             'Kolektor ini menagih di POP di luar scope Anda. Posisi kasnya hanya boleh dibuka admin yang membawahi seluruh POP-nya.'
         );
 
-        $tab = in_array($request->query('tab'), ['assign', 'setoran', 'kunjungan', 'kwitansi'], true)
+        $tab = in_array($request->query('tab'), ['assign', 'setoran', 'kunjungan', 'kwitansi', 'sudah_bayar'], true)
             ? $request->query('tab')
             : 'pembayaran';
 
@@ -320,6 +320,7 @@ class CollectorWorksheetController extends Controller
         // Dua angka uang kolektor, sengaja dipisah dan tak pernah dijumlahkan
         // (§11.2): saldo di tangan vs kewajiban kurang setor.
         $balance = $this->balance->balance($collector);
+        $unsettledCount = $this->balance->unsettledPaymentsQuery($collector)->count();
         $outstandingShortfall = $this->balance->outstandingShortfall($collector);
         $openShortfallDeposits = $this->balance->openShortfallDeposits($collector);
 
@@ -339,10 +340,32 @@ class CollectorWorksheetController extends Controller
         // jatuh tempo. Admin bukan pengetuk pintu — dia butuh gambaran penuh
         // buat cross check. Jendela tagih cuma berlaku di Worklist Kolektor
         // (CollectorWorklistService::dueInvoices(), §10).
+        //
+        // `invoice_search` dipisah dari `search` (tab Atur Pelanggan) meski
+        // sama-sama cari nama/kode/CID — satu kolektor bisa punya ratusan
+        // tunggakan sekaligus, dan tanpa param sendiri, filter tab Pembayaran
+        // ikut kepencet begitu admin pindah ke tab lain lewat query string yang
+        // sama.
+        $invoiceSearch = trim((string) $request->query('invoice_search', ''));
         $invoices = $this->worklist
-            ->outstandingInvoices($collector)
+            ->outstandingInvoices($collector, search: $invoiceSearch !== '' ? $invoiceSearch : null)
             ->paginate(150, ['*'], 'invoice_page')
             ->withQueryString();
+
+        // Tab TERSENDIRI "Sudah Bayar" — rincian di balik angka "Saldo Belum
+        // Disetor" di kartu profil, persis isi setoran yang akan terbentuk
+        // kalau admin menekan "Setor Atas Nama Kolektor" sekarang. SENGAJA
+        // dipisah dari tab Pembayaran (yang isinya tagihan BELUM dibayar) —
+        // dua sumbu berbeda (belum ditagih vs sudah ditagih tapi belum
+        // disetor) numpuk di satu tab bikin admin susah bedain mana yang
+        // masih perlu ditagih dan mana yang tinggal disetor.
+        $unsettledPayments = $tab === 'sudah_bayar'
+            ? $this->balance->unsettledPaymentsQuery($collector)
+                ->with(['customer:id,full_name,cid,customer_code', 'invoice:id,billing_period'])
+                ->orderByDesc('id')
+                ->paginate(50, ['*'], 'unsettled_page')
+                ->withQueryString()
+            : null;
 
         $assignedCustomers = Customer::query()
             ->applyUserScope()
@@ -375,7 +398,7 @@ class CollectorWorksheetController extends Controller
         $activityChannels = $this->activityChannels($viewer);
 
         return view('collector-worksheet.show', compact(
-            'collector', 'tab', 'invoices', 'assignedCustomers', 'search', 'searchResults',
+            'collector', 'tab', 'invoices', 'invoiceSearch', 'unsettledPayments', 'unsettledCount', 'assignedCustomers', 'search', 'searchResults',
             'deposits', 'balance', 'outstandingShortfall', 'openShortfallDeposits',
             'aging', 'visitHistory', 'receipts', 'receiptCandidates', 'activityChannels',
         ));

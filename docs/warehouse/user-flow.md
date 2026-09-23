@@ -65,6 +65,28 @@ Dua sub-form halaman create, permission `warehouse_reassign.create`, dipicu dari
 
 **View-only, read-only list** — daftar semua custody aktif (material + serial), KPI per satuan. Titik lompat ke Adjustment/Reassign lewat tombol per baris.
 
+### 8a. Tab "Return dari Pelanggan" (di Custody Aktif, ADHOC-88)
+
+Tab keempat (setelah Perangkat Serial Number, Perangkat Pasif, Roll Kabel): modem hasil pengambilan alat yang **masih dipegang teknisi** (`SerialStatus::RETURNED`, transit). Kolom: teknisi, barang, SN, dari pelanggan, tanggal diambil (+ "berapa lama"), gudang tujuan; tombol **Terima** → Terima Retur untuk yang ber-permission `warehouse_reassign.create`. Ikut filter teknisi/gudang/cari (SN, barang, nama pelanggan) dan scope POP gudang tujuan. Beda arah dari tab Perangkat Serial Number (barang yang **dibawa** ke lapangan, `ISSUED`) — ini barang yang dibawa **pulang**. Hilang dari tab begitu gudang menerima.
+
+## 8b. Terima Retur (`warehouse.returns.index` → `warehouse.returns.receive.create`, ADHOC-86)
+
+Konfirmasi gudang cabang atas modem hasil task Ambil Modem (DEAC). **Halaman create tersendiri** (mutasi data, pola 2), permission **reuse `warehouse_reassign.create`**, scope POP lewat gudang tujuan (`issued_from_pop_id`); menu sidebar "Terima Retur".
+
+1. Daftar modem `RETURNED` di cabang aktor (SN, barang, dari pelanggan, teknisi pemegang, gudang tujuan).
+2. **Terima** → halaman form: periksa fisik, pilih **kondisi** (Bekas — Kondisi Baik / Bekas — Rusak; bukan Baru), boleh **mengoreksi model** (mis. dari "Modem Pelanggan Lama"), **nilai taksiran (Rp)** opsional (kosong = Rp 0 di Laporan Bulanan). Ada petunjuk merek dari data lama pelanggan kalau tersedia (hanya bantuan).
+3. Submit → SN jadi `AVAILABLE` di gudang (siap di-Issue lagi), ledger `RETURN` kedua tertulis, log riwayat dilengkapi penerimanya. Menerima dua kali ditolak.
+
+Gudang **tidak** menginput SN manual untuk modem yang ditarik lewat task: SN diinput teknisi di lapangan dan didaftarkan otomatis (termasuk SN legacy yang belum pernah tercatat). Satu-satunya input manual gudang adalah menambah **model baru di Master Barang** kalau belum ada.
+
+## 8c. Terima modem dari pelanggan (`warehouse.returns.from-customer.create`, ADHOC-88)
+
+Pelanggan yang sudah putus **mengantar modem sendiri ke gudang, tanpa task DEAC**. Halaman create tiga keadaan yang di-render server lewat query string (tanpa endpoint JSON): **cari** pelanggan (nama/kode/CID/HP/SN; hanya yang `terminated` dan dalam scope POP) → **pilih** → **form**. Permission `warehouse_reassign.create`.
+
+Form: gudang penerima, SN (baris repeatable, SN sesuai stiker), model (wajib hanya untuk SN yang belum tercatat), kondisi, foto kondisi (wajib), kelengkapan, nilai taksiran opsional, catatan. **Satu langkah, tanpa transit** — staf sudah memegang fisiknya, jadi SN langsung `AVAILABLE`. Banyak SN dalam satu form diproses atomik (satu ditolak → semua batal, foto yatim dihapus). Alat pelanggan ikut ditandai diambil (`device_retrieved_at`).
+
+Guard: ditolak kalau masih ada **task Ambil Alat yang berjalan** untuk pelanggan itu (modem bisa tercatat dua kali). Sengaja **bukan** lewat Barang Masuk (jalur pengadaan: kondisi dipaksa baru, harga wajib, hanya Pusat, tidak tertaut ke pelanggan).
+
 ## 9. Traceability (`warehouse.traceability.index`)
 
 **View-only** + satu aksi inline — cari 1 SN, tampilkan seluruh ledger `inventory_transactions` terurut kronologis. Di luar jangkauan POP aktor → tampil "tidak ditemukan" (bukan 403), supaya keberadaan SN di cabang lain tidak bocor.
@@ -74,6 +96,10 @@ Badge kondisi fisik (`ItemCondition`, ADHOC-80) tampil di samping badge status. 
 ## 10. Riwayat / History (`warehouse.history.index`)
 
 **View-only** — ledger terpaginasi (30/halaman) + filter type/pop/search/date/**kondisi**/**alasan** (2 filter terakhir ditambah ADHOC-80 — kondisi baca `serial.condition`, alasan baca `resulting_status` khusus baris `adjustment`). Reuse permission `warehouse.view`.
+
+## 10a. Riwayat Pengambilan Alat (`warehouse.retrievals.index`, ADHOC-88)
+
+**View-only**, permission `warehouse.view`, menu sidebar "Riwayat Ambil Alat". Log **per SN**: pelanggan, SN + model, **teknisi/petugas pengambil**, sumber (diambil teknisi via task DEAC / diantar pelanggan), status (**Transit di teknisi** atau **Diterima** + gudang + penerima + tanggal), kondisi, dan foto. Filter: cari (SN/nama/kode pelanggan), teknisi, status, sumber, periode. Tunduk pada scope POP gudang tujuan. Terpisah dari Riwayat Mutasi (§10, ledger per dokumen) karena pertanyaannya beda: "siapa yang menarik modem ini", bukan "apa saja mutasinya". Dari halaman ini ada pintasan ke Terima Retur dan Terima modem dari pelanggan. Sumber data `device_retrieval_logs` — tidak ikut hilang saat Langganan Lagi.
 
 ## 11. Laporan (`warehouse.reports.index`)
 

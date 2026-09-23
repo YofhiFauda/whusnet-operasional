@@ -16,17 +16,17 @@ Dua pintu masuk, jalur belakang (route + logic) sama persis:
 1. **Halaman penuh** — dari `/invoices/{id}` (Detail Tagihan), klik "Bayar"/"Bayar Cicil" (label ikut status: "Bayar Cicil" kalau tagihan sudah `sebagian`) → form `/invoices/{id}/payments/create`.
 2. **Modal cepat** (paling sering dipakai sehari-hari) — tombol "Bayar"/"Bayar Cicil" langsung di baris tagihan `/invoices` (list) atau tab Tagihan di Detail Pelanggan → modal AJAX, tanpa pindah halaman.
 
-Isian sama di kedua form: tanggal bayar, metode (cash/transfer/qris/lainnya), **Nominal Diterima dari Pelanggan** (total uang fisik — boleh lebih besar dari sisa tagihan, lihat poin 4), bukti (opsional, jpg/png/pdf ≤2MB), catatan.
+Isian sama di kedua form: tanggal bayar, metode (cash/transfer/kolektor/lainnya — `qris` dihapus 2026-09-22, tak pernah dipakai), **Nominal Diterima dari Pelanggan** (total uang fisik — boleh lebih besar dari sisa tagihan, lihat poin 4), bukti (opsional, jpg/png/pdf ≤2MB), catatan. Metode **Lainnya** menampilkan field keterangan wajib (mis. "OVO", "Dana") — reuse field Catatan yang sama, cuma jadi wajib & relabel via JS (`qpToggleMethodFields()` / `pcToggleMethodFields()` / `hubTogglePaymentMethodFields()` / `cbToggleNote()` tergantung form), divalidasi ulang server (`required_if:payment_method,lainnya`).
 
 3. Submit → sistem cek status invoice (tolak kalau udah lunas/batal), simpan `Payment`, update `paid_amount`/`remaining_amount`/`invoice_status` di `Invoice`.
-4. **Lebih bayar (2026-08-04):** nominal yang diketik BOLEH lebih besar dari sisa tagihan — admin tak perlu hitung sendiri. Sistem otomatis menerapkan sebesar sisa tagihan ke invoice (jadi `lunas`) dan mencatat kelebihannya sebagai `overpay_amount` — murni catatan, BUKAN saldo, tak otomatis dipakai bulan depan. Kedua form kasih pratinjau hidup sebelum submit ("Rp X diterapkan ke tagihan (Lunas), Rp Y tercatat sebagai lebih bayar").
+4. **Lebih bayar (2026-08-04):** nominal yang diketik BOLEH lebih besar dari sisa tagihan — admin tak perlu hitung sendiri. Sistem otomatis menerapkan sebesar sisa tagihan ke invoice (jadi `lunas`) dan mencatat kelebihannya sebagai `overpay_amount` — kelebihan itu otomatis masuk **Saldo Pelanggan** (ADHOC-38) dan bisa dipakai manual di pembayaran berikutnya; **belum** otomatis dipakai bulan depan (rancangan ADHOC-92: [analisa-rancangan-saldo-pelanggan.md](../plan/billing/analisa-rancangan-saldo-pelanggan.md)). Kedua form kasih pratinjau hidup sebelum submit ("Rp X diterapkan ke tagihan (Lunas), Rp Y tercatat sebagai lebih bayar").
 5. Kalau nominal PAS = sisa penuh → status invoice jadi `lunas`. Kalau KURANG dari sisa → `sebagian` (cicilan, masih bisa dibayar lagi) — tercatat sebagai "Cicilan Ke-N", lihat poin 2b.
 
 ### 2a. Lihat riwayat lebih bayar — Tab Khusus (`/payments/overpay`)
 
 1. Buka `/payments`, klik tombol "Lebih Bayar" (badge amber di header) → daftar READ-ONLY semua payment yang punya `overpay_amount > 0`, filter search pelanggan & POP.
 2. Info juga muncul di: Detail Pembayaran (badge "Lebih Bayar Rp X" + sub-baris nominal), kwitansi cetak, header Detail Tagihan (kalau tagihan lunas dengan sisa lebih), Riwayat Pembayaran Pelanggan (Detail Pelanggan), dan daftar `/payments` global.
-3. Tidak ada aksi "pakai saldo" di mana pun — cuma untuk admin tahu ke mana harus menyelesaikan kelebihan itu secara manual (refund fisik / potong tagihan berikutnya).
+3. Halaman ini read-only. Kelebihan yang tercatat di sini sudah masuk ledger Saldo Pelanggan (ADHOC-38); pemakaiannya lewat isian `use_balance_amount` di form bayar. Pemakaian otomatis saat tagihan bulanan terbit belum ada (rancangan ADHOC-92).
 
 ### 2b. Lihat riwayat cicilan
 
@@ -89,7 +89,19 @@ Dua jalur terpisah, jangan tertukar:
 ## 10. Laporan (`/reports/invoices`, `/reports/payments`)
 
 1. Admin buka laporan tagihan/pembayaran → filter periode & POP → lihat rekap.
-2. Tombol export → download CSV/stream (`InvoiceReportController@export`, `PaymentReportController@export`, plus `reports.payments.export-xlsx`).
+2. Tombol export → CSV (`@export`) atau XLSX (`@exportXlsx`, `reports.invoices.export-xlsx` & `reports.payments.export-xlsx`) — dua-duanya sekarang, konsisten (2026-09-22, sebelumnya Laporan Tagihan cuma CSV).
+
+## 11. Laporan Bulanan Admin Collector & tutup periode (`/reports/collector-monthly`)
+
+1. Admin buka laporan → pilih bulan (& POP) → lihat 4 blok (Tagihan, Piutang Bulan Lalu, Pelanggan, Uang Diterima). Tombol Export Excel.
+2. Setelah bulan berganti: tombol **Tutup Periode** membekukan angka (semua POP dalam scope, atau satu POP). Bulan berjalan belum bisa ditutup. Periode berikutnya otomatis terbuka.
+3. Salah hitung → owner **Buka Ulang** (alasan wajib) per POP.
+4. Piutang yang sudah mustahil ditagih: di detail tagihan (piutang) → **Hapus Buku** + alasan → status Tak Tertagih; bisa **Batalkan Hapus Buku** selama periodenya belum ditutup.
+
+## 12. Laporan Bayar Kolektor (`/reports/collector-payments`)
+
+1. Admin buka laporan → pilih kolektor (atau semua), rentang tanggal, metode → tabel bayar per sesi input dengan Total Sub per kelompok; header **Kas Terkumpul** = jumlah semua baris pada filter.
+2. Cari pelanggan/akun/alamat/keterangan lewat kotak cari; tombol Export → Excel.
 
 ## Guard / Permission per Aksi
 
@@ -97,6 +109,11 @@ Dua jalur terpisah, jangan tertukar:
 |------|------------|
 | Lihat `/invoices`, `/invoices/lunas`, `/invoices/belum-lunas`, detail invoice | `invoices.view` |
 | Buat tagihan manual | `invoices.create` |
+| Hapus buku piutang / batalkan hapus buku | `invoices.approve` |
+| Lihat / export Laporan Bulanan Admin Collector | `collector_report.view` / `collector_report.export` |
+| Tutup periode | `collector_report.approve` (admin, pop_admin — hanya POP dalam scope) |
+| Buka ulang periode | `collector_report.cancel` (owner saja) |
+| Lihat / export Laporan Bayar Kolektor | `collector_payment_report.view` / `collector_payment_report.export` |
 | Lihat `/payments`, `/payments/overpay`, detail payment, kwitansi | `payments.view` |
 | Bayar (single/bulk/batch kolektor) | `payments.create` |
 | Tolak pembayaran | `payments.reject` |

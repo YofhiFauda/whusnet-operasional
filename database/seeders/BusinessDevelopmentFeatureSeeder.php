@@ -10,10 +10,10 @@ use Illuminate\Database\Seeder;
 /**
  * BusinessDevelopmentFeatureSeeder
  *
- * Menanamkan 3 Feature ROOT baru untuk modul Business Development
+ * Menanamkan Feature ROOT baru untuk modul Business Development
  * (2026-09-12): `agents` (master mitra Agent), `package_restrictions`
  * (restriksi paket per role — Skema 1), `sales_omset_dashboard` (dashboard
- * omset Sales — Skema 2). Permission-nya digenerate dari config/rbac.php
+ * omset Sales — Skema 2), dan `business_customers` (List Pelanggan Bisnis). Permission-nya digenerate dari config/rbac.php
  * oleh PermissionGeneratorService, assignment ke role diatur di
  * RolePermissionSeeder (jalankan lagi setelah seeder ini, pola sama
  * CustomerAcquisitionFeatureSeeder).
@@ -58,8 +58,19 @@ class BusinessDevelopmentFeatureSeeder extends Seeder
             ]
         );
 
+        Feature::updateOrCreate(
+            ['code' => 'business_customers'],
+            [
+                'name' => 'List Pelanggan Bisnis',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 28,
+                'is_active' => true,
+                'parent_id' => null,
+            ]
+        );
+
         app(PermissionGeneratorService::class)->generate();
 
-        $this->command->info('BusinessDevelopmentFeatureSeeder: feature agents/package_restrictions/sales_omset_dashboard + permission digenerate.');
+        $this->command->info('BusinessDevelopmentFeatureSeeder: feature agents/package_restrictions/sales_omset_dashboard/business_customers + permission digenerate.');
     }
 }

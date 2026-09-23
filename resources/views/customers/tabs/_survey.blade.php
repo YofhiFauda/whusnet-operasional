@@ -70,7 +70,8 @@
         $estimasiMaterial = \App\Models\TaskMaterial::where('customer_id', $customer->id)
             ->estimasi()->orderBy('id')->get();
 
-        $alatSurvey = \App\Models\TaskWorkTool::where('customer_id', $customer->id)
+        $alatSurvey = \App\Models\TaskWorkTool::with('workTool')
+            ->where('customer_id', $customer->id)
             ->whereHas('fopTask', fn ($q) => $q->where('category', \App\Enums\TaskType::SURVEY->value))
             ->orderBy('id')->get();
     @endphp

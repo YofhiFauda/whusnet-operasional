@@ -74,7 +74,7 @@ $functionalCategories = [
         'subtitle' => 'Monitoring akuisisi pelanggan, restriksi paket Sales/Teknisi, master Agent, dan omset Sales.',
         'icon' => 'chart-bar',
         'badge' => 'bg-fuchsia-50 dark:bg-fuchsia-950/50 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-800',
-        'features' => ['customer_acquisitions', 'agents', 'package_restrictions', 'sales_omset_dashboard'],
+        'features' => ['customer_acquisitions', 'agents', 'package_restrictions', 'sales_omset_dashboard', 'business_customers'],
     ],
 ];
 
@@ -129,6 +129,7 @@ $featureMeta = [
     'customer_acquisitions' => ['name' => 'Pelanggan Aktif < 30 Hari (Busdev)', 'desc' => 'Monitoring pelanggan baru diverifikasi admin, dikelompokkan per bulan — dipakai Busdev untuk rekap komisi Sales.'],
     'agents' => ['name' => 'Master Agent', 'desc' => 'Kelola data mitra Agent (bukan akun login) yang dipakai saat mendaftarkan pelanggan atas nama Agent.'],
     'package_restrictions' => ['name' => 'Restriksi Paket per Role', 'desc' => 'Atur daftar paket internet yang boleh dipilih role bertanda "Batasi pilihan paket internet" (mis. Sales, Teknisi).'],
+    'business_customers' => ['name' => 'List Pelanggan Bisnis', 'desc' => 'Daftar pelanggan kategori paket Bisnis: harga paket, alat yang ditinggalkan, biaya instalasi & tanggal aktivasi (read-only).'],
     'sales_omset_dashboard' => ['name' => 'Dashboard Omset Sales', 'desc' => 'Pantau omset (Biaya Langganan − PPN 11%) per Sales, per periode bulan.'],
 ];
 
@@ -345,6 +346,7 @@ $permissionDescMap = [
     'agents.update' => 'Ubah data Agent & aktif/nonaktifkan lewat tombol Toggle Status.',
     'package_restrictions.view' => 'Buka halaman Restriksi Paket: lihat daftar paket yang diizinkan untuk role restricted.',
     'package_restrictions.update' => 'Ubah daftar paket yang diizinkan untuk role bertanda "Batasi pilihan paket internet".',
+    'business_customers.view' => 'Buka List Pelanggan Bisnis: daftar pelanggan paket Bisnis beserta harga, alat, biaya instalasi & tanggal aktivasi.',
     'sales_omset_dashboard.view' => 'Buka Dashboard Omset Sales: agregasi omset per Sales, per periode bulan, dengan rincian per pelanggan.',
 ];
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\Pop;
@@ -75,7 +76,11 @@ class PaymentReportController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $allowedMethods = ['cash', 'transfer', 'qris', 'lainnya'];
+        // Dulu hardcode ['cash','transfer','qris','lainnya'] — ketinggalan
+        // 'kolektor' (PaymentMethod::KOLEKTOR), jadi dropdown filter Metode
+        // tak pernah bisa memilih transaksi kolektor. Baca dari enum supaya
+        // metode baru (mis. 'saldo' — ADHOC-92) otomatis ikut tanpa disentuh lagi.
+        $allowedMethods = array_column(PaymentMethod::cases(), 'value');
         $allowedStatuses = array_column(PaymentStatus::cases(), 'value');
 
         return view('reports.payments.index', compact(

@@ -332,7 +332,7 @@ unset($__errorArgs, $__bag); ?>
 
                             <div>
                                 <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Registrasi <span class="text-rose-500">*</span></label>
-                                <input type="date" name="registration_date" id="registration_date" value="<?php echo e(old('registration_date', now()->format('Y-m-d'))); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['registration_date'];
+                                <input type="date" name="registration_date" id="registration_date" value="<?php echo e(old('registration_date', today()->format('Y-m-d'))); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['registration_date'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }

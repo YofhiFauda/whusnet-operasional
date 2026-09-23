@@ -1133,17 +1133,11 @@ unset($__errorArgs, $__bag); ?>
 
     // ── LIGHTBOX ───────────────────────────────────────────────────────
     function openPhotoLightbox(src, caption) {
-        const lb = document.getElementById('photo-lightbox');
-        document.getElementById('lightbox-img').src = src;
-        document.getElementById('lightbox-caption').textContent = caption || '';
-        lb.classList.remove('hidden');
-        lb.classList.add('flex');
+        window.dispatchEvent(new CustomEvent('open-image-preview', { detail: { url: src, label: caption } }));
     }
 
     function closePhotoLightbox() {
-        const lb = document.getElementById('photo-lightbox');
-        lb.classList.add('hidden');
-        lb.classList.remove('flex');
+        // Handled by x-ui.image-preview-modal
     }
 
     // Escape key for modals
@@ -1498,6 +1492,27 @@ unset($__errorArgs, $__bag); ?>
         <?php endif; ?>
     });
 </script>
+
+<?php if (isset($component)) { $__componentOriginalc54844c8500937c8c904b75d0190ca4d = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalc54844c8500937c8c904b75d0190ca4d = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.image-preview-modal','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.image-preview-modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalc54844c8500937c8c904b75d0190ca4d)): ?>
+<?php $attributes = $__attributesOriginalc54844c8500937c8c904b75d0190ca4d; ?>
+<?php unset($__attributesOriginalc54844c8500937c8c904b75d0190ca4d); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalc54844c8500937c8c904b75d0190ca4d)): ?>
+<?php $component = $__componentOriginalc54844c8500937c8c904b75d0190ca4d; ?>
+<?php unset($__componentOriginalc54844c8500937c8c904b75d0190ca4d); ?>
+<?php endif; ?>
 <?php $__env->stopSection(); ?>
 
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /home/yopi/whusnet/whusnet-operasional/resources/views/verifications/admin.blade.php ENDPATH**/ ?>

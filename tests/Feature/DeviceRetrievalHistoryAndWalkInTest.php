@@ -107,7 +107,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
 
         $cat = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
         $this->modem = Item::create(['code' => 'HS-MODEM', 'name' => 'Modem Riwayat Test', 'item_category_id' => $cat->id, 'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable']);
-        $this->modemLegacy = Item::create(['code' => 'MODEM-LEGACY', 'name' => 'Modem Legacy (Belum Teridentifikasi)', 'item_category_id' => $cat->id, 'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable']);
+        $this->modemLegacy = Item::create(['code' => 'MODEM-PELANGGAN-LAMA', 'name' => 'Modem Pelanggan Lama (Belum Teridentifikasi)', 'item_category_id' => $cat->id, 'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable']);
 
         $this->customer = $this->makeTerminatedCustomer('Siti Aminah');
         $this->task = $this->makeDeacTask($this->customer);
@@ -450,7 +450,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         $serial = InventorySerial::where('serial_number', 'LEGACY-WI-9')->firstOrFail();
         $this->assertEquals(SerialStatus::AVAILABLE, $serial->status);
         $this->assertEquals($this->modemLegacy->id, $serial->item_id);
-        $this->assertStringContainsString('SN legacy', (string) InventoryTransaction::where('serial_id', $serial->id)->value('notes'));
+        $this->assertStringContainsString('SN pelanggan lama', (string) InventoryTransaction::where('serial_id', $serial->id)->value('notes'));
     }
 
     #[Test]

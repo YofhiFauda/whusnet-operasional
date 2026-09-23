@@ -15,7 +15,8 @@
     $materialTerpakai = \App\Models\TaskMaterial::where('customer_id', $customer->id)
         ->terpakai()->orderBy('id')->get();
 
-    $alatPemasangan = \App\Models\TaskWorkTool::where('customer_id', $customer->id)
+    $alatPemasangan = \App\Models\TaskWorkTool::with('workTool')
+        ->where('customer_id', $customer->id)
         ->whereHas('fopTask', fn ($q) => $q->where('category', \App\Enums\TaskType::PEMASANGAN->value))
         ->orderBy('id')->get();
 

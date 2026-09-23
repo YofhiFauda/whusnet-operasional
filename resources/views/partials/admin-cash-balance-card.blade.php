@@ -89,7 +89,7 @@
             Rp {{ number_format($nonTunai['total'], 0, ',', '.') }}
         </div>
         <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-            Transfer &amp; QRIS — sudah di rekening, <span class="font-semibold">bukan</span> kewajiban setor.
+            Transfer &amp; metode non-tunai lain — sudah di rekening, <span class="font-semibold">bukan</span> kewajiban setor.
         </p>
         @if (! $ringkas && ! empty($nonTunai['per_metode']))
             <div class="mt-2 flex flex-wrap gap-1.5">

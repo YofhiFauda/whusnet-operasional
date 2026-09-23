@@ -57,9 +57,11 @@ class FopDashboardController extends Controller
 
         // ── Antrean survey: pelanggan yang belum disurvey ───────────
         // Countdown Survey: (customers.created_at + 1 hari) - sekarang
+        // `registered` (Verifikasi Registrasi) tidak dihitung — belum diverifikasi
+        // CS, jadi belum masuk antrean survey/Task FOP.
         $surveyQueue = Customer::with(['pop'])
             ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-            ->whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
+            ->whereIn('status', ['calon_pelanggan', 'waiting_survey'])
             ->orderBy('created_at', 'asc') // terlama di atas — paling prioritas
             ->limit(50)
             ->get()
@@ -101,7 +103,7 @@ class FopDashboardController extends Controller
             $statsCacheKey,
             30,
             function () use ($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday, $user) {
-                $surveyStatuses = ['calon_pelanggan', 'waiting_survey', 'registered'];
+                $surveyStatuses = ['calon_pelanggan', 'waiting_survey'];
 
                 return [
                     'antrian_survey' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))

@@ -66,6 +66,10 @@ class Invoice extends Model
         'other_fee',
         'extra_installation_fee',
         'extra_pole_fee',
+        'written_off_at',
+        'written_off_by',
+        'written_off_amount',
+        'write_off_reason',
     ];
 
     /**
@@ -85,6 +89,8 @@ class Invoice extends Model
             'paid_amount' => 'decimal:2',
             'remaining_amount' => 'decimal:2',
             'other_fee' => 'decimal:2',
+            'written_off_at' => 'datetime',
+            'written_off_amount' => 'decimal:2',
         ];
     }
 
@@ -188,7 +194,11 @@ class Invoice extends Model
      */
     public function recalculateFromPayments(): void
     {
-        if ($this->invoice_status === InvoiceStatus::BATAL) {
+        // TAK_TERTAGIH dijaga seperti BATAL: status ini hanya boleh keluar lewat
+        // InvoiceWriteOffService::reverse(). Tanpa guard, payment susulan (mis.
+        // void/reject) akan diam-diam menghidupkan lagi piutang yang sudah
+        // dihapus buku dan menggeser Laporan Bulanan yang sudah ditutup.
+        if (in_array($this->invoice_status, [InvoiceStatus::BATAL, InvoiceStatus::TAK_TERTAGIH], true)) {
             return;
         }
 

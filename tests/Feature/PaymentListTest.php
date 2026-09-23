@@ -84,8 +84,8 @@ class PaymentListTest extends TestCase
 
         $invoiceA = $this->createInvoice($popA, 'Customer Payment Cabang Sendiri', 'INV-202606-7101');
         $invoiceB = $this->createInvoice($popB, 'Customer Payment Cabang Lain', 'INV-202606-7102');
-        $paymentA = $this->createPayment($invoiceA, 'PAY-202606-7101', '2026-06-13', 'qris', 'valid');
-        $paymentB = $this->createPayment($invoiceB, 'PAY-202606-7102', '2026-06-13', 'qris', 'valid');
+        $paymentA = $this->createPayment($invoiceA, 'PAY-202606-7101', '2026-06-13', 'transfer', 'valid');
+        $paymentB = $this->createPayment($invoiceB, 'PAY-202606-7102', '2026-06-13', 'transfer', 'valid');
 
         $response = $this->actingAs($adminCabang)->get(route('payments.index'));
 

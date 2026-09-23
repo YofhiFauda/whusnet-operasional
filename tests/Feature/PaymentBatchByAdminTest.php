@@ -154,6 +154,50 @@ class PaymentBatchByAdminTest extends TestCase
         ]);
     }
 
+    /**
+     * QRIS dihapus dari PaymentMethod (2026-09-22); metode Lainnya wajib
+     * mengisi 'note' (keterangan metode apa persisnya) — lihat
+     * PaymentMethod::requiresDescription(), CollectorPaymentService::validateRows().
+     */
+    public function test_qris_ditolak_dan_lainnya_wajib_keterangan(): void
+    {
+        $invoiceQris = $this->createUnpaidInvoice('C-CBP-Q1', $this->kolektor->id, 100000);
+
+        $rejectedQris = $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
+            'idempotency_key' => 'batch-test-qris',
+            'rows' => [
+                ['invoice_id' => $invoiceQris->id, 'amount' => 100000, 'payment_method' => 'qris', 'collected_date' => '2026-06-13'],
+            ],
+        ]);
+        $rejectedQris->assertStatus(422);
+        $this->assertDatabaseCount('payments', 0);
+
+        $invoiceNoNote = $this->createUnpaidInvoice('C-CBP-Q2', $this->kolektor->id, 100000);
+        $rejectedNoNote = $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
+            'idempotency_key' => 'batch-test-lainnya-no-note',
+            'rows' => [
+                ['invoice_id' => $invoiceNoNote->id, 'amount' => 100000, 'payment_method' => 'lainnya', 'collected_date' => '2026-06-13'],
+            ],
+        ]);
+        $rejectedNoNote->assertStatus(422);
+        $rejectedNoNote->assertJsonFragment(['reason' => "{$invoiceNoNote->invoice_number}: metode Lainnya wajib diisi keterangannya."]);
+        $this->assertDatabaseCount('payments', 0);
+
+        $invoiceOk = $this->createUnpaidInvoice('C-CBP-Q3', $this->kolektor->id, 100000);
+        $accepted = $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
+            'idempotency_key' => 'batch-test-lainnya-ok',
+            'rows' => [
+                ['invoice_id' => $invoiceOk->id, 'amount' => 100000, 'payment_method' => 'lainnya', 'collected_date' => '2026-06-13', 'note' => 'OVO an. Budi'],
+            ],
+        ]);
+        $accepted->assertOk();
+        $this->assertDatabaseHas('payments', [
+            'invoice_id' => $invoiceOk->id,
+            'payment_method' => 'lainnya',
+            'note' => 'Batch kolektor: '.$this->kolektor->name.' — OVO an. Budi',
+        ]);
+    }
+
     public function test_partial_payment_in_batch_leaves_invoice_sebagian(): void
     {
         $invoice = $this->createUnpaidInvoice('C-CBP-B1', $this->kolektor->id, 150000);

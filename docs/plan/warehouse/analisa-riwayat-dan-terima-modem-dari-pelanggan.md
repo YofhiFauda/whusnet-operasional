@@ -92,4 +92,4 @@ Tiga view ADHOC-86 memakai `$customer->name`, padahal kolomnya `full_name` — n
 
 ## 7. Deploy
 
-`php artisan migrate` (tabel `device_retrieval_logs`), `php artisan db:seed --class=ItemSeeder` (item `MODEM-LEGACY` dari ADHOC-86), `npm run build`.
+`php artisan migrate` (tabel `device_retrieval_logs`), `php artisan db:seed --class=ItemSeeder` (item `MODEM-PELANGGAN-LAMA` dari ADHOC-86), `npm run build`.

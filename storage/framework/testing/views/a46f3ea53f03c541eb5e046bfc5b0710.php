@@ -14,7 +14,7 @@
     $methodLabels = [
         'cash' => 'Cash',
         'transfer' => 'Transfer Bank',
-        'qris' => 'QRIS',
+        'kolektor' => 'Kolektor',
         'lainnya' => 'Lainnya',
     ];
 ?>

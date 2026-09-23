@@ -3515,7 +3515,8 @@ class CustomerController extends Controller
             'cash' => 'cash',
             'transfer' => 'transfer',
             'bank_transfer' => 'transfer',
-            'qris' => 'qris',
+            // 'qris' DIHAPUS dari PaymentMethod (2026-09-22) — legacy 'qris'
+            // sekarang jatuh ke fallback 'lainnya' di bawah.
         ][$normalized] ?? 'lainnya';
     }
 

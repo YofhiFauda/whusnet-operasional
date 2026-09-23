@@ -2,7 +2,22 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-slate-50 dark:bg-slate-900 scroll-smooth">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {{--
+        interactive-widget=resizes-content — sejak Chrome 108, default
+        Android jadi `overlays-content`: keyboard virtual OVERLAY konten,
+        cuma nge-pan visual viewport, layout viewport gak ikut resize.
+        Itu akar bug "background modal ikut kescroll pas keyboard muncul" —
+        `position:fixed` (body lock, window.Dialog) ngikutin LAYOUT
+        viewport, bukan visual viewport, jadi begitu keduanya kepisah gara2
+        overlay-mode itu, overlay dialog ninggalin celah yang nembus ke
+        konten di belakang. `resizes-content` balikin perilaku lama: browser
+        BENERAN resize viewport pas keyboard buka, jadi CSS fixed/dvh biasa
+        otomatis ngikut tanpa perlu JS visualViewport (lihat
+        components/dialog.blade.php — itu tetap dipertahankan sebagai
+        fallback buat browser yang belum dukung directive ini, mis. iOS
+        Safari versi lama).
+    --}}
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>@yield('title', 'Whusnet Operasional')</title>
@@ -27,7 +42,17 @@
 </head>
 <body class="h-full text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
-<div class="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+{{--
+    h-dvh, bukan h-screen (=100vh): di real device, address bar mobile
+    muncul-hilang bikin 100vh statis lebih tinggi dari area kelihatan.
+    Shell ini jadi lebih tinggi dari viewport asli → browser nampilin
+    scrollbar body beneran, dan halaman "app-shell" kayak Worksheet
+    Ticketing (yang ngandelin h-full/overflow-hidden internal, BUKAN
+    scroll body) jadi ikut kescroll dari luar. Kontainernya sendiri gak
+    salah (overflow-hidden + flex tetap bener), yang salah unit tinggi
+    acuannya. dvh reaktif ke toolbar browser, jadi shell selalu pas.
+--}}
+<div class="flex h-dvh overflow-hidden bg-slate-50 dark:bg-slate-900">
 
     {{-- ═══════════════════════════════════════════════════════
          SIDEBAR — Light mode (putih), sesuai Design.md §3.2
@@ -303,7 +328,7 @@
                          sama toggleSubmenu() yang dipakai submenu lain di sidebar
                          ini. "Busdev" diganti "Pelanggan Aktif < 30 Hari" — biar
                          gak redundan dengan judul group. --}}
-                    @if(auth()->user()->hasPermission('customer_acquisitions.view') || auth()->user()->hasPermission('sales_omset_dashboard.view') || auth()->user()->hasPermission('agents.view') || auth()->user()->hasPermission('package_restrictions.view') || auth()->user()->hasPermission('business_development_verification.view'))
+                    @if(auth()->user()->hasPermission('customer_acquisitions.view') || auth()->user()->hasPermission('sales_omset_dashboard.view') || auth()->user()->hasPermission('agents.view') || auth()->user()->hasPermission('package_restrictions.view') || auth()->user()->hasPermission('business_development_verification.view') || auth()->user()->hasPermission('business_customers.view'))
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-busdev', 'chevron-busdev')"
                                 title="Business Development"
@@ -332,6 +357,10 @@
                                 @if(auth()->user()->hasPermission('business_development_verification.view'))
                                 <a href="{{ route('business-development-verifications.index') }}"
                                    class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Menunggu Verifikasi BD</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('business_customers.view'))
+                                <a href="{{ route('business-development.business-customers.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development/business-customers*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">List Pelanggan Bisnis</a>
                                 @endif
                                 @if(auth()->user()->hasPermission('sales_omset_dashboard.view'))
                                 <a href="{{ route('business-development.sales-omset.index') }}"
@@ -539,6 +568,18 @@
                                    class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('reports/payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                     Laporan Pembayaran
                                 </a>
+                                @if(auth()->user()->hasPermission('collector_report.view'))
+                                <a href="{{ route('reports.collector-monthly.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('reports/collector-monthly*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    Laporan Bulanan Admin
+                                </a>
+                                @endif
+                                @if(auth()->user()->hasPermission('collector_payment_report.view'))
+                                <a href="{{ route('reports.collector-payments.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('reports/collector-payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    Laporan Bayar Kolektor
+                                </a>
+                                @endif
                                 <a href="{{ route('reports.imports.index') }}"
                                    class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('reports/imports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                     Laporan Import Data

@@ -64,6 +64,8 @@ erDiagram
 
 Index: `tracking_type`.
 
+**Item placeholder `MODEM-PELANGGAN-LAMA` (ADHOC-86, `ItemSeeder`, idempotent):** "Modem Pelanggan Lama (Belum Teridentifikasi)", `tracking_type=serialized`, kategori `modem_ont`. Data legacy pelanggan hanya punya SN tanpa nama barang, sedangkan `inventory_serials.item_id` wajib — placeholder ini dipakai saat teknisi/staf gudang tidak tahu modelnya; staf gudang mengoreksi ke model sebenarnya di Terima Retur. **Wajib dijalankan** (`php artisan db:seed --class=ItemSeeder`) di lingkungan yang sudah berjalan.
+
 ## `item_categories` (kolom tambahan — `2026_09_02_100002`)
 
 | Kolom | Tipe | Default |
@@ -108,6 +110,8 @@ Konsistensi "cuma satu lokasi yang keisi sesuai status" ditegakkan Service/Obser
 
 Index: `status`, `current_pop_id`, `current_technician_id`, `customer_id`.
 
+**`status = returned` sebagai transit pengambilan alat (ADHOC-86):** case `SerialStatus::RETURNED` yang sebelumnya tidak pernah ditulis dipakai untuk modem yang baru dicabut dari pelanggan oleh teknisi (task Ambil Modem/DEAC) dan **belum diterima gudang**. Selama transit: `current_technician_id` = teknisi, `current_pop_id` NULL, dan `customer_id`/`fop_task_id`/`installed_at` **sengaja dipertahankan** (jejak "modem ini dari pelanggan siapa" tidak putus); `issued_from_pop_id` = gudang tujuan (untuk SN legacy ditelusuri naik lewat `parent_id` dari POP task). Begitu gudang menerima (`confirmReturnedSerial()`): `available`, `current_pop_id` = gudang, teknisi/pelanggan/task dikosongkan, dan `condition_checked_*` terisi (melepas gate Issue). SN `returned` **tidak muncul di dropdown Issue** dan tampil di tab "Return dari Pelanggan" (Custody). SN yang belum pernah tercatat di sistem (modem legacy) dibuat langsung berstatus `returned` oleh `pickupSerialFromCustomer()`. `serial_number` unik global dan di MySQL dibandingkan **tanpa membedakan huruf besar-kecil** (collation `utf8mb4_0900_ai_ci`; SQLite membedakan).
+
 ## `inventory_transfers` (`2026_09_02_100005`)
 
 Header **mutable** Transfer Pusat→Cabang — berbeda dari ledger append-only, mengikuti pola `Ticket` (mutable) berdampingan `ticket_histories` (append-only).
@@ -148,6 +152,8 @@ Index: `status`.
 Kombinasi kolom valid per `type` — lihat tabel di [business-logic.md §2](business-logic.md#2-tipe-transaksi-ledger-inventorytransactiontype).
 
 Index: `type`, `item_id`, `reference_number`, `fop_task_id`.
+
+**Dua baris `RETURN` per modem hasil pengambilan alat (ADHOC-86/88):** (1) pelanggan → teknisi — `to_technician_id` terisi, **tanpa `to_pop_id`** sehingga belum dihitung stok oleh `WarehouseStockAsOfService` (yang menghitung kedatangan dari `to_pop_id`); (2) teknisi → gudang — `from_technician_id` + `to_pop_id`, dan **`unit_price_snapshot` = nilai taksiran opsional** yang diisi staf (kosong → NULL → dihitung Rp 0 di Laporan Bulanan). Penanda asal pengambilan alat = `fop_task_id` terisi pada baris `RETURN` (retur custody biasa tidak mengisinya). Jalur diantar pelanggan (`receiveSerialFromCustomerAtWarehouse()`) menulis SATU baris (langsung `to_pop_id`). SN legacy yang baru didaftarkan ditandai di `notes` ("SN legacy — didaftarkan otomatis…").
 
 ## `technician_custody` (`2026_09_02_100007`, `+issued_from_pop_id` di `100011`, `+unit_price_snapshot` di `100009`)
 
@@ -197,6 +203,33 @@ Index: `status`, `cabang_pop_id`.
 | `qty_fulfilled` | `decimal(12,2)` default 0 — numpuk (bukan snapshot terakhir), direkonsiliasi manual via `recordDelivery()` |
 | `lot_no` | `string(50)` nullable |
 
+## `device_retrieval_logs` (`2026_09_21_100000`, ADHOC-88)
+
+Jejak pengambilan modem dari pelanggan — **satu baris per SN**. Tabel sendiri karena `inventory_serials.customer_id` dikosongkan saat gudang menerima modem (SN itu nanti di-Issue ke pelanggan lain) dan `customer_devices.device_retrieved_at` direset saat pelanggan Langganan Lagi; tanpa tabel ini, "modem ini pernah diambil dari pelanggan siapa, oleh siapa, diterima siapa" hilang. **Baris tidak boleh ikut hilang** walau flag lain berubah.
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `customer_id` | FK `customers`, restrict | |
+| `serial_id` | FK `inventory_serials`, restrict | |
+| `serial_number` | `string(100)` | Snapshot — pencarian riwayat tidak bergantung pada baris SN yang statusnya terus berubah |
+| `item_id` | FK `items` nullable, null-on-delete | Model; diperbarui saat gudang mengoreksi (`confirmReturnedSerial()`) |
+| `source` | `string(20)` | `DeviceRetrievalSource`: `deac` (teknisi, transit dulu) / `walk_in` (diantar pelanggan, langsung diterima) |
+| `task_id` | FK `tasks` nullable, null-on-delete | Hanya `deac` |
+| `retrieved_by` | FK `users` nullable, null-on-delete | Teknisi **pengirim laporan** (bukan seluruh tim task) atau petugas gudang (`walk_in`) |
+| `received_by` / `received_at` | FK `users` nullable / `timestamp` nullable | NULL = masih transit di teknisi |
+| `warehouse_pop_id` | FK `pops` nullable, null-on-delete | Gudang tujuan — dasar scope POP halaman Riwayat |
+| `condition` | `string(20)` nullable | `ItemCondition` hasil penilaian gudang |
+| `estimated_value` | `decimal(15,2)` nullable | Nilai taksiran opsional |
+| `condition_photo` | `string(255)` nullable | Hanya `walk_in`; `deac` membaca foto dari `task_device_retrievals` (`DeviceRetrievalLog::photoPath()`) |
+| `accessories` / `notes` | `json` / `text` nullable | |
+| `retrieved_at` | `timestamp` | |
+
+Index: `(customer_id, retrieved_at)`, `(retrieved_by, retrieved_at)`, `(warehouse_pop_id, retrieved_at)`.
+
+Penulis: `pickupSerialFromCustomer()` (deac, `received_at` kosong) → dilengkapi `confirmReturnedSerial()`; `receiveSerialFromCustomerAtWarehouse()` (walk_in, sekali tulis). Pembaca: halaman **Riwayat Pengambilan Alat** (`/warehouse/retrievals`), kartu di tab Perangkat Detail Pelanggan, tab **Return dari Pelanggan** (Custody), detail task & Riwayat Task FOP.
+
+Tabel pasangannya `task_device_retrievals` (laporan per **task**: hasil, foto kondisi, kelengkapan, catatan) didokumentasikan di [task-teknisi/database-schema.md](../task-teknisi/database-schema.md).
+
 ## Relasi Model Penting
 
 - `InventoryBalance` — `belongsTo(Pop)`, `belongsTo(Item)`; `scopeLowStock()`, `isLowStock()`.
@@ -206,3 +239,4 @@ Index: `status`, `cabang_pop_id`.
 - `TechnicianCustody` — cast `status => CustodyStatus`; `scopeActive()`, `ageLabel()`.
 - `StockRequest`/`StockRequestItem` — cast `status => StockRequestStatus`; `StockRequestItem::remaining()`, `isFullyFulfilled()`.
 - `Item`/`ItemCategory` — `getEffectiveEquipmentClassAttribute()` (resolusi 2-level).
+- `DeviceRetrievalLog` — cast `source => DeviceRetrievalSource`, `condition => ItemCondition`; relasi `customer`, `serial`, `item`, `task`, `retrievedBy`, `receivedBy`, `warehousePop`; `isReceived()`, `photoPath()`. `Customer::deviceRetrievalLogs()`.

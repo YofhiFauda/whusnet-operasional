@@ -39,6 +39,13 @@ class CollectorWorklistController extends Controller
     {
         $collector = $request->user();
 
+        // Dua tab: `tagihan` (default, siapa yang perlu didatangi) dan
+        // `bayar` (siapa yang SUDAH bayar dan uangnya sedang menunggu
+        // disetor). Kolektor sering perlu cross check sendiri sebelum
+        // menekan "Setor ke Admin" — nama & nominal siapa saja yang bakal
+        // ikut ke setoran itu, bukan cuma total saldonya.
+        $tab = $request->query('tab') === 'bayar' ? 'bayar' : 'tagihan';
+
         $search = trim((string) $request->query('search', ''));
 
         $query = $this->worklist->dueInvoices($collector, $collector);
@@ -96,10 +103,22 @@ class CollectorWorklistController extends Controller
             ->orderByDesc('submitted_at')
             ->get();
 
+        // Rincian tab "Sudah Bayar" — daftar PAYMENT (bukan invoice) yang
+        // belum ikut setoran mana pun. Ini persis isi setoran yang akan
+        // terbentuk kalau tombol "Setor ke Admin" ditekan SEKARANG — kolektor
+        // berhak tahu siapa saja & berapa sebelum menyerahkan uangnya.
+        $unsettledPayments = $tab === 'bayar'
+            ? $this->balance->unsettledPaymentsQuery($collector)
+                ->with(['customer:id,full_name,cid,customer_code', 'invoice:id,billing_period'])
+                ->orderByDesc('id')
+                ->paginate(50, ['*'], 'unsettled_page')
+                ->withQueryString()
+            : null;
+
         return view('collector-worklist.index', compact(
-            'invoices', 'canPay', 'canDeposit', 'canLogVisit', 'dueWindowDays',
+            'tab', 'invoices', 'canPay', 'canDeposit', 'canLogVisit', 'dueWindowDays',
             'balance', 'unsettledCount', 'outstandingShortfall', 'pendingDeposits',
-            'visitCandidates', 'todayVisits', 'search',
+            'unsettledPayments', 'visitCandidates', 'todayVisits', 'search',
         ));
     }
 }

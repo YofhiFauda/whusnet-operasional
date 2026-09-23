@@ -94,14 +94,14 @@ class AdminCashBalanceTest extends TestCase
     public function test_pembayaran_non_tunai_tidak_masuk_saldo_tunai_tapi_muncul_di_rekap(): void
     {
         $this->payAtOffice('KAS-TF', 500000, 'transfer');
-        $this->payAtOffice('KAS-QR', 250000, 'qris');
+        $this->payAtOffice('KAS-LN', 250000, 'lainnya');
 
         $this->assertSame(0.0, $this->saldo());
 
         $rekap = app(AdminCashBalanceService::class)->nonTunaiRekap($this->admin->fresh());
         $this->assertSame(750000.0, $rekap['total']);
         $this->assertSame(500000.0, $rekap['per_metode']['transfer']);
-        $this->assertSame(250000.0, $rekap['per_metode']['qris']);
+        $this->assertSame(250000.0, $rekap['per_metode']['lainnya']);
     }
 
     /**

@@ -91,7 +91,7 @@ SN → AVAILABLE, current_pop_id = cabang, kondisi dinilai staf gudang (used_goo
 
 **Item untuk SN legacy.** Data legacy tidak punya nama barang, tapi `inventory_serials.item_id` wajib.
 - Form DEAC menyediakan dropdown item (SERIALIZED + INSTALLABLE); teknisi memilih model yang ia lihat di fisik.
-- Item placeholder **"Modem Legacy (Belum Teridentifikasi)"** ditambah lewat `ItemSeeder` sebagai pilihan cadangan.
+- Item placeholder **"Modem Pelanggan Lama (Belum Teridentifikasi)"** ditambah lewat `ItemSeeder` sebagai pilihan cadangan.
 - Staf gudang boleh **mengoreksi item** saat Terima Retur.
 
 ### 4.2 Form DEAC khusus

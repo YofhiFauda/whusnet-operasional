@@ -27,6 +27,17 @@
     atas backdrop malah menggeser tabel di belakangnya, dan waktu drawer ditutup
     posisi baris yang tadi diklik udah pindah. Pola sama dengan components/ui/drawer.
 
+    `body.overflow-hidden` doang CUKUP di desktop (mouse wheel scroll body),
+    tapi TIDAK di real device (touch): browser mobile scroll `<body>` lewat
+    touch-drag walau `overflow:hidden` — itu cuma matiin scrollbar/scroll
+    programatik body, bukan gesture touch di atasnya. Efeknya: list di
+    belakang backdrop kebawa scroll pas jari geser drawer, bikin drawer
+    "loncat"/misalign secara visual. Fix baku: kunci beneran pakai
+    `position:fixed` di body sambil nyimpen `scrollY`, baru dibalikin lewat
+    `window.scrollTo` pas ditutup — teknik ini yang bikin touch-drag gak
+    tembus ke document di belakang (Android Chrome & iOS Safari sama-sama
+    butuh ini, gak cukup overflow-hidden doang).
+
     Sekalian dispatch 'ticket-drawer-shown'/'ticket-drawer-hidden' tiap `shown`
     beneran berubah — SATU-SATUNYA sinyal yang bisa dipercaya halaman pemanggil
     buat tahu drawer lagi kebuka/ketutup. `close-ticket-drawer` (event di bawah)
@@ -41,7 +52,7 @@
 <div x-data="ticketDetailDrawer()" x-on:open-ticket-drawer.window="open($event.detail.id)"
      x-on:close-ticket-drawer.window="close()"
      x-on:keydown.escape.window="close()"
-     x-effect="document.body.classList.toggle('overflow-hidden', shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
+     x-effect="lockBodyScroll(shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
 
     {{--
         Backdrop mulai di bawah navbar (top-16 = tinggi header layout) supaya
@@ -57,12 +68,19 @@
     <div x-show="shown" x-transition.opacity @click="close()"
          class="fixed inset-0 top-16 bg-slate-950/60 backdrop-blur-sm z-[60]" x-cloak></div>
 
-    {{-- Panel kanan --}}
+    {{--
+        Panel kanan — masuk dari kanan ke kiri (translate-x-full → 0), keluar
+        kiri ke kanan (0 → translate-x-full). Durasi & easing (320ms,
+        cubic-bezier(0.4,0,0.2,1)) SAMA persis dengan `.panel-motion` yang
+        dipakai panel "Buat Tiket Baru" (resources/css/app.css) — dua drawer
+        ini kebuka gantian di halaman yang sama, jadi bahasa geraknya harus
+        satu, bukan dua kurva/durasi beda yang kerasa gak nyambung.
+    --}}
     <div x-show="shown" x-cloak
-         x-transition:enter="transform transition ease-in-out duration-300"
+         x-transition:enter="transform transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
          x-transition:enter-start="translate-x-full"
          x-transition:enter-end="translate-x-0"
-         x-transition:leave="transform transition ease-in-out duration-200"
+         x-transition:leave="transform transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
          {{-- dvh (bukan vh): di mobile, address bar yang muncul-hilang bikin 100vh
@@ -448,6 +466,43 @@
             loading: false,
             failed: false,
             ticket: null,
+            _scrollY: 0,
+
+            /**
+             * `overflow-hidden` di body doang gak nahan touch-drag di HP —
+             * lihat komentar x-effect di atas. `position:fixed` beneran
+             * ngunci viewport; scrollY disimpen manual soalnya browser
+             * reset posisi scroll begitu body jadi fixed.
+             */
+            lockBodyScroll(shown) {
+                const body = document.body;
+
+                if (shown) {
+                    if (body.style.position === 'fixed') {
+                        return;
+                    }
+
+                    this._scrollY = window.scrollY;
+                    body.style.position = 'fixed';
+                    body.style.top = `-${this._scrollY}px`;
+                    body.style.left = '0';
+                    body.style.right = '0';
+                    body.classList.add('overflow-hidden');
+
+                    return;
+                }
+
+                if (body.style.position !== 'fixed') {
+                    return;
+                }
+
+                body.style.position = '';
+                body.style.top = '';
+                body.style.left = '';
+                body.style.right = '';
+                body.classList.remove('overflow-hidden');
+                window.scrollTo(0, this._scrollY);
+            },
 
             get hasAnyAction() {
                 const a = this.ticket?.actions ?? {};

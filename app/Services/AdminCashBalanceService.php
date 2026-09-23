@@ -21,7 +21,7 @@ use Illuminate\Support\Collection;
  *      berasal dari setoran kolektor yang dia verifikasi + pembayaran manual
  *      tunai yang dia terima di kantor. Ini satu-satunya angka yang menjadi
  *      KEWAJIBAN SETOR.
- *   2. **Non-Tunai** — transfer & QRIS. Uangnya sudah ada di bank, tak pernah
+ *   2. **Non-Tunai** — transfer & metode lain. Uangnya sudah ada di bank, tak pernah
  *      lewat tangan admin. Ditampilkan sebagai INFORMASI saja; kalau ikut
  *      dijumlahkan, admin diminta menyetorkan uang yang tak pernah dia pegang.
  *   3. **Selisih Setoran Kas Terbuka** — hasil pemeriksaan yang belum ditutup

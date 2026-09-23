@@ -8,7 +8,10 @@ use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\User;
 use App\Services\CustomerBalanceService;
+use App\Services\InvoiceWriteOffService;
+use App\Support\ReasonValidationRule;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -175,5 +178,44 @@ class InvoiceController extends Controller
         }
 
         return view('invoices.show', compact('invoice'));
+    }
+
+    /**
+     * Hapus buku piutang → status Tak Tertagih (ADHOC-90). Logika & guard
+     * (hanya piutang, periode belum ditutup) ada di InvoiceWriteOffService.
+     */
+    public function writeOff(Request $request, Invoice $invoice, InvoiceWriteOffService $service): RedirectResponse
+    {
+        $this->authorizeScope($invoice);
+
+        $validated = $request->validate([
+            'reason' => ReasonValidationRule::required(500),
+        ]);
+
+        $service->writeOff($invoice, $request->user(), $validated['reason']);
+
+        return redirect()
+            ->route('invoices.show', $invoice)
+            ->with('success', 'Piutang dihapus buku (tak tertagih).');
+    }
+
+    public function reverseWriteOff(Invoice $invoice, InvoiceWriteOffService $service): RedirectResponse
+    {
+        $this->authorizeScope($invoice);
+
+        $service->reverse($invoice);
+
+        return redirect()
+            ->route('invoices.show', $invoice)
+            ->with('success', 'Hapus buku dibatalkan. Tagihan kembali menjadi piutang.');
+    }
+
+    private function authorizeScope(Invoice $invoice): void
+    {
+        abort_unless(
+            Invoice::query()->applyUserScope()->whereKey($invoice->id)->exists(),
+            403,
+            'Anda tidak memiliki akses ke tagihan POP ini.'
+        );
     }
 }

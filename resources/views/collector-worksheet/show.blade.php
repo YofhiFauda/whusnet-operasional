@@ -91,9 +91,29 @@
                     Rp {{ number_format($balance, 0, ',', '.') }}
                 </div>
             </div>
-            <div class="mt-3 text-[11px] text-slate-400 dark:text-slate-500">
-                Uang tagihan tunai yang masih di tangan kolektor.
-            </div>
+            @if ($balance > 0 && auth()->user()->hasPermission('collector_worksheet.deposit'))
+                {{-- Khusus kolektor yang tak bisa akses aplikasinya sendiri
+                     (HP rusak, cuti mendadak) — admin setor atas nama dia di
+                     sini. Kalau kolektornya masih bisa buka Worklist, dia
+                     yang harus menyetor sendiri lewat sana; tombol ini bukan
+                     pintas buat kondisi normal. --}}
+                <form action="{{ route('collector-worksheet.deposit', $collector->id) }}" method="POST" class="mt-3"
+                      data-confirm="Setorkan seluruh saldo {{ $collector->name }} sebesar Rp{{ number_format($balance, 0, ',', '.') }} atas nama dia ke Anda? Pakai ini HANYA kalau kolektornya tak bisa menyetor sendiri lewat Worklist. Saldonya jadi nol dan menunggu verifikasi.">
+                    @csrf
+                    <input type="hidden" name="idempotency_key" value="{{ 'deposit-'.$collector->id.'-by-'.auth()->id().'-'.now()->timestamp.'-'.\Illuminate\Support\Str::random(8) }}">
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        <span>Setor Atas Nama Kolektor</span>
+                    </button>
+                </form>
+                <div class="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                    Uang tagihan tunai yang masih di tangan kolektor — atau, kalau dipakai lewat tombol ini, yang admin catat mewakili dia.
+                </div>
+            @else
+                <div class="mt-3 text-[11px] text-slate-400 dark:text-slate-500">
+                    Uang tagihan tunai yang masih di tangan kolektor.
+                </div>
+            @endif
         </div>
 
         {{-- Kurang Setor --}}
@@ -124,6 +144,11 @@
                class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs font-semibold border-b-2 -mb-px transition-all inline-flex items-center gap-2 {{ $tab === 'pembayaran' ? 'border-sky-600 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                 <span>Pembayaran</span>
+            </a>
+            <a href="{{ route('collector-worksheet.show', ['collector' => $collector->id, 'tab' => 'sudah_bayar']) }}"
+               class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs font-semibold border-b-2 -mb-px transition-all inline-flex items-center gap-2 {{ $tab === 'sudah_bayar' ? 'border-sky-600 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span>Sudah Bayar ({{ $unsettledCount }})</span>
             </a>
             <a href="{{ route('collector-worksheet.show', ['collector' => $collector->id, 'tab' => 'setoran']) }}"
                class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs font-semibold border-b-2 -mb-px transition-all inline-flex items-center gap-2 {{ $tab === 'setoran' ? 'border-sky-600 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200' }}">
@@ -156,6 +181,24 @@
                 Seluruh tagihan belum dibayar kolektor ini — tanpa filter jatuh tempo, supaya cross check melihat gambaran penuh. Jendela tagih hanya berlaku di Worklist kolektor.
             </div>
 
+            <form action="{{ route('collector-worksheet.show', $collector->id) }}" method="GET" class="flex gap-2">
+                <input type="hidden" name="tab" value="pembayaran">
+                <div class="relative flex-1 max-w-md">
+                    <input type="text" name="invoice_search" value="{{ $invoiceSearch }}" placeholder="Cari nama atau CID pelanggan..."
+                           class="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <button type="submit" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2 px-4 rounded-xl transition-all cursor-pointer shrink-0 shadow-xs">
+                    Cari
+                </button>
+                @if ($invoiceSearch !== '')
+                    <a href="{{ route('collector-worksheet.show', ['collector' => $collector->id, 'tab' => 'pembayaran']) }}"
+                       class="inline-flex items-center px-3 text-xs text-rose-600 dark:text-rose-400 hover:underline font-semibold shrink-0">
+                        Reset
+                    </a>
+                @endif
+            </form>
+
             @include('partials.collector-pay-table', [
                 'invoices' => $invoices,
                 'emptyMessage' => 'Kolektor ini tidak memiliki pelanggan dengan tagihan belum dibayar.',
@@ -169,6 +212,77 @@
                     'emptyMessage' => 'Kolektor ini tidak memiliki pelanggan dengan tagihan belum dibayar.',
                 ])
             @endpush
+        </div>
+
+    @elseif ($tab === 'sudah_bayar')
+        {{-- ============ TAB: SUDAH BAYAR ============ --}}
+        {{-- Rincian di balik "Saldo Belum Disetor" di kartu profil — daftar
+             PAYMENT (bukan invoice) yang belum ikut setoran mana pun. Persis
+             isi setoran yang akan terbentuk kalau admin menekan "Setor Atas
+             Nama Kolektor" sekarang. Tab TERSENDIRI, sengaja dipisah dari
+             Pembayaran (yang isinya tagihan BELUM dibayar) — dua sumbu
+             berbeda (belum ditagih vs sudah ditagih tapi belum disetor)
+             numpuk di satu tab bikin admin susah bedain mana yang masih
+             perlu ditagih dan mana yang tinggal disetor. --}}
+        <div class="space-y-4">
+            <div class="p-4 bg-emerald-50/60 dark:bg-emerald-500/10 border border-emerald-200/60 dark:border-emerald-500/20 rounded-2xl text-xs text-emerald-800 dark:text-emerald-300">
+                Sudah ditagih kolektor ini tapi belum ikut setoran mana pun — persis yang akan tersetor kalau tombol "Setor Atas Nama Kolektor" di kartu profil ditekan sekarang.
+            </div>
+
+            <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse text-left text-sm text-slate-700 dark:text-slate-200 min-w-0 sm:min-w-full">
+                        <thead class="hidden sm:table-header-group">
+                            <tr class="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                                <th class="px-6 py-4">Pelanggan</th>
+                                <th class="px-6 py-4">No. Pembayaran</th>
+                                <th class="px-6 py-4">Metode</th>
+                                <th class="px-6 py-4">Tgl Ditagih</th>
+                                <th class="px-6 py-4">Keterangan</th>
+                                <th class="px-6 py-4 text-right">Nominal</th>
+                            </tr>
+                        </thead>
+                        <tbody class="block sm:table-row-group divide-y-0 sm:divide-y p-3 sm:p-0 space-y-3 sm:space-y-0 divide-slate-100 dark:divide-slate-700/50">
+                            @forelse ($unsettledPayments as $payment)
+                                @php $periodType = $payment->periodType(); @endphp
+                                <tr class="block sm:table-row bg-white dark:bg-slate-800/90 sm:bg-transparent rounded-2xl sm:rounded-none border border-slate-200/80 dark:border-slate-700/80 sm:border-x-0 sm:border-t-0 sm:border-b p-4 sm:p-0 shadow-xs sm:shadow-none hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
+                                    <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4">
+                                        <div class="font-bold text-slate-900 dark:text-slate-100">{{ $payment->customer->full_name ?? '-' }}</div>
+                                        <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{{ $payment->customer->cid ?? $payment->customer->customer_code ?? '-' }}</div>
+                                    </td>
+                                    <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4 font-mono text-xs">
+                                        <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">No. Pembayaran:</span>
+                                        {{ $payment->payment_number }}
+                                    </td>
+                                    <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4 text-xs">
+                                        <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Metode:</span>
+                                        <span class="capitalize">{{ $payment->payment_method }}</span>
+                                    </td>
+                                    <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4 text-xs">
+                                        <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tgl Ditagih:</span>
+                                        {{ $payment->collected_date?->format('d/m/Y') ?? '-' }}
+                                    </td>
+                                    <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4">
+                                        <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Keterangan:</span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $periodType->badgeClass() }}">{{ $periodType->label() }}</span>
+                                    </td>
+                                    <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4 sm:text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                        <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nominal:</span>
+                                        Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="px-6 py-12 text-center text-sm text-slate-500 dark:text-slate-400">Belum ada pembayaran yang menunggu disetor.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700">
+                    {{ $unsettledPayments->links() }}
+                </div>
+            </div>
         </div>
 
     @elseif ($tab === 'setoran')

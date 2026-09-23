@@ -42,7 +42,7 @@ use Tests\TestCase;
 /**
  * ADHOC-86 — Ambil Modem (DEAC) → Gudang: form laporan khusus (SN fisik
  * dari teknisi), transit `RETURNED`, konfirmasi gudang ("Terima Retur"),
- * dan SN legacy yang tidak pernah tercatat di `inventory_serials`.
+ * dan SN pelanggan lama yang tidak pernah tercatat di `inventory_serials`.
  * Rancangan: docs/plan/warehouse/analisa-ambil-modem-deac-ke-gudang.md.
  */
 class DeviceRetrievalDeacToWarehouseTest extends TestCase
@@ -102,7 +102,7 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
 
         $cat = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
         $this->modem = Item::create(['code' => 'DR-MODEM', 'name' => 'Modem Retur Test', 'item_category_id' => $cat->id, 'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable']);
-        $this->modemLegacy = Item::create(['code' => 'MODEM-LEGACY', 'name' => 'Modem Legacy (Belum Teridentifikasi)', 'item_category_id' => $cat->id, 'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable']);
+        $this->modemLegacy = Item::create(['code' => 'MODEM-PELANGGAN-LAMA', 'name' => 'Modem Pelanggan Lama (Belum Teridentifikasi)', 'item_category_id' => $cat->id, 'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => 'installable']);
 
         // Task DEAC ber-POP mini_pop (kasus nyata) — gudang tujuan harus
         // ditelusuri naik ke cabang induknya.
@@ -218,7 +218,7 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         $this->assertEquals($this->customer->id, $serial->customer_id);
         // Task ber-POP mini_pop → gudang tujuan = cabang induknya.
         $this->assertEquals($this->cabang->id, $serial->issued_from_pop_id);
-        $this->assertStringContainsString('SN legacy', InventoryTransaction::where('serial_id', $serial->id)->value('notes'));
+        $this->assertStringContainsString('SN pelanggan lama', InventoryTransaction::where('serial_id', $serial->id)->value('notes'));
         $this->assertNotNull($this->customer->customerDevice->refresh()->device_retrieved_at);
 
         // Staf gudang mengoreksi model saat menerima.

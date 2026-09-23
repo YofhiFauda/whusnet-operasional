@@ -79,7 +79,7 @@
             <div class="mt-2 flex items-center gap-3 text-xs">
                 <?php
                     $cashCount = $payments->filter(fn($p) => strtolower($p->payment_method) === 'cash')->count();
-                    $transferCount = $payments->filter(fn($p) => in_array(strtolower($p->payment_method), ['transfer', 'qris']))->count();
+                    $transferCount = $payments->filter(fn($p) => strtolower($p->payment_method) === 'transfer')->count();
                 ?>
                 <span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Cash: <?php echo e($cashCount); ?>
@@ -233,7 +233,6 @@
                             $methodBadge = match(strtolower($payment->payment_method)) {
                                 'cash' => 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20',
                                 'transfer' => 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20',
-                                'qris' => 'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20',
                                 default => 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
                             };
                         ?>

@@ -60,6 +60,7 @@ class RolePermissionSeeder extends Seeder
                 'agents.create',
                 'agents.update',
                 'sales_omset_dashboard.view',
+                'business_customers.view',
                 'customers.view',
                 'customers.detail.view',
                 'customers.create',
@@ -109,6 +110,10 @@ class RolePermissionSeeder extends Seeder
                 'reports.export',
                 'audit_logs.view',
                 'audit_logs.export', // assuming audit_logs has export
+                'collector_report.view',
+                'collector_report.export',
+                'collector_payment_report.view',
+                'collector_payment_report.export',
                 'fop_tasks.view',
                 'tickets.view', // Atasan cuma memantau — gak ikut ngirim tiket
                 'tickets.selesai.view',
@@ -155,6 +160,7 @@ class RolePermissionSeeder extends Seeder
                 'package_restrictions.view',
                 'agents.view',
                 'sales_omset_dashboard.view',
+                'business_customers.view',
             ],
 
             'admin' => [
@@ -166,6 +172,7 @@ class RolePermissionSeeder extends Seeder
                 'agents.*',
                 'package_restrictions.*',
                 'sales_omset_dashboard.view',
+                'business_customers.view',
                 'roles.*',
                 'packages.*',
                 'sla_timeline.*',
@@ -189,6 +196,11 @@ class RolePermissionSeeder extends Seeder
                 'collector_worksheet.validate',
                 'collector_worksheet.print',
                 'collector_worksheet.upload',
+                // Kolektor yang tak bisa akses aplikasinya sendiri (HP rusak,
+                // cuti mendadak) — admin bantu setor atas nama dia dari
+                // Worksheet, bukan lewat Worklist Kolektor yang butuh login
+                // sebagai kolektor tersebut.
+                'collector_worksheet.deposit',
                 // Setoran Kas: admin MENYETOR, tidak memeriksa. `validate` &
                 // `approve` sengaja tidak diberikan — pemeriksa setoran kas
                 // adalah Owner/atasan, dan admin yang memeriksa setorannya
@@ -202,6 +214,12 @@ class RolePermissionSeeder extends Seeder
                 // sudah tersaji di Worksheet Admin lewat `create` (§10).
                 'cash_deposit.create',
                 'reports.*',
+                // Tutup periode boleh, buka ulang (`.cancel`) khusus owner.
+                'collector_report.view',
+                'collector_report.export',
+                'collector_report.approve',
+                'collector_payment_report.view',
+                'collector_payment_report.export',
                 'audit_logs.view',
                 'audit_logs.export',
                 'fop_tasks.*',
@@ -476,12 +494,19 @@ class RolePermissionSeeder extends Seeder
                 'collector_worksheet.validate',
                 'collector_worksheet.print',
                 'collector_worksheet.upload',
+                'collector_worksheet.deposit', // Setor atas nama kolektor yang tak bisa akses aplikasinya
                 // Sama seperti admin: pop_admin memegang kas cabangnya, jadi
                 // menyetor — bukan memeriksa, dan tidak membuka pandangan
                 // pemeriksa (§10).
                 'cash_deposit.create',
                 'reports.view',
                 'reports.export',
+                // Menutup periode POP-nya sendiri (scope tetap dijaga di controller).
+                'collector_report.view',
+                'collector_report.export',
+                'collector_report.approve',
+                'collector_payment_report.view',
+                'collector_payment_report.export',
                 'tickets.*',
                 'master_wilayah.view',
                 'master_distribusi.view',

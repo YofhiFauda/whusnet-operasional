@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Pop;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Spatie\SimpleExcel\SimpleExcelWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceReportController extends Controller
@@ -114,6 +116,68 @@ class InvoiceReportController extends Controller
      */
     public function export(Request $request): StreamedResponse
     {
+        $query = $this->exportQuery($request);
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="laporan-tagihan-'.now()->format('YmdHis').'.csv"',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($query) {
+            $file = fopen('php://output', 'w');
+
+            // Add UTF-8 BOM for proper Excel compatibility
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($file, $this->exportHeaderRow());
+
+            // Query dieksekusi di dalam closure stream pakai `lazy()` supaya
+            // baris ditarik & ditulis sambil jalan, bukan seluruh hasil
+            // dimuat ke memori PHP dulu (240.000 invoice = 240.000 model
+            // sekaligus di RAM kalau pakai `get()`).
+            foreach ($query->lazy(500) as $invoice) {
+                fputcsv($file, $this->exportDataRow($invoice));
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Export invoice report to XLSX — format asli Excel, konsisten dengan
+     * Laporan Pembayaran (`PaymentReportController::exportXlsx`). Repo ini
+     * pakai Excel sebagai format arsip, bukan CSV (2026-09-22).
+     */
+    public function exportXlsx(Request $request)
+    {
+        $query = $this->exportQuery($request);
+
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'laporan-tagihan-'.uniqid().'.xlsx';
+        $writer = SimpleExcelWriter::create($path);
+
+        $header = $this->exportHeaderRow();
+
+        $query->chunk(500, function ($invoices) use ($writer, $header) {
+            $writer->addRows($invoices->map(fn (Invoice $invoice) => array_combine(
+                $header,
+                $this->exportDataRow($invoice)
+            ))->all());
+        });
+
+        return response()->download($path, 'laporan-tagihan-'.now()->format('Ymd-His').'.xlsx')
+            ->deleteFileAfterSend();
+    }
+
+    /**
+     * @return Builder<Invoice>
+     */
+    private function exportQuery(Request $request)
+    {
         $user = auth()->user();
 
         if (! $user->hasPermission('reports.view')) {
@@ -135,7 +199,6 @@ class InvoiceReportController extends Controller
             }
         }
 
-        // Query data tanpa pagination
         $query = Invoice::with(['customer', 'pop', 'internetPackage'])
             ->applyUserScope();
 
@@ -166,65 +229,50 @@ class InvoiceReportController extends Controller
             $query->piutang();
         }
 
-        // Sengaja TIDAK di-`get()` di sini. Query dieksekusi di dalam closure
-        // stream pakai `lazy()` supaya baris ditarik & ditulis sambil jalan.
-        // Versi lama memuat seluruh hasil ke memori PHP sebelum streaming
-        // dimulai — manfaat StreamedResponse hilang, dan ekspor 240.000 invoice
-        // berarti 240.000 model Invoice + relasinya sekaligus di RAM.
-        $query->orderByDesc('issue_date')->orderByDesc('id');
+        return $query->orderByDesc('issue_date')->orderByDesc('id');
+    }
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="laporan-tagihan-'.now()->format('YmdHis').'.csv"',
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires' => '0',
+    /**
+     * @return array<int, string>
+     */
+    private function exportHeaderRow(): array
+    {
+        return [
+            'No. Invoice',
+            'Kode Pelanggan',
+            'Nama Pelanggan',
+            'POP/Cabang',
+            'Periode',
+            'Tanggal Terbit',
+            'Tanggal Jatuh Tempo',
+            'Subtotal',
+            'PPN',
+            'Total Tagihan',
+            'Terbayar',
+            'Sisa Tunggakan',
+            'Status Tagihan',
         ];
+    }
 
-        $callback = function () use ($query) {
-            $file = fopen('php://output', 'w');
-
-            // Add UTF-8 BOM for proper Excel compatibility
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-
-            // Kolom Header
-            fputcsv($file, [
-                'No. Invoice',
-                'Kode Pelanggan',
-                'Nama Pelanggan',
-                'POP/Cabang',
-                'Periode',
-                'Tanggal Terbit',
-                'Tanggal Jatuh Tempo',
-                'Subtotal',
-                'PPN',
-                'Total Tagihan',
-                'Terbayar',
-                'Sisa Tunggakan',
-                'Status Tagihan',
-            ]);
-
-            foreach ($query->lazy(500) as $invoice) {
-                fputcsv($file, [
-                    $invoice->invoice_number,
-                    $invoice->customer->customer_code ?? '-',
-                    $invoice->customer->full_name ?? '-',
-                    $invoice->pop->name ?? '-',
-                    $invoice->billing_period,
-                    $invoice->issue_date ? $invoice->issue_date->format('Y-m-d') : '-',
-                    $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '-',
-                    (float) $invoice->subtotal,
-                    (float) $invoice->ppn,
-                    (float) $invoice->total_amount,
-                    (float) $invoice->paid_amount,
-                    (float) $invoice->remaining_amount,
-                    $invoice->invoice_status->label(),
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+    /**
+     * @return array<int, string|float>
+     */
+    private function exportDataRow(Invoice $invoice): array
+    {
+        return [
+            $invoice->invoice_number,
+            $invoice->customer->customer_code ?? '-',
+            $invoice->customer->full_name ?? '-',
+            $invoice->pop->name ?? '-',
+            $invoice->billing_period,
+            $invoice->issue_date ? $invoice->issue_date->format('Y-m-d') : '-',
+            $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '-',
+            (float) $invoice->subtotal,
+            (float) $invoice->ppn,
+            (float) $invoice->total_amount,
+            (float) $invoice->paid_amount,
+            (float) $invoice->remaining_amount,
+            $invoice->invoice_status->label(),
+        ];
     }
 }

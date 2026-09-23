@@ -67,12 +67,31 @@
                 <!-- Metode Bayar -->
                 <div>
                     <label for="payment_method" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Metode Bayar</label>
-                    <select name="payment_method" id="payment_method" required 
+                    <select name="payment_method" id="payment_method" required onchange="pcToggleMethodFields()"
                             class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-semibold bg-surface text-text-main transition-colors">
-                        @foreach(['cash' => 'Cash', 'transfer' => 'Transfer', 'qris' => 'QRIS', 'lainnya' => 'Lainnya'] as $value => $label)
+                        @foreach(['cash' => 'Cash', 'transfer' => 'Transfer', 'lainnya' => 'Lainnya'] as $value => $label)
                             <option value="{{ $value }}" @selected(old('payment_method') === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                {{-- Transfer: field pendukung dulu TIDAK ADA di halaman ini
+                     padahal PaymentController::store mewajibkan bank_name +
+                     account_number begitu metode Transfer dipilih
+                     (`required_if:payment_method,transfer`) — akibatnya
+                     "Transfer" di form ini mustahil disubmit sukses. Ditambah
+                     sekaligus saat merapikan dropdown (2026-09-22). --}}
+                <div id="pc-transfer-fields" class="hidden space-y-3">
+                    <div>
+                        <label for="bank_name" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nama Bank</label>
+                        <input type="text" name="bank_name" id="bank_name" value="{{ old('bank_name') }}" placeholder="mis. BCA, BRI, Mandiri"
+                               class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main transition-colors">
+                    </div>
+                    <div>
+                        <label for="account_number" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nomer Rekening</label>
+                        <input type="text" name="account_number" id="account_number" value="{{ old('account_number') }}" placeholder="Nomer rekening tujuan/asal"
+                               class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono bg-surface text-text-main transition-colors">
+                    </div>
                 </div>
 
                 <!-- Nominal Diterima -->
@@ -133,9 +152,13 @@
 
                 <!-- Catatan -->
                 <div>
-                    <label for="note" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Catatan Pembayaran</label>
-                    <textarea name="note" id="note" rows="3" placeholder="Tuliskan catatan transaksi jika ada..." 
+                    <label for="note" id="note-label" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Catatan Pembayaran</label>
+                    {{-- Metode Lainnya wajib mengisi field ini (keterangan metode
+                         apa persisnya, mis. "OVO") — required/placeholder digeser
+                         via pcToggleMethodFields(), lihat PaymentMethod::requiresDescription(). --}}
+                    <textarea name="note" id="note" rows="3" placeholder="Tuliskan catatan transaksi jika ada..."
                               class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main placeholder:text-text-muted/60 transition-colors">{{ old('note') }}</textarea>
+                    @error('note')<p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>@enderror
                 </div>
 
                 <!-- Form Action Buttons -->
@@ -262,6 +285,31 @@
 </div>
 
 <script>
+    /** Tampilkan/wajibkan field pendukung sesuai metode dipilih — sama
+     *  polanya dengan qpToggleMethodFields() di quick-payment-modal.
+     *  Dipanggil onchange dan sekali saat load (jaga state setelah
+     *  validasi server gagal & `old()` mengisi ulang method-nya). */
+    function pcToggleMethodFields() {
+        const method = document.getElementById('payment_method').value;
+        const transferFields = document.getElementById('pc-transfer-fields');
+        const bankName = document.getElementById('bank_name');
+        const accountNumber = document.getElementById('account_number');
+        const note = document.getElementById('note');
+        const noteLabel = document.getElementById('note-label');
+
+        const isTransfer = method === 'transfer';
+        const isLainnya = method === 'lainnya';
+
+        transferFields.classList.toggle('hidden', !isTransfer);
+        bankName.required = isTransfer;
+        accountNumber.required = isTransfer;
+
+        note.required = isLainnya;
+        note.placeholder = isLainnya ? 'Jelaskan metode pembayaran (mis. OVO, Dana, GoPay)...' : 'Tuliskan catatan transaksi jika ada...';
+        noteLabel.textContent = isLainnya ? 'Keterangan Metode (wajib)' : 'Catatan Pembayaran';
+    }
+    document.addEventListener('DOMContentLoaded', pcToggleMethodFields);
+
     (function () {
         const remaining = {{ (float) $invoice->remaining_amount }};
         const customerBalance = {{ (float) $customerBalance }};

@@ -63,6 +63,21 @@ Migrasi: `2026_07_01_152851_create`. 1:1 dengan `tasks` (khusus task tipe non-Su
 | `kabel`, `modem`, `patchcord`, `sleeve`, `lainnya` | string | Opsional, catatan part yang dipakai |
 | `opm_photo`, `speedtest_photo` | string | Wajib diisi saat submit laporan |
 
+## Tabel `task_device_retrievals` (ADHOC-86)
+
+Migrasi: `2026_09_19_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe Ambil Modem / `DEAC`) — laporan lapangan pengambilan alat. Tabel sendiri, bukan numpang `task_maintenances`, karena form DEAC tidak punya kendala teknis / foto OPM / speedtest — memaksa kolom itu terisi berarti data palsu.
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | bigint PK | |
+| `task_id` | FK → `tasks.id`, **unique**, cascade delete | Satu laporan per task; kirim ulang setelah FOP me-reject memakai `updateOrCreate` |
+| `outcome` | string(20) | `App\Enums\DeviceRetrievalOutcome`: `diambil` / `tidak_ditemukan` / `ditolak` |
+| `condition_photo` | string nullable | Foto kondisi alat (disk `public`, folder `device-retrieval/`); wajib kalau `outcome=diambil` |
+| `accessories` | json nullable | Kunci dari `TaskDeviceRetrieval::ACCESSORY_OPTIONS` (`adaptor`, `patchcord`, `kabel_lan`, `remote`) |
+| `notes` | text nullable | Catatan teknisi; **wajib** kalau `outcome` ≠ `diambil` (alasan alat tidak diambil) |
+
+**SN yang dibawa TIDAK disimpan di sini** — sumber kebenarannya `inventory_serials` + ledger `inventory_transactions` + `device_retrieval_logs` ([warehouse/database-schema.md](../warehouse/database-schema.md#device_retrieval_logs-2026_09_21_100000-adhoc-88)), supaya tidak ada dua salinan yang bisa menyimpang. Relasi: `Task::deviceRetrieval()` (HasOne), `TaskDeviceRetrieval::task()`.
+
 ## Perbandingan dengan `FopTask` / `fop_tasks`
 
 | | `tasks` (modul ini) | `fop_tasks` (lihat [docs/fop-task](../fop-task/README.md)) |
@@ -81,6 +96,7 @@ pop(): BelongsTo(Pop::class)
 fop(): BelongsTo(User::class, 'fop_id')
 teamMembers(): HasMany(TaskTeam::class)
 maintenanceReport(): HasOne(TaskMaintenance::class)
+deviceRetrieval(): HasOne(TaskDeviceRetrieval::class)   // khusus task Ambil Modem (DEAC), ADHOC-86
 auditLogs(): MorphMany(AuditLog::class, 'auditable')
 
 // TaskTeam

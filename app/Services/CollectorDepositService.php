@@ -38,9 +38,20 @@ class CollectorDepositService
      * terus menagih selagi setoran menunggu verifikasi; penagihan sesudah
      * submit masuk saldo baru, tidak menggeser angka yang sedang dihitung
      * admin.
+     *
+     * `$actor` beda dari `$collector` khusus jalur admin (Worksheet Admin →
+     * "Setor Atas Nama Kolektor", buat kolektor yang tak bisa mengakses
+     * aplikasinya sendiri — HP rusak, cuti mendadak, dst). Setoran itu
+     * SENDIRI tetap tercatat milik `$collector` (saldo yang nol adalah
+     * saldonya dia, bukan admin), tapi audit log harus jujur soal siapa yang
+     * benar-benar menekan tombol — kalau `$actor` diam-diam disamakan dengan
+     * `$collector`, jejaknya berbohong seolah kolektor yang menyetor sendiri
+     * padahal dia sedang tak bisa berbuat apa-apa.
      */
-    public function submit(User $collector, ?string $idempotencyKey = null): CollectorDeposit
+    public function submit(User $collector, ?string $idempotencyKey = null, ?User $actor = null): CollectorDeposit
     {
+        $actor ??= $collector;
+
         if ($idempotencyKey) {
             $existing = CollectorDeposit::where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
@@ -48,7 +59,7 @@ class CollectorDepositService
             }
         }
 
-        [$deposit, $paymentCount, $total] = DB::transaction(function () use ($collector, $idempotencyKey) {
+        [$deposit, $paymentCount, $total] = DB::transaction(function () use ($collector, $actor, $idempotencyKey) {
             $payments = $this->balance->unsettledPaymentsQuery($collector)
                 ->lockForUpdate()
                 ->get();
@@ -72,10 +83,14 @@ class CollectorDepositService
                 'collector_deposit_id' => $deposit->id,
             ]);
 
-            $this->audit($deposit, $collector, 'disetorkan', [
+            $this->audit($deposit, $actor, 'disetorkan', array_filter([
                 'jumlah_pembayaran' => $payments->count(),
                 'total_tercatat' => round((float) $payments->sum('amount'), 2),
-            ]);
+                // Cuma ditulis kalau memang beda — jangan bikin baris audit
+                // normal (kolektor setor sendiri) jadi berisik dengan field
+                // yang selalu kosong.
+                'disetorkan_oleh_admin_untuk' => $actor->id !== $collector->id ? $collector->name : null,
+            ], fn ($value) => $value !== null));
 
             return [$deposit, $payments->count(), round((float) $payments->sum('amount'), 2)];
         });
@@ -88,7 +103,7 @@ class CollectorDepositService
         // menyerahkan uangnya cuma karena layanan kabar sedang rusak. Dan
         // kalau dispatch berhasil lalu transaksinya rollback karena hal lain,
         // admin menerima kabar setoran yang tak pernah ada.
-        $this->safelyNotify(fn () => $this->notifyVerifiers($deposit, $collector, $paymentCount, $total));
+        $this->safelyNotify(fn () => $this->notifyVerifiers($deposit, $collector, $actor, $paymentCount, $total));
         $this->safelyNotify(fn () => CollectorDepositUpdated::dispatch($deposit, $collector, 'diajukan'));
 
         return $deposit;
@@ -429,7 +444,7 @@ class CollectorDepositService
      * ini memang menuntut tindakan: uang fisik sudah berpindah tangan dan
      * belum ada yang menghitungnya.
      */
-    private function notifyVerifiers(CollectorDeposit $deposit, User $collector, int $paymentCount, float $total): void
+    private function notifyVerifiers(CollectorDeposit $deposit, User $collector, User $actor, int $paymentCount, float $total): void
     {
         if (! $deposit->pop_id) {
             return;
@@ -437,6 +452,10 @@ class CollectorDepositService
 
         $users = User::whereHas('role', fn ($q) => $q->whereIn('code', ['admin', 'pop_admin']))
             ->where('id', '!=', $collector->id)
+            // Kecualikan `$actor` juga — kalau admin yang menyetor atas nama
+            // kolektor kebetulan salah satu penerima notif verifikasi, dia
+            // tak perlu diberitahu soal aksinya sendiri.
+            ->where('id', '!=', $actor->id)
             ->where(function ($query) use ($deposit) {
                 $query->whereHas('roleScopes', fn ($q) => $q->where('scope_type', ScopeType::ALL_POP->value))
                     ->orWhereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])

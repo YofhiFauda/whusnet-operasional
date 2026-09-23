@@ -1182,17 +1182,11 @@
 
     // ── LIGHTBOX ───────────────────────────────────────────────────────
     function openPhotoLightbox(src, caption) {
-        const lb = document.getElementById('photo-lightbox');
-        document.getElementById('lightbox-img').src = src;
-        document.getElementById('lightbox-caption').textContent = caption || '';
-        lb.classList.remove('hidden');
-        lb.classList.add('flex');
+        window.dispatchEvent(new CustomEvent('open-image-preview', { detail: { url: src, label: caption } }));
     }
 
     function closePhotoLightbox() {
-        const lb = document.getElementById('photo-lightbox');
-        lb.classList.add('hidden');
-        lb.classList.remove('flex');
+        // Handled by x-ui.image-preview-modal
     }
 
     // Escape key for modals
@@ -1547,4 +1541,6 @@
         @endif
     });
 </script>
+
+<x-ui.image-preview-modal />
 @endsection

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabel Bayar Wifi Cash</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 text-slate-800">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">Tabel Bayar Wifi Cash</h1>
+                <p class="text-sm text-slate-500">Rekapitulasi Pembayaran Pelanggan</p>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg text-emerald-700 font-semibold text-sm">
+                Kas Terkumpul: <span class="text-lg">Rp 70.508,0</span>
+            </div>
+        </div>
+
+        <!-- Filter / Search Bar -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 justify-between items-center">
+            <div class="relative w-full md:w-80">
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Cari pelanggan, akun, atau alamat..." 
+                    class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all">
+                <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <div class="text-xs text-slate-500 w-full md:w-auto text-right">
+                Menampilkan seluruh data pembayaran
+            </div>
+        </div>
+
+        <!-- Main Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse" id="dataTable">
+                    <thead>
+                        <tr class="bg-amber-100/70 border-b border-amber-200 text-slate-700 font-semibold uppercase text-xs tracking-wider">
+                            <th class="py-3 px-4">Tanggal</th>
+                            <th class="py-3 px-4">Akun</th>
+                            <th class="py-3 px-4">Nama Pelanggan</th>
+                            <th class="py-3 px-4">Alamat</th>
+                            <th class="py-3 px-4 text-right">Jumlah</th>
+                            <th class="py-3 px-4 text-right bg-amber-200/50">Total Sub</th>
+                            <th class="py-3 px-4">Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-slate-700">
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500">08-09-26</td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C1X4DRQ0018</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Hefida Tri Puspitasari</td>
+                            <td class="py-3 px-4 text-slate-500">Bila Bakery Jetis, Jl. Dipor</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 138,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-slate-100 px-2 py-0.5 rounded text-xs">hari</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500">03-09-26</td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000019</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Slamet Harianto</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. Moh yahmin, RT.03 RW...</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000023</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Imam Jaenudin</td>
+                            <td class="py-3 px-4 text-slate-500">Jln Jend. Sudirman RT 3 RW</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 150,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000022</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Santi Rahayu</td>
+                            <td class="py-3 px-4 text-slate-500">Jln Moh. Yamin RT 3 RW 2</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 70,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000032</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Mohamad Zanuar Anggara Putra</td>
+                            <td class="py-3 px-4 text-slate-500">Jln Moh. Yamin RT 3 RW 2</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000064</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Kabul Saichoni</td>
+                            <td class="py-3 px-4 text-slate-500">Jl K.Muhammad Na'im No</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 115,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000074</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Heri Setiardi</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. K. Asngari RT 02 RW 01 J</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000185</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Puji Astutik</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Josari Kulon RT 03</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000196</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Kasriati</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Josari Kulon RT 03</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000219</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Wiji</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. moh yamin 7 Rt 03/Rw 0</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 111,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000214</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">M Aris Nurhidayat</td>
+                            <td class="py-3 px-4 text-slate-500">jl. hasan besari, rt/rw 003</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000405</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Munari</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. Muh Yamin RT 03 RW 02</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 111,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000897</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Tolu</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. Moh. Yahmin, Josari We</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 165,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ001351</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Katenan</td>
+                            <td class="py-3 px-4 text-slate-500">Jl Moh Yamin 04 RT/RW 03</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 111,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ001439</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Eka Maria Fransisca</td>
+                            <td class="py-3 px-4 text-slate-500">JI Moh Yamin RT/RW 03/02</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ001467</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Imam Meseno Bachtiar</td>
+                            <td class="py-3 px-4 text-slate-500">Josari Wetan, Josari, Kec.</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 111,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunasd ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ001539</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Muhamad Nuri</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. Jend. Sudirman, No. 301</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 111,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-yellow-50/60 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C1X4CRQ0016</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Aida Faizatur Rahma</td>
+                            <td class="py-3 px-4 text-slate-500">Raudlatul Athfal (RA) Mift</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 150,000</td>
+                            <td class="py-3 px-4 text-right bg-yellow-200/70 font-mono font-bold text-slate-900">Rp 2,035,000</td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-yellow-50/60 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500">03-09-26</td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000350</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Yulianti</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Durungan RT2/RW2</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-yellow-200/70 font-mono font-bold text-slate-900">Rp 110,000</td>
+                            <td class="py-3 px-4"><span class="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-xs">lunas ags</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500">09-09-26</td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000638</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Watini</td>
+                            <td class="py-3 px-4 text-slate-500">JL. Manggar RT 002 / RW 00</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000643</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Agus Hariyanto</td>
+                            <td class="py-3 px-4 text-slate-500">JL. Manggar, RT.02/RW.02,</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000639</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Herman London</td>
+                            <td class="py-3 px-4 text-slate-500">JL. Manggar Dukuh Butung</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000640</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Sri Lestari Bajang</td>
+                            <td class="py-3 px-4 text-slate-500">JL. Manggar Dukuh Butung</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000646</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Tubianto</td>
+                            <td class="py-3 px-4 text-slate-500">JL. Manggar, RT.02/RW.00</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000660</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Sugiono</td>
+                            <td class="py-3 px-4 text-slate-500">JL.Kenongo RT 002 / RW 00</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000647</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Nana Supriatna</td>
+                            <td class="py-3 px-4 text-slate-500">JL. Manggar, RT/RW 002/00</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000678</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Liya Ikfina</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Mantren, RT.03/RW</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000698</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Djari</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. Kenongo, RT.01/RW.02,</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 111,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000748</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Sutrisno</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. Kenongo RT 002 / RW 00</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000936</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Rizky Purna Aji Galih Pangestu</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Mantren, RT 002/ R</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ001047</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Rumini</td>
+                            <td class="py-3 px-4 text-slate-500">JI Kenongo RT/RW 02/01 D</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ001246</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Sukardi Bajang</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Mantren RT/RW 03,</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 115,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-yellow-50/60 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ001247</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Dasir</td>
+                            <td class="py-3 px-4 text-slate-500">JI Manggar RT/RW 02/02 D</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 115,000</td>
+                            <td class="py-3 px-4 text-right bg-yellow-200/70 font-mono font-bold text-slate-900">Rp 1,651,000</td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-yellow-50/60 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500">09-09-26</td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ001558</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">H Effendi Eko Cahyono</td>
+                            <td class="py-3 px-4 text-slate-500">Setono, Tegalsari, Jetis, Ka</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 1,656,000</td>
+                            <td class="py-3 px-4 text-right bg-yellow-200/70 font-mono font-bold text-slate-900">Rp 1,656,000</td>
+                            <td class="py-3 px-4"><span class="inline-block bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-xs">lunas sep 26 s/d ags 27, free sep dan ok 2027</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500">09-09-26</td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000079</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Kiky Alamsyah Supriadi</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Tempel RT 01 RW 0</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 165,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000099</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Siti Samsiyah / Smp Ma'arif Gandu</td>
+                            <td class="py-3 px-4 text-slate-500">JI. Teratai 8 RT 01 RW 01 G</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 198,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000111</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Djoko Susilo</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Caru RT 03 RW 02 B</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 198,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000155</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Nehru Benny Wiyoga</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Krajan RT 01 RW 01</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 198,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000195</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Musrianah</td>
+                            <td class="py-3 px-4 text-slate-500">Warung Soto Desember sa</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000238</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Lina Widayati</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Jetis 2 RT.04/RW.01</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 130,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000344</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Zuheri Faruq Ridwan / MUHAMMADIY</td>
+                            <td class="py-3 px-4 text-slate-500">MBS Jetis Kampus 2</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 198,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000404</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Kateno</td>
+                            <td class="py-3 px-4 text-slate-500">Dkh. Pandanderek, RT.014</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000481</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Imanul Cholifah (Migrasi Whusnet)</td>
+                            <td class="py-3 px-4 text-slate-500">Salon Rosana Dkh.Jintap,</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 150,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000488</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Wahid Khoiru Sholikhin</td>
+                            <td class="py-3 px-4 text-slate-500">Jl. Kamboja , Winong 1, W</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 198,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000315</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Muchamad Fatchul Fauzi</td>
+                            <td class="py-3 px-4 text-slate-500">Dukuh Krajan Barat RT 01 R</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 110,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap text-slate-500"></td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-600">C00RQ000721</td>
+                            <td class="py-3 px-4 font-medium text-slate-900">Muhammad Munawir</td>
+                            <td class="py-3 px-4 text-slate-500">Jl.Aster RT 001 / RW 002 D</td>
+                            <td class="py-3 px-4 text-right font-mono">Rp 330,000</td>
+                            <td class="py-3 px-4 text-right bg-slate-50 font-mono"></td>
+                            <td class="py-3 px-4"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script pencarian sederhana -->
+    <script>
+        function filterTable() {
+            const input = document.getElementById("searchInput");
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById("dataTable");
+            const tr = table.getElementsByTagName("tr");
+
+            for (let i = 1; i < tr.length; i++) {
+                let rowMatch = false;
+                const tds = tr[i].getElementsByTagName("td");
+                for (let j = 0; j < tds.length; j++) {
+                    if (tds[j]) {
+                        if (tds[j].textContent.toLowerCase().indexOf(filter) > -1) {
+                            rowMatch = true;
+                            break;
+                        }
+                    }
+                }
+                tr[i].style.display = rowMatch ? "" : "none";
+            }
+        }
+    </script>
+</body>
+</html>

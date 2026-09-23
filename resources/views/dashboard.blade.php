@@ -16,6 +16,7 @@
         'sebagian' => 'Dibayar Sebagian',
         'lunas' => 'Lunas',
         'batal' => 'Batal',
+        'tak_tertagih' => 'Tak Tertagih',
     ];
 @endphp
 
@@ -173,17 +174,46 @@
             <p class="metric-card-footer">{{ number_format($stats['new_active_customers']) }} aktif baru &middot; {{ number_format($stats['terminated_customers']) }} putus</p>
         </div>
 
-        <!-- Collection Rate (KPI Strip — Pilar 1) -->
-        <div class="metric-card {{ is_null($stats['collection_rate']) ? '' : ($stats['collection_rate'] >= 80 ? 'status-success' : 'status-warning') }}">
+        <!-- Omset Sales (Metric Card) -->
+        <div class="metric-card">
             <div>
-                <div class="metric-card-label">
-                    <span>Collection Rate</span>
+                <div class="metric-card-label flex items-center justify-between">
+                    <span>Omset Sales</span>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300 rounded-full">Sales</span>
                 </div>
                 <div class="metric-card-value-container">
-                    <p class="metric-card-value">{{ is_null($stats['collection_rate']) ? '-' : $stats['collection_rate'].'%' }}</p>
+                    <p class="metric-card-value text-2xl text-sky-600 dark:text-sky-400">{{ $currency($stats['omset_sales_amount']) }}</p>
                 </div>
             </div>
-            <p class="metric-card-footer">Realisasi kas / omzet tagihan periode</p>
+            <p class="metric-card-footer"><span class="font-mono">{{ number_format($stats['omset_sales_count']) }}</span> pelanggan aktif dari Sales</p>
+        </div>
+
+        <!-- Omset Teknisi (Metric Card) -->
+        <div class="metric-card">
+            <div>
+                <div class="metric-card-label flex items-center justify-between">
+                    <span>Omset Teknisi</span>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 rounded-full">Teknisi</span>
+                </div>
+                <div class="metric-card-value-container">
+                    <p class="metric-card-value text-2xl text-emerald-600 dark:text-emerald-400">{{ $currency($stats['omset_teknisi_amount']) }}</p>
+                </div>
+            </div>
+            <p class="metric-card-footer"><span class="font-mono">{{ number_format($stats['omset_teknisi_count']) }}</span> pelanggan aktif dari Teknisi</p>
+        </div>
+
+        <!-- Omset Bisnis (Metric Card) -->
+        <div class="metric-card">
+            <div>
+                <div class="metric-card-label flex items-center justify-between">
+                    <span>Omset Bisnis</span>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 rounded-full">Bisnis</span>
+                </div>
+                <div class="metric-card-value-container">
+                    <p class="metric-card-value text-2xl text-amber-600 dark:text-amber-400">{{ $currency($stats['omset_bisnis_amount']) }}</p>
+                </div>
+            </div>
+            <p class="metric-card-footer"><span class="font-mono">{{ number_format($stats['omset_bisnis_count']) }}</span> pelanggan aktif segmen Bisnis</p>
         </div>
     </div>
 

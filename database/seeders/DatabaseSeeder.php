@@ -40,7 +40,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CustomerAcquisitionFeatureSeeder::class); // Customer Acquisition (Busdev) - Pelanggan Aktif < 30 Hari
         $this->call(BusinessDevelopmentVerificationFeatureSeeder::class); // Antrean Menunggu Verifikasi BD (pelanggan Bisnis pra-ACTIVE)
         $this->call(CustomerRegistrationVerificationFeatureSeeder::class); // Antrean Verifikasi Registrasi (ADHOC-73)
-        $this->call(BusinessDevelopmentFeatureSeeder::class); // agents/package_restrictions/sales_omset_dashboard (Skema 1-3, 2026-09-12)
+        $this->call(BusinessDevelopmentFeatureSeeder::class); // agents/package_restrictions/sales_omset_dashboard/business_customers (Skema 1-3, 2026-09-12)
         $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.*/warehouse*.*/fop_analytics.*/customer_acquisitions.*/agents.*/package_restrictions.*/sales_omset_dashboard.*/customer_registration_verification.* ke-sync ke owner
         $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
         $this->call(ItemCategorySeeder::class); // Kategori tambahan non-system (modem_ont, router_gateway) — sebelum ItemSeeder, dirujuk barangnya
@@ -52,6 +52,7 @@ class DatabaseSeeder extends Seeder
 
         // $this->call(TechnicianSeeder::class);
         // $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
+        // $this->call(BusinessCustomerSeeder::class); // Data List Pelanggan Bisnis (7 pelanggan dari docs/plan/bussiness-development/tabel_paket_bisnis.md) — WAJIB setelah ItemCategorySeeder & CustomerAcquisitionFeatureSeeder
         // $this->call(BusinessDevelopmentSeeder::class); // Data demo Busdev: Restriksi Paket, Master Agent, Omset Sales (Skema 1-3) — reuse Sales/Teknisi di atas, WAJIB setelah keduanya
         // $this->call(FopSeeder::class);
         // $this->call(KolektorSeeder::class);

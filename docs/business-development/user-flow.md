@@ -35,7 +35,9 @@
 3. Kolom "Harga Dikurangi PPN" dihitung otomatis (Biaya Langganan × 89%) — tidak ada input manual.
 4. Baris pelanggan yang lewat gate BD di atas otomatis sudah terisi Biaya Instalasi & link invoice-nya — tidak pernah muncul "Menunggu Validasi".
 
-## BD — Dashboard Omset Sales, Restriksi Paket, Master Agent
+## BD — List Pelanggan Bisnis, Dashboard Omset Sales, Restriksi Paket, Master Agent
+
+0. **List Pelanggan Bisnis** (`/business-development/business-customers`) — cari nama/ID/nama alat, filter Tipe Paket & Status. Kolom: Harga Paket (setelah diskon, sebelum PPN), Harga Sesudah PPN (tagihan bulanan, ikut PPN per pelanggan), Status, Alat yang Ditinggalkan (unit gudang berstatus terpasang), Biaya Instalasi (dari baris Pelanggan Aktif < 30 Hari), Tanggal Aktivasi. Hanya pelanggan yang sudah lewat pemasangan (Menunggu Verifikasi BD/Aktif/Suspend/Putus); tidak ada tombol tambah — pelanggan masuk lewat Registrasi biasa.
 
 1. **Dashboard Omset Sales** (`/business-development/sales-omset`) — pilih rentang tanggal/POP, lihat total Omset per Sales, klik nama untuk breakdown per pelanggan.
 2. **Restriksi Paket per Role** (`/business-development/package-restrictions`) — centang paket yang BOLEH dipilih Sales/Teknisi saat registrasi (daftar berlaku global untuk semua role dengan pembatasan).

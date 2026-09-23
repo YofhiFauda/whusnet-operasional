@@ -43,18 +43,27 @@
     {{-- Toast Notification --}}
     <div x-show="toast.show" x-cloak
          x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 translate-y-3 scale-95"
-         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+         x-transition:enter-start="opacity-0 -translate-y-4 translate-x-2 scale-95"
+         x-transition:enter-end="opacity-100 translate-y-0 translate-x-0 scale-100"
          x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-         x-transition:leave-end="opacity-0 translate-y-3 scale-95"
-         class="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl shadow-2xl border px-4 py-3 flex items-start gap-2.5"
-         :class="toast.type === 'error' ? 'bg-rose-50 dark:bg-rose-900/40 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-200' : 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-200'">
-        <svg class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path x-show="toast.type !== 'error'" stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            <path x-show="toast.type === 'error'" stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        <span class="text-xs font-semibold" x-text="toast.message"></span>
+         x-transition:leave-start="opacity-100 translate-y-0 translate-x-0 scale-100"
+         x-transition:leave-end="opacity-0 -translate-y-2 translate-x-2 scale-95"
+         class="fixed top-4 right-4 sm:top-5 sm:right-6 z-[9999] max-w-sm sm:max-w-md w-auto rounded-xl shadow-2xl border px-4 py-3 flex items-start justify-between gap-3 backdrop-blur-md pointer-events-auto"
+         :class="toast.type === 'error'
+             ? 'bg-rose-50/95 dark:bg-rose-900/90 border-rose-200 dark:border-rose-700 text-rose-800 dark:text-rose-100'
+             : 'bg-emerald-50/95 dark:bg-emerald-900/90 border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-100'">
+        <div class="flex items-start gap-2.5 min-w-0">
+            <svg class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path x-show="toast.type !== 'error'" stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path x-show="toast.type === 'error'" stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span class="text-xs font-semibold leading-relaxed" x-text="toast.message"></span>
+        </div>
+        <button type="button" @click="toast.show = false" class="p-1 -mr-1 -mt-0.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition-all shrink-0 cursor-pointer" title="Tutup">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
     </div>
 
     {{--
@@ -228,7 +237,7 @@
         <form action="{{ route('tickets.store') }}" method="POST" @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
             @csrf
 
-            <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3.5">
+            <div x-ref="formBody" class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3.5">
 
                 {{-- Row 1: Klasifikasi & Prioritas --}}
                 <div class="grid grid-cols-2 gap-2.5">
@@ -694,7 +703,18 @@
     <div class="flex-1 flex min-w-0 overflow-hidden bg-background ticket-queue-container">
     <div class="flex-1 flex flex-col min-w-[280px] overflow-hidden">
 
-        <div class="shrink-0 p-3 border-b border-border bg-surface flex items-center gap-2 flex-wrap queue-toolbar">
+        {{--
+            Layout toolbar: DUA baris di bawah `lg` (tab full-width lalu
+            kontrol full-width), SATU baris di `lg` ke atas (tab + kontrol
+            berbagi baris via ml-auto). Sebelumnya semua elemen ini ada di
+            satu flex-wrap — di layar mobile/tablet elemen ke-4/5 (select
+            prioritas, toggle table/cards, refresh, bantuan) kepental ke
+            baris berikutnya dalam urutan gak terduga & toolbar jadi tinggi
+            banget. Kontrol sekarang SELALU nowrap (gak ada lagi jalur wrap
+            yang nyembunyiin tombol) — input cari jadi `flex-1` biar nyerap
+            sisa lebar, elemen lain fixed-width di sebelahnya.
+        --}}
+        <div class="shrink-0 p-3 border-b border-border bg-surface flex flex-col lg:flex-row lg:items-center gap-2 queue-toolbar">
             {{--
                 Filter Tabs — value = TicketHandler->value asli (helpdesk/noc/fop),
                 BUKAN TicketBucket lagi. Tab di sini nunjukin "tiket ini lagi
@@ -707,7 +727,7 @@
                 (tabCounts), biar user tetap lihat antrean penuh tiap tab walau
                 sedang menyaring prioritas tertentu.
             --}}
-            <div class="flex-1 basis-full sm:basis-auto min-w-[180px] flex items-center gap-1 bg-surface-muted dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted queue-toolbar-tabs">
+            <div class="w-full lg:w-auto lg:flex-1 lg:min-w-[180px] flex items-center gap-1 bg-surface-muted dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted queue-toolbar-tabs">
                 <template x-for="tab in tabs" :key="tab.value">
                     <button type="button" @click="setTab(tab.value)"
                             :class="taskFilter === tab.value ? 'bg-surface text-text-main font-bold shadow-sm' : 'hover:text-text-main'"
@@ -720,9 +740,9 @@
                 </template>
             </div>
 
-            <div class="shrink-0 flex items-center gap-2 ml-auto flex-wrap sm:flex-nowrap queue-toolbar-controls">
-                {{-- Input Cari Tiket Aktif --}}
-                <div class="relative min-w-[130px] max-w-[180px]">
+            <div class="w-full lg:w-auto shrink-0 flex items-center gap-2 lg:ml-auto queue-toolbar-controls">
+                {{-- Input Cari Tiket Aktif — flex-1 di semua breakpoint: nyerap sisa lebar biar elemen shrink-0 di sebelahnya gak pernah kepental baris baru. --}}
+                <div class="relative flex-1 min-w-0 lg:flex-none lg:min-w-[130px] lg:max-w-[180px]">
                     <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-text-muted">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -740,9 +760,14 @@
                     </button>
                 </div>
 
-                {{-- Filter prioritas — murni client-side atas array `tasks` yang udah dimuat. --}}
-                <select x-model="filterPriority"
-                        class="max-w-[9.5rem] bg-surface-muted dark:bg-slate-900 border border-border text-xs font-medium rounded-lg px-2 py-1.5 text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/30">
+                {{--
+                    Filter prioritas — murni client-side atas array `tasks` yang
+                    udah dimuat. `w-9 sm:w-auto` + `truncate` biar di layar sempit
+                    cuma nampilin ikon corong (opsi tetep kebaca pas dropdown
+                    dibuka), gak makan lebar buat teks "Semua Prioritas".
+                --}}
+                <select x-model="filterPriority" title="Filter prioritas"
+                        class="shrink-0 w-24 sm:w-auto sm:max-w-[9.5rem] truncate bg-surface-muted dark:bg-slate-900 border border-border text-xs font-medium rounded-lg px-2 py-1.5 text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/30">
                     <option value="ALL">Semua Prioritas</option>
                     <option value="Urgent">🔴 Urgent</option>
                     <option value="High">🟠 High</option>
@@ -785,16 +810,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
-                <button type="button" onclick="openHelp('keys')" title="Pintasan Keyboard & Bantuan (?)"
-                        class="p-1.5 rounded-lg text-text-muted hover:text-sky-600 dark:hover:text-sky-400 hover:bg-surface-muted dark:hover:bg-slate-900 transition-colors cursor-pointer">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
-                    </svg>
-                </button>
+                    
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-3">
+        <div class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <template x-if="filteredTasks.length === 0">
                 <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
                     <div class="w-14 h-14 rounded-2xl bg-surface-muted dark:bg-slate-800/80 border border-border flex items-center justify-center text-text-muted mb-3 shadow-2xs">
@@ -1101,23 +1121,20 @@
                 </div>
             </div>
 
-            {{-- ── MODE KARTU ── satu baris kartu per tiket (layout sebelumnya) --}}
-            <div x-show="activeViewMode === 'cards' && filteredTasks.length > 0" class="space-y-2">
+            {{-- ── MODE KARTU ── menyatu dalam satu blok list terpadu (seperti tampilan Desktop) --}}
+            <div x-show="activeViewMode === 'cards' && filteredTasks.length > 0" class="border border-border bg-surface shadow-xs divide-y divide-border overflow-hidden">
                 <template x-for="(task, index) in sortedTasks" :key="task.id">
                     {{--
-                        Tepi kiri kartu diwarnai per prioritas (border-l-2).
-                        Bukan hiasan: di mode kartu tiket kebaca dari atas ke
-                        bawah, dan warna tepi bikin Urgent/High kelihatan tanpa
-                        harus baca badge dulu. Badge teksnya tetap ada buat yang
-                        gak bisa mengandalkan warna.
+                        Tepi kiri kartu diwarnai per prioritas (border-l-4).
+                        Menyatu dalam satu kontainer list terpadu dengan divider tipis antar baris, persis seperti baris pada tampilan desktop.
                     --}}
-                    <div class="ticket-card flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5 p-3 2xl:py-2.5 rounded-xl border border-l-2 border-border bg-surface hover:border-sky-500/60 hover:shadow-md transition-[transform,box-shadow,border-color,background-color] duration-200 group"
+                    <div class="ticket-card flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5 p-3 2xl:py-2.5 border-l-4 bg-surface hover:bg-surface-muted/60 dark:hover:bg-slate-800/40 transition-colors duration-150 group relative z-0"
                          :data-ticket-row="task.id"
                          :class="{
                              'border-l-rose-500': task.priority === 'Urgent',
                              'border-l-amber-500': task.priority === 'High',
-                             'border-l-border': task.priority !== 'Urgent' && task.priority !== 'High',
-                             'ring-1 ring-sky-400/60 bg-sky-50/60 dark:bg-sky-950/30': task.id === focusedTicketId,
+                             'border-l-slate-300 dark:border-l-slate-700': task.priority !== 'Urgent' && task.priority !== 'High',
+                             'ring-1 ring-inset ring-sky-400/60 bg-sky-50/70 dark:bg-sky-950/30 z-10': task.id === focusedTicketId,
                          }"
                          :style="`animation-delay:${Math.min(index, 8) * 30}ms`">
                         
@@ -1318,7 +1335,7 @@
 
                         {{-- Expanded Batch Members Container for Card View Mode (1-Baris List) --}}
                         <div x-show="task.is_batch && expandedBatchTicketId === task.id" x-cloak
-                             class="w-full pt-3 mt-2 border-t border-violet-200/80 dark:border-violet-900/50 bg-violet-50/40 dark:bg-violet-950/20 -mx-3 -mb-3 p-3 rounded-b-xl space-y-2.5">
+                             class="w-full pt-3 mt-2 border-t border-violet-200/80 dark:border-violet-900/50 bg-violet-50/40 dark:bg-violet-950/20 -mx-3 -mb-3 p-3 space-y-2.5">
                             <div class="flex items-center justify-between gap-2 flex-wrap">
                                 <span class="text-[11px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
                                     <span class="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"></span>
@@ -2146,6 +2163,7 @@
                 this.popSearchQuery = '';
                 this.popTypeFilter = 'all';
                 this.popId = '';
+                this.$nextTick(() => this.$refs.searchInput?.focus());
             },
 
             // Kategori issue auto-fill prioritas — user tetap bisa override manual.
@@ -2253,9 +2271,18 @@
                 }
             },
 
+            toastTimer: null,
             showToast(message, type = 'success') {
+                if (window.Toast) {
+                    const title = type === 'error' ? 'Gagal' : (type === 'warning' ? 'Peringatan' : 'Berhasil');
+                    if (type === 'error') window.Toast.error(title, message);
+                    else if (type === 'warning') window.Toast.warning(title, message);
+                    else window.Toast.success(title, message);
+                    return;
+                }
+                if (this.toastTimer) clearTimeout(this.toastTimer);
                 this.toast = { show: true, type, message };
-                setTimeout(() => { this.toast.show = false; }, 3000);
+                this.toastTimer = setTimeout(() => { this.toast.show = false; }, 4000);
             },
 
             resetForm() {
@@ -2274,7 +2301,10 @@
                 this.popSearchQuery = '';
                 this.popTypeFilter = 'all';
                 if (this.$refs.fileInput) this.$refs.fileInput.value = '';
-                this.$nextTick(() => this.$refs.searchInput?.focus());
+                this.$nextTick(() => {
+                    if (this.$refs.formBody) this.$refs.formBody.scrollTop = 0;
+                    this.$refs.searchInput?.focus();
+                });
             },
 
             handleShortcut(e) {

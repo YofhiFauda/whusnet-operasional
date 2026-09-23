@@ -350,7 +350,7 @@ class SeedVolumeForBenchmark extends Command
                         'pop_id' => $inv->pop_id,
                         'received_by' => $userId,
                         'payment_date' => $payDate->toDateString(),
-                        'payment_method' => ['cash', 'transfer', 'qris'][array_rand([0, 1, 2])],
+                        'payment_method' => ['cash', 'transfer'][array_rand([0, 1])],
                         'payment_status' => 'valid',
                         'amount' => $inv->total_amount,
                         'created_at' => $payDate,

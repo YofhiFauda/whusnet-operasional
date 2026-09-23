@@ -183,7 +183,7 @@
 
                             <div>
                                 <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Registrasi <span class="text-rose-500">*</span></label>
-                                <input type="date" name="registration_date" id="registration_date" value="{{ old('registration_date', now()->format('Y-m-d')) }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('registration_date') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <input type="date" name="registration_date" id="registration_date" value="{{ old('registration_date', today()->format('Y-m-d')) }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('registration_date') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
                                 @error('registration_date')
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
                                 @enderror

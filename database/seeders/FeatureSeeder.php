@@ -124,6 +124,24 @@ class FeatureSeeder extends Seeder
                 'sort_order' => 13,
             ],
             [
+                // Laporan Bulanan Admin Collector + tutup periode (ADHOC-90).
+                // Feature sendiri, bukan numpang `reports.*`: menutup/membuka
+                // ulang pembukuan mengubah angka resmi, kewenangannya jauh
+                // lebih sempit daripada sekadar melihat laporan.
+                'code' => 'collector_report',
+                'name' => 'Laporan Bulanan Admin',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 13,
+            ],
+            [
+                // Tabel "Bayar Wifi Cash" per kolektor — halaman terpisah dari
+                // laporan bulanan admin (audiens & data beda), permission sendiri.
+                'code' => 'collector_payment_report',
+                'name' => 'Laporan Bayar Kolektor',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 13,
+            ],
+            [
                 'code' => 'audit_logs',
                 'name' => 'Audit Log',
                 'type' => FeatureType::ROOT,

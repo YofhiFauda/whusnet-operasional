@@ -1306,7 +1306,14 @@ class FopTaskController extends Controller
         // --- 1. Auto-Sync Survey ---
         // 'pop' WAJIB ikut eager-load — Customer::getDisplayIdAttribute() butuh
         // relasi ini buat resolve CID (format tugas "{CID}_{Nama}" di bawah).
-        $surveyCustomers = Customer::whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
+        //
+        // `registered` (Verifikasi Registrasi, ADHOC-73) SENGAJA tidak ikut:
+        // pelanggan di status itu masih menunggu Admin/CS memverifikasi
+        // (CustomerRegistrationVerificationController). FopTask Survey baru
+        // boleh lahir saat approve → waiting_survey. Kalau `registered`
+        // dimasukkan lagi, jaring pengaman ini membuat FopTask SURVEY tiap
+        // halaman /fop-tasks dibuka dan verifikasi CS jadi bisa dilangkahi.
+        $surveyCustomers = Customer::whereIn('status', ['calon_pelanggan', 'waiting_survey'])
             ->with('pop')
             ->whereDoesntHave('fopTasks', function ($q) {
                 $q->where('category', TaskType::SURVEY->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);

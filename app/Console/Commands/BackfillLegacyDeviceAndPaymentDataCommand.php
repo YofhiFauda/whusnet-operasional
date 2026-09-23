@@ -163,7 +163,8 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
                 $mappedMethod = match ($realMethod) {
                     'tunai', 'cash' => 'cash',
                     'transfer', 'bank_transfer' => 'transfer',
-                    'qris' => 'qris',
+                    // 'qris' DIHAPUS dari PaymentMethod (2026-09-22) — jatuh
+                    // ke default 'lainnya' di bawah.
                     '' => null,
                     default => 'lainnya',
                 };

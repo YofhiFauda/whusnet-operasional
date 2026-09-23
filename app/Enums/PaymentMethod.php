@@ -12,12 +12,16 @@ namespace App\Enums;
  * diterima langsung admin. Kolektornya sendiri disimpan di kolom
  * `payments.collected_by` (sudah ada), bukan field enum baru — saldo
  * kolektor tetap DERIVED lewat CollectorBalanceService.
+ *
+ * `QRIS` DIHAPUS (2026-09-22, permintaan user) — tidak pernah dipakai
+ * operasional. Baris lama di DB (kalau ada) tetap tersimpan apa adanya
+ * (kolom `payments.payment_method` string biasa, bukan cast enum), cuma
+ * tak lagi bisa dipilih dari form/filter mana pun.
  */
 enum PaymentMethod: string
 {
     case CASH = 'cash';
     case TRANSFER = 'transfer';
-    case QRIS = 'qris';
     case KOLEKTOR = 'kolektor';
     case LAINNYA = 'lainnya';
 
@@ -26,7 +30,6 @@ enum PaymentMethod: string
         return match ($this) {
             self::CASH => 'Cash',
             self::TRANSFER => 'Transfer Bank',
-            self::QRIS => 'QRIS',
             self::KOLEKTOR => 'Kolektor',
             self::LAINNYA => 'Lainnya',
         };
@@ -42,5 +45,15 @@ enum PaymentMethod: string
     public function requiresCollector(): bool
     {
         return $this === self::KOLEKTOR;
+    }
+
+    /**
+     * Lainnya wajib mengisi keterangan (metode apa persisnya — mis. "OVO",
+     * "Dana", "GoPay") — form menampilkan input tambahan begitu dipilih
+     * (permintaan user 2026-09-22).
+     */
+    public function requiresDescription(): bool
+    {
+        return $this === self::LAINNYA;
     }
 }

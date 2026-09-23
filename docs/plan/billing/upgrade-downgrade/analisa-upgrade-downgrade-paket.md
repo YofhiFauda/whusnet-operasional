@@ -1,6 +1,6 @@
 # Analisa & Rancangan: Upgrade/Downgrade Paket Internet
 
-**Status:** Terbuka — analisa selesai 2026-09-15, implementasi belum mulai. Di luar Sprint 8.10 (aktif), dicatat sebagai ADHOC-68 di `docs/TASKS.md`.
+**Status:** Terbuka — analisa selesai 2026-09-15, framing diperjelas 2026-09-22 (dikonfirmasi user — isi/keputusan **tidak berubah**, cuma cara penjelasan §1 diperbaiki karena bikin salah paham "2 rumus terpisah"). Di luar Sprint 8.10 (aktif), dicatat sebagai ADHOC-68 di `docs/TASKS.md`.
 
 **Sumber ide awal:** `docs/plan/billing/upgrade-downgrade/Skema-downgrade-dan-upgrade.md` (skema matematis dari user). Dokumen ini adalah hasil review terhadap skema tsb + gap analysis terhadap kode nyata + rancangan implementasi.
 
@@ -8,13 +8,22 @@
 
 ## 1. Ringkasan Putusan
 
-Skema matematis (prorate harian, jumlah untuk postpaid, selisih+deposit untuk prepaid) **sudah benar secara prinsip** — pola prorate ISP standar. Tapi dua istilah di dokumen sumber, **"Postpaid"** dan **"Prepaid"**, salah dipahami kalau dibaca sebagai *tipe pelanggan* — sistem ini **tidak** punya kolom/konsep semacam itu (sudah dicek: nihil di `app/`, `database/migrations/`). Istilah itu di-reinterpretasi di sini jadi:
+**Rumusnya CUMA SATU** — bukan dua rumus terpisah ("Postpaid" vs "Prepaid" seperti judul di dokumen sumber). Berlaku sama persis untuk upgrade maupun downgrade:
 
-> **Kondisi invoice periode berjalan saat paket diganti**, bukan tipe pelanggan:
-> - Invoice periode ini **belum lunas** (`belum_dibayar` / `sebagian`) → rumus **jumlah** (yang di dokumen sumber disebut "Postpaid").
-> - Invoice periode ini **sudah lunas** (`lunas`) → rumus **selisih + deposit** (yang di dokumen sumber disebut "Prepaid").
+```
+total_tagihan_periode_ini = prorate_paket_lama + prorate_paket_baru
+sisa_yang_harus_dibayar   = total_tagihan_periode_ini − yang_sudah_dibayar
+```
 
-Dengan reinterpretasi ini, skema bisa dipetakan ke `InvoiceStatus` yang sudah ada — tidak perlu kolom customer baru untuk "metode bayar".
+Hasilnya otomatis menyesuaikan tergantung berapa yang **sudah dibayar duluan** untuk periode ini — bukan tergantung "tipe pelanggan":
+- **Belum bayar sama sekali** → `sisa` = total penuh (ini yang di dokumen sumber disebut "Postpaid").
+- **Sudah bayar lunas** paket lama duluan → `sisa` otomatis jadi lebih kecil, cuma kekurangannya aja (ini yang di dokumen sumber disebut "Prepaid" — rumus "selisih").
+- **Kalau hasil `sisa` malah minus** (dibayar lebih besar dari total baru, kasus umum di downgrade) → jadi **Deposit** untuk bulan depan, bukan ditagih.
+- **Kalau baru dibayar sebagian** (cicilan) → `sisa` dikurangi sebesar yang sudah dicicil, sama seperti dua kasus di atas — satu formula yang sama, tidak perlu cabang tambahan.
+
+Dikonfirmasi user (2026-09-22): pemahaman ini benar, cuma penjelasan `Postpaid`/`Prepaid` di dokumen sumber sempat disangka butuh 2 rumus/kolom "tipe pelanggan" terpisah — sistem ini memang **tidak** dan **tidak perlu** punya kolom/konsep semacam itu (dicek: nihil di `app/`, `database/migrations/`). Satu formula di atas sudah otomatis mencakup semua kasus.
+
+Piutang: **upgrade diblok** kalau pelanggan masih punya piutang periode sebelumnya (termasuk yang sudah dicicil sebagian, status `sebagian` — bukan cuma yang sama sekali belum dibayar); **downgrade tetap boleh jalan** meski ada piutang (dikonfirmasi ulang user 2026-09-22, lihat §2.9).
 
 ---
 

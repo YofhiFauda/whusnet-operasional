@@ -231,9 +231,30 @@ class="space-y-6" id="live-content">
 
     <div id="batch-alert" class="hidden text-sm rounded-2xl p-4 shadow-xs"></div>
 
+    {{-- Navigation Tabs: Tagihan (siapa yang perlu didatangi) vs Sudah Bayar
+         (siapa yang sudah bayar & uangnya sedang menunggu disetor). Tab
+         kedua ada supaya kolektor bisa cross check sendiri sebelum menekan
+         "Setor ke Admin" — bukan cuma percaya angka total saldo. --}}
+    <div class="border-b border-slate-200 dark:border-slate-700/80 overflow-x-auto custom-scrollbar pb-1">
+        <div class="flex gap-1.5 sm:gap-2 min-w-max">
+            <a href="{{ route('collector-worklist.index', ['tab' => 'tagihan']) }}"
+               class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs font-semibold border-b-2 -mb-px transition-all inline-flex items-center gap-2 {{ $tab === 'tagihan' ? 'border-sky-600 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>Tagihan</span>
+            </a>
+            <a href="{{ route('collector-worklist.index', ['tab' => 'bayar']) }}"
+               class="px-3 sm:px-4 py-2.5 sm:py-3 text-xs font-semibold border-b-2 -mb-px transition-all inline-flex items-center gap-2 {{ $tab === 'bayar' ? 'border-sky-600 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span>Sudah Bayar ({{ $unsettledCount }})</span>
+            </a>
+        </div>
+    </div>
+
+    @if ($tab === 'tagihan')
     {{-- Search Form --}}
     <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-xs">
         <form action="{{ route('collector-worklist.index') }}" method="GET" class="flex flex-col sm:flex-row gap-3">
+            <input type="hidden" name="tab" value="tagihan">
             <div class="relative flex-1">
                 <input type="text" name="search" value="{{ $search }}" placeholder="Cari Nama, CID, atau No. Invoice..."
                        class="w-full text-sm pl-9 pr-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
@@ -244,7 +265,7 @@ class="space-y-6" id="live-content">
                     Cari
                 </button>
                 @if($search !== '')
-                    <a href="{{ route('collector-worklist.index') }}" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm px-4 py-2.5 rounded-xl transition-all cursor-pointer">
+                    <a href="{{ route('collector-worklist.index', ['tab' => 'tagihan']) }}" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm px-4 py-2.5 rounded-xl transition-all cursor-pointer">
                         Reset
                     </a>
                 @endif
@@ -318,6 +339,66 @@ class="space-y-6" id="live-content">
                 {{ $invoices->links() }}
             </div>
         </div>
+    @endif
+
+    @else
+    {{-- Tab Sudah Bayar — view-only, daftar PAYMENT (bukan invoice) yang
+         belum ikut setoran mana pun. Persis isi setoran yang akan terbentuk
+         kalau "Setor ke Admin" ditekan sekarang. --}}
+    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left text-sm text-slate-700 dark:text-slate-200 min-w-0 sm:min-w-full">
+                <thead class="hidden sm:table-header-group">
+                    <tr class="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                        <th class="px-6 py-4">Pelanggan</th>
+                        <th class="px-6 py-4">No. Pembayaran</th>
+                        <th class="px-6 py-4">Metode</th>
+                        <th class="px-6 py-4">Tgl Ditagih</th>
+                        <th class="px-6 py-4">Keterangan</th>
+                        <th class="px-6 py-4 text-right">Nominal</th>
+                    </tr>
+                </thead>
+                <tbody class="block sm:table-row-group divide-y-0 sm:divide-y p-3 sm:p-0 space-y-3 sm:space-y-0 divide-slate-100 dark:divide-slate-700/50">
+                    @forelse ($unsettledPayments as $payment)
+                        @php $periodType = $payment->periodType(); @endphp
+                        <tr class="block sm:table-row bg-white dark:bg-slate-800/90 sm:bg-transparent rounded-2xl sm:rounded-none border border-slate-200/80 dark:border-slate-700/80 sm:border-x-0 sm:border-t-0 sm:border-b p-4 sm:p-0 shadow-xs sm:shadow-none hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
+                            <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4">
+                                <div class="font-bold text-slate-900 dark:text-slate-100">{{ $payment->customer->full_name ?? '-' }}</div>
+                                <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{{ $payment->customer->cid ?? $payment->customer->customer_code ?? '-' }}</div>
+                            </td>
+                            <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4 font-mono text-xs">
+                                <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">No. Pembayaran:</span>
+                                {{ $payment->payment_number }}
+                            </td>
+                            <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4 text-xs">
+                                <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Metode:</span>
+                                <span class="capitalize">{{ $payment->payment_method }}</span>
+                            </td>
+                            <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4 text-xs">
+                                <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tgl Ditagih:</span>
+                                {{ $payment->collected_date?->format('d/m/Y') ?? '-' }}
+                            </td>
+                            <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4">
+                                <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Keterangan:</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $periodType->badgeClass() }}">{{ $periodType->label() }}</span>
+                            </td>
+                            <td class="block sm:table-cell px-0 sm:px-6 py-1 sm:py-4 sm:text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                <span class="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nominal:</span>
+                                Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center text-sm text-slate-500 dark:text-slate-400">Belum ada pembayaran yang menunggu disetor.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700">
+            {{ $unsettledPayments->links() }}
+        </div>
+    </div>
     @endif
 
     {{-- Responsive Dialog: Mobile Bottom Sheet Drawer / Desktop Centered Modal --}}

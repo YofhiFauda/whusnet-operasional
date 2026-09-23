@@ -2,12 +2,13 @@
 
 Kumpulan fitur buat tim Business Development (dulu disebut "Busdev" — istilah itu masih dipakai di **label UI**, tapi kode/permission/tabel semua pakai `business_development`/`customer_acquisitions`): monitoring pelanggan baru, dashboard omset Sales, master restriksi paket per role, master Agent/mitra, dan gate validasi "Biaya Instalasi" buat kategori paket Bisnis sebelum pelanggan resmi aktif.
 
-Empat sub-fitur beda tujuan, satu submenu sidebar **"Business Development"**:
+Lima sub-fitur beda tujuan, satu submenu sidebar **"Business Development"**:
 
 | Sub-fitur | Route awal | Buat apa |
 |---|---|---|
 | Pelanggan Aktif < 30 Hari (Customer Acquisition) | `/customer-acquisitions` | Monitoring pelanggan baru terverifikasi, direset tampilan tiap bulan |
 | Menunggu Verifikasi BD | `/business-development-verifications` | **Gate**: pelanggan kategori Bisnis nyangkut di sini sebelum resmi ACTIVE, BD isi Biaya Instalasi |
+| List Pelanggan Bisnis | `/business-development/business-customers` | Daftar pelanggan kategori paket Bisnis: harga paket, harga sesudah PPN, status, alat yang ditinggalkan, biaya instalasi, tanggal aktivasi. **Read-only, turunan data sistem** (tanpa tabel/input manual) |
 | Dashboard Omset Sales | `/business-development/sales-omset` | Agregat komisi/omset per Sales |
 | Restriksi Paket per Role | `/business-development/package-restrictions` | Batasi paket apa yang boleh dipilih role tertentu (Sales/Teknisi) saat registrasi |
 | Master Agent | `/business-development/agents` | Master mitra/agen referral (bukan akun login) |
@@ -44,15 +45,16 @@ Diatur admin lewat **Master Kategori Paket** (`/master/package-categories`, drop
 | View verifikasi (dipakai CS **dan** BD, satu file) | `resources/views/verifications/admin.blade.php`, `app/Services/CustomerVerificationDetailService.php` |
 | Restriksi Paket (Skema 1) | `app/Models/RestrictedPackage.php`, `app/Http/Controllers/PackageRestrictionController.php`, `InternetPackage::scopeAvailableFor()` |
 | Dashboard Omset Sales (Skema 2) | `app/Http/Controllers/SalesOmsetDashboardController.php` |
+| List Pelanggan Bisnis | `app/Http/Controllers/BusinessDevelopment/BusinessCustomerController.php`, view `resources/views/business-development/business-customers/index.blade.php` |
 | FK Sales/Agent/Referral (Skema 3) | `app/Models/Agent.php`, kolom `customers.sales_user_id`/`agent_id`/`referral_customer_id` |
-| Seed data demo | `database/seeders/BusinessDevelopmentSeeder.php` |
+| Seed data demo | `database/seeders/BusinessDevelopmentSeeder.php`, `database/seeders/BusinessCustomerSeeder.php` (List Pelanggan Bisnis, 7 pelanggan) |
 
 ## Terhubung dengan Modul Lain
 
 - [docs/customer-lifecycle](../customer-lifecycle/README.md) — gate BD nempel di ujung tahap Verifikasi Admin (`finalVerify()`), sebelum `WorkflowTransition::ACTIVE`.
 - [docs/billing-pembayaran](../billing-pembayaran/README.md) — Invoice Awal (`InitialInvoiceService`) & Invoice Biaya Instalasi (`InstallationFeeInvoiceService`) sama-sama lewat `InvoiceItemBuilder`/kategori pendapatan.
-- [docs/rbac](../rbac/README.md) — role `business_development` (`RoleSeeder`), permission `business_development_verification.view`, `customer_acquisitions.*`, `agents.*`, `package_restrictions.*`, `sales_omset_dashboard.view`.
+- [docs/rbac](../rbac/README.md) — role `business_development` (`RoleSeeder`), permission `business_development_verification.view`, `customer_acquisitions.*`, `agents.*`, `package_restrictions.*`, `sales_omset_dashboard.view`, `business_customers.view`.
 
 ---
 
-**Last updated:** 2026-09-16 — 2 invoice terpisah (Invoice Awal + Biaya Instalasi) digabung jadi SATU invoice di jalur gate BD (laporan user: "kenapa muncul 2 tagihan pada 1 pelanggan"). Riwayat sebelumnya: 2026-09-14, Invoice Awal kategori Bisnis ditunda sampai BD verifikasi (sebelumnya terbit duluan di CS, cuma status pelanggan yang ketunda)
+**Last updated:** 2026-09-21 — tambah List Pelanggan Bisnis (read-only). Sebelumnya 2026-09-16 — 2 invoice terpisah (Invoice Awal + Biaya Instalasi) digabung jadi SATU invoice di jalur gate BD (laporan user: "kenapa muncul 2 tagihan pada 1 pelanggan"). Riwayat sebelumnya: 2026-09-14, Invoice Awal kategori Bisnis ditunda sampai BD verifikasi (sebelumnya terbit duluan di CS, cuma status pelanggan yang ketunda)

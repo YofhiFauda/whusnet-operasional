@@ -3,11 +3,14 @@
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BusinessDevelopment\AgentController;
+use App\Http\Controllers\BusinessDevelopment\BusinessCustomerController;
 use App\Http\Controllers\BusinessDevelopment\PackageRestrictionController;
 use App\Http\Controllers\BusinessDevelopmentVerificationController;
 use App\Http\Controllers\CashDepositController;
 use App\Http\Controllers\CollectorDepositController;
+use App\Http\Controllers\CollectorMonthlyReportController;
 use App\Http\Controllers\CollectorPaymentController;
+use App\Http\Controllers\CollectorPaymentReportController;
 use App\Http\Controllers\CollectorVisitController;
 use App\Http\Controllers\CollectorWorklistController;
 use App\Http\Controllers\CollectorWorksheetController;
@@ -329,6 +332,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
     });
 
+    // Hapus buku piutang → Tak Tertagih (ADHOC-90). Permission sendiri
+    // (`invoices.approve`), tidak numpang invoices.update.
+    Route::middleware('permission:invoices.approve')->group(function () {
+        Route::post('/invoices/{invoice}/write-off', [InvoiceController::class, 'writeOff'])->name('invoices.write-off');
+        Route::post('/invoices/{invoice}/write-off/reverse', [InvoiceController::class, 'reverseWriteOff'])->name('invoices.write-off.reverse');
+    });
+
     Route::middleware('permission:payments.reject')->group(function () {
         Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     });
@@ -389,6 +399,14 @@ Route::middleware('auth')->group(function () {
     // tanpa parameter, kolektor dari auth()->user().
     Route::middleware('permission:kolektor.deposit')->group(function () {
         Route::post('/collector-worklist/deposit', [CollectorDepositController::class, 'store'])->name('collector-worklist.deposit');
+    });
+
+    // Admin menyetor atas nama kolektor yang tak bisa akses aplikasinya
+    // sendiri — dari Worksheet Admin, kolektornya dari route parameter
+    // (digerbang permission-nya sendiri, terpisah dari `kolektor.deposit`
+    // yang buat kolektor sendiri).
+    Route::middleware('permission:collector_worksheet.deposit')->group(function () {
+        Route::post('/collector-worksheet/{collector}/deposit', [CollectorDepositController::class, 'storeForCollector'])->name('collector-worksheet.deposit');
     });
 
     // Kolektor mencatat kunjungan tanpa hasil. Tanpa parameter kolektor —
@@ -882,12 +900,40 @@ Route::middleware('auth')->group(function () {
         Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');
         Route::get('/reports/invoices', [InvoiceReportController::class, 'index'])->name('reports.invoices.index');
         Route::get('/reports/invoices/export', [InvoiceReportController::class, 'export'])->name('reports.invoices.export');
+        Route::get('/reports/invoices/export-xlsx', [InvoiceReportController::class, 'exportXlsx'])->name('reports.invoices.export-xlsx');
         Route::get('/reports/payments', [PaymentReportController::class, 'index'])->name('reports.payments.index');
         Route::get('/reports/payments/export', [PaymentReportController::class, 'export'])->name('reports.payments.export');
         Route::get('/reports/payments/export-xlsx', [PaymentReportController::class, 'exportXlsx'])->name('reports.payments.export-xlsx');
         Route::get('/reports/imports', [ImportReportController::class, 'index'])->name('reports.imports.index');
         Route::get('/reports/imports/{batch}', [ImportReportController::class, 'show'])->name('reports.imports.show');
         Route::get('/reports/imports/{batch}/export', [ImportReportController::class, 'export'])->name('reports.imports.export');
+    });
+
+    // Laporan Bulanan Admin Collector (ADHOC-90) — permission feature sendiri,
+    // bukan numpang reports.view (aturan: tiap halaman punya permission sendiri).
+    Route::middleware('permission:collector_report.view')->group(function () {
+        Route::get('/reports/collector-monthly', [CollectorMonthlyReportController::class, 'index'])->name('reports.collector-monthly.index');
+        // Rincian per sel (drill-down) — dipanggil modal via fetch, permission
+        // sama dengan halaman induknya, bukan izin baru.
+        Route::get('/reports/collector-monthly/detail', [CollectorMonthlyReportController::class, 'detail'])->name('reports.collector-monthly.detail');
+    });
+    Route::middleware('permission:collector_report.export')->group(function () {
+        Route::get('/reports/collector-monthly/export', [CollectorMonthlyReportController::class, 'export'])->name('reports.collector-monthly.export');
+        Route::get('/reports/collector-monthly/detail/export', [CollectorMonthlyReportController::class, 'detailExport'])->name('reports.collector-monthly.detail-export');
+    });
+    // Laporan Bayar Kolektor (tabel "Bayar Wifi Cash" per kolektor) — halaman
+    // lain dari Laporan Bulanan Admin di atas, jadi permission sendiri juga.
+    Route::middleware('permission:collector_payment_report.view')->group(function () {
+        Route::get('/reports/collector-payments', [CollectorPaymentReportController::class, 'index'])->name('reports.collector-payments.index');
+    });
+    Route::middleware('permission:collector_payment_report.export')->group(function () {
+        Route::get('/reports/collector-payments/export', [CollectorPaymentReportController::class, 'export'])->name('reports.collector-payments.export');
+    });
+    Route::middleware('permission:collector_report.approve')->group(function () {
+        Route::post('/reports/collector-monthly/close', [CollectorMonthlyReportController::class, 'close'])->name('reports.collector-monthly.close');
+    });
+    Route::middleware('permission:collector_report.cancel')->group(function () {
+        Route::post('/reports/collector-monthly/reopen', [CollectorMonthlyReportController::class, 'reopen'])->name('reports.collector-monthly.reopen');
     });
 
     // ── FOP Dashboard ────────────────────────────────────────────
@@ -1068,6 +1114,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/business-development/agents/{agent}/edit', [AgentController::class, 'edit'])->name('business-development.agents.edit');
         Route::put('/business-development/agents/{agent}', [AgentController::class, 'update'])->name('business-development.agents.update');
         Route::post('/business-development/agents/{agent}/toggle', [AgentController::class, 'toggleStatus'])->name('business-development.agents.toggle');
+    });
+
+    // List Pelanggan Bisnis — view-only, turunan data pelanggan kategori Bisnis.
+    Route::middleware('permission:business_customers.view')->group(function () {
+        Route::get('/business-development/business-customers', [BusinessCustomerController::class, 'index'])->name('business-development.business-customers.index');
     });
 
     Route::middleware('permission:sales_omset_dashboard.view')->group(function () {

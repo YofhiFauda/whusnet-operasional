@@ -11,6 +11,7 @@
         'lunas' => 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
         'sebagian' => 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
         'batal' => 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+        'tak_tertagih' => 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20',
         default => 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
     };
 
@@ -247,7 +248,7 @@
                 </a>
             @endif
 
-            @if(auth()->user()->hasPermission('create_payments') && !in_array($invoice->invoice_status->value, ['lunas', 'batal'], true))
+            @if(auth()->user()->hasPermission('create_payments') && !in_array($invoice->invoice_status->value, ['lunas', 'batal', 'tak_tertagih'], true))
                 <a href="{{ route('invoices.payments.create', $invoice->id) }}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-emerald-600/20 transition-all cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                     <span>{{ $invoice->invoice_status->value === 'sebagian' ? 'Bayar Cicil' : 'Input Pembayaran' }}</span>
@@ -292,6 +293,40 @@
             </div>
         </div>
     </div>
+
+    {{-- Hapus buku piutang (ADHOC-90). Aksi lanjutan di halaman detail record ini,
+         jadi inline toggle Alpine (pola 3 CLAUDE.md), bukan modal. Target POST
+         dirender server-side lewat route(). --}}
+    @php $canWriteOff = auth()->user()->hasPermission('invoices.approve'); @endphp
+    @if($canWriteOff && $invoice->invoice_status === \App\Enums\InvoiceStatus::TAK_TERTAGIH)
+        <div class="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 rounded-2xl p-4 no-print">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="text-xs text-rose-800 dark:text-rose-300">
+                    <p class="font-bold">Piutang dihapus buku (tak tertagih) sebesar Rp {{ number_format((float) $invoice->written_off_amount, 0, ',', '.') }}</p>
+                    <p class="mt-0.5">{{ optional($invoice->written_off_at)->format('d/m/Y') }} — {{ $invoice->write_off_reason }}</p>
+                </div>
+                <form method="POST" action="{{ route('invoices.write-off.reverse', $invoice) }}" onsubmit="return confirm('Batalkan hapus buku? Tagihan kembali menjadi piutang.')">
+                    @csrf
+                    <button type="submit" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors">Batalkan Hapus Buku</button>
+                </form>
+            </div>
+            @error('reason')<p class="mt-2 text-xs text-red-600">{{ $message }}</p>@enderror
+        </div>
+    @elseif($canWriteOff && $invoice->isPiutang())
+        <div x-data="{ open: {{ $errors->has('reason') ? 'true' : 'false' }} }" class="bg-surface border border-border rounded-2xl p-4 no-print">
+            <div class="flex items-center justify-between gap-3">
+                <p class="text-xs text-text-muted">Piutang bulan lalu. Jika sudah tidak mungkin tertagih, tandai sebagai <strong class="text-text-main">tak tertagih</strong>.</p>
+                <button type="button" @click="open = !open" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" x-text="open ? 'Tutup' : 'Hapus Buku'"></button>
+            </div>
+            <form x-show="open" x-cloak method="POST" action="{{ route('invoices.write-off', $invoice) }}" class="mt-3 space-y-2">
+                @csrf
+                <label class="block text-xs font-semibold text-text-main" for="write_off_reason">Alasan hapus buku</label>
+                <textarea id="write_off_reason" name="reason" rows="2" maxlength="500" required class="w-full rounded-xl border border-border bg-surface text-sm p-2.5">{{ old('reason') }}</textarea>
+                @error('reason')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
+                <button type="submit" class="px-4 py-2 text-xs font-semibold rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition-colors">Hapus Buku Rp {{ number_format($remainingAmount, 0, ',', '.') }}</button>
+            </form>
+        </div>
+    @endif
 
     <!-- HERO METRIC SUMMARY CARDS (4 Grid) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-5">
@@ -699,7 +734,7 @@
         </a>
     @endif
 
-    @if(auth()->user()->hasPermission('create_payments') && !in_array($invoice->invoice_status->value, ['lunas', 'batal'], true))
+    @if(auth()->user()->hasPermission('create_payments') && !in_array($invoice->invoice_status->value, ['lunas', 'batal', 'tak_tertagih'], true))
         <a href="{{ route('invoices.payments.create', $invoice->id) }}" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             <span>{{ $invoice->invoice_status->value === 'sebagian' ? 'Bayar Cicil' : 'Bayar Tagihan' }}</span>

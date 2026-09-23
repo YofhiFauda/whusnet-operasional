@@ -3,10 +3,10 @@
 <div x-data="ticketDetailDrawer()" x-on:open-ticket-drawer.window="open($event.detail.id)"
      x-on:close-ticket-drawer.window="close()"
      x-on:keydown.escape.window="close()"
-     x-effect="document.body.classList.toggle('overflow-hidden', shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
+     x-effect="document.body.classList.toggle('overflow-hidden', shown); document.querySelector('main')?.classList.toggle('overflow-hidden', shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
 
     
-    <div x-show="shown" x-transition.opacity @click="close()"
+    <div x-show="shown" x-transition.opacity @click="close()" @touchmove.prevent
          class="fixed inset-0 top-16 bg-slate-950/60 backdrop-blur-sm z-[60]" x-cloak></div>
 
     
@@ -17,8 +17,7 @@
          x-transition:leave="transform transition ease-in-out duration-200"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
-         
-         class="fixed top-16 right-0 bottom-0 h-[calc(100dvh-4rem)] w-full max-w-2xl bg-surface border-l border-border shadow-2xl z-[60] flex flex-col overflow-hidden"
+         class="fixed top-16 right-0 bottom-0 w-full max-w-2xl bg-surface border-l border-border shadow-2xl z-[60] flex flex-col overflow-hidden overscroll-contain"
          role="dialog" aria-modal="true" aria-label="Detail Ticket">
 
         
@@ -44,7 +43,7 @@
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 text-xs">
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 text-xs overscroll-contain">
 
             <template x-if="loading">
                 <div class="space-y-3">

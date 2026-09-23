@@ -46,16 +46,15 @@
             cursor: pointer;
         }
 
-        /* Sticker 100mm x 80mm + bleed 2mm tiap sisi = 104mm x 84mm, safe
-           area 6mm dari tepi canvas luar — sama ukuran stiker QR pelanggan
-           biar staf gudang bisa pakai stok label yang sama. */
+        /* Sticker barcode 1D 104mm x 40mm, safe area 3mm 4mm — dibuat press
+           terhadap barcode 1D (koreksi layout 2026-09-22). */
         .sticker {
             width: 104mm;
-            height: 84mm;
+            height: 40mm;
             margin: 0 auto 6mm;
             background: #fff;
             border: 1px solid #cbd5e1;
-            padding: 6mm;
+            padding: 3mm 4mm;
             position: relative;
             display: flex;
             flex-direction: column;
@@ -73,6 +72,7 @@
         .sticker-barcode img {
             width: 88mm;
             height: auto;
+            max-height: 22mm;
             display: block;
         }
 
@@ -124,7 +124,7 @@
                 page-break-inside: avoid;
             }
             @page {
-                size: 104mm 84mm;
+                size: 104mm 40mm;
                 margin: 0;
             }
         }

@@ -216,7 +216,6 @@
                                         <option value="cash">Tunai / Kasir</option>
                                         <option value="transfer">Transfer Bank</option>
                                         <option value="kolektor">Kolektor</option>
-                                        <option value="qris">QRIS</option>
                                         <option value="lainnya">Lainnya</option>
                                     </select>
                                 </div>
@@ -281,7 +280,8 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Catatan</label>
+                                    <label id="hub_note_label" class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Catatan</label>
+                                    {{-- Metode Lainnya wajib mengisi field ini — hubTogglePaymentMethodFields(). --}}
                                     <input type="text" name="note" id="hub_note" placeholder="Catatan pembayaran..." class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
                                 </div>
                             </div>

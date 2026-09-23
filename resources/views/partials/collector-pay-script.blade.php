@@ -126,6 +126,8 @@
     }
 
     function cbRowToPayload(tr) {
+        const noteInput = tr.querySelector('.cb-note');
+
         return {
             invoice_id: parseInt(tr.querySelector('.cb-row-checkbox').value, 10),
             // Kolom nominal bermasking ribuan (data-rupiah): parseFloat langsung
@@ -134,7 +136,22 @@
             amount: window.Rupiah.angka(tr.querySelector('.cb-amount').value),
             payment_method: tr.querySelector('.cb-method').value,
             collected_date: tr.querySelector('.cb-collected-date').value,
+            // Wajib untuk metode Lainnya — dicek cbBarisValid() sebelum
+            // submit, dan lagi di CollectorPaymentService (server otoritatif).
+            note: noteInput ? noteInput.value.trim() : '',
         };
+    }
+
+    // Metode Lainnya menampilkan input keterangan di baris yang sama
+    // (PaymentMethod::requiresDescription()) — sembunyi untuk metode lain.
+    function cbToggleNote(select) {
+        const tr = select.closest('tr');
+        const noteInput = tr ? tr.querySelector('.cb-note') : null;
+        if (!noteInput) return;
+
+        const isLainnya = select.value === 'lainnya';
+        noteInput.classList.toggle('hidden', !isLainnya);
+        if (!isLainnya) noteInput.value = '';
     }
 
     function cbPost(rows, submittingBtn, restoreLabel) {
@@ -255,6 +272,14 @@
             if (!isNaN(batas) && nilai > batas) {
                 cbShowAlert('Nominal melebihi sisa tagihan (Rp ' + Math.round(batas).toLocaleString('id-ID') + ').', true);
                 input.focus();
+                return false;
+            }
+
+            const method = tr.querySelector('.cb-method').value;
+            const noteInput = tr.querySelector('.cb-note');
+            if (method === 'lainnya' && (!noteInput || !noteInput.value.trim())) {
+                cbShowAlert('Metode Lainnya wajib diisi keterangannya (mis. OVO, Dana, GoPay).', true);
+                if (noteInput) noteInput.focus();
                 return false;
             }
         }

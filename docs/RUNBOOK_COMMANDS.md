@@ -619,6 +619,37 @@ php artisan billing:generate-monthly-invoices
 Menghidupkan scheduler saja **tidak** menambal bulan yang sudah lewat — jadwalnya
 `monthlyOn(1)`, tanggal 1 yang terlewat tidak akan diulang.
 
+### Memasang fitur Ambil Modem (DEAC) → Gudang (ADHOC-86/88)
+
+Butuh 2 tabel baru (`task_device_retrievals`, `device_retrieval_logs`), 1 item
+master baru (`MODEM-PELANGGAN-LAMA`), dan asset frontend baru. Jalankan di container `app`
+(bukan `exec app npm run build` — lihat catatan kepemilikan file di CLAUDE.md):
+
+```bash
+docker compose exec app php artisan migrate
+docker compose exec app php artisan db:seed --class=ItemSeeder   # item "Modem Pelanggan Lama" (idempotent)
+docker compose exec app php artisan storage:link                 # sekali saja; foto kondisi alat di disk public
+docker compose run --rm assets                                   # npm run build (class Tailwind & view baru)
+```
+
+Tanpa `migrate` form teknisi dan Terima Retur akan error (tabel tidak ada). Tanpa
+`ItemSeeder` pilihan "Modem Pelanggan Lama" tidak muncul (model lain tetap bisa dipilih).
+Tanpa `storage:link` foto kondisi tersimpan tapi thumbnail di Detail Task/Riwayat
+Task FOP tidak tampil.
+
+Periksa hasilnya (read-only):
+
+```bash
+docker compose exec app php artisan tinker --execute 'echo \App\Models\Item::where("code","MODEM-PELANGGAN-LAMA")->count();'   # harus 1
+docker compose exec app php artisan tinker --execute 'echo \Schema::hasTable("device_retrieval_logs") ? "ok" : "BELUM";'
+```
+
+**Tidak ada backfill massal SN legacy — sengaja.** Data lama punya SN kosong (273
+dari 1.957 detail teknis di data dev), SN dobel lintas pelanggan (93), dan tanpa
+nama barang; SN didaftarkan satu per satu **saat modemnya benar-benar ditarik**
+(SN di stiker fisik yang menjadi kebenaran). Jangan menyalin
+`customer_technical_details.router_or_ont_serial` ke `inventory_serials` secara massal.
+
 ---
 
 ## Yang TIDAK boleh dilakukan

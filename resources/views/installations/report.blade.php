@@ -1101,6 +1101,11 @@
     // catatan di app/Services/TaskMaterialService.php). Baca langsung dari DOM
     // (bukan state Alpine materialRows) karena ini vanilla JS di luar x-data-nya
     // dan Alpine sudah menulis atribut `name` yang reaktif ke elemen sungguhan.
+    function hasMaterialTerpakaiRow() {
+        const qtyInputs = document.querySelectorAll('input[name^="materials["][name$="[qty]"]');
+        return Array.from(qtyInputs).some(input => parseFloat(input.value) > 0);
+    }
+
     function buildFase6IncompleteWarning() {
         const missingParts = [];
 
@@ -1119,9 +1124,7 @@
             missingParts.push('Foto belum lengkap: ' + missingPhotos.join(', '));
         }
 
-        const qtyInputs = document.querySelectorAll('input[name^="materials["][name$="[qty]"]');
-        const hasMaterialRow = Array.from(qtyInputs).some(input => parseFloat(input.value) > 0);
-        if (! hasMaterialRow) {
+        if (! hasMaterialTerpakaiRow()) {
             missingParts.push('Material Terpakai: belum ada baris dengan jumlah > 0');
         }
 
@@ -1430,6 +1433,22 @@
         // lagi alasan buka step 6 sebelum pemasanganComplete true.
         if (stepNumber === 6 && ! pemasanganComplete) {
             const missing = getMissingRequiredFields(5);
+
+            // getMissingRequiredFields(5) TIDAK memasukkan Material Terpakai
+            // (bukan bagian formFields.pemasangan.required — lihat catatan di
+            // atas formFields) padahal itu tetap syarat buka Fase 6
+            // (buildFase6IncompleteWarning() & $fase6Unlocked server). Dulu
+            // gerbang ini cuma lihat `missing` lalu langsung attemptActivate(),
+            // jadi kalau material-nya yang belum ada, teknisi ketiban modal
+            // Confirm "Fase 6 Belum Bisa Dibuka" dadakan dari DALAM
+            // attemptActivate() — bukan toast biasa kayak field lain — dan
+            // harus klik lagi buat submit (keluhan nyata: 2 kali pencet
+            // Lanjut, 2026-09-22). Cek material DI SINI JUGA supaya jalur
+            // toast-nya konsisten & attemptActivate() cuma dipanggil kalau
+            // memang bakal langsung submit bersih tanpa modal kejutan.
+            if (missing.length === 0 && ! hasMaterialTerpakaiRow()) {
+                missing.push('Material Terpakai (minimal 1 baris, jumlah > 0)');
+            }
 
             // Semua field step 5 (termasuk foto & Material Terpakai) SUDAH
             // lengkap di browser, cuma belum ke-submit — submit OTOMATIS

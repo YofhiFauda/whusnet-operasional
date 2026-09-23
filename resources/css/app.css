@@ -1098,11 +1098,21 @@ html {
    pakai durasi + easing yang sama, jadi transisinya konsisten di semua lebar
    layar. `width` sengaja tetap di daftar walau di bawah xl gak dianimasikan —
    satu kelas buat dua rezim, biar gak ada dua sumber timing. */
+/* `translate` WAJIB ada di daftar, dan itu BUKAN duplikat dari `transform`:
+   Tailwind v4 gak lagi nulis `transform: translateX(...)` buat utility
+   `translate-x-*` — yang dikeluarin properti CSS standalone
+   `translate: var(--tw-translate-x) var(--tw-translate-y)` (cek hasil build:
+   `.-translate-x-full{--tw-translate-x:-100%;translate:...}`). Selama daftar
+   ini cuma nyebut `transform`, panel di bawah `lg` (rezim OVERLAY yang geser
+   pakai translate) LONCAT tanpa animasi, sementara di `lg` ke atas kelihatan
+   mulus karena di situ yang dianimasikan `width` — persis gejala "di mobile &
+   tablet gak ada slide, di desktop ada". `transform` sengaja ditahan buat
+   utility lama/manual yang masih nulis transform beneran. */
 .panel-motion {
-  transition-property: width, transform, opacity;
+  transition-property: width, translate, transform, opacity;
   transition-duration: 320ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: width, transform;
+  will-change: width, translate;
 }
 
 /* Dipasang sebelum frame pertama selesai — cegah animasi "mental sendiri"

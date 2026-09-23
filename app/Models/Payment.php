@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentPeriodType;
 use App\Enums\PaymentStatus;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
@@ -251,6 +252,35 @@ class Payment extends Model
         }
 
         return null;
+    }
+
+    /**
+     * Klasifikasi payment ini terhadap periode tagihannya — lihat
+     * `PaymentPeriodType` untuk urutan prioritas & alasannya.
+     *
+     * SENGAJA tidak memakai `Invoice::isPiutang()`: method itu bersandar ke
+     * `invoice_status` SEKARANG (yang berubah jadi `lunas` begitu payment ini
+     * tercatat) dan ke `now()` (yang terus berjalan) — dipakai di sini, label
+     * sebuah payment lama diam-diam berubah besok. Klasifikasi payment harus
+     * BEKU sejak dia diterima: dibandingkan ke bulan payment ini SENDIRI
+     * (`collected_date` ?: `payment_date`), bukan ke bulan berjalan.
+     */
+    public function periodType(): PaymentPeriodType
+    {
+        if ($this->overpay_amount !== null && (float) $this->overpay_amount > 0.0) {
+            return PaymentPeriodType::LEBIH_BAYAR;
+        }
+
+        $billingPeriod = $this->invoice?->billing_period;
+        $referenceMonth = ($this->collected_date ?? $this->payment_date)?->format('Y-m');
+
+        if ($billingPeriod === null || $referenceMonth === null) {
+            return PaymentPeriodType::BULANAN;
+        }
+
+        return $billingPeriod < $referenceMonth
+            ? PaymentPeriodType::PIUTANG
+            : PaymentPeriodType::BULANAN;
     }
 
     /**

@@ -202,6 +202,7 @@
 
         const isTransfer = method === 'transfer';
         const isKolektor = method === 'kolektor';
+        const isLainnya = method === 'lainnya';
 
         if (transferFields) transferFields.classList.toggle('hidden', !isTransfer);
         if (bankName) bankName.required = isTransfer;
@@ -209,6 +210,16 @@
 
         if (collectorFields) collectorFields.classList.toggle('hidden', !isKolektor);
         if (collector) collector.required = isKolektor;
+
+        // Metode Lainnya wajib menjelaskan metode apa persisnya — reuse
+        // field Catatan yang sudah ada (PaymentMethod::requiresDescription()).
+        const note = document.getElementById('hub_note');
+        const noteLabel = document.getElementById('hub_note_label');
+        if (note) {
+            note.required = isLainnya;
+            note.placeholder = isLainnya ? 'Jelaskan metode pembayaran (mis. OVO, Dana, GoPay)...' : 'Catatan pembayaran...';
+        }
+        if (noteLabel) noteLabel.textContent = isLainnya ? 'Keterangan Metode (wajib)' : 'Catatan';
 
         hubRefreshInstallmentHint();
     }
@@ -783,6 +794,16 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
                 errorBox.textContent = 'Nominal pembayaran wajib diisi minimal Rp 1 atau menggunakan Saldo Pelanggan.';
                 errorBox.classList.remove('hidden');
             }
+            return;
+        }
+
+        const methodSelect = document.getElementById('payment_method');
+        if (methodSelect && methodSelect.value === 'lainnya' && !document.getElementById('hub_note').value.trim()) {
+            if (errorBox) {
+                errorBox.textContent = 'Jelaskan metode pembayarannya di kolom Catatan untuk metode Lainnya.';
+                errorBox.classList.remove('hidden');
+            }
+            document.getElementById('hub_note').focus();
             return;
         }
 

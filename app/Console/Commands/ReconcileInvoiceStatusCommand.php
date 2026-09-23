@@ -46,7 +46,7 @@ class ReconcileInvoiceStatusCommand extends Command
         $threshold = (float) $this->option('fix-threshold');
 
         $invoices = Invoice::query()
-            ->where('invoice_status', '!=', InvoiceStatus::BATAL->value)
+            ->whereNotIn('invoice_status', [InvoiceStatus::BATAL->value, InvoiceStatus::TAK_TERTAGIH->value])
             ->when($period !== null, fn ($q) => $q->where('billing_period', $period))
             ->with(['customer'])
             ->orderBy('billing_period')

@@ -14,6 +14,7 @@ use App\Models\Customer;
 use App\Models\CustomerStatusLog;
 use App\Models\InventoryBalance;
 use App\Models\Invoice;
+use App\Models\PackageCategory;
 use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Task;
@@ -167,6 +168,7 @@ class DashboardController extends Controller
                         ? round(($totalPaymentAmount / $totalInvoiceAmount) * 100, 1)
                         : null,
 
+                    ...$this->omsetStats($popId),
                     ...$this->growthStats($popId, $periodStartDate, $periodEndDate),
                     ...($canViewCash ? $this->cashPositionStats($popId) : []),
                     ...$this->funnelAndRetentionStats($popId, $periodStartDate, $periodEndDate),
@@ -274,6 +276,67 @@ class DashboardController extends Controller
             'pops',
             'filters'
         ));
+    }
+
+    /**
+     * Omset per Segmen (Sales, Teknisi, Bisnis).
+     *
+     * @return array{
+     *     omset_sales_amount: float,
+     *     omset_sales_count: int,
+     *     omset_teknisi_amount: float,
+     *     omset_teknisi_count: int,
+     *     omset_bisnis_amount: float,
+     *     omset_bisnis_count: int
+     * }
+     */
+    private function omsetStats(string|int|null $popId): array
+    {
+        $activeCustomers = (clone $this->scopedCustomerQuery($popId))
+            ->where('status', 'active')
+            ->with(['salesUser.role', 'customerService.internetPackage'])
+            ->get();
+
+        $salesCustomers = $activeCustomers->filter(function ($c) {
+            $roleCode = strtolower($c->salesUser?->role?->code ?? '');
+
+            return $roleCode === 'sales';
+        });
+
+        $teknisiCustomers = $activeCustomers->filter(function ($c) {
+            $roleCode = strtolower($c->salesUser?->role?->code ?? '');
+
+            return $roleCode === 'teknisi';
+        });
+
+        $bisnisCategoryNames = PackageCategory::query()
+            ->whereNotNull('installation_fee_approval_role_id')
+            ->orWhere('name', 'LIKE', '%bisnis%')
+            ->orWhere('name', 'LIKE', '%business%')
+            ->pluck('name')
+            ->map(fn ($n) => strtolower((string) $n))
+            ->toArray();
+
+        $bisnisCustomers = $activeCustomers->filter(function ($c) use ($bisnisCategoryNames) {
+            $catName = strtolower($c->customerService?->internetPackage?->category ?? '');
+            if ($catName === '') {
+                return false;
+            }
+            if (str_contains($catName, 'bisnis') || str_contains($catName, 'business')) {
+                return true;
+            }
+
+            return in_array($catName, $bisnisCategoryNames, true);
+        });
+
+        return [
+            'omset_sales_amount' => (float) $salesCustomers->sum(fn ($c) => $c->customerService?->total_monthly_bill ?? 0),
+            'omset_sales_count' => $salesCustomers->count(),
+            'omset_teknisi_amount' => (float) $teknisiCustomers->sum(fn ($c) => $c->customerService?->total_monthly_bill ?? 0),
+            'omset_teknisi_count' => $teknisiCustomers->count(),
+            'omset_bisnis_amount' => (float) $bisnisCustomers->sum(fn ($c) => $c->customerService?->total_monthly_bill ?? 0),
+            'omset_bisnis_count' => $bisnisCustomers->count(),
+        ];
     }
 
     /**

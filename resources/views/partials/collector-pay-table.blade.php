@@ -143,12 +143,14 @@
                         <td class="block float-left w-[48%] xl:w-auto xl:float-none xl:table-cell px-0 py-0.5 xl:px-3 xl:py-3 xl:min-w-[85px]">
                             <div class="space-y-0.5">
                                 <label class="xl:hidden text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Metode</label>
-                                <select class="cb-method w-full xl:w-26 2xl:w-28 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                <select class="cb-method w-full xl:w-26 2xl:w-28 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500" onchange="cbToggleNote(this)">
                                     <option value="cash">Cash</option>
                                     <option value="transfer">Transfer</option>
-                                    <option value="qris">QRIS</option>
                                     <option value="lainnya">Lainnya</option>
                                 </select>
+                                {{-- Wajib diisi kalau metode = Lainnya (dicek cbValidateRows()
+                                     sebelum submit) — lihat PaymentMethod::requiresDescription(). --}}
+                                <input type="text" placeholder="Metode apa? (mis. OVO)" class="cb-note hidden w-full xl:w-26 2xl:w-28 mt-0.5 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                             </div>
                         </td>
 

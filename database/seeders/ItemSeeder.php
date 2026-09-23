@@ -44,6 +44,18 @@ class ItemSeeder extends Seeder
 {
     public function run(): void
     {
+        // Rename kode lama → baru, SEBELUM updateOrCreate di bawah (2026-09-22).
+        // `updateOrCreate` cocok berdasar `code`, jadi sekadar mengganti string
+        // code di array $items akan bikin baris LAMA jadi yatim (masih ada di
+        // DB dengan code usang, gak pernah ketimpa) dan baris BARU dibuat
+        // terpisah — kalau itemnya sudah pernah dipakai transaksi, ID lama
+        // tetap benar (FK `item_id`, bukan `code`), tapi kode di ledger jadi
+        // tidak sinkron. No-op kalau kode lama sudah gak ada (instalasi baru)
+        // atau sudah pernah di-rename (idempotent).
+        //   MODEM-LEGACY → MODEM-PELANGGAN-LAMA (ADHOC-86 istilah "legacy"
+        //   diganti "pelanggan lama" biar konsisten sama istilah di UI/dokumen).
+        Item::where('code', 'MODEM-LEGACY')->update(['code' => 'MODEM-PELANGGAN-LAMA']);
+
         // Kategori bawaan ditanam migrasi (bukan seeder) karena code-nya jadi
         // kontrak; di sini tinggal dirujuk.
         $categoryIds = ItemCategory::pluck('id', 'code');
@@ -79,11 +91,11 @@ class ItemSeeder extends Seeder
             ['code' => 'ONT-ZTE-F660', 'name' => 'Modem ONT ZTE F660', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
             ['code' => 'ONT-HUAWEI-8245H', 'name' => 'Modem ONT Huawei HG8245H', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
             ['code' => 'ONT-FIBERHOME-5506', 'name' => 'Modem ONT Fiberhome AN5506', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
-            // Placeholder untuk modem legacy hasil pengambilan alat (DEAC,
-            // ADHOC-86): data lama pelanggan cuma punya SN, tanpa nama barang,
-            // sedangkan `inventory_serials.item_id` wajib. Staf Gudang
+            // Placeholder untuk modem pelanggan lama hasil pengambilan alat
+            // (DEAC, ADHOC-86): data lama pelanggan cuma punya SN, tanpa nama
+            // barang, sedangkan `inventory_serials.item_id` wajib. Staf Gudang
             // mengoreksi ke model sebenarnya saat "Terima Retur".
-            ['code' => 'MODEM-LEGACY', 'name' => 'Modem Legacy (Belum Teridentifikasi)', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
+            ['code' => 'MODEM-PELANGGAN-LAMA', 'name' => 'Modem Pelanggan Lama (Belum Teridentifikasi)', 'category' => 'modem_ont', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
 
             // ── Media Converter — kategori BAWAAN, dipersempit ke media
             //    converter murni (kotak fiber-ke-ethernet tanpa WiFi/router).

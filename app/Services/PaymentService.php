@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\InvoiceStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Invoice;
@@ -44,6 +45,14 @@ class PaymentService
             if (Money::isZero($remaining)) {
                 throw ValidationException::withMessages([
                     'amount' => 'Tagihan ini sudah lunas.',
+                ]);
+            }
+
+            // Dicek ulang di sini (dengan lock) selain di controller: hapus buku
+            // bisa terjadi antara form dibuka dan disubmit.
+            if ($lockedInvoice->invoice_status === InvoiceStatus::TAK_TERTAGIH) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Tagihan ini sudah dihapus buku (tak tertagih). Batalkan hapus buku dulu sebelum mencatat pembayaran.',
                 ]);
             }
 

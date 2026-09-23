@@ -48,7 +48,7 @@ class InventoryReassignService
      * Catatan ledger untuk SN yang baru didaftarkan dari pengambilan alat —
      * penanda modem legacy (belum pernah tercatat di Gudang).
      */
-    private const LEGACY_SERIAL_NOTE = 'SN legacy — didaftarkan otomatis dari pengambilan alat (belum pernah tercatat di Gudang).';
+    private const LEGACY_SERIAL_NOTE = 'SN pelanggan lama — didaftarkan otomatis dari pengambilan alat (belum pernah tercatat di Gudang).';
 
     /**
      * Custody QUANTITY/BATCH kembali ke gudang cabang — SELURUH sisa
@@ -441,7 +441,7 @@ class InventoryReassignService
         }
 
         if (! $item) {
-            throw new InvalidArgumentException("SN {$serialNumber} belum pernah tercatat di sistem — pilih model modem/perangkat-nya (atau \"Modem Legacy\" kalau tidak tahu modelnya).");
+            throw new InvalidArgumentException("SN {$serialNumber} belum pernah tercatat di sistem — pilih model modem/perangkat-nya (atau \"Modem Pelanggan Lama\" kalau tidak tahu modelnya).");
         }
 
         if ($item->tracking_type !== TrackingType::SERIALIZED) {

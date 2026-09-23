@@ -35,13 +35,26 @@ class CollectorWorklistService
      * dia butuh gambaran penuh untuk cross check.
      *
      * @param  User|null  $viewer  pemilik POP scope yang dipakai; default user login
+     * @param  string|null  $search  filter nama/kode/CID pelanggan — cross check admin
+     *                               atas ratusan tunggakan kolektor sering butuh cari
+     *                               satu pelanggan tertentu, bukan scroll seluruh daftar
      */
-    public function outstandingInvoices(User $collector, ?User $viewer = null): Builder
+    public function outstandingInvoices(User $collector, ?User $viewer = null, ?string $search = null): Builder
     {
         return Invoice::query()
             ->applyUserScope($viewer)
             ->whereIn('invoice_status', self::OUTSTANDING_STATUSES)
-            ->whereHas('customer', fn ($q) => $q->where('collector_id', $collector->id))
+            ->whereHas('customer', function ($q) use ($collector, $search) {
+                $q->where('collector_id', $collector->id);
+
+                if ($search !== null && $search !== '') {
+                    $q->where(function ($inner) use ($search) {
+                        $inner->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('customer_code', 'like', "%{$search}%")
+                            ->orWhere('cid', 'like', "%{$search}%");
+                    });
+                }
+            })
             ->with(['customer'])
             ->orderBy('customer_id')
             ->orderBy('due_date')

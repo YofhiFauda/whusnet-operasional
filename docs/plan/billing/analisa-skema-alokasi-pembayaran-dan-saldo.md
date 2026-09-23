@@ -1,6 +1,8 @@
 # Analisa & Rancangan: Alokasi Pembayaran (Bulanan, Piutang, Cicilan, Lebih Bayar)
 
-**Status:** Terbuka — rancangan **final & disederhanakan** 2026-09-19, implementasi belum mulai. Dicatat sebagai ADHOC-84 di `docs/TASKS.md`, di luar sprint aktif.
+**Status:** Terbuka — rancangan **final & disederhanakan** 2026-09-19, ditambah & dikunci §8 (visibilitas laporan & audit) 2026-09-22, tidak ada pertanyaan tersisa. Implementasi belum mulai. Dicatat sebagai ADHOC-84 di `docs/TASKS.md`, di luar sprint aktif.
+
+**Dikonfirmasi ulang user (2026-09-22): dropdown "Alokasi Pembayaran" manual TETAP tidak jadi dikerjakan** — mekanisme bulanan/piutang/cicilan/lebih-bayar yang sudah otomatis di `PaymentService` dinilai sudah bagus, tidak perlu diketik manual kasir (§1 poin 1–2 tidak berubah). Yang BARU diminta: klasifikasi itu **ditunjukkan** di laporan & audit internal — lihat §8.
 **Modul terkait:** Billing & Pembayaran (`invoices`, `payments`, `customer_credits`, `payments/partials/quick-payment-modal.blade.php`, `payments/create.blade.php`, `CollectorPaymentService`)
 **Rujukan:**
 - `docs/plan/billing/analisa-skema-piutang-dan-laporan-kas.md` (aturan "piutang dibayar dulu", FIFO)
@@ -18,6 +20,7 @@
 3. **Kontrol kasir = konfirmasi**, bukan pilihan: konfirmasi eksplisit untuk **lebih bayar** (uang masuk saldo pelanggan). Cicilan cukup petunjuk yang sudah ada.
 4. **Piutang dibayar dulu = peringatan (bukan blokir)** untuk admin yang membayar tagihan lebih baru saat pelanggan masih punya tagihan lebih lama.
 5. **FIFO hanya untuk Kolektor**, sebagai isian awal yang bisa diubah kolektor. Admin **tidak** pakai FIFO.
+6. **Klasifikasi tetap ditampilkan** di Laporan Tagihan, Pembayaran, Bulanan Admin, Bayar Kolektor, dan Audit Internal — dihitung dari data yang sama (§2.2), lewat satu classifier bersama, bukan diketik ulang per laporan (ditambahkan 2026-09-22, lihat §8).
 
 ---
 
@@ -157,3 +160,48 @@ Test yang gagal akibat perubahan ini **diperbaiki**, bukan perubahan dilonggarka
 - Kolom/enum `allocation_type`, backfill data lama, guard penolak nominal tidak pas — **dibatalkan** (§1, §2.2).
 - Blokir keras untuk pembayaran tagihan baru saat piutang lama ada — tidak dipilih; peringatan saja (§2.4).
 - Tagihan bulanan otomatis memakai saldo pelanggan (`GenerateMonthlyInvoicesCommand` tidak memakai saldo; saldo dipakai manual lewat `use_balance_amount` saat bayar) — tidak diubah, di luar ADHOC-84.
+- **Dropdown/input manual alokasi di form bayar** — dikonfirmasi ulang **tidak** dikerjakan (lihat catatan status di atas). §8 di bawah cuma soal **menampilkan** klasifikasi yang sudah dihitung otomatis, bukan membiarkan kasir memilihnya.
+
+---
+
+## 8. Visibilitas Klasifikasi di Laporan & Audit (ditambahkan 2026-09-22, permintaan user)
+
+**Kebutuhan:** klasifikasi per pembayaran (Bulanan / Piutang / Cicilan / Lebih Bayar, dihitung dari §2.2 — **tetap tidak disimpan sebagai kolom**, tetap dihitung saat dibutuhkan) harus **terlihat** di lima permukaan: **Laporan Tagihan**, **Laporan Pembayaran**, **Laporan Bulanan Admin**, **Laporan Bayar Kolektor**, dan **Audit Internal**. Ini murni soal **tampilan/pelaporan** — tidak mengubah cara pembayaran dicatat (§1–§7 tetap berlaku apa adanya).
+
+### 8.1 Satu classifier bersama, dipakai di semua tempat
+
+Supaya logika klasifikasi (§2.2) tidak diketik ulang 5x dengan risiko menyimpang satu sama lain, dibuat satu titik hitung bersama — mis. `PaymentClassifier::classify(Payment $payment): array` (nama & lokasi final diputuskan saat implementasi, pola service/helper existing) — mengembalikan label yang konsisten dipakai kelima permukaan di bawah:
+
+| Klasifikasi | Sumber (sama seperti §2.2) |
+|---|---|
+| **Bulanan** | `payment->invoice->invoice_type` = `bulanan`, DAN `invoice->billing_period` = periode berjalan saat `payment_date` (bukan piutang) |
+| **Piutang** | `invoice->billing_period` < periode `payment_date` (pelunasan tagihan periode lalu — definisi sama `analisa-skema-piutang-dan-laporan-kas.md`/ADHOC-89) |
+| **Cicilan** | `Payment::installmentContext()` menunjukkan ini bukan pelunasan pertama/penuh |
+| **Lebih Bayar** | `payment->overpay_amount > 0` |
+
+Satu payment bisa kena **lebih dari satu label sekaligus** (mis. bayar piutang lama secara mencicil = Piutang + Cicilan) — tampilkan sebagai badge majemuk, bukan dipaksa satu kategori tunggal seperti dropdown lama yang dibuang (§2.1).
+
+### 8.2 Per permukaan
+
+| Permukaan | Controller | Perubahan |
+|---|---|---|
+| **Laporan Tagihan** | `InvoiceReportController` (`/reports/invoices`) | Kolom/badge per invoice: apakah ini pelunasan Piutang (periode lalu) atau Bulanan berjalan (turunan langsung `billing_period` vs periode laporan, sudah dekat ke logika piutang ADHOC-89 yang sudah ada) — tidak butuh classifier payment, cukup status invoice yang sudah dibaca laporan ini. |
+| **Laporan Pembayaran** | `PaymentReportController` (`/reports/payments`) | Kolom baru "Jenis" per baris pembayaran (badge majemuk dari §8.1) + **filter dropdown** (Bulanan/Piutang/Cicilan/Lebih Bayar) supaya bisa disaring, bukan cuma ditampilkan. |
+| **Laporan Bulanan Admin** | `CollectorMonthlyReportController` (`/reports/collector-monthly`, ADHOC-90) | Blok Tagihan sudah pisah Terbit/Bulanan/Dimuka/Piutang (ADHOC-90) — modal detail per-sel (`GET /reports/collector-monthly/detail`, sudah ada dari ADHOC-90) ditambah kolom "Jenis" per transaksi di dalam modal, pakai classifier yang sama supaya konsisten sama Laporan Pembayaran. |
+| **Laporan Bayar Kolektor** | `CollectorPaymentReportController` (`/reports/collector-payments`, ADHOC-90) | Tabel "Bayar Wifi Cash" — kolom "Jenis" per baris transaksi, classifier sama. |
+| **Audit Internal** | `AuditLogController` (`/audit-logs`) | Entri `module=Pembayaran` (atau modul apapun nama Payment di audit) — saat merender detail entri, tampilkan label klasifikasi hasil classifier di samping payload JSON mentah yang sudah ada (`Payment::auditPayload()` sudah menyimpan `amount`/`overpay_amount`/`invoice_id`/`billing_period`, cukup untuk classifier menghitung ulang tanpa query invoice hidup — cek saat implementasi apakah cukup dari payload tersimpan atau perlu load relasi `payment->invoice` untuk entri yang invoice-nya belum berubah). |
+
+### 8.3 Belum diputuskan (untuk implementasi nanti)
+
+> **Dikunci (user, 2026-09-22) — tidak ada lagi yang terbuka di §8:**
+
+1. **Classifier numpang di model `Payment`** — method baru `Payment::classification(): array`, pola sama persis `installmentContext()` yang sudah ada di model ini. Bukan Service terpisah.
+2. **Badge majemuk = beberapa pil kecil bersebelahan**, satu pil per label (`[Piutang] [Cicilan]`), bukan digabung jadi satu teks — konsisten sama pola badge status yang sudah ada di tempat lain (invoice, task, dll).
+3. **Filter di Laporan Bulanan Admin & Laporan Bayar Kolektor — TIDAK perlu.** Cukup kolom/badge "Jenis" tampil di modal detail & tabel (§8.2), tanpa kontrol filter tambahan di dua laporan itu. Cuma **Laporan Pembayaran** yang dapat filter (sudah dari awal §8.2).
+
+### 8.4 Test yang wajib ada
+
+- Classifier: payment Bulanan biasa → label `Bulanan` saja; pelunasan periode lalu → `Piutang`; nominal kurang → `+Cicilan`; nominal lebih → `+Lebih Bayar`; kombinasi piutang+cicilan sekaligus → kedua label muncul.
+- Laporan Pembayaran: kolom "Jenis" tampil benar per baris; filter per jenis menyaring hasil dengan benar; POP scope tetap tertegak (regresi).
+- Laporan Bulanan Admin & Laporan Bayar Kolektor: modal/tabel detail menampilkan "Jenis" konsisten dengan Laporan Pembayaran untuk transaksi yang sama.
+- Audit Internal: entri Payment menampilkan label klasifikasi yang benar, tidak error untuk entri lama (payment yang invoice-nya sudah dihapus/berubah — pakai payload tersimpan, jangan crash kalau relasi live sudah tidak valid).

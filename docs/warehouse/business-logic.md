@@ -169,7 +169,7 @@ Alur:
    - *Tidak diambil*: alasan wajib. Task tetap selesai, **`device_retrieved_at` tetap kosong** → badge "Belum Diambil" dan tombol "Ambil Alat" muncul lagi di List Putus Langganan untuk dicoba ulang.
 2. **`InventoryReassignService::pickupSerialFromCustomer()`** — per SN yang dilaporkan:
    - `INSTALLED` milik pelanggan ini → `RETURNED`.
-   - Belum ada di `inventory_serials` (**modem legacy** — data lama hanya punya SN, tanpa nama barang) → didaftarkan otomatis dengan model pilihan teknisi (atau item placeholder `MODEM-LEGACY`), kondisi `used_good` belum dicek.
+   - Belum ada di `inventory_serials` (**modem legacy** — data lama hanya punya SN, tanpa nama barang) → didaftarkan otomatis dengan model pilihan teknisi (atau item placeholder `MODEM-PELANGGAN-LAMA`), kondisi `used_good` belum dicek.
    - Ada tapi bukan milik pelanggan ini / bukan `INSTALLED` → **ditolak**, tidak ditimpa (konflik data, admin yang menyelesaikan). Satu SN gagal membatalkan seluruh laporan (satu transaksi).
    - Idempoten untuk SN yang sudah `RETURNED` dari pelanggan yang sama (kirim ulang laporan setelah FOP me-reject).
 3. **Status `RETURNED` = transit**: `current_technician_id` = teknisi, belum `current_pop_id`, `customer_id`/`fop_task_id` sengaja dipertahankan sampai diterima. Ledger `RETURN` pertama (pelanggan → teknisi) **tanpa `to_pop_id`**, jadi belum dihitung stok oleh `WarehouseStockAsOfService`. SN `RETURNED` tidak bisa di-Issue (status ≠ `AVAILABLE`).

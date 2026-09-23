@@ -65,7 +65,7 @@ class WarehouseReturnReceiveController extends Controller
             ->get();
 
         // Petunjuk merek dari data lama pelanggan (bantuan, bukan kebenaran):
-        // membantu staf mengoreksi model "Modem Legacy" saat memegang fisiknya.
+        // membantu staf mengoreksi model "Modem Pelanggan Lama" saat memegang fisiknya.
         $legacyHint = $serial->customer ? $hints->forCustomer($serial->customer) : null;
 
         return view('warehouse.returns.receive', compact('serial', 'items', 'legacyHint'));

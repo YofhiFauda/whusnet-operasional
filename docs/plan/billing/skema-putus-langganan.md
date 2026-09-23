@@ -1,8 +1,9 @@
-> Rancangan lengkap & gap terhadap kode: `analisa-rancangan-putus-langganan.md` (ADHOC-69). Bullet ke-4 dirinci di §3.1a dokumen itu.
+> Rancangan lengkap & gap terhadap kode: `analisa-rancangan-putus-langganan.md` (ADHOC-69). Bullet ke-4 & ke-5 dirinci di §3.1/§3.1a dokumen itu.
 
 ## SKEMA
 Putus Langganan:
-Pada saat pelanggan putus langganan di tengah bulan maka Catatan piutang tersebut akan akan tercatat di List Putus Langganan dan Invoice akan terbit + Denda putus langganan (bisa di isi manual)
--Pada putusn Langganan terdapat kolom itu pelanggan siapa (berdasarkan siapa yang registrasi sales/teknisi siapa saja)
+Pada saat pelanggan putus langganan di tengah bulan maka Catatan piutang tersebut akan akan tercatat di List Putus Langganan dan Invoice **pemakaian bulan berjalan** (tagihan Bulanan biasa, terbit apa adanya tanpa prorate — beda dengan skema Upgrade/Downgrade Paket yang memang prorate) tetap terbit, **ditambah** Denda putus langganan (bisa di isi manual) **khusus untuk pelanggan yang masa langganannya ≤ 1 tahun/12 bulan**.
+-Pelanggan yang masa langganannya **> 1 tahun/12 bulan tidak dikenakan denda sama sekali** — cuma tagihan pemakaian bulan berjalan yang tetap terbit seperti biasa.
+-Pada putusn Langganan terdapat kolom itu pelanggan siapa (berdasarkan siapa yang registrasi sales/teknisi siapa saja) — **klarifikasi (2026-09-22): bukan permintaan tambah role/kolom baru**, cuma menunjukkan siapa yang mendaftarkan pelanggan itu, dan sekarang cuma 2 pihak yang perlu ditrace (buat komisi): Sales dan Teknisi Survei. Kalau ke depan bertambah pihak lain, itu perubahan terpisah di luar scope putus-langganan ini.
 -jika ingin memutuskan pelanggan itu harus berdasarkan alas an (nanti di generate by master) yang dimana pada list pelanggan putus terdapat alas an tersebut yang bisa di sorting atau di filter. (ini untuk memudahkan Customer service), Masternya nanti itu seperti Pindah, Kompetitor, dll yang bisa di tambah dan di edit sendiri.
--Kalau pelanggan putus dan masa langgananya (dihitung dari tanggal_aktivasi di customer_services sampai tanggal putus diajukan) masih <=1 tahun, nominal denda default dari master alasan **tidak dipakai** — diisi manual per kasus oleh admin/CS saat submit form putus (gantikan, bukan tambahan di atas denda alasan).
+-Kalau pelanggan putus dan masa langgananya (dihitung dari tanggal_aktivasi di customer_services sampai tanggal putus diajukan) masih <=1 tahun, nominal denda default dari master alasan **tidak wajib dipakai** — diisi manual per kasus oleh admin/CS saat submit form putus (default cuma jadi angka awal/prefill di form, bukan otomatis terpakai).

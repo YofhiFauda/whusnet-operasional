@@ -285,7 +285,7 @@
                     <?php endif; ?>
 
                     
-                    <?php if(auth()->user()->hasPermission('customer_acquisitions.view') || auth()->user()->hasPermission('sales_omset_dashboard.view') || auth()->user()->hasPermission('agents.view') || auth()->user()->hasPermission('package_restrictions.view') || auth()->user()->hasPermission('business_development_verification.view')): ?>
+                    <?php if(auth()->user()->hasPermission('customer_acquisitions.view') || auth()->user()->hasPermission('sales_omset_dashboard.view') || auth()->user()->hasPermission('agents.view') || auth()->user()->hasPermission('package_restrictions.view') || auth()->user()->hasPermission('business_development_verification.view') || auth()->user()->hasPermission('business_customers.view')): ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-busdev', 'chevron-busdev')"
                                 title="Business Development"
@@ -314,6 +314,10 @@
                                 <?php if(auth()->user()->hasPermission('business_development_verification.view')): ?>
                                 <a href="<?php echo e(route('business-development-verifications.index')); ?>"
                                    class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('business-development-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Menunggu Verifikasi BD</a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('business_customers.view')): ?>
+                                <a href="<?php echo e(route('business-development.business-customers.index')); ?>"
+                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('business-development/business-customers*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">List Pelanggan Bisnis</a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('sales_omset_dashboard.view')): ?>
                                 <a href="<?php echo e(route('business-development.sales-omset.index')); ?>"
@@ -521,6 +525,18 @@
                                    class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
                                     Laporan Pembayaran
                                 </a>
+                                <?php if(auth()->user()->hasPermission('collector_report.view')): ?>
+                                <a href="<?php echo e(route('reports.collector-monthly.index')); ?>"
+                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/collector-monthly*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
+                                    Laporan Bulanan Admin
+                                </a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('collector_payment_report.view')): ?>
+                                <a href="<?php echo e(route('reports.collector-payments.index')); ?>"
+                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/collector-payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
+                                    Laporan Bayar Kolektor
+                                </a>
+                                <?php endif; ?>
                                 <a href="<?php echo e(route('reports.imports.index')); ?>"
                                    class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/imports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
                                     Laporan Import Data
@@ -911,7 +927,7 @@
         </header>
 
         
-        <main class="flex-1 p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto scroll-smooth">
+        <main class="flex-1 <?php echo $__env->yieldContent('main_class', 'p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto scroll-smooth'); ?>">
             <?php echo $__env->yieldContent('content'); ?>
         </main>
     </div>
