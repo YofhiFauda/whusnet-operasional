@@ -265,6 +265,8 @@
             <p class="metric-card-footer"><?php echo e(number_format($stats['new_active_customers'])); ?> aktif baru &middot; <?php echo e(number_format($stats['terminated_customers'])); ?> putus</p>
         </div>
 
+        
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('sales_omset_dashboard.view')): ?>
         <!-- Omset Sales (Metric Card) -->
         <div class="metric-card">
             <div>
@@ -306,6 +308,7 @@
             </div>
             <p class="metric-card-footer"><span class="font-mono"><?php echo e(number_format($stats['omset_bisnis_count'])); ?></span> pelanggan aktif segmen Bisnis</p>
         </div>
+        <?php endif; ?>
     </div>
 
     <?php if($canViewCash): ?>

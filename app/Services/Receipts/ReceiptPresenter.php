@@ -2,8 +2,13 @@
 
 namespace App\Services\Receipts;
 
+use App\Enums\BalanceMutationSource;
+use App\Enums\CustomerBalanceMutationType;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\Invoice;
 use App\Models\Payment;
+use Carbon\Carbon;
 
 /**
  * Satu sumber isi kwitansi untuk SEMUA bentuk cetakan.
@@ -17,8 +22,13 @@ use App\Models\Payment;
  * pelanggan dan dipakai saat audit, perbedaan itu bukan selera tata letak.
  *
  * Aturannya: **bentuk boleh berbeda, isi tidak.** Tiap view merangkai kunci
- * yang sama dengan tata letaknya sendiri (80mm vs A4 vs kartu). Field baru
- * ditambahkan DI SINI supaya ketiganya ikut, bukan di salah satu view.
+ * yang sama dengan tata letaknya sendiri. Field baru ditambahkan DI SINI
+ * supaya semua titik cetak ikut, bukan di salah satu view.
+ *
+ * `alamat_baris` dipertahankan (dipakai `PaymentReceiptResource`/JSON Portal
+ * apa adanya, docs/api/api-portal-pelanggan/business-logic.md §3) walau
+ * template kwitansi cetak (ADHOC-94) sudah tidak memakainya lagi — cetakan
+ * sekarang menampilkan `alamat` satu baris utuh.
  *
  * Kelas ini sengaja tidak memformat HTML apa pun — cuma nilai siap tampil.
  *
@@ -29,12 +39,15 @@ use App\Models\Payment;
  *     keterangan_cicilan: string|null,
  *     tanggal_bayar: string,
  *     tanggal_ditagih: string,
+ *     jatuh_tempo: string,
  *     metode: string,
  *     pop: string,
  *     pelanggan: array{nama: string, cid: string, hp: string, alamat: string, alamat_baris: list<string>},
  *     invoice: array{ada: bool, nomor: string, periode: string, paket: string, total: string, sisa: string, lunas: bool},
+ *     keterangan_item: string,
  *     dibayar: string,
  *     lebih_bayar: string|null,
+ *     titip_saldo: string|null,
  *     penerima: string,
  *     penagih: string,
  *     catatan: string|null,
@@ -68,7 +81,13 @@ class ReceiptPresenter
             'tanggal_ditagih' => $payment->collected_date?->format('d/m/Y')
                 ?: ($payment->payment_date?->format('d/m/Y') ?: '-'),
 
-            'metode' => strtoupper((string) $payment->payment_method),
+            'jatuh_tempo' => $invoice?->due_date?->format('d/m/Y') ?: '-',
+
+            // SALDO (ADHOC-92) diberi label sendiri — kwitansi tidak boleh
+            // menyiratkan uang tunai/transfer masuk untuk pembayaran yang
+            // sebenarnya dipotong dari saldo yang sudah ada.
+            'metode' => PaymentMethod::tryFrom((string) $payment->payment_method)?->label()
+                ?? strtoupper((string) $payment->payment_method),
             'pop' => $payment->pop->name ?? 'Kantor Pusat',
 
             'pelanggan' => [
@@ -89,12 +108,21 @@ class ReceiptPresenter
                 'lunas' => $invoice ? (float) $invoice->remaining_amount <= 0 : false,
             ],
 
+            'keterangan_item' => $this->keteranganItem($payment, $invoice),
+
             'dibayar' => $this->rupiah($payment->amount),
             // null, bukan "Rp 0" — baris lebih bayar memang tidak dicetak kalau
             // tidak ada kelebihan.
             'lebih_bayar' => (float) $payment->overpay_amount > 0
                 ? $this->rupiah($payment->overpay_amount)
                 : null,
+
+            // "Titip saldo" (ADHOC-92 §4.2) — cuma dicetak untuk kredit sumber
+            // `bayar_di_muka` (overpay invoice AWAL), BUKAN untuk kelebihan
+            // bayar biasa/pemakaian saldo. Dibaca dari ledger, bukan
+            // `overpay_amount` mentah, supaya baris ini tidak dobel dengan
+            // `lebih_bayar` di atas untuk jenis invoice lain.
+            'titip_saldo' => $this->titipSaldo($payment),
 
             'penerima' => $payment->receiver->name ?? '-',
             'penagih' => $payment->collector?->name
@@ -122,6 +150,30 @@ class ReceiptPresenter
         }
 
         return $context['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$context['number'];
+    }
+
+    /**
+     * "Pembayaran Layanan Internet Bulan {NamaBulan}" — bulan diambil dari
+     * `billing_period` invoice ('Y-m') kalau ada, fallback ke bulan
+     * `payment_date`. Suffix cicilan/pelunasan ditempel supaya info itu tidak
+     * hilang dari satu-satunya baris item kwitansi (ADHOC-94, tabel item
+     * tidak lagi punya baris "Keterangan" terpisah seperti struk lama).
+     */
+    private function keteranganItem(Payment $payment, ?Invoice $invoice): string
+    {
+        $bulan = $invoice?->billing_period
+            ? Carbon::createFromFormat('Y-m', $invoice->billing_period)->locale('id')->translatedFormat('F')
+            : $payment->payment_date?->locale('id')->translatedFormat('F');
+
+        $keterangan = 'Pembayaran Layanan Internet Bulan '.($bulan ?: '-');
+
+        $context = $payment->installmentContext();
+
+        if ($context) {
+            $keterangan .= $context['settles'] ? ' (Pelunasan)' : ' (Cicilan Ke-'.$context['number'].')';
+        }
+
+        return $keterangan;
     }
 
     /**
@@ -154,6 +206,19 @@ class ReceiptPresenter
         $bagian = preg_split('/,\s*(?=Kec(?:\.|amatan)\s)/iu', $alamat, 2);
 
         return array_values(array_filter(array_map('trim', $bagian ?: [$alamat]), fn ($baris) => $baris !== ''));
+    }
+
+    /**
+     * "Titip saldo: Rp450.000" — cuma untuk payment yang menghasilkan kredit
+     * `bayar_di_muka` (ADHOC-92 §4.2, studi kasus AWAL 100k dibayar 550k).
+     */
+    private function titipSaldo(Payment $payment): ?string
+    {
+        $credit = $payment->balanceMutations
+            ->first(fn ($mutation) => $mutation->type === CustomerBalanceMutationType::CREDIT
+                && $mutation->source === BalanceMutationSource::BAYAR_DI_MUKA);
+
+        return $credit ? $this->rupiah($credit->amount) : null;
     }
 
     private function rupiah(mixed $nilai): string

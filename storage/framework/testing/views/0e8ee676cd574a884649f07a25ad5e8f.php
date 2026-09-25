@@ -1,14 +1,15 @@
 <?php $__env->startSection('title', 'Worksheet Helpdesk - Create Service Ticket'); ?>
 <?php $__env->startSection('page_title', 'Worksheet Helpdesk — New Ticket'); ?>
-<?php $__env->startSection('main_class', 'p-0 overflow-hidden flex flex-col'); ?>
 
 <?php $__env->startSection('content'); ?>
 
+
 <div x-data="ticketPage()" @keydown.window="handleShortcut($event)"
      @ticket-drawer-action.window="handleDrawerAction($event.detail)"
+     
      @ticket-drawer-shown.window="drawerOpen = true"
      @ticket-drawer-hidden.window="drawerOpen = false"
-     class="relative flex-1 w-full flex overflow-hidden bg-background">
+     class="relative -m-4 sm:-m-6 lg:-m-8 h-[calc(100dvh-4rem)] flex overflow-hidden bg-background">
 
     
     <div x-show="toast.show" x-cloak
@@ -169,7 +170,7 @@
         <form action="<?php echo e(route('tickets.store')); ?>" method="POST" @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
             <?php echo csrf_field(); ?>
 
-            <div x-ref="formBody" class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3.5 overscroll-contain">
+            <div x-ref="formBody" class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3.5">
 
                 
                 <div class="grid grid-cols-2 gap-2.5">
@@ -625,9 +626,10 @@
     <div class="flex-1 flex min-w-0 overflow-hidden bg-background ticket-queue-container">
     <div class="flex-1 flex flex-col min-w-[280px] overflow-hidden">
 
-        <div class="shrink-0 p-3 border-b border-border bg-surface flex items-center gap-2 flex-wrap queue-toolbar">
+        
+        <div class="shrink-0 p-3 border-b border-border bg-surface flex flex-col lg:flex-row lg:items-center gap-2 queue-toolbar">
             
-            <div class="flex-1 basis-full sm:basis-auto min-w-[180px] flex items-center gap-1 bg-surface-muted dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted queue-toolbar-tabs">
+            <div class="w-full lg:w-auto lg:flex-1 lg:min-w-[180px] flex items-center gap-1 bg-surface-muted dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted queue-toolbar-tabs">
                 <template x-for="tab in tabs" :key="tab.value">
                     <button type="button" @click="setTab(tab.value)"
                             :class="taskFilter === tab.value ? 'bg-surface text-text-main font-bold shadow-sm' : 'hover:text-text-main'"
@@ -640,9 +642,9 @@
                 </template>
             </div>
 
-            <div class="shrink-0 flex items-center gap-2 ml-auto flex-wrap sm:flex-nowrap queue-toolbar-controls">
+            <div class="w-full lg:w-auto shrink-0 flex items-center gap-2 lg:ml-auto queue-toolbar-controls">
                 
-                <div class="relative min-w-[130px] max-w-[180px]">
+                <div class="relative flex-1 min-w-0 lg:flex-none lg:min-w-[130px] lg:max-w-[180px]">
                     <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-text-muted">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -661,8 +663,8 @@
                 </div>
 
                 
-                <select x-model="filterPriority"
-                        class="max-w-[9.5rem] bg-surface-muted dark:bg-slate-900 border border-border text-xs font-medium rounded-lg px-2 py-1.5 text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/30">
+                <select x-model="filterPriority" title="Filter prioritas"
+                        class="shrink-0 w-24 sm:w-auto sm:max-w-[9.5rem] truncate bg-surface-muted dark:bg-slate-900 border border-border text-xs font-medium rounded-lg px-2 py-1.5 text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/30">
                     <option value="ALL">Semua Prioritas</option>
                     <option value="Urgent">🔴 Urgent</option>
                     <option value="High">🟠 High</option>
@@ -695,16 +697,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
-                <button type="button" onclick="openHelp('keys')" title="Pintasan Keyboard & Bantuan (?)"
-                        class="p-1.5 rounded-lg text-text-muted hover:text-sky-600 dark:hover:text-sky-400 hover:bg-surface-muted dark:hover:bg-slate-900 transition-colors cursor-pointer">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
-                    </svg>
-                </button>
+                    
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar overscroll-contain">
+        <div class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <template x-if="filteredTasks.length === 0">
                 <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
                     <div class="w-14 h-14 rounded-2xl bg-surface-muted dark:bg-slate-800/80 border border-border flex items-center justify-center text-text-muted mb-3 shadow-2xs">

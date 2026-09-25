@@ -1072,24 +1072,24 @@
         {{-- Review FOP --}}
         @if($task->status->value === 'selesai' && $task->fop_review_status === 'pending')
         @can('review', $task)
-        @if($task->task_type->value === 'PSB')
+        @if(in_array($task->task_type->value, ['PSB', 'SRV'], true))
         <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
             <div class="min-w-0 flex-1">
-                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Approve Pemasangan (Verifikasi Admin)</h4>
-                <p class="text-[11px] text-text-muted font-ui leading-relaxed">Aktivasi layanan (CID + tagihan awal) hanya boleh diproses melalui halaman Verifikasi Admin.</p>
+                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">{{ $task->task_type->value === 'SRV' ? 'Verifikasi Survey (Menunggu ACC)' : 'Approve Pemasangan (Verifikasi Admin)' }}</h4>
+                <p class="text-[11px] text-text-muted font-ui leading-relaxed">{{ $task->task_type->value === 'SRV' ? 'Verifikasi hasil survey dan penerusan ke tim pemasangan diproses melalui halaman Verifikasi oleh Admin/CS.' : 'Aktivasi layanan (CID + tagihan awal) hanya boleh diproses melalui halaman Verifikasi Admin.' }}</p>
             </div>
             @if($task->customer_id)
                 @if(auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasFullAccess())
                 <a href="{{ route('customers.verification.admin', $task->customer_id) }}"
                    class="w-full sm:w-auto text-center inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-500/10 cursor-pointer font-ui active:scale-95"
                    style="background:var(--color-primary)">
-                    Buka Verifikasi Admin
+                    Buka Verifikasi
                 </a>
                 @else
-                <a href="{{ route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) }}"
+                <a href="{{ $task->task_type->value === 'SRV' ? route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) : route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) }}"
                    class="w-full sm:w-auto text-center inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-500/10 cursor-pointer font-ui active:scale-95"
                    style="background:var(--color-primary)">
-                    Lihat Laporan Pemasangan
+                    {{ $task->task_type->value === 'SRV' ? 'Lihat Laporan Survey' : 'Lihat Laporan Pemasangan' }}
                 </a>
                 @endif
             @endif

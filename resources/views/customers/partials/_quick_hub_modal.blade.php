@@ -222,15 +222,19 @@
                             </div>
 
                             <!-- Dynamic Transfer Fields -->
-                            <div id="hub-pay-transfer-fields" class="hidden grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nama Bank</label>
-                                    <input type="text" name="bank_name" id="hub_bank_name" placeholder="mis. BCA, BRI, Mandiri" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
-                                </div>
-                                <div>
-                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nomer Rekening</label>
-                                    <input type="text" name="account_number" id="hub_account_number" placeholder="No. Rekening" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
-                                </div>
+                            {{-- Rekening dari Master Rekening Bank (ADHOC-95), opsi
+                                 diisi dari `available_bank_accounts` payment-info. --}}
+                            <div id="hub-pay-transfer-fields" class="hidden">
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Rekening Tujuan</label>
+                                <select name="bank_account_id" id="hub_bank_account_id" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                                    <option value="">Pilih rekening...</option>
+                                </select>
+                            </div>
+
+                            {{-- Nama Pengirim (opsional) — cuma Transfer & Kolektor. --}}
+                            <div id="hub-pay-sender-fields" class="hidden">
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nama Pengirim (opsional)</label>
+                                <input type="text" name="sender_name" id="hub_sender_name" maxlength="150" placeholder="Nama di bukti transfer, jika beda dari nama pelanggan" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
                             </div>
 
                             <!-- Dynamic Collector Fields -->
@@ -559,6 +563,17 @@
                 </button>
                 @endif
 
+
+                {{-- WA — buka dropdown template yang SUDAH ADA di tab Ringkasan
+                     (bukan salinan kedua, lihat komentar focusWaTemplates()
+                     di _list_scripts.blade.php). `data-wa-trigger` mengecualikan
+                     tombol ini dari listener "klik di luar dropdown = tutup",
+                     karena tombol ini secara DOM ada di luar #wa-dropdown-container. --}}
+                <button type="button" onclick="focusWaTemplates()" data-wa-trigger title="Kirim WA"
+                        class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors btn-interactive">
+                    <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+                    <span class="text-[9px] font-semibold leading-none">WA</span>
+                </button>
 
                 @if(auth()->user()->hasPermission('payments.view'))
                 {{-- Struk yang dicetak = pembayaran TERAKHIR pelanggan ini. Tombol sengaja di luar <form> (type=button) supaya tidak

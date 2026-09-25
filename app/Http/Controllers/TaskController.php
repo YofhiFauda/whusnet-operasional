@@ -594,15 +594,14 @@ class TaskController extends Controller
                 return back()->with('error', 'Approve pemasangan wajib dilakukan lewat halaman Verifikasi Admin (generate CID & tagihan awal).');
             }
 
+            // Approve Survey wajib lewat Verifikasi Admin / CS (processToTeam) — jalur
+            // itu yang memverifikasi hasil survey dan meneruskannya ke TIM Pemasangan.
+            if ($task->task_type === TaskType::SURVEY) {
+                return back()->with('error', 'Approve survey wajib dilakukan lewat halaman Verifikasi & Pemasangan oleh Admin/CS.');
+            }
+
             $task->update(['fop_review_status' => 'approved']);
             AuditLog::log($task, 'approved', $oldValues, $task->toArray());
-
-            // Transition customer status
-            if ($task->customer) {
-                if ($task->task_type === TaskType::SURVEY) {
-                    $workflowService->transition($task->customer, WorkflowTransition::WAITING_INSTALLATION, 'Survey Approved by FOP');
-                }
-            }
             $this->notifyTeamMembers(
                 $task,
                 'Laporan Disetujui: '.$task->task_number,

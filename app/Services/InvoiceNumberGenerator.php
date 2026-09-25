@@ -7,8 +7,8 @@ use App\Models\Invoice;
 /**
  * Penomoran tagihan `INV-{YYYYMM}-{NNNN}`.
  *
- * Diekstrak dari dua salinan identik (CustomerController::storeManualInvoice
- * dan GenerateMonthlyInvoicesCommand) waktu jalur tagihan manual dipindah ke
+ * Diekstrak dari dua salinan identik (bekas CustomerController::storeManualInvoice,
+ * dihapus ADHOC-70, dan GenerateMonthlyInvoicesCommand) waktu jalur tagihan manual dipindah ke
  * modul Tagihan (ADHOC-60). Dua salinan itu menulis ke deret yang SAMA, jadi
  * begitu keduanya menyimpang formatnya nomor tagihan langsung bentrok —
  * masalah yang persis sama sudah pernah didokumentasikan untuk `TFOP-` di

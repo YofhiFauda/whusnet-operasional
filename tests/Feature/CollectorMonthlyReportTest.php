@@ -14,6 +14,7 @@ use App\Models\UserRoleScopeTarget;
 use App\Services\CollectorMonthlyReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\BuildsCollectorMonthlyScenario;
@@ -196,10 +197,9 @@ class CollectorMonthlyReportTest extends TestCase
     #[Test]
     public function tutup_periode_membekukan_angka_walau_ada_pembayaran_susulan(): void
     {
-        $owner = $this->ownerUser();
         $before = $this->figuresA();
 
-        $this->service()->close('2026-08', $this->branchA, $owner);
+        $this->service()->closePeriod('2026-08');
 
         $inv3 = Invoice::query()->where('billing_period', '2026-08')->where('remaining_amount', 100000)->firstOrFail();
         // Susulan bertanggal Agustus (mis. impor legacy) — masuk SETELAH ditutup.
@@ -214,47 +214,90 @@ class CollectorMonthlyReportTest extends TestCase
     }
 
     #[Test]
-    public function periode_berjalan_dan_periode_yang_sudah_ditutup_tidak_bisa_ditutup(): void
+    public function periode_berjalan_tidak_bisa_ditutup_dan_tutup_ulang_idempoten(): void
     {
-        $owner = $this->ownerUser();
-
         try {
-            $this->service()->close('2026-09', $this->branchA, $owner);
+            $this->service()->closePeriod('2026-09');
             $this->fail('Periode berjalan seharusnya ditolak.');
         } catch (ValidationException $e) {
             $this->assertArrayHasKey('period', $e->errors());
         }
 
-        $this->service()->close('2026-08', $this->branchA, $owner);
+        // Semua POP pusat/cabang (A & B) dibekukan; mini-POP tidak jadi baris sendiri.
+        $this->assertSame(2, $this->service()->closePeriod('2026-08'));
+        $this->assertEqualsCanonicalizing(
+            [$this->branchA->id, $this->branchB->id],
+            PeriodClosing::query()->pluck('pop_id')->all(),
+        );
 
-        $this->expectException(ValidationException::class);
-        $this->service()->close('2026-08', $this->branchA, $owner);
+        // Jalan ulang (mis. scheduler dobel) tidak menimpa snapshot pertama.
+        $this->assertSame(0, $this->service()->closePeriod('2026-08'));
+        $this->assertDatabaseCount('period_closings', 2);
     }
 
     #[Test]
-    public function buka_ulang_hanya_owner_dan_wajib_alasan_serta_tercatat_di_audit(): void
+    public function scheduler_tutup_buku_otomatis_tanggal_1_untuk_bulan_lalu(): void
+    {
+        Carbon::setTestNow('2026-09-01 00:10:00');
+
+        $this->artisan('billing:close-period')->assertSuccessful();
+
+        $this->assertEqualsCanonicalizing(['2026-08'], PeriodClosing::query()->distinct()->pluck('period')->all());
+        $log = AuditLog::query()->where('action', 'periode_ditutup')->firstOrFail();
+        $this->assertNull($log->user_id, 'Ditutup sistem, bukan orang.');
+
+        // Menambal bulan yang terlewat saat scheduler mati.
+        $this->artisan('billing:close-period', ['--period' => '2026-07'])->assertSuccessful();
+        $this->assertTrue(PeriodClosing::query()->where('period', '2026-07')->exists());
+
+        // Periode berjalan tetap ditolak.
+        $this->artisan('billing:close-period', ['--period' => '2026-09'])->assertFailed();
+    }
+
+    #[Test]
+    public function migration_menghapus_permission_tutup_dan_buka_ulang_yang_yatim(): void
+    {
+        // Simulasi DB produksi lama: dua permission masih ada & menempel di role.
+        $featureId = DB::table('features')->where('code', 'collector_report')->value('id');
+        $admin = Role::where('code', 'admin')->firstOrFail();
+
+        foreach (['approve', 'cancel'] as $actionCode) {
+            $permissionId = DB::table('permissions')->insertGetId([
+                'feature_id' => $featureId,
+                'action_id' => DB::table('actions')->where('code', $actionCode)->value('id'),
+                'code' => "collector_report.{$actionCode}",
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('role_permissions')->insert(['role_id' => $admin->id, 'permission_id' => $permissionId]);
+        }
+
+        (require database_path('migrations/2026_09_23_131132_remove_collector_report_close_reopen_permissions.php'))->up();
+
+        $this->assertDatabaseMissing('permissions', ['code' => 'collector_report.approve']);
+        $this->assertDatabaseMissing('permissions', ['code' => 'collector_report.cancel']);
+        // Permission lain di fitur yang sama tidak ikut terhapus.
+        $this->assertDatabaseHas('permissions', ['code' => 'collector_report.view']);
+        $this->assertDatabaseHas('permissions', ['code' => 'collector_report.export']);
+    }
+
+    #[Test]
+    public function tombol_tutup_dan_buka_ulang_manual_sudah_tidak_ada(): void
     {
         $owner = $this->ownerUser();
-        $this->service()->close('2026-08', $this->branchA, $owner);
+        $this->service()->closePeriod('2026-08');
 
-        $admin = $this->scopedUser('admin', $this->branchA);
-        $this->actingAs($admin)
-            ->post('/reports/collector-monthly/reopen', ['period' => '2026-08', 'pop_id' => $this->branchA->id, 'reason' => 'salah hitung'])
-            ->assertForbidden();
-        $this->assertDatabaseCount('period_closings', 1);
-
-        $this->actingAs($owner)
-            ->post('/reports/collector-monthly/reopen', ['period' => '2026-08', 'pop_id' => $this->branchA->id, 'reason' => ''])
-            ->assertSessionHasErrors('reason');
-        $this->assertDatabaseCount('period_closings', 1);
-
+        $this->actingAs($owner)->post('/reports/collector-monthly/close', ['period' => '2026-08'])->assertNotFound();
         $this->actingAs($owner)
             ->post('/reports/collector-monthly/reopen', ['period' => '2026-08', 'pop_id' => $this->branchA->id, 'reason' => 'salah hitung'])
-            ->assertRedirect();
+            ->assertNotFound();
+        $this->assertDatabaseCount('period_closings', 2);
 
-        $this->assertDatabaseCount('period_closings', 0);
-        $log = AuditLog::query()->where('action', 'periode_dibuka_ulang')->firstOrFail();
-        $this->assertSame('salah hitung', $log->new_values['alasan']);
+        $this->actingAs($owner)->get('/reports/collector-monthly?period=2026-08')
+            ->assertOk()
+            ->assertSee('Terkunci')
+            ->assertDontSee('Tutup Periode')
+            ->assertDontSee('Buka Ulang');
     }
 
     #[Test]
@@ -273,23 +316,6 @@ class CollectorMonthlyReportTest extends TestCase
         $this->actingAs($owner)->get('/reports/collector-monthly/export?period=2026-08')
             ->assertOk()
             ->assertHeader('content-disposition', 'attachment; filename=laporan-admin-collector-2026-08.xlsx');
-    }
-
-    #[Test]
-    public function tutup_lewat_route_hanya_menyentuh_pop_dalam_scope(): void
-    {
-        $popAdmin = $this->scopedUser('pop_admin', $this->branchA);
-
-        $this->actingAs($popAdmin)
-            ->post('/reports/collector-monthly/close', ['period' => '2026-08'])
-            ->assertRedirect();
-
-        $this->assertSame([$this->branchA->id], PeriodClosing::query()->pluck('pop_id')->all());
-
-        // Menunjuk POP di luar scope → 403, bukan diam-diam dilewati.
-        $this->actingAs($popAdmin)
-            ->post('/reports/collector-monthly/close', ['period' => '2026-08', 'pop_id' => $this->branchB->id])
-            ->assertForbidden();
     }
 
     #[Test]
@@ -316,7 +342,6 @@ class CollectorMonthlyReportTest extends TestCase
         ]);
 
         $this->actingAs($teknisi)->get('/reports/collector-monthly')->assertForbidden();
-        $this->actingAs($teknisi)->post('/reports/collector-monthly/close', ['period' => '2026-08'])->assertForbidden();
     }
 
     private function scopedUser(string $roleCode, Pop $pop): User

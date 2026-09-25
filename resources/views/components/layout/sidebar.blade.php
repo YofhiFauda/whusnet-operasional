@@ -111,7 +111,7 @@
         @endif
 
         <!-- Master Data -->
-        @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view'))
+        @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view'))
         <div class="pt-3 pb-1">
             <p x-show="sidebarOpen" class="px-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Master Data</p>
             <div x-show="!sidebarOpen" class="w-full border-t border-border my-2"></div>
@@ -168,6 +168,24 @@
            :class="{ 'justify-center px-0': !sidebarOpen }">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
             <span x-show="sidebarOpen" class="truncate">Alat Kerja</span>
+        </a>
+        @endif
+
+        @if(auth()->user()->hasPermission('master_rekening.view'))
+        <a href="{{ route('master.rekening.index') }}" title="Rekening Bank"
+           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('master.rekening.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           :class="{ 'justify-center px-0': !sidebarOpen }">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M3 21h18"/><path d="M3 10h18"/><path d="m12 3 9 7H3z"/><path d="M5 10v11"/><path d="M19 10v11"/><path d="M9 14v3"/><path d="M15 14v3"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Rekening Bank</span>
+        </a>
+        @endif
+
+        @if(auth()->user()->hasPermission('termination_reasons.view'))
+        <a href="{{ route('master.termination-reasons.index') }}" title="Alasan Putus Langganan"
+           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('master.termination-reasons.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           :class="{ 'justify-center px-0': !sidebarOpen }">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Alasan Putus Langganan</span>
         </a>
         @endif
         @endif

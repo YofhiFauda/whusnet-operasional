@@ -11,13 +11,17 @@
     ];
     $statusLabels = [
         'valid' => 'Valid / Disetujui',
-        'ditolak' => 'Ditolak',
+        'ditolak' => 'Dikembalikan',
     ];
     $methodLabels = [
         'cash' => 'Cash',
         'transfer' => 'Transfer Bank',
         'kolektor' => 'Kolektor',
         'lainnya' => 'Lainnya',
+        // ADHOC-92 — dibuat sistem (auto-pay/pakai saldo), bukan pilihan
+        // dropdown input, tapi tetap dibaca `PaymentMethod::cases()` di
+        // controller sebagai opsi FILTER laporan ini.
+        'saldo' => 'Saldo Pelanggan',
     ];
 @endphp
 
@@ -58,7 +62,7 @@
                 </svg>
             </div>
             <div>
-                <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pembayaran Ditolak</p>
+                <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pembayaran Dikembalikan</p>
                 <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">Rp {{ number_format($totalDitolakSum, 2, ',', '.') }}</h3>
             </div>
         </div>
@@ -99,7 +103,7 @@
                         <option value="">Semua Metode</option>
                         @foreach($allowedMethods as $item)
                             <option value="{{ $item }}" @selected($paymentMethod === $item)>
-                                {{ $methodLabels[$item] }}
+                                {{ $methodLabels[$item] ?? strtoupper($item) }}
                             </option>
                         @endforeach
                     </select>
@@ -113,6 +117,19 @@
                         @foreach($allowedStatuses as $item)
                             <option value="{{ $item }}" @selected($status === $item)>
                                 {{ $statusLabels[$item] }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Filter Jenis (ADHOC-84 §8.2) -->
+                <div>
+                    <label for="classification" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Jenis</label>
+                    <select id="classification" name="classification" class="w-full rounded-md border-slate-300 dark:border-slate-600 text-sm focus:border-sky-500 focus:ring-sky-500">
+                        <option value="">Semua Jenis</option>
+                        @foreach($allowedClassifications as $item)
+                            <option value="{{ $item->value }}" @selected($classification === $item->value)>
+                                {{ $item->label() }}
                             </option>
                         @endforeach
                     </select>
@@ -231,6 +248,7 @@
                         <th class="px-6 py-3 text-center">Metode</th>
                         <th class="px-6 py-3">Kolektor</th>
                         <th class="px-6 py-3 text-right">Nominal</th>
+                        <th class="px-6 py-3">Jenis</th>
                         <th class="px-6 py-3">Penerima</th>
                         <th class="px-6 py-3 text-center">Status</th>
                     </tr>
@@ -283,6 +301,13 @@
                             <td class="px-6 py-4 text-right font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
                                 Rp {{ number_format($payment->amount, 2, ',', '.') }}
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach($payment->classification() as $label)
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $label->badgeClass() }}">{{ $label->label() }}</span>
+                                    @endforeach
+                                </div>
+                            </td>
                             <td class="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                                 {{ $payment->receiver->name ?? '-' }}
                             </td>
@@ -294,7 +319,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
+                            <td colspan="11" class="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
                                 <svg class="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>

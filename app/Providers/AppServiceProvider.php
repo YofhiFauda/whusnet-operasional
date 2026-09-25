@@ -5,12 +5,14 @@ namespace App\Providers;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Models\Customer;
+use App\Models\CustomerBalanceMutation;
 use App\Models\CustomerQrToken;
 use App\Models\FopTask;
 use App\Models\InventoryTransaction;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Task;
+use App\Observers\CustomerBalanceMutationObserver;
 use App\Observers\CustomerObserver;
 use App\Observers\CustomerQrTokenObserver;
 use App\Observers\FopTaskObserver;
@@ -121,6 +123,10 @@ class AppServiceProvider extends ServiceProvider
         // InventoryTransactionObserver buat batasan jalur yang TIDAK
         // ketangkep (bulk update query builder/raw SQL).
         InventoryTransaction::observe(InventoryTransactionObserver::class);
+
+        // Saldo Pelanggan (ADHOC-92) — ledger append-only sama alasannya
+        // dengan InventoryTransaction di atas (G8).
+        CustomerBalanceMutation::observe(CustomerBalanceMutationObserver::class);
 
         // Register Blade Directives for formatting
         Blade::directive('rupiah', function ($expression) {

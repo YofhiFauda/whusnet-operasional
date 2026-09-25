@@ -17,7 +17,9 @@ use InvalidArgumentException;
 /**
  * Penerbitan Tagihan Manual (ADHOC-60).
  *
- * Menggantikan `CustomerController::storeManualInvoice()` yang cuma bisa
+ * Menggantikan bekas `CustomerController::storeManualInvoice()` (dihapus
+ * ADHOC-70 — tagihan manual sekarang lewat `/invoices/create`, terpisah dari
+ * ADHOC-60 ini) yang cuma bisa
  * menagih kombinasi kolom biaya tetap di `invoices`. Sekarang admin merinci
  * sendiri barisnya per kategori pendapatan, dan rinciannya yang jadi dasar
  * pemecahan angka di Laporan Tagihan & Laporan Pembayaran.

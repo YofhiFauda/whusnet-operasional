@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
+use App\Enums\ManualInvoiceCategory;
 use App\Enums\PaymentStatus;
 use App\Events\InvoiceStatusUpdated;
 use App\Models\Concerns\RecordsAuditLogs;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 
 class Invoice extends Model
 {
@@ -43,6 +46,9 @@ class Invoice extends Model
     protected $fillable = [
         'invoice_number',
         'invoice_type',
+        'manual_category',
+        'manual_subtype_name',
+        'description',
         'old_invoice_id',
         'old_cost_id',
         'old_request_id',
@@ -79,6 +85,7 @@ class Invoice extends Model
     {
         return [
             'invoice_type' => InvoiceType::class,
+            'manual_category' => ManualInvoiceCategory::class,
             'invoice_status' => InvoiceStatus::class,
             'issue_date' => 'date',
             'due_date' => 'date',
@@ -152,6 +159,18 @@ class Invoice extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Baris pembebasan (ADHOC-87) yang membatalkan invoice ini, kalau ada —
+     * dipakai Detail Tagihan untuk menampilkan alasan & siapa yang membatalkan
+     * invoice `batal` lewat mekanisme ini (bukan write-off/hard cancel lain).
+     *
+     * @return HasOne<CustomerBillingWaiver, $this>
+     */
+    public function billingWaiver(): HasOne
+    {
+        return $this->hasOne(CustomerBillingWaiver::class);
     }
 
     /**
@@ -267,6 +286,30 @@ class Invoice extends Model
         return in_array($this->invoice_status?->value, self::OUTSTANDING_STATUSES, true)
             && $this->billing_period !== null
             && $this->billing_period < now()->format('Y-m');
+    }
+
+    /**
+     * Tagihan LEBIH LAMA (`billing_period` lebih kecil) milik pelanggan yang
+     * sama, yang masih `belum_dibayar`/`sebagian` — dasar peringatan piutang
+     * di form/modal bayar (ADHOC-84 §2.4). Dipakai dua jalur (form Input
+     * Pembayaran & Modal Bayar Cepat via JSON `InvoiceController::show()`),
+     * satu definisi supaya keduanya tak pernah menyimpang.
+     *
+     * @return Collection<int, Invoice>
+     */
+    public function olderUnpaidInvoices(): Collection
+    {
+        if (! $this->customer_id || $this->billing_period === null) {
+            return collect();
+        }
+
+        return static::query()
+            ->where('customer_id', $this->customer_id)
+            ->where('id', '!=', $this->id)
+            ->where('billing_period', '<', $this->billing_period)
+            ->whereIn('invoice_status', self::OUTSTANDING_STATUSES)
+            ->orderBy('billing_period')
+            ->get(['id', 'invoice_number', 'billing_period', 'remaining_amount']);
     }
 
     /**

@@ -15,11 +15,12 @@ class InternetPackageSeederTest extends TestCase
     {
         $this->seed(InternetPackageSeeder::class);
 
-        $this->assertSame(27, InternetPackage::query()->count());
+        $this->assertSame(31, InternetPackage::query()->count());
         $this->assertSame(10, InternetPackage::query()->where('category', 'Paket Home Broadband')->count());
         $this->assertSame(7, InternetPackage::query()->where('category', 'Paket Bisnis Broadband')->count());
         $this->assertSame(6, InternetPackage::query()->where('category', 'Paket Bisnis UKM')->count());
         $this->assertSame(4, InternetPackage::query()->where('category', 'Paket Bisnis Dedicated')->count());
+        $this->assertSame(4, InternetPackage::query()->where('category', 'Paket Internet Khusus')->count());
     }
 
     public function test_whusnet_internet_package_seed_stores_package_details(): void
@@ -31,6 +32,7 @@ class InternetPackageSeederTest extends TestCase
         $smePackage = InternetPackage::query()->where('package_code', 'NetBLite110')->firstOrFail();
 
         $this->assertSame('200.00', $homePackage->download_speed_mbps);
+        $this->assertSame('200 Mbps', $homePackage->bandwidth_label);
         $this->assertSame('198000.00', $homePackage->monthly_price);
         $this->assertSame('Dualband Wifi6', $homePackage->modem);
         $this->assertSame(['CCTV 1CH'], $homePackage->features);
@@ -49,6 +51,6 @@ class InternetPackageSeederTest extends TestCase
         $this->seed(InternetPackageSeeder::class);
         $this->seed(InternetPackageSeeder::class);
 
-        $this->assertSame(27, InternetPackage::query()->count());
+        $this->assertSame(31, InternetPackage::query()->count());
     }
 }

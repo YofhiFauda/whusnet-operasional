@@ -16,17 +16,17 @@ Dua pintu masuk, jalur belakang (route + logic) sama persis:
 1. **Halaman penuh** — dari `/invoices/{id}` (Detail Tagihan), klik "Bayar"/"Bayar Cicil" (label ikut status: "Bayar Cicil" kalau tagihan sudah `sebagian`) → form `/invoices/{id}/payments/create`.
 2. **Modal cepat** (paling sering dipakai sehari-hari) — tombol "Bayar"/"Bayar Cicil" langsung di baris tagihan `/invoices` (list) atau tab Tagihan di Detail Pelanggan → modal AJAX, tanpa pindah halaman.
 
-Isian sama di kedua form: tanggal bayar, metode (cash/transfer/kolektor/lainnya — `qris` dihapus 2026-09-22, tak pernah dipakai), **Nominal Diterima dari Pelanggan** (total uang fisik — boleh lebih besar dari sisa tagihan, lihat poin 4), bukti (opsional, jpg/png/pdf ≤2MB), catatan. Metode **Lainnya** menampilkan field keterangan wajib (mis. "OVO", "Dana") — reuse field Catatan yang sama, cuma jadi wajib & relabel via JS (`qpToggleMethodFields()` / `pcToggleMethodFields()` / `hubTogglePaymentMethodFields()` / `cbToggleNote()` tergantung form), divalidasi ulang server (`required_if:payment_method,lainnya`).
+Isian sama di kedua form: tanggal bayar, metode (cash/transfer/kolektor/lainnya — `qris` dihapus 2026-09-22, tak pernah dipakai), **Nominal Diterima dari Pelanggan** (total uang fisik — boleh lebih besar dari sisa tagihan, lihat poin 4), bukti (opsional, jpg/png/pdf ≤2MB), catatan. Metode **Lainnya** menampilkan field keterangan wajib (mis. "OVO", "Dana") — reuse field Catatan yang sama, cuma jadi wajib & relabel via JS (`qpToggleMethodFields()` / `pcToggleMethodFields()` / `hubTogglePaymentMethodFields()` / `cbToggleNote()` tergantung form), divalidasi ulang server (`required_if:payment_method,lainnya`). Metode **Transfer** wajib memilih **Rekening Tujuan** dari dropdown Master Rekening Bank (cuma rekening aktif; ADHOC-95) — nama bank & nomor rekening tidak lagi diketik, disalin otomatis ke payment sebagai snapshot. Metode **Transfer & Kolektor** menampilkan field opsional **Nama Pengirim** (nama di bukti transfer / yang menyerahkan uang, kalau beda dari pelanggan) — cuma terlihat di Detail Pembayaran, tidak dicetak di kwitansi.
 
 3. Submit → sistem cek status invoice (tolak kalau udah lunas/batal), simpan `Payment`, update `paid_amount`/`remaining_amount`/`invoice_status` di `Invoice`.
-4. **Lebih bayar (2026-08-04):** nominal yang diketik BOLEH lebih besar dari sisa tagihan — admin tak perlu hitung sendiri. Sistem otomatis menerapkan sebesar sisa tagihan ke invoice (jadi `lunas`) dan mencatat kelebihannya sebagai `overpay_amount` — kelebihan itu otomatis masuk **Saldo Pelanggan** (ADHOC-38) dan bisa dipakai manual di pembayaran berikutnya; **belum** otomatis dipakai bulan depan (rancangan ADHOC-92: [analisa-rancangan-saldo-pelanggan.md](../plan/billing/analisa-rancangan-saldo-pelanggan.md)). Kedua form kasih pratinjau hidup sebelum submit ("Rp X diterapkan ke tagihan (Lunas), Rp Y tercatat sebagai lebih bayar").
+4. **Lebih bayar (2026-08-04):** nominal yang diketik BOLEH lebih besar dari sisa tagihan — admin tak perlu hitung sendiri. Sistem otomatis menerapkan sebesar sisa tagihan ke invoice (jadi `lunas`) dan mencatat kelebihannya sebagai `overpay_amount` — kelebihan itu otomatis masuk **Saldo Pelanggan** (ADHOC-38) dan bisa dipakai manual di pembayaran berikutnya. Sejak **ADHOC-92 (2026-09-24)**, saldo itu juga dipakai **OTOMATIS** ke tagihan `bulanan` berikutnya begitu terbit (FIFO periode terlama dulu) — admin tak perlu ingat mencentang `use_balance_amount` tiap bulan: [analisa-rancangan-saldo-pelanggan.md](../plan/billing/analisa-rancangan-saldo-pelanggan.md). Kedua form kasih pratinjau hidup sebelum submit ("Rp X diterapkan ke tagihan (Lunas), Rp Y tercatat sebagai lebih bayar").
 5. Kalau nominal PAS = sisa penuh → status invoice jadi `lunas`. Kalau KURANG dari sisa → `sebagian` (cicilan, masih bisa dibayar lagi) — tercatat sebagai "Cicilan Ke-N", lihat poin 2b.
 
 ### 2a. Lihat riwayat lebih bayar — Tab Khusus (`/payments/overpay`)
 
 1. Buka `/payments`, klik tombol "Lebih Bayar" (badge amber di header) → daftar READ-ONLY semua payment yang punya `overpay_amount > 0`, filter search pelanggan & POP.
 2. Info juga muncul di: Detail Pembayaran (badge "Lebih Bayar Rp X" + sub-baris nominal), kwitansi cetak, header Detail Tagihan (kalau tagihan lunas dengan sisa lebih), Riwayat Pembayaran Pelanggan (Detail Pelanggan), dan daftar `/payments` global.
-3. Halaman ini read-only. Kelebihan yang tercatat di sini sudah masuk ledger Saldo Pelanggan (ADHOC-38); pemakaiannya lewat isian `use_balance_amount` di form bayar. Pemakaian otomatis saat tagihan bulanan terbit belum ada (rancangan ADHOC-92).
+3. Halaman ini read-only. Kelebihan yang tercatat di sini sudah masuk ledger Saldo Pelanggan (ADHOC-38); bisa dipakai manual lewat isian `use_balance_amount` di form bayar, atau otomatis begitu tagihan bulanan terbit (ADHOC-92, FIFO periode terlama dulu).
 
 ### 2b. Lihat riwayat cicilan
 
@@ -111,8 +111,7 @@ Dua jalur terpisah, jangan tertukar:
 | Buat tagihan manual | `invoices.create` |
 | Hapus buku piutang / batalkan hapus buku | `invoices.approve` |
 | Lihat / export Laporan Bulanan Admin Collector | `collector_report.view` / `collector_report.export` |
-| Tutup periode | `collector_report.approve` (admin, pop_admin — hanya POP dalam scope) |
-| Buka ulang periode | `collector_report.cancel` (owner saja) |
+| Tutup periode | Otomatis tiap pergantian bulan (`billing:close-period`), terkunci permanen — tidak ada permission / tombol tutup maupun buka ulang |
 | Lihat / export Laporan Bayar Kolektor | `collector_payment_report.view` / `collector_payment_report.export` |
 | Lihat `/payments`, `/payments/overpay`, detail payment, kwitansi | `payments.view` |
 | Bayar (single/bulk/batch kolektor) | `payments.create` |

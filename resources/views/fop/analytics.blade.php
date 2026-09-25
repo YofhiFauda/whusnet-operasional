@@ -169,7 +169,7 @@
             <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
                 <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Solving Terbanyak</h3>
                 @if($completedByWarning)
-                <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">⚠ Rentang mencakup data sebelum {{ \Illuminate\Support\Carbon::parse('2026-08-07')->translatedFormat('d M Y') }} — kolom pencatat penyelesai baru mulai dilacak sejak tanggal itu, angka historis sebelumnya mungkin belum lengkap.</p>
+                <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">⚠ {{ \Illuminate\Support\Carbon::parse('2026-08-07')->translatedFormat('d M Y') }} — kolom pencatat penyelesai baru mulai dilacak sejak tanggal itu, angka historis sebelumnya mungkin belum lengkap.</p>
                 @endif
             </div>
             @include('fop.partials.analytics-leaderboard-table', ['rows' => $solvingLeaderboard, 'total' => $solvingLeaderboardTotal, 'emptyText' => 'Gak ada task selesai tercatat di periode ini.'])

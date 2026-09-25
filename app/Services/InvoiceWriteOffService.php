@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Support\BookPeriod;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -19,8 +20,6 @@ use Illuminate\Validation\ValidationException;
  */
 class InvoiceWriteOffService
 {
-    public function __construct(private readonly CollectorMonthlyReportService $report) {}
-
     public function writeOff(Invoice $invoice, User $actor, string $reason): Invoice
     {
         return DB::transaction(function () use ($invoice, $actor, $reason): Invoice {
@@ -35,15 +34,8 @@ class InvoiceWriteOffService
                 ]);
             }
 
-            // Hapus buku dicatat di bulan berjalan (Blok 2 bulan ini). Kalau
-            // bulan ini sudah ditutup untuk POP-nya, angkanya sudah beku.
-            $currentPeriod = now()->format('Y-m');
-            if ($this->report->isClosed($currentPeriod, (int) $locked->pop_id)) {
-                throw ValidationException::withMessages([
-                    'reason' => "Periode {$currentPeriod} untuk POP ini sudah ditutup — hapus buku tidak bisa dicatat.",
-                ]);
-            }
-
+            // Hapus buku selalu dicatat di bulan berjalan (Blok 2 bulan ini),
+            // yang tidak pernah terkunci — jadi tidak perlu cek kunci periode.
             $locked->update([
                 'invoice_status' => InvoiceStatus::TAK_TERTAGIH->value,
                 'written_off_at' => now(),
@@ -71,12 +63,12 @@ class InvoiceWriteOffService
                 ]);
             }
 
-            // Hapus buku yang jatuh di periode yang sudah ditutup tak boleh
-            // dibatalkan diam-diam: snapshot periode itu memuatnya.
+            // Hapus buku yang jatuh di periode terkunci tak boleh dibatalkan:
+            // laporan bulan itu sudah memuatnya, dan kuncinya permanen.
             $writtenOffPeriod = $locked->written_off_at?->format('Y-m');
-            if ($writtenOffPeriod && $this->report->isClosed($writtenOffPeriod, (int) $locked->pop_id)) {
+            if (BookPeriod::isLocked($writtenOffPeriod)) {
                 throw ValidationException::withMessages([
-                    'reason' => "Hapus buku ini tercatat di periode {$writtenOffPeriod} yang sudah ditutup. Buka ulang periodenya dulu.",
+                    'reason' => "Hapus buku ini tercatat di periode {$writtenOffPeriod} yang sudah ditutup buku (terkunci permanen) — tidak bisa dibatalkan.",
                 ]);
             }
 

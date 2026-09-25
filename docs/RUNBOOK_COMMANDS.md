@@ -456,6 +456,31 @@ Baris hasil migrasi legacy dilewati — tanggalnya sudah benar dari sistem lama.
 Setiap perubahan masuk audit log (`action = backfill_activation_date`) lengkap
 dengan nilai lama, nilai baru, dan sumbernya.
 
+### `billing:apply-balance` — auto-pakai Saldo Pelanggan (ADHOC-92)
+
+```bash
+php artisan billing:apply-balance --dry-run                # WAJIB dijalankan dulu, lihat yang AKAN terjadi
+php artisan billing:apply-balance                           # eksekusi
+php artisan billing:apply-balance --customer=123             # batasi ke satu pelanggan
+php artisan billing:apply-balance --period=2026-09 --dry-run # ringkasan dry-run per periode (tidak membatasi eksekusi)
+```
+
+Auto-pay utama sudah otomatis lewat `billing:generate-monthly-invoices` (dalam
+transaksi yang sama dengan penerbitan tagihan BULANAN). Command ini untuk:
+
+1. **Kasus pinggiran** — saldo yang masuk SETELAH tagihan bulan itu sudah
+   terbit (mis. pelanggan titip saldo di tengah bulan padahal tagihan bulan
+   itu belum lunas).
+2. **Audit sebelum go-live/deploy** — `--dry-run` WAJIB dijalankan dulu
+   sebelum tanggal 1 pertama setelah fitur ini di-deploy. Credit lama (dari
+   ADHOC-38 atau `payments:backfill-customer-balance`) akan langsung terpakai
+   di generator tanggal 1 berikutnya — tinjau daftar pelanggan terdampak
+   dulu supaya tidak ada yang kaget tagihannya lunas tanpa uang masuk.
+
+FIFO periode terlama dulu, hanya invoice `bulanan` terbuka (`belum_dibayar`/
+`sebagian`). `--period` cuma membatasi RINGKASAN `--dry-run`, tidak membatasi
+invoice yang disentuh saat eksekusi nyata — FIFO tetap jalan lintas periode.
+
 ---
 
 ## E. Queue, worker & batas PHP

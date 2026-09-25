@@ -42,18 +42,30 @@
                 </span>
             </div>
 
-            <form action="<?php echo e(route('invoices.payments.store', $invoice->id)); ?>" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
+            <form id="payment-create-form" action="<?php echo e(route('invoices.payments.store', $invoice->id)); ?>" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
                 <?php echo csrf_field(); ?>
 
                 
                 <input type="hidden" name="idempotency_key" value="<?php echo e(old('idempotency_key', (string) \Illuminate\Support\Str::uuid())); ?>">
+
+                
+                <?php if($olderUnpaidInvoices->isNotEmpty()): ?>
+                <div class="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-3 py-2.5 space-y-1">
+                    <p class="font-bold uppercase tracking-wider text-[10px]">Pelanggan ini masih punya tagihan lebih lama</p>
+                    <ul class="list-disc list-inside space-y-0.5">
+                        <?php $__currentLoopData = $olderUnpaidInvoices; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $older): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <li><?php echo e($older->billing_period); ?> — <?php echo e($older->invoice_number); ?>: sisa Rp <?php echo e(number_format((float) $older->remaining_amount, 0, ',', '.')); ?></li>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
 
                 <!-- Tanggal Bayar -->
                 <div>
                     <label for="payment_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Tanggal Bayar</label>
                     
                     <input type="date" name="payment_date" id="payment_date" value="<?php echo e(old('payment_date', now()->format('Y-m-d'))); ?>" required
-                           max="<?php echo e(now()->format('Y-m-d')); ?>"
+                           min="<?php echo e(\App\Support\BookPeriod::firstOpenDate()); ?>" max="<?php echo e(now()->format('Y-m-d')); ?>"
                            class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono bg-surface text-text-main transition-colors">
                 </div>
 
@@ -71,15 +83,46 @@
                 
                 <div id="pc-transfer-fields" class="hidden space-y-3">
                     <div>
-                        <label for="bank_name" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nama Bank</label>
-                        <input type="text" name="bank_name" id="bank_name" value="<?php echo e(old('bank_name')); ?>" placeholder="mis. BCA, BRI, Mandiri"
-                               class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main transition-colors">
+                        <label for="bank_account_id" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Rekening Tujuan</label>
+                        <select name="bank_account_id" id="bank_account_id"
+                                class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-semibold bg-surface text-text-main transition-colors">
+                            <option value="">Pilih rekening...</option>
+                            <?php $__currentLoopData = $bankAccounts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $bankAccount): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <option value="<?php echo e($bankAccount->id); ?>" <?php if((string) old('bank_account_id') === (string) $bankAccount->id): echo 'selected'; endif; ?>><?php echo e($bankAccount->displayName()); ?></option>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </select>
+                        <?php $__errorArgs = ['bank_account_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                            <p class="text-[10px] text-rose-500 mt-1 font-semibold"><?php echo e($message); ?></p>
+                        <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                        <?php if($bankAccounts->isEmpty()): ?>
+                            <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Belum ada rekening aktif di Master Rekening Bank.</p>
+                        <?php endif; ?>
                     </div>
-                    <div>
-                        <label for="account_number" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nomer Rekening</label>
-                        <input type="text" name="account_number" id="account_number" value="<?php echo e(old('account_number')); ?>" placeholder="Nomer rekening tujuan/asal"
-                               class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono bg-surface text-text-main transition-colors">
-                    </div>
+                </div>
+
+                
+                <div id="pc-sender-fields" class="hidden">
+                    <label for="sender_name" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nama Pengirim (opsional)</label>
+                    <input type="text" name="sender_name" id="sender_name" value="<?php echo e(old('sender_name')); ?>" maxlength="150"
+                           placeholder="Nama sesuai yang tercantum di bukti transfer, jika berbeda dari nama pelanggan"
+                           class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main transition-colors">
+                    <?php $__errorArgs = ['sender_name'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                        <p class="text-[10px] text-rose-500 mt-1 font-semibold"><?php echo e($message); ?></p>
+                    <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
                 </div>
 
                 <!-- Nominal Diterima -->
@@ -269,6 +312,40 @@ unset($__errorArgs, $__bag); ?>
     </div>
 </div>
 
+
+<?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['name' => 'pc-overpay-confirm','title' => 'Konfirmasi Lebih Bayar','maxWidth' => 'sm']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'pc-overpay-confirm','title' => 'Konfirmasi Lebih Bayar','maxWidth' => 'sm']); ?>
+    <p class="text-xs text-text-secondary" id="pc-overpay-confirm-message"></p>
+
+     <?php $__env->slot('footer', null, []); ?> 
+        <button type="button" id="pc-overpay-confirm-proceed"
+                class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer">
+            Lanjutkan
+        </button>
+        <button type="button" onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: 'pc-overpay-confirm' }))"
+                class="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-surface-muted cursor-pointer">
+            Batal, Cek Lagi
+        </button>
+     <?php $__env->endSlot(); ?>
+ <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
 <script>
     /** Tampilkan/wajibkan field pendukung sesuai metode dipilih — sama
      *  polanya dengan qpToggleMethodFields() di quick-payment-modal.
@@ -277,17 +354,23 @@ unset($__errorArgs, $__bag); ?>
     function pcToggleMethodFields() {
         const method = document.getElementById('payment_method').value;
         const transferFields = document.getElementById('pc-transfer-fields');
-        const bankName = document.getElementById('bank_name');
-        const accountNumber = document.getElementById('account_number');
+        const bankAccount = document.getElementById('bank_account_id');
+        const senderFields = document.getElementById('pc-sender-fields');
+        const senderName = document.getElementById('sender_name');
         const note = document.getElementById('note');
         const noteLabel = document.getElementById('note-label');
 
         const isTransfer = method === 'transfer';
         const isLainnya = method === 'lainnya';
+        const acceptsSender = isTransfer || method === 'kolektor';
 
         transferFields.classList.toggle('hidden', !isTransfer);
-        bankName.required = isTransfer;
-        accountNumber.required = isTransfer;
+        bankAccount.required = isTransfer;
+        // Field tersembunyi di-disable supaya tak ikut terkirim form biasa.
+        bankAccount.disabled = !isTransfer;
+
+        senderFields.classList.toggle('hidden', !acceptsSender);
+        senderName.disabled = !acceptsSender;
 
         note.required = isLainnya;
         note.placeholder = isLainnya ? 'Jelaskan metode pembayaran (mis. OVO, Dana, GoPay)...' : 'Tuliskan catatan transaksi jika ada...';
@@ -306,6 +389,11 @@ unset($__errorArgs, $__bag); ?>
         const useBalanceToggle = document.getElementById('use-balance-toggle');
         const useBalanceAmountWrap = document.getElementById('use-balance-amount-wrap');
         const useBalanceAmountInput = document.getElementById('use_balance_amount');
+        // Overpay ter-hitung dari refreshHint() — dipakai gerbang konfirmasi
+        // sebelum submit (ADHOC-84 §2.3). Direset tiap nominal/saldo berubah
+        // supaya submit berikutnya (nominal baru) dikonfirmasi ulang.
+        let currentOverpay = 0;
+        let overpayConfirmed = false;
 
         function formatRupiah(value) {
             return 'Rp ' + value.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -343,6 +431,8 @@ unset($__errorArgs, $__bag); ?>
             installmentHint.classList.add('hidden');
             settleHint.classList.add('hidden');
             overpayHint.classList.add('hidden');
+            overpayConfirmed = false;
+            currentOverpay = 0;
 
             if (isNaN(amount) || amount <= 0) {
                 return;
@@ -350,6 +440,7 @@ unset($__errorArgs, $__bag); ?>
 
             if (amount > remaining) {
                 const overpay = Math.round((amount - remaining) * 100) / 100;
+                currentOverpay = overpay;
                 overpayHint.textContent =
                     formatRupiah(remaining) + ' diterapkan ke tagihan (Lunas), ' +
                     formatRupiah(overpay) + ' tercatat sebagai lebih bayar.';
@@ -392,6 +483,27 @@ unset($__errorArgs, $__bag); ?>
         useBalanceAmountInput?.addEventListener('input', applyBalanceToAmount);
 
         refreshHint();
+
+        // Konfirmasi lebih bayar (ADHOC-84 §2.3) — form ini POST biasa (bukan
+        // fetch), jadi gerbangnya preventDefault() sekali lalu re-submit lewat
+        // form.requestSubmit() setelah dikonfirmasi. requestSubmit() MEMICU
+        // ulang listener 'submit' ini (beda dari form.submit()) — submit
+        // kedua lolos karena overpayConfirmed sudah true, tidak infinite loop.
+        const form = document.getElementById('payment-create-form');
+        form?.addEventListener('submit', function (e) {
+            if (currentOverpay > 0 && !overpayConfirmed) {
+                e.preventDefault();
+                document.getElementById('pc-overpay-confirm-message').textContent =
+                    'Lebih bayar Rp ' + Math.round(currentOverpay).toLocaleString('id-ID') + ' akan masuk saldo pelanggan. Lanjutkan?';
+                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pc-overpay-confirm' }));
+            }
+        });
+
+        document.getElementById('pc-overpay-confirm-proceed')?.addEventListener('click', function () {
+            overpayConfirmed = true;
+            window.dispatchEvent(new CustomEvent('close-modal', { detail: 'pc-overpay-confirm' }));
+            form?.requestSubmit();
+        });
     })();
 </script>
 <?php $__env->stopSection(); ?>

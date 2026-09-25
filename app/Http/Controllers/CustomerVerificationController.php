@@ -241,6 +241,14 @@ class CustomerVerificationController extends Controller
                 ]);
             }
 
+            // D. Simpan audit timestamp & PIC review admin pada customer_services
+            if ($customer->customerService) {
+                $customer->customerService->update([
+                    'admin_filter_at' => now(),
+                    'admin_filter_by_name' => auth()->user()->name,
+                ]);
+            }
+
             DB::commit();
 
             if ($surveyTask) {

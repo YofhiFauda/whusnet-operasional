@@ -43,7 +43,7 @@
                 </span>
             </div>
 
-            <form action="{{ route('invoices.payments.store', $invoice->id) }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
+            <form id="payment-create-form" action="{{ route('invoices.payments.store', $invoice->id) }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
                 @csrf
 
                 {{-- Penahan submit dobel. Kuncinya lahir saat form DIRENDER dan
@@ -54,13 +54,27 @@
                      "sudah tercatat", bukan sebagai error. --}}
                 <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
 
+                {{-- Peringatan piutang lama (ADHOC-84 §2.4) — non-blokir,
+                     dirender server-side dari Invoice::olderUnpaidInvoices(). --}}
+                @if($olderUnpaidInvoices->isNotEmpty())
+                <div class="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-3 py-2.5 space-y-1">
+                    <p class="font-bold uppercase tracking-wider text-[10px]">Pelanggan ini masih punya tagihan lebih lama</p>
+                    <ul class="list-disc list-inside space-y-0.5">
+                        @foreach($olderUnpaidInvoices as $older)
+                            <li>{{ $older->billing_period }} — {{ $older->invoice_number }}: sisa Rp {{ number_format((float) $older->remaining_amount, 0, ',', '.') }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                @endif
+
                 <!-- Tanggal Bayar -->
                 <div>
                     <label for="payment_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Tanggal Bayar</label>
-                    {{-- `max` menahan tanggal masa depan di sisi UI; aturan
-                         sesungguhnya `before_or_equal:today` di controller. --}}
+                    {{-- `max` menahan tanggal masa depan, `min` menahan bulan
+                         yang sudah tutup buku; aturan sesungguhnya di
+                         controller & PaymentService (BookPeriod). --}}
                     <input type="date" name="payment_date" id="payment_date" value="{{ old('payment_date', now()->format('Y-m-d')) }}" required
-                           max="{{ now()->format('Y-m-d') }}"
+                           min="{{ \App\Support\BookPeriod::firstOpenDate() }}" max="{{ now()->format('Y-m-d') }}"
                            class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono bg-surface text-text-main transition-colors">
                 </div>
 
@@ -80,18 +94,39 @@
                      account_number begitu metode Transfer dipilih
                      (`required_if:payment_method,transfer`) — akibatnya
                      "Transfer" di form ini mustahil disubmit sukses. Ditambah
-                     sekaligus saat merapikan dropdown (2026-09-22). --}}
+                     sekaligus saat merapikan dropdown (2026-09-22).
+                     ADHOC-95: dua input teks diganti dropdown Master
+                     Rekening Bank — cuma rekening aktif. --}}
                 <div id="pc-transfer-fields" class="hidden space-y-3">
                     <div>
-                        <label for="bank_name" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nama Bank</label>
-                        <input type="text" name="bank_name" id="bank_name" value="{{ old('bank_name') }}" placeholder="mis. BCA, BRI, Mandiri"
-                               class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main transition-colors">
+                        <label for="bank_account_id" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Rekening Tujuan</label>
+                        <select name="bank_account_id" id="bank_account_id"
+                                class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-semibold bg-surface text-text-main transition-colors">
+                            <option value="">Pilih rekening...</option>
+                            @foreach($bankAccounts as $bankAccount)
+                                <option value="{{ $bankAccount->id }}" @selected((string) old('bank_account_id') === (string) $bankAccount->id)>{{ $bankAccount->displayName() }}</option>
+                            @endforeach
+                        </select>
+                        @error('bank_account_id')
+                            <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+                        @enderror
+                        @if($bankAccounts->isEmpty())
+                            <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Belum ada rekening aktif di Master Rekening Bank.</p>
+                        @endif
                     </div>
-                    <div>
-                        <label for="account_number" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nomer Rekening</label>
-                        <input type="text" name="account_number" id="account_number" value="{{ old('account_number') }}" placeholder="Nomer rekening tujuan/asal"
-                               class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono bg-surface text-text-main transition-colors">
-                    </div>
+                </div>
+
+                {{-- Nama Pengirim (opsional) — cuma Transfer & Kolektor
+                     (PaymentMethod::requiresSenderName()). Halaman ini tak
+                     punya opsi Kolektor, jadi praktis tampil saat Transfer. --}}
+                <div id="pc-sender-fields" class="hidden">
+                    <label for="sender_name" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nama Pengirim (opsional)</label>
+                    <input type="text" name="sender_name" id="sender_name" value="{{ old('sender_name') }}" maxlength="150"
+                           placeholder="Nama sesuai yang tercantum di bukti transfer, jika berbeda dari nama pelanggan"
+                           class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main transition-colors">
+                    @error('sender_name')
+                        <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <!-- Nominal Diterima -->
@@ -284,6 +319,23 @@
     </div>
 </div>
 
+{{-- Konfirmasi lebih bayar (ADHOC-84 §2.3) — sama polanya dengan modal di
+     quick-payment-modal.blade.php. Server tetap tidak menolak overpay. --}}
+<x-ui.modal name="pc-overpay-confirm" title="Konfirmasi Lebih Bayar" maxWidth="sm">
+    <p class="text-xs text-text-secondary" id="pc-overpay-confirm-message"></p>
+
+    <x-slot name="footer">
+        <button type="button" id="pc-overpay-confirm-proceed"
+                class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer">
+            Lanjutkan
+        </button>
+        <button type="button" onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: 'pc-overpay-confirm' }))"
+                class="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-surface-muted cursor-pointer">
+            Batal, Cek Lagi
+        </button>
+    </x-slot>
+</x-ui.modal>
+
 <script>
     /** Tampilkan/wajibkan field pendukung sesuai metode dipilih — sama
      *  polanya dengan qpToggleMethodFields() di quick-payment-modal.
@@ -292,17 +344,23 @@
     function pcToggleMethodFields() {
         const method = document.getElementById('payment_method').value;
         const transferFields = document.getElementById('pc-transfer-fields');
-        const bankName = document.getElementById('bank_name');
-        const accountNumber = document.getElementById('account_number');
+        const bankAccount = document.getElementById('bank_account_id');
+        const senderFields = document.getElementById('pc-sender-fields');
+        const senderName = document.getElementById('sender_name');
         const note = document.getElementById('note');
         const noteLabel = document.getElementById('note-label');
 
         const isTransfer = method === 'transfer';
         const isLainnya = method === 'lainnya';
+        const acceptsSender = isTransfer || method === 'kolektor';
 
         transferFields.classList.toggle('hidden', !isTransfer);
-        bankName.required = isTransfer;
-        accountNumber.required = isTransfer;
+        bankAccount.required = isTransfer;
+        // Field tersembunyi di-disable supaya tak ikut terkirim form biasa.
+        bankAccount.disabled = !isTransfer;
+
+        senderFields.classList.toggle('hidden', !acceptsSender);
+        senderName.disabled = !acceptsSender;
 
         note.required = isLainnya;
         note.placeholder = isLainnya ? 'Jelaskan metode pembayaran (mis. OVO, Dana, GoPay)...' : 'Tuliskan catatan transaksi jika ada...';
@@ -321,6 +379,11 @@
         const useBalanceToggle = document.getElementById('use-balance-toggle');
         const useBalanceAmountWrap = document.getElementById('use-balance-amount-wrap');
         const useBalanceAmountInput = document.getElementById('use_balance_amount');
+        // Overpay ter-hitung dari refreshHint() — dipakai gerbang konfirmasi
+        // sebelum submit (ADHOC-84 §2.3). Direset tiap nominal/saldo berubah
+        // supaya submit berikutnya (nominal baru) dikonfirmasi ulang.
+        let currentOverpay = 0;
+        let overpayConfirmed = false;
 
         function formatRupiah(value) {
             return 'Rp ' + value.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -358,6 +421,8 @@
             installmentHint.classList.add('hidden');
             settleHint.classList.add('hidden');
             overpayHint.classList.add('hidden');
+            overpayConfirmed = false;
+            currentOverpay = 0;
 
             if (isNaN(amount) || amount <= 0) {
                 return;
@@ -365,6 +430,7 @@
 
             if (amount > remaining) {
                 const overpay = Math.round((amount - remaining) * 100) / 100;
+                currentOverpay = overpay;
                 overpayHint.textContent =
                     formatRupiah(remaining) + ' diterapkan ke tagihan (Lunas), ' +
                     formatRupiah(overpay) + ' tercatat sebagai lebih bayar.';
@@ -407,6 +473,27 @@
         useBalanceAmountInput?.addEventListener('input', applyBalanceToAmount);
 
         refreshHint();
+
+        // Konfirmasi lebih bayar (ADHOC-84 §2.3) — form ini POST biasa (bukan
+        // fetch), jadi gerbangnya preventDefault() sekali lalu re-submit lewat
+        // form.requestSubmit() setelah dikonfirmasi. requestSubmit() MEMICU
+        // ulang listener 'submit' ini (beda dari form.submit()) — submit
+        // kedua lolos karena overpayConfirmed sudah true, tidak infinite loop.
+        const form = document.getElementById('payment-create-form');
+        form?.addEventListener('submit', function (e) {
+            if (currentOverpay > 0 && !overpayConfirmed) {
+                e.preventDefault();
+                document.getElementById('pc-overpay-confirm-message').textContent =
+                    'Lebih bayar Rp ' + Math.round(currentOverpay).toLocaleString('id-ID') + ' akan masuk saldo pelanggan. Lanjutkan?';
+                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pc-overpay-confirm' }));
+            }
+        });
+
+        document.getElementById('pc-overpay-confirm-proceed')?.addEventListener('click', function () {
+            overpayConfirmed = true;
+            window.dispatchEvent(new CustomEvent('close-modal', { detail: 'pc-overpay-confirm' }));
+            form?.requestSubmit();
+        });
     })();
 </script>
 @endsection

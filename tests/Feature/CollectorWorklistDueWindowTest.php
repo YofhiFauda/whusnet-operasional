@@ -18,15 +18,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Jendela tagih Worklist Kolektor — `config('billing.collector_due_window_days')`.
+ * Kapan tagihan boleh ditagih kolektor — berbasis PERIODE, bukan `due_date`.
  *
- * Tiga aturan §10 yang gampang tertukar, ketiganya diuji di sini:
- *   1. tagihan yang masih jauh dari jatuh tempo TIDAK muncul;
- *   2. tagihan dalam jendela muncul walau belum jatuh tempo;
- *   3. begitu satu pelanggan masuk daftar, SELURUH tunggakannya ikut tampil —
- *      termasuk yang di luar jendela. Kolektor cuma lewat sebulan sekali;
- *      kalau tunggakan lama dan tagihan berjalan pecah ke dua kunjungan, dia
- *      harus datang dua kali ke pintu yang sama.
+ * Nama kelas dipertahankan dari era jendela `collector_due_window_days`
+ * (sudah dihapus): aturannya kini `billing_period <= bulan berjalan`, selaras
+ * dengan `Invoice::scopePiutang()`. Yang diuji:
+ *   1. tagihan periode yang belum dimulai TIDAK muncul;
+ *   2. tagihan periode berjalan muncul walau `due_date`-nya belum lewat —
+ *      termasuk `due_date` di akhir bulan (label UI, bukan gerbang);
+ *   3. begitu satu pelanggan masuk daftar, SELURUH tunggakannya ikut tampil.
+ *      Kolektor cuma lewat sebulan sekali; kalau tunggakan lama dan tagihan
+ *      berjalan pecah ke dua kunjungan, dia harus datang dua kali.
  */
 class CollectorWorklistDueWindowTest extends TestCase
 {
@@ -92,7 +94,7 @@ class CollectorWorklistDueWindowTest extends TestCase
         return $customer;
     }
 
-    private function createInvoice(Customer $customer, string $number, string $dueDate): Invoice
+    private function createInvoice(Customer $customer, string $number, string $dueDate, ?string $billingPeriod = null): Invoice
     {
         $service = CustomerService::create([
             'customer_id' => $customer->id,
@@ -115,7 +117,7 @@ class CollectorWorklistDueWindowTest extends TestCase
             'pop_id' => $this->pop->id,
             'customer_service_id' => $service->id,
             'internet_package_id' => $this->package->id,
-            'billing_period' => substr($dueDate, 0, 7),
+            'billing_period' => $billingPeriod ?? substr($dueDate, 0, 7),
             'issue_date' => $dueDate,
             'due_date' => $dueDate,
             'subtotal' => 150000,
@@ -128,12 +130,12 @@ class CollectorWorklistDueWindowTest extends TestCase
         ]);
     }
 
-    public function test_invoice_far_beyond_due_window_is_hidden(): void
+    public function test_invoice_periode_belum_dimulai_tidak_muncul(): void
     {
-        config(['billing.collector_due_window_days' => 7]);
+        $this->travelTo('2026-09-23 10:00:00');
 
         $customer = $this->createCustomer('C-DW-FAR');
-        $this->createInvoice($customer, 'INV-DW-FAR', now()->addDays(30)->toDateString());
+        $this->createInvoice($customer, 'INV-DW-FAR', '2026-10-10', '2026-10');
 
         $response = $this->actingAs($this->kolektor)->get(route('collector-worklist.index'));
 
@@ -141,12 +143,17 @@ class CollectorWorklistDueWindowTest extends TestCase
         $response->assertDontSee('INV-DW-FAR');
     }
 
-    public function test_invoice_inside_due_window_is_shown_before_due_date(): void
+    /**
+     * Tanggal 1 tagihan bulanan terbit → hari itu juga sudah boleh ditagih.
+     * Jendela lama (`due_date` 10 ≤ hari ini + 7) menyembunyikannya sampai
+     * tanggal 3.
+     */
+    public function test_invoice_periode_berjalan_muncul_sejak_tanggal_terbit(): void
     {
-        config(['billing.collector_due_window_days' => 7]);
+        $this->travelTo('2026-09-01 08:00:00');
 
         $customer = $this->createCustomer('C-DW-SOON');
-        $this->createInvoice($customer, 'INV-DW-SOON', now()->addDays(3)->toDateString());
+        $this->createInvoice($customer, 'INV-DW-SOON', '2026-09-10', '2026-09');
 
         $response = $this->actingAs($this->kolektor)->get(route('collector-worklist.index'));
 
@@ -154,50 +161,50 @@ class CollectorWorklistDueWindowTest extends TestCase
         $response->assertSee('INV-DW-SOON');
     }
 
+    /**
+     * `due_date` cuma label UI — nilainya di akhir bulan pun tidak boleh
+     * menahan tagihan periode berjalan dari daftar kolektor.
+     */
+    public function test_due_date_akhir_bulan_tidak_menahan_tagihan_periode_berjalan(): void
+    {
+        $this->travelTo('2026-09-02 08:00:00');
+
+        $customer = $this->createCustomer('C-DW-EOM');
+        $this->createInvoice($customer, 'INV-DW-EOM', '2026-09-30', '2026-09');
+
+        $response = $this->actingAs($this->kolektor)->get(route('collector-worklist.index'));
+
+        $response->assertOk();
+        $response->assertSee('INV-DW-EOM');
+    }
+
     public function test_all_outstanding_invoices_shown_once_customer_enters_worklist(): void
     {
-        config(['billing.collector_due_window_days' => 7]);
+        $this->travelTo('2026-09-23 10:00:00');
 
         $customer = $this->createCustomer('C-DW-MIX');
-        $this->createInvoice($customer, 'INV-DW-LAMA', now()->subDays(40)->toDateString());
-        $this->createInvoice($customer, 'INV-DW-JAUH', now()->addDays(30)->toDateString());
+        $this->createInvoice($customer, 'INV-DW-LAMA', '2026-08-10', '2026-08');
+        $this->createInvoice($customer, 'INV-DW-JAUH', '2026-10-10', '2026-10');
 
         $response = $this->actingAs($this->kolektor)->get(route('collector-worklist.index'));
 
         $response->assertOk();
         $response->assertSee('INV-DW-LAMA');
-        // Ikut tampil MESKI di luar jendela, karena pelanggannya sudah harus
-        // didatangi — sekali datang, seluruh tunggakannya selesai.
+        // Ikut tampil MESKI periodenya belum dimulai, karena pelanggannya
+        // sudah harus didatangi — sekali datang, seluruh tunggakannya selesai.
         $response->assertSee('INV-DW-JAUH');
     }
 
     /**
-     * Jendela dibaca dari config, bukan angka mati di query — supaya tiap POP
-     * bisa disetel tanpa deploy.
-     */
-    public function test_due_window_is_configurable(): void
-    {
-        config(['billing.collector_due_window_days' => 45]);
-
-        $customer = $this->createCustomer('C-DW-CFG');
-        $this->createInvoice($customer, 'INV-DW-CFG', now()->addDays(30)->toDateString());
-
-        $response = $this->actingAs($this->kolektor)->get(route('collector-worklist.index'));
-
-        $response->assertOk();
-        $response->assertSee('INV-DW-CFG');
-    }
-
-    /**
-     * Worksheet Admin sengaja TIDAK memakai jendela: admin bukan pengetuk
+     * Worksheet Admin sengaja TIDAK memfilter periode: admin bukan pengetuk
      * pintu, dia butuh gambaran penuh untuk cross check.
      */
     public function test_admin_worksheet_shows_invoices_outside_due_window(): void
     {
-        config(['billing.collector_due_window_days' => 7]);
+        $this->travelTo('2026-09-23 10:00:00');
 
         $customer = $this->createCustomer('C-DW-ADMIN');
-        $this->createInvoice($customer, 'INV-DW-ADMIN', now()->addDays(30)->toDateString());
+        $this->createInvoice($customer, 'INV-DW-ADMIN', '2026-10-10', '2026-10');
 
         $admin = User::factory()->create([
             'role_id' => Role::where('code', 'owner')->firstOrFail()->id,

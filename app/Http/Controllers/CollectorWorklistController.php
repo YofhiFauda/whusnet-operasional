@@ -70,7 +70,6 @@ class CollectorWorklistController extends Controller
         // daftar invoice acak yang memaksa kolektor bolak-balik (§10 no. 2).
         $canPay = $collector->hasPermission('kolektor.pay') && $collector->hasRole('kolektor');
         $canDeposit = $collector->hasPermission('kolektor.deposit') && $collector->hasRole('kolektor');
-        $dueWindowDays = $this->worklist->dueWindowDays();
 
         // Saldo = Σ pembayaran yang belum ikut setoran. Angka TURUNAN, bukan
         // kolom — lihat CollectorBalanceService.
@@ -116,7 +115,7 @@ class CollectorWorklistController extends Controller
             : null;
 
         return view('collector-worklist.index', compact(
-            'tab', 'invoices', 'canPay', 'canDeposit', 'canLogVisit', 'dueWindowDays',
+            'tab', 'invoices', 'canPay', 'canDeposit', 'canLogVisit',
             'balance', 'unsettledCount', 'outstandingShortfall', 'pendingDeposits',
             'unsettledPayments', 'visitCandidates', 'todayVisits', 'search',
         ));

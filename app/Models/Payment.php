@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PaymentPeriodType;
 use App\Enums\PaymentStatus;
+use App\Support\Money;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,9 +34,12 @@ class Payment extends Model
         'payment_date',
         'collected_date',
         'payment_method',
+        'bank_account_id',
         'bank_name',
         'account_number',
+        'sender_name',
         'amount',
+        'balance_used_amount',
         'overpay_amount',
         'received_by',
         'collected_by',
@@ -56,6 +60,7 @@ class Payment extends Model
             'payment_date' => 'date',
             'collected_date' => 'date',
             'amount' => 'decimal:2',
+            'balance_used_amount' => 'decimal:2',
             'overpay_amount' => 'decimal:2',
             'payment_status' => PaymentStatus::class,
             'rejected_at' => 'datetime',
@@ -199,6 +204,19 @@ class Payment extends Model
     }
 
     /**
+     * Rekening tujuan dari Master Rekening Bank (ADHOC-95). Null untuk
+     * non-Transfer dan untuk payment Transfer sebelum master ini ada.
+     * Tampilan riwayat tetap membaca SNAPSHOT `bank_name`/`account_number`,
+     * bukan relasi ini — rekening di master boleh diedit belakangan.
+     *
+     * @return BelongsTo<BankAccount, $this>
+     */
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
+    /**
      * Baris ledger saldo pelanggan yang menyebut payment ini — sebagai
      * SUMBER kredit (overpay) atau sebagai KONSUMEN debit (pemakaian
      * saldo). Dua peran, satu kolom `payment_id`; dibedakan lewat `type`
@@ -209,6 +227,30 @@ class Payment extends Model
     public function balanceMutations(): HasMany
     {
         return $this->hasMany(CustomerBalanceMutation::class);
+    }
+
+    /**
+     * Uang FISIK yang benar-benar diterima/dipegang dari payment ini —
+     * ADHOC-92 (G4), koreksi susulan 2026-09-24.
+     *
+     * `amount` (porsi diterapkan ke invoice) dikurangi `balance_used_amount`
+     * (porsi dari Saldo Pelanggan, BUKAN uang fisik) ditambah `overpay_amount`
+     * (uang lebih yang FISIK tetap, cuma disimpan di kolom terpisah dari
+     * `amount` — lihat PaymentService::record()). Dipakai di SEMUA tempat
+     * yang menghitung kewajiban setor/kas fisik (AdminCashBalanceService,
+     * CollectorBalanceService, CollectorDeposit::computedAmount(),
+     * CashDepositService) — sebelumnya masing-masing menjumlah `amount`
+     * mentah sendiri-sendiri, ada yang lupa `overpay_amount` (kelebihan tunai
+     * ikut tercatat sistem tapi hilang dari kewajiban setor) dan ada yang
+     * lupa `balance_used_amount` (saldo yang dipakai dihitung dobel sebagai
+     * uang fisik).
+     */
+    public function physicalAmount(): float
+    {
+        return Money::add(
+            Money::sub($this->amount, $this->balance_used_amount),
+            (float) ($this->overpay_amount ?? 0)
+        );
     }
 
     /**
@@ -281,6 +323,46 @@ class Payment extends Model
         return $billingPeriod < $referenceMonth
             ? PaymentPeriodType::PIUTANG
             : PaymentPeriodType::BULANAN;
+    }
+
+    /**
+     * Klasifikasi MAJEMUK payment ini — ADHOC-84 §8.1. Beda dari
+     * `periodType()` (3 label saling lepas, prioritas overpay > piutang >
+     * bulanan, dipakai badge tunggal yang sudah ada): method ini dipakai
+     * lima permukaan laporan/audit yang butuh label bertumpuk sekaligus,
+     * mis. payment yang mencicil piutang lama = [Piutang, Cicilan].
+     *
+     * Urutan label TIDAK menyatakan prioritas — semuanya independen:
+     *   - Base, SELALU tepat satu: BULANAN atau PIUTANG (posisi
+     *     `invoice->billing_period` terhadap bulan payment ini SENDIRI,
+     *     sama seperti `periodType()` — BUKAN `invoice_status`/`now()` yang
+     *     berubah-ubah, supaya label payment lama tak diam-diam berganti).
+     *   - Tambahan, PALING BANYAK satu (keduanya saling tiadakan — payment
+     *     tak mungkin under- dan over-pay sekaligus):
+     *       - LEBIH_BAYAR kalau `overpay_amount > 0`.
+     *       - CICILAN kalau `installmentContext()` bilang payment ini BUKAN
+     *         yang melunasi invoice-nya (`settles === false`).
+     *
+     * @return list<PaymentPeriodType>
+     */
+    public function classification(): array
+    {
+        $billingPeriod = $this->invoice?->billing_period;
+        $referenceMonth = ($this->collected_date ?? $this->payment_date)?->format('Y-m');
+
+        $labels = [
+            ($billingPeriod !== null && $referenceMonth !== null && $billingPeriod < $referenceMonth)
+                ? PaymentPeriodType::PIUTANG
+                : PaymentPeriodType::BULANAN,
+        ];
+
+        if ($this->overpay_amount !== null && (float) $this->overpay_amount > 0.0) {
+            $labels[] = PaymentPeriodType::LEBIH_BAYAR;
+        } elseif (($context = $this->installmentContext()) !== null && ! $context['settles']) {
+            $labels[] = PaymentPeriodType::CICILAN;
+        }
+
+        return $labels;
     }
 
     /**
@@ -367,9 +449,12 @@ class Payment extends Model
             'payment_date',
             'collected_date',
             'payment_method',
+            'bank_account_id',
             'bank_name',
             'account_number',
+            'sender_name',
             'amount',
+            'balance_used_amount',
             'overpay_amount',
             'received_by',
             'collected_by',

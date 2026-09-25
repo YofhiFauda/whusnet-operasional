@@ -6,6 +6,7 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\CustomerTerminationReason;
 use App\Models\District;
 use App\Models\FopTask;
 use App\Models\InternetPackage;
@@ -67,6 +68,11 @@ trait RendersCustomerList
         ));
         $completenessStatus = $request->query('completeness_status', '');
         $collectorId = $request->query('collector_id', '');
+        // Filter alasan putus (ADHOC-69) — cuma bermakna di List Putus, tapi
+        // aman dibaca di halaman lain (query string diabaikan kalau
+        // statusGroup != 'terminated', lihat blok filter di bawah).
+        $terminationReasonId = $request->query('termination_reason_id', '');
+        $sort = $request->query('sort', '');
 
         // Fase 5.6 — batasi kolom yang ditarik untuk daftar (G/row bloat).
         // `customers` punya ~45 kolom termasuk banyak yang TIDAK dipakai di list
@@ -85,9 +91,22 @@ trait RendersCustomerList
                 'rejected_at', 'terminated_at', 'address',
                 'pop_id', 'distribution_id', 'mini_pop_id', 'collector_id',
                 'city_id', 'district_id', 'village_id', 'internet_package_id',
+                'sales_user_id', 'termination_reason_id', 'termination_note',
                 'created_at', 'updated_at',
             ])
             ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice', 'latestPayment', 'collector:id,name']);
+
+        // List Putus (ADHOC-69) butuh 3 relasi tambahan yang TIDAK dipakai di
+        // List Data Pelanggan biasa — dipisah supaya query List Data Pelanggan
+        // (jauh lebih sering diakses) tidak ikut menanggung 3 join/eager-load
+        // yang percuma untuk statusGroup lain.
+        if ($statusGroup === 'terminated') {
+            $query->with([
+                'salesUser:id,name',
+                'latestSurvey.technician:id,name',
+                'terminationReason:id,name',
+            ]);
+        }
 
         // Search filter — Fase 5.3. Diarahkan per BENTUK input, bukan LIKE '%x%'
         // di 8 kolom sekaligus (yang memaksa full scan tiap ketik):
@@ -180,6 +199,14 @@ trait RendersCustomerList
             $query->where('collector_id', $collectorId);
         }
 
+        // Filter & sort alasan putus (ADHOC-69) — di level QUERY (WHERE/ORDER
+        // BY), bukan di memori setelah fetch seperti $customer->termination_reason
+        // lama (§2.3 rancangan: itu yang bikin filter/sort salah setelah
+        // pagination). Cuma berlaku untuk List Putus.
+        if ($statusGroup === 'terminated' && $terminationReasonId !== '') {
+            $query->where('termination_reason_id', $terminationReasonId);
+        }
+
         if ($statusGroup === 'failed') {
             // Fase 5.1 — urut pakai kolom nyata rejected_at. Versi lama memakai
             // subquery JSON berkorelasi ke audit_logs di ORDER BY (dieksekusi
@@ -188,7 +215,18 @@ trait RendersCustomerList
             // CustomerWorkflowService, import, dan command backfill.
             $query->orderByDesc('rejected_at');
         } elseif ($statusGroup === 'terminated') {
-            $query->orderByDesc('terminated_at');
+            // Sort by alasan (nama) butuh JOIN — kolom `name` bukan milik
+            // `customers`. `select('customers.*', ...)` WAJIB ditambah begitu
+            // JOIN dipakai, kalau tidak kolom `name` master ikut nyampur ke
+            // hasil select pelanggan (ambigu antar tabel).
+            if ($sort === 'alasan') {
+                $query->select('customers.*')
+                    ->leftJoin('customer_termination_reasons', 'customer_termination_reasons.id', '=', 'customers.termination_reason_id')
+                    ->orderBy('customer_termination_reasons.name')
+                    ->orderByDesc('customers.terminated_at');
+            } else {
+                $query->orderByDesc('terminated_at');
+            }
         } else {
             $query->orderBy('customer_code', 'asc');
         }
@@ -253,8 +291,15 @@ trait RendersCustomerList
 
             foreach ($customers as $customer) {
                 $log = $terminateLogs->get($customer->id);
-                $customer->termination_reason = $log?->new_values['reason'] ?? '-';
-                $customer->terminated_at = $log?->created_at;
+                // ADHOC-69: sumber utama sekarang relasi `terminationReason`
+                // (master, bisa di-filter/sort di level query — §2.3
+                // rancangan). AuditLog cuma fallback untuk data LAMA yang
+                // putus sebelum fitur ini live (`termination_reason_id` NULL
+                // — §4.5, sengaja tidak di-backfill).
+                $customer->termination_reason = $customer->terminationReason?->name
+                    ?? $log?->new_values['reason']
+                    ?? '-';
+                $customer->terminated_at = $customer->terminated_at ?? $log?->created_at;
                 $customer->device_retrieved_at = $customer->customerDevice?->device_retrieved_at;
                 $customer->device_retrieval_in_progress = $customersWithOpenRetrieval->has($customer->id);
             }
@@ -287,6 +332,11 @@ trait RendersCustomerList
             ->whereHas('role', fn ($q) => $q->where('code', 'kolektor'))
             ->orderBy('name')
             ->get(['id', 'name']);
+        // Dropdown filter Alasan Putus (ADHOC-69) — cuma dipakai List Putus,
+        // tapi murah untuk di-resolve di halaman lain juga (query kecil).
+        $terminationReasonOptions = $statusGroup === 'terminated'
+            ? CustomerTerminationReason::orderBy('name')->get(['id', 'name'])
+            : collect();
 
         // Customer count by status (for badge list / submenus)
         $statusCounts = Customer::applyUserScope()->selectRaw('status, count(*) as count')
@@ -326,7 +376,10 @@ trait RendersCustomerList
             'miniPopIds',
             'completenessStatus',
             'collectorId',
-            'collectorOptions'
+            'collectorOptions',
+            'terminationReasonId',
+            'terminationReasonOptions',
+            'sort'
         ));
     }
 }

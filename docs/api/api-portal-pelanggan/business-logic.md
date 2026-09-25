@@ -225,7 +225,19 @@ tetap hidup.
 additive, cuma kepakai kalau `status=` gak dikirim (`status` menang kalau
 dua-duanya ada). Dipakai halaman daftar tagihan Portal biar tagihan `lunas`
 gak dobel tampil sama `/me/payments` (riwayat pembayarannya sudah
-merepresentasikan itu). Item:
+merepresentasikan itu).
+
+**Invoice `batal` disaring di sini, bukan di Portal (ADHOC-87, keputusan
+user 2026-09-21).** Kalau `status` kosong (termasuk saat cuma `exclude_status`
+yang dikirim), hasil "Semua Status" **TIDAK menyertakan** invoice `batal` —
+baik yang dibatalkan lewat Request Putus Langganan/Cuti Berlangganan
+(`BillingPeriodWaiverService`) maupun hasil import legacy. Kirim
+`status=batal` eksplisit kalau memang mau lihat daftarnya — opsi "Batal" di
+dropdown Portal tetap berfungsi. `GET /me/invoices/{invoice_number}` (detail)
+**tidak disaring** — pelanggan yang membuka nomor invoice batal tetap
+melihatnya dengan badge "Batal", bukan 404. `?status=belum_dibayar` (dipakai
+Dashboard Portal) tidak terpengaruh sama sekali, `batal` memang tidak pernah
+masuk di sana. Item:
 ```json
 {
   "invoice_number": "INV-2026-08-000123",

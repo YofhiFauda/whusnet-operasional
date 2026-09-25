@@ -97,9 +97,10 @@ class PortalPaymentController extends Controller
      *
      * Render dompdf dari template `payments.receipt` YANG SAMA dipakai
      * kasir/kolektor internal (`PaymentController::receipt()`) — Portal
-     * TIDAK punya template kwitansi sendiri. `$isCustomerCopy=true`
-     * menyembunyikan baris "Diterima oleh"/"Catatan" (data internal
-     * pegawai, sama alasan `PaymentReceiptResource` membuangnya dari JSON).
+     * TIDAK punya template kwitansi sendiri. Isinya identik untuk staf &
+     * pelanggan (ADHOC-94) — `$isPdf=true` cuma menyembunyikan toolbar
+     * "Cetak Kwitansi"/"Detail Pembayaran" (link rute staf internal, tak
+     * relevan buat pelanggan) dan melewati ukuran kertas NCR fisik staf.
      *
      * `?download=1` → `Content-Disposition: attachment` (tombol Unduh, file
      * .pdf beneran). Tanpa itu → `inline` (tombol Lihat, dibuka di tab/
@@ -113,13 +114,6 @@ class PortalPaymentController extends Controller
     {
         $viewData = $this->receiptViewData($request, $paymentNumber);
 
-        // `isPdf` → blade render layout invoice A4 TERPISAH (`.a4`, lihat
-        // docblock $isPdf di payments.receipt.blade.php), BUKAN struk
-        // thermal 80mm yang dibesarin paksa (tiga percobaan sebelumnya
-        // ke arah situ semua gagal/rapuh). Kertas A4 standar biar gak
-        // perlu itung px manual kayak sebelumnya. Cuma buat render dompdf
-        // ini — TIDAK ikut ke `receiptView()` (iframe HTML modal, tetap
-        // struk thermal ukuran natural).
         $pdf = Pdf::loadView('payments.receipt', [...$viewData, 'isPdf' => true])
             ->setPaper('a4');
 
@@ -135,23 +129,28 @@ class PortalPaymentController extends Controller
      *
      * Blade `payments.receipt` yang SAMA (lewat browser, bukan dompdf) —
      * dipilih user eksplisit di atas render PDF-dalam-tab: dompdf cuma
-     * APROKSIMASI CSS (flexbox/font web-nya gak 100% identik), sedangkan
-     * HTML asli dirender browser pelanggan sendiri, jadi PIXEL-IDENTIK
-     * sama yang staf lihat buka `/payments/{id}/kwitansi` di Operasional.
-     * Portal nge-embed ini lewat `<iframe>` di dalam modal (lihat proxy
-     * `api/payments/[paymentNumber]/receipt-view/route.ts`), TIDAK pernah
-     * dipakai standalone/dinavigasi langsung dari luar.
+     * APROKSIMASI CSS, sedangkan HTML asli dirender browser pelanggan
+     * sendiri, jadi PIXEL-IDENTIK sama yang staf lihat buka
+     * `/payments/{id}/kwitansi` di Operasional — isinya memang identik
+     * (ADHOC-94). Portal nge-embed ini lewat `<iframe>` di dalam modal
+     * (lihat proxy `api/payments/[paymentNumber]/receipt-view/route.ts`),
+     * TIDAK pernah dipakai standalone/dinavigasi langsung dari luar.
+     *
+     * `isPdf: true` di sini juga (bukan cuma di `receiptPdf()`) — konteksnya
+     * sama-sama Portal, bukan halaman cetak fisik staf, jadi toolbar & ukuran
+     * kertas NCR fisik sama-sama tidak relevan. Lihat docblock `$isPdf` di
+     * `payments/receipt.blade.php`.
      */
     #[Response(200, description: 'Kwitansi HTML berhasil dirender.')]
     #[Response(401, description: 'Access token tidak disertakan atau tidak valid.')]
     #[Response(404, description: 'payment_number tidak ditemukan atau milik pelanggan lain — sengaja sama, tidak bisa dibedakan dari luar.')]
     public function receiptView(Request $request, string $paymentNumber): View
     {
-        return view('payments.receipt', $this->receiptViewData($request, $paymentNumber));
+        return view('payments.receipt', [...$this->receiptViewData($request, $paymentNumber), 'isPdf' => true]);
     }
 
     /**
-     * @return array{payment: Payment, installmentContext: array<string, mixed>|null, kwitansi: array<string, mixed>, isCustomerCopy: bool}
+     * @return array{payment: Payment, installmentContext: array<string, mixed>|null, kwitansi: array<string, mixed>}
      */
     private function receiptViewData(Request $request, string $paymentNumber): array
     {
@@ -167,10 +166,6 @@ class PortalPaymentController extends Controller
             'payment' => $payment,
             'installmentContext' => $payment->installmentContext(),
             'kwitansi' => app(ReceiptPresenter::class)->for($payment),
-            // Sembunyikan toolbar + baris "Diterima oleh"/"Catatan" (data
-            // internal pegawai) — dipakai HTML modal maupun PDF, lihat
-            // docblock $isCustomerCopy di payments/receipt.blade.php.
-            'isCustomerCopy' => true,
         ];
     }
 }

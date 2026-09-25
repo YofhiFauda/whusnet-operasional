@@ -41,7 +41,7 @@
             </thead>
             <tbody class="block xl:table-row-group p-2.5 sm:p-3 xl:p-0 space-y-2.5 xl:space-y-0 divide-y-0 xl:divide-y divide-slate-100 dark:divide-slate-700/50">
                 @forelse ($invoices as $invoice)
-                    <tr class="block xl:table-row bg-white dark:bg-slate-800/90 xl:bg-transparent rounded-2xl xl:rounded-none border border-slate-200/80 dark:border-slate-700/80 xl:border-x-0 xl:border-t-0 xl:border-b p-3 sm:p-3.5 xl:p-0 shadow-xs xl:shadow-none hover:border-sky-300 dark:hover:border-sky-600/50 xl:hover:bg-slate-50/80 dark:xl:hover:bg-slate-700/30 transition-all space-y-2 xl:space-y-0" data-invoice-row="{{ $invoice->id }}">
+                    <tr class="block xl:table-row bg-white dark:bg-slate-800/90 xl:bg-transparent rounded-2xl xl:rounded-none border border-slate-200/80 dark:border-slate-700/80 xl:border-x-0 xl:border-t-0 xl:border-b p-3 sm:p-3.5 xl:p-0 shadow-xs xl:shadow-none hover:border-sky-300 dark:hover:border-sky-600/50 xl:hover:bg-slate-50/80 dark:xl:hover:bg-slate-700/30 transition-all space-y-2 xl:space-y-0" data-invoice-row="{{ $invoice->id }}" data-customer-id="{{ $invoice->customer_id }}">
                         {{-- 1. Checkbox & Mobile Card Header --}}
                         <td class="block xl:table-cell px-0 pb-1 xl:px-3 xl:py-3 xl:w-10">
                             <div class="flex items-center justify-between gap-2">

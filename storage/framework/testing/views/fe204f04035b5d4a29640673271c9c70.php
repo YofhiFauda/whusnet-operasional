@@ -1,6 +1,6 @@
 
 
-<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+<div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <div>
         <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Hasil Laporan Survey Lapangan (Data FOP &amp; Survey)</h3>
         <p class="text-[11px] text-slate-500 mt-0.5">Waktu penugasan, tim surveyor, kelayakan lokasi, estimasi material &amp; alat kerja, serta foto dokumentasi.</p>
@@ -64,7 +64,8 @@
         $estimasiMaterial = \App\Models\TaskMaterial::where('customer_id', $customer->id)
             ->estimasi()->orderBy('id')->get();
 
-        $alatSurvey = \App\Models\TaskWorkTool::where('customer_id', $customer->id)
+        $alatSurvey = \App\Models\TaskWorkTool::with('workTool')
+            ->where('customer_id', $customer->id)
             ->whereHas('fopTask', fn ($q) => $q->where('category', \App\Enums\TaskType::SURVEY->value))
             ->orderBy('id')->get();
     ?>
@@ -98,8 +99,12 @@
                 ])->filter()->implode(', ');
 
                 $odpPort = $customer->customerDevice->odp_port ?? $customer->customerTechnicalDetail?->odp_port;
-                $tglMulai = $survey->survey_date ? \App\Support\IndonesianDate::date($survey->survey_date) : '-';
-                $tglSelesai = $survey->end_date ? \App\Support\IndonesianDate::date($survey->end_date) : $tglMulai;
+                $tglMulai = $survey->survey_date
+                    ? \App\Support\IndonesianDate::date($survey->survey_date)
+                    : ($survey->started_at ? \App\Support\IndonesianDate::date($survey->started_at) : ($survey->created_at ? \App\Support\IndonesianDate::date($survey->created_at) : '-'));
+                $tglSelesai = $survey->end_date
+                    ? \App\Support\IndonesianDate::date($survey->end_date)
+                    : ($survey->completed_at ? \App\Support\IndonesianDate::date($survey->completed_at) : $tglMulai);
             ?>
 
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
@@ -118,13 +123,13 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                         <div class="space-y-2.5">
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">ID FOP Penugasan Survey</span>
-                                <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text"><?php echo e($survey->fop_id ?: '-'); ?></span>
+                                <span class="text-slate-400">Petugas FOP Penugasan Survey</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($survey->fop?->name ?: ($survey->fop_id ?: '-')); ?></span>
                             </div>
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Waktu Penugasan FOP Survey</span>
                                 <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
-                                    <?php echo e($survey->assigned_at ? \App\Support\IndonesianDate::dateTime($survey->assigned_at) . ' WIB' : '-'); ?>
+                                    <?php echo e($survey->assigned_at ? \App\Support\IndonesianDate::dateTime($survey->assigned_at) . ' WIB' : ($survey->created_at ? \App\Support\IndonesianDate::dateTime($survey->created_at) . ' WIB' : '-')); ?>
 
                                 </span>
                             </div>

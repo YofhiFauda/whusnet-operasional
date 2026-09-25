@@ -30,6 +30,11 @@
         <a href="/customers" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
             Buka Data Pelanggan
         </a>
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
+            <a href="<?php echo e(route('invoices.create')); ?>" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+                + Buat Tagihan
+            </a>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -79,6 +84,7 @@
                 <option value="awal" <?php echo e(($invoiceType ?? '') === 'awal' ? 'selected' : ''); ?>>Aktivasi</option>
                 <option value="bulanan" <?php echo e(($invoiceType ?? '') === 'bulanan' ? 'selected' : ''); ?>>Tagihan Bulanan Rutin</option>
                 <option value="reaktivasi" <?php echo e(($invoiceType ?? '') === 'reaktivasi' ? 'selected' : ''); ?>>Tagihan Reaktivasi</option>
+                <option value="manual" <?php echo e(($invoiceType ?? '') === 'manual' ? 'selected' : ''); ?>>Tagihan Manual</option>
             </select>
         </div>
 
@@ -117,10 +123,10 @@
                     <th class="px-6 py-3.5">PELANGGAN</th>
                     <th class="px-6 py-3.5">POP</th>
                     <th class="px-6 py-3.5">PERIODE</th>
-                    <th class="px-6 py-3.5 text-right">TOTAL</th>
-                    <th class="px-6 py-3.5 text-right">SISA</th>
+                    <th class="px-6 py-3.5 text-center">TOTAL</th>
+                    <th class="px-6 py-3.5 text-center">SISA</th>
                     <th class="px-6 py-3.5 text-center">STATUS</th>
-                    <th class="px-6 py-3.5 text-right">ACTION</th>
+                    <th class="px-6 py-3.5 text-center">ACTION</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -177,7 +183,18 @@
 
                                 </span>
                                 <?php endif; ?>
-                                <span class="text-[10px] text-slate-400 dark:text-slate-500">Tempo <?php echo e(optional($invoice->due_date)->format('d/m/Y')); ?></span>
+                                
+                                <?php if($invoice->manual_subtype_name): ?>
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-500/20">
+                                    <?php echo e($invoice->manual_subtype_name); ?>
+
+                                </span>
+                                <?php elseif($invoice->manual_category): ?>
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-slate-50 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/20">
+                                    <?php echo e($invoice->manual_category->label()); ?>
+
+                                </span>
+                                <?php endif; ?>
                             </div>
                         </td>
                         <td class="px-6 py-3.5 whitespace-nowrap">
@@ -194,11 +211,14 @@
                         <td class="px-6 py-3.5 whitespace-nowrap font-mono"><?php echo e($invoice->billing_period); ?></td>
                         <td class="px-6 py-3.5 text-right font-mono font-semibold">Rp <?php echo e(number_format((float) $invoice->total_amount, 2, ',', '.')); ?></td>
                         <td class="px-6 py-3.5 text-right font-mono" id="invoice-remaining-<?php echo e($invoice->id); ?>">Rp <?php echo e(number_format((float) $invoice->remaining_amount, 2, ',', '.')); ?></td>
-                        <td class="px-6 py-3.5 text-center whitespace-nowrap">
-                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border <?php echo e($badgeClass); ?>" id="invoice-status-badge-<?php echo e($invoice->id); ?>" data-badge-style="pill">
-                                <?php echo e($invoice->invoice_status->label()); ?>
+                        <td class="px-6 py-3.5 text-center">
+                            
+                            <?php if (! (($statusGroup ?? '') === 'belum_lunas')): ?>
+                                <span id="invoice-status-badge-<?php echo e($invoice->id); ?>" class="px-2 py-0.5 text-[10px] font-bold rounded-full border <?php echo e($badgeClass); ?>">
+                                    <?php echo e($invoice->invoice_status->label()); ?>
 
-                            </span>
+                                </span>
+                            <?php endif; ?>
                         </td>
                         <td class="px-6 py-3.5 text-right whitespace-nowrap">
                             <div class="inline-flex items-center gap-1.5">
@@ -297,6 +317,8 @@
 
 <?php $__env->startPush('scripts'); ?>
     <script>
+        const HIDE_INVOICE_STATUS_BADGE = <?php echo json_encode(($statusGroup ?? '') === 'belum_lunas', 15, 512) ?>;
+
         const INVOICE_STATUS_LABELS = {
             belum_dibayar: 'Belum Dibayar',
             sebagian: 'Sebagian',
@@ -322,7 +344,11 @@
                 remainingCell.textContent = 'Rp ' + Number(data.remaining_amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
 
-            const badge = document.getElementById('invoice-status-badge-' + data.invoice_id);
+            // Mode Tagihan Belum Lunas: badge sengaja tak dirender (lihat
+            // Blade di atas) — patch realtime juga tidak boleh memunculkannya
+            // lagi. Cek eksplisit, bukan cuma andalkan elemen yang tak ada,
+            // supaya kode patch berikutnya yang MEMBUAT badge tetap patuh.
+            const badge = HIDE_INVOICE_STATUS_BADGE ? null : document.getElementById('invoice-status-badge-' + data.invoice_id);
             if (badge) {
                 badge.textContent = data.invoice_status_label || INVOICE_STATUS_LABELS[data.invoice_status] || data.invoice_status;
                 badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full border ' +

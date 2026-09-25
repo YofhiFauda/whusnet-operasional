@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
-use App\Models\PeriodClosing;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -155,37 +154,15 @@ class InvoiceWriteOffTest extends TestCase
     }
 
     #[Test]
-    public function hapus_buku_ditolak_saat_periode_berjalan_pop_itu_sudah_ditutup(): void
-    {
-        $invoice = $this->piutang();
-        PeriodClosing::create([
-            'period' => '2026-09',
-            'pop_id' => $this->pop->id,
-            'figures' => CollectorMonthlyReportService::emptyFigures(),
-            'closed_by' => $this->owner->id,
-            'closed_at' => now(),
-        ]);
-
-        $this->actingAs($this->owner)
-            ->post(route('invoices.write-off', $invoice), ['reason' => 'macet'])
-            ->assertSessionHasErrors('reason');
-
-        $this->assertSame(InvoiceStatus::BELUM_DIBAYAR, $invoice->refresh()->invoice_status);
-    }
-
-    #[Test]
-    public function batalkan_hapus_buku_ditolak_kalau_periodenya_sudah_ditutup(): void
+    public function batalkan_hapus_buku_ditolak_setelah_bulan_berganti_walau_snapshot_belum_ada(): void
     {
         $invoice = $this->piutang();
         $this->actingAs($this->owner)->post(route('invoices.write-off', $invoice), ['reason' => 'macet']);
 
-        PeriodClosing::create([
-            'period' => '2026-09',
-            'pop_id' => $this->pop->id,
-            'figures' => CollectorMonthlyReportService::emptyFigures(),
-            'closed_by' => $this->owner->id,
-            'closed_at' => now(),
-        ]);
+        // Bulan berganti = September tutup buku permanen. Kunci dari kalender,
+        // BUKAN dari baris period_closings (scheduler bisa telat jalan).
+        Carbon::setTestNow('2026-10-01 00:01:00');
+        $this->assertDatabaseCount('period_closings', 0);
 
         $this->actingAs($this->owner)
             ->post(route('invoices.write-off.reverse', $invoice))

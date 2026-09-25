@@ -196,8 +196,9 @@
         const method = methodSelect.value;
         const transferFields = document.getElementById('hub-pay-transfer-fields');
         const collectorFields = document.getElementById('hub-pay-collector-fields');
-        const bankName = document.getElementById('hub_bank_name');
-        const accountNumber = document.getElementById('hub_account_number');
+        const bankAccount = document.getElementById('hub_bank_account_id');
+        const senderFields = document.getElementById('hub-pay-sender-fields');
+        const senderName = document.getElementById('hub_sender_name');
         const collector = document.getElementById('hub_collected_by');
 
         const isTransfer = method === 'transfer';
@@ -205,8 +206,17 @@
         const isLainnya = method === 'lainnya';
 
         if (transferFields) transferFields.classList.toggle('hidden', !isTransfer);
-        if (bankName) bankName.required = isTransfer;
-        if (accountNumber) accountNumber.required = isTransfer;
+        if (bankAccount) {
+            bankAccount.required = isTransfer;
+            // Form ini dikirim via FormData(form) — field tersembunyi ikut
+            // terkirim. `disabled` mencegah id rekening/nama pengirim sisa
+            // pilihan sebelumnya ikut tersimpan saat metode diganti.
+            bankAccount.disabled = !isTransfer;
+        }
+
+        const acceptsSender = isTransfer || isKolektor;
+        if (senderFields) senderFields.classList.toggle('hidden', !acceptsSender);
+        if (senderName) senderName.disabled = !acceptsSender;
 
         if (collectorFields) collectorFields.classList.toggle('hidden', !isKolektor);
         if (collector) collector.required = isKolektor;
@@ -232,6 +242,18 @@
             const opt = document.createElement('option');
             opt.value = c.id;
             opt.textContent = c.name;
+            select.appendChild(opt);
+        });
+    }
+
+    function hubPopulateBankAccounts(bankAccounts) {
+        const select = document.getElementById('hub_bank_account_id');
+        if (!select) return;
+        select.innerHTML = '<option value="">Pilih rekening...</option>';
+        (bankAccounts || []).forEach((account) => {
+            const opt = document.createElement('option');
+            opt.value = account.id;
+            opt.textContent = account.name;
             select.appendChild(opt);
         });
     }
@@ -417,6 +439,7 @@
             detailUrl: button.getAttribute('data-detail-url') || '',
             packageUpdateUrl: button.getAttribute('data-package-update-url') || '',
             currentPackageId: button.getAttribute('data-current-package-id') || '',
+            toggleSuspendUrl: button.getAttribute('data-toggle-suspend-url') || '',
         };
 
         const setElemText = (id, txt) => {
@@ -491,10 +514,8 @@
         // Reset Payment Form Inputs
         const payMethod = document.getElementById('payment_method');
         if (payMethod) payMethod.value = 'cash';
-        const bankInput = document.getElementById('hub_bank_name');
-        if (bankInput) bankInput.value = '';
-        const accInput = document.getElementById('hub_account_number');
-        if (accInput) accInput.value = '';
+        const senderInput = document.getElementById('hub_sender_name');
+        if (senderInput) senderInput.value = '';
         const noteInput = document.getElementById('hub_note');
         if (noteInput) noteInput.value = '';
         const allocInput = document.getElementById('hub_allocation');
@@ -504,6 +525,7 @@
         
         hubApplyCustomerBalance(0);
         hubPopulateCollectors([]);
+        hubPopulateBankAccounts([]);
         hubTogglePaymentMethodFields();
 
         switchActionTab('finance');
@@ -554,6 +576,7 @@
 
                     hubApplyCustomerBalance(data.customer_balance);
                     hubPopulateCollectors(data.available_collectors);
+                    hubPopulateBankAccounts(data.available_bank_accounts);
 
                     const validPayments = Array.isArray(data.recent_payments)
                         ? data.recent_payments
@@ -898,7 +921,9 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
         if (btnTop) btnTop.disabled = true;
         if (btnText) btnText.innerText = 'Memproses...';
 
-        fetch(`/customers/${selectedCustomerData.id}/toggle-suspend`, {
+        {{-- Target POST dirender server-side (data-toggle-suspend-url di
+             tombol Aksi) — jangan rakit URL-nya di sini. ADHOC-20 langkah 3. --}}
+        fetch(selectedCustomerData.toggleSuspendUrl, {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',

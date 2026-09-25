@@ -1,14 +1,32 @@
 <!DOCTYPE html>
-<html lang="<?php echo e(str_replace('_', '-', app()->getLocale())); ?>" class="h-full bg-slate-50 dark:bg-slate-900 scroll-smooth">
+<html lang="<?php echo e(str_replace('_', '-', app()->getLocale())); ?>" class="h-full overflow-hidden bg-slate-50 dark:bg-slate-900">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
     <meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
 
     <title><?php echo $__env->yieldContent('title', 'Whusnet Operasional'); ?></title>
 
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+    </style>
+
     
     <script>
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+        window.scrollTo(0, 0);
+        window.addEventListener('focus', function() {
+            if (window.scrollY !== 0 || window.scrollX !== 0) {
+                window.scrollTo(0, 0);
+            }
+        });
         (function () {
             const saved = localStorage.getItem('whusnet-theme');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -25,9 +43,10 @@
     <!-- Styles / Scripts -->
     <?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css', 'resources/js/app.js']); ?>
 </head>
-<body class="h-full text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+<body class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
-<div class="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+
+<div class="flex h-dvh overflow-hidden bg-slate-50 dark:bg-slate-900">
 
     
     <aside id="sidebar"
@@ -563,7 +582,7 @@
             <?php endif; ?>
 
             
-            <?php if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view')): ?>
+            <?php if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view')): ?>
             <div>
                 <div class="sidebar-group-header">
                     <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Master &amp; Pengaturan</p>
@@ -571,7 +590,7 @@
                 </div>
                 <div class="space-y-1">
 
-                    <?php if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view')): ?>
+                    <?php if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view')): ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-master', 'chevron-master')"
                                 title="Master Data"
@@ -622,6 +641,12 @@
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('work_tools.view')): ?>
                                 <a href="/master/work-tools" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/work-tools*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Alat Kerja</a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('master_rekening.view')): ?>
+                                <a href="<?php echo e(route('master.rekening.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/rekening*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Rekening Bank</a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('termination_reasons.view')): ?>
+                                <a href="<?php echo e(route('master.termination-reasons.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/termination-reasons*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Alasan Putus Langganan</a>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -830,7 +855,7 @@
             <div class="flex items-center gap-1 sm:gap-2">
                 
                 <button onclick="toggleTheme(event)" id="themeToggle" aria-label="Ganti tema" title="Ganti Tema (Ctrl+D / Alt+T)"
-                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
+                        class="hidden sm:flex items-center justify-center p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
                                hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all duration-200 active:scale-90 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
                     <svg id="themeIconMoon" class="h-5 w-5 theme-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/>
@@ -842,7 +867,7 @@
 
                 
                 <button onclick="openHelp()" aria-label="Bantuan dan pintasan keyboard" title="Bantuan (?)"
-                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
+                        class="hidden sm:flex items-center justify-center p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
                                hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
@@ -871,7 +896,7 @@
 <?php unset($__componentOriginal0676521d0d1386b8a24fdc18016b8d4a); ?>
 <?php endif; ?>
 
-                <div class="h-5 w-px bg-slate-200 dark:bg-slate-700"></div>
+                <div class="hidden sm:block h-5 w-px bg-slate-200 dark:bg-slate-700"></div>
 
                 
                 <div class="relative" x-data="{ open: false }">
@@ -915,6 +940,34 @@
                                 Scan QR
                             </a>
                         <?php endif; ?>
+
+                        
+                        <div class="sm:hidden my-1 border-t border-slate-100 dark:border-slate-700/60"></div>
+                        <button type="button" onclick="toggleTheme(event)"
+                                class="sm:hidden w-full px-3 py-2 flex items-center justify-between text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                            <div class="flex items-center gap-2.5">
+                                <svg class="h-4 w-4 text-slate-400 dark:text-slate-500 dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/>
+                                </svg>
+                                <svg class="h-4 w-4 text-amber-400 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                                </svg>
+                                <span>Ganti Tema</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                <span class="dark:hidden">Light</span>
+                                <span class="hidden dark:inline">Dark</span>
+                            </span>
+                        </button>
+
+                        <button type="button" onclick="openHelp(); open = false;"
+                                class="sm:hidden w-full px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
+                            </svg>
+                            <span>Bantuan &amp; Pintasan</span>
+                        </button>
+
                         <div class="my-1 border-t border-slate-100 dark:border-slate-700/60"></div>
                         <button onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
                                 class="w-full px-3 py-2 flex items-center gap-2.5 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors">
@@ -927,7 +980,7 @@
         </header>
 
         
-        <main class="flex-1 <?php echo $__env->yieldContent('main_class', 'p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto scroll-smooth'); ?>">
+        <main class="flex-1 p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto scroll-smooth">
             <?php echo $__env->yieldContent('content'); ?>
         </main>
     </div>

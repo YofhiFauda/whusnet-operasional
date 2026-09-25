@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
 use App\Services\CollectorPaymentService;
+use App\Services\CustomerBalanceService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Contracts\Notifications\Dispatcher as NotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -236,7 +237,13 @@ class CollectorSelfPaymentTest extends TestCase
         $this->assertDatabaseCount('payments', 0);
     }
 
-    public function test_kolektor_cannot_pay_more_than_remaining_amount(): void
+    /**
+     * ADHOC-84 §2.5/§4.4 (2026-09-23): aturan lama "kolektor tak boleh bayar
+     * lebih dari sisa, kelebihan dikembalikan tunai" DIBALIK atas keputusan
+     * eksplisit user — sekarang identik jalur admin (`PaymentService::record()`):
+     * kelebihan otomatis dipisah jadi `overpay_amount` & masuk saldo pelanggan.
+     */
+    public function test_kolektor_overpay_is_auto_split_and_credited_to_customer_balance(): void
     {
         $invoice = $this->createUnpaidInvoice($this->pop, 'C-CSP-LEBIH', $this->kolektor->id);
 
@@ -247,8 +254,17 @@ class CollectorSelfPaymentTest extends TestCase
             ],
         ]);
 
-        $response->assertStatus(422);
-        $this->assertDatabaseCount('payments', 0);
+        $response->assertOk();
+        $this->assertDatabaseCount('payments', 1);
+
+        $payment = Payment::where('invoice_id', $invoice->id)->firstOrFail();
+        $this->assertSame('150000.00', $payment->amount);
+        $this->assertSame('50000.00', $payment->overpay_amount);
+
+        $invoice->refresh();
+        $this->assertSame('lunas', $invoice->invoice_status->value);
+
+        $this->assertSame(50000.0, app(CustomerBalanceService::class)->balance($invoice->customer));
     }
 
     public function test_batch_is_all_or_nothing(): void

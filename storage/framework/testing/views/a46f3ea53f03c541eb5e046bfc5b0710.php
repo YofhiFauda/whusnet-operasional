@@ -9,7 +9,7 @@
     ];
     $statusLabels = [
         'valid' => 'Valid / Disetujui',
-        'ditolak' => 'Ditolak',
+        'ditolak' => 'Dikembalikan',
     ];
     $methodLabels = [
         'cash' => 'Cash',
@@ -56,7 +56,7 @@
                 </svg>
             </div>
             <div>
-                <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pembayaran Ditolak</p>
+                <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pembayaran Dikembalikan</p>
                 <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">Rp <?php echo e(number_format($totalDitolakSum, 2, ',', '.')); ?></h3>
             </div>
         </div>
@@ -113,6 +113,20 @@
                         <?php $__currentLoopData = $allowedStatuses; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                             <option value="<?php echo e($item); ?>" <?php if($status === $item): echo 'selected'; endif; ?>>
                                 <?php echo e($statusLabels[$item]); ?>
+
+                            </option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </select>
+                </div>
+
+                <!-- Filter Jenis (ADHOC-84 §8.2) -->
+                <div>
+                    <label for="classification" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Jenis</label>
+                    <select id="classification" name="classification" class="w-full rounded-md border-slate-300 dark:border-slate-600 text-sm focus:border-sky-500 focus:ring-sky-500">
+                        <option value="">Semua Jenis</option>
+                        <?php $__currentLoopData = $allowedClassifications; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($item->value); ?>" <?php if($classification === $item->value): echo 'selected'; endif; ?>>
+                                <?php echo e($item->label()); ?>
 
                             </option>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
@@ -233,6 +247,7 @@
                         <th class="px-6 py-3 text-center">Metode</th>
                         <th class="px-6 py-3">Kolektor</th>
                         <th class="px-6 py-3 text-right">Nominal</th>
+                        <th class="px-6 py-3">Jenis</th>
                         <th class="px-6 py-3">Penerima</th>
                         <th class="px-6 py-3 text-center">Status</th>
                     </tr>
@@ -292,6 +307,13 @@
                                 Rp <?php echo e(number_format($payment->amount, 2, ',', '.')); ?>
 
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex flex-wrap gap-1">
+                                    <?php $__currentLoopData = $payment->classification(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold <?php echo e($label->badgeClass()); ?>"><?php echo e($label->label()); ?></span>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </div>
+                            </td>
                             <td class="px-6 py-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                                 <?php echo e($payment->receiver->name ?? '-'); ?>
 
@@ -305,7 +327,7 @@
                         </tr>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
-                            <td colspan="10" class="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
+                            <td colspan="11" class="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
                                 <svg class="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>

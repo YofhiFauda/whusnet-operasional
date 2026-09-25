@@ -54,19 +54,14 @@
                 </span>
             <?php endif; ?>
 
-            <?php
-                // Total uang lebih yang pernah diserahkan pelanggan ini.
-                // Pembayaran DITOLAK tak ikut dijumlah — kalau pembayarannya
-                // dibatalkan, lebih bayarnya ikut batal.
-                $totalOverpay = $customer->payments
-                    ->filter(fn ($p) => $p->payment_status === \App\Enums\PaymentStatus::VALID)
-                    ->sum(fn ($p) => (float) $p->overpay_amount);
-            ?>
-            <?php if($totalOverpay > 0): ?>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20" title="Total uang lebih yang pernah diserahkan. Catatan saja — bukan saldo, tidak otomatis dipakai untuk tagihan berikutnya.">
-                    Lebih Bayar: Rp <?php echo e(number_format($totalOverpay, 0, ',', '.')); ?>
+            
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customer_balance.view')): ?>
+                <?php if($customerBalance > 0): ?>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20" title="Saldo aktif pelanggan ini — otomatis dipakai untuk tagihan Bulanan berikutnya begitu terbit (FIFO periode terlama dulu). Lihat riwayat di tab Billing.">
+                        Saldo: Rp <?php echo e(number_format($customerBalance, 0, ',', '.')); ?>
 
-                </span>
+                    </span>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -108,10 +103,10 @@
 
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
             <?php if($isActive && $customer->customerService): ?>
-                <button type="button" onclick="openInvoiceModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
+                <a href="<?php echo e(route('invoices.create', ['customer_id' => $customer->id])); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
                     <i class="fa-solid fa-plus"></i>
                     Buat Tagihan
-                </button>
+                </a>
             <?php endif; ?>
         <?php endif; ?>
 
@@ -225,7 +220,7 @@
     </div>
 
     <!-- SECTION D: UNIFIED DETAILS BODY (All Data Tabs) -->
-    <div class="p-6 text-xs" id="details-container">
+    <div class="p-0 text-xs" id="details-container">
 
         <!-- TAB 1: RINGKASAN (OVERVIEW) -->
         <div id="tab-content-ringkasan" class="tab-content space-y-6 searchable-section">
@@ -262,7 +257,7 @@
                     </p>
                 <?php endif; ?>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                     <?php $__currentLoopData = ($timeline ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $step): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <?php
                             $stepTone = match($step['status']) {
@@ -712,34 +707,85 @@
                     
                     <?php if($customer->customerService && auth()->user()->hasPermission('customers.deactivate') && in_array($customer->status, ['active', 'suspended'], true)): ?>
                     <div id="terminate" class="border border-rose-200 dark:border-rose-900/40 rounded-lg p-4 bg-rose-50/40 dark:bg-rose-950/20"
-                         x-data="{ terminateOpen: <?php echo e($errors->has('reason') ? 'true' : 'false'); ?> }"
+                         x-data="{ terminateOpen: <?php echo e($errors->has('termination_reason_id') ? 'true' : 'false'); ?> }"
                          x-init="if (window.location.hash === '#terminate' || terminateOpen) {
                             terminateOpen = true;
                             switchTab('paket-layanan');
                             $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
                          }">
                         <div class="flex items-center justify-between">
-                            <span class="block text-[9px] font-bold text-rose-500 uppercase tracking-wider">PUTUS LANGGANAN</span>
+                            <span class="block text-[9px] font-bold text-rose-500 uppercase tracking-wider">REQUEST PUTUS LANGGANAN</span>
                             <template x-if="!terminateOpen">
-                                <button type="button" @click="terminateOpen = true" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400">Putus Langganan</button>
+                                <button type="button" @click="terminateOpen = true" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400">Request Putus Langganan</button>
                             </template>
                         </div>
                         <template x-if="terminateOpen">
                             <form action="<?php echo e(route('customers.terminate', $customer)); ?>" method="POST" class="mt-3 space-y-2"
                                   onsubmit="event.preventDefault(); window.confirmDelete('Yakin memutuskan langganan pelanggan <?php echo e($customer->full_name); ?>? Layanan akan dihentikan permanen dan tidak bisa diaktifkan lagi lewat toggle Isolir.', this);">
                                 <?php echo csrf_field(); ?>
-                                <textarea name="reason" rows="2" required maxlength="500" placeholder="Alasan pemutusan langganan (wajib diisi)..."
-                                          class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200"><?php echo e(old('reason')); ?></textarea>
-                                <?php $__errorArgs = ['reason'];
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Alasan Putus <span class="text-rose-500">*</span></label>
+                                    <select name="termination_reason_id" required
+                                            <?php if($terminationPenaltyEligible): ?>
+                                            onchange="const opt=this.selectedOptions[0]; const f=this.closest('form').querySelector('[name=penalty_amount]'); if(f && opt && opt.dataset.default !== undefined){ f.value = opt.dataset.default; window.formatInputRupiah && window.formatInputRupiah(); }"
+                                            <?php endif; ?>
+                                            class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                        <option value="">-- Pilih Alasan --</option>
+                                        <?php $__currentLoopData = $terminationReasons; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $reason): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($reason->id); ?>" data-default="<?php echo e((int) $reason->default_penalty_amount); ?>" <?php echo e(old('termination_reason_id') == $reason->id ? 'selected' : ''); ?>><?php echo e($reason->name); ?></option>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </select>
+                                    <?php $__errorArgs = ['termination_reason_id'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
 $message = $__bag->first($__errorArgs[0]); ?>
-                                    <p class="text-[11px] text-rose-600"><?php echo e($message); ?></p>
-                                <?php unset($message);
+                                        <p class="text-[11px] text-rose-600 mt-1"><?php echo e($message); ?></p>
+                                    <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                </div>
+
+                                <?php if($terminationPenaltyEligible): ?>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Nominal Denda <span class="text-rose-500">*</span></label>
+                                    <input type="text" inputmode="decimal" name="penalty_amount" data-rupiah required value="<?php echo e(old('penalty_amount', 0)); ?>"
+                                           class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                    <p class="text-[10px] text-slate-400 mt-1">Masa langganan pelanggan ini &le;1 tahun — denda wajib diisi (boleh 0). Nilai diprefill dari alasan terpilih, tapi tetap wajib dikonfirmasi/diubah sebelum submit.</p>
+                                    <?php $__errorArgs = ['penalty_amount'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                        <p class="text-[11px] text-rose-600 mt-1"><?php echo e($message); ?></p>
+                                    <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                                </div>
+                                <?php else: ?>
+                                <p class="text-[10px] text-emerald-600 dark:text-emerald-400">Masa langganan pelanggan ini &gt;1 tahun — tidak ada denda putus langganan.</p>
+                                <?php endif; ?>
+
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Catatan Tambahan (opsional)</label>
+                                    <textarea name="termination_note" rows="2" maxlength="1000" placeholder="Detail lebih spesifik, opsional..."
+                                              class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200"><?php echo e(old('termination_note')); ?></textarea>
+                                    <?php $__errorArgs = ['termination_note'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                        <p class="text-[11px] text-rose-600 mt-1"><?php echo e($message); ?></p>
+                                    <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                                </div>
+
+                                
+
                                 <div class="flex gap-2">
                                     <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Putuskan Langganan</button>
                                     <button type="button" @click="terminateOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
@@ -747,6 +793,78 @@ unset($__errorArgs, $__bag); ?>
                             </form>
                         </template>
                         <p class="text-[10px] text-rose-500/80 mt-2" x-show="terminateOpen" x-cloak>Tindakan permanen — status pelanggan jadi Terminated/Berhenti. Beda dengan Isolir yang masih bisa diaktifkan kembali.</p>
+                    </div>
+                    <?php endif; ?>
+
+                    
+                    <?php if($customer->customerService && auth()->user()->hasPermission('billing_waivers.create') && in_array($customer->status, ['active', 'suspended', 'terminated'], true)): ?>
+                    <div class="border border-amber-200 dark:border-amber-900/40 rounded-lg p-4 bg-amber-50/40 dark:bg-amber-950/20"
+                         x-data="{ leaveOpen: <?php echo e($errors->has('periods') ? 'true' : 'false'); ?> }">
+                        <div class="flex items-center justify-between">
+                            <span class="block text-[9px] font-bold text-amber-600 uppercase tracking-wider">CUTI BERLANGGANAN / BEBASKAN TAGIHAN</span>
+                            <template x-if="!leaveOpen">
+                                <button type="button" @click="leaveOpen = true" class="text-[11px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400">Cuti Berlangganan</button>
+                            </template>
+                        </div>
+                        <template x-if="leaveOpen">
+                            <form action="<?php echo e(route('billing-waivers.store', $customer)); ?>" method="POST" class="mt-3 space-y-2">
+                                <?php echo csrf_field(); ?>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Bebaskan Tagihan Periode <span class="text-rose-500">*</span></label>
+                                    <div class="space-y-1 max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-900/60">
+                                        <?php $__empty_1 = true; $__currentLoopData = $leaveWaiverPeriods; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                                        <label class="flex items-center gap-2 text-[11px] <?php echo e($row['eligible'] ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-600'); ?>">
+                                            <input type="checkbox" name="periods[]" value="<?php echo e($row['billing_period']); ?>"
+                                                   <?php echo e($row['eligible'] ? '' : 'disabled'); ?>
+
+                                                   class="rounded border-slate-300 dark:border-slate-600">
+                                            <span class="font-mono"><?php echo e($row['billing_period']); ?></span>
+                                            <?php if($row['invoice']): ?>
+                                            <span>— Rp <?php echo e(number_format((float) $row['invoice']->total_amount, 0, ',', '.')); ?> (sudah terbit)</span>
+                                            <?php else: ?>
+                                            <span class="text-slate-400">(belum terbit)</span>
+                                            <?php endif; ?>
+                                            <?php if(! $row['eligible']): ?>
+                                            <span class="italic">(<?php echo e($row['reason']); ?>)</span>
+                                            <?php endif; ?>
+                                        </label>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                                        <p class="text-[11px] text-slate-400">Tidak ada periode yang bisa dibebaskan.</p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php $__errorArgs = ['periods'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                        <p class="text-[11px] text-rose-600 mt-1"><?php echo e($message); ?></p>
+                                    <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Catatan <span class="text-rose-500">*</span></label>
+                                    <textarea name="reason" rows="2" required maxlength="1000" placeholder="Mis. pelanggan minta cuti September, kembali Oktober..."
+                                              class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200"><?php echo e(old('reason')); ?></textarea>
+                                    <?php $__errorArgs = ['reason'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                        <p class="text-[11px] text-rose-600 mt-1"><?php echo e($message); ?></p>
+                                    <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Bebaskan Tagihan</button>
+                                    <button type="button" @click="leaveOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                </div>
+                            </form>
+                        </template>
+                        <p class="text-[10px] text-amber-600/80 dark:text-amber-400/70 mt-2" x-show="leaveOpen" x-cloak>Status pelanggan TIDAK berubah — cuma tagihan periode terpilih yang dibebaskan. Cuti tidak otomatis mengisolir koneksi; pakai toggle Isolir terpisah kalau perlu mematikan layanan.</p>
                     </div>
                     <?php endif; ?>
 
@@ -938,16 +1056,16 @@ unset($__errorArgs, $__bag); ?>
 
         <!-- TAB 10: TAGIHAN -->
         <div id="tab-content-tagihan" class="tab-content hidden space-y-6 searchable-section">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+            <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h3>
                     <p class="text-[11px] text-slate-500 mt-0.5">Daftar invoice tagihan bulanan yang diterbitkan secara manual maupun sistem.</p>
                 </div>
                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
                     <?php if($isActive && $customer->customerService): ?>
-                        <button type="button" onclick="openInvoiceModal()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold shadow-sm cursor-pointer">
-                            + Buat Tagihan Manual
-                        </button>
+                        <a href="<?php echo e(route('invoices.create', ['customer_id' => $customer->id])); ?>" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 shrink-0 transition-colors">
+                            <i class="fa-solid fa-plus text-xs"></i> Buat Tagihan Manual
+                        </a>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>
@@ -1055,18 +1173,121 @@ unset($__errorArgs, $__bag); ?>
                     <p class="text-[11px] text-slate-500 mt-1">Gunakan tombol "Buat Tagihan Manual" untuk membuat invoice pertama pelanggan.</p>
                 </div>
             <?php endif; ?>
+
+            
+            <?php if($activeBillingWaivers->isNotEmpty()): ?>
+            <div class="mt-6">
+                <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Riwayat Pembebasan Tagihan (<?php echo e($activeBillingWaivers->count()); ?>)</h4>
+                <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-400 uppercase text-[10px]">
+                                <th class="px-4 py-3">Periode</th>
+                                <th class="px-4 py-3">Sumber</th>
+                                <th class="px-4 py-3">Catatan</th>
+                                <th class="px-4 py-3">Dibebaskan Oleh</th>
+                                <th class="px-4 py-3">Kapan</th>
+                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('billing_waivers.delete')): ?>
+                                <th class="px-4 py-3 text-center">Aksi</th>
+                                <?php endif; ?>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300 font-mono">
+                            <?php $__currentLoopData = $activeBillingWaivers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $waiver): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                                <td class="px-4 py-3 font-bold"><?php echo e($waiver->billing_period); ?></td>
+                                <td class="px-4 py-3 font-sans">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide <?php echo e($waiver->source->value === 'termination' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-amber-50 text-amber-600 border-amber-200'); ?>">
+                                        <?php echo e($waiver->source->label()); ?>
+
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 font-sans max-w-xs"><?php echo e($waiver->reason); ?></td>
+                                <td class="px-4 py-3 font-sans"><?php echo e($waiver->creator->name ?? '-'); ?></td>
+                                <td class="px-4 py-3 font-sans"><?php echo e(\App\Support\IndonesianDate::date($waiver->created_at)); ?></td>
+                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('billing_waivers.delete')): ?>
+                                <td class="px-4 py-3 text-center font-sans">
+                                    <form action="<?php echo e(route('billing-waivers.destroy', $waiver)); ?>" method="POST" class="inline-flex items-center gap-1"
+                                          onsubmit="event.preventDefault(); const alasan = prompt('Alasan mencabut pembebasan periode <?php echo e($waiver->billing_period); ?>:'); if (alasan === null || alasan.trim() === '') return; this.querySelector('[name=reason]').value = alasan; this.submit();">
+                                        <?php echo csrf_field(); ?>
+                                        <?php echo method_field('DELETE'); ?>
+                                        <input type="hidden" name="reason" value="">
+                                        <button type="submit" class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-rose-600 border border-rose-200 dark:border-rose-800 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer">
+                                            Cabut
+                                        </button>
+                                    </form>
+                                </td>
+                                <?php endif; ?>
+                            </tr>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1.5">Mencabut TIDAK menghidupkan kembali invoice yang sudah dibatalkan — jalankan generator tagihan bulanan untuk periode itu kalau perlu ditagih ulang.</p>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- TAB 11: PEMBAYARAN -->
         <div id="tab-content-pembayaran" class="tab-content hidden space-y-6 searchable-section">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+            
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customer_balance.view')): ?>
+            <div class="border border-sky-200 dark:border-sky-500/20 bg-sky-50/60 dark:bg-sky-500/10 rounded-lg p-4 space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                        <h3 class="text-xs font-bold text-sky-900 dark:text-sky-300 uppercase tracking-wider">Saldo Pelanggan</h3>
+                        <p class="text-[11px] text-sky-700/80 dark:text-sky-400/80 mt-0.5">Otomatis dipakai untuk tagihan Bulanan berikutnya begitu terbit (FIFO periode terlama dulu).</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-lg font-bold font-mono text-sky-900 dark:text-sky-300">Rp <?php echo e(number_format($customerBalance, 0, ',', '.')); ?></p>
+                        <?php if($customerBalance > 0 && $totalBill > 0): ?>
+                            <p class="text-[10px] text-sky-700/80 dark:text-sky-400/80">≈ cukup <?php echo e(floor($customerBalance / $totalBill)); ?> bulan tagihan (Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>/bln)</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <?php if($customerBalanceMutations->isNotEmpty()): ?>
+                <div class="overflow-x-auto border border-sky-200/60 dark:border-sky-500/20 rounded-lg">
+                    <table class="w-full text-left border-collapse text-[11px]">
+                        <thead>
+                            <tr class="bg-sky-50 dark:bg-sky-500/10 border-b border-sky-200/60 dark:border-sky-500/20 font-semibold text-sky-700/70 dark:text-sky-400/70 uppercase text-[9px]">
+                                <th class="px-3 py-2">Tanggal</th>
+                                <th class="px-3 py-2">Sumber</th>
+                                <th class="px-3 py-2">Tagihan</th>
+                                <th class="px-3 py-2 text-right">Mutasi</th>
+                                <th class="px-3 py-2">Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-sky-200/40 dark:divide-sky-500/10 font-mono">
+                            <?php $__currentLoopData = $customerBalanceMutations; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $mutation): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <tr>
+                                    <td class="px-3 py-2 font-sans"><?php echo e($mutation->created_at->format('d/m/Y')); ?></td>
+                                    <td class="px-3 py-2 font-sans"><?php echo e($mutation->source?->label() ?? '-'); ?></td>
+                                    <td class="px-3 py-2 font-sans"><?php echo e($mutation->payment?->invoice?->invoice_number ?? '-'); ?></td>
+                                    <td class="px-3 py-2 text-right font-semibold <?php echo e($mutation->type->value === 'credit' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'); ?>">
+                                        <?php echo e($mutation->type->value === 'credit' ? '+' : '-'); ?>Rp <?php echo e(number_format((float) $mutation->amount, 0, ',', '.')); ?>
+
+                                    </td>
+                                    <td class="px-3 py-2 font-sans text-slate-500 dark:text-slate-400"><?php echo e($mutation->note); ?></td>
+                                </tr>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Pembayaran Pelanggan</h3>
                     <p class="text-[11px] text-slate-500 mt-0.5">Pembayaran yang terhubung ke invoice pelanggan ini.</p>
                 </div>
             </div>
 
-            <?php if($customer->payments && $customer->payments->count() > 0): ?>
+            
+            <?php $listedPayments = $customer->payments?->where('payment_status', \App\Enums\PaymentStatus::VALID) ?? collect(); ?>
+            <?php if($listedPayments->count() > 0): ?>
                 <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
@@ -1081,7 +1302,7 @@ unset($__errorArgs, $__bag); ?>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
-                            <?php $__currentLoopData = $customer->payments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $payment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <?php $__currentLoopData = $listedPayments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $payment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                 <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
                                     <td class="px-4 py-3 font-bold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($payment->payment_number); ?></td>
                                     <td class="px-4 py-3 searchable-text">
@@ -1093,7 +1314,15 @@ unset($__errorArgs, $__bag); ?>
                                         <?php endif; ?>
                                     </td>
                                     <td class="px-4 py-3 font-sans searchable-text"><?php echo e(\App\Support\IndonesianDate::date($payment->payment_date)); ?></td>
-                                    <td class="px-4 py-3 font-sans uppercase searchable-text"><?php echo e(strtoupper($payment->payment_method->value ?? (string)$payment->payment_method)); ?></td>
+                                    <td class="px-4 py-3 font-sans uppercase searchable-text">
+                                        
+                                        <?php if(\App\Enums\PaymentMethod::tryFrom((string) $payment->payment_method) === \App\Enums\PaymentMethod::SALDO): ?>
+                                            Saldo Pelanggan
+                                        <?php else: ?>
+                                            <?php echo e(strtoupper((string) $payment->payment_method)); ?>
+
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                         Rp <?php echo e(number_format((float) $payment->amount, 2, ',', '.')); ?>
 
@@ -1133,14 +1362,14 @@ unset($__errorArgs, $__bag); ?>
         <!-- TAB 12: DOKUMEN & BERKAS -->
         <div id="tab-content-dokumen" class="tab-content hidden space-y-6 searchable-section">
             <?php if(auth()->user()->hasPermission('customers.detail.documents.view')): ?>
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                         <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">LAMPIRAN DOKUMEN PENDUKUNG</h3>
                         <p class="text-[11px] text-slate-500 mt-0.5">Dokumen disimpan aman & private sesuai hak akses permission sistem.</p>
                     </div>
                     <?php if(auth()->user()->hasPermission('upload_customer_documents')): ?>
-                    <button type="button" onclick="openModal('document-upload-modal')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold cursor-pointer">
-                        + Upload Dokumen Baru
+                    <button type="button" onclick="openModal('document-upload-modal')" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors">
+                        <i class="fa-solid fa-cloud-arrow-up text-xs"></i> Upload Dokumen Baru
                     </button>
                     <?php endif; ?>
                 </div>
@@ -1248,71 +1477,6 @@ unset($__errorArgs, $__bag); ?>
 </div>
 
 <!-- MODALS SECTION -->
-<!-- MODAL: Manual Invoice -->
-<?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
-    <?php if($isActive && $customer->customerService): ?>
-        <?php
-            $defaultPeriod = now()->format('Y-m');
-            $defaultIssueDate = now()->format('Y-m-d');
-            $defaultDueDate = now()->addDays(14)->format('Y-m-d');
-            if ($customer->customerService->due_date) {
-                $dueDay = \Carbon\Carbon::parse($customer->customerService->due_date)->day;
-                try {
-                    $defaultDueDate = now()->day($dueDay)->format('Y-m-d');
-                } catch (\Exception $e) {
-                    $defaultDueDate = now()->addDays(14)->format('Y-m-d');
-                }
-            }
-        ?>
-        <div id="manual-invoice-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-            <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
-                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Buat Tagihan Manual</h3>
-                    <button type="button" onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <i class="fa-solid fa-xmark text-base"></i>
-                    </button>
-                </div>
-                <form action="<?php echo e(route('customers.invoices.manual', $customer->id)); ?>" method="POST">
-                    <?php echo csrf_field(); ?>
-                    <div class="p-6 space-y-4 text-xs">
-                        <div class="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
-                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pelanggan: <?php echo e($customer->full_name); ?></span>
-                            <span class="text-xs font-bold text-slate-900 dark:text-slate-100"><?php echo e($customer->customerService->package_name_snapshot); ?> (Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>)</span>
-                        </div>
-                        <div>
-                            <label for="billing_period" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Periode Tagihan</label>
-                            <input type="month" name="billing_period" id="billing_period" value="<?php echo e($defaultPeriod); ?>" required class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tanggal Terbit & Jatuh Tempo</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <input type="date" name="issue_date" id="issue_date" value="<?php echo e($defaultIssueDate); ?>" required class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                                <input type="date" name="due_date" id="due_date" value="<?php echo e($defaultDueDate); ?>" required class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                            </div>
-                        </div>
-                        <div>
-                            <label for="invoice_type" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Jenis Tagihan</label>
-                            <select name="invoice_type" id="invoice_type" required class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-semibold text-xs text-slate-800 dark:text-slate-200">
-                                <option value="bulanan" <?php echo e($customer->invoices->count() > 0 ? 'selected' : ''); ?>>Tagihan Bulanan Rutin</option>
-                                <option value="awal" <?php echo e($customer->invoices->count() === 0 ? 'selected' : ''); ?>>Tagihan Awal (PSB)</option>
-                                <option value="reaktivasi">Tagihan Reaktivasi</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="prorate_amount" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tagihan Prorate (Opsional)</label>
-                            
-                            <input type="text" inputmode="decimal" data-rupiah name="prorate_amount" id="prorate_amount" value="0" oninput="recalcInvoiceTotal()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                        </div>
-                        <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                            <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
-                            <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-sm cursor-pointer">Proses Tagihan</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    <?php endif; ?>
-<?php endif; ?>
 
 <!-- MODAL: Document Upload Modal -->
 <?php if(auth()->user()->hasPermission('upload_customer_documents')): ?>
@@ -1630,9 +1794,6 @@ unset($__errorArgs, $__bag); ?>
     function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
 
-    function openInvoiceModal() { openModal('manual-invoice-modal'); }
-    function closeInvoiceModal() { closeModal('manual-invoice-modal'); }
-
     // Modal milik partial tab Pemasangan & Perangkat. Sebelumnya fungsi ini HANYA
     // ada di customers/fieldwork.blade.php, jadi tombol "Isi Data Pemasangan" /
     // "Isi Laporan Uji" / "Isi Ubah Data Perangkat" di halaman Detail Pelanggan
@@ -1644,17 +1805,6 @@ unset($__errorArgs, $__bag); ?>
     function openDeviceModal() { openModal('device-modal'); }
     function closeDeviceModal() { closeModal('device-modal'); }
 
-    const BASE_NETT = <?php echo e((float)$totalBill); ?>;
-    function recalcInvoiceTotal() {
-        // Kolom prorata bermasking ribuan — parseFloat('50.000') = 50, dan
-        // pratinjau total tagihan akan berbohong tanpa parser ini.
-        const prorateEl = document.getElementById('prorate_amount');
-        const prorate = (prorateEl && window.Rupiah ? window.Rupiah.angka(prorateEl.value) : parseFloat(prorateEl?.value || 0)) || 0;
-        const total   = BASE_NETT + prorate;
-        const fmt = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
-        const totalEl = document.getElementById('preview-total');
-        if (totalEl) totalEl.textContent = fmt(total);
-    }
 </script>
 <?php $__env->stopSection(); ?>
 

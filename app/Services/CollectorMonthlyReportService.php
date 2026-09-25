@@ -4,13 +4,17 @@ namespace App\Services;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
+use App\Enums\PaymentPeriodType;
 use App\Enums\PaymentStatus;
 use App\Models\AuditLog;
+use App\Models\Payment;
 use App\Models\PeriodClosing;
 use App\Models\Pop;
 use App\Models\User;
+use App\Support\BookPeriod;
 use App\Support\Money;
 use Carbon\Carbon;
+use Closure;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +57,30 @@ class CollectorMonthlyReportService
         $start = self::parsePeriod($period);
 
         return [$start->toDateString(), $start->copy()->addMonth()->toDateString()];
+    }
+
+    /**
+     * Payment dianggap sah PER TANGGAL `$asOf`: VALID, atau dikembalikan
+     * (`ditolak`) pada/sesudah `$asOf`.
+     *
+     * Kenapa bukan `payment_status = valid` saja: sejak tutup buku permanen,
+     * pembayaran bulan terkunci yang dikembalikan belakangan TIDAK boleh
+     * menggeser angka bulan itu — di bulan itu uangnya memang (salah) tercatat
+     * diterima. Pengembaliannya dibukukan di bulan terjadinya, sebagai kolom
+     * `dikembalikan` Blok 4. Tanpa filter ini hitung-ulang bulan lama menyimpang
+     * dari snapshot dan piutang pembuka bulan berikutnya tak lagi nyambung
+     * dengan penutupan bulan sebelumnya.
+     *
+     * Baris legacy `ditolak` tanpa `rejected_at` → tidak pernah dihitung.
+     */
+    private static function countedAsOf(string $asOf, string $table = ''): Closure
+    {
+        $col = fn (string $column) => $table === '' ? $column : "{$table}.{$column}";
+
+        return fn ($q) => $q->where($col('payment_status'), PaymentStatus::VALID->value)
+            ->orWhere(fn ($reversed) => $reversed
+                ->where($col('payment_status'), PaymentStatus::DITOLAK->value)
+                ->where($col('rejected_at'), '>=', $asOf));
     }
 
     public static function parsePeriod(string $period): Carbon
@@ -106,7 +134,10 @@ class CollectorMonthlyReportService
             'tagihan' => ['tagihan_terbit' => 0.0, 'dimuka' => 0.0, 'diskon' => 0.0, 'bulanan' => 0.0, 'total_pembayaran' => 0.0, 'piutang' => 0.0],
             'piutang_lalu' => ['pembuka' => 0.0, 'sudah_dibayar' => 0.0, 'belum_dibayar' => 0.0, 'tak_tertagih' => 0.0],
             'pelanggan' => ['total' => 0, 'dimuka' => 0, 'sudah_bayar' => 0, 'belum_bayar' => 0],
-            'uang_diterima' => ['bulanan' => 0.0, 'piutang' => 0.0, 'lebih_bayar' => 0.0, 'aktivasi' => 0.0, 'lainnya' => 0.0, 'total' => 0.0],
+            // `dikembalikan` = pengurang: pembayaran bulan terkunci yang
+            // di-Kembalikan bulan ini (lihat countedAsOf()). Snapshot lama
+            // belum punya kunci ini — pembaca wajib `?? 0`.
+            'uang_diterima' => ['bulanan' => 0.0, 'piutang' => 0.0, 'lebih_bayar' => 0.0, 'aktivasi' => 0.0, 'lainnya' => 0.0, 'dikembalikan' => 0.0, 'total' => 0.0],
         ];
     }
 
@@ -248,13 +279,13 @@ class CollectorMonthlyReportService
     private function fillPiutangLalu(array &$figures, array $map, array $popIds, string $period, string $start, string $nextStart): void
     {
         $before = DB::table('payments')
-            ->where('payment_status', PaymentStatus::VALID->value)
+            ->where(self::countedAsOf($start))
             ->where('payment_date', '<', $start)
             ->groupBy('invoice_id')
             ->select('invoice_id', DB::raw('SUM(amount) AS paid_before'));
 
         $during = DB::table('payments')
-            ->where('payment_status', PaymentStatus::VALID->value)
+            ->where(self::countedAsOf($nextStart))
             ->where('payment_date', '>=', $start)
             ->where('payment_date', '<', $nextStart)
             ->groupBy('invoice_id')
@@ -321,7 +352,7 @@ class CollectorMonthlyReportService
     {
         $rows = DB::table('payments as pay')
             ->leftJoin('invoices as i', 'i.id', '=', 'pay.invoice_id')
-            ->where('pay.payment_status', PaymentStatus::VALID->value)
+            ->where(self::countedAsOf($nextStart, 'pay'))
             ->where('pay.payment_date', '>=', $start)
             ->where('pay.payment_date', '<', $nextStart)
             ->whereIn('pay.pop_id', $popIds)
@@ -349,9 +380,31 @@ class CollectorMonthlyReportService
 
         unset($block);
 
+        // Pengembalian di bulan P atas pembayaran bertanggal SEBELUM P (bulan
+        // yang sudah tutup buku). Pengembalian pembayaran bertanggal P sendiri
+        // tidak masuk sini — pembayaran itu sudah tidak terhitung di atas.
+        $reversals = DB::table('payments')
+            ->where('payment_status', PaymentStatus::DITOLAK->value)
+            ->where('rejected_at', '>=', $start)
+            ->where('rejected_at', '<', $nextStart)
+            ->where('payment_date', '<', $start)
+            ->whereIn('pop_id', $popIds)
+            ->groupBy('pop_id')
+            ->get(['pop_id', DB::raw('SUM(amount + COALESCE(overpay_amount, 0)) AS amount')]);
+
+        foreach ($reversals as $row) {
+            $block = &$figures[$map[$row->pop_id]]['uang_diterima'];
+            $block['dikembalikan'] = Money::add($block['dikembalikan'], $row->amount);
+        }
+
+        unset($block);
+
         foreach ($figures as &$perPop) {
             $b = &$perPop['uang_diterima'];
-            $b['total'] = Money::sum([$b['bulanan'], $b['piutang'], $b['lebih_bayar'], $b['aktivasi'], $b['lainnya']]);
+            $b['total'] = Money::sub(
+                Money::sum([$b['bulanan'], $b['piutang'], $b['lebih_bayar'], $b['aktivasi'], $b['lainnya']]),
+                $b['dikembalikan'],
+            );
         }
 
         unset($perPop, $b);
@@ -367,7 +420,7 @@ class CollectorMonthlyReportService
     private function paidPerInvoiceByMethod(?string $from, string $before): QueryBuilder
     {
         return DB::table('payments')
-            ->where('payment_status', PaymentStatus::VALID->value)
+            ->where(self::countedAsOf($before))
             ->when($from, fn ($q) => $q->where('payment_date', '>=', $from))
             ->where('payment_date', '<', $before)
             ->groupBy('invoice_id')
@@ -455,7 +508,7 @@ class CollectorMonthlyReportService
             'tagihan' => ['tagihan_terbit', 'dimuka', 'diskon', 'bulanan', 'piutang'],
             'piutang_lalu' => ['pembuka', 'sudah_dibayar', 'belum_dibayar', 'tak_tertagih'],
             'pelanggan' => ['total', 'dimuka', 'sudah_bayar', 'belum_bayar'],
-            'uang_diterima' => ['bulanan', 'piutang', 'lebih_bayar', 'aktivasi', 'lainnya', 'total'],
+            'uang_diterima' => ['bulanan', 'piutang', 'lebih_bayar', 'aktivasi', 'lainnya', 'dikembalikan', 'total'],
         ];
     }
 
@@ -534,19 +587,35 @@ class CollectorMonthlyReportService
         if (in_array($column, ['bulanan', 'dimuka'], true)) {
             $methodFilter = $column === 'dimuka' ? "= 'saldo'" : "!= 'saldo'";
 
-            return DB::table('payments as pay')
+            $rows = DB::table('payments as pay')
                 ->join('invoices as i', 'i.id', '=', 'pay.invoice_id')
                 ->join('customers as c', 'c.id', '=', 'pay.customer_id')
                 ->where('i.billing_period', $period)
                 ->where('i.invoice_type', InvoiceType::BULANAN->value)
                 ->where('i.invoice_status', '!=', InvoiceStatus::BATAL->value)
                 ->whereIn('i.pop_id', $popIds)
-                ->where('pay.payment_status', PaymentStatus::VALID->value)
+                ->where(self::countedAsOf($nextStart, 'pay'))
                 ->where('pay.payment_date', '<', $nextStart)
                 ->whereRaw("pay.payment_method {$methodFilter}")
                 ->orderBy('pay.payment_date')
-                ->get(['c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'pay.payment_date', 'pay.amount', 'pay.payment_method', 'pay.note'])
-                ->map(fn ($r) => $this->row($r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number, $r->payment_date, (float) $r->amount, trim(($r->payment_method ?? '').' '.($r->note ?? ''))))
+                ->get(['pay.id as payment_id', 'c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'pay.payment_date', 'pay.amount', 'pay.payment_method', 'pay.note']);
+
+            // Klasifikasi (ADHOC-84 §8.2) — cuma baris ini yang benar-benar
+            // transaksi payment (bukan agregat invoice), jadi cuma di sini
+            // "Jenis" bermakna. Di-batch, bukan query per baris — modal ini
+            // dipaginasi per-sel, bukan seluruh dataset.
+            $paymentsById = Payment::query()
+                ->with('invoice:id,billing_period,total_amount')
+                ->whereIn('id', $rows->pluck('payment_id'))
+                ->get()
+                ->keyBy('id');
+
+            return $rows
+                ->map(fn ($r) => $this->row(
+                    $r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number, $r->payment_date, (float) $r->amount,
+                    trim(($r->payment_method ?? '').' '.($r->note ?? '')),
+                    $paymentsById->get($r->payment_id)?->classification() ?? [],
+                ))
                 ->all();
         }
 
@@ -587,7 +656,7 @@ class CollectorMonthlyReportService
         }
 
         $before = DB::table('payments')
-            ->where('payment_status', PaymentStatus::VALID->value)
+            ->where(self::countedAsOf($start))
             ->where('payment_date', '<', $start)
             ->groupBy('invoice_id')
             ->select('invoice_id', DB::raw('SUM(amount) AS paid_before'));
@@ -614,7 +683,7 @@ class CollectorMonthlyReportService
 
         if ($column === 'pembuka' || $column === 'belum_dibayar') {
             $paidDuring = $openInvoiceIds === [] ? collect() : DB::table('payments')
-                ->where('payment_status', PaymentStatus::VALID->value)
+                ->where(self::countedAsOf($nextStart))
                 ->where('payment_date', '>=', $start)
                 ->where('payment_date', '<', $nextStart)
                 ->whereIn('invoice_id', array_keys($openInvoiceIds))
@@ -646,7 +715,7 @@ class CollectorMonthlyReportService
             ->join('invoices as i', 'i.id', '=', 'pay.invoice_id')
             ->join('customers as c', 'c.id', '=', 'pay.customer_id')
             ->whereIn('pay.invoice_id', array_keys($openInvoiceIds))
-            ->where('pay.payment_status', PaymentStatus::VALID->value)
+            ->where(self::countedAsOf($nextStart, 'pay'))
             ->where('pay.payment_date', '>=', $start)
             ->where('pay.payment_date', '<', $nextStart)
             ->orderBy('pay.payment_date')
@@ -703,10 +772,36 @@ class CollectorMonthlyReportService
      */
     private function detailUangDiterima(array $popIds, string $period, string $start, string $nextStart, string $column): array
     {
+        // Pengembalian bulan P atas pembayaran bulan terkunci — sinkron dengan
+        // `$reversals` di fillUangDiterima(). Di kolom Total tampil negatif
+        // supaya jumlah rincian = angka Total.
+        $reversals = DB::table('payments as pay')
+            ->leftJoin('invoices as i', 'i.id', '=', 'pay.invoice_id')
+            ->join('customers as c', 'c.id', '=', 'pay.customer_id')
+            ->where('pay.payment_status', PaymentStatus::DITOLAK->value)
+            ->where('pay.rejected_at', '>=', $start)
+            ->where('pay.rejected_at', '<', $nextStart)
+            ->where('pay.payment_date', '<', $start)
+            ->whereIn('pay.pop_id', $popIds)
+            ->orderBy('pay.rejected_at')
+            ->get(['c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'pay.payment_number', 'pay.payment_date', 'pay.rejected_at', 'pay.amount', 'pay.overpay_amount', 'pay.reject_reason'])
+            ->map(fn ($r) => $this->row(
+                $r->full_name,
+                $r->cid ?: $r->customer_code,
+                $r->invoice_number ?? $r->payment_number,
+                $r->rejected_at,
+                (float) Money::add($r->amount, $r->overpay_amount ?? 0),
+                "Dikembalikan (bayar tgl {$r->payment_date}): ".($r->reject_reason ?? '-'),
+            ));
+
+        if ($column === 'dikembalikan') {
+            return $reversals->values()->all();
+        }
+
         $query = DB::table('payments as pay')
             ->leftJoin('invoices as i', 'i.id', '=', 'pay.invoice_id')
             ->join('customers as c', 'c.id', '=', 'pay.customer_id')
-            ->where('pay.payment_status', PaymentStatus::VALID->value)
+            ->where(self::countedAsOf($nextStart, 'pay'))
             ->where('pay.payment_date', '>=', $start)
             ->where('pay.payment_date', '<', $nextStart)
             ->whereIn('pay.pop_id', $popIds);
@@ -731,13 +826,21 @@ class CollectorMonthlyReportService
 
             return $column === 'total' || $kolom === $column;
         })->map(fn ($r) => $this->row($r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number ?? '-', $r->payment_date, (float) $r->amount, (string) ($r->note ?? '')))
+            ->when($column === 'total', fn ($list) => $list->concat(
+                $reversals->map(fn (array $row) => [...$row, 'nominal' => -$row['nominal']])
+            ))
             ->values()->all();
     }
 
     /**
-     * @return array{pelanggan: string, akun: string, referensi: string, tanggal: ?string, nominal: float, keterangan: string}
+     * @param  list<PaymentPeriodType>  $jenis  Klasifikasi (ADHOC-84
+     *                                          §8.2) — cuma diisi baris yang benar-benar
+     *                                          transaksi payment; default kosong untuk baris
+     *                                          agregat invoice (tak ada payment tunggal untuk
+     *                                          diklasifikasikan).
+     * @return array{pelanggan: string, akun: string, referensi: string, tanggal: ?string, nominal: float, keterangan: string, jenis: list<PaymentPeriodType>}
      */
-    private function row(string $pelanggan, string $akun, string $referensi, ?string $tanggal, float $nominal, string $keterangan): array
+    private function row(string $pelanggan, string $akun, string $referensi, ?string $tanggal, float $nominal, string $keterangan, array $jenis = []): array
     {
         return [
             'pelanggan' => $pelanggan,
@@ -746,86 +849,69 @@ class CollectorMonthlyReportService
             'tanggal' => $tanggal,
             'nominal' => $nominal,
             'keterangan' => $keterangan,
+            'jenis' => $jenis,
         ];
     }
 
     /**
-     * Tutup buku periode untuk satu POP. Hanya periode SEBELUM bulan berjalan:
-     * bulan yang masih jalan belum "selesai", pembukanya baru terkunci setelah
-     * bulan berganti.
+     * Bekukan angka laporan periode yang sudah lewat untuk SEMUA POP
+     * pusat/cabang — dijalankan scheduler `billing:close-period` tiap tanggal 1.
+     *
+     * Ini cuma snapshot angka, BUKAN kuncinya: periode terkunci ditentukan
+     * kalender (`BookPeriod::isLocked()`), jadi periode lama tetap terkunci
+     * walau scheduler telat/gagal jalan. Idempoten — POP yang sudah punya
+     * snapshot dilewati, tidak ditimpa (snapshot pertama = angka resmi).
+     * Tidak ada buka ulang: kunci periode permanen.
+     *
+     * @return int jumlah POP yang baru dibekukan
      */
-    public function close(string $period, Pop $branch, User $actor): PeriodClosing
+    public function closePeriod(string $period): int
     {
         self::parsePeriod($period);
 
-        if ($period >= now()->format('Y-m')) {
+        if (! BookPeriod::isLocked($period)) {
             throw ValidationException::withMessages([
                 'period' => 'Periode yang masih berjalan belum bisa ditutup. Tunggu bulan berganti.',
             ]);
         }
 
-        if (! in_array($branch->type, ['pusat', 'cabang'], true)) {
-            throw ValidationException::withMessages(['pop_id' => 'Tutup buku hanya untuk POP pusat/cabang.']);
+        $closed = 0;
+
+        $branches = Pop::query()->whereIn('type', ['pusat', 'cabang'])->orderBy('id')->get();
+
+        foreach ($branches as $branch) {
+            $created = DB::transaction(function () use ($period, $branch): bool {
+                if (PeriodClosing::query()->where('period', $period)->where('pop_id', $branch->id)->lockForUpdate()->exists()) {
+                    return false;
+                }
+
+                $closing = PeriodClosing::create([
+                    'period' => $period,
+                    'pop_id' => $branch->id,
+                    'figures' => $this->figures($period, [$branch->id])[$branch->id],
+                    'closed_by' => null,
+                    'closed_at' => now(),
+                ]);
+
+                $this->audit($closing, 'periode_ditutup', ['period' => $period, 'pop_id' => $branch->id]);
+
+                return true;
+            });
+
+            $closed += (int) $created;
         }
 
-        return DB::transaction(function () use ($period, $branch, $actor): PeriodClosing {
-            if (PeriodClosing::query()->where('period', $period)->where('pop_id', $branch->id)->lockForUpdate()->exists()) {
-                throw ValidationException::withMessages([
-                    'period' => "Periode {$period} untuk {$branch->name} sudah ditutup.",
-                ]);
-            }
-
-            $closing = PeriodClosing::create([
-                'period' => $period,
-                'pop_id' => $branch->id,
-                'figures' => $this->figures($period, [$branch->id])[$branch->id],
-                'closed_by' => $actor->id,
-                'closed_at' => now(),
-            ]);
-
-            $this->audit($closing, $actor, 'periode_ditutup', ['period' => $period, 'pop_id' => $branch->id]);
-
-            return $closing;
-        });
-    }
-
-    /**
-     * Buka ulang periode yang sudah ditutup (hapus snapshot). Alasan wajib
-     * dan masuk audit log bersama angka snapshot yang dibuang.
-     */
-    public function reopen(PeriodClosing $closing, User $actor, string $reason): void
-    {
-        DB::transaction(function () use ($closing, $actor, $reason): void {
-            $this->audit($closing, $actor, 'periode_dibuka_ulang', [
-                'period' => $closing->period,
-                'pop_id' => $closing->pop_id,
-                'alasan' => $reason,
-                'snapshot_dibuang' => $closing->figures,
-            ]);
-
-            $closing->delete();
-        });
-    }
-
-    /**
-     * Apakah periode (yyyy-mm) POP ini sudah ditutup? Dipakai guard
-     * hapus buku invoice: menghapus buku di periode tertutup akan menggeser
-     * angka yang sudah dibekukan.
-     */
-    public function isClosed(string $period, int $popId): bool
-    {
-        $branchId = $this->branchMap()[$popId] ?? $popId;
-
-        return PeriodClosing::query()->where('period', $period)->where('pop_id', $branchId)->exists();
+        return $closed;
     }
 
     /**
      * @param  array<string, mixed>  $values
      */
-    private function audit(PeriodClosing $closing, User $actor, string $action, array $values): void
+    private function audit(PeriodClosing $closing, string $action, array $values): void
     {
         AuditLog::create([
-            'user_id' => $actor->id,
+            // Ditutup sistem (scheduler), bukan orang.
+            'user_id' => null,
             'module' => 'laporan',
             'action' => $action,
             'auditable_type' => PeriodClosing::class,

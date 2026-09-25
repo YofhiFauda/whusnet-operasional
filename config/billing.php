@@ -19,4 +19,23 @@ return [
     |
     */
     'collector_due_window_days' => (int) env('COLLECTOR_DUE_WINDOW_DAYS', 7),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Jendela Mundur Pembebasan Tagihan (ADHOC-87)
+    |--------------------------------------------------------------------------
+    |
+    | Berapa bulan ke BELAKANG dari bulan berjalan yang boleh dibebaskan lewat
+    | Request Putus Langganan / Cuti Berlangganan (`BillingPeriodWaiverService`).
+    | Default 1 = bulan berjalan + 1 bulan sebelumnya boleh, lebih lama dari
+    | itu ditolak (piutang yang sudah "tutup buku" tidak boleh dihapus diam-diam
+    | lewat jalur ini — kalau jendelanya kurang, admin membatalkan manual bulan
+    | berikutnya, keputusan user 2026-09-21).
+    |
+    | Periode KE DEPAN (khusus Cuti, tagihan yang belum terbit) tidak dibatasi
+    | angka ini — lihat BillingPeriodWaiverService::eligiblePeriods().
+    |
+    | docs/plan/billing/analisa-rancangan-request-deaktivasi-bebas-tagihan-periode.md §4.3 G3.
+    */
+    'waiver_backdate_window_months' => (int) env('BILLING_WAIVER_BACKDATE_WINDOW_MONTHS', 1),
 ];

@@ -27,6 +27,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SubscriptionStatusSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class CustomerQuickHubPaymentTest extends TestCase
@@ -44,6 +45,9 @@ class CustomerQuickHubPaymentTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Tanggal bayar di tes ini hardcode Juni 2026. Sejak tutup buku otomatis
+        // (ADHOC-96) bulan lewat terkunci, jadi waktu dibekukan di Juni.
+        $this->travelTo(Carbon::parse('2026-06-20 10:00:00'));
 
         $this->seed(FeatureSeeder::class);
         $this->seed(ActionSeeder::class);

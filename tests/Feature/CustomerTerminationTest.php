@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerService;
+use App\Models\CustomerTerminationReason;
 use App\Models\InternetPackage;
 use App\Models\Pop;
 use App\Models\User;
@@ -15,12 +16,6 @@ use Tests\TestCase;
 class CustomerTerminationTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        // $this->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
-    }
 
     public function test_user_can_terminate_customer_and_service()
     {
@@ -55,10 +50,16 @@ class CustomerTerminationTest extends TestCase
             'package_price_snapshot' => 150000,
             'monthly_price' => 150000,
             'total_monthly_bill' => 150000,
+            // Masa langganan > 1 tahun — tidak ada denda (ADHOC-69 §3.1),
+            // supaya test ini murni memverifikasi status pelanggan/layanan
+            // seperti sebelumnya, tanpa perlu penalty_amount.
+            'activation_date' => now()->subYears(2),
         ]);
 
+        $reason = CustomerTerminationReason::create(['name' => 'Pelanggan pindah rumah']);
+
         $response = $this->post(route('customers.terminate', $customer), [
-            'reason' => 'Pelanggan pindah rumah',
+            'termination_reason_id' => $reason->id,
         ]);
 
         $response->assertRedirect();
@@ -67,6 +68,7 @@ class CustomerTerminationTest extends TestCase
         $this->assertDatabaseHas('customers', [
             'id' => $customer->id,
             'status' => 'terminated',
+            'termination_reason_id' => $reason->id,
         ]);
 
         $this->assertDatabaseHas('customer_services', [
@@ -91,7 +93,7 @@ class CustomerTerminationTest extends TestCase
     public function test_terminate_requires_reason()
     {
         $this->seed(DatabaseSeeder::class);
-        $user = $this->loginAsAdmin();
+        $this->loginAsAdmin();
 
         $pop = Pop::first() ?? Pop::create([
             'code' => 'POP-TEST',
@@ -114,7 +116,7 @@ class CustomerTerminationTest extends TestCase
 
         $response = $this->post(route('customers.terminate', $customer), []);
 
-        $response->assertSessionHasErrors('reason');
+        $response->assertSessionHasErrors('termination_reason_id');
     }
 
     public function test_user_without_permission_cannot_terminate()
@@ -141,8 +143,10 @@ class CustomerTerminationTest extends TestCase
             'status' => 'active',
         ]);
 
+        $reason = CustomerTerminationReason::create(['name' => 'Test reason']);
+
         $response = $this->actingAs($user)->post(route('customers.terminate', $customer), [
-            'reason' => 'Test reason',
+            'termination_reason_id' => $reason->id,
         ]);
 
         $response->assertForbidden();

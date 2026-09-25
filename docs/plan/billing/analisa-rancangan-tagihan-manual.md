@@ -15,7 +15,7 @@
 - Pendapatan Lainnya (nama diisi manual — contoh: over kabel, Pendapatan A, Pendapatan B)
 - Pendapatan Pindah Lokasi
 
-Deskripsi tagihan diisi sendiri. Nominal tagihan diisi sendiri. Metode pembayaran: Cash atau TF.
+Deskripsi tagihan diisi sendiri. Nominal tagihan diisi sendiri. ~~Metode pembayaran: Cash atau TF~~ — **dicabut 2026-09-23**, lihat §3.4: form ini cuma menerbitkan tagihan, metode bayar diisi belakangan lewat jalur Pembayaran.
 
 **Dari Halaman Tagihan** — strukturnya sama seperti di atas, tapi pelanggan dicari lewat **CID atau Nama**.
 
@@ -66,14 +66,12 @@ Tagihan manual boleh terbit di bulan yang sama dengan tagihan bulanan pelanggan.
 - **Kode lama `INSIDENTAL` tidak dipakai** (instruksi user 2026-09-19). Tipe barunya **`manual` / "Tagihan Manual"** (§3.2) — case baru di `InvoiceType`, di luar `SUBSCRIPTION_TYPES`. Bentuk penyimpanan jenis / nama sub / deskripsi di tabel `invoices` (kolom baru vs kolom catatan yang sudah ada) diputuskan saat implementasi — cek kolom existing dulu sebelum menambah.
 - Kode ADHOC-60 yang masih ada di repo (`RevenueCategory`, `RevenueSubcategory`, `InvoiceItem`, `ManualInvoiceService`, `InvoiceItemBuilder`) **tidak dipakai dan tidak diubah** oleh pekerjaan ini. `ManualInvoiceService` masih dipanggil `CustomerAcquisitionController::updateInstallationFee()` (biaya instalasi Busdev) — nasibnya (dihapus/dibiarkan) di luar scope dokumen ini.
 
-> **Catatan lintas-dokumen (2026-09-19):** Tagihan Manual jenis Lainnya punya **produsen kedua** di luar form ini — denda putus langganan (ADHOC-69, sub "Denda Putus Langganan" diisi sistem). Produsen itu menerbitkan invoice **tanpa Payment** (`belum_dibayar`). Karena itu pembayaran di bawah wajib hanya di **form** `/invoices/create`; Service pembuat invoice-nya harus bisa jalan tanpa Payment. Lihat `analisa-rancangan-putus-langganan.md` §2.1.
+> **Catatan lintas-dokumen (2026-09-19):** Tagihan Manual jenis Lainnya punya **produsen kedua** di luar form ini — denda putus langganan (ADHOC-69, sub "Denda Putus Langganan" diisi sistem). Produsen itu menerbitkan invoice **tanpa Payment** (`belum_dibayar`) — sama seperti form ini sejak revisi §3.4 di bawah, jadi tidak ada lagi perbedaan perilaku antara dua produsen ini soal Payment.
 
-### 3.4 Invoice + pembayaran dalam satu submit
-Studi kasus menyebut metode pembayaran ada di form, jadi satu submit menghasilkan **dua record**: `Invoice` dan `Payment` (lewat `PaymentService::record()`, bukan ditulis ulang), dalam **satu `DB::transaction()`**. Payment gagal → invoice ikut rollback (tidak ada invoice yatim `belum_dibayar`).
+### 3.4 Invoice saja, TANPA Payment (revisi 2026-09-23)
+**Keputusan user 2026-09-23** (mengoreksi rancangan awal): form `/invoices/create` **hanya** menerbitkan `Invoice` (`belum_dibayar`) — **tidak** ada field metode pembayaran/nominal dibayar, dan **tidak** memanggil `PaymentService::record()`. Alasan: metode bayar & pencatatan pembayaran itu ranah **Pembayaran**, bukan ranah **Tagihan** — sudah ada jalur resminya sendiri (List Tagihan → tombol Bayar/Bayar Cicil → `PaymentController::store()`/`PaymentService::record()`), jadi menaruh field itu lagi di form pembuatan tagihan cuma duplikasi UI untuk kemampuan yang sudah ada.
 
-Field pembayaran:
-- **Metode:** Cash atau Transfer. Transfer wajib `bank_name` & `account_number` (aturan existing `PaymentMethod::requiresBankDetails()`).
-- **Nominal dibayar:** default = total tagihan, tetap bisa diedit (bayar sebagian → invoice `sebagian`; bayar lebih → `overpay_amount` jadi saldo, dengan **konfirmasi lebih bayar** yang sama dengan ADHOC-84 §2.3).
+~~Versi awal (dibatalkan): satu submit menghasilkan Invoice + Payment sekaligus, field metode Cash/Transfer + nominal dibayar di form yang sama.~~ Tidak dipakai — dicatat di sini supaya tidak terulang tanpa sadar.
 
 ---
 
@@ -105,13 +103,11 @@ Field pembayaran:
 
 ## 6. Test yang Wajib Ada
 
-- `/invoices/create?customer_id=…` — pelanggan terkunci; invoice + payment terbit sekaligus dengan jenis, deskripsi, nominal, metode sesuai input.
+- `/invoices/create?customer_id=…` — pelanggan terkunci; invoice terbit `belum_dibayar` dengan jenis, deskripsi, nominal sesuai input, **tanpa** Payment.
 - `/invoices/create` polos — cari by CID & by Nama; submit menghasilkan invoice untuk pelanggan yang benar (bukan tertukar hasil pencarian lain).
 - Jenis **Lainnya** wajib nama ketikan; jenis lain tidak.
 - Tagihan manual **bisa terbit di periode yang sama** dengan tagihan bulanan pelanggan (regresi guard `rejectSecondSubscriptionInvoice`).
-- Payment gagal (nominal invalid) → invoice ikut rollback.
-- Nominal dibayar < total → `sebagian`; > total → `overpay_amount` masuk saldo.
-- Metode Transfer tanpa bank/rekening → ditolak; Cash tidak butuh.
+- Nominal wajib diisi, format ribuan (`150.000`) ternormalisasi benar.
 - POP scope: tidak bisa membuat tagihan untuk pelanggan di luar POP yang diizinkan.
 - Route `customers.invoices.manual` dan modal lama sudah tidak ada; `grep` `storeManualInvoice|invoices.manual|manual-invoice-modal` di `app/ routes/ resources/ tests/ docs/billing-pembayaran/` bersih (§4 butir 6).
 

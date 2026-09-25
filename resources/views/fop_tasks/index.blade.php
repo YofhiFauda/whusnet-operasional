@@ -3,7 +3,7 @@
 @section('title', 'Task FOP')
 
 @section('content')
-<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts(); initFopTaskEchoListeners()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open || switchTechModal.open || cancelModal.open || filterDrawerOpen)" class="px-3 sm:px-4 py-4 sm:py-6 max-w-12xl mx-auto space-y-4 sm:space-y-5 pb-20 md:pb-6">
+<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts(); initFopTaskEchoListeners()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open || switchTechModal.open || cancelModal.open || filterDrawerOpen || bulkTeamModal.open)" class="px-3 sm:px-4 py-4 sm:py-6 max-w-12xl mx-auto space-y-4 sm:space-y-5 pb-20 md:pb-6">
 
     {{-- ══ Page Header ══ --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 py-1">
@@ -43,6 +43,48 @@
         $activeFiltersCount = count(array_filter(request()->only(['category', 'priority', 'village_id', 'team_id'])));
         $currentStatus = request('status', '');
     @endphp
+
+    {{-- ══ Interactive Team Roster Strip (Hari Ini) ══ --}}
+    @if(isset($todayTeams) && $todayTeams->isNotEmpty())
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 sm:p-4 shadow-2xs font-ui">
+            <div class="flex items-center justify-between mb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Tim Kerja Hari Ini ({{ now()->translatedFormat('l, d M Y') }})</h2>
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400">
+                    <span class="font-bold text-slate-700 dark:text-slate-200">{{ $todayTeams->count() }}</span> Tim Aktif
+                    @php
+                        $standbyCount = $technicians->filter(fn($t) => ($t->today_task_count ?? 0) === 0)->count();
+                    @endphp
+                    @if($standbyCount > 0)
+                        &middot; <span class="text-emerald-600 dark:text-emerald-400 font-semibold">{{ $standbyCount }} Teknisi Standby</span>
+                    @endif
+                </div>
+            </div>
+            <div class="flex items-center gap-2.5 overflow-x-auto pb-1 custom-scrollbar">
+                @foreach($todayTeams as $teamItem)
+                    @php
+                        $isTeamSelected = request('team_id') == $teamItem['id'];
+                    @endphp
+                    <a href="{{ $isTeamSelected ? route('fop-tasks.index', request()->except(['team_id', 'page'])) : route('fop-tasks.index', array_merge(request()->except(['page']), ['team_id' => $teamItem['id']])) }}"
+                       class="group shrink-0 p-2.5 rounded-lg border transition-all cursor-pointer text-left min-w-[170px] sm:min-w-[200px] {{ $isTeamSelected ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-400 dark:border-sky-600 ring-2 ring-sky-500/20 shadow-xs' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50' }}">
+                        <div class="flex items-center justify-between gap-1.5 mb-1.5">
+                            <span class="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">{{ $teamItem['name'] }}</span>
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold {{ $teamItem['task_count'] > 0 ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600' }}">{{ $teamItem['task_count'] }} Task</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1">
+                            @foreach($teamItem['members'] as $m)
+                                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 font-medium">
+                                    {{ explode(' ', trim($m['name']))[0] }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
     {{-- ══ Quick Segmented Status Tabs (Horizontal Scroll on Mobile) ══ --}}
     <div class="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar -mx-1 px-1">
@@ -301,6 +343,9 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                        <th class="w-8 px-2.5 py-2.5 text-center">
+                            <input type="checkbox" @change="toggleSelectAll($event.target.checked)" :checked="isAllSelected()" class="w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                        </th>
                         <th class="px-3 py-2.5">Kategori</th>
                         <th class="px-3 py-2.5">Tanggal</th>
                         <th class="px-3 py-2.5">Tugas</th>
@@ -315,7 +360,14 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-[11px] text-slate-700 dark:text-slate-300 font-ui">
                     @forelse($fopTasks as $task)
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors align-top" id="fop-task-row-{{ $task->id }}" data-pop-id="{{ $task->pop_id }}">
+                        @php
+                            $isTaskToday = $task->task_date && $task->task_date->isToday();
+                            $isOverdue = $task->task_date && $task->task_date->isPast() && !in_array($task->status->value, ['selesai', 'dibatalkan']);
+                        @endphp
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors align-top {{ $isOverdue ? 'border-l-4 border-l-rose-500 bg-rose-50/10' : ($isTaskToday ? 'border-l-4 border-l-amber-500 bg-amber-50/15' : '') }}" id="fop-task-row-{{ $task->id }}" data-pop-id="{{ $task->pop_id }}">
+                            <td class="w-8 px-2.5 py-2 text-center" @click.stop>
+                                <input type="checkbox" :checked="selectedTaskIds.includes({{ $task->id }})" @change="toggleSelectTask({{ $task->id }})" class="w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                            </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border {{ $task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400' }}">
                                     {{ $task->category instanceof \App\Enums\TaskType ? $task->category->value : $task->category }}
@@ -386,6 +438,26 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap text-right">
                                 <div class="flex items-center justify-end gap-1.5">
+                                    <button type="button" @click="copyWhatsAppFormat({
+                                        task_number: '{{ $task->task_number }}',
+                                        category: '{{ $task->category instanceof \App\Enums\TaskType ? $task->category->value : $task->category }}',
+                                        tugas: @js($task->tugas),
+                                        customer_name: @js($task->customer?->full_name ?? $task->ticket?->customer_name ?? $task->tugas),
+                                        cid: '{{ $task->customer?->cid ?? $task->ticket?->customer?->cid ?? '—' }}',
+                                        phone: '{{ $task->customer?->primary_phone ?? $task->ticket?->customer_phone ?? '—' }}',
+                                        address: @js($task->customer?->address ?? $task->ticket?->customer_address ?? '—'),
+                                        village: @js($task->village?->name ?? '—'),
+                                        odp: '{{ $task->ticket?->customer_odp ?? '—' }}',
+                                        issue: @js($task->issue ?? $task->ticket?->detail_keluhan ?? '—'),
+                                        lat: '{{ $task->customer?->latitude ?? $task->ticket?->customer_latitude ?? '' }}',
+                                        lng: '{{ $task->customer?->longitude ?? $task->ticket?->customer_longitude ?? '' }}'
+                                    })"
+                                    class="text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 p-1.5 rounded cursor-pointer"
+                                    title="Salin Format WA ke Teknisi">
+                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                    </button>
                                     <a href="{{ route('fop-tasks.history.show', $task->id) }}"
                                        class="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 p-1.5 rounded"
                                        title="Detail Task">
@@ -425,7 +497,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="px-3 py-10 text-center text-slate-500 dark:text-slate-400">
+                            <td colspan="11" class="px-3 py-10 text-center text-slate-500 dark:text-slate-400">
                                 <svg class="w-8 h-8 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
@@ -471,7 +543,7 @@
 
     {{-- ══ CREATE/EDIT TASK MODAL (Adaptive Mobile Bottom-Sheet & Desktop Dialog) ══ --}}
     <div x-show="modal.open" 
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center" 
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4" 
          x-transition:enter="transition ease-out duration-200" 
          x-transition:enter-start="opacity-0" 
          x-transition:enter-end="opacity-100" 
@@ -482,7 +554,7 @@
         
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="modal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-2xl rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[90vh] md:max-h-[85vh] flex flex-col overflow-hidden" 
+        <div class="bg-surface border-0 md:border border-border w-full max-w-2xl lg:max-w-3xl rounded-none md:rounded-xl shadow-2xl relative z-10 h-full md:h-auto max-h-dvh md:max-h-[85vh] flex flex-col overflow-hidden" 
              @click.away="modal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95 md:opacity-0"
@@ -490,11 +562,8 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="translate-y-0 md:translate-y-0 md:scale-100 md:opacity-100"
              x-transition:leave-end="translate-y-full md:translate-y-4 md:scale-95 md:opacity-0">
-            
-            {{-- Mobile Drag Handle --}}
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
 
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-none md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main font-ui" x-text="modal.isEdit ? 'Edit Task FOP' : 'Tambah Task FOP'"></h3>
                 <button type="button" @click="modal.open = false" class="text-text-muted hover:text-text-main transition-colors p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -504,7 +573,7 @@
             </div>
 
             <form :action="formAction" method="POST" enctype="multipart/form-data"
-                  class="flex flex-col flex-1 overflow-hidden"
+                  class="flex flex-col flex-1 min-h-0 overflow-hidden"
                   @submit="
                       if (!$el.getAttribute('action')) {
                           $event.preventDefault();
@@ -515,7 +584,7 @@
                       }
                       isSubmitting = true;
                   ">
-                <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar font-ui">
+                <div class="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 min-h-0 custom-scrollbar font-ui overscroll-contain">
                     @csrf
                     <template x-if="modal.isEdit">
                         <input type="hidden" name="_method" value="PUT">
@@ -546,7 +615,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-text-secondary mb-1">Tanggal & Waktu <span class="text-error">*</span></label>
-                            <input type="datetime-local" name="task_date" x-model="modal.data.task_date" required class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted font-mono">
+                            <input type="datetime-local" name="task_date" x-model="modal.data.task_date" @change="onTaskDateChange()" required class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted font-mono">
                         </div>
                     </div>
 
@@ -600,6 +669,11 @@
 
                     <input type="hidden" name="customer_id" :value="modal.data.customer_id">
                     <input type="hidden" name="origin" value="fop_tasks">
+                    {{-- Mode Ticketing POST ke tickets.store yang mewajibkan `type`, sedang
+                         dropdown di atas bernama `category` (dipakai bareng fop-tasks.store).
+                         Tanpa input ini submit MTN/C-REQ selalu 422 "Bidang type wajib diisi".
+                         Di-disable di luar mode Ticketing biar gak ikut terkirim ke fop-tasks. --}}
+                    <input type="hidden" name="type" :value="modal.data.category" :disabled="!isTicketMode">
 
                     {{-- Mode Ticketing (MTN/C-REQ): CID lookup + panel auto-fill --}}
                     <div x-show="isTicketMode" class="space-y-4">
@@ -674,32 +748,219 @@
                         </div>
                     </div>
 
-                    <div class="relative" x-data="{ openTechDropdown: false }">
-                        <label class="block text-xs font-semibold text-text-secondary mb-1">Pilih Teknisi <span class="text-error">*</span></label>
-                        <div @click="openTechDropdown = true" @click.away="openTechDropdown = false" class="min-h-[38px] w-full border border-border rounded-lg bg-surface px-2 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary cursor-text flex items-center gap-2 flex-wrap">
-                            <template x-for="techId in modal.techs" :key="techId">
-                                <span class="inline-flex items-center gap-1 bg-surface-muted border border-border text-text-secondary text-xs font-medium px-2 py-0.5 rounded-md">
-                                    <span x-text="getTechName(techId)"></span>
-                                    <button type="button" @click.stop="toggleTech(techId)" class="hover:text-error transition-colors p-0.5">
-                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
+                    {{-- ══ TEKNISI & PENJADWALAN SECTION (UX TERPADU & REALTIME WORKLOAD) ══ --}}
+                    <div class="border border-border/80 rounded-xl bg-surface-muted/30 p-4 space-y-3.5 shadow-2xs">
+                        
+                        {{-- Section Header & Realtime Workload Summary Bar --}}
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-border/60">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-primary/10 text-primary text-xs font-bold">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                    </span>
+                                    <label class="text-xs font-bold text-text-main uppercase tracking-wider">
+                                        Pilih &amp; Jadwalkan Teknisi <span class="text-error normal-case" x-show="!isTicketMode">*</span>
+                                    </label>
+                                </div>
+                                <p class="text-[11px] text-text-muted mt-0.5 flex items-center gap-1.5 font-medium flex-wrap">
+                                    <span>Jadwal:</span>
+                                    <span class="font-bold text-text-secondary font-mono" x-text="formatDatePreview(modal.data.task_date)"></span>
+                                    <span x-show="techAvailabilityLoading" class="inline-flex items-center gap-1 text-[10px] text-primary">
+                                        <svg class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        Memeriksa ketersediaan...
+                                    </span>
+                                </p>
+                            </div>
+
+                            {{-- Availability Pills on that Date --}}
+                            <div class="flex items-center gap-1.5 text-[11px] shrink-0">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold border border-emerald-500/20">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    <span x-text="techSummary.free + ' Standby'"></span>
                                 </span>
-                            </template>
-                            <input type="text" x-model="searchTech" @focus="openTechDropdown = true" placeholder="Cari teknisi..." class="flex-1 min-w-[100px] outline-none text-sm text-text-main bg-transparent border-none p-0 focus:ring-0">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold border border-amber-500/20">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                    <span x-text="techSummary.medium + ' Terjadwal'"></span>
+                                </span>
+                                <span x-show="techSummary.busy > 0" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold border border-rose-500/20">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                    <span x-text="techSummary.busy + ' Padat'"></span>
+                                </span>
+                            </div>
                         </div>
 
-                        <div x-show="openTechDropdown" class="absolute z-50 w-full bg-surface border border-border rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto" style="display: none;">
-                            @foreach($technicians as $tech)
-                                <label class="flex items-center gap-2 px-3 py-2 bg-surface hover:bg-surface-muted cursor-pointer border-b border-border last:border-0"
-                                       x-show="searchTech === '' || '{{ strtolower($tech->name) }}'.includes(searchTech.toLowerCase())">
-                                    <input type="checkbox" name="technicians[]" value="{{ $tech->id }}"
-                                           :checked="modal.techs.includes({{ $tech->id }})"
-                                           @change="toggleTech({{ $tech->id }})"
-                                           class="w-4 h-4 rounded border-border bg-surface text-primary focus:ring-primary">
-                                    <span class="text-sm text-text-secondary">{{ $tech->name }}</span>
-                                </label>
-                            @endforeach
+                        {{-- Quick Team Presets (If teams exist on that date) --}}
+                        <div x-show="dateTeams.length > 0" class="space-y-1.5 bg-surface/60 border border-border/70 rounded-lg p-2.5">
+                            <div class="flex items-center justify-between text-[11px]">
+                                <span class="font-semibold text-text-secondary flex items-center gap-1">
+                                    <span>⚡ Tim Terjadwal di Tanggal Ini:</span>
+                                    <span class="text-text-muted font-normal">(1-klik untuk pilih seluruh tim)</span>
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <template x-for="tm in dateTeams" :key="tm.id">
+                                    <button type="button" @click="toggleTeam(tm)"
+                                            :class="isTeamSelected(tm) 
+                                                ? 'bg-primary text-white border-primary shadow-xs ring-2 ring-primary/20' 
+                                                : 'bg-surface hover:bg-surface-muted text-text-secondary border-border hover:border-primary/50'"
+                                            class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 cursor-pointer">
+                                        <svg x-show="isTeamSelected(tm)" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        <span class="font-bold" x-text="tm.name"></span>
+                                        <span class="text-[10px] opacity-80" x-text="'(' + tm.member_names.join(', ') + ')'"></span>
+                                    </button>
+                                </template>
+                            </div>
                         </div>
+
+                        {{-- Filter Tabs & Search Bar --}}
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-0.5">
+                            {{-- Search Input --}}
+                            <div class="relative flex-1">
+                                <input type="text" x-model="searchTech" placeholder="Cari nama teknisi..."
+                                       class="w-full text-xs bg-surface text-text-main border border-border rounded-lg pl-8 pr-7 py-1.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                                <svg class="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <button type="button" x-show="searchTech" @click="searchTech = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main p-0.5">
+                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            {{-- Filter Pills --}}
+                            <div class="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar shrink-0 text-xs">
+                                <button type="button" @click="techFilter = 'all'"
+                                        :class="techFilter === 'all' ? 'bg-surface text-text-main font-bold shadow-xs border-border' : 'text-text-muted hover:text-text-secondary border-transparent'"
+                                        class="px-2 py-1 rounded-md border text-[11px] transition-colors cursor-pointer">
+                                    Semua (<span x-text="availableTechList.length"></span>)
+                                </button>
+                                <button type="button" @click="techFilter = 'free'"
+                                        :class="techFilter === 'free' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold border-emerald-300 dark:border-emerald-800' : 'text-text-muted hover:text-emerald-600 border-transparent'"
+                                        class="px-2 py-1 rounded-md border text-[11px] transition-colors cursor-pointer">
+                                    🟢 Standby (<span x-text="techSummary.free"></span>)
+                                </button>
+                                <button type="button" @click="techFilter = 'selected'"
+                                        :class="techFilter === 'selected' ? 'bg-primary/10 text-primary font-bold border-primary/30' : 'text-text-muted hover:text-primary border-transparent'"
+                                        class="px-2 py-1 rounded-md border text-[11px] transition-colors cursor-pointer">
+                                    ✓ Terpilih (<span x-text="modal.techs.length"></span>)
+                                </button>
+                                
+                                <template x-if="techSummary.free > 0 && modal.techs.length === 0">
+                                    <button type="button" @click="selectStandbyTechs()" class="text-[10px] text-primary hover:underline font-semibold ml-1 cursor-pointer">
+                                        + Pilih Standby
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        {{-- Interactive Technician Cards Grid --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                            <template x-for="tech in filteredTechList" :key="tech.id">
+                                <div @click="toggleTech(tech.id)"
+                                     :class="modal.techs.includes(tech.id)
+                                         ? 'border-primary bg-primary/5 dark:bg-primary/10 ring-1 ring-primary/40 shadow-xs'
+                                         : 'border-border bg-surface hover:bg-surface-muted/60 hover:border-border/80'"
+                                     class="relative flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer group">
+                                    
+                                    {{-- Left: Checkbox & Avatar & Info --}}
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        {{-- Custom Checkbox --}}
+                                        <div class="w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0"
+                                             :class="modal.techs.includes(tech.id) ? 'bg-primary border-primary text-white' : 'border-border bg-surface group-hover:border-primary/60'">
+                                            <svg x-show="modal.techs.includes(tech.id)" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+
+                                        {{-- Avatar Initials with Colored Status Dot --}}
+                                        <div class="relative shrink-0">
+                                            <div class="w-8 h-8 rounded-lg bg-surface-muted border border-border flex items-center justify-center text-xs font-bold text-text-secondary font-ui"
+                                                 x-text="getTechInitials(tech.name)">
+                                            </div>
+                                            <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface"
+                                                  :class="{
+                                                      'bg-emerald-500': tech.status_level === 'free',
+                                                      'bg-amber-500': tech.status_level === 'medium',
+                                                      'bg-rose-500': tech.status_level === 'busy'
+                                                  }"></span>
+                                        </div>
+
+                                        {{-- Name & Active Tasks count --}}
+                                        <div class="min-w-0">
+                                            <p class="text-xs font-bold text-text-main truncate" x-text="tech.name"></p>
+                                            <p class="text-[10px] text-text-muted truncate" x-show="tech.tasks && tech.tasks.length > 0">
+                                                <span x-text="tech.tasks.map(t => (t.time ? t.time + ' ' : '') + t.tugas).join('; ')"></span>
+                                            </p>
+                                            <p class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium" x-show="!tech.tasks || tech.tasks.length === 0">
+                                                Tidak ada task terjadwal
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {{-- Right: Status Badge --}}
+                                    <div class="shrink-0 ml-2">
+                                        <span class="px-2 py-0.5 rounded-md text-[10px] font-bold font-ui inline-flex items-center gap-1"
+                                              :class="{
+                                                  'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40': tech.status_level === 'free',
+                                                  'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40': tech.status_level === 'medium',
+                                                  'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40': tech.status_level === 'busy'
+                                              }">
+                                            <span x-text="tech.task_count + ' task'"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div x-show="filteredTechList.length === 0" class="col-span-full py-6 text-center text-xs text-text-muted">
+                                Tidak ada teknisi yang cocok dengan pencarian/filter.
+                            </div>
+                        </div>
+
+                        {{-- Selected Technicians Tray & Summary Strip --}}
+                        <div class="pt-2 border-t border-border/60 flex flex-col gap-2">
+                            <div class="flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-1.5 font-medium">
+                                    <span class="text-text-secondary">Teknisi Terpilih:</span>
+                                    <span class="font-bold font-mono px-2 py-0.5 rounded-md text-xs"
+                                          :class="modal.techs.length > 0 ? 'bg-primary/10 text-primary' : 'bg-surface-muted text-text-muted'"
+                                          x-text="modal.techs.length + ' Orang'"></span>
+                                </div>
+                                <button type="button" x-show="modal.techs.length > 0" @click="clearAllTechs()" class="text-[11px] text-text-muted hover:text-error transition-colors cursor-pointer font-medium">
+                                    Kosongkan Pilihan
+                                </button>
+                            </div>
+
+                            {{-- Badges of Selected Technicians --}}
+                            <div x-show="modal.techs.length > 0" class="flex items-center gap-1.5 flex-wrap">
+                                <template x-for="techId in modal.techs" :key="techId">
+                                    <span class="inline-flex items-center gap-1.5 bg-surface border border-primary/30 text-text-main text-xs font-semibold px-2.5 py-1 rounded-lg shadow-2xs">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                        <span x-text="getTechName(techId)"></span>
+                                        <button type="button" @click.stop="toggleTech(techId)" class="text-text-muted hover:text-error transition-colors p-0.5 rounded ml-0.5 cursor-pointer">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </span>
+                                </template>
+                            </div>
+
+                            {{-- Warning if any selected technician is busy --}}
+                            <template x-for="warn in selectedTechWarnings" :key="warn.id">
+                                <div class="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg">
+                                    <svg class="w-3.5 h-3.5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <span x-text="warn.message"></span>
+                                </div>
+                            </template>
+                        </div>
+
+                        {{-- Hidden form inputs to send array to backend --}}
+                        <template x-for="tId in modal.techs" :key="'input-' + tId">
+                            <input type="hidden" name="technicians[]" :value="tId">
+                        </template>
                         <input type="hidden" :required="!isTicketMode && modal.techs.length === 0" class="absolute w-0 h-0 opacity-0" name="technicians_required">
                         <p class="mt-1 text-[10px] text-text-muted" x-show="isTicketMode">Teknisi opsional di sini — kosongkan buat masuk sebagai Ticket Masuk dulu, di-assign belakangan.</p>
                     </div>
@@ -763,7 +1024,7 @@
                     </div>
                 </div>
 
-                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-xl shrink-0">
+                <div class="px-4 sm:px-5 py-3 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                     <button type="button" @click="modal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                     <button type="submit" :disabled="isSubmitting" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
                         <span x-show="!isSubmitting">Simpan</span>
@@ -1005,6 +1266,69 @@
             </div>
         </div>
     </div>
+
+    {{-- ══ Floating Bulk Action Bar (Muncul saat ada task terpilih) ══ --}}
+    <div x-show="selectedTaskIds.length > 0"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="translate-y-full opacity-0"
+         x-transition:enter-end="translate-y-0 opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="translate-y-0 opacity-100"
+         x-transition:leave-end="translate-y-full opacity-0"
+         class="fixed bottom-6 inset-x-0 z-40 flex justify-center px-4 pointer-events-none"
+         style="display: none;">
+        <div class="bg-slate-900/95 dark:bg-slate-950/95 text-white backdrop-blur-md px-4 sm:px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-3 sm:gap-4 pointer-events-auto max-w-xl w-full justify-between font-ui">
+            <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-sky-500 text-white text-xs font-bold flex items-center justify-center font-mono" x-text="selectedTaskIds.length"></span>
+                <span class="text-xs sm:text-sm font-semibold">Task Terpilih</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" @click="openBulkTeamModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-xs cursor-pointer transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    <span>Masukkan ke Tim...</span>
+                </button>
+                <button type="button" @click="selectedTaskIds = []" class="text-xs text-slate-400 hover:text-white px-2 py-1.5 transition-colors cursor-pointer">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- ══ Modal Bulk Assign Team ══ --}}
+    <div x-show="bulkTeamModal.open"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none;">
+        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="bulkTeamModal.open = false"></div>
+        <div class="bg-surface border border-border w-full max-w-md rounded-2xl shadow-2xl relative z-10 p-5 font-ui"
+             @click.away="bulkTeamModal.open = false">
+            <h3 class="text-sm font-bold text-text-main mb-1">Tugaskan Massal ke Tim</h3>
+            <p class="text-xs text-text-muted mb-4">Pilih tim tujuan untuk <span class="font-bold text-text-main font-mono" x-text="selectedTaskIds.length"></span> task yang dipilih.</p>
+            
+            <div class="space-y-3 mb-4">
+                <label class="block text-xs font-semibold text-text-secondary">Pilih Tim</label>
+                <select x-model="bulkTeamModal.selectedTeamId" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                    <option value="">— Pilih Tim —</option>
+                    @foreach($teams as $t)
+                        <option value="{{ $t['id'] }}">{{ $t['name'] }} ({{ $t['work_date'] }}) · {{ $t['task_count'] }} Task</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button type="button" @click="bulkTeamModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
+                <button type="button" :disabled="bulkTeamModal.isSubmitting || !bulkTeamModal.selectedTeamId" @click="submitBulkAssignTeam()" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
+                    <span x-show="!bulkTeamModal.isSubmitting">Tugaskan Sekarang</span>
+                    <span x-show="bulkTeamModal.isSubmitting">Memproses...</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -1020,6 +1344,126 @@
             ticketCustomerResults: [],
             ticketSelectedCustomer: null,
             ticketSearching: false,
+            selectedTaskIds: [],
+            pageTaskIds: @json($fopTasks->pluck('id')),
+
+            isAllSelected() {
+                return this.pageTaskIds.length > 0 && this.pageTaskIds.every(id => this.selectedTaskIds.includes(id));
+            },
+
+            toggleSelectAll(checked) {
+                if (checked) {
+                    this.selectedTaskIds = [...new Set([...this.selectedTaskIds, ...this.pageTaskIds])];
+                } else {
+                    this.selectedTaskIds = this.selectedTaskIds.filter(id => !this.pageTaskIds.includes(id));
+                }
+            },
+
+            toggleSelectTask(id) {
+                if (this.selectedTaskIds.includes(id)) {
+                    this.selectedTaskIds = this.selectedTaskIds.filter(item => item !== id);
+                } else {
+                    this.selectedTaskIds.push(id);
+                }
+            },
+
+            bulkTeamModal: {
+                open: false,
+                selectedTeamId: '',
+                isSubmitting: false,
+            },
+
+            openBulkTeamModal() {
+                if (this.selectedTaskIds.length === 0) return;
+                this.bulkTeamModal = {
+                    open: true,
+                    selectedTeamId: '',
+                    isSubmitting: false,
+                };
+            },
+
+            submitBulkAssignTeam() {
+                if (!this.bulkTeamModal.selectedTeamId || this.selectedTaskIds.length === 0) return;
+                this.bulkTeamModal.isSubmitting = true;
+                const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+                fetch('{{ route("fop-tasks.bulk-assign-team") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token
+                    },
+                    body: JSON.stringify({
+                        task_ids: this.selectedTaskIds,
+                        team_id: this.bulkTeamModal.selectedTeamId
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    this.bulkTeamModal.isSubmitting = false;
+                    if (data.success) {
+                        this.showToast('success', data.message);
+                        this.bulkTeamModal.open = false;
+                        this.selectedTaskIds = [];
+                        setTimeout(() => window.location.reload(), 800);
+                    } else {
+                        this.showToast('error', data.message || 'Gagal menugaskan task ke tim.');
+                    }
+                })
+                .catch(() => {
+                    this.bulkTeamModal.isSubmitting = false;
+                    this.showToast('error', 'Terjadi kesalahan jaringan.');
+                });
+            },
+
+            copyWhatsAppFormat(data) {
+                const mapsUrl = data.lat && data.lng 
+                    ? `https://maps.google.com/?q=${data.lat},${data.lng}`
+                    : (data.address ? `https://maps.google.com/?q=${encodeURIComponent(data.address + ' ' + (data.village || ''))}` : '—');
+                
+                const lines = [
+                    `*📌 PENUGASAN TASK FOP (${data.category})*`,
+                    `*No Task:* ${data.task_number}`,
+                    `*Pelanggan:* ${data.customer_name}`,
+                    `*CID:* ${data.cid || '—'}`,
+                    `*No HP:* ${data.phone || '—'}`,
+                    `*Alamat:* ${data.address || '—'} (${data.village || '—'})`,
+                    `*ODP:* ${data.odp || '—'}`,
+                    `*Tugas:* ${data.tugas}`,
+                    `*Issue/Keluhan:* ${data.issue || '—'}`,
+                    `*Maps:* ${mapsUrl}`,
+                ];
+                
+                const text = lines.join('\n');
+                
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.showToast('success', 'Format WA berhasil disalin ke clipboard!');
+                    }).catch(() => {
+                        this.fallbackCopyText(text);
+                    });
+                } else {
+                    this.fallbackCopyText(text);
+                }
+            },
+
+            fallbackCopyText(text) {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    this.showToast('success', 'Format WA berhasil disalin ke clipboard!');
+                } catch (err) {
+                    this.showToast('error', 'Gagal menyalin format WA.');
+                }
+                document.body.removeChild(textArea);
+            },
             modal: {
                 open: false,
                 isEdit: false,
@@ -1092,6 +1536,15 @@
 
             allTasksData: @json($switchTargetTasks),
             techniciansData: @json($technicians),
+            techFilter: 'all',
+            searchTech: '',
+            techAvailabilityLoading: false,
+            dateAvailability: {
+                date: '',
+                technicians: [],
+                teams: [],
+                summary: { total: 0, free: 0, medium: 0, busy: 0 }
+            },
             teamConflictModal: {
                 open: false,
                 conflicts: @json($teamConflicts)
@@ -1280,8 +1733,159 @@
             },
 
             getTechName(id) {
+                const fromDate = (this.dateAvailability.technicians || []).find(t => t.id == id);
+                if (fromDate) return fromDate.name;
                 const tech = this.techniciansData.find(t => t.id == id);
-                return tech ? tech.name : '';
+                return tech ? tech.name : `Teknisi #${id}`;
+            },
+
+            formatDatePreview(dtString) {
+                if (!dtString) return '—';
+                try {
+                    const d = new Date(dtString);
+                    if (isNaN(d.getTime())) return dtString;
+                    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                    const pad = n => String(n).padStart(2, '0');
+                    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} (${pad(d.getHours())}:${pad(d.getMinutes())} WIB)`;
+                } catch (e) {
+                    return dtString;
+                }
+            },
+
+            getTechInitials(name) {
+                if (!name) return '??';
+                const parts = name.trim().split(/\s+/);
+                if (parts.length >= 2) {
+                    return (parts[0][0] + parts[1][0]).toUpperCase();
+                }
+                return name.slice(0, 2).toUpperCase();
+            },
+
+            get availableTechList() {
+                if (this.dateAvailability.technicians && this.dateAvailability.technicians.length > 0) {
+                    return this.dateAvailability.technicians;
+                }
+                return this.techniciansData.map(t => {
+                    const cnt = t.today_task_count ?? 0;
+                    return {
+                        id: t.id,
+                        name: t.name,
+                        task_count: cnt,
+                        status_level: cnt === 0 ? 'free' : (cnt <= 2 ? 'medium' : 'busy'),
+                        status_label: cnt === 0 ? 'Standby (0 task)' : (cnt <= 2 ? `Normal (${cnt} task)` : `Padat (${cnt} task)`),
+                        tasks: []
+                    };
+                });
+            },
+
+            get filteredTechList() {
+                const list = this.availableTechList;
+                const query = this.searchTech.trim().toLowerCase();
+                return list.filter(tech => {
+                    if (query && !tech.name.toLowerCase().includes(query)) {
+                        return false;
+                    }
+                    if (this.techFilter === 'free') {
+                        return tech.status_level === 'free';
+                    }
+                    if (this.techFilter === 'medium') {
+                        return tech.status_level === 'medium';
+                    }
+                    if (this.techFilter === 'busy') {
+                        return tech.status_level === 'busy';
+                    }
+                    if (this.techFilter === 'selected') {
+                        return this.modal.techs.includes(tech.id);
+                    }
+                    return true;
+                });
+            },
+
+            get techSummary() {
+                if (this.dateAvailability.summary && this.dateAvailability.summary.total > 0) {
+                    return this.dateAvailability.summary;
+                }
+                const list = this.availableTechList;
+                return {
+                    total: list.length,
+                    free: list.filter(t => t.status_level === 'free').length,
+                    medium: list.filter(t => t.status_level === 'medium').length,
+                    busy: list.filter(t => t.status_level === 'busy').length,
+                };
+            },
+
+            get dateTeams() {
+                return this.dateAvailability.teams || [];
+            },
+
+            get selectedTechWarnings() {
+                const warnings = [];
+                const list = this.availableTechList;
+                this.modal.techs.forEach(id => {
+                    const tech = list.find(t => t.id == id);
+                    if (tech && tech.task_count >= 3) {
+                        warnings.push({
+                            id: tech.id,
+                            message: `Teknisi ${tech.name} sudah memiliki ${tech.task_count} task terjadwal pada tanggal ini.`
+                        });
+                    }
+                });
+                return warnings;
+            },
+
+            async fetchTechAvailability(dateStr, excludeTaskId = null) {
+                if (!dateStr) return;
+                this.techAvailabilityLoading = true;
+                try {
+                    const url = `{{ route('fop-tasks.technicians-availability') }}?date=${encodeURIComponent(dateStr)}&exclude_task_id=${excludeTaskId || ''}`;
+                    const res = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        this.dateAvailability = data;
+                    }
+                } catch (e) {
+                    // Fail silently
+                } finally {
+                    this.techAvailabilityLoading = false;
+                }
+            },
+
+            onTaskDateChange() {
+                if (!this.modal.data.task_date) return;
+                const datePart = this.modal.data.task_date.slice(0, 10);
+                this.fetchTechAvailability(datePart, this.modal.isEdit ? this.modal.data.id : null);
+            },
+
+            toggleTeam(team) {
+                if (!team || !team.member_ids) return;
+                const isAllSelected = this.isTeamSelected(team);
+                if (isAllSelected) {
+                    this.modal.techs = this.modal.techs.filter(id => !team.member_ids.includes(id));
+                } else {
+                    const merged = new Set([...this.modal.techs, ...team.member_ids]);
+                    this.modal.techs = Array.from(merged);
+                }
+            },
+
+            isTeamSelected(team) {
+                if (!team || !team.member_ids || team.member_ids.length === 0) return false;
+                return team.member_ids.every(id => this.modal.techs.includes(id));
+            },
+
+            selectStandbyTechs() {
+                const freeTechs = this.availableTechList.filter(t => t.status_level === 'free');
+                const merged = new Set([...this.modal.techs, ...freeTechs.map(t => t.id)]);
+                this.modal.techs = Array.from(merged);
+            },
+
+            clearAllTechs() {
+                this.modal.techs = [];
             },
 
             async searchCustomer() {
@@ -1371,10 +1975,11 @@
                 this.modal.isEdit = false;
                 this.modal.updateUrl = '';
                 this.clearTicketCustomer();
+                const nowIso = new Date().toISOString().slice(0, 16);
                 this.modal.data = {
                     id: '',
                     task_number: '',
-                    task_date: new Date().toISOString().slice(0, 16),
+                    task_date: nowIso,
                     category: '',
                     tugas: '',
                     customer_id: '',
@@ -1393,7 +1998,9 @@
                 this.modal.techs = [];
                 this.customerSearchResults = [];
                 this.searchTech = '';
+                this.techFilter = 'all';
                 this.modal.open = true;
+                this.fetchTechAvailability(nowIso.slice(0, 10));
             },
 
             openEditModal(task, techIds, updateUrl) {
@@ -1401,6 +2008,7 @@
                 this.modal.updateUrl = updateUrl || '';
                 this.customerSearchResults = [];
                 this.searchTech = '';
+                this.techFilter = 'all';
 
                 let dateStr = '';
                 if (task.task_date) {
@@ -1470,6 +2078,9 @@
                 };
                 this.modal.techs = techIds ? [...techIds] : [];
                 this.modal.open = true;
+                if (dateStr) {
+                    this.fetchTechAvailability(dateStr.slice(0, 10), task.id);
+                }
             },
 
             get formAction() {

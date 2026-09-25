@@ -15,6 +15,7 @@ use App\Http\Controllers\CollectorVisitController;
 use App\Http\Controllers\CollectorWorklistController;
 use App\Http\Controllers\CollectorWorksheetController;
 use App\Http\Controllers\CustomerAcquisitionController;
+use App\Http\Controllers\CustomerBillingWaiverController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\CustomerDocumentController;
@@ -38,6 +39,8 @@ use App\Http\Controllers\FopTaskController;
 use App\Http\Controllers\ImportReportController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceReportController;
+use App\Http\Controllers\Master\BankAccountController;
+use App\Http\Controllers\Master\CustomerTerminationReasonController;
 use App\Http\Controllers\Master\DistributionController;
 use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\ItemCategoryController;
@@ -244,6 +247,19 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/{customer}/terminate', [CustomerTerminationController::class, '__invoke'])->name('customers.terminate');
     });
 
+    // Pembebasan Tagihan Periode (ADHOC-87) — permission SENDIRI
+    // (billing_waivers.*), terpisah dari customers.deactivate/update (G5).
+    // "Cuti Berlangganan" (pintu kedua) dicek di sini; pintu pertama
+    // (dropdown di form Request Putus Langganan) numpang route terminate di
+    // atas, dicek ulang di controller/service.
+    Route::middleware('permission:billing_waivers.create')->group(function () {
+        Route::post('/customers/{customer}/billing-waivers', [CustomerBillingWaiverController::class, 'store'])->name('billing-waivers.store');
+    });
+
+    Route::middleware('permission:billing_waivers.delete')->group(function () {
+        Route::delete('/billing-waivers/{waiver}', [CustomerBillingWaiverController::class, 'destroy'])->name('billing-waivers.destroy');
+    });
+
     Route::middleware('permission:customers.detail.devices.retrieve')->group(function () {
         Route::post('/customers/{customer}/retrieve-device', [CustomerController::class, 'retrieveDevice'])->name('customers.retrieve-device');
     });
@@ -301,8 +317,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/{customer}/perangkat-pemasangan', [CustomerFieldworkController::class, 'show'])->name('customers.fieldwork');
     });
 
+    // Tagihan Manual (ADHOC-70) — statis (`/invoices/create`) WAJIB terdaftar
+    // sebelum `/invoices/{invoice}` dinamis di grup invoices.view bawah.
     Route::middleware('permission:invoices.create')->group(function () {
-        Route::post('/customers/{customer}/invoices/manual', [CustomerController::class, 'storeManualInvoice'])->name('customers.invoices.manual');
+        Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
+        Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
     });
 
     Route::middleware('permission:invoices.view')->group(function () {
@@ -630,6 +649,45 @@ Route::middleware('auth')->group(function () {
         Route::post('/master/work-tools/{workTool}/toggle', [WorkToolController::class, 'toggleStatus'])->name('master.work-tools.toggle');
     });
 
+    // Master Rekening Bank (ADHOC-95) - Static Routes First
+    Route::middleware('permission:master_rekening.create')->group(function () {
+        Route::get('/master/rekening/create', [BankAccountController::class, 'create'])->name('master.rekening.create');
+        Route::post('/master/rekening', [BankAccountController::class, 'store'])->name('master.rekening.store');
+    });
+
+    Route::middleware('permission:master_rekening.view')->group(function () {
+        Route::get('/master/rekening', [BankAccountController::class, 'index'])->name('master.rekening.index');
+    });
+
+    // Master Rekening Bank - Dynamic Routes Last. Toggle aktif/nonaktif =
+    // `.update` (sama seperti master lain) — tak ada aksi hapus.
+    Route::middleware('permission:master_rekening.update')->group(function () {
+        Route::get('/master/rekening/{bankAccount}/edit', [BankAccountController::class, 'edit'])->name('master.rekening.edit');
+        Route::put('/master/rekening/{bankAccount}', [BankAccountController::class, 'update'])->name('master.rekening.update');
+        Route::post('/master/rekening/{bankAccount}/toggle', [BankAccountController::class, 'toggleStatus'])->name('master.rekening.toggle');
+    });
+
+    // Master Alasan Putus Langganan (ADHOC-69) - Static Routes First
+    Route::middleware('permission:termination_reasons.create|termination_reasons.update')->group(function () {
+        Route::get('/master/termination-reasons/create', [CustomerTerminationReasonController::class, 'create'])->name('master.termination-reasons.create');
+        Route::post('/master/termination-reasons', [CustomerTerminationReasonController::class, 'store'])->name('master.termination-reasons.store');
+    });
+
+    Route::middleware('permission:termination_reasons.view')->group(function () {
+        Route::get('/master/termination-reasons', [CustomerTerminationReasonController::class, 'index'])->name('master.termination-reasons.index');
+    });
+
+    // Master Alasan Putus Langganan - Dynamic Routes Last
+    Route::middleware('permission:termination_reasons.create|termination_reasons.update')->group(function () {
+        Route::get('/master/termination-reasons/{reason}/edit', [CustomerTerminationReasonController::class, 'edit'])->name('master.termination-reasons.edit');
+        Route::put('/master/termination-reasons/{reason}', [CustomerTerminationReasonController::class, 'update'])->name('master.termination-reasons.update');
+        Route::post('/master/termination-reasons/{reason}/toggle', [CustomerTerminationReasonController::class, 'toggleStatus'])->name('master.termination-reasons.toggle');
+    });
+
+    Route::middleware('permission:termination_reasons.delete')->group(function () {
+        Route::delete('/master/termination-reasons/{reason}', [CustomerTerminationReasonController::class, 'destroy'])->name('master.termination-reasons.destroy');
+    });
+
     // Gudang/Inventory (ADHOC-54) - Static Routes First
     Route::middleware('permission:warehouse.view')->group(function () {
         Route::get('/warehouse', [WarehouseController::class, 'index'])->name('warehouse.index');
@@ -929,12 +987,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:collector_payment_report.export')->group(function () {
         Route::get('/reports/collector-payments/export', [CollectorPaymentReportController::class, 'export'])->name('reports.collector-payments.export');
     });
-    Route::middleware('permission:collector_report.approve')->group(function () {
-        Route::post('/reports/collector-monthly/close', [CollectorMonthlyReportController::class, 'close'])->name('reports.collector-monthly.close');
-    });
-    Route::middleware('permission:collector_report.cancel')->group(function () {
-        Route::post('/reports/collector-monthly/reopen', [CollectorMonthlyReportController::class, 'reopen'])->name('reports.collector-monthly.reopen');
-    });
+    // Tutup/buka ulang periode manual DIHAPUS: tutup buku otomatis saat bulan
+    // berganti (`billing:close-period` + BookPeriod) dan kuncinya permanen.
 
     // ── FOP Dashboard ────────────────────────────────────────────
 
@@ -1017,6 +1071,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/fop-tasks', [FopTaskController::class, 'index'])->name('fop-tasks.index');
         Route::get('/fop-tasks/history', [FopTaskController::class, 'history'])->name('fop-tasks.history');
         Route::get('/fop-tasks/history/{fop_task}', [FopTaskController::class, 'showHistory'])->name('fop-tasks.history.show');
+        Route::get('/fop-tasks/technicians-availability', [FopTaskController::class, 'techniciansAvailability'])->name('fop-tasks.technicians-availability');
         Route::get('/fop-tasks/{fop_task}/row', [FopTaskController::class, 'row'])->name('fop-tasks.row');
     });
     Route::middleware('permission:fop_tasks.create')->group(function () {
@@ -1026,6 +1081,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/fop-tasks/{fop_task}', [FopTaskController::class, 'update'])->name('fop-tasks.update');
         Route::post('/fop-tasks/{fop_task}/assign-to-team', [FopTaskController::class, 'assignToTeam'])->name('fop-tasks.assign-to-team');
         Route::post('/fop-tasks/switch-technician', [FopTaskController::class, 'switchTechnician'])->name('fop-tasks.switch-technician');
+        Route::post('/fop-tasks/bulk-assign-team', [FopTaskController::class, 'bulkAssignTeam'])->name('fop-tasks.bulk-assign-team');
         Route::post('/fop-tasks/{fop_task}/switch-team', [FopDashboardController::class, 'switchTeam'])->name('fop-tasks.switch-team');
     });
     Route::middleware('permission:fop_tasks.delete')->group(function () {

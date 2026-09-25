@@ -11,8 +11,6 @@ use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
-use App\Models\RevenueCategory;
-use App\Models\RevenueSubcategory;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
@@ -196,31 +194,18 @@ class NominalRupiahBertitikDiterimaTest extends TestCase
 
     public function test_tagihan_manual_menerima_titik_ribuan(): void
     {
+        // ADHOC-70 (2026-09-23) merombak total InvoiceController::store() —
+        // bentuk request lama (banyak baris `lines[]` + revenue category/
+        // subcategory manual) diganti satu kategori + deskripsi + nominal.
         $this->loginAsAdmin();
         $invoice = $this->buatInvoice('C-RPH-7', 150000);
-        $category = RevenueCategory::firstOrCreate(
-            ['code' => 'TEST_CAT'],
-            ['name' => 'Kategori Uji', 'is_active' => true, 'sort_order' => 1]
-        );
-        $subcategory = RevenueSubcategory::firstOrCreate(
-            ['code' => 'SUB_TEST', 'revenue_category_id' => $category->id],
-            ['name' => 'Sub Uji', 'is_active' => true, 'sort_order' => 1]
-        );
 
         $this->post(route('invoices.store'), [
             'customer_id' => $invoice->customer_id,
-            'billing_period' => now()->addMonth()->format('Y-m'),
-            'issue_date' => now()->toDateString(),
-            'due_date' => now()->addDays(10)->toDateString(),
-            'invoice_type' => 'insidental',
-            'lines' => [
-                [
-                    'revenue_category_id' => $category->id,
-                    'revenue_subcategory_id' => $subcategory->id,
-                    'custom_name' => 'Jasa Tambahan',
-                    'amount' => '50.000',
-                ],
-            ],
+            'manual_category' => 'lainnya',
+            'manual_subtype_name' => 'Jasa Tambahan',
+            'description' => 'Jasa Tambahan',
+            'amount' => '50.000',
         ])->assertSessionHasNoErrors();
 
         $manual = Invoice::where('customer_id', $invoice->customer_id)

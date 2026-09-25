@@ -1,6 +1,6 @@
 # Rancangan: Master Rekening Bank, Nama Pengirim & Penyesuaian Status Tagihan (UI)
 
-Status: **Terbuka — semua keputusan dikunci 2026-09-22, belum dikoding.** Dicatat sebagai **ADHOC-95** di `docs/TASKS.md`, di luar sprint aktif.
+Status: **Selesai — diimplementasi 2026-09-23.** Dicatat sebagai **ADHOC-95** di `docs/TASKS.md`, di luar sprint aktif. Lihat [Catatan Implementasi](#catatan-implementasi-2026-09-23) di akhir dokumen untuk koreksi logic terhadap rancangan.
 Tanggal: 2026-09-22
 
 Tiga perubahan dari permintaan user (satu batch, modul Tagihan/Pembayaran):
@@ -402,3 +402,20 @@ Elemen `<span>` **tidak dirender sama sekali** untuk halaman `belum_lunas` (§Ke
    bukan pil kosong tanpa teks.
 
 **Tidak ada lagi pertanyaan terbuka di bagian ini.**
+
+## Catatan Implementasi (2026-09-23)
+
+Dikerjakan sesuai rancangan, dengan koreksi berikut (temuan saat baca kode — rancangan asli akan meninggalkan celah):
+
+1. **Jalur form bayar ada TIGA, bukan satu.** Rancangan cuma menyebut `quick-payment-modal.blade.php`. Ternyata input teks `bank_name`/`account_number` juga ada di **Modal Hub List Pelanggan** (`customers/partials/_quick_hub_modal.blade.php` + `_list_scripts.blade.php`) dan **halaman Catat Pembayaran** (`payments/create.blade.php`). Ketiganya POST ke endpoint yang sama (`invoices.payments.store`) — kalau cuma satu yang diganti, dua lainnya langsung gagal validasi `bank_account_id`. Ketiganya diganti dropdown.
+2. **Daftar rekening dikirim lewat payload JSON, bukan `$bankAccounts` ke view.** Modal Bayar Cepat di-include di beberapa halaman (`invoices/index`, `customers/show`) dan sudah mengisi daftar kolektor dari fetch `invoices.show` (`available_collectors`). Rekening ikut pola yang sama: `available_bank_accounts` di JSON `InvoiceController::show()` dan `CustomerController` (payment-info Modal Hub). Satu sumber: `BankAccount::activeOptions()` (+ `displayName()` untuk teks opsi). Cuma `payments/create` (halaman Blade biasa) yang menerima `$bankAccounts` dari controller.
+3. **Permission: `master_rekening.view|create|update`, tanpa `delete` & tanpa `manage`.** `manage` tidak ada di `ActionCode`; format permission `{feature}.{action}` membuat "`master.rekening`" mustahil jadi kode permission — `master.rekening.*` dipakai sebagai **nama route**, feature code-nya `master_rekening` (konsisten `master_distribusi`, `master_status_pelanggan`). Toggle aktif/nonaktif = `.update` (pola Master Alat Kerja). Feature ditanam `BankAccountFeatureSeeder` (dipanggil `DatabaseSeeder`); owner dapat via `*`, role lain via Role Matrix.
+4. **`bank_name`/`account_number` dari request SENGAJA diabaikan** oleh `PaymentService` — snapshot selalu dari master. Tanpa ini klien bisa kirim `bank_account_id` valid + nama bank palsu dan snapshot jadi tak cocok dengan FK-nya.
+5. **Guard duplikat & format di master**: unique `(bank_name, account_number)`; nomor rekening dinormalkan (spasi/strip/titik dibuang) dan wajib angka — `"123 456"` dan `"123456"` tak bisa jadi dua rekening.
+6. **Nama Pengirim di-trim & di-null-kan untuk metode selain Transfer/Kolektor di Service** (bukan cuma disembunyikan di UI) — Modal Hub mengirim `FormData(form)` apa adanya, termasuk field tersembunyi.
+7. **Badge Tagihan Belum Lunas**: flag JS `HIDE_INVOICE_STATUS_BADGE` (di-render dari `$statusGroup`), bukan `window.__invoiceStatusGroup` — cukup konstanta lokal script halaman itu.
+8. **Irisan ADHOC-70 (Tagihan Manual)**: `InvoiceController::store()` ikut memanggil `PaymentService::record()` dengan metode Transfer — disesuaikan ke `bank_account_id` + `sender_name` oleh sesi ADHOC-70 (dikoordinasikan 2026-09-23).
+
+**Di luar scope, dicatat:** Setoran Kas (`cash_deposits.bank_name`) masih teks bebas — domain lain (uang admin → bank), bukan pembayaran pelanggan. Kalau mau ikut pakai master rekening, task terpisah.
+
+**Test:** `MasterRekeningBankTest`, `PaymentMethodTransferBankFieldsTest` (ditulis ulang: tolak tanpa rekening, snapshot + audit, tolak rekening nonaktif, snapshot tak berubah setelah edit/nonaktif, nama pengirim Transfer/Kolektor/Cash, payload JSON cuma rekening aktif), `InvoiceBelumLunasHidesStatusBadgeTest`; `PaymentInputTest` & `PaymentCollectedByNotCopiedFromCustomerTest` disesuaikan ke `bank_account_id`.

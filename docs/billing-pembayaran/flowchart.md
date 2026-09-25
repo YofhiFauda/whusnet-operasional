@@ -4,18 +4,20 @@
 
 ```
 ┌─────────────────────────┐  ┌──────────────────────────┐  ┌───────────────────────────┐
-│ A. Aktivasi (AWAL)      │  │ B. Bulanan Rutin          │  │ C. Manual (admin input)   │
-│ CustomerVerification    │  │ Console: billing:generate-│  │ CustomerController::      │
-│ Controller::finalVerify │  │ monthly-invoices          │  │ storeManualInvoice        │
+│ A. Aktivasi (AWAL)      │  │ B. Bulanan Rutin          │  │ C. Tagihan Manual (ADHOC-70) │
+│ CustomerVerification    │  │ Console: billing:generate-│  │ InvoiceController::       │
+│ Controller::finalVerify │  │ monthly-invoices          │  │ create()/store()          │
 └──────────┬───────────────┘  └──────────┬─────────────────┘  └──────────┬──────────────┘
            │                             │                              │
            ▼                             ▼                              ▼
-   FOP approve verifikasi        Cron/manual jalanin           Admin isi form invoice_type,
-   instalasi terakhir       →    command tiap awal bulan  →    billing_period, fee-fee →
-   → invoice_type=awal,          → loop customer                cek dobel (customer+type+
-     subtotal+prorate+           active/suspended yang           period) → InvoiceObserver
-     extra fee dihitung           belum punya invoice              cek lagi (dedup 5 menit)
-     manual di form                bulanan periode ini
+   FOP approve verifikasi        Cron/manual jalanin           Admin cari pelanggan (CID/nama)
+   instalasi terakhir       →    command tiap awal bulan  →    atau lewat Detail Pelanggan →
+   → invoice_type=awal,          → loop customer                isi jenis (Perbaikan/Lainnya/
+     subtotal+prorate+           active/suspended yang           Pindah Lokasi), deskripsi,
+     extra fee dihitung           belum punya invoice              nominal → invoice_type=manual,
+     manual di form                bulanan periode ini             terbit belum_dibayar TANPA
+                                                                    Payment (dicatat belakangan
+                                                                    lewat jalur Pembayaran)
            │                             │                              │
            └─────────────┬───────────────┴──────────────────────────────┘
                          ▼

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\CustomerTerminationReason;
 use App\Models\Pop;
 use App\Services\CustomerWorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,8 +51,10 @@ class CustomerListStatusTimestampOrderingTest extends TestCase
             'pop_id' => $this->pop()->id,
         ]);
 
+        $reason = CustomerTerminationReason::create(['name' => 'Pindah rumah']);
+
         $this->actingAs($admin)
-            ->post("/customers/{$customer->id}/terminate", ['reason' => 'Pindah rumah'])
+            ->post("/customers/{$customer->id}/terminate", ['termination_reason_id' => $reason->id, 'penalty_amount' => 0])
             ->assertRedirect();
 
         $this->assertNotNull($customer->fresh()->terminated_at);

@@ -1,6 +1,6 @@
 # Analisa & Rancangan: Saldo Pelanggan — Bayar di Muka + Auto-Pakai ke Tagihan Bulanan
 
-**Status:** Terbuka — analisa selesai 2026-09-21, implementasi belum mulai. Di luar sprint aktif, dicatat sebagai ADHOC-92 di `docs/TASKS.md`.
+**Status:** ✅ **Selesai diimplementasi 2026-09-24.** Analisa selesai 2026-09-21. Dicatat sebagai ADHOC-92 di `docs/TASKS.md`.
 
 **Sumber ide awal:** permintaan user 2026-09-21 (studi kasus pelanggan paket 150k, prorate 100k, bayar aktivasi + 3 bulan di muka = 550k sekali bayar di admin). Dokumen ini = gap analysis terhadap kode nyata + rancangan implementasi + keputusan hasil diskusi.
 
@@ -9,7 +9,7 @@
 - `upgrade-downgrade/analisa-upgrade-downgrade-paket.md` §2.3 (ADHOC-68) — butuh jalur `credit()` tanpa `Payment`; belum dirancang di sini (lihat §5).
 - ADHOC-38 (`docs/TASKS.md`) — ledger saldo yang sudah ada.
 
-> **Peringatan urutan kerja:** ADHOC-90 (hapus buku piutang `tak_tertagih`) masih uncommitted dan menyentuh `PaymentService`, `Invoice.php`, `CollectorPaymentService`. Implementasi dokumen ini **setelah** ADHOC-90 di-commit, supaya tidak konflik.
+> ADHOC-90 (hapus buku piutang `tak_tertagih`) sudah di-commit sebelum implementasi dokumen ini dimulai — tidak ada konflik.
 
 ---
 
@@ -187,19 +187,19 @@ Tidak ada yang menghalangi implementasi. FIFO dan kolom `balance_used_amount` su
 
 ---
 
-## 9. Checklist Eksekusi (saat implementasi — belum dimulai)
+## 9. Checklist Eksekusi
 
-- [ ] ADHOC-90 sudah di-commit (hindari konflik file)
-- [ ] Migration: `source`, unique ledger, `balance_used_amount` + backfill
-- [ ] `PaymentMethod::SALDO`, enum `BalanceMutationSource`
-- [ ] `CustomerBalanceService::applyToOpenInvoices()` + hook generator + command `billing:apply-balance`
-- [ ] Perbaikan reject, laporan kas, observer append-only, POP scope ledger
-- [ ] RBAC `customer_balance` + seed + `clearCache`
-- [ ] UI: modal konfirmasi overpay, kartu Saldo, label SALDO, kwitansi
-- [ ] Test §4.4 hijau (`php artisan test --compact --filter=CustomerBalance`)
-- [ ] `vendor/bin/pint` + `npm run build`
-- [ ] Update `docs/billing-pembayaran/*`, `docs/RUNBOOK_COMMANDS.md`, pindah ADHOC-92 ke Done di `docs/TASKS.md`
-- [ ] Dry-run `billing:apply-balance` di server sebelum tgl 1 pertama
+- [x] ADHOC-90 sudah di-commit (hindari konflik file)
+- [x] Migration: `source`, unique ledger, `balance_used_amount` + backfill
+- [x] `PaymentMethod::SALDO`, enum `BalanceMutationSource`
+- [x] `CustomerBalanceService::applyToOpenInvoices()` + hook generator + command `billing:apply-balance`
+- [x] Perbaikan reject, laporan kas, observer append-only, POP scope ledger
+- [x] RBAC `customer_balance` + seed + `clearCache`
+- [x] UI: kartu Saldo (Detail Pelanggan), label SALDO (Detail Tagihan/Riwayat Pembayaran), kwitansi "Titip Saldo" — modal konfirmasi overpay reuse ADHOC-84, tidak dibuat ulang
+- [x] Test §4.4 hijau (`php artisan test --compact --filter=CustomerBalance`, 6 file baru + `AdvancePaymentOverpayCreditsBalanceWithSourceTest`/`PaymentRejectRefundsBalanceUsedTest`/`CashReportsExcludeSaldoPaymentsTest`/`ApplyBalanceCommandDryRunTest`)
+- [x] `vendor/bin/pint`
+- [x] Update `docs/billing-pembayaran/*`, pindah ADHOC-92 ke Done di `docs/TASKS.md`
+- [ ] **Dry-run `billing:apply-balance` di server produksi sebelum tgl 1 pertama setelah deploy** — belum dieksekusi, ini murni operasional deploy (bukan kode), lihat §4.5
 
 ---
 

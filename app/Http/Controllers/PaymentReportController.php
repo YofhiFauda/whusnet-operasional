@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentPeriodType;
 use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\Pop;
@@ -34,6 +35,10 @@ class PaymentReportController extends Controller
         $collectorId = $request->query('collector_id', '');
         $startDate = $request->query('start_date', '');
         $endDate = $request->query('end_date', '');
+        // Filter Jenis (ADHOC-84 §8.2) — Bulanan/Piutang/Cicilan/Lebih Bayar,
+        // dihitung dari data yang sama dengan Payment::classification(),
+        // BUKAN kolom tersimpan.
+        $classification = $request->query('classification', '');
 
         // POP yang bisa diakses user. Pop::forUser() lewat EffectiveAccessService
         // (paham pop_tree + deny-by-default) — BUKAN whereHas('users') pivot
@@ -63,6 +68,7 @@ class PaymentReportController extends Controller
             ->applyUserScope(auth()->user());
 
         $this->applyFilters($query, $popId, $paymentMethod, $status, $collectorId, $startDate, $endDate);
+        $this->applyClassificationFilter($query, $classification);
 
         // Clone query untuk menghitung agregat ringkasan sebelum dipaginasi
         $summaryQuery = clone $query;
@@ -82,6 +88,7 @@ class PaymentReportController extends Controller
         // metode baru (mis. 'saldo' — ADHOC-92) otomatis ikut tanpa disentuh lagi.
         $allowedMethods = array_column(PaymentMethod::cases(), 'value');
         $allowedStatuses = array_column(PaymentStatus::cases(), 'value');
+        $allowedClassifications = PaymentPeriodType::cases();
 
         return view('reports.payments.index', compact(
             'payments',
@@ -93,11 +100,13 @@ class PaymentReportController extends Controller
             'collectorId',
             'startDate',
             'endDate',
+            'classification',
             'totalAmountSum',
             'totalValidSum',
             'totalDitolakSum',
             'allowedMethods',
-            'allowedStatuses'
+            'allowedStatuses',
+            'allowedClassifications'
         ));
     }
 
@@ -179,6 +188,7 @@ class PaymentReportController extends Controller
         $collectorId = $request->query('collector_id', '');
         $startDate = $request->query('start_date', '');
         $endDate = $request->query('end_date', '');
+        $classification = $request->query('classification', '');
 
         // Pastikan input pop_id divalidasi dengan POP yang diizinkan untuk user
         // ini — Pop::forUser(), sama seperti index() di atas, bukan whereHas('users').
@@ -193,6 +203,7 @@ class PaymentReportController extends Controller
             ->applyUserScope(auth()->user());
 
         $this->applyFilters($query, $popId, $paymentMethod, $status, $collectorId, $startDate, $endDate);
+        $this->applyClassificationFilter($query, $classification);
 
         return $query->orderByDesc('payment_date')->orderByDesc('id');
     }
@@ -238,6 +249,50 @@ class PaymentReportController extends Controller
     }
 
     /**
+     * Filter "Jenis" (ADHOC-84 §8.2/§8.1) — SQL setara `Payment::classification()`,
+     * bukan diketik ulang beda logika.
+     *
+     * SENGAJA tidak `join`/`leftJoin` ke `invoices`: query ini sudah lewat
+     * `applyUserScope()` (HasPopScope) yang menulis `where('pop_id', ...)`
+     * TANPA prefix tabel — `invoices` juga punya kolom `pop_id`, jadi sebuah
+     * join di sini akan membuat filter POP scope error "ambiguous column"
+     * (atau, lebih parah, diam-diam salah tabel). `whereHas`/subquery
+     * korelasi TIDAK menambah tabel ke FROM utama, jadi aman dipakai
+     * berdampingan dengan scope manapun.
+     *
+     * Base (Bulanan/Piutang) turun dari posisi `invoices.billing_period`
+     * terhadap bulan payment SENDIRI (`collected_date` ?: `payment_date`,
+     * string 'Y-m-d' → 'Y-m' lewat SUBSTR, portable sqlite/MySQL — bukan
+     * `DATE_FORMAT()`). Cicilan turun dari subquery jumlah berjalan payment
+     * VALID invoice yang sama dibanding total tagihan — replika
+     * `Payment::installmentContext()` tanpa memuat model satu-satu.
+     *
+     * @param  Builder<Payment>  $query
+     */
+    private function applyClassificationFilter($query, string $classification): void
+    {
+        if ($classification === '' || ! in_array($classification, array_column(PaymentPeriodType::cases(), 'value'), true)) {
+            return;
+        }
+
+        $referenceMonthExpr = 'SUBSTR(COALESCE(payments.collected_date, payments.payment_date), 1, 7)';
+
+        match ($classification) {
+            'bulanan' => $query->where(fn ($q) => $q->whereDoesntHave('invoice')
+                ->orWhereHas('invoice', fn ($iq) => $iq->whereRaw("invoices.billing_period >= {$referenceMonthExpr}"))),
+            'piutang' => $query->whereHas('invoice', fn ($iq) => $iq->whereRaw("invoices.billing_period < {$referenceMonthExpr}")),
+            'lebih_bayar' => $query->where('payments.overpay_amount', '>', 0),
+            'cicilan' => $query->where(fn ($q) => $q->whereNull('payments.overpay_amount')->orWhere('payments.overpay_amount', '<=', 0))
+                ->whereRaw(
+                    'COALESCE((SELECT SUM(p2.amount) FROM payments p2 WHERE p2.invoice_id = payments.invoice_id AND p2.payment_status = ? AND (p2.payment_date < payments.payment_date OR (p2.payment_date = payments.payment_date AND p2.id <= payments.id))), 0)'
+                    .' < COALESCE((SELECT total_amount FROM invoices WHERE invoices.id = payments.invoice_id), 0)',
+                    [PaymentStatus::VALID->value]
+                ),
+            default => null,
+        };
+    }
+
+    /**
      * @return array<int, string>
      */
     private function exportHeaderRow(): array
@@ -252,6 +307,7 @@ class PaymentReportController extends Controller
             'Metode Pembayaran',
             'Kolektor',
             'Nominal Pembayaran',
+            'Jenis',
             'Penerima/Petugas',
             'Status Pembayaran',
             'Catatan',
@@ -273,6 +329,7 @@ class PaymentReportController extends Controller
             strtoupper($payment->payment_method),
             $payment->collector->name ?? 'Langsung',
             (float) $payment->amount,
+            implode(' + ', array_map(fn (PaymentPeriodType $label) => $label->label(), $payment->classification())),
             $payment->receiver->name ?? '-',
             $payment->payment_status->label(),
             $payment->note ?? '-',

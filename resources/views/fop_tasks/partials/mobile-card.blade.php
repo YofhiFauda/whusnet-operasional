@@ -34,15 +34,26 @@
     $statusClasses = $taskRelation
         ? $taskRelation->status->displayBadgeClasses($taskRelation->report_deferred)
         : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
+
+    // Urgency & Visual Indicator
+    $isTaskToday = !$isHistory && $task->task_date && $task->task_date->isToday();
+    $isTaskOverdue = !$isHistory && $task->task_date && $task->task_date->isPast() && !$task->task_date->isToday() && !in_array($task->status->value, ['selesai', 'dibatalkan'], true);
 @endphp
 
-<div class="bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 rounded-xl p-4 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col gap-3 relative overflow-hidden"
+<div class="bg-white dark:bg-slate-800 border {{ $isTaskOverdue ? 'border-l-4 border-l-rose-500' : ($isTaskToday ? 'border-l-4 border-l-amber-500' : '') }} border-slate-200/90 dark:border-slate-700/80 rounded-xl p-4 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col gap-3 relative overflow-hidden"
      id="fop-task-card-{{ $task->id }}"
      data-pop-id="{{ $task->pop_id }}">
 
-    {{-- ══ 1. Card Header: Kategori, Task Number, Status / SLA ══ --}}
+    {{-- ══ 1. Card Header: Checkbox, Kategori, Task Number, Status / SLA ══ --}}
     <div class="flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-700/50 pb-2.5">
         <div class="flex items-center gap-2 flex-wrap">
+            @if(!$isHistory)
+                <input type="checkbox"
+                       value="{{ $task->id }}"
+                       :checked="selectedTaskIds.includes({{ $task->id }})"
+                       @click.stop="toggleSelectTask({{ $task->id }})"
+                       class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+            @endif
             <span class="px-2 py-0.5 rounded text-[11px] font-bold tracking-wide border {{ $task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400' }}">
                 {{ $task->category instanceof \App\Enums\TaskType ? $task->category->value : $task->category }}
             </span>
@@ -246,13 +257,6 @@
                         $cleanPhone = '62' . substr($cleanPhone, 1);
                     }
                 @endphp
-                <a href="https://wa.me/{{ $cleanPhone }}" target="_blank" rel="noopener"
-                   class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800/60 hover:bg-green-100 transition-colors shadow-2xs"
-                   title="WhatsApp: {{ $customerPhone }}">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824z"/>
-                    </svg>
-                </a>
             @endif
 
             @if($customerLat && $customerLng)
@@ -273,6 +277,27 @@
                     </svg>
                 </a>
             @endif
+
+            {{-- WhatsApp Dispatch Format Copy Shortcut --}}
+            <button type="button"
+                    @click="copyWhatsAppFormat({
+                        task_number: '{{ $task->task_number }}',
+                        tugas: @js($task->tugas),
+                        category: '{{ $task->category instanceof \App\Enums\TaskType ? $task->category->value : $task->category }}',
+                        priority: '{{ $task->priority->value }}',
+                        customer_name: @js($customerName ?? '-'),
+                        customer_phone: '{{ $customerPhone ?? '-' }}',
+                        address: @js($customerAddress ?? ($villageRelation?->name ?? '-')),
+                        issue: @js($task->issue ?? '-'),
+                        date: '{{ $task->task_date ? $task->task_date->format('d/m/Y H:i') : '-' }}',
+                        team: @js($teamRelation?->name ?? ($technicians->pluck('name')->implode(', ') ?: '-'))
+                    })"
+                    class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 transition-colors shadow-2xs cursor-pointer"
+                    title="Salin Format Pesan WhatsApp Dispatch">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+            </button>
         </div>
 
         {{-- Main Task Action Buttons --}}

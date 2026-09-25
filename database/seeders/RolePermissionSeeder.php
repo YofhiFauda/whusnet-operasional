@@ -181,12 +181,15 @@ class RolePermissionSeeder extends Seeder
                 'customers.update',
                 'customers.delete',
                 'customers.deactivate', // Terminasi langganan — permission baru, terpisah dari customers.update
+                'termination_reasons.*', // Master Alasan Putus Langganan (ADHOC-69) — terpisah dari customers.deactivate
+                'billing_waivers.*', // Request Putus Langganan + Cuti Berlangganan (ADHOC-87) — terpisah dari customers.deactivate/update
                 'customers.terminated.view', // List Pelanggan Putus — permission sendiri, bukan wildcard customers.detail.*
                 'customers.failed.view', // List Pelanggan Gagal — permission sendiri, bukan wildcard customers.detail.*
                 'customers.import.*',
                 'customers.detail.*', // Access to all detail sections (termasuk customers.detail.view - Detail Pelanggan)
                 'invoices.*', // Ex: view, create, update, delete, cancel, print
                 'payments.*', // Ex: view, create, update, validate, reject, print
+                'customer_balance.view', // Saldo Pelanggan (ADHOC-92) — read-only, keuangan
                 // Halaman admin atas kolektor. SENGAJA bukan wildcard `*`:
                 // `collector_worksheet.approve` (hapus buku selisih) khusus
                 // Owner — admin yang menemukan selisih tak boleh sekaligus
@@ -214,10 +217,9 @@ class RolePermissionSeeder extends Seeder
                 // sudah tersaji di Worksheet Admin lewat `create` (§10).
                 'cash_deposit.create',
                 'reports.*',
-                // Tutup periode boleh, buka ulang (`.cancel`) khusus owner.
+                // Tutup periode otomatis (scheduler) — tidak ada permission tutup/buka ulang.
                 'collector_report.view',
                 'collector_report.export',
-                'collector_report.approve',
                 'collector_payment_report.view',
                 'collector_payment_report.export',
                 'audit_logs.view',
@@ -477,6 +479,8 @@ class RolePermissionSeeder extends Seeder
                 'customers.create',
                 'customers.update',
                 'customers.deactivate', // Terminasi langganan dalam scope POP-nya
+                'termination_reasons.view', // Isi dropdown alasan di form putus — tidak berhak CRUD master-nya
+                'billing_waivers.*', // Request Putus Langganan + Cuti Berlangganan (ADHOC-87) dalam scope POP-nya
                 'customers.terminated.view', // List Pelanggan Putus — permission sendiri, bukan wildcard customers.detail.*
                 'customers.failed.view', // List Pelanggan Gagal — permission sendiri, bukan wildcard customers.detail.*
                 'customers.import.*',
@@ -489,6 +493,7 @@ class RolePermissionSeeder extends Seeder
                 'payments.validate',
                 'payments.reject',
                 'payments.print',
+                'customer_balance.view', // Saldo Pelanggan (ADHOC-92) DALAM scope POP-nya
                 'collector_worksheet.view', // Cross check kolektor DALAM scope POP-nya
                 'collector_worksheet.assign',
                 'collector_worksheet.validate',
@@ -501,10 +506,8 @@ class RolePermissionSeeder extends Seeder
                 'cash_deposit.create',
                 'reports.view',
                 'reports.export',
-                // Menutup periode POP-nya sendiri (scope tetap dijaga di controller).
                 'collector_report.view',
                 'collector_report.export',
-                'collector_report.approve',
                 'collector_payment_report.view',
                 'collector_payment_report.export',
                 'tickets.*',

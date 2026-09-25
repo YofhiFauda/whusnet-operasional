@@ -28,7 +28,7 @@ class="space-y-6" id="live-content">
             </div>
             <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Worklist Kolektor</h1>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Daftar pelanggan yang perlu didatangi dalam jendela tagih (<?php echo e($dueWindowDays); ?> hari sebelum jatuh tempo).
+                Daftar pelanggan yang tagihannya sudah terbit dan belum lunas (periode berjalan &amp; sebelumnya).
             </p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -317,7 +317,7 @@ class="space-y-6" id="live-content">
 
         <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 px-4 py-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
             <svg class="w-4 h-4 text-sky-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span>Pelanggan mencicil? Ubah nominalnya — sisa tagihan tetap muncul di daftar sampai lunas. Kelebihan bayar dikembalikan tunai di tempat.</span>
+            <span>Pelanggan mencicil? Ubah nominalnya — sisa tagihan tetap muncul di daftar sampai lunas. Nominal boleh diisi lebih besar dari sisa tagihan — kelebihannya otomatis masuk saldo pelanggan (bukan dikembalikan tunai).</span>
         </div>
 
         <?php $__env->startPush('scripts'); ?>

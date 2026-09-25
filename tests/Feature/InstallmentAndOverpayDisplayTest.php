@@ -12,8 +12,10 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
+use App\Services\CustomerBalanceService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -35,6 +37,9 @@ class InstallmentAndOverpayDisplayTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Tanggal bayar di tes ini hardcode Juni 2026. Sejak tutup buku otomatis
+        // (ADHOC-96) bulan lewat terkunci, jadi waktu dibekukan di Juni.
+        $this->travelTo(Carbon::parse('2026-06-20 10:00:00'));
         $this->seed(DatabaseSeeder::class);
         $this->package = InternetPackage::query()->firstOrFail();
     }
@@ -220,22 +225,33 @@ class InstallmentAndOverpayDisplayTest extends TestCase
         $this->assertDatabaseCount('payments', 1);
     }
 
-    public function test_overpay_badge_appears_on_customer_detail_and_ignores_rejected_payment(): void
+    public function test_saldo_badge_appears_on_customer_detail_and_ignores_rejected_payment(): void
     {
+        // ADHOC-92 (2026-09-24): badge header Detail Pelanggan diganti dari
+        // "Lebih Bayar" (jumlah `overpay_amount` mentah, termasuk payment
+        // ditolak yang lupa dibalik) jadi "Saldo" — angka AKTIF dari ledger
+        // `customer_balance_mutations` (SUM kredit − SUM debit), yang memang
+        // otomatis mengabaikan payment ditolak (reject membalik kreditnya,
+        // bukan cuma menyaring `payment_status` saat render).
         $pop = $this->createPop('OVR3');
         $invoice = $this->createInvoice($pop, 150000);
 
         $valid = $this->addPayment($invoice, 100000, '2026-06-13');
         $valid->update(['overpay_amount' => 30000]);
+        app(CustomerBalanceService::class)->credit($invoice->customer, 30000, $valid);
 
+        // Payment ditolak: DALAM ALUR NYATA (PaymentController::reject())
+        // kreditnya sudah pernah dibalik lewat reverseCreditForPayment() —
+        // di sini disimulasikan dengan tidak pernah mengkreditkannya sama
+        // sekali, hasil akhirnya identik (tidak menambah saldo).
         $rejected = $this->addPayment($invoice, 50000, '2026-06-14', 'ditolak');
         $rejected->update(['overpay_amount' => 99000]);
 
         $response = $this->actingAs($this->owner())->get(route('customers.show', $invoice->customer_id));
 
         $response->assertOk();
-        $response->assertSee('Lebih Bayar: Rp 30.000');
-        $response->assertDontSee('Lebih Bayar: Rp 129.000');
+        $response->assertSee('Saldo: Rp 30.000');
+        $response->assertDontSee('Saldo: Rp 129.000');
     }
 
     // ---------------------------------------------------------------
@@ -502,7 +518,14 @@ class InstallmentAndOverpayDisplayTest extends TestCase
         $response = $this->actingAs($this->owner())->get(route('payments.receipt', $payment->id));
 
         $response->assertOk();
-        $response->assertSee('Melunasi Tagihan');
+        // ADHOC-94 (2026-09-23): kwitansi cetak gak lagi punya baris
+        // "Keterangan" terpisah kayak struk lama — pelunasan/cicilan
+        // ditempel sebagai suffix di satu-satunya baris item
+        // (`ReceiptPresenter::keteranganItem()`), bukan literal "Melunasi
+        // Tagihan" (itu masih dipakai di payments/show.blade.php, beda
+        // halaman — lihat test_payment_detail_shows_cicilan_label_...
+        // di atas yang justru assertDontSee ini di halaman ITU).
+        $response->assertSee('(Pelunasan)');
         $response->assertSee('Lebih Bayar');
         $response->assertSee('58.903');
     }

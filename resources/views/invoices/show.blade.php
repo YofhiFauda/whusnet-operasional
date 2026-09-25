@@ -221,6 +221,18 @@
                 </span>
                 @endif
 
+                {{-- Sub-jenis Tagihan Manual (ADHOC-70/69) — pembeda visual antara
+                     denda Putus Langganan dengan Tagihan Manual "Lainnya" biasa. --}}
+                @if($invoice->manual_subtype_name)
+                <span class="px-2.5 py-1 text-xs font-medium rounded-full border bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800">
+                    {{ $invoice->manual_subtype_name }}
+                </span>
+                @elseif($invoice->manual_category)
+                <span class="px-2.5 py-1 text-xs font-medium rounded-full border bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">
+                    {{ $invoice->manual_category->label() }}
+                </span>
+                @endif
+
                 @php
                     $invoiceTotalOverpay = $invoice->payments
                         ->filter(fn ($p) => $p->payment_status === \App\Enums\PaymentStatus::VALID)
@@ -237,6 +249,18 @@
                 <span>&bull;</span>
                 <span>Diterbitkan {{ optional($invoice->issue_date)->format('d/m/Y') }} oleh {{ $invoice->creator->name ?? 'System' }}</span>
             </p>
+            @if($invoice->description)
+            <p class="text-xs text-text-muted mt-1">{{ $invoice->description }}</p>
+            @endif
+            {{-- ADHOC-87 — invoice `batal` lewat Request Putus Langganan/Cuti
+                 Berlangganan punya alasan & pembatal tercatat di baris waiver
+                 (beda dari write-off/dedup, yang tidak menyentuh field ini). --}}
+            @if($invoice->invoice_status->value === 'batal' && $invoice->billingWaiver)
+            <div class="mt-2 px-3 py-2 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-400">
+                <strong>Dibatalkan ({{ $invoice->billingWaiver->source->label() }})</strong> oleh {{ $invoice->billingWaiver->creator->name ?? 'System' }}
+                pada {{ \App\Support\IndonesianDate::date($invoice->billingWaiver->created_at) }} — {{ $invoice->billingWaiver->reason }}
+            </div>
+            @endif
         </div>
 
         <!-- Desktop Action Buttons Toolbar -->
@@ -276,15 +300,15 @@
                         <a href="{{ route('payments.receipt', $invoice->payments->first()->id) }}" target="_blank" onclick="closePrintDropdown();" class="w-full px-3.5 py-2.5 flex items-center gap-2.5 text-text-main hover:bg-surface-muted transition-colors text-left font-medium">
                             <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                             <div>
-                                <p class="font-semibold text-text-main leading-tight">Struk Thermal (80mm)</p>
-                                <p class="text-[10px] text-text-muted">Struk bukti bayar kasir POP</p>
+                                <p class="font-semibold text-text-main leading-tight">Cetak Kwitansi</p>
+                                <p class="text-[10px] text-text-muted">Kwitansi bukti bayar kasir POP</p>
                             </div>
                         </a>
                     @else
                         <button type="button" onclick="window.Toast.warning('Belum Ada Struk', 'Belum ada riwayat pembayaran terdaftar untuk mencetak struk kasir.'); closePrintDropdown();" class="w-full px-3.5 py-2.5 flex items-center gap-2.5 text-text-muted hover:bg-surface-muted transition-colors text-left opacity-75">
                             <svg class="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                             <div>
-                                <p class="font-semibold leading-tight">Struk Thermal (80mm)</p>
+                                <p class="font-semibold leading-tight">Cetak Kwitansi</p>
                                 <p class="text-[10px] text-text-muted">Perlu pembayaran terdaftar</p>
                             </div>
                         </button>
@@ -305,10 +329,15 @@
                     <p class="font-bold">Piutang dihapus buku (tak tertagih) sebesar Rp {{ number_format((float) $invoice->written_off_amount, 0, ',', '.') }}</p>
                     <p class="mt-0.5">{{ optional($invoice->written_off_at)->format('d/m/Y') }} — {{ $invoice->write_off_reason }}</p>
                 </div>
-                <form method="POST" action="{{ route('invoices.write-off.reverse', $invoice) }}" onsubmit="return confirm('Batalkan hapus buku? Tagihan kembali menjadi piutang.')">
-                    @csrf
-                    <button type="submit" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors">Batalkan Hapus Buku</button>
-                </form>
+                {{-- Hapus buku di periode yang sudah tutup buku terkunci permanen (BookPeriod). --}}
+                @if(\App\Support\BookPeriod::isLocked($invoice->written_off_at?->format('Y-m')))
+                    <span class="text-[11px] font-semibold text-rose-700 dark:text-rose-300">Periode sudah tutup buku — tidak bisa dibatalkan</span>
+                @else
+                    <form method="POST" action="{{ route('invoices.write-off.reverse', $invoice) }}" onsubmit="return confirm('Batalkan hapus buku? Tagihan kembali menjadi piutang.')">
+                        @csrf
+                        <button type="submit" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors">Batalkan Hapus Buku</button>
+                    </form>
+                @endif
             </div>
             @error('reason')<p class="mt-2 text-xs text-red-600">{{ $message }}</p>@enderror
         </div>
@@ -563,8 +592,11 @@
                                             </td>
                                             <td class="px-4 py-3.5 font-mono text-text-main whitespace-nowrap">{{ optional($payment->payment_date)->format('d/m/Y') }}</td>
                                             <td class="px-4 py-3.5 whitespace-nowrap">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 uppercase">
-                                                    {{ strtoupper($payment->payment_method) }}
+                                                {{-- SALDO (ADHOC-92) diberi label sendiri — "Dibayar dari Saldo",
+                                                     bukan uang tunai/transfer yang diterima. --}}
+                                                @php $paymentMethodEnum = \App\Enums\PaymentMethod::tryFrom((string) $payment->payment_method); @endphp
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border {{ $paymentMethodEnum === \App\Enums\PaymentMethod::SALDO ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-800' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' }}">
+                                                    {{ $paymentMethodEnum === \App\Enums\PaymentMethod::SALDO ? 'Dibayar dari Saldo' : strtoupper((string) $payment->payment_method) }}
                                                 </span>
                                             </td>
                                             <td class="px-4 py-3.5 text-right font-mono font-bold text-text-main whitespace-nowrap">
@@ -577,7 +609,7 @@
                                             </td>
                                             <td class="px-4 py-3.5 text-center whitespace-nowrap">
                                                 @if(! $meta)
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">Ditolak</span>
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">Dikembalikan</span>
                                                 @elseif($meta['settles'])
                                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Lunas</span>
                                                 @else
@@ -590,7 +622,7 @@
                                                     @if($payment->proof_file)
                                                         <a href="{{ asset('storage/' . $payment->proof_file) }}" target="_blank" class="px-2 py-1 bg-surface-muted text-primary hover:bg-border rounded text-[11px] font-semibold">Bukti</a>
                                                     @endif
-                                                    <a href="{{ route('payments.receipt', $payment->id) }}" target="_blank" class="p-1.5 rounded-lg border border-border hover:bg-surface-muted text-text-muted transition-colors" title="Lihat Struk Thermal">
+                                                    <a href="{{ route('payments.receipt', $payment->id) }}" target="_blank" class="p-1.5 rounded-lg border border-border hover:bg-surface-muted text-text-muted transition-colors" title="Lihat Kwitansi">
                                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                             <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                                         </svg>

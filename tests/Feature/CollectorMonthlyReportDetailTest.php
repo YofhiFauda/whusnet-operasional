@@ -199,7 +199,7 @@ class CollectorMonthlyReportDetailTest extends TestCase
     {
         Carbon::setTestNow('2026-09-15');
         $invoice = $this->makeInvoice($this->pop, '2026-08', 100000);
-        $this->service()->close('2026-08', $this->pop, $this->owner);
+        $this->service()->closePeriod('2026-08');
 
         // Transaksi susulan bertanggal Agustus, masuk SETELAH ditutup.
         $this->makePayment($invoice, 100000, '2026-08-25');

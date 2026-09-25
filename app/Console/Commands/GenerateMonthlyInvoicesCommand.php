@@ -6,9 +6,11 @@ use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
 use App\Enums\WorkflowTransition;
 use App\Models\Customer;
+use App\Models\CustomerBillingWaiver;
 use App\Models\Invoice;
 use App\Models\RevenueCategory;
 use App\Models\RevenueSubcategory;
+use App\Services\CustomerBalanceService;
 use App\Services\InvoiceItemBuilder;
 use App\Services\InvoiceNumberGenerator;
 use Carbon\Carbon;
@@ -106,6 +108,18 @@ class GenerateMonthlyInvoicesCommand extends Command
                 continue;
             }
 
+            // ADHOC-87 — Cuti Berlangganan bisa membebaskan periode yang
+            // BELUM terbit (baris waiver dengan invoice_id null). Tanpa
+            // guard ini, menjalankan generator untuk periode itu (jadwal
+            // tanggal 1, atau --period menambal bulan lama) akan menerbitkan
+            // tagihan yang justru sedang sengaja dibebaskan. Guard yang sama
+            // (InvoiceObserver) menutup jalur pembuatan invoice manual/import.
+            if (CustomerBillingWaiver::existsFor($customer->id, $billingPeriod)) {
+                $skipped++;
+
+                continue;
+            }
+
             if ($dryRun) {
                 $this->line("Would create BULANAN invoice for {$customer->customer_code} ({$billingPeriod}, Rp ".number_format((float) $service->monthly_price, 0, ',', '.').')');
                 $created++;
@@ -124,7 +138,8 @@ class GenerateMonthlyInvoicesCommand extends Command
 
                     // Penomoran dipindah ke InvoiceNumberGenerator (ADHOC-60) —
                     // sebelumnya salinan identik dari blok ini juga hidup di
-                    // CustomerController::storeManualInvoice, dan keduanya
+                    // bekas CustomerController::storeManualInvoice (dihapus
+                    // ADHOC-70), dan keduanya
                     // menulis ke deret yang sama. Tetap dipanggil DI DALAM
                     // transaksi supaya lockForUpdate()-nya bermakna.
                     $invoice = Invoice::create([
@@ -165,6 +180,19 @@ class GenerateMonthlyInvoicesCommand extends Command
                         'description' => "Langganan {$billingPeriod}",
                         'amount' => $subtotal,
                     ]]);
+
+                    // ADHOC-92 — KEPUTUSAN 2026-09-21: saldo pelanggan dipakai
+                    // OTOMATIS begitu tagihan BULANAN terbit, dalam transaksi
+                    // yang sama dengan pembuatan invoice-nya (bukan job
+                    // terpisah). Kegagalan auto-pay TIDAK BOLEH membatalkan
+                    // penerbitan tagihan — di-catch di sini (bukan dibiarkan
+                    // menembus ke luar transaksi) supaya invoice yang sudah
+                    // dibuat di atas tetap commit walau auto-pay-nya gagal.
+                    try {
+                        app(CustomerBalanceService::class)->applyToOpenInvoices($customer);
+                    } catch (\Throwable $e) {
+                        $this->error("Auto-pay saldo gagal untuk {$customer->customer_code}: {$e->getMessage()}");
+                    }
                 });
 
                 $created++;

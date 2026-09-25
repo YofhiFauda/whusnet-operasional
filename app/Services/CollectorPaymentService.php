@@ -40,7 +40,10 @@ use Illuminate\Support\Facades\DB;
  */
 class CollectorPaymentService
 {
-    public function __construct(private readonly CollectorVisitService $visits) {}
+    public function __construct(
+        private readonly CollectorVisitService $visits,
+        private readonly CustomerBalanceService $balances,
+    ) {}
 
     /**
      * Validasi cepat tanpa lock — supaya pesan gagal per baris bisa
@@ -110,10 +113,15 @@ class CollectorPaymentService
                 continue;
             }
 
-            if (Money::greaterThan($amount, $invoice->remaining_amount)) {
+            // Nominal BOLEH melebihi sisa tagihan (ADHOC-84 §2.5) — kelebihannya
+            // otomatis dipisah jadi overpay & masuk saldo pelanggan di record(),
+            // sama seperti PaymentService::record() di jalur admin. TAPI kalau
+            // pelanggannya sendiri tak ada (harusnya mustahil sejak kepemilikan
+            // dicek di atas), kelebihan tak punya ke mana pun dikreditkan.
+            if (Money::greaterThan($amount, $invoice->remaining_amount) && ! $invoice->customer) {
                 $failures[] = [
                     'invoice_id' => $row['invoice_id'],
-                    'reason' => "{$invoice->invoice_number}: nominal Rp".number_format($amount, 0, ',', '.').' melebihi sisa Rp'.number_format((float) $invoice->remaining_amount, 0, ',', '.').'.',
+                    'reason' => "{$invoice->invoice_number}: nominal Rp".number_format($amount, 0, ',', '.').' melebihi sisa dan tagihan ini tak terhubung pelanggan mana pun — kelebihan tak bisa dikreditkan.',
                 ];
             }
 
@@ -198,9 +206,17 @@ class CollectorPaymentService
                     throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: sudah {$lockedInvoice->invoice_status->label()} (berubah sejak form dibuka).");
                 }
 
-                $amount = Money::of($row['amount']);
-                if (Money::greaterThan($amount, $lockedInvoice->remaining_amount)) {
-                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: nominal melebihi sisa tagihan (kemungkinan berubah sejak form dibuka).");
+                // Auto-split: bagian yang menutup tagihan dulu, sisanya (kalau
+                // ada) jadi overpay_amount — pola sama persis
+                // PaymentService::record() jalur admin (ADHOC-84 §2.5, §4.4).
+                // Dipisah di ranah sen (lihat Money::class) supaya "bayar pas"
+                // tak melahirkan lebih bayar Rp0,000001 hantu.
+                $totalReceived = Money::of($row['amount']);
+                $appliedAmount = Money::min($totalReceived, $lockedInvoice->remaining_amount);
+                $overpayAmount = Money::sub($totalReceived, $appliedAmount);
+
+                if (Money::greaterThan($overpayAmount, 0) && ! $lockedInvoice->customer) {
+                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: nominal melebihi sisa tagihan dan tak terhubung pelanggan mana pun — kelebihan tak bisa dikreditkan.");
                 }
 
                 $description = trim((string) ($row['note'] ?? ''));
@@ -225,12 +241,17 @@ class CollectorPaymentService
                     'payment_date' => now()->format('Y-m-d'),
                     'collected_date' => $row['collected_date'],
                     'payment_method' => $row['payment_method'],
-                    'amount' => $amount,
+                    'amount' => $appliedAmount,
+                    'overpay_amount' => Money::isZero($overpayAmount) ? null : $overpayAmount,
                     'received_by' => $actor->id,
                     'collected_by' => $collector->id,
                     'payment_status' => PaymentStatus::VALID->value,
                     'note' => $note,
                 ]);
+
+                if (Money::greaterThan($overpayAmount, 0)) {
+                    $this->balances->credit($lockedInvoice->customer, $overpayAmount, $payment);
+                }
 
                 $lockedInvoice->recalculateFromPayments();
 
@@ -253,7 +274,10 @@ class CollectorPaymentService
                     'invoice_status' => $lockedInvoice->invoice_status->value,
                     'remaining_amount' => (float) $lockedInvoice->remaining_amount,
                     'pop_id' => $lockedInvoice->pop_id,
-                    'amount' => $amount,
+                    // Total uang DITERIMA (applied + overpay) — bukan cuma
+                    // bagian yang menutup invoice, supaya notifikasi/setoran
+                    // admin menghitung uang fisik yang benar-benar masuk.
+                    'amount' => $totalReceived,
                 ];
             }
 

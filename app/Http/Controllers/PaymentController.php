@@ -7,6 +7,7 @@ use App\Enums\NotificationType;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Events\CollectorActivityUpdated;
+use App\Models\BankAccount;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
@@ -90,9 +91,10 @@ class PaymentController extends Controller
             $query->where('payment_method', $method);
         }
 
-        if ($status !== '' && in_array($status, $allowedStatuses, true)) {
-            $query->where('payment_status', $status);
-        }
+        // Pembayaran yang dikembalikan (status `ditolak`) disembunyikan dari
+        // daftar — transaksi salah yang sudah dibalik. Tetap bisa dibuka lewat
+        // detail (notifikasi/audit) dan terhitung di Laporan Pembayaran.
+        $query->where('payment_status', PaymentStatus::VALID->value);
 
         if ($invoiceType !== '') {
             $query->whereHas('invoice', function ($invoiceQuery) use ($invoiceType) {
@@ -233,7 +235,13 @@ class PaymentController extends Controller
             ? app(CustomerBalanceService::class)->balance($invoice->customer)
             : 0.0;
 
-        return view('payments.create', compact('invoice', 'nextInstallmentNumber', 'customerBalance'));
+        $bankAccounts = BankAccount::query()->active()->orderBy('bank_name')->orderBy('account_number')->get();
+
+        // Peringatan piutang lama (ADHOC-84 §2.4) — non-blokir, server-side
+        // (aturan CLAUDE.md "target aksi/data dirender server").
+        $olderUnpaidInvoices = $invoice->olderUnpaidInvoices();
+
+        return view('payments.create', compact('invoice', 'nextInstallmentNumber', 'customerBalance', 'bankAccounts', 'olderUnpaidInvoices'));
     }
 
     /**
@@ -317,8 +325,15 @@ class PaymentController extends Controller
             'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
             // Transfer & Kolektor punya field pendukung wajib — lihat
             // PaymentMethod::requiresBankDetails()/requiresCollector().
-            'bank_name' => 'required_if:payment_method,transfer|nullable|string|max:100',
-            'account_number' => 'required_if:payment_method,transfer|nullable|string|max:50',
+            // Transfer: pilih rekening dari Master Rekening Bank (ADHOC-95),
+            // bukan ketik nama bank/nomor rekening. Status aktifnya dicek
+            // PaymentService (pesan lebih jelas daripada rule `exists`), dan
+            // `bank_name`/`account_number` diisi di sana sebagai snapshot —
+            // SENGAJA tak lagi diterima dari request.
+            'bank_account_id' => 'required_if:payment_method,transfer|nullable|integer|exists:bank_accounts,id',
+            // Opsional, cuma disimpan untuk Transfer/Kolektor —
+            // PaymentMethod::requiresSenderName().
+            'sender_name' => 'nullable|string|max:150',
             'collected_by' => [
                 'required_if:payment_method,kolektor',
                 'nullable',
@@ -474,7 +489,7 @@ class PaymentController extends Controller
         if ($payment->payment_status === PaymentStatus::DITOLAK) {
             return redirect()
                 ->route('payments.show', $payment->id)
-                ->withErrors(['reject_reason' => 'Pembayaran ini sudah ditolak sebelumnya.']);
+                ->withErrors(['reject_reason' => 'Pembayaran ini sudah dikembalikan sebelumnya.']);
         }
 
         // Batas koreksi = titik verifikasi setoran. Sebelum itu payment masih
@@ -490,10 +505,15 @@ class PaymentController extends Controller
             return redirect()
                 ->route('payments.show', $payment->id)
                 ->withErrors([
-                    'reject_reason' => "Pembayaran ini sudah masuk setoran {$deposit->deposit_number} yang berstatus {$deposit->status->label()}. Setoran terverifikasi tidak boleh diubah — buat pembayaran koreksi, jangan tolak yang ini.",
+                    'reject_reason' => "Pembayaran ini sudah masuk setoran {$deposit->deposit_number} yang berstatus {$deposit->status->label()}. Setoran terverifikasi tidak boleh diubah — pembayaran ini tidak bisa dikembalikan.",
                 ]);
         }
 
+        // Pembayaran bulan yang sudah tutup buku TETAP boleh dikembalikan —
+        // transaksi salah harus bisa dibalik kapan pun ketahuannya. Buku lama
+        // tidak disentuh: laporan menghitung pembayaran ini sah sampai
+        // `rejected_at`, dan pengembaliannya jadi kolom "Dikembalikan" di
+        // bulan berjalan (CollectorMonthlyReportService::countedAsOf()).
         $validated = $request->validate([
             'reject_reason' => ReasonValidationRule::required(1000),
         ]);
@@ -517,6 +537,14 @@ class PaymentController extends Controller
             // ikut dibalik — kalau tidak, pelanggan tetap punya saldo aktif
             // dari uang yang ternyata tak pernah sah tercatat.
             app(CustomerBalanceService::class)->reverseCreditForPayment($payment);
+
+            // G5 (ADHOC-92) — payment yang MEMAKAI saldo (manual atau
+            // auto-pay) juga harus kembalikan saldonya kalau ditolak. Tanpa
+            // ini, saldo yang sudah "dipakai" hilang permanen padahal
+            // pembayarannya sendiri dibatalkan.
+            if ((float) $payment->balance_used_amount > 0) {
+                app(CustomerBalanceService::class)->reverseDebitForPayment($payment);
+            }
         });
 
         // Notif ke yang mencatat setoran (kolektor lapangan kalau ada, kalau
@@ -546,7 +574,7 @@ class PaymentController extends Controller
 
         return redirect()
             ->route('payments.show', $payment->id)
-            ->with('success', "Pembayaran {$payment->payment_number} berhasil ditolak/dibatalkan.");
+            ->with('success', "Pembayaran {$payment->payment_number} berhasil dikembalikan.");
     }
 
     private function notifyPaymentRecorderIfDifferentActor(Payment $payment, User $actor, string $reason): void
@@ -559,8 +587,8 @@ class PaymentController extends Controller
         }
 
         $recorder->notify(new AppNotification(
-            title: 'Pembayaran Ditolak: '.$payment->payment_number,
-            message: "Pembayaran {$payment->payment_number} yang Anda catat ditolak {$actor->name}. Alasan: {$reason}",
+            title: 'Pembayaran Dikembalikan: '.$payment->payment_number,
+            message: "Pembayaran {$payment->payment_number} yang Anda catat dikembalikan {$actor->name}. Alasan: {$reason}",
             actionUrl: route('payments.show', $payment->id),
             type: NotificationType::ERROR
         ));

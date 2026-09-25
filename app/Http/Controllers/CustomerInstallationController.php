@@ -95,6 +95,30 @@ class CustomerInstallationController extends Controller
                 ];
                 if ($task) {
                     $updateData['fop_id'] = $task->fop_id ?? $task->created_by;
+
+                    $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                    $currentUserId = auth()->id();
+
+                    $memberIndex = 1;
+                    foreach ($teamMembers as $idx => $member) {
+                        if ($member->user_id == $currentUserId) {
+                            $memberIndex = $idx + 1;
+                            break;
+                        }
+                    }
+                    $updateData['technicians'] = "Teknisi {$memberIndex} - ".auth()->user()->name;
+                    $updateData['technician_id'] = auth()->id();
+
+                    $otherMembers = $teamMembers->filter(fn ($m) => $m->user_id != $currentUserId)->values();
+                    if ($otherMembers->isNotEmpty()) {
+                        $updateData['technician_2_id'] = $otherMembers[0]->user_id;
+                    }
+                    if ($otherMembers->count() > 1) {
+                        $updateData['technician_3_id'] = $otherMembers[1]->user_id;
+                    }
+                } else {
+                    $updateData['technician_id'] = auth()->id();
+                    $updateData['technicians'] = 'Teknisi 1 - '.auth()->user()->name;
                 }
 
                 if ($installation) {
@@ -440,6 +464,12 @@ class CustomerInstallationController extends Controller
             'olt_port' => 'nullable|string|max:50',
             'vlan' => 'nullable|string|max:20',
 
+            // Technician info
+            'technician_id' => 'nullable|exists:users,id',
+            'technician_2_id' => 'nullable|exists:users,id',
+            'technician_3_id' => 'nullable|exists:users,id',
+            'technicians' => 'nullable|string|max:255',
+
             // Speedtest
             'test_upload' => 'nullable|numeric',
             'test_download' => 'nullable|numeric',
@@ -553,11 +583,46 @@ class CustomerInstallationController extends Controller
 
                 $task = Task::where('customer_id', $customer->id)
                     ->where('task_type', TaskType::PEMASANGAN->value)
-                    ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                    ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
                     ->latest('id')
                     ->first();
                 if ($task && ! $installation->fop_id) {
                     $installation->fop_id = $task->fop_id ?? $task->created_by;
+                }
+
+                $installation->technician_id = $validated['technician_id'] ?? $installation->technician_id ?? auth()->id();
+                if (isset($validated['technician_2_id'])) {
+                    $installation->technician_2_id = $validated['technician_2_id'];
+                }
+                if (isset($validated['technician_3_id'])) {
+                    $installation->technician_3_id = $validated['technician_3_id'];
+                }
+                if (isset($validated['technicians'])) {
+                    $installation->technicians = $validated['technicians'];
+                }
+
+                if ($task && (! $installation->technician_2_id || ! $installation->technicians)) {
+                    $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                    $currentUserId = $installation->technician_id ?? auth()->id();
+                    $memberIndex = 1;
+                    foreach ($teamMembers as $idx => $member) {
+                        if ($member->user_id == $currentUserId) {
+                            $memberIndex = $idx + 1;
+                            break;
+                        }
+                    }
+                    if (! $installation->technicians) {
+                        $installation->technicians = "Teknisi {$memberIndex} - ".(User::find($currentUserId)?->name ?? auth()->user()->name);
+                    }
+                    $otherMembers = $teamMembers->filter(fn ($m) => $m->user_id != $currentUserId)->values();
+                    if ($otherMembers->isNotEmpty() && ! $installation->technician_2_id) {
+                        $installation->technician_2_id = $otherMembers[0]->user_id;
+                    }
+                    if ($otherMembers->count() > 1 && ! $installation->technician_3_id) {
+                        $installation->technician_3_id = $otherMembers[1]->user_id;
+                    }
+                } elseif (! $installation->technicians) {
+                    $installation->technicians = 'Teknisi 1 - '.auth()->user()->name;
                 }
 
                 if (! $installation->completed_at) {
@@ -918,17 +983,41 @@ class CustomerInstallationController extends Controller
             // storeSpeedtest(), begitu Laporan Speedtest ikut tersimpan.
             $installation->installation_status = 'in_progress';
 
-            if (! empty($validated['started_at'])) {
-                $installation->started_at = $validated['started_at'];
-            }
-
             $task = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::PEMASANGAN->value)
-                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
                 ->latest('id')
                 ->first();
             if ($task && ! $installation->fop_id) {
                 $installation->fop_id = $task->fop_id ?? $task->created_by;
+            }
+
+            if (! $installation->technician_id) {
+                $installation->technician_id = auth()->id();
+            }
+
+            if ($task) {
+                $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                $currentUserId = $installation->technician_id ?? auth()->id();
+                $memberIndex = 1;
+                foreach ($teamMembers as $idx => $member) {
+                    if ($member->user_id == $currentUserId) {
+                        $memberIndex = $idx + 1;
+                        break;
+                    }
+                }
+                if (! $installation->technicians) {
+                    $installation->technicians = "Teknisi {$memberIndex} - ".(User::find($currentUserId)?->name ?? auth()->user()->name);
+                }
+                $otherMembers = $teamMembers->filter(fn ($m) => $m->user_id != $currentUserId)->values();
+                if ($otherMembers->isNotEmpty() && ! $installation->technician_2_id) {
+                    $installation->technician_2_id = $otherMembers[0]->user_id;
+                }
+                if ($otherMembers->count() > 1 && ! $installation->technician_3_id) {
+                    $installation->technician_3_id = $otherMembers[1]->user_id;
+                }
+            } elseif (! $installation->technicians) {
+                $installation->technicians = 'Teknisi 1 - '.auth()->user()->name;
             }
 
             $installation->save();
@@ -1143,17 +1232,47 @@ class CustomerInstallationController extends Controller
                 ? Carbon::parse($validated['completed_at'])
                 : now();
 
+            $task = Task::where('customer_id', $customer->id)
+                ->where('task_type', TaskType::PEMASANGAN->value)
+                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
+                ->latest('id')
+                ->first();
+
+            if (! $installation->technician_id) {
+                $installation->technician_id = auth()->id();
+            }
+            if ($task) {
+                if (! $installation->fop_id) {
+                    $installation->fop_id = $task->fop_id ?? $task->created_by;
+                }
+                $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                $currentUserId = $installation->technician_id ?? auth()->id();
+                $memberIndex = 1;
+                foreach ($teamMembers as $idx => $member) {
+                    if ($member->user_id == $currentUserId) {
+                        $memberIndex = $idx + 1;
+                        break;
+                    }
+                }
+                if (! $installation->technicians) {
+                    $installation->technicians = "Teknisi {$memberIndex} - ".(User::find($currentUserId)?->name ?? auth()->user()->name);
+                }
+                $otherMembers = $teamMembers->filter(fn ($m) => $m->user_id != $currentUserId)->values();
+                if ($otherMembers->isNotEmpty() && ! $installation->technician_2_id) {
+                    $installation->technician_2_id = $otherMembers[0]->user_id;
+                }
+                if ($otherMembers->count() > 1 && ! $installation->technician_3_id) {
+                    $installation->technician_3_id = $otherMembers[1]->user_id;
+                }
+            } elseif (! $installation->technicians) {
+                $installation->technicians = 'Teknisi 1 - '.auth()->user()->name;
+            }
+
             $installation->installation_status = 'completed';
             $installation->completed_at = $completedAt;
             $installation->finished_date = $completedAt->toDateString();
             $installation->end_time = $completedAt->toTimeString();
             $installation->save();
-
-            $task = Task::where('customer_id', $customer->id)
-                ->where('task_type', TaskType::PEMASANGAN->value)
-                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
-                ->latest('id')
-                ->first();
 
             // Reconcile custody Gudang/Inventory (ADHOC-54) DI SINI — storeSpeedtest()
             // itu SATU-SATUNYA titik penyelesaian pemasangan (ADHOC-41, gak bisa

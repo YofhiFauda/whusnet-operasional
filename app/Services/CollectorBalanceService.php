@@ -49,10 +49,21 @@ class CollectorBalanceService
 
     /**
      * Saldo Belum Disetor.
+     *
+     * `Payment::physicalAmount()` (ADHOC-92 G4, koreksi 2026-09-24):
+     * `balance_used_amount` dikeluarkan — porsi `amount` yang dibayar dari
+     * Saldo Pelanggan bukan uang fisik yang ada di tangan kolektor
+     * (`use_balance_amount` manual). `overpay_amount` DIIKUTKAN — kelebihan
+     * tunai yang ditagih kolektor (mis. pelanggan bayar beberapa bulan
+     * sekaligus) tetap uang fisik di tangannya, wajib ikut disetor. Payment
+     * method SALDO sendiri (auto-pay) tidak pernah muncul di query ini
+     * karena `collected_by`-nya selalu null.
      */
     public function balance(User $collector): float
     {
-        return Money::of($this->unsettledPaymentsQuery($collector)->sum('amount'));
+        return Money::sum(
+            $this->unsettledPaymentsQuery($collector)->get()->map(fn (Payment $p) => $p->physicalAmount())
+        );
     }
 
     /**

@@ -23,7 +23,7 @@
     $hasTestReport = $tech && ($tech->test_date || $tech->test_download !== null || $tech->test_upload !== null || $tech->latency_ms !== null);
 @endphp
 
-<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+<div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <div>
         <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Hasil Laporan Pemasangan Perangkat &amp; Laporan Uji Speed Test</h3>
         <p class="text-[11px] text-slate-500 mt-0.5">Jadwal, tim teknisi, material terpakai, alat kerja, foto berita acara, dan metrik hasil pengujian layanan.</p>
@@ -34,13 +34,6 @@
              event 'open-modal' (dipakai bareng <x-ui.modal>), BUKAN
              manggil method Alpine lintas komponen (dua x-data terpisah,
              gak saling lihat state). --}}
-        @can('customers.qr.view')
-            <button type="button" @click="window.dispatchEvent(new CustomEvent('open-modal', { detail: 'qr-peek' }))"
-                    class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
-                <i class="fa-solid fa-qrcode"></i>
-                QR Pelanggan
-            </button>
-        @endcan
 
         @can('customers.detail.installation.update')
             <button type="button" onclick="openTestReportModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
@@ -107,19 +100,46 @@
                     default => 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600',
                 };
 
-                $timTeknisi = collect([
-                    $installation->technicians ?: ($installation->technician->name ?? null),
-                    $installation->technician2->name ?? null,
-                    $installation->technician3->name ?? null,
-                ])->filter()->implode(', ');
+                // Fallback to related Task Pemasangan if installation technician relations are not yet saved
+                $installTask = $customer->tasks()
+                    ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+                    ->with(['teamMembers.user'])
+                    ->latest('id')
+                    ->first();
 
-                $tglJadwal = $installation->scheduled_date ? \App\Support\IndonesianDate::date($installation->scheduled_date) : '-';
-                $tglSelesai = $installation->finished_date ? \App\Support\IndonesianDate::date($installation->finished_date) : $tglJadwal;
+                $taskLead = $installTask?->teamMembers?->firstWhere('role_in_task', 'lead')?->user ?? $installTask?->teamMembers?->first()?->user;
+                $taskOtherMembers = $installTask?->teamMembers?->filter(fn($m) => $m->user_id !== ($taskLead?->id ?? null))->map(fn($m) => $m->user?->name)->filter()->values() ?? collect();
+                $allTaskMemberNames = $installTask?->teamMembers?->map(fn($m) => $m->user?->name)->filter()->values() ?? collect();
+
+                $teknisiUtama = $installation->technician?->name
+                    ?? ($installation->technicians ?: ($taskLead?->name ?? '-'));
+
+                $timTeknisiList = collect([
+                    $installation->technician?->name ?? ($taskLead?->name ?? null),
+                    $installation->technician2?->name ?? ($taskOtherMembers->get(0) ?? null),
+                    $installation->technician3?->name ?? ($taskOtherMembers->get(1) ?? null),
+                ])->filter()->values();
+
+                if ($timTeknisiList->isEmpty() && $installation->technicians) {
+                    $timTeknisiList = collect([$installation->technicians]);
+                }
+
+                $timTeknisi = $timTeknisiList->implode(', ') ?: ($allTaskMemberNames->implode(', ') ?: '-');
+
+                $tglJadwal = $installation->scheduled_date
+                    ? \App\Support\IndonesianDate::date($installation->scheduled_date)
+                    : ($installTask?->scheduled_at ? \App\Support\IndonesianDate::date($installTask->scheduled_at) : '-');
+                $tglMulai = $installation->started_at
+                    ? \App\Support\IndonesianDate::date($installation->started_at)
+                    : ($installation->scheduled_date ? \App\Support\IndonesianDate::date($installation->scheduled_date) : ($installTask?->scheduled_at ? \App\Support\IndonesianDate::date($installTask->scheduled_at) : ($installation->created_at ? \App\Support\IndonesianDate::date($installation->created_at) : '-')));
+                $tglSelesai = $installation->finished_date
+                    ? \App\Support\IndonesianDate::date($installation->finished_date)
+                    : ($installation->completed_at ? \App\Support\IndonesianDate::date($installation->completed_at) : $tglMulai);
             @endphp
 
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 justify-between items-center">
-                    <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Pemasangan — {{ $tglJadwal }}</span>
+                    <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Pemasangan — {{ $tglMulai !== '-' ? $tglMulai : $tglJadwal }}</span>
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $statusBadge }}">{{ $statusLabel }}</span>
                 </div>
 
@@ -127,25 +147,25 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                         <div class="space-y-2.5">
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">ID FOP Penugasan Pemasangan</span>
-                                <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text">{{ $installation->fop_id ?: '-' }}</span>
+                                <span class="text-slate-400">Petugas FOP Penugasan Pemasangan</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $installation->fop?->name ?: ($installation->fop_id ?: ($installTask?->fop?->name ?: '-')) }}</span>
                             </div>
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Waktu Penugasan FOP Pasang</span>
                                 <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
-                                    {{ $installation->assigned_at ? \App\Support\IndonesianDate::dateTime($installation->assigned_at) . ' WIB' : '-' }}
+                                    {{ $installation->assigned_at ? \App\Support\IndonesianDate::dateTime($installation->assigned_at) . ' WIB' : ($installTask?->created_at ? \App\Support\IndonesianDate::dateTime($installTask->created_at) . ' WIB' : ($installation->created_at ? \App\Support\IndonesianDate::dateTime($installation->created_at) . ' WIB' : '-')) }}
                                 </span>
                             </div>
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Jadwal Pemasangan</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">
-                                    {{ $tglJadwal }}{{ $installation->scheduled_time ? ' — ' . substr($installation->scheduled_time, 0, 5) . ' WIB' : '' }}
+                                    {{ $tglJadwal }}{{ $installation->scheduled_time ? ' — ' . substr($installation->scheduled_time, 0, 5) . ' WIB' : ($installTask?->scheduled_at ? ' — ' . $installTask->scheduled_at->format('H:i') . ' WIB' : '') }}
                                 </span>
                             </div>
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Tanggal &amp; Waktu Mulai Pasang</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">
-                                    {{ $tglJadwal }} — {{ $installation->start_time ? substr($installation->start_time, 0, 5) . ' WIB' : '-' }}
+                                    {{ $tglMulai }} — {{ $installation->start_time ? substr($installation->start_time, 0, 5) . ' WIB' : '-' }}
                                 </span>
                             </div>
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
@@ -159,11 +179,11 @@
                         <div class="space-y-2.5">
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Teknisi 1 (Utama)</span>
-                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $installation->technicians ?: ($installation->technician->name ?? '-') }}</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $teknisiUtama }}</span>
                             </div>
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Teknisi Bertugas (Tim)</span>
-                                <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text">{{ $timTeknisi ?: '-' }}</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text">{{ $timTeknisi }}</span>
                             </div>
                             <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Status Pengujian Uji Coba</span>

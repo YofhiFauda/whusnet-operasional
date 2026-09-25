@@ -4,9 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\PeriodClosing;
 use App\Services\CollectorMonthlyReportService as Report;
-use App\Support\ReasonValidationRule;
+use App\Support\BookPeriod;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use InvalidArgumentException;
@@ -41,10 +40,9 @@ class CollectorMonthlyReportController extends Controller
             'totals' => $report['totals'],
             'periodLabel' => $this->monthLabel($period),
             'previousLabel' => $this->monthLabel(Report::parsePeriod($period)->subMonth()->format('Y-m')),
-            // Bulan yang masih berjalan belum bisa ditutup.
-            'closable' => $period < now()->format('Y-m'),
-            'canClose' => $request->user()->hasPermission('collector_report.approve'),
-            'canReopen' => $request->user()->hasPermission('collector_report.cancel'),
+            // Tutup buku otomatis saat bulan berganti — tidak ada tombol
+            // tutup/buka ulang (BookPeriod).
+            'locked' => BookPeriod::isLocked($period),
             'canExport' => $request->user()->hasPermission('collector_report.export'),
             // Rincian per sel (drill-down) — dipakai JS buat tahu kolom mana
             // yang boleh diklik, dan endpoint-nya (query string ditambah
@@ -81,31 +79,6 @@ class CollectorMonthlyReportController extends Controller
     }
 
     /**
-     * Tutup buku. `pop_id` kosong = semua POP dalam scope user yang belum
-     * ditutup. POP di luar scope tidak pernah disentuh.
-     */
-    public function close(Request $request, Report $service): RedirectResponse
-    {
-        [$period, $popId] = $this->filters($request);
-
-        $branches = $service->branchesFor($request->user(), $popId);
-        abort_if($popId && $branches->isEmpty(), 403, 'Anda tidak memiliki akses ke POP ini.');
-
-        $closed = 0;
-        foreach ($branches as $branch) {
-            if ($service->isClosed($period, $branch->id)) {
-                continue;
-            }
-            $service->close($period, $branch, $request->user());
-            $closed++;
-        }
-
-        return redirect()
-            ->route('reports.collector-monthly.index', array_filter(['period' => $period, 'pop_id' => $popId]))
-            ->with('success', "Periode {$period} ditutup untuk {$closed} POP.");
-    }
-
-    /**
      * Rincian baris di balik satu sel angka ("siapa saja yang sudah
      * membayar", dst.) — dipanggil modal via fetch. SELALU live dari DB
      * (lihat docblock `CollectorMonthlyReportService::detail()`), jadi kalau
@@ -115,6 +88,18 @@ class CollectorMonthlyReportController extends Controller
     public function detail(Request $request, Report $service): JsonResponse
     {
         [$rows, $validated, $isClosed] = $this->resolveDetail($request, $service);
+
+        // Klasifikasi (ADHOC-84 §8.2) dipetakan ke label/badge di sini —
+        // enum PHP tak berguna langsung buat JS, dan pemetaan warnanya harus
+        // satu tempat (PaymentPeriodType), bukan diketik ulang di Blade/JS.
+        $rows = array_map(function (array $row) {
+            $row['jenis'] = array_map(fn ($label) => [
+                'label' => $label->label(),
+                'badge_class' => $label->badgeClass(),
+            ], $row['jenis'] ?? []);
+
+            return $row;
+        }, $rows);
 
         return response()->json([
             'rows' => $rows,
@@ -178,31 +163,12 @@ class CollectorMonthlyReportController extends Controller
             abort(422, $e->getMessage());
         }
 
-        return [$rows, $validated, $service->isClosed($validated['period'], (int) $validated['pop_id'])];
-    }
+        $frozen = PeriodClosing::query()
+            ->where('period', $validated['period'])
+            ->where('pop_id', (int) $validated['pop_id'])
+            ->exists();
 
-    public function reopen(Request $request, Report $service): RedirectResponse
-    {
-        [$period, $popId] = $this->filters($request);
-
-        $validated = $request->validate([
-            'pop_id' => ['required', 'integer'],
-            'reason' => ReasonValidationRule::required(500),
-        ]);
-
-        $branches = $service->branchesFor($request->user(), (int) $validated['pop_id']);
-        abort_if($branches->isEmpty(), 403, 'Anda tidak memiliki akses ke POP ini.');
-
-        $closing = PeriodClosing::query()
-            ->where('period', $period)
-            ->where('pop_id', $validated['pop_id'])
-            ->firstOrFail();
-
-        $service->reopen($closing, $request->user(), $validated['reason']);
-
-        return redirect()
-            ->route('reports.collector-monthly.index', ['period' => $period, 'pop_id' => $popId])
-            ->with('success', "Periode {$period} dibuka ulang.");
+        return [$rows, $validated, $frozen];
     }
 
     private function monthLabel(string $period): string
@@ -292,12 +258,15 @@ class CollectorMonthlyReportController extends Controller
             ],
             [
                 'UANG DITERIMA '.mb_strtoupper($bulan),
-                ['No', 'OLT', 'Bulanan', 'Piutang', 'Lebih Bayar', 'Aktivasi', 'Lainnya', 'Total Uang Diterima'],
+                ['No', 'OLT', 'Bulanan', 'Piutang', 'Lebih Bayar', 'Aktivasi', 'Lainnya', 'Dikembalikan', 'Total Uang Diterima'],
                 fn (array $f) => [
                     $f['uang_diterima']['bulanan'], $f['uang_diterima']['piutang'], $f['uang_diterima']['lebih_bayar'],
-                    $f['uang_diterima']['aktivasi'], $f['uang_diterima']['lainnya'], $f['uang_diterima']['total'],
+                    $f['uang_diterima']['aktivasi'], $f['uang_diterima']['lainnya'],
+                    // Snapshot sebelum kolom ini ada tidak punya kuncinya.
+                    -($f['uang_diterima']['dikembalikan'] ?? 0),
+                    $f['uang_diterima']['total'],
                 ],
-                'nnnnnn',
+                'nnnnnnn',
             ],
         ];
 

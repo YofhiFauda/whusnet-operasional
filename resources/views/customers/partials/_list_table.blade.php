@@ -188,6 +188,7 @@
                                     data-network-data-url="{{ route('customers.network-assignment.data', $customer->id) }}"
                                     data-package-update-url="{{ route('customers.package.update', $customer->id) }}"
                                     data-current-package-id="{{ $customer->customerService->internet_package_id ?? '' }}"
+                                    data-toggle-suspend-url="{{ route('customers.toggle-suspend', $customer->id) }}"
                                     class="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-slate-700 hover:border-sky-300 text-slate-500 hover:text-sky-600 inline-flex items-center justify-center transition-all shadow-sm cursor-pointer"
                                     title="Buka Modal Hub Aksi Cepat">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
@@ -324,8 +325,9 @@
                                     data-network-data-url="{{ route('customers.network-assignment.data', $customer->id) }}"
                                     data-package-update-url="{{ route('customers.package.update', $customer->id) }}"
                                     data-current-package-id="{{ $customer->customerService->internet_package_id ?? '' }}"
+                                    data-toggle-suspend-url="{{ route('customers.toggle-suspend', $customer->id) }}"
                                 class="flex-1 py-1.5 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center justify-center gap-1 shadow-md shadow-sky-600/20 transition-all btn-interactive touch-target min-w-0">
-                            <span class="truncate">Quick Hub</span>
+                            <span class="truncate">Detail Pelanggan</span>
                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                     </div>

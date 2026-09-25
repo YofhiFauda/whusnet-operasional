@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\BillingWaiverSource;
 use App\Enums\DocumentType;
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
@@ -15,9 +16,11 @@ use App\Http\Controllers\Concerns\RendersCustomerList;
 use App\Http\Requests\CustomerRegistrationRequest;
 use App\Models\Agent;
 use App\Models\AuditLog;
+use App\Models\BankAccount;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
+use App\Models\CustomerBalanceMutation;
 use App\Models\CustomerDevice;
 use App\Models\CustomerDocument;
 use App\Models\CustomerInstallation;
@@ -25,6 +28,7 @@ use App\Models\CustomerService;
 use App\Models\CustomerStatusLog;
 use App\Models\CustomerSurvey;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\CustomerTerminationReason;
 use App\Models\Distribution;
 use App\Models\District;
 use App\Models\FopTask;
@@ -43,6 +47,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Services\BillingPeriodWaiverService;
 use App\Services\CustomerBalanceService;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
@@ -1092,7 +1097,7 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Data pelanggan berhasil dihapus!');
     }
 
-    public function show(Customer $customer)
+    public function show(Customer $customer, BillingPeriodWaiverService $waiverService)
     {
         if (! $customer->exists) {
             $customer = Customer::findOrFail(request()->route('customer'));
@@ -1190,9 +1195,26 @@ class CustomerController extends Controller
         $latestInstallation = $customer->installations()->latest('id')->first();
         $service = $customer->customerService;
 
-        $surveyDate = $latestSurvey?->end_date ?? $latestSurvey?->survey_date;
-        $installationDate = $latestInstallation?->finished_date ?? $latestInstallation?->scheduled_date;
+        $latestSurveyTask = $customer->tasks()
+            ->where('task_type', TaskType::SURVEY->value)
+            ->with(['updater', 'teamMembers.user'])
+            ->latest('id')
+            ->first();
+
+        $latestInstallTask = $customer->tasks()
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->with(['teamMembers.user', 'fop'])
+            ->latest('id')
+            ->first();
+
+        $surveyDate = $latestSurvey?->end_date ?? $latestSurvey?->survey_date ?? ($latestSurveyTask?->scheduled_at ? Carbon::parse($latestSurveyTask->scheduled_at)->toDateString() : null);
+        $installationDate = $latestInstallation?->finished_date ?? $latestInstallation?->scheduled_date ?? ($latestInstallTask?->scheduled_at ? Carbon::parse($latestInstallTask->scheduled_at)->toDateString() : null);
         $activationDate = $service?->activation_date;
+
+        $adminFilterDate = $service?->admin_filter_at
+            ?? ($latestSurveyTask?->fop_review_status === 'approved' ? $latestSurveyTask->updated_at : null);
+        $adminFilterPic = $service?->admin_filter_by_name
+            ?? ($latestSurveyTask?->fop_review_status === 'approved' ? $latestSurveyTask->updater?->name : null);
 
         $timeline = [
             [
@@ -1215,8 +1237,19 @@ class CustomerController extends Controller
                     : ($statusRank == 2 || $latestSurvey ? 'current' : 'pending'),
             ],
             [
+                'step' => 'Review Admin',
+                'title' => 'Verifikasi Hasil Survey (ACC)',
+                'date' => $adminFilterDate ? IndonesianDate::date($adminFilterDate) : '-',
+                'notes' => $adminFilterPic
+                    ? 'Disetujui oleh '.$adminFilterPic
+                    : ($status === 'waiting_acc' ? 'Menunggu ACC / verifikasi Admin' : ($statusRank >= 4 ? 'Survey disetujui (ACC)' : 'Menunggu hasil survey')),
+                'status' => $statusRank >= 4 || $adminFilterDate
+                    ? 'completed'
+                    : ($status === 'waiting_acc' || ($latestSurvey && $latestSurvey->survey_status === 'completed') ? 'current' : 'pending'),
+            ],
+            [
                 'step' => 'Pemasangan',
-                'title' => 'Penarikan Kabel & Pemasangan ONT',
+                'title' => 'Penarikan Kabel & ONT',
                 'date' => $installationDate ? IndonesianDate::date($installationDate) : '-',
                 'notes' => $latestInstallation
                     ? 'SN ONT: '.($customer->ont_sn ?: '-')
@@ -1224,7 +1257,7 @@ class CustomerController extends Controller
                     : ($statusRank == 4 ? 'Teknisi sedang melakukan penarikan kabel dropcore.' : 'Belum ada laporan pemasangan.'),
                 'status' => $latestInstallation && $latestInstallation->installation_status === 'completed'
                     ? 'completed'
-                    : ($latestInstallation ? 'current' : 'pending'),
+                    : ($latestInstallation || $statusRank == 4 ? 'current' : 'pending'),
             ],
             [
                 'step' => 'Aktivasi Billing',
@@ -1248,12 +1281,6 @@ class CustomerController extends Controller
                 'no' => 1,
                 'title' => 'Registrasi & Input Pelanggan',
                 'subtitle' => 'Pendaftaran Awal Data Pelanggan',
-                // Pelanggan hasil migrasi legacy: $customer->created_at &
-                // creator selalu mencatat SAAT IMPORT dijalankan (wall clock +
-                // admin yang jalanin command), bukan kapan/siapa yang beneran
-                // mendaftarkan pelanggan itu di sistem lama. registration_date
-                // & registered_by_name (diisi khusus dari jalur migrasi) yang
-                // jadi sumber kebenaran kalau ada.
                 'at' => $customer->registered_by_name ? $regDate : $customer->created_at,
                 'date_fallback' => IndonesianDate::date($regDate),
                 'pic' => $customer->registered_by_name ?? $customer->creator?->name,
@@ -1264,9 +1291,9 @@ class CustomerController extends Controller
                 'no' => 2,
                 'title' => 'Survey Lokasi',
                 'subtitle' => 'Pemeriksaan Jalur & ODP',
-                'at' => $latestSurvey?->assigned_at,
+                'at' => $latestSurvey?->assigned_at ?? ($latestSurveyTask?->scheduled_at ? Carbon::parse($latestSurveyTask->scheduled_at) : null),
                 'date_fallback' => $surveyDate ? IndonesianDate::date($surveyDate) : null,
-                'pic' => $latestSurvey?->technician?->name ?? $latestSurvey?->surveyors,
+                'pic' => $latestSurvey?->technician?->name ?? ($latestSurvey?->surveyors ?? ($latestSurveyTask?->teamMembers?->first()?->user?->name ?? null)),
                 'pic_role' => $latestSurvey?->technician?->role?->name ?? 'Surveyor FOP',
                 'accent' => 'indigo',
             ],
@@ -1274,9 +1301,9 @@ class CustomerController extends Controller
                 'no' => 3,
                 'title' => 'Review & Filter Admin',
                 'subtitle' => 'Verifikasi Hasil Survey (ACC)',
-                'at' => $service?->admin_filter_at,
+                'at' => $adminFilterDate,
                 'date_fallback' => null,
-                'pic' => $service?->admin_filter_by_name,
+                'pic' => $adminFilterPic,
                 'pic_role' => 'Admin POP',
                 'accent' => 'amber',
             ],
@@ -1284,9 +1311,9 @@ class CustomerController extends Controller
                 'no' => 4,
                 'title' => 'Proses Pemasangan Perangkat',
                 'subtitle' => 'Penarikan Dropcore & Pemasangan ONT',
-                'at' => $latestInstallation?->assigned_at,
+                'at' => $latestInstallation?->assigned_at ?? ($latestInstallTask?->scheduled_at ? Carbon::parse($latestInstallTask->scheduled_at) : null),
                 'date_fallback' => $installationDate ? IndonesianDate::date($installationDate) : null,
-                'pic' => $latestInstallation?->technician?->name ?? $latestInstallation?->technicians,
+                'pic' => $latestInstallation?->technician?->name ?? ($latestInstallation?->technicians ?? ($latestInstallTask?->teamMembers?->first()?->user?->name ?? null)),
                 'pic_role' => $latestInstallation?->technician?->role?->name ?? 'Teknisi FOP',
                 'accent' => 'purple',
             ],
@@ -1389,6 +1416,37 @@ class CustomerController extends Controller
         // Dropdown "Ganti Paket" di tab Paket & Layanan (CustomerPackageController).
         $availablePackages = InternetPackage::orderBy('name')->get(['id', 'name', 'monthly_price', 'download_speed_mbps', 'upload_speed_mbps']);
 
+        // Dropdown alasan Putus Langganan (ADHOC-69) + eligibilitas denda
+        // (masa langganan <=1 tahun, dihitung server, sama dengan
+        // CustomerTerminationService — form cuma menampilkan field denda
+        // kalau eligible, guard sebenarnya tetap di Service).
+        $terminationReasons = CustomerTerminationReason::active()->orderBy('name')->get();
+        $terminationPenaltyEligible = $activationDate === null
+            || now()->lessThanOrEqualTo(Carbon::parse($activationDate)->addYear());
+
+        // ADHOC-87 (disederhanakan 2026-09-24) — dropdown periode tagihan
+        // buat aksi "Cuti Berlangganan / Bebaskan Tagihan", SATU-SATUNYA
+        // pintu ke BillingPeriodWaiverService sekarang (form Request Putus
+        // Langganan tidak lagi bawa periode). Dihitung juga untuk pelanggan
+        // `terminated` — aksi ini sengaja tetap dibuka setelah putus (G6),
+        // buat bersihin tagihan yang kelupaan dibebaskan sebelum putus resmi.
+        $leaveWaiverPeriods = collect();
+        if ($customer->customerService && in_array($customer->status, ['active', 'suspended', 'terminated'], true)) {
+            $leaveWaiverPeriods = $waiverService->eligiblePeriods($customer, BillingWaiverSource::LEAVE);
+        }
+        $activeBillingWaivers = $customer->billingWaivers()->with(['invoice', 'creator'])->latest()->get();
+
+        // Saldo Pelanggan (ADHOC-92) — kartu ringkasan + riwayat ledger di tab
+        // Billing. `customer_balance.view` permission SENGAJA tidak menggerbang
+        // variabel ini (dihitung selalu) — gerbangnya di Blade (`@can`), sama
+        // pola field sensitif lain di halaman ini.
+        $customerBalance = app(CustomerBalanceService::class)->balance($customer);
+        $customerBalanceMutations = CustomerBalanceMutation::where('customer_id', $customer->id)
+            ->with(['payment.invoice', 'creator'])
+            ->latest()
+            ->limit(15)
+            ->get();
+
         return view('customers.show', compact(
             'customer',
             'displayId',
@@ -1405,7 +1463,13 @@ class CustomerController extends Controller
             'customerFopTasks',
             'availableMiniPops',
             'availableDistributions',
-            'availablePackages'
+            'availablePackages',
+            'terminationReasons',
+            'terminationPenaltyEligible',
+            'leaveWaiverPeriods',
+            'activeBillingWaivers',
+            'customerBalance',
+            'customerBalanceMutations'
         ));
     }
 
@@ -1539,6 +1603,8 @@ class CustomerController extends Controller
             'due_date' => $latestInvoice && $latestInvoice->due_date ? $latestInvoice->due_date->format('d/m/Y') : null,
             'customer_balance' => (float) $customerBalance,
             'available_collectors' => $availableCollectors,
+            // Dropdown rekening tujuan metode Transfer (ADHOC-95).
+            'available_bank_accounts' => BankAccount::activeOptions(),
             'technical' => [
                 'pppoe_username' => $service?->pppoe_username ?? '-',
                 'onu_sn' => $device?->onu_sn ?? $device?->mac_address ?? '-',
@@ -3741,159 +3807,5 @@ class CustomerController extends Controller
             ->get(['id', 'customer_code', 'full_name']);
 
         return response()->json($customers);
-    }
-
-    /**
-     * S5-T003 — Buat Tagihan Manual
-     * Handle POST request to create a manual invoice for a customer.
-     */
-    public function storeManualInvoice(Request $request, Customer $customer)
-    {
-        if (! $customer->exists) {
-            $customer = Customer::findOrFail($request->route('customer'));
-        }
-
-        // 1. Authorization checks
-        if (! auth()->user()->hasPermission('invoices.create')) {
-            abort(403, 'Anda tidak memiliki akses untuk membuat tagihan.');
-        }
-
-        // Scope check for user's assigned POPs
-        if (! Customer::query()->applyUserScope()->where('id', $customer->id)->exists()) {
-            abort(403, 'Anda tidak memiliki akses ke data pelanggan di POP ini.');
-        }
-
-        // 2. Validate request
-        // Nominal prorata & biaya tambahan diketik berformat ribuan.
-        $request->merge(RupiahInput::parseKeys(
-            $request->only(['prorate_amount', 'extra_cable_fee', 'extra_installation_fee', 'extra_pole_fee']),
-            'prorate_amount',
-            'extra_cable_fee',
-            'extra_installation_fee',
-            'extra_pole_fee',
-        ));
-
-        $validated = $request->validate([
-            'billing_period' => 'required|date_format:Y-m',
-            'issue_date' => 'required|date',
-            'due_date' => 'required|date|after_or_equal:issue_date',
-            'invoice_type' => ['required', Rule::enum(InvoiceType::class)],
-            'prorate_amount' => 'nullable|numeric|min:0',
-            'extra_cable_fee' => 'nullable|numeric|min:0',
-            'extra_installation_fee' => 'nullable|numeric|min:0',
-            'extra_pole_fee' => 'nullable|numeric|min:0',
-        ]);
-
-        $billingPeriod = $validated['billing_period'];
-        $issueDate = $validated['issue_date'];
-        $dueDate = $validated['due_date'];
-        $invoiceType = InvoiceType::from($validated['invoice_type']);
-        $prorateAmount = (float) ($validated['prorate_amount'] ?? 0);
-        $extraCableFee = (float) ($validated['extra_cable_fee'] ?? 0);
-        $extraInstallationFee = (float) ($validated['extra_installation_fee'] ?? 0);
-        $extraPoleFee = (float) ($validated['extra_pole_fee'] ?? 0);
-
-        // 3. Business logic checks
-        // Cek pelanggan aktif/siap billing
-        if (! in_array($customer->status, ['active', 'suspended']) && $customer->data_completeness_status !== 'siap_billing') {
-            return redirect()->back()->withErrors(['error' => 'Tagihan hanya bisa dibuat untuk pelanggan dengan status aktif atau siap billing.']);
-        }
-
-        $service = $customer->customerService;
-        if (! $service) {
-            return redirect()->back()->withErrors(['error' => 'Pelanggan tidak memiliki layanan aktif.']);
-        }
-
-        // Cek invoice dobel untuk periode + jenis tagihan yang sama (bukan
-        // seluruh periode, karena AWAL dan BULANAN sah muncul bersamaan di
-        // periode yang sama — misal saat reaktivasi).
-        $exists = Invoice::where('customer_id', $customer->id)
-            ->where('billing_period', $billingPeriod)
-            ->where('invoice_type', $invoiceType->value)
-            ->exists();
-
-        if ($exists) {
-            return redirect()->back()->withErrors(['billing_period' => "Tagihan {$invoiceType->label()} untuk periode {$billingPeriod} sudah pernah dibuat untuk pelanggan ini."]);
-        }
-
-        // 4. Generate invoice number sequentially (e.g., format INV-YYYYMM-[counter] where counter increment is locked for update)
-        $periodCode = str_replace('-', '', $billingPeriod);
-
-        $invoice = DB::transaction(function () use (
-            $customer, $service, $billingPeriod, $issueDate, $dueDate, $periodCode, $invoiceType,
-            $prorateAmount, $extraCableFee, $extraInstallationFee, $extraPoleFee
-        ) {
-            $lastInvoice = Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
-                ->orderBy('invoice_number', 'desc')
-                ->lockForUpdate()
-                ->first();
-
-            $nextSeq = 1;
-            if ($lastInvoice) {
-                $parts = explode('-', $lastInvoice->invoice_number);
-                if (count($parts) === 3) {
-                    $nextSeq = ((int) $parts[2]) + 1;
-                }
-            }
-            $invoiceNumber = sprintf('INV-%s-%04d', $periodCode, $nextSeq);
-
-            // Rincian biaya dari service snapshot
-            $subtotal = (float) $service->monthly_price;
-            $discount = (float) ($service->discount ?? 0.00);
-            $ppnPercent = (float) ($service->ppn ?? 0.00);
-
-            // Hitung PPN dari (subtotal - discount) × rate
-            $afterDiscount = max(0, $subtotal - $discount);
-            $ppnAmount = round($afterDiscount * ($ppnPercent / 100), 2);
-            $nettMonthly = $afterDiscount + $ppnAmount;
-
-            // Total = tagihan bulanan nett + semua biaya tambahan
-            $totalAmount = $nettMonthly + $prorateAmount + $extraCableFee + $extraInstallationFee + $extraPoleFee;
-            $paidAmount = 0.00;
-            $remainingAmount = $totalAmount;
-
-            $newInvoice = Invoice::create([
-                'invoice_number' => $invoiceNumber,
-                'invoice_type' => $invoiceType->value,
-                'customer_id' => $customer->id,
-                'pop_id' => $customer->pop_id,
-                'customer_service_id' => $service->id,
-                'internet_package_id' => $service->internet_package_id,
-                'billing_period' => $billingPeriod,
-                'issue_date' => $issueDate,
-                'due_date' => $dueDate,
-                'subtotal' => $subtotal,
-                'discount' => $discount,
-                'ppn' => $ppnPercent,
-                'prorate_amount' => $prorateAmount > 0 ? $prorateAmount : null,
-                'extra_cable_fee' => $extraCableFee > 0 ? $extraCableFee : null,
-                'extra_installation_fee' => $extraInstallationFee > 0 ? $extraInstallationFee : null,
-                'extra_pole_fee' => $extraPoleFee > 0 ? $extraPoleFee : null,
-                'total_amount' => $totalAmount,
-                'paid_amount' => $paidAmount,
-                'remaining_amount' => $remainingAmount,
-                'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
-                'created_by' => auth()->id(),
-            ]);
-
-            // Save changes to audit log (Sprint 8: audit_logs)
-            AuditLog::create([
-                'user_id' => auth()->id(),
-                'module' => 'Tagihan',
-                'action' => 'create',
-                'auditable_type' => get_class($newInvoice),
-                'auditable_id' => $newInvoice->id,
-                'old_values' => null,
-                'new_values' => $newInvoice->toArray(),
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-                'created_at' => now(),
-            ]);
-
-            return $newInvoice;
-        });
-
-        return $this->redirectToCustomer($customer)
-            ->with('success', "Tagihan manual dengan nomor {$invoice->invoice_number} berhasil dibuat!");
     }
 }

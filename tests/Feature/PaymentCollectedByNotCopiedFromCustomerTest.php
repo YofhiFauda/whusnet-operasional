@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\ScopeType;
+use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -16,6 +17,7 @@ use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -34,6 +36,9 @@ class PaymentCollectedByNotCopiedFromCustomerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Tanggal bayar di tes ini hardcode Juni 2026. Sejak tutup buku otomatis
+        // (ADHOC-96) bulan lewat terkunci, jadi waktu dibekukan di Juni.
+        $this->travelTo(Carbon::parse('2026-06-20 10:00:00'));
         $this->seed(DatabaseSeeder::class);
     }
 
@@ -124,8 +129,7 @@ class PaymentCollectedByNotCopiedFromCustomerTest extends TestCase
         $response = $this->actingAs($admin)->post(route('invoices.payments.store', $invoice->id), [
             'payment_date' => '2026-06-13',
             'payment_method' => 'transfer',
-            'bank_name' => 'BCA',
-            'account_number' => '1234567890',
+            'bank_account_id' => BankAccount::factory()->create()->id,
             'amount' => 150000,
         ]);
 

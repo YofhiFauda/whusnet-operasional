@@ -216,10 +216,19 @@
 
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold <?php echo e($statusBadges[$invoice->invoice_status->value] ?? 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'); ?>">
-                                    <?php echo e($statusLabels[$invoice->invoice_status->value] ?? $invoice->invoice_status->label()); ?>
+                                <div class="flex flex-col items-center gap-1">
+                                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold <?php echo e($statusBadges[$invoice->invoice_status->value] ?? 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'); ?>">
+                                        <?php echo e($statusLabels[$invoice->invoice_status->value] ?? $invoice->invoice_status->label()); ?>
 
-                                </span>
+                                    </span>
+                                    
+                                    <?php if($invoice->remaining_amount > 0): ?>
+                                        <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold <?php echo e($invoice->isPiutang() ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20' : 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20'); ?>">
+                                            <?php echo e($invoice->isPiutang() ? 'Piutang' : 'Bulanan Berjalan'); ?>
+
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>

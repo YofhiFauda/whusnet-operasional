@@ -5,7 +5,7 @@
 **Urutan pengerjaan disarankan:** ADHOC-84 → ADHOC-70 → ADHOC-69 → ADHOC-87 → ADHOC-92 → ADHOC-68 (94 & 95 independen, bisa disisipkan kapan aja).
 
 ---
-
+(DONE)
 ## 1. Tagihan Manual — ADHOC-70
 
 **Dokumen:** [`analisa-rancangan-tagihan-manual.md`](analisa-rancangan-tagihan-manual.md)
@@ -19,6 +19,7 @@
 
 ---
 
+(DONE)
 ## 2. Putus Langganan — ADHOC-69
 
 **Dokumen:** [`analisa-rancangan-putus-langganan.md`](analisa-rancangan-putus-langganan.md) (sumber ide: [`skema-putus-langganan.md`](skema-putus-langganan.md))
@@ -36,6 +37,7 @@
 
 ---
 
+(DONE)
 ## 3. Upgrade/Downgrade Paket — ADHOC-68
 
 **Dokumen:** [`upgrade-downgrade/analisa-upgrade-downgrade-paket.md`](upgrade-downgrade/analisa-upgrade-downgrade-paket.md) (sumber ide: [`upgrade-downgrade/Skema-downgrade-dan-upgrade.md`](upgrade-downgrade/Skema-downgrade-dan-upgrade.md))
@@ -56,7 +58,7 @@
 **Status:** ✅ Selesai — dokumen referensi/definisi (piutang, cash-basis vs accrual-basis, aturan tutup buku), bukan rancangan fitur baru berdiri sendiri. FIFO yang tadinya disebut di sini digabung jadi bagian ADHOC-84.
 
 ---
-
+(DONE — Selesai 2026-09-23)
 ## 5. Alokasi Pembayaran & Saldo — ADHOC-84
 
 **Dokumen:** [`analisa-skema-alokasi-pembayaran-dan-saldo.md`](analisa-skema-alokasi-pembayaran-dan-saldo.md)
@@ -71,7 +73,7 @@
 **Fondasi buat:** kerja duluan, area `PaymentService` yang disentuh task lain.
 
 ---
-
+(DONE)
 ## 6. Perubahan Kwitansi — ADHOC-94
 
 **Dokumen:** [`analisa-rancangan-perubahan-kwitansi.md`](analisa-rancangan-perubahan-kwitansi.md) (referensi visual: [`kwitansi.md`](kwitansi.md)/[`kwitansi.html`](kwitansi.html))
@@ -85,11 +87,11 @@
 - JSON Portal (`PaymentReceiptResource`) gak dipangkas lebih jauh, tetap ikut satu sumber `ReceiptPresenter`.
 
 ---
-
+(DONE)
 ## 7. Master Rekening Bank + Nama Pengirim + Sembunyikan Badge — ADHOC-95
 
 **Dokumen:** [`analisa-rancangan-master-rekening-transfer.md`](analisa-rancangan-master-rekening-transfer.md)
-**Status:** ✅ Clear, tidak ada pertanyaan terbuka.
+**Status:** ✅ **Selesai diimplementasi 2026-09-23** — lihat § Catatan Implementasi di dokumen (dropdown diganti di 3 form bayar, bukan 1; permission final `master_rekening.view|create|update`).
 
 **Inti (3 perubahan satu batch):**
 1. **Master Rekening Bank** (`bank_accounts`, global bukan per-POP) — dropdown pilih rekening di form bayar Transfer, ganti input teks bebas. `payments.bank_account_id` FK + snapshot nama/nomor tetap di kolom lama (riwayat gak berubah kalau rekening diedit belakangan). Permission `master.rekening` lewat matrix RBAC (gak dihardcode ke role tertentu).
@@ -102,6 +104,7 @@
 
 ---
 
+(DONE — Selesai 2026-09-24)
 ## 9. Saldo Pelanggan (Bayar di Muka + Auto-Pakai) — ADHOC-92
 
 **Dokumen:** [`analisa-rancangan-saldo-pelanggan.md`](analisa-rancangan-saldo-pelanggan.md)
@@ -114,7 +117,7 @@
 - **Risiko utama:** credit lama bisa langsung kepake di generator tanggal 1 pertama setelah deploy — wajib `billing:apply-balance --dry-run` dulu sebelum go-live.
 
 ---
-
+(PROSES)
 ## 10. Request Deaktivasi + Cuti Berlangganan — ADHOC-87
 
 **Dokumen:** [`analisa-rancangan-request-deaktivasi-bebas-tagihan-periode.md`](analisa-rancangan-request-deaktivasi-bebas-tagihan-periode.md)
@@ -130,11 +133,11 @@
 
 ## Checklist Cepat
 
-- [ ] ADHOC-84 — Alokasi Pembayaran & Saldo
-- [ ] ADHOC-70 — Tagihan Manual
-- [ ] ADHOC-69 — Putus Langganan
+- [x] ADHOC-84 — Alokasi Pembayaran & Saldo — Selesai 2026-09-23
+- [x] ADHOC-70 — Tagihan Manual
+- [x] ADHOC-69 — Putus Langganan
 - [ ] ADHOC-87 — Request Deaktivasi + Cuti
-- [ ] ADHOC-92 — Saldo Pelanggan
-- [ ] ADHOC-68 — Upgrade/Downgrade Paket
-- [ ] ADHOC-94 — Perubahan Kwitansi *(independen, sisipkan kapan aja)*
-- [ ] ADHOC-95 — Master Rekening + Nama Pengirim + Badge *(independen, sisipkan kapan aja)*
+- [x] ADHOC-92 — Saldo Pelanggan — Selesai 2026-09-24
+- [x] ADHOC-68 — Upgrade/Downgrade Paket
+- [x] ADHOC-94 — Perubahan Kwitansi *(independen, sisipkan kapan aja)* — Selesai 2026-09-23
+- [x] ADHOC-95 — Master Rekening + Nama Pengirim + Badge *(independen, sisipkan kapan aja)*

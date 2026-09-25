@@ -47,21 +47,19 @@ class PaymentReceiptPrintTest extends TestCase
         $response = $this->get(route('payments.receipt', $payment->id));
 
         $response->assertStatus(200);
-        $response->assertSee('STRUK PEMBAYARAN', false);
-        $response->assertSee('PAY-202606-9001', false);
-        $response->assertSee('INV-202606-9001', false);
+        // No. Dokumen di kertas = CID pelanggan, bukan nomor pembayaran.
+        $response->assertSee($payment->customer->customer_code, false);
         $response->assertSee('Customer Struk Test', false);
         // Nominal dibayar diformat rupiah tanpa desimal.
         $response->assertSee('Rp 75.000', false);
     }
 
     /**
-     * Struk yang dicetak untuk pelanggan tidak boleh membawa header/footer
-     * bawaan browser — di sana tercetak tanggal, judul dokumen, dan URL
-     * internal sistem. Teks itu hidup di kotak margin halaman; satu-satunya
-     * cara mematikannya adalah menolkan margin @page.
+     * Kwitansi cetak fisik staf dicetak di atas kertas NCR 2-ply blangko
+     * polos (9,5×5,5 inci, bukan A4/roll thermal) — `@page` wajib mengunci
+     * ukuran itu, bukan diserahkan ke default browser/printer.
      */
-    public function test_struk_menolak_header_footer_bawaan_browser(): void
+    public function test_struk_menggunakan_ukuran_kertas_ncr(): void
     {
         $this->loginAsAdmin();
         $pop = $this->createPop('POP-RCP-PG', 'RCPG', 'POP Struk Page');
@@ -70,8 +68,8 @@ class PaymentReceiptPrintTest extends TestCase
         $response = $this->get(route('payments.receipt', $payment->id));
 
         $response->assertStatus(200);
-        $response->assertSee('@page { margin: 0; }', false);
-        // Jarak ke tepi kertas pindah ke struk-nya sendiri, bukan hilang.
+        $response->assertSee('size: 9.5in 5.5in;', false);
+        // Jarak ke tepi kertas pindah ke lembarnya sendiri, bukan hilang.
         $response->assertSee('padding: 6mm 5mm', false);
     }
 

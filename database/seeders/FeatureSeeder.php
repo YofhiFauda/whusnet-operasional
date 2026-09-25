@@ -124,10 +124,9 @@ class FeatureSeeder extends Seeder
                 'sort_order' => 13,
             ],
             [
-                // Laporan Bulanan Admin Collector + tutup periode (ADHOC-90).
-                // Feature sendiri, bukan numpang `reports.*`: menutup/membuka
-                // ulang pembukuan mengubah angka resmi, kewenangannya jauh
-                // lebih sempit daripada sekadar melihat laporan.
+                // Laporan Bulanan Admin Collector (ADHOC-90). Feature sendiri,
+                // bukan numpang `reports.*`: audiensnya admin collector, bukan
+                // semua yang boleh lihat laporan.
                 'code' => 'collector_report',
                 'name' => 'Laporan Bulanan Admin',
                 'type' => FeatureType::ROOT,

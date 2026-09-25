@@ -36,6 +36,9 @@
     window.Dialog = {
         isOpen: false,
         onCloseCallback: null,
+        _scrollY: 0,
+        _locked: false,
+        _vvHandler: null,
         get container() { return document.getElementById('global-dialog-container'); },
         get box() { return document.getElementById('global-dialog-box'); },
         get titleEl() { return document.getElementById('global-dialog-title'); },
@@ -149,18 +152,20 @@
             box.classList.remove('scale-95', 'opacity-0');
             
             this.isOpen = true;
-            document.body.classList.add('overflow-hidden');
+            this.lockBodyScroll();
+            this.trackVisualViewport();
         },
-        
+
         close() {
             const container = this.container;
             const box = this.box;
             if (!this.isOpen || !container || !box) return;
-            
+
             container.classList.add('opacity-0');
             box.classList.add('scale-95', 'opacity-0');
-            document.body.classList.remove('overflow-hidden');
-            
+            this.unlockBodyScroll();
+            this.untrackVisualViewport();
+
             setTimeout(() => {
                 container.classList.add('hidden');
                 if (typeof this.onCloseCallback === 'function') {
@@ -168,6 +173,114 @@
                 }
                 this.isOpen = false;
             }, 300);
+        },
+
+        /**
+         * `position:fixed` di body ngunci DOCUMENT scroll, tapi di iOS
+         * Safari itu belum cukup: begitu textarea di-fokus & keyboard
+         * kebuka, Safari bisa nge-pan VISUAL viewport (area yang beneran
+         * kelihatan) tanpa nge-scroll document sama sekali — `position:fixed`
+         * itu ngikutin LAYOUT viewport, bukan visual viewport, jadi begitu
+         * dua-duanya kepisah gara-gara pan itu, dialog kelihatan "kegeser"/
+         * "bisa discroll" padahal document-nya diem. Body-lock doang gak
+         * bakal pernah nutup celah ini — perlu `window.visualViewport` buat
+         * tau ukuran & offset viewport yang BENERAN kelihatan, terus paksa
+         * container dialog ngikutin situ tiap kali browser nge-resize/pan
+         * (dua-duanya kepicu pas keyboard muncul/hilang atau usernya scroll
+         * visual viewport).
+         */
+        trackVisualViewport() {
+            if (!window.visualViewport || this._vvHandler) {
+                return;
+            }
+
+            this._vvHandler = () => this.syncToVisualViewport();
+            window.visualViewport.addEventListener('resize', this._vvHandler);
+            window.visualViewport.addEventListener('scroll', this._vvHandler);
+            this.syncToVisualViewport();
+        },
+
+        untrackVisualViewport() {
+            if (this._vvHandler) {
+                window.visualViewport.removeEventListener('resize', this._vvHandler);
+                window.visualViewport.removeEventListener('scroll', this._vvHandler);
+                this._vvHandler = null;
+            }
+
+            const container = this.container;
+            if (container) {
+                container.style.height = '';
+                container.style.top = '';
+                container.style.left = '';
+            }
+        },
+
+        syncToVisualViewport() {
+            const vv = window.visualViewport;
+            const container = this.container;
+            if (!vv || !container) {
+                return;
+            }
+
+            container.style.height = `${vv.height}px`;
+            container.style.top = `${vv.offsetTop}px`;
+            container.style.left = `${vv.offsetLeft}px`;
+        },
+
+        /**
+         * `overflow-hidden` di body doang gak nahan real device: begitu
+         * textarea alasan di-fokus, browser mobile auto-scroll DOCUMENT
+         * biar caret keliatan di atas keyboard virtual — itu jalan biarpun
+         * ancestor-nya `position:fixed` dan body `overflow:hidden`, karena
+         * scroll-into-view fokus itu browser-driven, bukan gesture user yang
+         * ditahan overflow-hidden. Efeknya: dialog "melayang" jauh dari
+         * posisi semula begitu keyboard muncul, dan area di baliknya jadi
+         * ke-scroll. Fix baku: body beneran dikunci `position:fixed` (gak
+         * punya scroll extent sama sekali) selama dialog kebuka, scrollY
+         * disimpen manual & dibalikin pas close(). Pola sama dipakai
+         * tickets/partials/detail-drawer.blade.php.
+         *
+         * `_locked` nandain APAKAH panggilan ini yang beneran ngunci —
+         * penting buat kasus dialog dibuka DI ATAS drawer detail tiket yang
+         * udah ngunci body duluan (position:fixed). Kalau ngasal unlock pas
+         * dialog ditutup, drawer di belakangnya ikut kebuka scroll-nya
+         * padahal dia masih kebuka.
+         */
+        lockBodyScroll() {
+            const body = document.body;
+
+            if (body.style.position === 'fixed') {
+                this._locked = false;
+                return;
+            }
+
+            this._scrollY = window.scrollY;
+            body.style.position = 'fixed';
+            body.style.top = `-${this._scrollY}px`;
+            body.style.left = '0';
+            body.style.right = '0';
+            body.classList.add('overflow-hidden');
+            this._locked = true;
+        },
+
+        unlockBodyScroll() {
+            if (!this._locked) {
+                return;
+            }
+
+            const body = document.body;
+
+            if (body.style.position !== 'fixed') {
+                return;
+            }
+
+            body.style.position = '';
+            body.style.top = '';
+            body.style.left = '';
+            body.style.right = '';
+            body.classList.remove('overflow-hidden');
+            window.scrollTo(0, this._scrollY);
+            this._locked = false;
         }
     };
 </script>

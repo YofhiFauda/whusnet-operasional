@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Enums\ScopeType;
-use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
@@ -11,6 +10,7 @@ use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -26,8 +26,19 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SubscriptionStatusSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
+/**
+ * Tagihan Manual (ADHOC-70) — /invoices/create. Menggantikan test lama yang
+ * menembak route `customers.invoices.manual` (dihapus bersih, lihat
+ * docs/plan/billing/analisa-rancangan-tagihan-manual.md §4 butir 6).
+ *
+ * Keputusan user 2026-09-23: form ini HANYA menerbitkan Invoice
+ * (`belum_dibayar`) — TANPA Payment. Metode pembayaran & nominal dibayar
+ * bukan urusan Tagihan, itu ranah Pembayaran (List Tagihan → Bayar/Bayar
+ * Cicil, jalur `PaymentController::store` yang sudah ada).
+ */
 class InvoiceCreateTest extends TestCase
 {
     use RefreshDatabase;
@@ -46,23 +57,34 @@ class InvoiceCreateTest extends TestCase
         $this->seed(PonorogoRegionSeeder::class);
     }
 
-    /**
-     * Helper to create a complete customer for testing.
-     */
-    protected function createTestCustomer(Pop $pop, InternetPackage $package, string $status = 'active', string $completeness = 'siap_billing'): Customer
+    protected function createPop(string $suffix = ''): Pop
+    {
+        return Pop::create([
+            'code' => "POP-TEST{$suffix}",
+            'pop_code' => "T{$suffix}",
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => "POP Test{$suffix}",
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+    }
+
+    protected function createTestCustomer(Pop $pop, InternetPackage $package, string $fullName = 'Budi Santoso', string $customerCode = 'WHUS-2026-0001'): Customer
     {
         $city = City::query()->where('name', 'Ponorogo')->firstOrFail();
         $district = District::query()->where('city_id', $city->id)->firstOrFail();
         $village = Village::query()->where('district_id', $district->id)->firstOrFail();
 
         $customer = Customer::create([
-            'customer_code' => 'WHUS-2026-0001',
-            'full_name' => 'Budi Santoso',
+            'customer_code' => $customerCode,
+            'cid' => $customerCode,
+            'full_name' => $fullName,
             'gender' => 'Laki-laki',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
-            'status' => $status,
-            'data_completeness_status' => $completeness,
+            'status' => 'active',
+            'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop->id,
             'city_id' => $city->id,
             'district_id' => $district->id,
@@ -90,100 +112,6 @@ class InvoiceCreateTest extends TestCase
             'download_speed_snapshot' => '20 Mbps',
             'upload_speed_snapshot' => '20 Mbps',
             'monthly_price' => $package->monthly_price,
-            'discount' => 10000.00,
-            'ppn' => 11.00,
-            'total_monthly_bill' => ($package->monthly_price - 10000.00) * 1.11,
-            'activation_date' => '2026-06-01',
-            'due_date' => '2026-07-01',
-            'service_status' => $status === 'active' ? 'aktif' : 'calon_pelanggan',
-            'billing_status' => $status === 'active' ? 'active' : 'pending',
-        ]);
-
-        return $customer;
-    }
-
-    public function test_authorized_user_can_create_manual_invoice_for_eligible_customer()
-    {
-        $role = Role::where('name', 'Owner')->firstOrFail();
-        $user = User::factory()->create(['role_id' => $role->id]);
-
-        $pop = Pop::create([
-            'code' => 'POP-TEST',
-            'pop_code' => 'TST',
-            'registration_prefix' => 'C',
-            'cid_prefix' => 'D',
-            'name' => 'POP Test',
-            'type' => 'cabang',
-            'status' => 'active',
-        ]);
-
-        $package = InternetPackage::query()->firstOrFail();
-        $customer = $this->createTestCustomer($pop, $package);
-
-        $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
-            'billing_period' => '2026-06',
-            'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
-        ]);
-
-        $response->assertRedirect(route('customers.show', $customer->id));
-        $response->assertSessionHas('success');
-
-        $this->assertDatabaseHas('invoices', [
-            'customer_id' => $customer->id,
-            'billing_period' => '2026-06',
-            'invoice_number' => 'INV-202606-0001',
-            'invoice_status' => 'belum_dibayar',
-            'subtotal' => $package->monthly_price,
-            'discount' => 10000.00,
-            'ppn' => 11.00,
-            'total_amount' => ($package->monthly_price - 10000.00) * 1.11,
-            'remaining_amount' => ($package->monthly_price - 10000.00) * 1.11,
-            'created_by' => $user->id,
-        ]);
-
-        // Assert AuditLog was created
-        $this->assertDatabaseHas('audit_logs', [
-            'user_id' => $user->id,
-            'module' => 'Tagihan',
-            'action' => 'create',
-        ]);
-    }
-
-    public function test_invoice_number_generates_sequentially()
-    {
-        $role = Role::where('name', 'Owner')->firstOrFail();
-        $user = User::factory()->create(['role_id' => $role->id]);
-
-        $pop = Pop::create([
-            'code' => 'POP-TEST',
-            'pop_code' => 'TST',
-            'registration_prefix' => 'C',
-            'cid_prefix' => 'D',
-            'name' => 'POP Test',
-            'type' => 'cabang',
-            'status' => 'active',
-        ]);
-
-        $package = InternetPackage::query()->firstOrFail();
-        $customer1 = $this->createTestCustomer($pop, $package);
-
-        // Create customer2
-        $customer2 = Customer::create([
-            'customer_code' => 'WHUS-2026-0002',
-            'full_name' => 'Rudi Santoso',
-            'gender' => 'Laki-laki',
-            'primary_phone' => '081234567891',
-            'registration_date' => '2026-06-01',
-            'status' => 'active',
-            'data_completeness_status' => 'siap_billing',
-            'pop_id' => $pop->id,
-        ]);
-        $customer2->customerService()->create([
-            'internet_package_id' => $package->id,
-            'package_name_snapshot' => $package->name,
-            'monthly_price' => $package->monthly_price,
             'discount' => 0.00,
             'ppn' => 11.00,
             'total_monthly_bill' => $package->monthly_price * 1.11,
@@ -193,138 +121,173 @@ class InvoiceCreateTest extends TestCase
             'billing_status' => 'active',
         ]);
 
-        // First invoice
-        $this->actingAs($user)->post(route('customers.invoices.manual', $customer1->id), [
-            'billing_period' => '2026-06',
-            'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
-        ]);
-
-        // Second invoice (same period, different customer)
-        $this->actingAs($user)->post(route('customers.invoices.manual', $customer2->id), [
-            'billing_period' => '2026-06',
-            'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
-        ]);
-
-        $this->assertDatabaseHas('invoices', [
-            'customer_id' => $customer1->id,
-            'invoice_number' => 'INV-202606-0001',
-        ]);
-
-        $this->assertDatabaseHas('invoices', [
-            'customer_id' => $customer2->id,
-            'invoice_number' => 'INV-202606-0002',
-        ]);
+        return $customer;
     }
 
-    public function test_cannot_create_duplicate_invoice_for_same_customer_and_period()
+    protected function owner(): User
     {
         $role = Role::where('name', 'Owner')->firstOrFail();
-        $user = User::factory()->create(['role_id' => $role->id]);
 
-        $pop = Pop::create([
-            'code' => 'POP-TEST',
-            'pop_code' => 'TST',
-            'registration_prefix' => 'C',
-            'cid_prefix' => 'D',
-            'name' => 'POP Test',
-            'type' => 'cabang',
-            'status' => 'active',
-        ]);
+        return User::factory()->create(['role_id' => $role->id]);
+    }
 
+    public function test_authorized_user_can_create_manual_invoice_with_customer_locked()
+    {
+        $user = $this->owner();
+        $pop = $this->createPop();
         $package = InternetPackage::query()->firstOrFail();
         $customer = $this->createTestCustomer($pop, $package);
 
-        // First creation succeeds
-        $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
-            'billing_period' => '2026-06',
-            'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
+        $response = $this->actingAs($user)->get(route('invoices.create', ['customer_id' => $customer->id]));
+        $response->assertOk();
+        $response->assertSee($customer->full_name);
+
+        $response = $this->actingAs($user)->post(route('invoices.store'), [
+            'customer_id' => $customer->id,
+            'manual_category' => 'perbaikan',
+            'description' => 'Ganti konektor rusak',
+            'amount' => '150.000',
         ]);
 
-        // Second creation fails
-        $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
-            'billing_period' => '2026-06',
-            'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
+        $invoice = Invoice::where('customer_id', $customer->id)->firstOrFail();
+        $response->assertRedirect(route('invoices.show', $invoice));
+
+        $this->assertDatabaseHas('invoices', [
+            'customer_id' => $customer->id,
+            'invoice_type' => 'manual',
+            'manual_category' => 'perbaikan',
+            'description' => 'Ganti konektor rusak',
+            'total_amount' => 150000,
+            'paid_amount' => 0,
+            'remaining_amount' => 150000,
+            'invoice_status' => 'belum_dibayar',
         ]);
 
-        $response->assertSessionHasErrors('billing_period');
-        $this->assertEquals(1, Invoice::where('customer_id', $customer->id)->count());
+        // Form Tagihan Manual TIDAK menerbitkan Payment — itu ranah
+        // pembayaran terpisah (List Tagihan → Bayar/Bayar Cicil).
+        $this->assertEquals(0, Payment::where('invoice_id', $invoice->id)->count());
     }
 
-    public function test_unauthorized_user_cannot_create_manual_invoice()
+    public function test_search_page_finds_customer_by_cid_and_name_and_creates_for_correct_customer()
     {
-        $role = Role::where('name', 'Teknisi')->firstOrFail(); // No create_invoices permission
-        $user = User::factory()->create(['role_id' => $role->id]);
+        $user = $this->owner();
+        $pop = $this->createPop();
+        $package = InternetPackage::query()->firstOrFail();
+        $target = $this->createTestCustomer($pop, $package, 'Target Customer', 'WHUS-2026-0001');
+        $other = $this->createTestCustomer($pop, $package, 'Other Customer', 'WHUS-2026-0002');
 
-        $pop = Pop::create([
-            'code' => 'POP-TEST',
-            'pop_code' => 'TST',
-            'registration_prefix' => 'C',
-            'cid_prefix' => 'D',
-            'name' => 'POP Test',
-            'type' => 'cabang',
-            'status' => 'active',
+        $byCid = $this->actingAs($user)->get(route('invoices.create', ['q' => $target->cid]));
+        $byCid->assertOk();
+        $byCid->assertSee('Target Customer');
+        $byCid->assertDontSee('Other Customer');
+
+        $byName = $this->actingAs($user)->get(route('invoices.create', ['q' => 'Other Customer']));
+        $byName->assertSee('Other Customer');
+        $byName->assertDontSee('Target Customer');
+
+        $response = $this->actingAs($user)->post(route('invoices.store'), [
+            'customer_id' => $target->id,
+            'manual_category' => 'pindah_lokasi',
+            'description' => 'Pindah lokasi rumah pelanggan',
+            'amount' => '200000',
         ]);
 
+        $response->assertRedirect();
+        $this->assertEquals(1, Invoice::where('customer_id', $target->id)->count());
+        $this->assertEquals(0, Invoice::where('customer_id', $other->id)->count());
+    }
+
+    public function test_lainnya_category_requires_subtype_name()
+    {
+        $user = $this->owner();
+        $pop = $this->createPop();
         $package = InternetPackage::query()->firstOrFail();
         $customer = $this->createTestCustomer($pop, $package);
 
-        $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
-            'billing_period' => '2026-06',
-            'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
+        $response = $this->actingAs($user)->post(route('invoices.store'), [
+            'customer_id' => $customer->id,
+            'manual_category' => 'lainnya',
+            'description' => 'Biaya tambahan lain',
+            'amount' => '50000',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertSessionHasErrors('manual_subtype_name');
+        $this->assertEquals(0, Invoice::count());
+
+        $response = $this->actingAs($user)->post(route('invoices.store'), [
+            'customer_id' => $customer->id,
+            'manual_category' => 'perbaikan',
+            'description' => 'Perbaikan tidak butuh sub-nama',
+            'amount' => '50000',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('manual_subtype_name');
+        $this->assertEquals(1, Invoice::count());
     }
 
-    public function test_cannot_create_invoice_for_ineligible_customer()
+    public function test_manual_invoice_can_coexist_with_monthly_invoice_same_period()
     {
-        $role = Role::where('name', 'Owner')->firstOrFail();
-        $user = User::factory()->create(['role_id' => $role->id]);
-
-        $pop = Pop::create([
-            'code' => 'POP-TEST',
-            'pop_code' => 'TST',
-            'registration_prefix' => 'C',
-            'cid_prefix' => 'D',
-            'name' => 'POP Test',
-            'type' => 'cabang',
-            'status' => 'active',
-        ]);
-
+        $user = $this->owner();
+        $pop = $this->createPop();
         $package = InternetPackage::query()->firstOrFail();
-        // Create draft/not ready customer
-        $customer = $this->createTestCustomer($pop, $package, 'registered', 'draft');
+        $customer = $this->createTestCustomer($pop, $package);
 
-        $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
-            'billing_period' => '2026-06',
+        $billingPeriod = now()->format('Y-m');
+        $customerService = CustomerService::where('customer_id', $customer->id)->firstOrFail();
+
+        Invoice::create([
+            'invoice_number' => 'INV-TEST-0001',
             'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'customer_service_id' => $customerService->id,
+            'internet_package_id' => $package->id,
+            'billing_period' => $billingPeriod,
+            'issue_date' => now()->toDateString(),
+            'due_date' => now()->toDateString(),
+            'subtotal' => 150000,
+            'total_amount' => 150000,
+            'paid_amount' => 0,
+            'remaining_amount' => 150000,
+            'invoice_status' => 'belum_dibayar',
         ]);
 
-        $response->assertSessionHasErrors('error');
+        $response = $this->actingAs($user)->post(route('invoices.store'), [
+            'customer_id' => $customer->id,
+            'manual_category' => 'perbaikan',
+            'description' => 'Perbaikan bulan ini',
+            'amount' => '75000',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertEquals(2, Invoice::where('customer_id', $customer->id)->count());
+    }
+
+    public function test_amount_is_required_and_normalizes_thousand_separator()
+    {
+        $user = $this->owner();
+        $pop = $this->createPop();
+        $package = InternetPackage::query()->firstOrFail();
+        $customer = $this->createTestCustomer($pop, $package);
+
+        $response = $this->actingAs($user)->post(route('invoices.store'), [
+            'customer_id' => $customer->id,
+            'manual_category' => 'perbaikan',
+            'description' => 'Tanpa nominal',
+        ]);
+
+        $response->assertSessionHasErrors('amount');
         $this->assertEquals(0, Invoice::count());
     }
 
-    public function test_admin_cabang_can_only_create_invoice_for_assigned_pop()
+    public function test_admin_cabang_cannot_create_invoice_for_customer_outside_assigned_pop()
     {
         $role = Role::where('name', 'POP Admin')->firstOrFail();
         $user = User::factory()->create(['role_id' => $role->id]);
 
-        $pop1 = Pop::create(['code' => 'POP-1', 'pop_code' => 'P1', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'POP 1', 'type' => 'cabang', 'status' => 'active']);
-        $pop2 = Pop::create(['code' => 'POP-2', 'pop_code' => 'P2', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'POP 2', 'type' => 'cabang', 'status' => 'active']);
+        $pop1 = $this->createPop('1');
+        $pop2 = $this->createPop('2');
 
-        // Assign user to pop1 only
         $user->pops()->attach($pop1->id);
         $scope = UserRoleScope::create([
             'user_id' => $user->id,
@@ -337,48 +300,28 @@ class InvoiceCreateTest extends TestCase
         ]);
 
         $package = InternetPackage::query()->firstOrFail();
-        $customerInPop1 = $this->createTestCustomer($pop1, $package);
+        $customerInPop1 = $this->createTestCustomer($pop1, $package, 'Pelanggan Satu', 'WHUS-2026-0001');
+        $customerInPop2 = $this->createTestCustomer($pop2, $package, 'Pelanggan Dua', 'WHUS-2026-0002');
 
-        $customerInPop2 = Customer::create([
-            'customer_code' => 'WHUS-2026-0003',
-            'full_name' => 'Siti Santoso',
-            'gender' => 'Perempuan',
-            'primary_phone' => '081234567895',
-            'registration_date' => '2026-06-01',
-            'status' => 'active',
-            'data_completeness_status' => 'siap_billing',
-            'pop_id' => $pop2->id,
-        ]);
-        $customerInPop2->customerService()->create([
-            'internet_package_id' => $package->id,
-            'package_name_snapshot' => $package->name,
-            'monthly_price' => $package->monthly_price,
-            'discount' => 0.00,
-            'ppn' => 11.00,
-            'total_monthly_bill' => $package->monthly_price * 1.11,
-            'activation_date' => '2026-06-01',
-            'due_date' => '2026-07-01',
-            'service_status' => 'aktif',
-            'billing_status' => 'active',
-        ]);
-
-        // Creating invoice for POP1 succeeds
-        $response1 = $this->actingAs($user)->post(route('customers.invoices.manual', $customerInPop1->id), [
-            'billing_period' => '2026-06',
-            'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
+        $response1 = $this->actingAs($user)->post(route('invoices.store'), [
+            'customer_id' => $customerInPop1->id,
+            'manual_category' => 'perbaikan',
+            'description' => 'Perbaikan POP 1',
+            'amount' => '50000',
         ]);
         $response1->assertRedirect();
-        $response1->assertSessionHas('success');
 
-        // Creating invoice for POP2 fails with 403
-        $response2 = $this->actingAs($user)->post(route('customers.invoices.manual', $customerInPop2->id), [
-            'billing_period' => '2026-06',
-            'invoice_type' => 'bulanan',
-            'issue_date' => '2026-06-01',
-            'due_date' => '2026-06-15',
+        $response2 = $this->actingAs($user)->post(route('invoices.store'), [
+            'customer_id' => $customerInPop2->id,
+            'manual_category' => 'perbaikan',
+            'description' => 'Perbaikan POP 2',
+            'amount' => '50000',
         ]);
         $response2->assertStatus(403);
+    }
+
+    public function test_old_manual_invoice_modal_route_no_longer_exists()
+    {
+        $this->assertFalse(Route::has('customers.invoices.manual'));
     }
 }

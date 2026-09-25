@@ -16,6 +16,10 @@ Schedule::command('check:countdown --minutes=60')->everyFiveMinutes();
 // bersifat FINAL; penundaan sehari lewat Pending atau ubah tanggal.
 // Penjaga: FopTasksTest::test_cancelled_task_stays_cancelled_and_is_never_auto_revived().
 Schedule::command('billing:generate-monthly-invoices')->monthlyOn(1, '01:00');
+// Tutup buku otomatis — bekukan angka Laporan Bulanan Admin bulan lalu.
+// Kuncinya sendiri sudah berlaku sejak 00:00 (BookPeriod::isLocked()),
+// jadi jam berapa pun command ini jalan tidak membuka celah.
+Schedule::command('billing:close-period')->monthlyOn(1, '00:10');
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
 Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();
 // '01:15' — hindari bentrok dgn billing:generate-monthly-invoices (01:00,

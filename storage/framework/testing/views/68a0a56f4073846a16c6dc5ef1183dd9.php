@@ -125,6 +125,7 @@
                     <div>
                         <label for="qp-payment-date" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Tanggal Bayar</label>
                         <input type="date" id="qp-payment-date" required
+                               min="<?php echo e(\App\Support\BookPeriod::firstOpenDate()); ?>" max="<?php echo e(now()->format('Y-m-d')); ?>"
                                class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-mono text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
                     </div>
 
@@ -140,17 +141,23 @@
                     </div>
 
                     
+                    
                     <div id="qp-transfer-fields" class="hidden space-y-3">
                         <div>
-                            <label for="qp-bank-name" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nama Bank</label>
-                            <input type="text" id="qp-bank-name" placeholder="mis. BCA, BRI, Mandiri"
-                                   class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
+                            <label for="qp-bank-account" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Rekening Tujuan</label>
+                            <select id="qp-bank-account" name="bank_account_id"
+                                    class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
+                                <option value="">Pilih rekening...</option>
+                            </select>
                         </div>
-                        <div>
-                            <label for="qp-account-number" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nomer Rekening</label>
-                            <input type="text" id="qp-account-number" placeholder="Nomer rekening tujuan/asal"
-                                   class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-mono text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
-                        </div>
+                    </div>
+
+                    
+                    <div id="qp-sender-fields" class="hidden">
+                        <label for="qp-sender-name" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nama Pengirim (opsional)</label>
+                        <input type="text" id="qp-sender-name" name="sender_name" maxlength="150"
+                               placeholder="Nama di bukti transfer, jika beda dari nama pelanggan"
+                               class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
                     </div>
 
                     
@@ -176,14 +183,10 @@
                         <p id="qp-overpay-hint" class="hidden text-[10px] font-semibold text-sky-700 dark:text-sky-400 mt-1.5 px-2 py-1.5 rounded bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20"></p>
                     </div>
 
-                    <div>
-                        <label for="qp-allocation" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Alokasi Pembayaran</label>
-                        <select id="qp-allocation" required
-                                class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
-                            <option value="Tagihan Bulanan">Tagihan Bulanan</option>
-                            <option value="Bayar Piutang">Bayar Piutang</option>
-                            <option value="Lebih Bayar">Lebih Bayar</option>
-                        </select>
+                    
+                    <div id="qp-piutang-warning" class="hidden text-[10px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-md px-3 py-2 space-y-1">
+                        <p class="font-bold uppercase tracking-wider">Pelanggan ini masih punya tagihan lebih lama</p>
+                        <ul id="qp-piutang-warning-list" class="list-disc list-inside space-y-0.5"></ul>
                     </div>
 
                     
@@ -225,6 +228,40 @@
         </form>
     </div>
 
+    
+    <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['name' => 'qp-overpay-confirm','title' => 'Konfirmasi Lebih Bayar','maxWidth' => 'sm']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'qp-overpay-confirm','title' => 'Konfirmasi Lebih Bayar','maxWidth' => 'sm']); ?>
+        <p class="text-xs text-text-secondary" id="qp-overpay-confirm-message"></p>
+
+         <?php $__env->slot('footer', null, []); ?> 
+            <button type="button" id="qp-overpay-confirm-proceed"
+                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer">
+                Lanjutkan
+            </button>
+            <button type="button" onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: 'qp-overpay-confirm' }))"
+                    class="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-surface-muted cursor-pointer">
+                Batal, Cek Lagi
+            </button>
+         <?php $__env->endSlot(); ?>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
     <?php $__env->startPush('scripts'); ?>
         <script>
             let qpInvoiceId = null;
@@ -236,6 +273,15 @@
             let qpRemainingAmount = 0;
             let qpNextInstallment = 1;
             let qpCustomerBalance = 0;
+            // Overpay ter-hitung dari qpRefreshInstallmentHint() — dipakai
+            // gerbang konfirmasi sebelum submit (ADHOC-84 §2.3), bukan
+            // dihitung ulang terpisah supaya pratinjau & gerbang tak pernah
+            // menyimpang.
+            let qpCurrentOverpay = 0;
+            // true setelah kasir menekan "Lanjutkan" di modal konfirmasi —
+            // direset tiap kali modal dibuka/nominal berubah lagi, supaya
+            // submit berikutnya (nominal baru) tetap dikonfirmasi ulang.
+            let qpOverpayConfirmed = false;
 
             const qpMethodLabels = { cash: 'Cash', transfer: 'Transfer Bank', kolektor: 'Kolektor', lainnya: 'Lainnya' };
 
@@ -246,8 +292,7 @@
                 const method = document.getElementById('qp-payment-method').value;
                 const transferFields = document.getElementById('qp-transfer-fields');
                 const collectorFields = document.getElementById('qp-collector-fields');
-                const bankName = document.getElementById('qp-bank-name');
-                const accountNumber = document.getElementById('qp-account-number');
+                const bankAccount = document.getElementById('qp-bank-account');
                 const collector = document.getElementById('qp-collector');
 
                 const isTransfer = method === 'transfer';
@@ -255,11 +300,12 @@
                 const isLainnya = method === 'lainnya';
 
                 transferFields.classList.toggle('hidden', !isTransfer);
-                bankName.required = isTransfer;
-                accountNumber.required = isTransfer;
+                bankAccount.required = isTransfer;
 
                 collectorFields.classList.toggle('hidden', !isKolektor);
                 collector.required = isKolektor;
+
+                document.getElementById('qp-sender-fields').classList.toggle('hidden', !(isTransfer || isKolektor));
 
                 const note = document.getElementById('qp-note');
                 const noteLabel = document.getElementById('qp-note-label');
@@ -279,6 +325,38 @@
                     opt.textContent = c.name;
                     select.appendChild(opt);
                 });
+            }
+
+            function qpPopulateBankAccounts(bankAccounts) {
+                const select = document.getElementById('qp-bank-account');
+                select.innerHTML = '<option value="">Pilih rekening...</option>';
+                (bankAccounts || []).forEach((account) => {
+                    const opt = document.createElement('option');
+                    opt.value = account.id;
+                    opt.textContent = account.name;
+                    select.appendChild(opt);
+                });
+            }
+
+            /** Peringatan piutang lama (ADHOC-84 §2.4) — non-blokir, murni
+             *  render daftar yang SUDAH dihitung server (`older_unpaid_invoices`
+             *  dari payload InvoiceController::show()), bukan disusun di sini. */
+            function qpApplyOlderUnpaidInvoices(invoices) {
+                const box = document.getElementById('qp-piutang-warning');
+                const list = document.getElementById('qp-piutang-warning-list');
+                list.innerHTML = '';
+
+                if (!Array.isArray(invoices) || invoices.length === 0) {
+                    box.classList.add('hidden');
+                    return;
+                }
+
+                invoices.forEach((inv) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${inv.billing_period} — ${inv.invoice_number}: sisa Rp ${Math.round(inv.remaining_amount).toLocaleString('id-ID')}`;
+                    list.appendChild(li);
+                });
+                box.classList.remove('hidden');
             }
 
             function qpApplyCustomerBalance(balance) {
@@ -353,6 +431,10 @@
                 installmentHint.classList.add('hidden');
                 settleHint.classList.add('hidden');
                 overpayHint.classList.add('hidden');
+                // Nominal berubah lagi setelah konfirmasi sebelumnya —
+                // konfirmasi lama tak lagi berlaku untuk nominal yang baru.
+                qpOverpayConfirmed = false;
+                qpCurrentOverpay = 0;
 
                 if (isNaN(amount) || amount <= 0) {
                     return;
@@ -364,6 +446,7 @@
                 // ini cuma pratinjau sebelum submit).
                 if (amount > qpRemainingAmount) {
                     const overpay = Math.round((amount - qpRemainingAmount) * 100) / 100;
+                    qpCurrentOverpay = overpay;
                     overpayHint.textContent =
                         qpFormatRupiah(qpRemainingAmount) + ' diterapkan ke tagihan (Lunas), ' +
                         qpFormatRupiah(overpay) + ' tercatat sebagai lebih bayar.';
@@ -420,21 +503,23 @@
                 qpSetNominal(remainingAmount);
                 document.getElementById('qp-payment-date').value = new Date().toISOString().slice(0, 10);
                 document.getElementById('qp-payment-method').value = 'cash';
-                document.getElementById('qp-bank-name').value = '';
-                document.getElementById('qp-account-number').value = '';
-                document.getElementById('qp-allocation').value = 'Tagihan Bulanan';
+                document.getElementById('qp-sender-name').value = '';
                 document.getElementById('qp-note').value = '';
                 document.getElementById('qp-installment-hint').classList.add('hidden');
                 document.getElementById('qp-settle-hint').classList.add('hidden');
                 document.getElementById('qp-overpay-hint').classList.add('hidden');
+                document.getElementById('qp-piutang-warning').classList.add('hidden');
                 document.getElementById('qp-use-balance').checked = false;
                 document.getElementById('qp-use-balance-amount').value = '';
                 document.getElementById('qp-use-balance-amount-wrap').classList.add('hidden');
                 qpApplyCustomerBalance(0);
                 qpPopulateCollectors([]);
+                qpPopulateBankAccounts([]);
                 qpToggleMethodFields();
                 qpRemainingAmount = remainingAmount;
                 qpNextInstallment = 1;
+                qpCurrentOverpay = 0;
+                qpOverpayConfirmed = false;
 
                 // Fetch dynamic data via AJAX
                 fetch(`/invoices/${invoiceId}`, {
@@ -562,6 +647,8 @@
 
                     qpApplyCustomerBalance(data.customer_balance);
                     qpPopulateCollectors(data.available_collectors);
+                    qpPopulateBankAccounts(data.available_bank_accounts);
+                    qpApplyOlderUnpaidInvoices(data.older_unpaid_invoices);
 
                     qpRemainingAmount = remainingAmountFromDb;
                     // Sama seperti PaymentController::create() — cuma hitung
@@ -638,8 +725,8 @@
                 }
 
                 const method = document.getElementById('qp-payment-method').value;
-                if (method === 'transfer' && (!document.getElementById('qp-bank-name').value.trim() || !document.getElementById('qp-account-number').value.trim())) {
-                    errorBox.textContent = 'Nama Bank dan Nomer Rekening wajib diisi untuk metode Transfer.';
+                if (method === 'transfer' && !document.getElementById('qp-bank-account').value) {
+                    errorBox.textContent = 'Pilih rekening tujuan untuk metode Transfer.';
                     errorBox.classList.remove('hidden');
                     return;
                 }
@@ -659,6 +746,17 @@
                     return;
                 }
 
+                // Konfirmasi lebih bayar (ADHOC-84 §2.3) — sekali per nominal.
+                // qpCurrentOverpay dihitung qpRefreshInstallmentHint() dan
+                // direset tiap nominal/saldo dipakai berubah, jadi konfirmasi
+                // lama tak "menempel" ke nominal yang sudah diganti kasir.
+                if (qpCurrentOverpay > 0 && !qpOverpayConfirmed) {
+                    document.getElementById('qp-overpay-confirm-message').textContent =
+                        'Lebih bayar Rp ' + Math.round(qpCurrentOverpay).toLocaleString('id-ID') + ' akan masuk saldo pelanggan. Lanjutkan?';
+                    window.dispatchEvent(new CustomEvent('open-modal', { detail: 'qp-overpay-confirm' }));
+                    return;
+                }
+
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Menyimpan...';
 
@@ -675,8 +773,11 @@
                 payload.append('payment_method', method);
 
                 if (method === 'transfer') {
-                    payload.append('bank_name', document.getElementById('qp-bank-name').value);
-                    payload.append('account_number', document.getElementById('qp-account-number').value);
+                    payload.append('bank_account_id', document.getElementById('qp-bank-account').value);
+                }
+
+                if (method === 'transfer' || method === 'kolektor') {
+                    payload.append('sender_name', document.getElementById('qp-sender-name').value.trim());
                 }
 
                 if (method === 'kolektor') {
@@ -688,11 +789,9 @@
                     payload.append('use_balance_amount', useBalance);
                 }
 
-                // Format note: "[Alokasi Pembayaran] - [Catatan]"
-                const allocation = document.getElementById('qp-allocation').value;
-                const userNote = document.getElementById('qp-note').value.trim();
-                const note = userNote ? allocation + ' - ' + userNote : allocation;
-                payload.append('note', note);
+                // `note` murni catatan kasir apa adanya — dropdown Alokasi
+                // yang dulu ditempelkan di depannya sudah dihapus (ADHOC-84 §4.1).
+                payload.append('note', document.getElementById('qp-note').value.trim());
 
                 fetch(qpPaymentStoreUrl, {
                     method: 'POST',
@@ -767,6 +866,15 @@
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Catat Pembayaran';
                 });
+            });
+
+            // "Lanjutkan" di modal konfirmasi lebih bayar — tandai terkonfirmasi
+            // lalu re-submit form yang sama (requestSubmit() ikut lewat listener
+            // 'submit' di atas, kali ini lolos gerbang karena qpOverpayConfirmed).
+            document.getElementById('qp-overpay-confirm-proceed')?.addEventListener('click', function () {
+                qpOverpayConfirmed = true;
+                window.dispatchEvent(new CustomEvent('close-modal', { detail: 'qp-overpay-confirm' }));
+                document.getElementById('quick-payment-form')?.requestSubmit();
             });
         </script>
     <?php $__env->stopPush(); ?>

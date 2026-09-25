@@ -21,12 +21,19 @@ enum PaymentPeriodType: string
     case PIUTANG = 'piutang';
     case LEBIH_BAYAR = 'lebih_bayar';
 
+    // ADHOC-84 §8.1 — label KEEMPAT dipakai badge majemuk Payment::classification(),
+    // BUKAN cabang periodType() (yang tetap 3 nilai lama, saling lepas). Cicilan
+    // itu independen dari bulanan/piutang: bisa cicilan tagihan berjalan MAUPUN
+    // cicilan piutang lama sekaligus (tampil sebagai dua pil bersebelahan).
+    case CICILAN = 'cicilan';
+
     public function label(): string
     {
         return match ($this) {
             self::BULANAN => 'Bayar Bulanan',
             self::PIUTANG => 'Piutang',
             self::LEBIH_BAYAR => 'Lebih Bayar (Overpay)',
+            self::CICILAN => 'Cicilan',
         };
     }
 
@@ -40,6 +47,7 @@ enum PaymentPeriodType: string
             self::BULANAN => 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20',
             self::PIUTANG => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20',
             self::LEBIH_BAYAR => 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20',
+            self::CICILAN => 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20',
         };
     }
 }

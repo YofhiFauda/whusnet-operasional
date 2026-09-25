@@ -22,6 +22,15 @@ enum InvoiceType: string
      */
     case INSIDENTAL = 'insidental';
 
+    /**
+     * Tagihan Manual (ADHOC-70) — Perbaikan / Lainnya / Pindah Lokasi, diisi
+     * dari `/invoices/create`. SENGAJA nilai baru, bukan reuse `INSIDENTAL`
+     * (instruksi user 2026-09-19): `INSIDENTAL` terikat aturan lama
+     * `ManualInvoiceService`/`invoice_items` yang tidak dipakai fitur ini.
+     * Di luar `Invoice::SUBSCRIPTION_TYPES` — lihat alasannya di sana.
+     */
+    case MANUAL = 'manual';
+
     public function label(): string
     {
         return match ($this) {
@@ -29,6 +38,7 @@ enum InvoiceType: string
             self::BULANAN => 'Tagihan Bulanan Rutin',
             self::REAKTIVASI => 'Tagihan Reaktivasi',
             self::INSIDENTAL => 'Tagihan Lain-lain',
+            self::MANUAL => 'Tagihan Manual',
         };
     }
 
@@ -39,6 +49,7 @@ enum InvoiceType: string
             self::BULANAN => 'bulan',
             self::REAKTIVASI => 'reaktivasi',
             self::INSIDENTAL => 'insidental',
+            self::MANUAL => 'manual',
         };
     }
 }

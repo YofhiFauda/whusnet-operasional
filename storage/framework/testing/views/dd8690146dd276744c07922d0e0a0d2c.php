@@ -34,185 +34,10 @@
     }
 </style>
 
-<!-- PRINT ONLY A4 KWITANSI PEMBAYARAN SHEET -->
+<!-- PRINT ONLY KWITANSI PEMBAYARAN SHEET -->
 
-<div class="print-only px-16 py-12 bg-white text-zinc-900 font-sans text-[13px] leading-relaxed">
-
-    <!-- Header -->
-    <div class="flex justify-between items-start mb-8">
-        <h1 class="text-[26px] font-bold text-zinc-900">Kwitansi</h1>
-        <div class="text-right">
-            <p class="text-sm font-bold uppercase tracking-wide text-zinc-900">Whusnet</p>
-            <p class="text-[11px] text-zinc-500">Internet Service Provider</p>
-        </div>
-    </div>
-
-    <!-- Meta -->
-    <table class="mb-7">
-        <tr>
-            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">No. Kwitansi</td>
-            <td class="py-0.5"><?php echo e($kwitansi['nomor']); ?></td>
-        </tr>
-        <tr>
-            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Tanggal Bayar</td>
-            <td class="py-0.5"><?php echo e($kwitansi['tanggal_bayar']); ?></td>
-        </tr>
-        <tr>
-            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Tanggal Ditagih</td>
-            <td class="py-0.5"><?php echo e($kwitansi['tanggal_ditagih']); ?></td>
-        </tr>
-        <tr>
-            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Metode</td>
-            <td class="py-0.5"><?php echo e($kwitansi['metode']); ?></td>
-        </tr>
-        <tr>
-            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Status</td>
-            
-            <td class="py-0.5 font-semibold <?php echo e($kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700'); ?>">● <?php echo e($kwitansi['status']); ?></td>
-        </tr>
-        <?php if($kwitansi['keterangan_cicilan']): ?>
-            <tr>
-                <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Keterangan</td>
-                <td class="py-0.5"><?php echo e($kwitansi['keterangan_cicilan']); ?></td>
-            </tr>
-        <?php endif; ?>
-        <tr>
-            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Area</td>
-            <td class="py-0.5"><?php echo e($kwitansi['pop']); ?></td>
-        </tr>
-    </table>
-
-    <!-- Pihak -->
-    <table class="w-full mb-7">
-        <tr>
-            <td class="w-1/2 align-top pr-6">
-                <p class="font-bold mb-1">Diterbitkan oleh</p>
-                <p class="font-bold">Whusnet Internet Service Provider</p>
-                <p>Grand Viola Townhouse No.3 Purbosuman</p>
-                <p>Kab. Ponorogo</p>
-            </td>
-            <td class="w-1/2 align-top">
-                <p class="font-bold mb-1">Ditagihkan kepada</p>
-                <p class="font-bold"><?php echo e($kwitansi['pelanggan']['nama']); ?></p>
-                <p>CID <?php echo e($kwitansi['pelanggan']['cid']); ?></p>
-                <?php $__currentLoopData = $kwitansi['pelanggan']['alamat_baris']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $baris): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                    <p><?php echo e($baris); ?></p>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                <p><?php echo e($kwitansi['pelanggan']['hp']); ?></p>
-            </td>
-        </tr>
-    </table>
-
-    <!-- Ringkasan -->
-    <p class="text-[17px] font-bold mb-5"><?php echo e($kwitansi['dibayar']); ?> dibayar pada <?php echo e($kwitansi['tanggal_bayar']); ?></p>
-
-    <table class="w-full border-collapse">
-        <thead>
-            <tr class="border-b border-zinc-300 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                <th class="text-left pb-2">Deskripsi</th>
-                <th class="text-right pb-2">Kuantitas</th>
-                <th class="text-right pb-2">Harga Satuan</th>
-                <th class="text-right pb-2">Jumlah</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr class="border-b border-zinc-100">
-                <td class="py-3 align-top">
-                    
-                    <p><?php echo e($kwitansi['keterangan_cicilan'] ?: 'Pembayaran'); ?> — Internet <?php echo e($kwitansi['invoice']['paket']); ?></p>
-                    <?php if($kwitansi['invoice']['ada']): ?>
-                        <p class="text-[11px] text-zinc-500 mt-0.5">No. Tagihan <?php echo e($kwitansi['invoice']['nomor']); ?> · Periode <?php echo e($kwitansi['invoice']['periode']); ?></p>
-                    <?php endif; ?>
-                </td>
-                <td class="py-3 text-right align-top">1</td>
-                <td class="py-3 text-right align-top"><?php echo e($kwitansi['invoice']['ada'] ? $kwitansi['invoice']['total'] : $kwitansi['dibayar']); ?></td>
-                <td class="py-3 text-right align-top"><?php echo e($kwitansi['dibayar']); ?></td>
-            </tr>
-            <?php if($kwitansi['lebih_bayar']): ?>
-            <tr class="border-b border-zinc-100">
-                <td class="py-3 align-top text-zinc-500" colspan="3">Lebih Bayar (Deposit / Overpay Pelanggan)</td>
-                <td class="py-3 text-right align-top text-sky-700 font-semibold"><?php echo e($kwitansi['lebih_bayar']); ?></td>
-            </tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
-
-    <table class="w-full mb-8">
-        <?php if($kwitansi['invoice']['ada']): ?>
-            <tr>
-                <td class="py-1 text-zinc-500">Total Tagihan</td>
-                <td class="py-1 text-right"><?php echo e($kwitansi['invoice']['total']); ?></td>
-            </tr>
-        <?php endif; ?>
-        <tr class="font-bold border-t border-zinc-300 <?php echo e($kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700'); ?>">
-            <td class="py-1 pt-2">Dibayar</td>
-            <td class="py-1 pt-2 text-right"><?php echo e($kwitansi['dibayar']); ?></td>
-        </tr>
-        <?php if($kwitansi['invoice']['ada']): ?>
-            <tr>
-                <td class="py-1 text-zinc-500">Sisa Tagihan</td>
-                <td class="py-1 text-right font-semibold <?php echo e($kwitansi['invoice']['lunas'] ? 'text-emerald-700' : 'text-rose-700'); ?>">
-                    <?php echo e($kwitansi['invoice']['sisa']); ?> <?php echo e($kwitansi['invoice']['lunas'] ? '(Lunas)' : ''); ?>
-
-                </td>
-            </tr>
-        <?php endif; ?>
-    </table>
-
-    <!-- Informasi Penagihan (internal, staf saja) -->
-    <p class="text-[15px] font-bold mb-3">Informasi Penagihan</p>
-
-    <table class="w-full mb-8">
-        <tr>
-            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Diterima oleh</td>
-            <td class="py-0.5"><?php echo e($kwitansi['penerima']); ?></td>
-        </tr>
-        <?php if($kwitansi['penagih']): ?>
-            <tr>
-                <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Kolektor/Penagih</td>
-                <td class="py-0.5"><?php echo e($kwitansi['penagih']); ?></td>
-            </tr>
-        <?php endif; ?>
-        <tr>
-            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Catatan</td>
-            
-            <?php if($kwitansi['catatan']): ?>
-                <td class="py-0.5 italic">"<?php echo e($kwitansi['catatan']); ?>"</td>
-            <?php else: ?>
-                <td class="py-0.5 italic text-zinc-400">Tanpa catatan.</td>
-            <?php endif; ?>
-        </tr>
-    </table>
-
-    <!-- Riwayat Pembayaran -->
-    <p class="text-[15px] font-bold mb-3">Riwayat Pembayaran</p>
-
-    <table class="w-full border-collapse mb-8">
-        <thead>
-            <tr class="border-b border-zinc-300 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                <th class="text-left pb-2">Metode Pembayaran</th>
-                <th class="text-left pb-2">Tanggal</th>
-                <th class="text-right pb-2">Jumlah Dibayar</th>
-                <th class="text-right pb-2">No. Kwitansi</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="py-2.5"><?php echo e($kwitansi['metode']); ?></td>
-                <td class="py-2.5"><?php echo e($kwitansi['tanggal_bayar']); ?></td>
-                <td class="py-2.5 text-right"><?php echo e($kwitansi['dibayar']); ?></td>
-                <td class="py-2.5 text-right"><?php echo e($kwitansi['nomor']); ?></td>
-            </tr>
-        </tbody>
-    </table>
-
-    <!-- Footer -->
-    <p class="text-[11px] text-zinc-500 border-t border-zinc-200 pt-4">
-        Kwitansi sah tanpa tanda tangan. Simpan sebagai bukti pembayaran.<br>
-        Dicetak: <?php echo e($kwitansi['dicetak']); ?>
-
-    </p>
-
+<div class="print-only px-16 py-12 bg-white">
+    <?php echo $__env->make('payments.partials.kwitansi', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 </div>
 
 <!-- SCREEN ONLY ENTERPRISE VIEW -->
@@ -230,12 +55,12 @@
                     </svg>
                 </div>
                 <div>
-                    <h4 class="font-bold text-sm text-rose-900 dark:text-rose-200">Pembayaran ini telah Ditolak / Dibatalkan</h4>
+                    <h4 class="font-bold text-sm text-rose-900 dark:text-rose-200">Pembayaran ini telah dikembalikan</h4>
                     <?php if($payment->reject_reason): ?>
                         <p class="mt-0.5">Alasan: <strong><?php echo e($payment->reject_reason); ?></strong></p>
                     <?php endif; ?>
                     <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-1">
-                        Ditolak oleh <?php echo e($payment->rejecter->name ?? '-'); ?> pada <?php echo e(optional($payment->rejected_at)->format('d/m/Y H:i')); ?> WIB
+                        Dikembalikan oleh <?php echo e($payment->rejecter->name ?? '-'); ?> pada <?php echo e(optional($payment->rejected_at)->format('d/m/Y H:i')); ?> WIB
                     </p>
                 </div>
             </div>
@@ -304,49 +129,23 @@
             </a>
             <?php endif; ?>
 
-            <!-- Print Struk Button & Dropdown Menu -->
-            <div class="relative inline-block text-left">
-                <button onclick="togglePrintDropdown(event)" id="printDropdownBtn" class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-600 active:scale-95 cursor-pointer">
-                    <svg class="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-                    </svg>
-                    <span>Cetak Struk</span>
-                    <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+            <!-- Print Kwitansi Button -->
+            <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-600 active:scale-95 cursor-pointer">
+                <svg class="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                <span>Cetak Kwitansi</span>
+            </button>
 
-                <div id="printDropdownMenu" class="hidden absolute right-0 mt-2 w-60 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl py-1.5 z-30 text-xs">
-                    <button type="button" onclick="window.print(); closePrintDropdown();" class="w-full px-4 py-2.5 flex items-center gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left cursor-pointer">
-                        <div class="p-1.5 rounded-lg bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        </div>
-                        <div>
-                            <p class="font-bold text-slate-900 dark:text-white">Cetak Kwitansi A4 (PDF)</p>
-                            <p class="text-[10px] text-slate-400">Format kuitansi resmi WHUSNET</p>
-                        </div>
-                    </button>
-                    <div class="border-t border-slate-100 dark:border-slate-700/60 my-1"></div>
-                    <button type="button" onclick="openThermalPreview(); closePrintDropdown();" class="w-full px-4 py-2.5 flex items-center gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left cursor-pointer">
-                        <div class="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        </div>
-                        <div>
-                            <p class="font-bold text-slate-900 dark:text-white">Struk Thermal (80mm)</p>
-                            <p class="text-[10px] text-slate-400">Pratinjau Struk Cetak Kasir</p>
-                        </div>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Reject Button -->
+            <!-- Kembalikan Button — juga untuk pembayaran bulan yang sudah tutup buku;
+                 pengembaliannya dibukukan di bulan berjalan. -->
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.reject')): ?>
                 <?php if($payment->payment_status->value === 'valid'): ?>
                 <button type="button" onclick="openRejectModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
-                    <span>Tolak Pembayaran</span>
+                    <span>Kembalikan Pembayaran</span>
                 </button>
                 <?php endif; ?>
             <?php endif; ?>
@@ -404,6 +203,19 @@
 
                     </span>
                 </div>
+                
+                <?php if($payment->bank_name || $payment->account_number): ?>
+                    <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                        Rekening: <strong class="text-slate-700 dark:text-slate-200"><?php echo e($payment->bank_name); ?></strong>
+                        <span class="font-mono"><?php echo e($payment->account_number); ?></span>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if($payment->sender_name): ?>
+                    <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Pengirim: <strong class="text-slate-700 dark:text-slate-200"><?php echo e($payment->sender_name); ?></strong>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -440,7 +252,7 @@
             </div>
             <div class="mt-3">
                 <div class="font-bold text-slate-900 dark:text-white text-base truncate">
-                    <?php echo e($payment->collector ? $payment->collector->name : 'Direct / Kasir POP'); ?>
+                    <?php echo e($payment->collector ? $payment->collector->name : 'Bayar Langsung'); ?>
 
                 </div>
                 <div class="mt-1">
@@ -609,7 +421,7 @@
 
                                 </p>
                                 <p class="text-xs text-slate-400 max-w-sm mx-auto mt-0.5">
-                                    Transaksi tunai kasir POP tidak mewajibkan upload foto fisik, namun struk resmi A4 & Thermal dapat dicetak kapan saja.
+                                    Transaksi tunai kasir POP tidak mewajibkan upload foto fisik, namun kwitansi resmi dapat dicetak kapan saja.
                                 </p>
                             </div>
                         </div>
@@ -798,8 +610,8 @@
                         </svg>
                     </div>
                     <div>
-                        <h3 class="font-bold text-slate-900 dark:text-white text-base">Tolak Pembayaran <?php echo e($payment->payment_number); ?></h3>
-                        <p class="text-[10px] text-slate-500">Tagihan akan dihitung ulang & status dikembalikan</p>
+                        <h3 class="font-bold text-slate-900 dark:text-white text-base">Kembalikan Pembayaran <?php echo e($payment->payment_number); ?></h3>
+                        <p class="text-[10px] text-slate-500">Tagihan akan dihitung ulang & kembali belum lunas</p>
                     </div>
                 </div>
                 <button type="button" onclick="closeRejectModal()" class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg cursor-pointer">
@@ -810,11 +622,11 @@
             <form id="rejectForm" method="POST" action="<?php echo e(route('payments.reject', $payment->id)); ?>" class="p-6 space-y-4 text-xs">
                 <?php echo csrf_field(); ?>
                 <p class="text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Menolak transaksi ini akan membatalkan status pelunasan invoice terkait dan membalikkan alokasi deposit. Tindakan ini membutuhkan alasan penolakan.
+                    Mengembalikan transaksi ini membatalkan status pelunasan invoice terkait dan membalikkan alokasi deposit. Kalau pembayarannya dari bulan yang sudah tutup buku, laporan bulan itu tidak berubah — pengembaliannya tercatat di bulan ini.
                 </p>
 
                 <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">Alasan Penolakan *</label>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">Alasan Pengembalian *</label>
                     <textarea name="reject_reason" id="rejectReasonInput" rows="4" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20" placeholder="Contoh: Bukti transfer tidak sah / Duplikasi input kasir / Rekonsiliasi kas tidak sesuai"><?php echo e(old('reject_reason')); ?></textarea>
                     <?php $__errorArgs = ['reject_reason'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
@@ -834,7 +646,7 @@ unset($__errorArgs, $__bag); ?>
                         Batal
                     </button>
                     <button type="submit" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md shadow-rose-600/20 active:scale-95 cursor-pointer">
-                        Ya, Tolak Pembayaran
+                        Ya, Kembalikan Pembayaran
                     </button>
                 </div>
             </form>
@@ -842,67 +654,6 @@ unset($__errorArgs, $__bag); ?>
     </div>
     <?php endif; ?>
 <?php endif; ?>
-
-<!-- MODAL: PRATINJAU STRUK THERMAL 80MM -->
-<div id="thermalModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
-        <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
-            <h3 class="font-bold text-slate-900 dark:text-white text-xs">Simulasi Struk Thermal 80mm</h3>
-            <button type="button" onclick="closeThermalModal()" class="p-1 text-slate-400 hover:text-slate-600 text-lg leading-none cursor-pointer">&times;</button>
-        </div>
-
-        <!-- 80mm Receipt Paper Card View -->
-        <div class="p-4 bg-amber-50/30 dark:bg-slate-900">
-            <div class="bg-white p-4 font-mono text-[11px] text-slate-900 shadow-md rounded border border-slate-200 space-y-2 leading-tight">
-                <div class="text-center pb-2 border-b border-dashed border-slate-300">
-                    <p class="font-black text-sm">WHUSNET OPERASIONAL</p>
-                    <p class="text-[9px]">ISP Internet Service Provider</p>
-                    <p class="text-[9px]">POP <?php echo e($payment->pop->name ?? 'Kantor Pusat'); ?></p>
-                </div>
-
-                <div class="space-y-0.5 text-[10px] py-1 border-b border-dashed border-slate-300">
-                    <p>No : <?php echo e($payment->payment_number); ?></p>
-                    <p>Tgl: <?php echo e(optional($payment->payment_date)->format('d/m/Y H:i')); ?></p>
-                    <p>Kas: <?php echo e($payment->receiver->name ?? '-'); ?></p>
-                    <p>Cst: <?php echo e($payment->customer->full_name ?? '-'); ?></p>
-                    <p>CID: <?php echo e($payment->customer->cid ?? $payment->customer->customer_code ?? '-'); ?></p>
-                </div>
-
-                <div class="py-1 border-b border-dashed border-slate-300 space-y-1">
-                    <div class="flex justify-between font-bold">
-                        <span>Inv: <?php echo e($payment->invoice->invoice_number ?? '-'); ?></span>
-                        <span>Rp <?php echo e(number_format((float) $payment->amount, 0, ',', '.')); ?></span>
-                    </div>
-                    <p class="text-[9px] text-slate-500"><?php echo e($payment->invoice->internetPackage->name ?? 'Layanan ISP'); ?></p>
-                    
-                    <?php if((float) $payment->overpay_amount > 0): ?>
-                    <div class="flex justify-between pt-1 font-bold text-sky-700">
-                        <span>Deposit Overpay</span>
-                        <span>Rp <?php echo e(number_format((float) $payment->overpay_amount, 0, ',', '.')); ?></span>
-                    </div>
-                    <?php endif; ?>
-                </div>
-
-                <div class="pt-1 space-y-0.5 text-right font-bold text-xs">
-                    <div class="flex justify-between">
-                        <span>TOTAL CASH:</span>
-                        <span>Rp <?php echo e(number_format($totalMoneyReceived, 0, ',', '.')); ?></span>
-                    </div>
-                </div>
-
-                <div class="text-center pt-3 border-t border-dashed border-slate-300 text-[9px] text-slate-500">
-                    <p>Terima kasih atas pembayaran Anda</p>
-                    <p class="mt-0.5">Layanan CS: <?php echo e($payment->customer->primary_phone ?? '083838506993'); ?></p>
-                </div>
-            </div>
-        </div>
-
-        <div class="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
-            <button type="button" onclick="closeThermalModal()" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">Tutup</button>
-            <a href="<?php echo e(route('payments.receipt', $payment->id)); ?>" target="_blank" onclick="closeThermalModal()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all">Cetak Thermal</a>
-        </div>
-    </div>
-</div>
 
 <script>
     function switchTab(tabKey) {
@@ -922,25 +673,6 @@ unset($__errorArgs, $__bag); ?>
         });
     }
 
-    function togglePrintDropdown(e) {
-        if (e) e.stopPropagation();
-        const menu = document.getElementById('printDropdownMenu');
-        if (menu) menu.classList.toggle('hidden');
-    }
-
-    function closePrintDropdown() {
-        const menu = document.getElementById('printDropdownMenu');
-        if (menu) menu.classList.add('hidden');
-    }
-
-    document.addEventListener('click', function(e) {
-        const btn = document.getElementById('printDropdownBtn');
-        const menu = document.getElementById('printDropdownMenu');
-        if (menu && !menu.classList.contains('hidden') && !menu.contains(e.target) && !btn?.contains(e.target)) {
-            closePrintDropdown();
-        }
-    });
-
     function openRejectModal() {
         const modal = document.getElementById('rejectModal');
         if (modal) modal.classList.remove('hidden');
@@ -954,16 +686,6 @@ unset($__errorArgs, $__bag); ?>
     <?php if($errors->has('reject_reason')): ?>
         document.addEventListener('DOMContentLoaded', openRejectModal);
     <?php endif; ?>
-
-    function openThermalPreview() {
-        const modal = document.getElementById('thermalModal');
-        if (modal) modal.classList.remove('hidden');
-    }
-
-    function closeThermalModal() {
-        const modal = document.getElementById('thermalModal');
-        if (modal) modal.classList.add('hidden');
-    }
 
     function toggleJsonView(id) {
         const el = document.getElementById(id);

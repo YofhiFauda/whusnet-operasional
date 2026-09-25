@@ -111,8 +111,14 @@
                                 <td class="py-2.5 px-4 text-right font-mono">{{ $rp($payment->amount) }}</td>
                                 <td class="py-2.5 px-4 text-right font-mono font-bold {{ $isLast ? 'bg-yellow-200/70 dark:bg-yellow-700/30 text-slate-900 dark:text-slate-100' : '' }}">{{ $isLast ? $rp($group['subtotal']) : '' }}</td>
                                 <td class="py-2.5 px-4">
-                                    @php $periodType = $payment->periodType(); @endphp
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $periodType->badgeClass() }}">{{ $periodType->label() }}</span>
+                                    {{-- Klasifikasi majemuk (ADHOC-84 §8.1/§8.2) — pengganti
+                                         badge tunggal periodType() lama, supaya "Piutang" yang
+                                         dicicil ikut kelihatan sebagai dua pil, bukan satu saja. --}}
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach($payment->classification() as $label)
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $label->badgeClass() }}">{{ $label->label() }}</span>
+                                        @endforeach
+                                    </div>
                                     @if($payment->note)
                                         <span class="block mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ $payment->note }}</span>
                                     @endif

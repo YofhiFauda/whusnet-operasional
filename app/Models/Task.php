@@ -89,6 +89,11 @@ class Task extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
     public function completedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by');

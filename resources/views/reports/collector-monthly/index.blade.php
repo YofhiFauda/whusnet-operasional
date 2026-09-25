@@ -49,29 +49,24 @@
     </div>
 
     {{-- Status pembukuan periode --}}
-    <div class="{{ $card }} p-5" x-data="{ reopen: null }">
+    <div class="{{ $card }} p-5">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
             <div>
                 <h2 class="text-sm font-bold text-slate-800 dark:text-slate-100">Pembukuan {{ $periodLabel }}</h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                    Periode tertutup angkanya dibekukan (snapshot) — pembayaran susulan tidak menggeser laporan bulan itu, masuk ke bulan uang diterima.
+                    Tutup buku otomatis saat bulan berganti dan terkunci permanen — pembayaran piutang masuk ke bulan uang diterima, tidak menggeser laporan bulan ini.
                 </p>
             </div>
-            @if($canClose && $closable)
-                <form method="POST" action="{{ route('reports.collector-monthly.close') }}" onsubmit="return confirm('Tutup pembukuan {{ $periodLabel }} untuk {{ $popId ? 'POP terpilih' : 'semua POP yang belum ditutup' }}?')">
-                    @csrf
-                    <input type="hidden" name="period" value="{{ $period }}">
-                    @if($popId)<input type="hidden" name="pop_id" value="{{ $popId }}">@endif
-                    <button type="submit" class="px-4 py-2 text-sm font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">Tutup Periode</button>
-                </form>
-            @elseif(! $closable)
-                <span class="text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">Periode berjalan — belum bisa ditutup</span>
+            @if($locked)
+                <span class="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200">Terkunci</span>
+            @else
+                <span class="text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">Periode berjalan — ditutup otomatis tanggal 1 bulan depan</span>
             @endif
         </div>
 
         @if($anyDrift)
             <div class="mb-3 text-xs rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 p-3">
-                Ada transaksi bertanggal periode ini yang tercatat <strong>setelah</strong> ditutup (mis. impor legacy). Angka yang tampil tetap snapshot; hitung ulang live berbeda untuk POP bertanda ⚠.
+                Ada transaksi bertanggal periode ini yang tercatat <strong>setelah</strong> ditutup (mis. impor legacy). Pengembalian pembayaran tidak memicu tanda ini — dibukukan di bulan pengembaliannya. Angka yang tampil tetap snapshot; hitung ulang live berbeda untuk POP bertanda ⚠.
             </div>
         @endif
 
@@ -81,18 +76,11 @@
                     <span class="font-semibold text-slate-800 dark:text-slate-100 w-40">{{ $row['pop']->name }}</span>
                     @if($row['closing'])
                         <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
-                            Tertutup {{ $row['closing']->closed_at->format('d/m/Y H:i') }}@if($row['drift']) ⚠@endif
+                            Dibekukan {{ $row['closing']->closed_at->format('d/m/Y H:i') }}@if($row['drift']) ⚠@endif
                         </span>
-                        @if($canReopen)
-                            <button type="button" class="text-xs font-semibold text-rose-600 hover:underline" @click="reopen = (reopen === {{ $row['pop']->id }} ? null : {{ $row['pop']->id }})">Buka Ulang</button>
-                            <form x-show="reopen === {{ $row['pop']->id }}" x-cloak method="POST" action="{{ route('reports.collector-monthly.reopen') }}" class="flex flex-wrap items-center gap-2 w-full">
-                                @csrf
-                                <input type="hidden" name="period" value="{{ $period }}">
-                                <input type="hidden" name="pop_id" value="{{ $row['pop']->id }}">
-                                <input type="text" name="reason" required maxlength="500" placeholder="Alasan buka ulang" class="flex-1 min-w-[16rem] rounded-md border-slate-300 dark:border-slate-600 text-sm">
-                                <button type="submit" class="px-3 py-1.5 text-xs font-semibold rounded-md bg-rose-600 hover:bg-rose-700 text-white">Buka Ulang Periode</button>
-                            </form>
-                        @endif
+                    @elseif($locked)
+                        {{-- Terkunci tapi snapshot belum ada (bulan sebelum fitur ini, atau scheduler belum jalan). --}}
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200">Terkunci (angka live)</span>
                     @else
                         <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">Terbuka (angka live)</span>
                     @endif
@@ -101,7 +89,6 @@
                 <li class="py-4 text-sm text-slate-500">Tidak ada POP dalam akses Anda.</li>
             @endforelse
         </ul>
-        @error('reason')<p class="mt-2 text-xs text-red-600">{{ $message }}</p>@enderror
         @error('period')<p class="mt-2 text-xs text-red-600">{{ $message }}</p>@enderror
     </div>
 
@@ -254,7 +241,7 @@
             <table class="w-full border-collapse">
                 <thead>
                     <tr>
-                        @foreach(['No', 'OLT', 'Bulanan', 'Piutang', 'Lebih Bayar', 'Aktivasi', 'Lainnya', 'Total Uang Diterima'] as $h)
+                        @foreach(['No', 'OLT', 'Bulanan', 'Piutang', 'Lebih Bayar', 'Aktivasi', 'Lainnya', 'Dikembalikan', 'Total Uang Diterima'] as $h)
                             <th class="{{ $th }}">{{ $h }}</th>
                         @endforeach
                     </tr>
@@ -270,6 +257,8 @@
                             <x-reports.detail-cell :cls="$td" :value="$rp($u['lebih_bayar'])" block="uang_diterima" column="lebih_bayar" :pop-id="$pid" label="Uang diterima — lebih bayar — {{ $row['pop']->name }}" :clickable="$can('uang_diterima', 'lebih_bayar')" />
                             <x-reports.detail-cell :cls="$td" :value="$rp($u['aktivasi'])" block="uang_diterima" column="aktivasi" :pop-id="$pid" label="Uang diterima — aktivasi — {{ $row['pop']->name }}" :clickable="$can('uang_diterima', 'aktivasi')" />
                             <x-reports.detail-cell :cls="$td" :value="$rp($u['lainnya'])" block="uang_diterima" column="lainnya" :pop-id="$pid" label="Uang diterima — lainnya — {{ $row['pop']->name }}" :clickable="$can('uang_diterima', 'lainnya')" />
+                            {{-- Pengurang: pembayaran bulan terkunci yang dikembalikan bulan ini. Snapshot lama tak punya kuncinya. --}}
+                            <x-reports.detail-cell :cls="$td" :value="$rp(-($u['dikembalikan'] ?? 0))" block="uang_diterima" column="dikembalikan" :pop-id="$pid" label="Uang diterima — dikembalikan — {{ $row['pop']->name }}" :clickable="$can('uang_diterima', 'dikembalikan')" />
                             <x-reports.detail-cell :cls="$td" :value="$rp($u['total'])" block="uang_diterima" column="total" :pop-id="$pid" label="Uang diterima — total — {{ $row['pop']->name }}" :clickable="$can('uang_diterima', 'total')" />
                         </tr>
                     @endforeach
@@ -284,6 +273,7 @@
                         <td class="{{ $tf }}">{{ $rp($u['lebih_bayar']) }}</td>
                         <td class="{{ $tf }}">{{ $rp($u['aktivasi']) }}</td>
                         <td class="{{ $tf }}">{{ $rp($u['lainnya']) }}</td>
+                        <td class="{{ $tf }}">{{ $rp(-($u['dikembalikan'] ?? 0)) }}</td>
                         <td class="{{ $tf }}">{{ $rp($u['total']) }}</td>
                     </tr>
                 </tfoot>
@@ -343,15 +333,16 @@
                         <th class="text-left p-2 font-bold">Referensi</th>
                         <th class="text-left p-2 font-bold">Tanggal</th>
                         <th class="text-right p-2 font-bold">Nominal</th>
+                        <th class="text-left p-2 font-bold">Jenis</th>
                         <th class="text-left p-2 font-bold">Keterangan</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="$store.reportDetail.loading">
-                        <tr><td colspan="6" class="p-4 text-center text-text-muted">Memuat…</td></tr>
+                        <tr><td colspan="7" class="p-4 text-center text-text-muted">Memuat…</td></tr>
                     </template>
                     <template x-if="!$store.reportDetail.loading && $store.reportDetail.filteredRows().length === 0">
-                        <tr><td colspan="6" class="p-4 text-center text-text-muted">Tidak ada baris untuk sel ini.</td></tr>
+                        <tr><td colspan="7" class="p-4 text-center text-text-muted">Tidak ada baris untuk sel ini.</td></tr>
                     </template>
                     <template x-for="(row, idx) in $store.reportDetail.filteredRows()" :key="idx">
                         <tr class="border-t border-border">
@@ -360,6 +351,13 @@
                             <td class="p-2 font-mono" x-text="row.referensi"></td>
                             <td class="p-2 whitespace-nowrap" x-text="row.tanggal ? row.tanggal.substring(0, 10) : '-'"></td>
                             <td class="p-2 text-right font-mono" x-text="'Rp ' + Number(row.nominal).toLocaleString('id-ID')"></td>
+                            <td class="p-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="(label, lIdx) in (row.jenis || [])" :key="lIdx">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold" :class="label.badge_class" x-text="label.label"></span>
+                                    </template>
+                                </div>
+                            </td>
                             <td class="p-2" x-text="row.keterangan"></td>
                         </tr>
                     </template>

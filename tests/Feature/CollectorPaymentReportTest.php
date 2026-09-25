@@ -138,12 +138,22 @@ class CollectorPaymentReportTest extends TestCase
     }
 
     #[Test]
-    public function lebih_bayar_tidak_ikut_jumlah_supaya_sama_dengan_saldo_kolektor(): void
+    public function lebih_bayar_tidak_ikut_jumlah_laporan_tapi_tetap_kas_fisik_kolektor(): void
     {
+        // Kolom "Jumlah" laporan ini murni `payments.amount` (porsi
+        // diterapkan ke invoice) — overpay punya tab/kolom sendiri
+        // (`/payments/overpay`), sengaja tidak digabung di sini.
+        //
+        // TAPI `CollectorBalanceService::balance()` ("Saldo Belum Disetor")
+        // itu KAS FISIK, bukan angka laporan — overpay tetap uang tunai
+        // beneran di tangan kolektor (ADHOC-92, koreksi 2026-09-24: dulu
+        // ekuivalensi ini SENGAJA dibuat sama nilainya dengan cara yang salah,
+        // yaitu `balance()` juga mengabaikan overpay; itu bug — kolektor yang
+        // pegang tunai lebih tak pernah tertagih kewajiban setornya).
         $this->makePayment($this->makeInvoice($this->popA, '2026-09', 100000), 100000, '2026-09-05', $this->kolektorA, overpay: 20000);
 
         $this->assertEquals(100000, $this->build()['total']);
-        $this->assertEquals(100000, app(CollectorBalanceService::class)->balance($this->kolektorA));
+        $this->assertEquals(120000, app(CollectorBalanceService::class)->balance($this->kolektorA));
     }
 
     #[Test]

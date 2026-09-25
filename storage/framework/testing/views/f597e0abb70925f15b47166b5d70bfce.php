@@ -82,6 +82,14 @@
                             <div class="font-mono text-xs text-slate-700 dark:text-slate-300"><?php echo e(class_basename($auditLog->auditable_type) ?: '-'); ?></div>
                             <div class="text-xs text-slate-500 dark:text-slate-400">ID: <?php echo e($auditLog->auditable_id ?? '-'); ?></div>
                             <div class="text-xs text-slate-500 dark:text-slate-400">IP: <?php echo e($auditLog->ip_address ?? '-'); ?></div>
+                            
+                            <?php if($auditLog->auditable_type === \App\Models\Payment::class && $paymentsForAuditRows->has($auditLog->auditable_id)): ?>
+                                <div class="mt-1.5 flex flex-wrap gap-1">
+                                    <?php $__currentLoopData = $paymentsForAuditRows->get($auditLog->auditable_id)->classification(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold <?php echo e($label->badgeClass()); ?>"><?php echo e($label->label()); ?></span>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </div>
+                            <?php endif; ?>
                         </td>
                         <td class="px-6 py-4 min-w-[24rem]">
                             <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">

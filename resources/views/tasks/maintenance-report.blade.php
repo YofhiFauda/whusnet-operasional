@@ -50,7 +50,14 @@
     </div>
     @endif
 
-    <form action="{{ route('tasks.maintenance.store', $task) }}" method="POST" enctype="multipart/form-data">
+    <div id="client-error-banner" class="hidden rounded-lg px-4 py-3 mb-5 flex items-start gap-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm">
+        <svg class="h-4 w-4 mt-0.5 shrink-0 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span id="client-error-text"></span>
+    </div>
+
+    <form id="maintenance-form" action="{{ route('tasks.maintenance.store', $task) }}" method="POST" enctype="multipart/form-data" class="no-confirm">
         @csrf
 
         {{-- ══ Main Form Panel — satu card utama ══════════════════════════ --}}
@@ -204,84 +211,73 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
                     {{-- Foto OPM --}}
-                    <div>
-                        <label class="block mb-2" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
-                            Foto Hasil OPM
-                            <span class="ml-1 text-xs font-normal" style="color:var(--color-text-muted)">(gunakan tag lokasi)</span>
-                            <span style="color:var(--color-error)"> *</span>
-                        </label>
-
-                        {{-- Drop zone OPM --}}
-                        <label for="opm_photo"
-                               class="flex flex-col items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors"
-                               style="border:2px dashed var(--color-border);background:var(--color-background);padding:28px 16px;text-align:center"
-                               onmouseover="this.style.borderColor='var(--color-primary)';this.style.background='var(--color-primary-soft,#E0F2FE)'"
-                               onmouseout="this.style.borderColor='var(--color-border)';this.style.background='var(--color-background)'"
-                               id="opm_label">
-                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--color-text-muted)">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"/>
-                            </svg>
+                    <div class="border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-xs flex flex-col justify-between relative group">
+                        <div id="default-placeholder-opm_photo" class="py-4 space-y-2">
+                            <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"/>
+                                </svg>
+                            </div>
                             <div>
-                                <p class="text-sm font-medium" style="color:var(--color-primary)">Pilih Foto OPM</p>
-                                <p class="text-xs mt-0.5" style="color:var(--color-text-muted)">JPG, PNG, HEIC · Maks 2MB</p>
+                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO HASIL OPM <span class="text-rose-500">*</span></span>
+                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Gunakan tag lokasi · Maks 2MB</span>
                             </div>
-                            <input type="file" id="opm_photo" name="opm_photo"
-                                   accept="image/*" capture="environment" required class="sr-only"
-                                   onchange="previewImage(this, 'opm_preview', 'opm_label')">
-                        </label>
+                        </div>
 
-                        {{-- Preview OPM --}}
-                        <div id="opm_preview" class="mt-2 hidden">
-                            <div class="relative rounded-lg overflow-hidden" style="border:1px solid var(--color-border)">
-                                <img id="opm_preview_img" src="" alt="Preview OPM" class="w-full object-cover" style="max-height:180px">
-                                <div class="absolute top-2 right-2">
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold text-white" style="background:rgba(0,0,0,0.55)">
-                                        <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
-                                        Foto dipilih
-                                    </span>
-                                </div>
+                        <div id="preview-container-opm_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                            <div class="relative inline-block w-full">
+                                <img id="preview-img-opm_photo" class="max-h-36 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-xs mx-auto" src="" alt="Preview Foto OPM">
+                                <button type="button" onclick="clearFile('opm_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
                             </div>
+                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto OPM Terpilih</span>
+                        </div>
+
+                        <div class="mt-2">
+                            <input type="file" name="opm_photo" id="opm_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('opm_photo')">
+                            <label for="opm_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-xs focus:outline-none">
+                                Pilih Foto OPM
+                            </label>
+                            <span id="file-label-opm_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
                         </div>
                     </div>
 
                     {{-- Foto Speedtest --}}
-                    <div>
-                        <label class="block mb-2" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
-                            Foto Hasil Speedtest
-                            <span style="color:var(--color-error)"> *</span>
-                        </label>
-
-                        {{-- Drop zone Speedtest --}}
-                        <label for="speedtest_photo"
-                               class="flex flex-col items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors"
-                               style="border:2px dashed var(--color-border);background:var(--color-background);padding:28px 16px;text-align:center"
-                               onmouseover="this.style.borderColor='var(--color-primary)';this.style.background='var(--color-primary-soft,#E0F2FE)'"
-                               onmouseout="this.style.borderColor='var(--color-border)';this.style.background='var(--color-background)'"
-                               id="speedtest_label">
-                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--color-text-muted)">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
-                            </svg>
+                    <div class="border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-xs flex flex-col justify-between relative group">
+                        <div id="default-placeholder-speedtest_photo" class="py-4 space-y-2">
+                            <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+                                </svg>
+                            </div>
                             <div>
-                                <p class="text-sm font-medium" style="color:var(--color-primary)">Pilih Foto Speedtest</p>
-                                <p class="text-xs mt-0.5" style="color:var(--color-text-muted)">JPG, PNG, HEIC · Maks 2MB</p>
+                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO HASIL SPEEDTEST <span class="text-rose-500">*</span></span>
+                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Screenshot Speedtest · Maks 2MB</span>
                             </div>
-                            <input type="file" id="speedtest_photo" name="speedtest_photo"
-                                   accept="image/*" capture="environment" required class="sr-only"
-                                   onchange="previewImage(this, 'speedtest_preview', 'speedtest_label')">
-                        </label>
+                        </div>
 
-                        {{-- Preview Speedtest --}}
-                        <div id="speedtest_preview" class="mt-2 hidden">
-                            <div class="relative rounded-lg overflow-hidden" style="border:1px solid var(--color-border)">
-                                <img id="speedtest_preview_img" src="" alt="Preview Speedtest" class="w-full object-cover" style="max-height:180px">
-                                <div class="absolute top-2 right-2">
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold text-white" style="background:rgba(0,0,0,0.55)">
-                                        <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
-                                        Foto dipilih
-                                    </span>
-                                </div>
+                        <div id="preview-container-speedtest_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                            <div class="relative inline-block w-full">
+                                <img id="preview-img-speedtest_photo" class="max-h-36 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-xs mx-auto" src="" alt="Preview Foto Speedtest">
+                                <button type="button" onclick="clearFile('speedtest_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
                             </div>
+                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Speedtest Terpilih</span>
+                        </div>
+
+                        <div class="mt-2">
+                            <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('speedtest_photo')">
+                            <label for="speedtest_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-xs focus:outline-none">
+                                Pilih Foto Speedtest
+                            </label>
+                            <span id="file-label-speedtest_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
                         </div>
                     </div>
 
@@ -320,43 +316,102 @@
 </div>
 
 <script>
-function previewImage(input, previewContainerId, labelId) {
-    const file = input.files[0];
-    if (!file) return;
+function onFileChange(fieldId) {
+    const input = document.getElementById(fieldId);
+    const label = document.getElementById('file-label-' + fieldId);
+    const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
+    const previewContainer = document.getElementById('preview-container-' + fieldId);
+    const previewImg = document.getElementById('preview-img-' + fieldId);
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const container = document.getElementById(previewContainerId);
-        const img = document.getElementById(previewContainerId + '_img');
-        img.src = e.target.result;
-        container.classList.remove('hidden');
+    if (input && input.files && input.files.length > 0) {
+        const file = input.files[0];
+        if (label) label.textContent = file.name;
 
-        // Hide the drop zone label once photo is chosen
-        const label = document.getElementById(labelId);
-        label.style.display = 'none';
-    };
-    reader.readAsDataURL(file);
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (previewImg) previewImg.src = e.target.result;
+                if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
+                if (previewContainer) previewContainer.style.display = 'flex';
+            };
+            reader.readAsDataURL(file);
+        }
+    } else {
+        if (label) label.textContent = 'Belum ada file';
+        if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
+        if (previewContainer) previewContainer.style.display = 'none';
+        if (previewImg) previewImg.src = '';
+    }
+
+    const errBanner = document.getElementById('client-error-banner');
+    if (errBanner) errBanner.classList.add('hidden');
 }
 
-// Show loading state on submit
-document.querySelector('form').addEventListener('submit', function() {
+function clearFile(fieldId) {
+    const input = document.getElementById(fieldId);
+    if (input) {
+        input.value = '';
+        onFileChange(fieldId);
+    }
+}
+
+function showFormError(message, targetElement) {
+    const banner = document.getElementById('client-error-banner');
+    const textEl = document.getElementById('client-error-text');
+    if (banner && textEl) {
+        textEl.textContent = message;
+        banner.classList.remove('hidden');
+    }
+    if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (typeof targetElement.focus === 'function') {
+            targetElement.focus();
+        }
+    } else if (banner) {
+        banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+// Client validation and loading state on submit
+document.getElementById('maintenance-form')?.addEventListener('submit', function(e) {
+    const kendalaInput = this.querySelector('textarea[name="kendala_teknis"]');
+    const opmInput = document.getElementById('opm_photo');
+    const speedtestInput = document.getElementById('speedtest_photo');
+
+    if (!kendalaInput || !kendalaInput.value.trim()) {
+        e.preventDefault();
+        showFormError('Detail Kendala & Solusi wajib diisi.', kendalaInput);
+        return;
+    }
+
+    if (!opmInput || !opmInput.files || opmInput.files.length === 0) {
+        e.preventDefault();
+        showFormError('Foto Hasil OPM wajib dipilih.', document.getElementById('default-placeholder-opm_photo'));
+        return;
+    }
+
+    if (!speedtestInput || !speedtestInput.files || speedtestInput.files.length === 0) {
+        e.preventDefault();
+        showFormError('Foto Hasil Speedtest wajib dipilih.', document.getElementById('default-placeholder-speedtest_photo'));
+        return;
+    }
+
     const btn = document.getElementById('submit-btn');
-    btn.disabled = true;
-    btn.innerHTML = `
-        <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        Menyimpan...
-    `;
-    btn.style.opacity = '0.75';
-    btn.style.cursor = 'not-allowed';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `
+            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Menyimpan...
+        `;
+        btn.style.opacity = '0.75';
+        btn.style.cursor = 'not-allowed';
+    }
 });
 
 // Sisa custody Perangkat Aktif — CUMA tampil kalau SN-nya lagi dipilih
-// (revisi user 2026-09-12: ringkasan statis makan tempat). data-available
-// ditulis server-side per <option> (lihat blok Blade @php di atasnya).
-// Duplikasi persis installations/report.blade.php — dua view terpisah.
 function updateSnStockHint() {
     const select = document.getElementById('selected_inventory_serial_id');
     const hint = document.getElementById('sn-stock-hint');

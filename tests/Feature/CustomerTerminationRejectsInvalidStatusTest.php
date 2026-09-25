@@ -6,6 +6,7 @@ use App\Enums\WorkflowTransition;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerStatusLog;
+use App\Models\CustomerTerminationReason;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -45,8 +46,9 @@ class CustomerTerminationRejectsInvalidStatusTest extends TestCase
         $this->loginAsAdmin();
         $terminatedAt = $status === 'terminated' ? now()->subMonth()->startOfSecond() : null;
         $customer = $this->customerWithStatus($status, ['terminated_at' => $terminatedAt]);
+        $reason = CustomerTerminationReason::create(['name' => 'Coba paksa']);
 
-        $this->post(route('customers.terminate', $customer), ['reason' => 'Coba paksa'])
+        $this->post(route('customers.terminate', $customer), ['termination_reason_id' => $reason->id, 'penalty_amount' => 0])
             ->assertSessionHas('error');
 
         $customer->refresh();
@@ -61,8 +63,9 @@ class CustomerTerminationRejectsInvalidStatusTest extends TestCase
     {
         $user = $this->loginAsAdmin();
         $customer = $this->customerWithStatus('suspended');
+        $reason = CustomerTerminationReason::create(['name' => 'Pindah kota']);
 
-        $this->post(route('customers.terminate', $customer), ['reason' => 'Pindah kota'])
+        $this->post(route('customers.terminate', $customer), ['termination_reason_id' => $reason->id, 'penalty_amount' => 0])
             ->assertSessionHas('success');
 
         $customer->refresh();
@@ -82,6 +85,8 @@ class CustomerTerminationRejectsInvalidStatusTest extends TestCase
             'changed_by' => $user->id,
             'note' => 'Pindah kota',
         ]);
+
+        $this->assertSame($reason->id, $customer->fresh()->termination_reason_id);
     }
 
     #[Test]
@@ -89,8 +94,9 @@ class CustomerTerminationRejectsInvalidStatusTest extends TestCase
     {
         $this->loginAsAdmin();
         $customer = $this->customerWithStatus('active');
+        $reason = CustomerTerminationReason::create(['name' => 'Kompetitor']);
 
-        $this->post(route('customers.terminate', $customer), ['reason' => 'Kompetitor'])
+        $this->post(route('customers.terminate', $customer), ['termination_reason_id' => $reason->id, 'penalty_amount' => 0])
             ->assertSessionHas('success');
 
         // RendersCustomerList membaca alasan dari baris ini — jangan dihapus.

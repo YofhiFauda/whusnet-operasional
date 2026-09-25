@@ -21,18 +21,22 @@ Satu desain kwitansi dipakai di **semua** tempat: staf & pelanggan melihat bentu
 
 Mengikuti struktur `kwitansi.html`: kop kiri, tanggal & jatuh tempo kanan atas, No. Dokumen, identitas pelanggan, tabel Rincian Pembayaran, tabel Rincian Total, Terima kasih, Perhatian.
 
+**Layout header (2026-09-23, feedback):** identitas pelanggan (kiri) & tanggal/jatuh tempo (kanan) dirender lewat satu baris tabel (bukan float), supaya keduanya sejajar mulai baris yang sama — float sebelumnya bikin blok tanggal gak sejajar rapi dengan blok identitas.
+
+**Tabel Rincian Pembayaran + Rincian Total (2026-09-23, feedback):** disatukan jadi SATU `<table>` (bukan dua tabel terpisah bersebelahan) — border 1px jadi konsisten di semua baris, tanpa border ganda yang numpuk kelihatan tebal di antara dua tabel. Baris Sub Total/DP/Lebih Bayar/Total cuma 2 kolom yang sejajar dengan Harga & Total; kolom No/Keterangan/Paket di baris itu kosong TANPA border sama sekali (`colspan="3"`, `border: none`) — bukan digabung jadi label lebar (percobaan sebelumnya) dan bukan pula kotak kosong ber-border (percobaan sebelum itu lagi).
+
 | Bagian template | Sumber data |
 |---|---|
 | Header perusahaan | Statis: "WHUSNET by CONNEXA DIGITAL NETWORK" + alamat + telepon (sama seperti sekarang, hardcoded di view) |
 | Tanggal | `ReceiptPresenter::tanggal_bayar` |
 | Tgl. Jatuh Tempo | **Field baru** — `invoice->due_date`; "-" kalau tak ada invoice |
-| No. Dokumen | `payment_number` (posisi yang sebelumnya "No. Kwitansi") |
+| No. Dokumen | `pelanggan.cid` (diubah dari `payment_number` 2026-09-23 — feedback layout, posisi yang sebelumnya "No. Kwitansi") |
 | Nama Pelanggan | `pelanggan.nama` |
 | Alamat | `pelanggan.alamat` — **satu baris utuh**, bukan `alamat_baris` yang dipecah dua baris (pecahan itu peninggalan struk sempit 80mm, tidak relevan lagi setelah thermal dihapus) |
 
 ### Tabel Rincian Pembayaran
 
-Satu baris item, **tanpa baris kosong filler** (2 baris kosong di template asli itu peninggalan kesan kertas struk manual — dibuang, keputusan sudah dikonfirmasi user).
+Satu baris item + **2 baris kosong filler** (persis `kwitansi.html` acuan) — keputusan dibalik 2026-09-23: awalnya dibuang (dianggap peninggalan struk manual), tapi tabel 1 baris tanpa filler bikin free space gak selaras dengan tinggi tabel Rincian Total di bawahnya. Baris kosong dikembalikan murni buat kerapian visual.
 
 - **Keterangan**: `"Pembayaran Layanan Internet Bulan {NamaBulan}"` — bulan diambil dari `billing_period` invoice kalau ada, fallback ke `payment_date`. Ditambah suffix supaya info cicilan lama tidak hilang dari kwitansi:
   - `" (Cicilan Ke-N)"` kalau pembayaran belum melunasi tagihan.

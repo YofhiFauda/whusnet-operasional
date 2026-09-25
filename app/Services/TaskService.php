@@ -75,6 +75,8 @@ class TaskService
             // sama persis (`create` module "Task Management" + `created` module
             // "Task"), yang kemudian tampil dobel di Riwayat Perubahan Status.
 
+            $this->syncToCustomerActivity($task);
+
             return $task->refresh();
         });
 
@@ -135,6 +137,7 @@ class TaskService
             // disimpulkan dari perubahan kolom: completed, cancelled, reassigned.
 
             $this->syncToFopTask($task);
+            $this->syncToCustomerActivity($task);
 
             return $task->refresh();
         });
@@ -780,6 +783,74 @@ class TaskService
         }
         if ($fopTask->task_date) {
             $fopTeamService->rebuildTeamsForDate($fopTask->task_date);
+        }
+    }
+
+    /**
+     * Synchronize Task changes (technicians, dates, fop) to corresponding CustomerInstallation or CustomerSurvey.
+     */
+    private function syncToCustomerActivity(Task $task): void
+    {
+        if (! $task->customer_id) {
+            return;
+        }
+
+        $teamMembers = $task->teamMembers()->orderBy('id')->get();
+        $leadUserId = $teamMembers->first()?->user_id;
+        $otherMembers = $teamMembers->slice(1)->values();
+
+        if ($task->task_type === TaskType::PEMASANGAN) {
+            $installation = CustomerInstallation::where('customer_id', $task->customer_id)->latest()->first();
+            if ($installation) {
+                $updateData = [];
+                if (! $installation->technician_id && $leadUserId) {
+                    $updateData['technician_id'] = $leadUserId;
+                }
+                if (! $installation->technician_2_id && $otherMembers->isNotEmpty()) {
+                    $updateData['technician_2_id'] = $otherMembers[0]->user_id;
+                }
+                if (! $installation->technician_3_id && $otherMembers->count() > 1) {
+                    $updateData['technician_3_id'] = $otherMembers[1]->user_id;
+                }
+                if (! $installation->fop_id) {
+                    $updateData['fop_id'] = $task->fop_id ?? $task->created_by;
+                }
+                if (! $installation->scheduled_date && $task->scheduled_at) {
+                    $updateData['scheduled_date'] = $task->scheduled_at->toDateString();
+                    $updateData['scheduled_time'] = $task->scheduled_at->toTimeString();
+                }
+                if (! $installation->assigned_at) {
+                    $updateData['assigned_at'] = $task->created_at ?? now();
+                }
+
+                if (! empty($updateData)) {
+                    $installation->update($updateData);
+                }
+            }
+        } elseif ($task->task_type === TaskType::SURVEY) {
+            $survey = CustomerSurvey::where('customer_id', $task->customer_id)->latest()->first();
+            if ($survey) {
+                $updateData = [];
+                if (! $survey->technician_id && $leadUserId) {
+                    $updateData['technician_id'] = $leadUserId;
+                }
+                if (! $survey->surveyor_2_id && $otherMembers->isNotEmpty()) {
+                    $updateData['surveyor_2_id'] = $otherMembers[0]->user_id;
+                }
+                if (! $survey->surveyor_3_id && $otherMembers->count() > 1) {
+                    $updateData['surveyor_3_id'] = $otherMembers[1]->user_id;
+                }
+                if (! $survey->fop_id) {
+                    $updateData['fop_id'] = $task->fop_id ?? $task->created_by;
+                }
+                if (! $survey->assigned_at) {
+                    $updateData['assigned_at'] = $task->created_at ?? now();
+                }
+
+                if (! empty($updateData)) {
+                    $survey->update($updateData);
+                }
+            }
         }
     }
 }

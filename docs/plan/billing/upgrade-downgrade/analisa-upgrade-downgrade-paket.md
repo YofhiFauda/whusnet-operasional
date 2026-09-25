@@ -1,6 +1,8 @@
 # Analisa & Rancangan: Upgrade/Downgrade Paket Internet
 
-**Status:** Terbuka — analisa selesai 2026-09-15, framing diperjelas 2026-09-22 (dikonfirmasi user — isi/keputusan **tidak berubah**, cuma cara penjelasan §1 diperbaiki karena bikin salah paham "2 rumus terpisah"). Di luar Sprint 8.10 (aktif), dicatat sebagai ADHOC-68 di `docs/TASKS.md`.
+**Status:** **Selesai diimplementasikan** (2026-09-23), `CustomerPackageService::change()` + tabel `customer_package_changes`. Analisa awal selesai 2026-09-15, framing diperjelas 2026-09-22 (isi/keputusan waktu itu **tidak berubah**, cuma cara penjelasan §1 diperbaiki karena bikin salah paham "2 rumus terpisah"). Dicatat sebagai ADHOC-68 di `docs/TASKS.md`.
+
+**Koreksi pasca-implementasi (2026-09-23, ketauan dari uji manual data real CID RQ001924 & RQ001971):** keputusan §2.4/§3 di bawah soal `other_fee` **SALAH** dan sudah diperbaiki di kode — `other_fee` **TIDAK** dikenakan sekali di level total invoice seperti tertulis semula. Alasan & angka yang benar ada di §2.4-addendum dan §3-koreksi. Baca itu, bukan versi asli di bawahnya, kalau lagi ngecek perilaku kode SEKARANG. Bagian asli sengaja dibiarkan (dicoret, bukan dihapus) supaya kelihatan jejak kenapa bug itu bisa lolos ke implementasi.
 
 **Sumber ide awal:** `docs/plan/billing/upgrade-downgrade/Skema-downgrade-dan-upgrade.md` (skema matematis dari user). Dokumen ini adalah hasil review terhadap skema tsb + gap analysis terhadap kode nyata + rancangan implementasi.
 
@@ -50,7 +52,15 @@ Tidak ada `customer_package_changes` atau sejenisnya. Dibutuhkan untuk:
 - Diskon (nominal tetap) & PPN (persen) — ikut diprorate per segmen (proporsional ke hari) atau dihitung dari total bulan penuh dulu baru dipotong prorate-nya?
 - `other_fee` (kalau ada biaya lain flat bulanan) — dikenakan sekali penuh, atau ikut dibagi hari juga?
 
-**Keputusan (2026-09-15):** yang diprorate **cuma `monthly_price` paket internet**. `discount`, `ppn`, `other_fee` **tidak** dipecah per segmen — tetap dihitung dari nilai `customer_service` yang berlaku saat invoice diproses (snapshot terbaru, dikenakan sekali penuh di level total invoice), sama seperti perilaku `total_monthly_bill` sekarang. Lihat §3 (rumus final sudah disesuaikan).
+**Keputusan (2026-09-15, ~~SEBAGIAN SALAH, lihat addendum di bawah~~):** yang diprorate **cuma `monthly_price` paket internet**. `discount`, `ppn`, `other_fee` **tidak** dipecah per segmen — tetap dihitung dari nilai `customer_service` yang berlaku saat invoice diproses (snapshot terbaru, dikenakan sekali penuh di level total invoice), sama seperti perilaku `total_monthly_bill` sekarang. Lihat §3 (rumus final sudah disesuaikan).
+
+**Addendum koreksi (2026-09-23):** premis "sama seperti perilaku `total_monthly_bill` sekarang" di atas KELIRU — dicek ulang ke `CustomerController.php:515-528`, ada keputusan **lebih baru dan lebih otoritatif** tertanggal **2026-09-14** (sehari SEBELUM analisa ini ditulis) yang eksplisit membalik itu:
+
+> "Calculate total bill — SENGAJA TIDAK ikutkan `$otherFee` (2026-09-14). `customer_services.total_monthly_bill` wajib murni tagihan bulanan berulang: `GenerateMonthlyInvoicesCommand` ... TIDAK PERNAH baca `other_fee` sama sekali ... `other_fee` (materai dkk) cuma sekali di Tagihan Awal/Registrasi ... Dulu di sini malah di-fold ke `total_monthly_bill`, bikin field itu berbohong soal nominal tagihan bulanan asli (temuan nyata: CID C1X4ARQ000004)."
+
+Analisa 2026-09-15 ini menyimpulkan "sama seperti sekarang" berdasarkan `CustomerPackageService::change()` versi LAMA — yang ternyata **belum ikut dibenerin** waktu fix 09-14 itu jalan (bug regresi yang kelewat, bukan keputusan bisnis yang disengaja). Jadi acuan yang dipakai analisa ini sendiri sudah buggy sebelum ditulis.
+
+**Kesimpulan final yang benar: `other_fee` (kolom `customer_services.other_fee`) TIDAK PERNAH masuk hitungan apa pun di alur ganti paket** — bukan di `total_invoice_periode` (§3), bukan juga di `total_monthly_bill` (`CustomerPackageService::applyPackageToService()`). Konsisten penuh dengan fix 09-14 dan `GenerateMonthlyInvoicesCommand`. Kolom `other_fee` di invoice AWAL (materai, field BEDA — `invoices.other_fee`, bukan `customer_services.other_fee`) tetap ikut sebagai biaya sekali-bayar yang sudah melekat di invoice itu sejak awal, TIDAK diprorate, dan TIDAK terdampak koreksi ini.
 
 ### 2.5 Aturan cutover hari belum eksplisit
 
@@ -90,11 +100,19 @@ subtotal_paket = Σ (harga_harian_paket_i × hari_segmen_i)   untuk i = 1..n
 harga_harian_paket_i = monthly_price_i / hari_dalam_periode
 ```
 
-Cuma `monthly_price` yang diprorate per segmen (§2.4). Baru di level total invoice, diskon/PPN/other_fee dikenakan **sekali** dari nilai `customer_service` terbaru:
+Cuma `monthly_price` yang diprorate per segmen (§2.4). Untuk invoice AWAL, biaya sekali-bayar yang sudah melekat di invoice itu (`invoices.extra_installation_fee`/`extra_cable_fee`/`extra_pole_fee`/`invoices.other_fee` — kolom INVOICE, beda dari `customer_services.other_fee`) ditambahkan penuh, TIDAK diprorate (untuk BULANAN semua kolom ini nol):
 
 ```
-total_invoice_periode = max(0, subtotal_paket - discount) × (1 + ppn%) + other_fee
+subtotal_invoice = subtotal_paket + one_time_fees   (one_time_fees = 0 untuk invoice BULANAN)
 ```
+
+Baru di level total invoice, diskon & PPN dikenakan **sekali** dari nilai `customer_service` terbaru:
+
+```
+total_invoice_periode = max(0, subtotal_invoice - discount) × (1 + ppn%)
+```
+
+**Koreksi 2026-09-23 (lihat §2.4-addendum):** rumus asli di sini sempat nulis `+ other_fee` di akhir (merujuk `customer_services.other_fee`) — SALAH, sudah dihapus. `customer_services.other_fee` tidak pernah masuk `total_invoice_periode` di titik mana pun.
 
 Lalu:
 
@@ -150,9 +168,11 @@ Ini backward-compatible: kalau `n=1` dan tidak ada ganti paket, `total_invoice_p
 4. Kalau invoice periode ini **belum ada** (baru lewat tanggal generate, atau baru aktivasi) → tidak ada yang perlu di-prorate, langsung ganti paket seperti sekarang (efek murni ke periode depan).
 5. Kalau **ada** → hitung segmen (ambil riwayat `customer_package_changes` periode ini + segmen baru), hitung `total_invoice_periode`, `sisa_tagih`, `deposit_baru` (§3).
 6. Simpan `customer_package_changes` (audit).
-7. Update invoice existing (`total_amount`, lalu panggil `recalculateFromPayments()` supaya status ikut update) — **bukan bikin invoice baru**, biar tidak kena/tidak melanggar guard anti-dobel per periode (`InvoiceObserver::creating()`, unique index).
+7. Update invoice existing (`subtotal`, `total_amount`) — **bukan bikin invoice baru**, biar tidak kena/tidak melanggar guard anti-dobel per periode (`InvoiceObserver::creating()`, unique index).
+7b. **(ditambah 2026-09-23, awalnya kelewat)** Rebuild `invoice_items` lewat `InvoiceItemBuilder` supaya rincian baris ikut sinkron dengan `subtotal` baru — tanpa ini, jumlah baris lama menyimpang dari subtotal baru dan Detail Tagihan/kwitansi tetap nampilin nominal lama. BULANAN → satu baris `Langganan {periode}`. AWAL → pakai `InitialInvoiceService::lineSpecs()` yang sama, biaya sekali-bayar dari kolom invoice yang sudah ada, cuma `prorate_amount` yang diganti.
+7c. Baru setelah itu panggil `recalculateFromPayments()` supaya status/`remaining_amount` ikut update dari `total_amount` baru.
 8. Kalau `deposit_baru > 0` → catat kredit lewat jalur baru (§2.3), bukan `CustomerBalanceService::credit()` yang sekarang (butuh `Payment`).
-9. Update `customer_services` + `customers.internet_package_id` seperti sekarang.
+9. Update `customer_services` + `customers.internet_package_id` seperti sekarang — **`total_monthly_bill` TIDAK ikutkan `other_fee`** (lihat §2.4-addendum).
 10. Semua dalam satu `DB::transaction()`.
 
 Tidak perlu langkah approval — ganti paket tetap **langsung efektif** begitu request lolos validasi (keputusan §4.4 poin 4), sama seperti perilaku sekarang.
@@ -172,10 +192,14 @@ Tidak perlu langkah approval — ganti paket tetap **langsung efektif** begitu r
 - **Upgrade diblok kalau ada tunggakan periode sebelumnya** (§2.9) — invoice `belum_dibayar` dan invoice `sebagian` di periode lalu, dua-duanya harus nolak.
 - **Upgrade tetap jalan** kalau yang belum lunas cuma invoice periode **berjalan** (bukan tunggakan, itu justru target prorate-nya sendiri).
 - **Downgrade tetap jalan** meski ada tunggakan periode sebelumnya (regresi check — jangan ikut kena blok upgrade).
+- `customer_services.other_fee` **tidak ikut** ditagih di invoice maupun `total_monthly_bill` (regresi test ditambah 2026-09-23 setelah bug ketauan — lihat §2.4-addendum).
+- `invoice_items` ikut ter-rebuild setelah ganti paket, jumlah barisnya sama dengan `subtotal` baru (BULANAN & AWAL+biaya sekali-bayar, ditambah 2026-09-23).
 
-### 4.4 Keputusan (2026-09-15)
+Status aktual: semua di atas ada di `tests/Feature/CustomerPackageChangeTest.php` (14 test).
 
-1. **`other_fee`/diskon/PPN** — tidak diprorate, dikenakan sekali dari nilai `customer_service` terbaru (§2.4, §3).
+### 4.4 Keputusan (2026-09-15, poin 1 dikoreksi 2026-09-23)
+
+1. ~~**`other_fee`/diskon/PPN** — tidak diprorate, dikenakan sekali dari nilai `customer_service` terbaru (§2.4, §3).~~ **Dikoreksi:** diskon/PPN tidak diprorate, dikenakan sekali — itu tetap benar. Tapi `other_fee` (`customer_services.other_fee`) TIDAK dikenakan sama sekali di alur ganti paket, bukan "dikenakan sekali" — lihat §2.4-addendum.
 2. **Tunggakan** — downgrade tetap boleh jalan; upgrade wajib lunasi dulu tunggakan periode sebelumnya (§2.9).
 3. **Siapa yang boleh eksekusi** — diatur lewat RBAC (permission existing `customers.detail.packages.change`, lihat `routes/web.php:848`), bukan hardcode role. Kalau nanti perlu beda hak antara upgrade vs downgrade, pisahkan jadi 2 permission (`...packages.upgrade` / `...packages.downgrade`) — belum perlu sekarang, pakai yang ada dulu.
 4. **Approval** — tidak perlu. Ganti paket tetap langsung efektif begitu lolos validasi (termasuk cek tunggakan poin 2), sama seperti alur sekarang.
@@ -188,3 +212,5 @@ Tidak perlu langkah approval — ganti paket tetap **langsung efektif** begitu r
 - `GenerateMonthlyInvoicesCommand` — pastikan tidak generate invoice `bulanan` kedua untuk periode yang invoice-nya sudah di-recompute oleh proses ganti paket (`hasActiveSubscriptionInvoiceForPeriod()` harus tetap true).
 - Laporan (`InvoiceReportController`, `PaymentReportController`) — kalau ada laporan yang mengasumsikan 1 invoice = 1 harga paket flat sepanjang periode, breakdown per-segmen prorate perlu tampil biar tidak membingungkan admin/finance saat rekonsiliasi.
 - `docs/billing-pembayaran/` — begitu diimplementasi, dokumentasi modul ini (README, business-logic, database-schema) wajib diupdate sesuai `docs/DEFINITION_OF_DONE.md` / alur `docs/TASKS.md`.
+- ~~`invoice_items` tidak ikut di-rebuild saat invoice diprorate ulang~~ — **selesai 2026-09-23**, lihat §4.2 langkah 7b.
+- **Data live yang sempat kena bug `other_fee`** (CID RQ001924, RQ001971 — ganti paket dieksekusi sebelum fix 2026-09-23) belum dikoreksi otomatis oleh fix ini; fix cuma mencegah kejadian BARU. Invoice/`total_monthly_bill`/`customer_package_changes.total_recomputed` dua CID itu masih nyimpen angka lama yang kelebihan `other_fee` sampai dikoreksi manual (lihat percakapan kerja 2026-09-23 buat angka koreksinya).

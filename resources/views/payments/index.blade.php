@@ -163,17 +163,6 @@
                         @endforeach
                     </select>
                 </div>
-
-                <!-- Status Select -->
-                <div>
-                    <label for="status" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Status Validasi</label>
-                    <select name="status" id="status" class="w-full px-3 py-2 text-xs border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors">
-                        <option value="">Semua Status</option>
-                        @foreach($allowedStatuses as $paymentStatus)
-                            <option value="{{ $paymentStatus }}" {{ $status === $paymentStatus ? 'selected' : '' }}>{{ ucwords(str_replace('_', ' ', $paymentStatus)) }}</option>
-                        @endforeach
-                    </select>
-                </div>
             </div>
 
             <!-- Action Filter Buttons -->
@@ -302,9 +291,8 @@
                                         </span>
                                     </div>
                                 @else
-                                    <span class="text-text-muted text-[11px]">Direct / Kasir</span>
+                                    <span class="text-text-muted text-[11px]">Bayar Langsung</span>
                                 @endif
-                                <div class="text-[10px] text-text-muted mt-0.5">by {{ $payment->receiver->name ?? 'System' }}</div>
                             </td>
 
                             <!-- Amount & Overpay -->
@@ -337,7 +325,7 @@
                                         </svg>
                                         <span>Detail</span>
                                     </a>
-                                    <a href="{{ route('payments.receipt', $payment->id) }}" target="_blank" class="p-1 border border-border bg-surface hover:bg-surface-muted text-text-secondary rounded-md transition-colors text-xs" title="Cetak Struk Thermal">
+                                    <a href="{{ route('payments.receipt', $payment->id) }}" target="_blank" class="p-1 border border-border bg-surface hover:bg-surface-muted text-text-secondary rounded-md transition-colors text-xs" title="Cetak Kwitansi">
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>

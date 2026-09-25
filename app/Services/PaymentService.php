@@ -2,12 +2,17 @@
 
 namespace App\Services;
 
+use App\Enums\BalanceMutationSource;
 use App\Enums\InvoiceStatus;
+use App\Enums\InvoiceType;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\BankAccount;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Support\BookPeriod;
 use App\Support\Money;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -29,8 +34,8 @@ class PaymentService
      *
      * @param  array<string, mixed>  $validated  hasil validate() controller —
      *                                           wajib sudah lolos aturan kondisional
-     *                                           per metode (bank_name/account_number
-     *                                           untuk transfer, collected_by untuk kolektor).
+     *                                           per metode (bank_account_id untuk
+     *                                           transfer, collected_by untuk kolektor).
      */
     public function record(Invoice $invoice, array $validated, ?string $proofPath): Payment
     {
@@ -56,7 +61,21 @@ class PaymentService
                 ]);
             }
 
+            // Tutup buku: tanggal bayar di bulan terkunci akan menggeser laporan
+            // bulan yang sudah final. Uang yang baru diinput sekarang dicatat di
+            // periode berjalan — termasuk pelunasan piutang bulan lalu.
+            $paymentPeriod = Carbon::parse($validated['payment_date'])->format('Y-m');
+            if (BookPeriod::isLocked($paymentPeriod)) {
+                throw ValidationException::withMessages([
+                    'payment_date' => "Periode {$paymentPeriod} sudah tutup buku. Tanggal bayar minimal ".Carbon::parse(BookPeriod::firstOpenDate())->format('d/m/Y').'.',
+                ]);
+            }
+
             $method = PaymentMethod::from($validated['payment_method']);
+
+            $bankAccount = $method->requiresBankDetails()
+                ? $this->resolveActiveBankAccount($validated['bank_account_id'] ?? null)
+                : null;
 
             $useBalanceAmount = Money::of($validated['use_balance_amount'] ?? 0);
 
@@ -95,9 +114,14 @@ class PaymentService
                 'pop_id' => $lockedInvoice->pop_id,
                 'payment_date' => $validated['payment_date'],
                 'payment_method' => $method->value,
-                'bank_name' => $method->requiresBankDetails() ? ($validated['bank_name'] ?? null) : null,
-                'account_number' => $method->requiresBankDetails() ? ($validated['account_number'] ?? null) : null,
+                // Snapshot dari master, bukan input request — edit/nonaktif
+                // rekening di master belakangan tidak mengubah riwayat ini.
+                'bank_account_id' => $bankAccount?->id,
+                'bank_name' => $bankAccount?->bank_name,
+                'account_number' => $bankAccount?->account_number,
+                'sender_name' => $method->requiresSenderName() ? $this->nullIfBlank($validated['sender_name'] ?? null) : null,
                 'amount' => $appliedAmount,
+                'balance_used_amount' => $useBalanceAmount,
                 'overpay_amount' => Money::isZero($overpayAmount) ? null : $overpayAmount,
                 'received_by' => auth()->id(),
                 'collected_by' => $method->requiresCollector() ? ($validated['collected_by'] ?? null) : null,
@@ -108,7 +132,12 @@ class PaymentService
 
             if (Money::compare($useBalanceAmount, 0) > 0) {
                 try {
-                    $this->balances->debit($lockedInvoice->customer, $useBalanceAmount, $payment);
+                    $this->balances->debit(
+                        $lockedInvoice->customer,
+                        $useBalanceAmount,
+                        $payment,
+                        source: BalanceMutationSource::PAKAI_MANUAL,
+                    );
                 } catch (InvalidArgumentException $e) {
                     // Saldo berubah di antara pengecekan di atas dan titik ini
                     // (payment lain memakainya lebih dulu) — lockedBalance()
@@ -123,12 +152,55 @@ class PaymentService
             }
 
             if (Money::greaterThan($overpayAmount, 0) && $lockedInvoice->customer) {
-                $this->balances->credit($lockedInvoice->customer, $overpayAmount, $payment);
+                // KEPUTUSAN "input awal" (ADHOC-92): overpay pada invoice AWAL
+                // = pelanggan sengaja titip saldo di muka (studi kasus 550k di
+                // tagihan 100k). Overpay pada jenis invoice lain tetap
+                // kelebihan bayar biasa — dua sumber sama-sama jadi saldo AKTIF,
+                // bedanya cuma label untuk laporan/riwayat.
+                $source = $lockedInvoice->invoice_type === InvoiceType::AWAL
+                    ? BalanceMutationSource::BAYAR_DI_MUKA
+                    : BalanceMutationSource::KELEBIHAN_BAYAR;
+
+                $this->balances->credit($lockedInvoice->customer, $overpayAmount, $payment, source: $source);
             }
 
             $lockedInvoice->recalculateFromPayments();
 
             return $payment;
         });
+    }
+
+    /**
+     * Rekening tujuan Transfer — wajib ada di master DAN masih aktif.
+     *
+     * Dicek di sini, bukan cuma rule `exists` di controller: rekening
+     * nonaktif tetap "exists", dan form yang dibuka sebelum rekening
+     * dinonaktifkan masih bisa mengirim id-nya. Pesannya harus jelas
+     * kenapa ditolak, bukan "pilihan tidak valid".
+     */
+    private function resolveActiveBankAccount(mixed $bankAccountId): BankAccount
+    {
+        $bankAccount = $bankAccountId ? BankAccount::find($bankAccountId) : null;
+
+        if (! $bankAccount) {
+            throw ValidationException::withMessages([
+                'bank_account_id' => 'Pilih rekening tujuan untuk metode Transfer.',
+            ]);
+        }
+
+        if (! $bankAccount->is_active) {
+            throw ValidationException::withMessages([
+                'bank_account_id' => "Rekening {$bankAccount->bank_name} {$bankAccount->account_number} sudah tidak aktif — pilih rekening lain.",
+            ]);
+        }
+
+        return $bankAccount;
+    }
+
+    private function nullIfBlank(?string $value): ?string
+    {
+        $value = $value === null ? null : trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

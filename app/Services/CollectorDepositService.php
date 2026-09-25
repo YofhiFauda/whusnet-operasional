@@ -83,16 +83,20 @@ class CollectorDepositService
                 'collector_deposit_id' => $deposit->id,
             ]);
 
+            // Payment::physicalAmount() (ADHOC-92 G4) — konsisten dengan
+            // CollectorDeposit::computedAmount() yang menentukan `difference`.
+            $totalTercatat = round(Money::sum($payments->map(fn (Payment $p) => $p->physicalAmount())), 2);
+
             $this->audit($deposit, $actor, 'disetorkan', array_filter([
                 'jumlah_pembayaran' => $payments->count(),
-                'total_tercatat' => round((float) $payments->sum('amount'), 2),
+                'total_tercatat' => $totalTercatat,
                 // Cuma ditulis kalau memang beda — jangan bikin baris audit
                 // normal (kolektor setor sendiri) jadi berisik dengan field
                 // yang selalu kosong.
                 'disetorkan_oleh_admin_untuk' => $actor->id !== $collector->id ? $collector->name : null,
             ], fn ($value) => $value !== null));
 
-            return [$deposit, $payments->count(), round((float) $payments->sum('amount'), 2)];
+            return [$deposit, $payments->count(), $totalTercatat];
         });
 
         // Notifikasi SESUDAH commit, dan kegagalannya tak boleh menggagalkan

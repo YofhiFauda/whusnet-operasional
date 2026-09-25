@@ -250,27 +250,21 @@
     }
 
     /**
-     * Nominal per baris dulu ditahan atribut `max` milik input number. Sejak
-     * kolomnya jadi teks bermasking ribuan, batas itu harus dicek sendiri —
-     * kalau tidak, kelebihan bayar lolos diam-diam ke jalur batch yang memang
-     * tidak menyediakan overpay.
+     * Nominal boleh melebihi `data-max` (sisa tagihan baris itu) — ADHOC-84
+     * §2.5/§4.4: kelebihannya otomatis dipisah jadi overpay & masuk saldo
+     * pelanggan di server (`CollectorPaymentService::record()`, pola sama
+     * `PaymentService::record()` jalur admin), bukan ditolak. Cuma batas
+     * bawah (minimal Rp 1) yang masih ditegakkan di sini.
      *
-     * @return {boolean} true kalau semua baris masih dalam batas.
+     * @return {boolean} true kalau semua baris valid.
      */
     function cbBarisValid(trs) {
         for (const tr of trs) {
             const input = tr.querySelector('.cb-amount');
             const nilai = window.Rupiah.angka(input.value);
-            const batas = parseFloat(input.dataset.max);
 
             if (isNaN(nilai) || nilai < 1) {
                 cbShowAlert('Nominal wajib diisi minimal Rp 1.', true);
-                input.focus();
-                return false;
-            }
-
-            if (!isNaN(batas) && nilai > batas) {
-                cbShowAlert('Nominal melebihi sisa tagihan (Rp ' + Math.round(batas).toLocaleString('id-ID') + ').', true);
                 input.focus();
                 return false;
             }
@@ -317,4 +311,73 @@
 
         cbPost(rows, btn, 'Bayar Massal (Baris Terpilih)');
     }
+
+    // ---------------------------------------------------------------
+    // FIFO isian awal (ADHOC-84 §2.5/§4.4) — cuma kemudahan mengisi, BUKAN
+    // aturan server. Uang total pelanggan disebar ke baris tagihannya
+    // (sudah berdempet per pelanggan, urutan periode tertua dulu — lihat
+    // komentar di collector-pay-table.blade.php) dari yang TERTUA: tiap
+    // baris selain yang TERAKHIR dibatasi `data-max`-nya sendiri (sisa
+    // tagihan baris itu, jadi cicilan wajar kalau uang habis di tengah);
+    // baris TERAKHIR menyerap SISANYA APA ADANYA, termasuk kalau itu
+    // melebihi sisa tagihannya sendiri — kelebihan itu yang nanti
+    // otomatis jadi kredit saldo di server. Nilainya tetap bisa diedit
+    // manual sesudahnya, cuma isian awal.
+    function cbApplyFifo(customerId, totalInput) {
+        const total = window.Rupiah ? window.Rupiah.angka(totalInput.value) : parseFloat(totalInput.value);
+        if (isNaN(total) || total <= 0) {
+            cbShowAlert('Isi total uang yang diterima dari pelanggan ini dulu.', true);
+            return;
+        }
+
+        const rows = Array.from(document.querySelectorAll('tr[data-customer-id="' + customerId + '"]'));
+        let sisaUang = total;
+
+        rows.forEach((tr, idx) => {
+            const input = tr.querySelector('.cb-amount');
+            if (!input) return;
+
+            const batas = parseFloat(input.dataset.max);
+            const isLast = idx === rows.length - 1;
+            const terapkan = isLast ? sisaUang : Math.min(sisaUang, isNaN(batas) ? sisaUang : batas);
+
+            input.value = window.Rupiah ? window.Rupiah.formatDariServer(String(Math.max(0, terapkan))) : String(Math.max(0, terapkan));
+            sisaUang = Math.max(0, sisaUang - terapkan);
+        });
+    }
+
+    // Baris toolbar "Total Diterima" disisipkan sekali per pelanggan yang
+    // punya 2+ tagihan tertunggak di halaman ini — pelanggan dengan 1
+    // tagihan tak butuh FIFO (tak ada yang disebar), isi manual saja.
+    document.addEventListener('DOMContentLoaded', function () {
+        const groups = new Map();
+        document.querySelectorAll('tr[data-customer-id]').forEach((tr) => {
+            const id = tr.dataset.customerId;
+            if (!groups.has(id)) groups.set(id, []);
+            groups.get(id).push(tr);
+        });
+
+        groups.forEach((rows, customerId) => {
+            if (rows.length < 2) return;
+
+            const firstRow = rows[0];
+            const toolbar = document.createElement('tr');
+            toolbar.className = 'block xl:table-row bg-sky-50/60 dark:bg-sky-500/10';
+            toolbar.innerHTML = `
+                <td class="block xl:table-cell px-3 py-2" colspan="${CB_COLSPAN}">
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <span class="font-semibold text-sky-800 dark:text-sky-300">Isian awal FIFO — total uang diterima dari pelanggan ini:</span>
+                        <input type="text" inputmode="decimal" data-rupiah class="fifo-total w-32 font-mono text-xs px-2 py-1 border border-sky-200 dark:border-sky-500/30 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                        <button type="button" class="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-semibold cursor-pointer">Terapkan</button>
+                        <span class="text-sky-700 dark:text-sky-400">Lebih dari total sisa tagihan otomatis jadi saldo pelanggan — tetap bisa diedit per baris.</span>
+                    </div>
+                </td>
+            `;
+            toolbar.querySelector('button').addEventListener('click', function () {
+                cbApplyFifo(customerId, toolbar.querySelector('.fifo-total'));
+            });
+
+            firstRow.parentNode.insertBefore(toolbar, firstRow);
+        });
+    });
 </script>

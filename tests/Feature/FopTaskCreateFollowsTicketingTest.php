@@ -127,6 +127,25 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * Regresi toast "Bidang type wajib diisi": semua test lain di file ini
+     * POST payload berisi `type` langsung, padahal modal asli cuma punya
+     * dropdown `category` — jadi test hijau sementara form beneran selalu 422.
+     * Test ini ngunci kontrak dari sisi view: mode Ticketing WAJIB ikut
+     * ngirim `type` yang diikat ke kategori terpilih, dan di-disable di luar
+     * mode Ticketing supaya gak nyasar ke fop-tasks.store.
+     */
+    public function test_fop_tasks_modal_sends_type_field_required_by_tickets_store(): void
+    {
+        $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+
+        $response->assertOk();
+        $response->assertSee(
+            '<input type="hidden" name="type" :value="modal.data.category" :disabled="!isTicketMode">',
+            false
+        );
+    }
+
     public function test_fop_submitting_from_fop_tasks_page_without_technicians_creates_draft_ticket_and_redirects_to_fop_tasks(): void
     {
         $response = $this->actingAs($this->fopUser)->post(route('tickets.store'), $this->basePayload());

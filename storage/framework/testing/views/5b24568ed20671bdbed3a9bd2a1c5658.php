@@ -3,21 +3,22 @@
 <div x-data="ticketDetailDrawer()" x-on:open-ticket-drawer.window="open($event.detail.id)"
      x-on:close-ticket-drawer.window="close()"
      x-on:keydown.escape.window="close()"
-     x-effect="document.body.classList.toggle('overflow-hidden', shown); document.querySelector('main')?.classList.toggle('overflow-hidden', shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
+     x-effect="lockBodyScroll(shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
 
     
-    <div x-show="shown" x-transition.opacity @click="close()" @touchmove.prevent
+    <div x-show="shown" x-transition.opacity @click="close()"
          class="fixed inset-0 top-16 bg-slate-950/60 backdrop-blur-sm z-[60]" x-cloak></div>
 
     
     <div x-show="shown" x-cloak
-         x-transition:enter="transform transition ease-in-out duration-300"
+         x-transition:enter="transform transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
          x-transition:enter-start="translate-x-full"
          x-transition:enter-end="translate-x-0"
-         x-transition:leave="transform transition ease-in-out duration-200"
+         x-transition:leave="transform transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
-         class="fixed top-16 right-0 bottom-0 w-full max-w-2xl bg-surface border-l border-border shadow-2xl z-[60] flex flex-col overflow-hidden overscroll-contain"
+         
+         class="fixed top-16 right-0 bottom-0 h-[calc(100dvh-4rem)] w-full max-w-2xl bg-surface border-l border-border shadow-2xl z-[60] flex flex-col overflow-hidden"
          role="dialog" aria-modal="true" aria-label="Detail Ticket">
 
         
@@ -43,7 +44,7 @@
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 text-xs overscroll-contain">
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 text-xs">
 
             <template x-if="loading">
                 <div class="space-y-3">
@@ -383,6 +384,43 @@
             loading: false,
             failed: false,
             ticket: null,
+            _scrollY: 0,
+
+            /**
+             * `overflow-hidden` di body doang gak nahan touch-drag di HP —
+             * lihat komentar x-effect di atas. `position:fixed` beneran
+             * ngunci viewport; scrollY disimpen manual soalnya browser
+             * reset posisi scroll begitu body jadi fixed.
+             */
+            lockBodyScroll(shown) {
+                const body = document.body;
+
+                if (shown) {
+                    if (body.style.position === 'fixed') {
+                        return;
+                    }
+
+                    this._scrollY = window.scrollY;
+                    body.style.position = 'fixed';
+                    body.style.top = `-${this._scrollY}px`;
+                    body.style.left = '0';
+                    body.style.right = '0';
+                    body.classList.add('overflow-hidden');
+
+                    return;
+                }
+
+                if (body.style.position !== 'fixed') {
+                    return;
+                }
+
+                body.style.position = '';
+                body.style.top = '';
+                body.style.left = '';
+                body.style.right = '';
+                body.classList.remove('overflow-hidden');
+                window.scrollTo(0, this._scrollY);
+            },
 
             get hasAnyAction() {
                 const a = this.ticket?.actions ?? {};

@@ -337,14 +337,12 @@ return [
             ActionCode::PRINT->value,
         ],
 
-        // Laporan Bulanan Admin Collector (ADHOC-90). APPROVE = tutup periode
-        // (dibekukan); CANCEL = buka ulang periode yang sudah ditutup —
-        // sengaja hanya owner (lewat `*`), tidak diberikan ke role lain.
+        // Laporan Bulanan Admin Collector (ADHOC-90). Tidak ada APPROVE/CANCEL
+        // lagi: tutup buku otomatis saat bulan berganti & kuncinya permanen
+        // (`billing:close-period`, App\Support\BookPeriod).
         'collector_report' => [
             ActionCode::VIEW->value,
             ActionCode::EXPORT->value,
-            ActionCode::APPROVE->value,
-            ActionCode::CANCEL->value,
         ],
 
         // Laporan Bayar Kolektor — daftar transaksi per kolektor (ADHOC-90).
@@ -482,6 +480,45 @@ return [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
             ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+        ],
+
+        // Master Rekening Bank (ADHOC-95). SENGAJA tanpa DELETE: payment
+        // menunjuk rekening lewat FK, yang tak dipakai lagi dinonaktifkan
+        // (toggle = `.update`). Assignment role diatur di Role Matrix.
+        'master_rekening' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+        ],
+
+        // Saldo Pelanggan (ADHOC-92) — cuma VIEW, penyesuaian saldo manual
+        // di luar scope rancangan §4.3.
+        'customer_balance' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Master Alasan Putus Langganan (ADHOC-69) — TERPISAH dari
+        // `customers.deactivate` (dokumen §4.2): role yang cuma bisa
+        // memproses form putus langganan (butuh `.view` buat isi dropdown)
+        // belum tentu boleh CRUD master-nya sendiri. Punya DELETE (beda dari
+        // `ticket_issue_categories`/`items` yang toggle-only) karena dijaga
+        // `restrictOnDelete()` — alasan yang masih dipakai tidak bisa hapus.
+        'termination_reasons' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+        ],
+
+        // Pembebasan Tagihan Periode (ADHOC-87) — Request Putus Langganan +
+        // Cuti Berlangganan. TERPISAH dari `customers.deactivate` dan
+        // `customers.update` (G5 rancangan): membatalkan tagihan lebih berat
+        // dari sekadar mengubah data pelanggan. CREATE = ajukan pembebasan
+        // (waive), DELETE = cabut. Tidak ada halaman list tersendiri — muncul
+        // inline di tab Tagihan Detail Pelanggan — jadi tidak perlu VIEW.
+        'billing_waivers' => [
+            ActionCode::CREATE->value,
             ActionCode::DELETE->value,
         ],
 
@@ -805,8 +842,6 @@ return [
         'invoices.approve' => 'Hapus Buku Piutang (Tak Tertagih)',
         'collector_report.view' => 'Lihat Laporan Bulanan Admin',
         'collector_report.export' => 'Ekspor Laporan Bulanan Admin ke Excel',
-        'collector_report.approve' => 'Tutup Periode Pembukuan (Bekukan Angka Bulanan)',
-        'collector_report.cancel' => 'Buka Ulang Periode Pembukuan yang Sudah Ditutup',
         'collector_payment_report.view' => 'Lihat Laporan Bayar Kolektor (tabel bayar per kolektor)',
         'collector_payment_report.export' => 'Ekspor Laporan Bayar Kolektor ke Excel',
 
@@ -818,5 +853,6 @@ return [
         'package_restrictions.update' => 'Atur Daftar Paket Restriksi',
         'sales_omset_dashboard.view' => 'Lihat Dashboard Omset Sales',
         'business_customers.view' => 'Lihat List Pelanggan Bisnis',
+        'customer_balance.view' => 'Lihat Saldo Pelanggan',
     ],
 ];

@@ -111,9 +111,18 @@ class CollectorDeposit extends Model
      */
     public function computedAmount(): float
     {
-        return Money::of($this->payments()
-            ->where('payment_status', PaymentStatus::VALID->value)
-            ->sum('amount'));
+        // Payment::physicalAmount() (ADHOC-92 G4, koreksi 2026-09-24) —
+        // sebelumnya cuma sum('amount'), jadi overpay tunai yang ditagih
+        // kolektor (uang fisik beneran ada) tidak ikut computedAmount(),
+        // membuat declared_amount (hasil hitung fisik verifier) selalu
+        // tampak "Lebih Setor" palsu sebesar overpay itu — padahal kolektor
+        // menyetor persis apa yang dia pegang.
+        return Money::sum(
+            $this->payments()
+                ->where('payment_status', PaymentStatus::VALID->value)
+                ->get()
+                ->map(fn (Payment $p) => $p->physicalAmount())
+        );
     }
 
     /**

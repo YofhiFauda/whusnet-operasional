@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\CashDepositStatus;
 use App\Enums\DepositStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\CashDeposit;
 use App\Models\CollectorDeposit;
@@ -93,7 +94,17 @@ class AdminCashBalanceService
                 ->map(fn (CollectorDeposit $deposit) => $deposit->cashReceivedByOffice())
         );
 
-        $dariManual = Money::of($this->unsettledManualPaymentsQuery($admin)->sum('amount'));
+        // `Payment::physicalAmount()` (ADHOC-92 G4, koreksi 2026-09-24):
+        // `balance_used_amount` dikeluarkan (bukan uang tunai — dari Saldo
+        // Pelanggan) DAN `overpay_amount` diikutkan (uang lebih itu FISIK
+        // tetap, cuma disimpan di kolom terpisah dari `amount`). Sebelum
+        // koreksi ini, kelebihan tunai yang diterima admin (mis. pelanggan
+        // bayar 3 bulan sekaligus lewat invoice BULANAN) hilang dari
+        // kewajiban setor — admin pegang uang lebih tapi sistem bilang tak
+        // ada yang harus disetor.
+        $dariManual = Money::sum(
+            $this->unsettledManualPaymentsQuery($admin)->get()->map(fn (Payment $p) => $p->physicalAmount())
+        );
 
         return Money::add($dariKolektor, $dariManual);
     }
@@ -112,21 +123,32 @@ class AdminCashBalanceService
         $sejak ??= now()->startOfMonth()->toDateString();
         $sampai ??= now()->endOfMonth()->toDateString();
 
+        // Method SALDO (auto-pay ADHOC-92) SENGAJA dikeluarkan juga — bukan
+        // cuma cash: uangnya sudah masuk kas saat kredit pertama terjadi
+        // (overpay), bukan saat dipakai, jadi tidak boleh dihitung sebagai
+        // uang non-tunai yang baru masuk lagi.
         $baris = Payment::query()
             ->where('received_by', $admin->id)
             ->whereNull('collected_by')
             ->where('payment_status', PaymentStatus::VALID->value)
             ->where('payment_method', '!=', 'cash')
+            ->where('payment_method', '!=', PaymentMethod::SALDO->value)
             ->whereBetween('payment_date', [$sejak, $sampai])
-            ->get(['payment_method', 'amount']);
+            ->get(['payment_method', 'amount', 'balance_used_amount', 'overpay_amount']);
+
+        // `Payment::physicalAmount()` per baris (ADHOC-92 G4) — payment
+        // transfer yang sebagian ditutup pakai saldo manual tidak menghitung
+        // porsi saldonya, TAPI kelebihan transfer (`overpay_amount`) ikut
+        // dihitung karena uangnya beneran mendarat di rekening.
+        $fisik = fn (Collection $group) => Money::sum($group->map(fn (Payment $p) => $p->physicalAmount()));
 
         $perMetode = $baris
             ->groupBy('payment_method')
-            ->map(fn (Collection $group) => Money::sum($group->pluck('amount')))
+            ->map($fisik)
             ->all();
 
         return [
-            'total' => Money::sum($baris->pluck('amount')),
+            'total' => $fisik($baris),
             'per_metode' => $perMetode,
         ];
     }

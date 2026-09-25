@@ -174,6 +174,13 @@
             <p class="metric-card-footer">{{ number_format($stats['new_active_customers']) }} aktif baru &middot; {{ number_format($stats['terminated_customers']) }} putus</p>
         </div>
 
+        {{-- Omset per Segmen (Sales/Teknisi/Bisnis) — REKAP PERUSAHAAN, bukan
+             omset pribadi. Sebelumnya tanpa gerbang permission sama sekali:
+             role `sales` biasa (tanpa `sales_omset_dashboard.view`) ikut
+             melihat omset SELURUH sales lain di perusahaan lewat dashboard —
+             bertentangan sama aturan "Sales tak boleh akses laporan
+             keuangan". Gerbang sama persis dengan link sidebar "Omset Sales". --}}
+        @can('sales_omset_dashboard.view')
         <!-- Omset Sales (Metric Card) -->
         <div class="metric-card">
             <div>
@@ -215,6 +222,7 @@
             </div>
             <p class="metric-card-footer"><span class="font-mono">{{ number_format($stats['omset_bisnis_count']) }}</span> pelanggan aktif segmen Bisnis</p>
         </div>
+        @endcan
     </div>
 
     @if($canViewCash)

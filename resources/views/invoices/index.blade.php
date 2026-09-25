@@ -32,6 +32,11 @@
         <a href="/customers" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
             Buka Data Pelanggan
         </a>
+        @can('invoices.create')
+            <a href="{{ route('invoices.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+                + Buat Tagihan
+            </a>
+        @endcan
     </div>
 </div>
 
@@ -81,6 +86,7 @@
                 <option value="awal" {{ ($invoiceType ?? '') === 'awal' ? 'selected' : '' }}>Aktivasi</option>
                 <option value="bulanan" {{ ($invoiceType ?? '') === 'bulanan' ? 'selected' : '' }}>Tagihan Bulanan Rutin</option>
                 <option value="reaktivasi" {{ ($invoiceType ?? '') === 'reaktivasi' ? 'selected' : '' }}>Tagihan Reaktivasi</option>
+                <option value="manual" {{ ($invoiceType ?? '') === 'manual' ? 'selected' : '' }}>Tagihan Manual</option>
             </select>
         </div>
 
@@ -119,10 +125,10 @@
                     <th class="px-6 py-3.5">PELANGGAN</th>
                     <th class="px-6 py-3.5">POP</th>
                     <th class="px-6 py-3.5">PERIODE</th>
-                    <th class="px-6 py-3.5 text-right">TOTAL</th>
-                    <th class="px-6 py-3.5 text-right">SISA</th>
+                    <th class="px-6 py-3.5 text-center">TOTAL</th>
+                    <th class="px-6 py-3.5 text-center">SISA</th>
                     <th class="px-6 py-3.5 text-center">STATUS</th>
-                    <th class="px-6 py-3.5 text-right">ACTION</th>
+                    <th class="px-6 py-3.5 text-center">ACTION</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -177,7 +183,18 @@
                                     {{ $invoice->invoice_type->label() }}
                                 </span>
                                 @endif
-                                <span class="text-[10px] text-slate-400 dark:text-slate-500">Tempo {{ optional($invoice->due_date)->format('d/m/Y') }}</span>
+                                {{-- Sub-jenis Tagihan Manual (ADHOC-70/69) — tanpa ini, denda
+                                     Putus Langganan gak bisa dibedakan dari Tagihan Manual
+                                     "Lainnya" biasa di daftar ini. --}}
+                                @if($invoice->manual_subtype_name)
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-500/20">
+                                    {{ $invoice->manual_subtype_name }}
+                                </span>
+                                @elseif($invoice->manual_category)
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-slate-50 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/20">
+                                    {{ $invoice->manual_category->label() }}
+                                </span>
+                                @endif
                             </div>
                         </td>
                         <td class="px-6 py-3.5 whitespace-nowrap">
@@ -193,10 +210,16 @@
                         <td class="px-6 py-3.5 whitespace-nowrap font-mono">{{ $invoice->billing_period }}</td>
                         <td class="px-6 py-3.5 text-right font-mono font-semibold">Rp {{ number_format((float) $invoice->total_amount, 2, ',', '.') }}</td>
                         <td class="px-6 py-3.5 text-right font-mono" id="invoice-remaining-{{ $invoice->id }}">Rp {{ number_format((float) $invoice->remaining_amount, 2, ',', '.') }}</td>
-                        <td class="px-6 py-3.5 text-center whitespace-nowrap">
-                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $badgeClass }}" id="invoice-status-badge-{{ $invoice->id }}" data-badge-style="pill">
-                                {{ $invoice->invoice_status->label() }}
-                            </span>
+                        <td class="px-6 py-3.5 text-center">
+                            {{-- ADHOC-95 §3: badge status TIDAK DIRENDER SAMA SEKALI di halaman
+                                 Tagihan Belum Lunas (bukan pil kosong) — kedua status di sana
+                                 (belum_dibayar/sebagian) sudah jelas dari konteks halamannya
+                                 sendiri. Daftar Tagihan umum & filter manual tetap tampil. --}}
+                            @unless(($statusGroup ?? '') === 'belum_lunas')
+                                <span id="invoice-status-badge-{{ $invoice->id }}" class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $badgeClass }}">
+                                    {{ $invoice->invoice_status->label() }}
+                                </span>
+                            @endunless
                         </td>
                         <td class="px-6 py-3.5 text-right whitespace-nowrap">
                             <div class="inline-flex items-center gap-1.5">
@@ -298,6 +321,8 @@
      operasional.md §2.1 no. 2 & 11). --}}
 @push('scripts')
     <script>
+        const HIDE_INVOICE_STATUS_BADGE = @json(($statusGroup ?? '') === 'belum_lunas');
+
         const INVOICE_STATUS_LABELS = {
             belum_dibayar: 'Belum Dibayar',
             sebagian: 'Sebagian',
@@ -323,7 +348,11 @@
                 remainingCell.textContent = 'Rp ' + Number(data.remaining_amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
 
-            const badge = document.getElementById('invoice-status-badge-' + data.invoice_id);
+            // Mode Tagihan Belum Lunas: badge sengaja tak dirender (lihat
+            // Blade di atas) — patch realtime juga tidak boleh memunculkannya
+            // lagi. Cek eksplisit, bukan cuma andalkan elemen yang tak ada,
+            // supaya kode patch berikutnya yang MEMBUAT badge tetap patuh.
+            const badge = HIDE_INVOICE_STATUS_BADGE ? null : document.getElementById('invoice-status-badge-' + data.invoice_id);
             if (badge) {
                 badge.textContent = data.invoice_status_label || INVOICE_STATUS_LABELS[data.invoice_status] || data.invoice_status;
                 badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full border ' +

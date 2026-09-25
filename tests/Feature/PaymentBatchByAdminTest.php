@@ -227,8 +227,11 @@ class PaymentBatchByAdminTest extends TestCase
             'idempotency_key' => 'batch-test-003',
             'rows' => [
                 ['invoice_id' => $goodInvoice->id, 'amount' => 100000, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
-                // Nominal melebihi sisa tagihan — baris ini harus gagal.
-                ['invoice_id' => $badInvoice->id, 'amount' => 999999, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
+                // Metode Lainnya tanpa keterangan — baris ini harus gagal.
+                // (ADHOC-84 §2.5/§4.4, 2026-09-23: nominal melebihi sisa
+                // BUKAN lagi penyebab tolak — kelebihannya otomatis kredit
+                // saldo, lihat CollectorSelfPaymentTest::test_kolektor_overpay_…)
+                ['invoice_id' => $badInvoice->id, 'amount' => 50000, 'payment_method' => 'lainnya', 'collected_date' => '2026-06-13'],
             ],
         ]);
 

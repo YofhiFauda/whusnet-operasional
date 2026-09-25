@@ -19,9 +19,24 @@
 @include('customers.partials._list_filters')
 
 <div class="@container bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
-    <div class="border-b border-slate-200 dark:border-slate-800 px-6 py-3.5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30">
+    <div class="border-b border-slate-200 dark:border-slate-800 px-6 py-3.5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30 gap-3 flex-wrap">
         <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Daftar Pelanggan Putus</span>
-        <a href="{{ route('customers.index') }}" class="text-xs text-sky-600 dark:text-sky-400 hover:underline">Lihat Semua Pelanggan</a>
+        <div class="flex items-center gap-2">
+            {{-- Filter Alasan Putus (ADHOC-69) — WHERE di level query, lihat
+                 RendersCustomerList::renderCustomerList(). --}}
+            <form action="{{ url()->current() }}" method="GET" class="flex items-center gap-2">
+                @if($search !== '')<input type="hidden" name="search" value="{{ $search }}">@endif
+                @if($sort !== '')<input type="hidden" name="sort" value="{{ $sort }}">@endif
+                <select name="termination_reason_id" onchange="this.form.submit()"
+                        class="text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-700 dark:text-slate-200">
+                    <option value="">Semua Alasan</option>
+                    @foreach($terminationReasonOptions as $reasonOption)
+                    <option value="{{ $reasonOption->id }}" {{ (string) $terminationReasonId === (string) $reasonOption->id ? 'selected' : '' }}>{{ $reasonOption->name }}</option>
+                    @endforeach
+                </select>
+            </form>
+            <a href="{{ route('customers.index') }}" class="text-xs text-sky-600 dark:text-sky-400 hover:underline whitespace-nowrap">Lihat Semua Pelanggan</a>
+        </div>
     </div>
 
     {{-- DESKTOP: Table layout, visible on container screens >= 64rem --}}
@@ -33,7 +48,13 @@
                     <th scope="col" class="py-3.5 px-4">Nama Pelanggan</th>
                     <th scope="col" class="py-3.5 px-4">POP</th>
                     <th scope="col" class="py-3.5 px-4">Kontrak</th>
-                    <th scope="col" class="py-3.5 px-4">Alasan Putus</th>
+                    <th scope="col" class="py-3.5 px-4">
+                        <a href="{{ request()->fullUrlWithQuery(['sort' => $sort === 'alasan' ? '' : 'alasan']) }}" class="hover:text-sky-600 dark:hover:text-sky-400">
+                            Alasan Putus {{ $sort === 'alasan' ? '▲' : '' }}
+                        </a>
+                    </th>
+                    <th scope="col" class="py-3.5 px-4">Sales</th>
+                    <th scope="col" class="py-3.5 px-4">Teknisi Survei</th>
                     <th scope="col" class="py-3.5 px-4">Tgl Pemutusan</th>
                     <th scope="col" class="py-3.5 px-4 text-center">Status Alat</th>
                     <th scope="col" class="py-3.5 px-5 text-right">Aksi</th>
@@ -76,6 +97,12 @@
                     <td class="px-4 py-3.5 max-w-xs text-slate-600 dark:text-slate-400 truncate">
                         {{ $customer->termination_reason ?? '-' }}
                     </td>
+                    <td class="px-4 py-3.5 text-slate-600 dark:text-slate-400">
+                        {{ $customer->salesUser->name ?? '-' }}
+                    </td>
+                    <td class="px-4 py-3.5 text-slate-600 dark:text-slate-400">
+                        {{ $customer->latestSurvey->technician->name ?? '-' }}
+                    </td>
                     <td class="px-4 py-3.5 font-mono text-slate-500 whitespace-nowrap">
                         {{ $customer->terminated_at ? \App\Support\IndonesianDate::date($customer->terminated_at) : '-' }}
                     </td>
@@ -114,7 +141,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
+                    <td colspan="10" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -169,6 +196,14 @@
                         <dd class="text-slate-600 dark:text-slate-400 mt-0.5 text-xs line-clamp-2" title="{{ $customer->termination_reason }}">
                             {{ $customer->termination_reason ?? '-' }}
                         </dd>
+                    </div>
+                    <div class="min-w-0">
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Sales</dt>
+                        <dd class="text-slate-700 dark:text-slate-300 font-semibold mt-0.5">{{ $customer->salesUser->name ?? '-' }}</dd>
+                    </div>
+                    <div class="min-w-0">
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Teknisi Survei</dt>
+                        <dd class="text-slate-700 dark:text-slate-300 font-semibold mt-0.5">{{ $customer->latestSurvey->technician->name ?? '-' }}</dd>
                     </div>
                 </dl>
 

@@ -7,6 +7,7 @@ use App\Models\CustomerPortalAccount;
 use App\Models\CustomerQrToken;
 use App\Models\CustomerService;
 use App\Models\CustomerStatusLog;
+use App\Models\CustomerTerminationReason;
 use App\Models\Pop;
 use App\Services\CustomerQrTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -99,7 +100,8 @@ class CustomerReactivateWritesStatusLogAndRestoresPortalTest extends TestCase
         $oldToken = app(CustomerQrTokenService::class)->issue($customer);
 
         // Terminasi lewat jalur resmi → observer menonaktifkan akun & mencabut QR.
-        $this->post(route('customers.terminate', $customer), ['reason' => 'Pindah'])->assertSessionHas('success');
+        $reason = CustomerTerminationReason::create(['name' => 'Pindah']);
+        $this->post(route('customers.terminate', $customer), ['termination_reason_id' => $reason->id, 'penalty_amount' => 0])->assertSessionHas('success');
         $this->assertSame('disabled', $account->fresh()->status);
         $this->assertTrue($oldToken->fresh()->isRevoked());
 

@@ -4,7 +4,7 @@ Semua logika uang ada di service, bukan controller. Controller tipis: validasi r
 
 | Service | Tanggung jawab |
 |---|---|
-| `CollectorWorklistService` | Satu-satunya sumber "tagihan mana yang boleh ditagih" — `dueInvoices()` (kolektor, ber-jendela) & `outstandingInvoices()` (admin, tanpa jendela) |
+| `CollectorWorklistService` | Satu-satunya sumber "tagihan mana yang boleh ditagih" — `dueInvoices()` (kolektor, periode sudah berjalan) & `outstandingInvoices()` (admin, tanpa filter periode) |
 | `CollectorPaymentService` | Pencatatan batch pembayaran: validasi baris, transaksi all-or-nothing, idempotency, notifikasi pop_admin |
 | `CollectorBalanceService` | Dua angka uang (saldo & kurang setor) + jejak POP kolektor untuk gerbang visibilitas |
 | `CollectorDepositService` | Siklus hidup setoran: setor → cross check → terverifikasi / kurang setor / lebih setor → lunas / hapus buku |
@@ -13,20 +13,18 @@ Semua logika uang ada di service, bukan controller. Controller tipis: validasi r
 
 ---
 
-## 1. Jendela Tagih — "sudah waktunya ditagih"
+## 1. Kapan Boleh Ditagih — berbasis periode (2026-09-23)
 
-`config('billing.collector_due_window_days')`, default **7**. Disimpan di config karena tiap POP bisa beda ritme keliling dan penyetelannya tak boleh butuh deploy.
+Tagihan boleh ditagih kolektor begitu **periodenya berjalan**: `billing_period <= bulan ini`. Tagihan bulanan terbit tanggal 1 → hari itu juga muncul di Worklist; batas bayar riil akhir bulan; mulai tanggal 1 bulan berikutnya jadi piutang (`Invoice::isPiutang()`). `due_date` cuma label UI dan **tidak** dibaca Worklist.
 
-Dua aturan yang gampang tertukar, keduanya disengaja:
+> Dulu (s.d. 2026-09-22) pakai jendela `config('billing.collector_due_window_days')` = `due_date <= hari ini + 7`. Dihapus karena membandingkan tanggal yang sudah tak bermakna, dan menyimpang dari aturan piutang yang berbasis periode. Jangan dihidupkan lagi.
 
-1. **Seleksi per PELANGGAN, tampilan per INVOICE.** Pelanggan masuk daftar kalau punya **minimal satu** tagihan `due_date <= hari ini + N`. Begitu masuk, **seluruh** tagihan tertunggaknya ikut tampil — termasuk yang belum jatuh tempo. Kalau tidak begitu, tunggakan lama dan tagihan berjalan pecah ke dua kunjungan, padahal kolektor cuma lewat sebulan sekali.
-2. **Jendela, bukan `due_date <= hari ini`.** Jatuh tempo tanggal 20, kolektor lewat tanggal 18 — pelanggan siap bayar tapi tak muncul di layar. Itu kegagalan yang mahal.
+Aturan yang tetap berlaku:
 
-**Jendela ini BUKAN pencegah "nagih 2× ke pelanggan sama".** Dobel tagih sudah tertutup struktural: bayar → `remaining_amount` turun → lunas → invoice keluar dari daftar; ditambah penolakan di `CollectorPaymentService::validateRows()` untuk invoice `lunas`/`batal` dan nominal melebihi sisa. Yang dicegah jendela adalah **nagih terlalu awal**.
+1. **Seleksi per PELANGGAN, tampilan per INVOICE.** Pelanggan masuk daftar kalau punya **minimal satu** tagihan belum lunas dengan periode sudah berjalan. Begitu masuk, **seluruh** tagihan tertunggaknya ikut tampil. Kalau tidak begitu, tunggakan lama dan tagihan berjalan pecah ke dua kunjungan, padahal kolektor cuma lewat sebulan sekali.
+2. **Filter ini BUKAN pencegah "nagih 2× ke pelanggan sama".** Dobel tagih sudah tertutup struktural: bayar → `remaining_amount` turun → lunas → invoice keluar dari daftar; ditambah penolakan di `CollectorPaymentService::validateRows()` untuk invoice `lunas`/`batal` dan nominal melebihi sisa. Yang dicegah filter adalah **nagih tagihan yang periodenya belum dimulai**.
 
-> **Jangan tertukar dengan piutang (2026-09-21).** Jendela tagih hanya soal *kapan kolektor mendatangi pelanggan* dan memakai `due_date`. Status **piutang** ditentukan lain: `billing_period` < bulan berjalan (`Invoice::isPiutang()`), karena `due_date` tanggal 10 hanya formalitas dan kas admin ditutup tanggal 1. Di tabel bayar kolektor, penanda merah "Piutang" mengikuti `isPiutang()`, bukan `due_date`.
-
-**Worksheet Admin sengaja TANPA jendela** — admin bukan pengetuk pintu, dia butuh gambaran penuh untuk cross check.
+**Worksheet Admin sengaja TANPA filter periode** — admin bukan pengetuk pintu, dia butuh gambaran penuh untuk cross check.
 
 ---
 
@@ -54,7 +52,7 @@ Satu endpoint logika, dua jalur masuk:
 
 | Aturan | Alasan |
 |---|---|
-| `amount` ≤ sisa tagihan | Kelebihan bayar dikembalikan fisik, tidak jadi kredit (§B-8 no. 6 dokumen lama, masih berlaku) |
+| `amount` BOLEH > sisa tagihan | **Diubah ADHOC-84 (2026-09-23)** — aturan lama "kelebihan dikembalikan fisik" dibalik: kelebihannya otomatis dipisah jadi `overpay_amount` & masuk saldo pelanggan (`CustomerBalanceService::credit()`), pola sama `PaymentService::record()` jalur admin. Isian awal FIFO (uang total pelanggan disebar ke invoice tertua dulu) murni kemudahan klien (`cbApplyFifo()` di `collector-pay-script.blade.php`), server tetap validasi per baris independen |
 | `amount` > 0 | `PaymentObserver::creating()` menolak ≤ 0 dari semua jalur |
 | `collected_date` ≤ hari ini | Tanggal masa depan merusak pemotongan pendapatan per periode dan melahirkan kunjungan bertanggal besok |
 

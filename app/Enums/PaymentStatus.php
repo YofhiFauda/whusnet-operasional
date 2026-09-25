@@ -11,7 +11,9 @@ enum PaymentStatus: string
     {
         return match ($this) {
             self::VALID => 'Valid',
-            self::DITOLAK => 'Ditolak',
+            // Nilai DB tetap `ditolak` (tanpa migrasi data); di UI aksinya
+            // "Kembalikan" — membalik transaksi yang salah input.
+            self::DITOLAK => 'Dikembalikan',
         };
     }
 }

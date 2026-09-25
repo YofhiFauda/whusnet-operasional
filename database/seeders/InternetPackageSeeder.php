@@ -42,7 +42,7 @@ class InternetPackageSeeder extends Seeder
             $this->home('Net138', 'Reguler Broadband Home Internet Only', '35 Mbps', 35, 138000, 'Singleband', [], null, 12, 'Gratis', 'Kontrak 12M'),
             $this->home('Net150', 'Reguler Broadband Home Internet Only', '45 Mbps', 45, 150000, 'Dualband', [], null, 8, 'Gratis', 'Kontrak 8M'),
             $this->home('Net165', 'Reguler Broadband Home Internet Only', '70 Mbps', 70, 165000, 'Dualband', [], null, 6, 'Gratis', 'Kontrak 6M'),
-            $this->home('Net198', 'Reguler Broadband Home Internet Only', '100 Mbps', 100, 198000, 'Dualband Wifi6', ['CCTV 1CH'], 200000, 6, 'Gratis + 200rb jika ambil CCTV', 'Kontrak 6M'),
+            $this->home('Net198', 'Reguler Broadband Home Internet Only', '200 Mbps', 200, 198000, 'Dualband Wifi6', ['CCTV 1CH'], 200000, 6, 'Gratis + 200rb jika ambil CCTV', 'Kontrak 6M'),
 
             $this->home('NetTC138', 'Broadband Internet + TV', '40 Mbps', 40, 138000, 'Singleband', ['IPTV'], 50000, 12, 'Rp 50.000', 'Kontrak 12'),
             $this->home('NetTC150', 'Broadband Internet + TV', '70 Mbps', 70, 150000, 'Dualband', ['IPTV'], 50000, 8, 'Rp 50.000', 'Kontrak 8'),

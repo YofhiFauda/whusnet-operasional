@@ -170,14 +170,18 @@ class CollectorBatchNotificationTest extends TestCase
 
     public function test_rejected_batch_does_not_notify_anyone(): void
     {
+        // ADHOC-84 §2.5/§4.4 (2026-09-23): nominal melebihi sisa BUKAN lagi
+        // penyebab tolak (kelebihannya otomatis kredit saldo) — dipakai invoice
+        // yang sudah lunas sebagai baris tidak valid, bukan overpay.
         $goodInvoice = $this->createUnpaidInvoice('C-CBN-B1', $this->kolektor->id, 100000);
+        $goodInvoice->update(['invoice_status' => 'lunas', 'paid_amount' => 100000, 'remaining_amount' => 0]);
 
         Notification::fake();
 
         $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
             'idempotency_key' => 'notif-batch-002',
             'rows' => [
-                ['invoice_id' => $goodInvoice->id, 'amount' => 999999, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
+                ['invoice_id' => $goodInvoice->id, 'amount' => 100000, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
             ],
         ])->assertStatus(422);
 

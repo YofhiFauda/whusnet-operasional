@@ -197,6 +197,11 @@
         <x-ui.modal name="reset-pin-confirm" title="Reset PIN Pelanggan" maxWidth="sm">
             <div class="space-y-4">
                 <p class="text-sm text-text-secondary">Apakah Anda yakin ingin me-reset PIN pelanggan ini? PIN lama akan langsung tidak aktif begitu proses selesai.</p>
+                {{-- §6.5.5: field `verification_note` yang dulu memaksa admin
+                     mengetik alasan verifikasi sudah dicabut (permintaan user) —
+                     TAPI pengingatnya tetap wajib ada, cuma bentuknya bukan lagi
+                     input wajib. Jangan hapus baris ini tanpa pengganti apa pun. --}}
+                <p class="text-xs font-semibold text-rose-600 dark:text-rose-400">Verifikasi identitas pelanggan dulu sebelum Reset PIN — pastikan yang minta reset benar pelanggan ini sendiri.</p>
                 <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300">
                     <strong>PENTING:</strong> PIN ini cuma gerbang halaman tagihan publik + kunci klaim awal — <strong>password Portal pelanggan (kalau sudah pernah diklaim) TIDAK ikut berubah</strong>, dan sesi login Portal yang sedang jalan tetap aktif, tidak ter-logout. Kalau yang lupa justru PASSWORD Portal-nya (bukan PIN ini), itu aksi TERPISAH (menu khusus "Lupa Password", cuma muncul buat akun yang sudah aktif) — jangan pakai Reset PIN ini buat itu.
                 </div>

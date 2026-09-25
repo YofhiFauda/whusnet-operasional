@@ -38,6 +38,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'status',
     'rejected_at',
     'terminated_at',
+    'termination_reason_id',
+    'termination_note',
     'address',
     'latitude',
     'longitude',
@@ -145,6 +147,28 @@ class Customer extends Model
     public function agent(): BelongsTo
     {
         return $this->belongsTo(Agent::class);
+    }
+
+    /**
+     * Alasan Putus Langganan (ADHOC-69) — klasifikasi master, sumber utama
+     * kolom Alasan di List Putus (menggantikan baca AuditLog.new_values).
+     *
+     * @return BelongsTo<CustomerTerminationReason, $this>
+     */
+    public function terminationReason(): BelongsTo
+    {
+        return $this->belongsTo(CustomerTerminationReason::class, 'termination_reason_id');
+    }
+
+    /**
+     * Riwayat pembebasan tagihan periode (ADHOC-87) — Request Putus
+     * Langganan / Cuti Berlangganan.
+     *
+     * @return HasMany<CustomerBillingWaiver, $this>
+     */
+    public function billingWaivers(): HasMany
+    {
+        return $this->hasMany(CustomerBillingWaiver::class);
     }
 
     /**
@@ -346,6 +370,18 @@ class Customer extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Ledger Saldo Pelanggan (ADHOC-92) — dipakai `billing:apply-balance`
+     * buat menyaring pelanggan yang PERNAH punya mutasi, sebelum menghitung
+     * saldo berjalannya lewat CustomerBalanceService::balance().
+     *
+     * @return HasMany<CustomerBalanceMutation, $this>
+     */
+    public function customerBalanceMutations(): HasMany
+    {
+        return $this->hasMany(CustomerBalanceMutation::class);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Models\CustomerBillingWaiver;
 use App\Models\Invoice;
 use BackedEnum;
 use InvalidArgumentException;
@@ -73,6 +74,17 @@ class InvoiceObserver
 
         if (empty($invoice->customer_id) || empty($invoice->billing_period)) {
             return;
+        }
+
+        // ADHOC-87 — periode yang sudah dibebaskan (Request Putus Langganan /
+        // Cuti Berlangganan) tidak boleh ditagih ulang lewat jalur MANA PUN
+        // (form manual, import, tinker, --period), bukan cuma dicegah di
+        // GenerateMonthlyInvoicesCommand. Pesan menyebut cara mencabutnya.
+        if (CustomerBillingWaiver::existsFor($invoice->customer_id, $invoice->billing_period)) {
+            throw new InvalidArgumentException(
+                "Periode {$invoice->billing_period} untuk pelanggan ini sudah dibebaskan dari tagihan (Request Putus Langganan/Cuti Berlangganan). "
+                .'Cabut pembebasannya dulu di tab Tagihan Detail Pelanggan kalau memang perlu ditagih lagi.'
+            );
         }
 
         $exists = Invoice::hasActiveSubscriptionInvoiceForPeriod($invoice->customer_id, $invoice->billing_period);

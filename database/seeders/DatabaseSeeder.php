@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ItemFeatureSeeder::class); // Master Barang/Material
         $this->call(ItemCategoryFeatureSeeder::class); // Master Kategori Barang
         $this->call(WorkToolFeatureSeeder::class); // Master Alat Kerja
+        $this->call(BankAccountFeatureSeeder::class); // Master Rekening Bank (ADHOC-95)
         $this->call(QrFeatureSeeder::class); // QR Pelanggan (Fase 1) Permission QR
         $this->call(WarehouseFeatureSeeder::class); // Gudang/Inventory (ADHOC-54, Fase 1)
         $this->call(FopAnalyticsFeatureSeeder::class); // Dashboard Analitik FOP
@@ -41,7 +42,10 @@ class DatabaseSeeder extends Seeder
         $this->call(BusinessDevelopmentVerificationFeatureSeeder::class); // Antrean Menunggu Verifikasi BD (pelanggan Bisnis pra-ACTIVE)
         $this->call(CustomerRegistrationVerificationFeatureSeeder::class); // Antrean Verifikasi Registrasi (ADHOC-73)
         $this->call(BusinessDevelopmentFeatureSeeder::class); // agents/package_restrictions/sales_omset_dashboard/business_customers (Skema 1-3, 2026-09-12)
-        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.*/warehouse*.*/fop_analytics.*/customer_acquisitions.*/agents.*/package_restrictions.*/sales_omset_dashboard.*/customer_registration_verification.* ke-sync ke owner
+        $this->call(CustomerTerminationReasonFeatureSeeder::class); // Master Alasan Putus Langganan (ADHOC-69)
+        $this->call(BillingWaiverFeatureSeeder::class); // Pembebasan Tagihan Periode (ADHOC-87)
+        $this->call(CustomerBalanceFeatureSeeder::class); // Saldo Pelanggan — Bayar di Muka + Auto-Pakai (ADHOC-92)
+        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.*/warehouse*.*/fop_analytics.*/customer_acquisitions.*/agents.*/package_restrictions.*/sales_omset_dashboard.*/customer_registration_verification.*/termination_reasons.*/billing_waivers.*/customer_balance.* ke-sync ke owner
         $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
         $this->call(ItemCategorySeeder::class); // Kategori tambahan non-system (modem_ont, router_gateway) — sebelum ItemSeeder, dirujuk barangnya
         $this->call(ItemSeeder::class); // Isi awal master barang — tambah sisanya lewat Master Data
