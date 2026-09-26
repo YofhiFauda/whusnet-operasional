@@ -26,10 +26,24 @@
     1. Toolbar "Cetak Kwitansi"/"Detail Pembayaran" disembunyikan — link
        "Detail Pembayaran" menuju rute staf internal, tak boleh muncul di
        konteks Portal (pelanggan tak login ke panel staf).
-    2. `@page` ukuran kertas fisik NCR (9,5×5,5in) cuma berlaku untuk jalur
-       cetak fisik staf. PDF & iframe Portal tidak pernah dicetak ke kertas
-       NCR kantor — biarkan default (dompdf pakai `setPaper('a4')`, browser
-       pakai default halaman kalau iframe-nya dicetak).
+    2. `@page` CSS di bawah (khusus jalur browser print, lihat poin
+       berikutnya) dilewati — ukuran PDF Portal ditentukan `->setPaper()`
+       di `receiptPdf()`, BUKAN CSS ini (dompdf sumber ukurannya dari sana).
+       Nilainya sama persis dengan lembar fisik staf ({{ \App\Services\Receipts\ReceiptPaperSize::WIDTH_IN }}×{{ \App\Services\Receipts\ReceiptPaperSize::HEIGHT_IN }}in, `ReceiptPaperSize`,
+       satu sumber angka dipakai dua tempat) — PDF ini cuma dilihat/diunduh
+       pelanggan, tak pernah dicetak ke printer NCR kantor, tapi TETAP layak
+       berbentuk sama persis dengan yang dipegang staf, bukan A4 penuh spasi
+       kosong.
+
+    Gaya "bersih" (background putih, lembar full-width, tanpa toolbar) buat
+    `$isPdf` DITULIS LANGSUNG (bukan lewat `@media print`) — dompdf merender
+    statis sekali jalan dan defaultnya membaca stylesheet sebagai media
+    `screen`, bukan `print`, jadi blok `@media print` diam-diam TIDAK PERNAH
+    kepakai di PDF Portal (bug 2026-09-26: PDF tercetak abu-abu dgn spasi
+    kosong lebar 700px di tengah kertas A4 — sisa gaya "kartu di atas
+    backdrop abu-abu" yang harusnya cuma buat preview interaktif staf di
+    browser). `@media print` di bawah TETAP dipakai — itu jalur browser staf
+    beneran nge-print (Ctrl+P/tombol Cetak), yang medianya memang `print`.
 --}}
 @php($isPdf = $isPdf ?? false)
 
@@ -50,9 +64,14 @@
         body {
             font-family: Arial, Helvetica, sans-serif;
             margin: 0;
-            padding: 16px;
-            background: #f4f4f4;
             color: #000000;
+            @if($isPdf)
+                padding: 0;
+                background: #ffffff;
+            @else
+                padding: 16px;
+                background: #f4f4f4;
+            @endif
         }
 
         .toolbar {
@@ -91,36 +110,46 @@
         .sheet-frame {
             background: #ffffff;
             width: 100%;
-            max-width: 700px;
-            margin: 0 auto;
-            padding: 24px;
+            @if($isPdf)
+                max-width: 100%;
+                {{-- Sama persis dgn jalur cetak fisik staf (kertasnya sama
+                     ukuran sejak 2026-09-26) --}}
+                padding: 4mm 4mm;
+            @else
+                max-width: 700px;
+                margin: 0 auto;
+                padding: 24px;
+            @endif
         }
 
-        /* Kertas NCR 2-ply — cuma jalur cetak fisik staf (bukan PDF/iframe
-           Portal). Lihat docblock $isPdf di atas. */
+        /* Kertas NCR 2-ply — cuma jalur cetak fisik staf beneran nge-print
+           (browser Ctrl+P/tombol Cetak, medianya `print`; PDF/iframe Portal
+           lihat docblock $isPdf di atas). Persegi panjang landscape ~16:9
+           (lebar > tinggi, dikonfirmasi user), sama seperti bentuk fisik
+           continuous form 1/2 part-nya — lihat `ReceiptPaperSize`. */
         @media print {
             @if(! $isPdf)
                 @page {
-                    size: 9.5in 5.5in;
+                    size: {{ \App\Services\Receipts\ReceiptPaperSize::WIDTH_IN }}in {{ \App\Services\Receipts\ReceiptPaperSize::HEIGHT_IN }}in;
                     margin: 0;
                 }
+
+                .toolbar {
+                    display: none !important;
+                }
+
+                body {
+                    background: #ffffff !important;
+                    padding: 0 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+
+                .sheet-frame {
+                    max-width: 100%;
+                    padding: 4mm 4mm;
+                }
             @endif
-
-            .toolbar {
-                display: none !important;
-            }
-
-            body {
-                background: #ffffff !important;
-                padding: 0 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            .sheet-frame {
-                max-width: 100%;
-                padding: 6mm 5mm;
-            }
         }
     </style>
 </head>

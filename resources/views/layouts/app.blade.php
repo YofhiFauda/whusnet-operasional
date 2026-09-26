@@ -774,6 +774,8 @@
                                 <a href="{{ route('warehouse.history.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/history*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Riwayat Mutasi</a>
                                 {{-- Riwayat Pengambilan Alat (ADHOC-88) — log siapa teknisi yang menarik modem --}}
                                 <a href="{{ route('warehouse.retrievals.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/retrievals*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Riwayat Ambil Alat</a>
+                                {{-- Pemakaian Material Lapangan (Daily Material Usage Report) --}}
+                                <a href="{{ route('warehouse.usage.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/usage*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Pemakaian Material</a>
                                 {{-- Scan Barang (2026-09-07, mode scan-first) --}}
                                 <a href="{{ route('warehouse.scan.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/scan*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Scan Barang</a>
                                 @endif

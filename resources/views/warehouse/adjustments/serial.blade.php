@@ -48,7 +48,7 @@
 
         <div x-show="evidenceRequired" x-cloak>
             <label class="block mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">Bukti Fisik (Foto Kondisi / BAP Kehilangan) <span class="text-rose-500">*</span></label>
-            <input type="file" name="evidence" accept="image/*" :required="evidenceRequired"
+            <input type="file" name="evidence" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" :required="evidenceRequired"
                    class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-100 dark:file:bg-amber-900/40 file:text-amber-700 dark:file:text-amber-300">
             <p class="text-[11px] text-slate-400 mt-1">Wajib buat Hilang/Rusak/Dimusnahkan — kontrol-anti-manipulasi.md §2. Karantina TIDAK wajib foto (status tahan sementara, bukan klaim rugi).</p>
         </div>

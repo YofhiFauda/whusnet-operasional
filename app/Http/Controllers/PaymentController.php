@@ -48,7 +48,7 @@ class PaymentController extends Controller
 
         $query = Payment::query()
             ->applyUserScope()
-            ->with(['invoice', 'customer', 'pop', 'receiver', 'collector'])
+            ->with(['invoice', 'customer', 'pop', 'receiver', 'collector', 'bankAccount'])
             ->latest('payment_date')
             ->latest('id');
 
@@ -57,6 +57,10 @@ class PaymentController extends Controller
                 $q->where('payment_number', 'like', "%{$search}%")
                     ->orWhere('old_payment_id', 'like', "%{$search}%")
                     ->orWhere('old_transaction_id', 'like', "%{$search}%")
+                    ->orWhere('bank_name', 'like', "%{$search}%")
+                    ->orWhere('account_number', 'like', "%{$search}%")
+                    ->orWhere('sender_name', 'like', "%{$search}%")
+                    ->orWhere('note', 'like', "%{$search}%")
                     ->orWhereHas('invoice', function ($invoiceQuery) use ($search) {
                         $invoiceQuery->where('invoice_number', 'like', "%{$search}%")
                             ->orWhere('old_invoice_id', 'like', "%{$search}%")
@@ -94,7 +98,11 @@ class PaymentController extends Controller
         // Pembayaran yang dikembalikan (status `ditolak`) disembunyikan dari
         // daftar — transaksi salah yang sudah dibalik. Tetap bisa dibuka lewat
         // detail (notifikasi/audit) dan terhitung di Laporan Pembayaran.
-        $query->where('payment_status', PaymentStatus::VALID->value);
+        if ($status !== '' && in_array($status, $allowedStatuses, true)) {
+            $query->where('payment_status', $status);
+        } else {
+            $query->where('payment_status', PaymentStatus::VALID->value);
+        }
 
         if ($invoiceType !== '') {
             $query->whereHas('invoice', function ($invoiceQuery) use ($invoiceType) {
@@ -104,10 +112,18 @@ class PaymentController extends Controller
 
         $payments = $query->paginate(10)->withQueryString();
         $pops = Pop::forUser()->orderBy('name')->get();
+        $bankAccounts = BankAccount::query()->active()->orderBy('bank_name')->orderBy('account_number')->get();
+        $collectors = User::query()
+            ->whereHas('role', fn ($q) => $q->where('name', 'kolektor')->orWhere('code', 'kolektor'))
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
 
         return view('payments.index', compact(
             'payments',
             'pops',
+            'bankAccounts',
+            'collectors',
             'search',
             'popId',
             'dateFrom',
@@ -140,7 +156,7 @@ class PaymentController extends Controller
             ->applyUserScope()
             ->where('payment_status', PaymentStatus::VALID->value)
             ->where('overpay_amount', '>', 0)
-            ->with(['invoice', 'customer', 'pop', 'receiver', 'collector'])
+            ->with(['invoice', 'customer', 'pop', 'receiver', 'collector', 'bankAccount'])
             ->latest('payment_date')
             ->latest('id');
 
@@ -174,7 +190,7 @@ class PaymentController extends Controller
             'Anda tidak memiliki akses ke pembayaran POP ini.'
         );
 
-        $relations = ['invoice.customerService', 'invoice.internetPackage', 'customer', 'pop', 'receiver', 'collector'];
+        $relations = ['invoice.customerService', 'invoice.internetPackage', 'customer', 'pop', 'receiver', 'collector', 'bankAccount'];
 
         if (auth()->user()->hasPermission('audit_logs.view')) {
             $relations[] = 'auditLogs.user';
@@ -592,6 +608,103 @@ class PaymentController extends Controller
             actionUrl: route('payments.show', $payment->id),
             type: NotificationType::ERROR
         ));
+    }
+
+    /**
+     * Update payment details via Modal.
+     */
+    public function update(Request $request, Payment $payment): RedirectResponse|JsonResponse
+    {
+        abort_unless(
+            Payment::query()->applyUserScope()->whereKey($payment->id)->exists(),
+            403,
+            'Anda tidak memiliki akses ke pembayaran POP ini.'
+        );
+
+        if ($payment->payment_status === PaymentStatus::DITOLAK) {
+            $message = 'Pembayaran yang sudah ditolak tidak dapat diubah.';
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+
+            return redirect()
+                ->route('payments.index')
+                ->withErrors(['payment' => $message]);
+        }
+
+        $validated = $request->validate([
+            'payment_date' => 'required|date|before_or_equal:today',
+            'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
+            'bank_account_id' => 'required_if:payment_method,transfer|nullable|integer|exists:bank_accounts,id',
+            'sender_name' => 'nullable|string|max:150',
+            'collected_by' => [
+                'required_if:payment_method,kolektor',
+                'nullable',
+                'exists:users,id',
+                function ($attribute, $value, $fail) {
+                    if (! $value) {
+                        return;
+                    }
+                    $collector = User::find($value);
+                    if (! $collector || ! $collector->hasRole('kolektor')) {
+                        $fail('User yang dipilih bukan kolektor.');
+                    }
+                },
+            ],
+            'note' => 'required_if:payment_method,lainnya|nullable|string|max:1000',
+            'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
+        ]);
+
+        $method = PaymentMethod::from($validated['payment_method']);
+
+        $bankAccount = null;
+        if ($method->requiresBankDetails() && ! empty($validated['bank_account_id'])) {
+            $bankAccount = BankAccount::find($validated['bank_account_id']);
+        }
+
+        $updateData = [
+            'payment_date' => $validated['payment_date'],
+            'payment_method' => $method->value,
+            'bank_account_id' => $bankAccount?->id,
+            'bank_name' => $bankAccount?->bank_name,
+            'account_number' => $bankAccount?->account_number,
+            'sender_name' => $method->requiresSenderName() ? ($validated['sender_name'] ?? null) : null,
+            'collected_by' => $method->requiresCollector() ? ($validated['collected_by'] ?? null) : null,
+            'note' => $validated['note'] ?? null,
+        ];
+
+        if ($request->hasFile('proof_file')) {
+            $payment->loadMissing('customer', 'invoice');
+            $updateData['proof_file'] = FileUploadService::uploadPaymentProof(
+                $request->file('proof_file'),
+                $payment->customer,
+                $payment->invoice?->invoice_type?->value,
+                $validated['payment_date']
+            );
+        }
+
+        $payment->update($updateData);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Pembayaran {$payment->payment_number} berhasil diperbarui.",
+                'payment' => [
+                    'id' => $payment->id,
+                    'payment_number' => $payment->payment_number,
+                    'payment_method' => $payment->payment_method,
+                    'payment_date' => $payment->payment_date?->format('Y-m-d'),
+                    'bank_name' => $payment->bank_name,
+                    'account_number' => $payment->account_number,
+                    'sender_name' => $payment->sender_name,
+                    'note' => $payment->note,
+                ],
+            ]);
+        }
+
+        return redirect()
+            ->back()
+            ->with('success', "Pembayaran {$payment->payment_number} berhasil diperbarui.");
     }
 
     private function authorizeInvoiceAccess(Invoice $invoice): void

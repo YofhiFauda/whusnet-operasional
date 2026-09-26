@@ -93,6 +93,7 @@ use App\Http\Controllers\Warehouse\WarehouseStockController;
 use App\Http\Controllers\Warehouse\WarehouseStockRequestController;
 use App\Http\Controllers\Warehouse\WarehouseTraceabilityController;
 use App\Http\Controllers\Warehouse\WarehouseTransferController;
+use App\Http\Controllers\Warehouse\WarehouseUsageController;
 use App\Models\City;
 use App\Models\District;
 use App\Models\Pop;
@@ -349,6 +350,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:payments.create')->group(function () {
         Route::get('/invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('invoices.payments.create');
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
+        Route::put('/payments/{payment}', [PaymentController::class, 'update'])->name('payments.update');
     });
 
     // Hapus buku piutang → Tak Tertagih (ADHOC-90). Permission sendiri
@@ -711,6 +713,10 @@ Route::middleware('auth')->group(function () {
         // pas create/konfirmasi; begitu ditinggal, dokumennya "hilang" gak
         // ke-reach lagi (laporan user: list/detail tersembunyi).
         Route::get('/warehouse/history', [WarehouseHistoryController::class, 'index'])->name('warehouse.history.index');
+
+        // Rekap Pemakaian Material Lapangan (Daily Material Consumption Report)
+        Route::get('/warehouse/usage', [WarehouseUsageController::class, 'index'])->name('warehouse.usage.index');
+        Route::get('/warehouse/usage/export', [WarehouseUsageController::class, 'export'])->name('warehouse.usage.export');
 
         // Riwayat Pengambilan Alat (ADHOC-88) — view-only, reuse warehouse.view.
         Route::get('/warehouse/retrievals', [WarehouseRetrievalHistoryController::class, 'index'])->name('warehouse.retrievals.index');

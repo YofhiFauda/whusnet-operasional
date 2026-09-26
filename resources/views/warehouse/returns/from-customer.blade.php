@@ -139,7 +139,7 @@
 
         <div>
             <label class="{{ $labelClass }}">Foto Kondisi Alat <span class="text-rose-500">*</span></label>
-            <input type="file" name="condition_photo" accept="image/*" capture="environment" required class="w-full text-xs">
+            <input type="file" name="condition_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" required class="w-full text-xs">
         </div>
 
         <div>

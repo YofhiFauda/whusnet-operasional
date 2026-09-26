@@ -230,8 +230,8 @@ class PaymentReceiptTest extends TestCase
         ]));
 
         $response->assertOk();
-        // Nomor dicetak sebagai TEKS — ini yang dibaca OCR saat QR sobek, dan
-        // dibaca manusia saat OCR pun gagal.
+        // Nomor dicetak sebagai TEKS — dibaca lapisan teks PDF, dan dibaca
+        // manusia saat QR sobek.
         $response->assertSee($payment->payment_number);
         // QR ditanam sebagai data URI SVG, tak butuh berkas sementara.
         $response->assertSee('data:image/svg+xml', false);
@@ -503,8 +503,7 @@ class PaymentReceiptTest extends TestCase
 
     /**
      * Nomor terbaca tapi tak menunjuk pembayaran mana pun. TIDAK boleh
-     * dicocokkan asal — inilah gerbang yang menahan QR salah cetak maupun
-     * halusinasi OCR.
+     * dicocokkan asal — inilah gerbang yang menahan QR salah cetak.
      */
     public function test_unknown_number_becomes_mismatch_not_a_wrong_match(): void
     {
@@ -537,22 +536,6 @@ class PaymentReceiptTest extends TestCase
         // Berkasnya TETAP ada — dokumen yang tak terbaca adalah pekerjaan yang
         // tertinggal, bukan sesuatu yang boleh hilang diam-diam.
         Storage::disk('local')->assertExists($receipt->path);
-    }
-
-    public function test_ocr_is_skipped_when_no_api_key_configured(): void
-    {
-        config(['services.gemini.key' => null]);
-
-        $receipt = app(PaymentReceiptService::class)->store(
-            UploadedFile::fake()->create('tanpa-qr.pdf', 10, 'application/pdf'),
-            $this->admin
-        );
-
-        app(PaymentReceiptService::class)->match($receipt->fresh());
-
-        // Tanpa API key, fitur tetap utuh: berkas jatuh ke penanganan manusia,
-        // bukan error, dan tak ada biaya yang keluar.
-        $this->assertSame(ReceiptStatus::FAILED, $receipt->fresh()->status);
     }
 
     // ================= PENCOCOKAN MANUAL =================
@@ -693,8 +676,7 @@ class PaymentReceiptTest extends TestCase
      * Regresi (review Fase 4 #3): satu pembaca yang MELEDAK tak boleh
      * menghentikan rantai. `Zxing\QrReader` melempar untuk gambar yang GD-nya
      * tak bisa buka — dan `getimagesize()` tetap mengenalinya, jadi penjaga
-     * isImage() lolos. Waktu exception-nya merambat, OCR (yang justru ada
-     * untuk kasus "QR tak terbaca") tak pernah dicoba.
+     * isImage() lolos. Exception-nya tak boleh lolos mentah ke pemanggil.
      */
     public function test_a_throwing_reader_does_not_abort_the_chain(): void
     {

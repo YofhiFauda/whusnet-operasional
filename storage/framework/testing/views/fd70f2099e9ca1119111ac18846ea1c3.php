@@ -722,7 +722,7 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                 </div>
 
                                 <div class="mt-2">
-                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_rumah')" <?php if($customer->foto_rumah): ?> data-populated="true" <?php endif; ?>>
+                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('foto_rumah')" <?php if($customer->foto_rumah): ?> data-populated="true" <?php endif; ?>>
                                     <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         <?php echo e($customer->foto_rumah ? 'Ganti Foto Rumah' : 'Pilih Foto Rumah'); ?>
 
@@ -850,7 +850,7 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                 </div>
 
                                 <div class="mt-2">
-                                    <input type="file" name="foto_kontrak" id="foto_kontrak" accept="image/*,application/pdf" capture="environment" class="hidden" onchange="onFileChange('foto_kontrak')" <?php if($customer->foto_kontrak): ?> data-populated="true" <?php endif; ?>>
+                                    <input type="file" name="foto_kontrak" id="foto_kontrak" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.jpg,.jpeg,.png,.webp,.pdf" class="hidden" onchange="onFileChange('foto_kontrak')" <?php if($customer->foto_kontrak): ?> data-populated="true" <?php endif; ?>>
                                     <label for="foto_kontrak" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         <?php echo e($customer->foto_kontrak ? 'Ganti Foto Kontrak' : 'Pilih Foto Kontrak'); ?>
 

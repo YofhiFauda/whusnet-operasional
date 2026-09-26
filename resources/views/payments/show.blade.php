@@ -72,86 +72,151 @@
         </div>
     @endif
 
-    <!-- PAGE TITLE BAR & ACTION BUTTONS -->
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
-        <div>
-            <!-- Title & ID Badge -->
-            <div class="flex items-center gap-2.5 flex-wrap">
-                <a href="{{ route('payments.index') }}" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors" title="Kembali ke Daftar">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                    </svg>
-                </a>
-                
-                <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                    Detail Pembayaran
-                </h1>
-
-                <!-- Payment Code Badge -->
-                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs">
-                    <span>{{ $payment->payment_number }}</span>
-                    <button onclick="copyText('{{ $payment->payment_number }}', 'No. Pembayaran')" title="Salin Kode Pembayaran" class="text-slate-400 hover:text-sky-600 transition-colors cursor-pointer">
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+    <!-- PAGE TITLE BAR & ACTION BUTTONS WITH INTEGRATED CUSTOMER IDENTITY -->
+    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-4">
+        <!-- Header Top Row: Title, Badges & Action Buttons -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+                <!-- Title & ID Badge -->
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <a href="{{ route('payments.index') }}" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors" title="Kembali ke Daftar">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                         </svg>
-                    </button>
+                    </a>
+                    
+                    <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                        Detail Pembayaran
+                    </h1>
+
+                    <!-- Payment Code Badge -->
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs">
+                        <span>{{ $payment->payment_number }}</span>
+                        <button onclick="copyText('{{ $payment->payment_number }}', 'No. Pembayaran')" title="Salin Kode Pembayaran" class="text-slate-400 hover:text-sky-600 transition-colors cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Status Badges -->
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border {{ $badgeClass }}">
+                        <span class="w-2 h-2 rounded-full bg-current"></span>
+                        <span>{{ $payment->payment_status->label() }}</span>
+                    </span>
+
+                    @if($installmentContext)
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold {{ $installmentContext['settles'] ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800' }}">
+                        {{ $installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number'] }}
+                    </span>
+                    @endif
+
+                    @if((float) $payment->overpay_amount > 0)
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800" title="Deposit lebih bayar dari pelanggan">
+                        Lebih Bayar Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}
+                    </span>
+                    @endif
                 </div>
 
-                <!-- Status Badges -->
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border {{ $badgeClass }}">
-                    <span class="w-2 h-2 rounded-full bg-current"></span>
-                    <span>{{ $payment->payment_status->label() }}</span>
-                </span>
-
-                @if($installmentContext)
-                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold {{ $installmentContext['settles'] ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800' }}">
-                    {{ $installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number'] }}
-                </span>
-                @endif
-
-                @if((float) $payment->overpay_amount > 0)
-                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800" title="Deposit lebih bayar dari pelanggan">
-                    Lebih Bayar Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}
-                </span>
-                @endif
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                    Tercatat pada <strong>{{ optional($payment->payment_date)->format('d/m/Y H:i') }} WIB</strong> • Diterima oleh <strong>{{ $payment->receiver->name ?? 'System' }}</strong> • Lokasi Kas <strong>POP {{ $payment->pop->name ?? '-' }}</strong>
+                </p>
             </div>
 
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-                Tercatat pada <strong>{{ optional($payment->payment_date)->format('d/m/Y H:i') }} WIB</strong> • Diterima oleh <strong>{{ $payment->receiver->name ?? 'System' }}</strong> • Lokasi Kas <strong>POP {{ $payment->pop->name ?? '-' }}</strong>
-            </p>
+            <!-- Right Action Bar -->
+            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+                @if($payment->invoice_id)
+                <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="inline-flex items-center gap-2 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span>Detail Tagihan</span>
+                </a>
+                @endif
+
+                <!-- Print Kwitansi Button -->
+                <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-600 active:scale-95 cursor-pointer">
+                    <svg class="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                    </svg>
+                    <span>Cetak Kwitansi</span>
+                </button>
+
+                <!-- Kembalikan Button — juga untuk pembayaran bulan yang sudah tutup buku;
+                     pengembaliannya dibukukan di bulan berjalan. -->
+                @can('payments.reject')
+                    @if($payment->payment_status->value === 'valid')
+                    <button type="button" onclick="openRejectModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        <span>Kembalikan Pembayaran</span>
+                    </button>
+                    @endif
+                @endcan
+            </div>
         </div>
 
-        <!-- Right Action Bar -->
-        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            @if($payment->invoice_id)
-            <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="inline-flex items-center gap-2 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <span>Detail Tagihan</span>
-            </a>
-            @endif
+        <!-- Integrated Customer Identity Card in Header -->
+        <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60">
+            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <!-- Customer Details -->
+                <div class="flex items-start sm:items-center gap-3.5">
+                    <div class="w-12 h-12 rounded-2xl bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-extrabold text-base flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800 shadow-2xs">
+                        {{ strtoupper(substr($payment->customer->full_name ?? 'P', 0, 2)) }}
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-[10px] font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/80 px-2 py-0.5 rounded-md border border-sky-200/60 dark:border-sky-800/60">Identitas Pelanggan</span>
+                            @if($payment->customer && ($payment->customer->cid || $payment->customer->customer_code))
+                            <div class="inline-flex items-center gap-1 font-mono text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 shadow-2xs">
+                                <span>CID: {{ $payment->customer->cid ?? $payment->customer->customer_code }}</span>
+                                <button onclick="copyText('{{ $payment->customer->cid ?? $payment->customer->customer_code }}', 'CID')" title="Salin CID" class="text-slate-400 hover:text-sky-600 cursor-pointer">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                </button>
+                            </div>
+                            @endif
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            @if($payment->customer_id)
+                            <a href="{{ route('customers.show', $payment->customer_id) }}" class="font-bold text-slate-900 dark:text-white text-base hover:text-sky-600 transition-colors">
+                                {{ $payment->customer->full_name ?? '-' }}
+                            </a>
+                            @else
+                            <span class="font-bold text-slate-900 dark:text-white text-base">{{ $payment->customer->full_name ?? '-' }}</span>
+                            @endif
+                        </div>
+                        <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+                            <div class="flex items-center gap-1.5 font-mono font-medium text-slate-700 dark:text-slate-300">
+                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                                <span>{{ $payment->customer->primary_phone ?? $payment->customer->phone ?? '-' }}</span>
+                            </div>
+                            <span>•</span>
+                            <div class="flex items-center gap-1 text-slate-700 dark:text-slate-300">
+                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                                <span>{{ $payment->pop->name ?? '-' }}</span>
+                            </div>
+                            @if($payment->customer && $payment->customer->address)
+                            <span>•</span>
+                            <div class="flex items-center gap-1 text-slate-600 dark:text-slate-400 max-w-md truncate" title="{{ $payment->customer->address }}">
+                                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                <span class="truncate">{{ $payment->customer->address }}</span>
+                            </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Print Kwitansi Button -->
-            <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-600 active:scale-95 cursor-pointer">
-                <svg class="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-                </svg>
-                <span>Cetak Kwitansi</span>
-            </button>
-
-            <!-- Kembalikan Button — juga untuk pembayaran bulan yang sudah tutup buku;
-                 pengembaliannya dibukukan di bulan berjalan. -->
-            @can('payments.reject')
-                @if($payment->payment_status->value === 'valid')
-                <button type="button" onclick="openRejectModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                    <span>Kembalikan Pembayaran</span>
-                </button>
+                <!-- Action: Full Profile Link -->
+                @if($payment->customer_id)
+                <div class="shrink-0 self-end md:self-center">
+                    <a href="{{ route('customers.show', $payment->customer_id) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all shadow-2xs">
+                        <span>Profil Pelanggan</span>
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </a>
+                </div>
                 @endif
-            @endcan
+            </div>
         </div>
     </div>
 
@@ -263,13 +328,14 @@
         </div>
     </div>
 
-    <!-- MAIN ENTERPRISE 2-COLUMN GRID -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <!-- MAIN ENTERPRISE 2-COLUMN GRID (EQUAL HEIGHT) -->
+    <!-- MAIN ENTERPRISE 2-COLUMN GRID (JOINED CONTAINER WITH DIVIDE) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-700 items-stretch bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-2xs">
         
-        <!-- LEFT MAIN TABBED CONTENT (8 cols on lg/xl) -->
-        <div class="lg:col-span-8 space-y-6">
+        <!-- LEFT MAIN TABBED CONTENT (8 cols) -->
+        <div class="lg:col-span-8 flex flex-col min-w-0">
             
-            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-2xs">
+            <div class="flex-1 flex flex-col min-w-0">
                 
                 <!-- Tab Bar Header -->
                 <div class="border-b border-slate-100 dark:border-slate-700/60 px-6 flex items-center gap-6 text-xs bg-slate-50/50 dark:bg-slate-900/40 custom-scrollbar overflow-x-auto">
@@ -290,98 +356,100 @@
                 </div>
 
                 <!-- TAB PANE 1: Informasi & Catatan -->
-                <div id="pane-info" class="p-6 space-y-6">
+                <div id="pane-info" class="p-6 space-y-6 flex-1 flex flex-col justify-between">
                     
-                    <!-- Financial Breakdown Itemization -->
-                    <div>
-                        <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-3">Rincian Pembagian Alokasi Dana</h3>
-                        <div class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-                            <table class="w-full text-left border-collapse text-xs">
-                                <thead class="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
-                                    <tr>
-                                        <th class="p-3.5">Deskripsi Alokasi</th>
-                                        <th class="p-3.5">Referensi / Keterangan</th>
-                                        <th class="p-3.5 text-right">Nominal</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium">
-                                    <tr>
-                                        <td class="p-3.5">
-                                            <span class="font-bold text-slate-900 dark:text-white block">Pelunasan Tagihan Internet</span>
-                                            <span class="text-[10px] text-slate-400">{{ $payment->invoice->internetPackage->name ?? 'Layanan ISP' }}</span>
-                                        </td>
-                                        <td class="p-3.5 font-mono text-slate-600 dark:text-slate-400">
-                                            {{ $payment->invoice->invoice_number ?? '-' }}
-                                        </td>
-                                        <td class="p-3.5 text-right font-mono font-bold text-slate-900 dark:text-white">
-                                            Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                    @if((float) $payment->overpay_amount > 0)
-                                    <tr class="bg-sky-50/30 dark:bg-sky-950/20">
-                                        <td class="p-3.5">
-                                            <span class="font-bold text-sky-700 dark:text-sky-300 block">Alokasi Lebih Bayar (Deposit Pelanggan)</span>
-                                            <span class="text-[10px] text-sky-600 dark:text-sky-400">Disimpan untuk pemotongan tagihan berikutnya</span>
-                                        </td>
-                                        <td class="p-3.5 font-mono text-sky-600 dark:text-sky-400">
-                                            Overpay / Saldo
-                                        </td>
-                                        <td class="p-3.5 text-right font-mono font-bold text-sky-600 dark:text-sky-400">
-                                            Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                    @endif
-                                </tbody>
-                                <tfoot class="bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-700 font-bold">
-                                    <tr>
-                                        <td colspan="2" class="p-3.5 text-slate-900 dark:text-white">TOTAL UANG DITERIMA DARI PELANGGAN</td>
-                                        <td class="p-3.5 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
-                                            Rp {{ number_format($totalMoneyReceived, 0, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                    <div class="space-y-6">
+                        <!-- Financial Breakdown Itemization -->
+                        <div>
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-3">Rincian Pembagian Alokasi Dana</h3>
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead class="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+                                        <tr>
+                                            <th class="p-3.5">Deskripsi Alokasi</th>
+                                            <th class="p-3.5">Referensi / Keterangan</th>
+                                            <th class="p-3.5 text-right">Nominal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium">
+                                        <tr>
+                                            <td class="p-3.5">
+                                                <span class="font-bold text-slate-900 dark:text-white block">Pelunasan Tagihan Internet</span>
+                                                <span class="text-[10px] text-slate-400">{{ $payment->invoice->internetPackage->name ?? 'Layanan ISP' }}</span>
+                                            </td>
+                                            <td class="p-3.5 font-mono text-slate-600 dark:text-slate-400">
+                                                {{ $payment->invoice->invoice_number ?? '-' }}
+                                            </td>
+                                            <td class="p-3.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                                Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                        @if((float) $payment->overpay_amount > 0)
+                                        <tr class="bg-sky-50/30 dark:bg-sky-950/20">
+                                            <td class="p-3.5">
+                                                <span class="font-bold text-sky-700 dark:text-sky-300 block">Alokasi Lebih Bayar (Deposit Pelanggan)</span>
+                                                <span class="text-[10px] text-sky-600 dark:text-sky-400">Disimpan untuk pemotongan tagihan berikutnya</span>
+                                            </td>
+                                            <td class="p-3.5 font-mono text-sky-600 dark:text-sky-400">
+                                                Overpay / Saldo
+                                            </td>
+                                            <td class="p-3.5 text-right font-mono font-bold text-sky-600 dark:text-sky-400">
+                                                Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                        @endif
+                                    </tbody>
+                                    <tfoot class="bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-700 font-bold">
+                                        <tr>
+                                            <td colspan="2" class="p-3.5 text-slate-900 dark:text-white">TOTAL UANG DITERIMA DARI PELANGGAN</td>
+                                            <td class="p-3.5 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                                                Rp {{ number_format($totalMoneyReceived, 0, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Remarks / Notes Box -->
-                    <div class="space-y-2">
-                        <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Catatan Petugas</h3>
-                        <div class="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
-                            {{ $payment->note ?: 'Tidak ada catatan khusus untuk transaksi ini.' }}
+                        <!-- Remarks / Notes Box -->
+                        <div class="space-y-2">
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Catatan Petugas</h3>
+                            <div class="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
+                                {{ $payment->note ?: 'Tidak ada catatan khusus untuk transaksi ini.' }}
+                            </div>
                         </div>
-                    </div>
 
-                    @if($payment->old_payment_id || $payment->old_transaction_id || $payment->old_request_id)
-                    <div class="space-y-2">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Audit Visibilitas Data Migrasi Legacy</h3>
-                        <div class="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2 text-xs">
-                            @if($payment->old_payment_id)
-                            <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700/60">
-                                <span class="text-slate-500">ID Bayar Lama:</span>
-                                <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_payment_id }}</span>
+                        @if($payment->old_payment_id || $payment->old_transaction_id || $payment->old_request_id)
+                        <div class="space-y-2">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Audit Visibilitas Data Migrasi Legacy</h3>
+                            <div class="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2 text-xs">
+                                @if($payment->old_payment_id)
+                                <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700/60">
+                                    <span class="text-slate-500">ID Bayar Lama:</span>
+                                    <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_payment_id }}</span>
+                                </div>
+                                @endif
+                                @if($payment->old_transaction_id)
+                                <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700/60">
+                                    <span class="text-slate-500">ID Transaksi Lama:</span>
+                                    <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_transaction_id }}</span>
+                                </div>
+                                @endif
+                                @if($payment->old_request_id)
+                                <div class="flex justify-between items-center">
+                                    <span class="text-slate-500">ID Permintaan Lama:</span>
+                                    <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_request_id }}</span>
+                                </div>
+                                @endif
                             </div>
-                            @endif
-                            @if($payment->old_transaction_id)
-                            <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700/60">
-                                <span class="text-slate-500">ID Transaksi Lama:</span>
-                                <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_transaction_id }}</span>
-                            </div>
-                            @endif
-                            @if($payment->old_request_id)
-                            <div class="flex justify-between items-center">
-                                <span class="text-slate-500">ID Permintaan Lama:</span>
-                                <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_request_id }}</span>
-                            </div>
-                            @endif
                         </div>
+                        @endif
                     </div>
-                    @endif
 
                 </div>
 
                 <!-- TAB PANE 2: Bukti Pembayaran -->
-                <div id="pane-proof" class="hidden p-6 space-y-4">
+                <div id="pane-proof" class="hidden p-6 space-y-4 flex-1">
                     <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Lampiran Bukti Pembayaran / Struk Transfer</h3>
                     
                     @if($payment->proof_file)
@@ -422,7 +490,7 @@
 
                 <!-- TAB PANE 3: Timeline & Audit Log -->
                 @if(auth()->user()->hasPermission('audit_logs.view'))
-                <div id="pane-audit" class="hidden p-6 space-y-4">
+                <div id="pane-audit" class="hidden p-6 space-y-4 flex-1">
                     <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Riwayat Audit Pembayaran</h3>
                     
                     @if($payment->relationLoaded('auditLogs') && $payment->auditLogs->count() > 0)
@@ -475,11 +543,9 @@
             </div>
         </div>
 
-        <!-- RIGHT STICKY SIDEBAR DETAILS (4 cols on lg/xl) -->
-        <div class="lg:col-span-4 space-y-6 lg:sticky lg:top-20">
-            
-            <!-- INVOICE CONTEXT CARD -->
-            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs space-y-4">
+        <!-- RIGHT DETAILS PANEL (4 cols) -->
+        <div class="lg:col-span-4 flex flex-col p-6 flex-1 justify-between">
+            <div>
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/60">
                     <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tagihan Terkait</span>
                     @if($payment->invoice_id)
@@ -491,7 +557,7 @@
                 </div>
 
                 @if($payment->invoice)
-                <div class="space-y-2 text-xs">
+                <div class="space-y-3.5 text-xs pt-4">
                     <div class="flex items-center justify-between">
                         <span class="text-slate-500 dark:text-slate-400">No. Invoice:</span>
                         <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline">
@@ -506,79 +572,27 @@
                         <span class="text-slate-500 dark:text-slate-400">Total Invoice:</span>
                         <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">Rp {{ number_format((float) ($payment->invoice->total_amount ?? 0), 0, ',', '.') }}</span>
                     </div>
-                    <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60">
-                        <span class="text-slate-500 dark:text-slate-400">Sisa Tagihan Saat Ini:</span>
-                        <span class="font-mono font-bold {{ (float)($payment->invoice->remaining_amount ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}">
-                            Rp {{ number_format((float) ($payment->invoice->remaining_amount ?? 0), 0, ',', '.') }} {{ (float)($payment->invoice->remaining_amount ?? 0) == 0 ? '(Lunas)' : '' }}
-                        </span>
-                    </div>
                 </div>
                 @else
-                <p class="text-xs text-slate-400 italic">Tidak terhubung ke invoice tertentu.</p>
+                <div class="pt-4">
+                    <p class="text-xs text-slate-400 italic">Tidak terhubung ke invoice tertentu.</p>
+                </div>
                 @endif
             </div>
 
-            <!-- CUSTOMER PROFILE CARD -->
-            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/60">
-                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Identitas Pelanggan</span>
-                    @if($payment->customer_id)
-                    <a href="{{ route('customers.show', $payment->customer_id) }}" class="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
-                        <span>Profil Full</span>
-                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                    </a>
-                    @endif
-                </div>
-
-                <div class="flex items-start gap-3">
-                    <div class="w-11 h-11 rounded-2xl bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-extrabold text-base flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800">
-                        {{ strtoupper(substr($payment->customer->full_name ?? 'P', 0, 2)) }}
-                    </div>
-                    <div class="space-y-1 text-xs">
-                        @if($payment->customer_id)
-                        <a href="{{ route('customers.show', $payment->customer_id) }}" class="font-bold text-slate-900 dark:text-white text-sm hover:text-sky-600 transition-colors block">
-                            {{ $payment->customer->full_name ?? '-' }}
-                        </a>
-                        @else
-                        <span class="font-bold text-slate-900 dark:text-white text-sm block">{{ $payment->customer->full_name ?? '-' }}</span>
-                        @endif
-                        <div class="font-mono text-[11px] text-slate-400 flex items-center gap-1.5">
-                            <span>CID: {{ $payment->customer->cid ?? $payment->customer->customer_code ?? '-' }}</span>
-                            @if($payment->customer && ($payment->customer->cid || $payment->customer->customer_code))
-                            <button onclick="copyText('{{ $payment->customer->cid ?? $payment->customer->customer_code }}', 'CID')" title="Salin CID" class="text-slate-400 hover:text-sky-600 cursor-pointer">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            </button>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-2.5 text-xs pt-3 border-t border-slate-100 dark:border-slate-700/60">
-                    <div class="flex justify-between items-center">
-                        <span class="text-slate-500 dark:text-slate-400">No. HP / WA:</span>
-                        <div class="flex items-center gap-1.5 font-mono font-semibold text-slate-800 dark:text-slate-200">
-                            <span>{{ $payment->customer->primary_phone ?? $payment->customer->phone ?? '-' }}</span>
-                            @if($payment->customer && ($payment->customer->primary_phone || $payment->customer->phone))
-                            <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $payment->customer->primary_phone ?? $payment->customer->phone) }}" target="_blank" class="p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded" title="Chat WA">
-                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
-                            </a>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-slate-500 dark:text-slate-400">POP / Cabang:</span>
-                        <span class="font-semibold text-slate-800 dark:text-slate-200">{{ $payment->pop->name ?? '-' }}</span>
-                    </div>
-                    <div class="pt-1">
-                        <span class="text-slate-500 dark:text-slate-400 block mb-1">Alamat Pemasangan:</span>
-                        <p class="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
-                            {{ $payment->customer->address ?? '-' }}
-                        </p>
-                    </div>
+            @if($payment->invoice)
+            <div class="pt-4 mt-6 border-t border-slate-100 dark:border-slate-700/60">
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                    <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Sisa Tagihan:</span>
+                    <span class="font-mono font-bold text-sm {{ (float)($payment->invoice->remaining_amount ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}">
+                        Rp {{ number_format((float) ($payment->invoice->remaining_amount ?? 0), 0, ',', '.') }} {{ (float)($payment->invoice->remaining_amount ?? 0) == 0 ? '(Lunas)' : '' }}
+                    </span>
                 </div>
             </div>
+            @endif
         </div>
     </div>
+    
 </div>
 
 <!-- MODAL: TOLAK PEMBAYARAN -->

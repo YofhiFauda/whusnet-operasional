@@ -103,6 +103,18 @@ class InvoiceController extends Controller
             ->where('invoice_type', 'bulanan')
             ->sum('remaining_amount');
 
+        $customerIds = $invoices->pluck('customer_id')->filter()->unique();
+        $customerIdsWithPiutang = $customerIds->isNotEmpty()
+            ? Invoice::query()
+                ->applyUserScope()
+                ->whereIn('customer_id', $customerIds)
+                ->piutang()
+                ->pluck('customer_id')
+                ->unique()
+                ->flip()
+                ->all()
+            : [];
+
         return view('invoices.index', compact(
             'invoices',
             'pops',
@@ -114,7 +126,8 @@ class InvoiceController extends Controller
             'invoiceType',
             'allowedStatuses',
             'unpaidAwalTotal',
-            'unpaidBulananTotal'
+            'unpaidBulananTotal',
+            'customerIdsWithPiutang'
         ));
     }
 

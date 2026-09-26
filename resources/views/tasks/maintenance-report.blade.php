@@ -238,7 +238,7 @@
                         </div>
 
                         <div class="mt-2">
-                            <input type="file" name="opm_photo" id="opm_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('opm_photo')">
+                            <input type="file" name="opm_photo" id="opm_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('opm_photo')">
                             <label for="opm_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-xs focus:outline-none">
                                 Pilih Foto OPM
                             </label>
@@ -273,7 +273,7 @@
                         </div>
 
                         <div class="mt-2">
-                            <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('speedtest_photo')">
+                            <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('speedtest_photo')">
                             <label for="speedtest_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-xs focus:outline-none">
                                 Pilih Foto Speedtest
                             </label>

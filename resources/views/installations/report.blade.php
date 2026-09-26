@@ -767,7 +767,7 @@
                                             </div>
 
                                             <div class="mt-2">
-                                                <input type="file" name="{{ $photo['field'] }}" id="{{ $photo['field'] }}" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ $existingFotoUrl ? 'true' : 'false' }}" onchange="onFileChange('{{ $photo['field'] }}')">
+                                                <input type="file" name="{{ $photo['field'] }}" id="{{ $photo['field'] }}" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" data-has-existing="{{ $existingFotoUrl ? 'true' : 'false' }}" onchange="onFileChange('{{ $photo['field'] }}')">
                                                 <label for="{{ $photo['field'] }}" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                                     {{ $existingFotoUrl ? 'Ganti Foto' : $photo['cta'] }}
                                                 </label>
@@ -884,7 +884,7 @@
                                     </div>
 
                                     <div class="mt-2 max-w-xs mx-auto w-full">
-                                        <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('speedtest_photo')">
+                                        <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('speedtest_photo')">
                                         <label for="speedtest_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                             Pilih Foto Speedtest
                                         </label>

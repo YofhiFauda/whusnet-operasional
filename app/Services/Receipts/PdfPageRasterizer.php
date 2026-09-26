@@ -12,7 +12,7 @@ use Symfony\Component\Process\Process;
  * Halaman cetak kwitansi mengembalikan View HTML, jadi alur alami admin adalah
  * Print → "Save as PDF" di browser. Tanpa langkah ini, format yang justru
  * dipancing oleh halaman cetak sendiri tak pernah bisa dibaca otomatis: QR
- * reader melewatkan non-gambar, dan OCR mati secara default.
+ * reader melewatkan non-gambar.
  *
  * Memakai `pdftoppm` (poppler-utils), SENGAJA bukan Imagick: Debian mematikan
  * coder PDF di policy.xml ImageMagick secara default, sehingga jalur itu gagal

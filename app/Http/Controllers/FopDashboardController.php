@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Enums\InventoryTransactionType;
 use App\Enums\MaterialKind;
+use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\FopTaskTeam;
+use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Pop;
 use App\Models\Task;
@@ -161,21 +163,29 @@ class FopDashboardController extends Controller
                         ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('from_pop_id', $allowedPopIds))
                         ->sum('qty'),
                     // Terpakai (dipasang/dihabiskan) di laporan teknisi hari ini —
-                    // scope lewat POP FopTask, sesuai jalur `TaskMaterial::create()`
-                    // di InventoryService::consumeFromCustody().
+                    // gabungan material pasif (TaskMaterial) dan perangkat aktif (InventoryTransaction type INSTALL)
                     'terpakai' => (float) TaskMaterial::where('kind', MaterialKind::TERPAKAI->value)
                         ->whereBetween('task_materials.created_at', [$startOfToday, $endOfToday])
                         ->whereHas('fopTask', fn ($q) => $q->when(
                             ! $hasAllPopAccess,
                             fn ($qq) => $qq->whereIn('pop_id', $allowedPopIds)
                         ))
-                        ->sum('qty'),
+                        ->sum('qty')
+                        + (float) InventoryTransaction::where('type', InventoryTransactionType::INSTALL->value)
+                            ->whereBetween('created_at', [$startOfToday, $endOfToday])
+                            ->whereHas('fopTask', fn ($q) => $q->when(
+                                ! $hasAllPopAccess,
+                                fn ($qq) => $qq->whereIn('pop_id', $allowedPopIds)
+                            ))
+                            ->sum('qty'),
                     // Masih di tangan teknisi (belum dipakai/dikembalikan) —
-                    // snapshot posisi sekarang, BUKAN kejadian "hari ini" seperti
-                    // dua angka di atas (custody bisa dibawa lintas hari).
+                    // snapshot posisi sekarang gabungan barang pasif (TechnicianCustody) & serial (InventorySerial ISSUED).
                     'sisa_di_teknisi' => (float) TechnicianCustody::active()
                         ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('issued_from_pop_id', $allowedPopIds))
-                        ->sum('qty_remaining'),
+                        ->sum('qty_remaining')
+                        + (float) InventorySerial::status(SerialStatus::ISSUED)
+                            ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('issued_from_pop_id', $allowedPopIds))
+                            ->count(),
                 ];
             }
         );

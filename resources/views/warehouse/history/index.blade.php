@@ -243,6 +243,11 @@
                                  konfirmasi Cabang), bukan berarti gak ada tujuan sama
                                  sekali. Fallback "Pelanggan / Luar" salah di sini. --}}
                             <span class="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-medium">{{ $txn->transfer->toPop->name }} (menunggu konfirmasi)</span>
+                            @elseif($txn->type->value === 'install')
+                            @php
+                                $cust = $txn->fopTask?->customer ?? $txn->serial?->customer;
+                            @endphp
+                            <span class="px-2 py-0.5 rounded bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800/50 font-medium">{{ $cust ? 'Pelanggan: '.$cust->full_name : 'Pelanggan' }}</span>
                             @else
                             <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60 font-medium">{{ $txn->toPop->name ?? ($txn->toTechnician->name ?? 'Pelanggan / Luar') }}</span>
                             @endif

@@ -19,9 +19,14 @@
         body {
             font-family: Arial, Helvetica, sans-serif;
             margin: 0;
-            padding: 16px;
-            background: #f4f4f4;
             color: #000000;
+            <?php if($isPdf): ?>
+                padding: 0;
+                background: #ffffff;
+            <?php else: ?>
+                padding: 16px;
+                background: #f4f4f4;
+            <?php endif; ?>
         }
 
         .toolbar {
@@ -60,36 +65,45 @@
         .sheet-frame {
             background: #ffffff;
             width: 100%;
-            max-width: 700px;
-            margin: 0 auto;
-            padding: 24px;
+            <?php if($isPdf): ?>
+                max-width: 100%;
+                
+                padding: 4mm 4mm;
+            <?php else: ?>
+                max-width: 700px;
+                margin: 0 auto;
+                padding: 24px;
+            <?php endif; ?>
         }
 
-        /* Kertas NCR 2-ply — cuma jalur cetak fisik staf (bukan PDF/iframe
-           Portal). Lihat docblock $isPdf di atas. */
+        /* Kertas NCR 2-ply — cuma jalur cetak fisik staf beneran nge-print
+           (browser Ctrl+P/tombol Cetak, medianya `print`; PDF/iframe Portal
+           lihat docblock $isPdf di atas). Persegi panjang landscape ~16:9
+           (lebar > tinggi, dikonfirmasi user), sama seperti bentuk fisik
+           continuous form 1/2 part-nya — lihat `ReceiptPaperSize`. */
         @media print {
             <?php if(! $isPdf): ?>
                 @page {
-                    size: 9.5in 5.5in;
+                    size: <?php echo e(\App\Services\Receipts\ReceiptPaperSize::WIDTH_IN); ?>in <?php echo e(\App\Services\Receipts\ReceiptPaperSize::HEIGHT_IN); ?>in;
                     margin: 0;
                 }
+
+                .toolbar {
+                    display: none !important;
+                }
+
+                body {
+                    background: #ffffff !important;
+                    padding: 0 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+
+                .sheet-frame {
+                    max-width: 100%;
+                    padding: 4mm 4mm;
+                }
             <?php endif; ?>
-
-            .toolbar {
-                display: none !important;
-            }
-
-            body {
-                background: #ffffff !important;
-                padding: 0 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            .sheet-frame {
-                max-width: 100%;
-                padding: 6mm 5mm;
-            }
         }
     </style>
 </head>

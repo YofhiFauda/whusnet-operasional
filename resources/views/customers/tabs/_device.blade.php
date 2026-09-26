@@ -11,6 +11,11 @@
 @php
     $device = $customer->customerDevice;
     $tech = $customer->customerTechnicalDetail;
+    $installedInventorySerial = \App\Models\InventorySerial::where('customer_id', $customer->id)
+        ->where('status', \App\Enums\SerialStatus::INSTALLED->value)
+        ->with('item')
+        ->latest('installed_at')
+        ->first();
 
     $canViewSensitiveDeviceFields = auth()->user()->hasPermission('customers.detail.devices.view_sensitive');
     $maskSensitive = fn ($value) => $canViewSensitiveDeviceFields ? ($value ?: '-') : ($value ? '********' : '-');
@@ -29,14 +34,14 @@
             $deviceType = 'ROUTER';
         } elseif ($connType && (str_contains($connType, 'fiber') || str_contains($connType, 'ont') || str_contains($connType, 'onu') || str_contains($connType, 'kabel'))) {
             $deviceType = 'ONT';
-        } elseif ($customer->ont_sn) {
+        } elseif ($customer->ont_sn || $installedInventorySerial) {
             $deviceType = 'ONT';
         }
     }
 
-    $brandModel = trim(($device?->brand ?? '').' '.($device?->model ?? '')) ?: ($tech?->passive_device ?: null);
-    $serialNumber = $device?->serial_number ?: ($tech?->router_or_ont_serial ?: $customer->ont_sn);
-    $macAddress = $device?->mac_address ?: ($tech?->router_mac ?: $tech?->antenna_mac);
+    $brandModel = ($installedInventorySerial?->item?->name ?? trim(($device?->brand ?? '').' '.($device?->model ?? ''))) ?: ($tech?->passive_device ?: null);
+    $serialNumber = $installedInventorySerial?->serial_number ?: ($device?->serial_number ?: ($tech?->router_or_ont_serial ?: $customer->ont_sn));
+    $macAddress = $installedInventorySerial?->mac_address ?: ($device?->mac_address ?: ($tech?->router_mac ?: $tech?->antenna_mac));
     $vlanId = $device?->vlan_id ?: ($tech?->vlan ?: $customer->vlan_id);
     $ssid = $device?->wifi_ssid ?: $tech?->ssid;
     $odpCode = $device?->odp ?: ($tech?->odp_number ?: $customer->odp_code);
@@ -172,7 +177,7 @@
                     <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->olt_code ?: '-' }}</span>
                 </div>
                 <div class="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-1">
-                    <span class="text-slate-400">Nomor OLT [CID Generator]</span>
+                    <span class="text-slate-400">Nomor OLT</span>
                     {{-- Pakai accessor, bukan $displayId: partial ini juga di-include
                          halaman Perangkat & Pemasangan (customers.fieldwork) yang
                          tidak mengoper variabel itu. --}}

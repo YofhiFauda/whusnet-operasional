@@ -8,6 +8,7 @@ use App\Http\Controllers\CustomerPortal\Concerns\ScopedToAuthenticatedCustomer;
 use App\Http\Resources\CustomerPortal\PaymentReceiptResource;
 use App\Http\Resources\CustomerPortal\PaymentResource;
 use App\Models\Payment;
+use App\Services\Receipts\ReceiptPaperSize;
 use App\Services\Receipts\ReceiptPresenter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dedoc\Scramble\Attributes\Group;
@@ -100,7 +101,16 @@ class PortalPaymentController extends Controller
      * TIDAK punya template kwitansi sendiri. Isinya identik untuk staf &
      * pelanggan (ADHOC-94) — `$isPdf=true` cuma menyembunyikan toolbar
      * "Cetak Kwitansi"/"Detail Pembayaran" (link rute staf internal, tak
-     * relevan buat pelanggan) dan melewati ukuran kertas NCR fisik staf.
+     * relevan buat pelanggan).
+     *
+     * Ukuran kertas PDF SENGAJA disamakan persis dengan lembar fisik staf
+     * (`ReceiptPaperSize`, bukan A4, koreksi 2026-09-26): PDF ini cuma
+     * pernah dilihat/diunduh, tak pernah dicetak ke printer kantor, jadi
+     * ukurannya bebas ditentukan sendiri — dan pelanggan mestinya melihat
+     * bentuk yang sama persis dengan kwitansi fisik yang dipegang staf,
+     * bukan A4 penuh spasi kosong. Satu sumber angka dipakai dua tempat
+     * (di sini & `payments/receipt.blade.php`) biar gak dobel kerja kalau
+     * ukurannya berubah lagi.
      *
      * `?download=1` → `Content-Disposition: attachment` (tombol Unduh, file
      * .pdf beneran). Tanpa itu → `inline` (tombol Lihat, dibuka di tab/
@@ -115,7 +125,7 @@ class PortalPaymentController extends Controller
         $viewData = $this->receiptViewData($request, $paymentNumber);
 
         $pdf = Pdf::loadView('payments.receipt', [...$viewData, 'isPdf' => true])
-            ->setPaper('a4');
+            ->setPaper([0, 0, ReceiptPaperSize::widthPt(), ReceiptPaperSize::heightPt()]);
 
         $filename = "kwitansi-{$viewData['payment']->payment_number}.pdf";
 

@@ -440,7 +440,7 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                 </div>
 
                                 <div class="mt-2">
-                                    <input type="file" name="house_photo" id="house_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('house_photo')" <?php echo e($existingHousePhoto ? 'data-populated=true' : ''); ?>>
+                                    <input type="file" name="house_photo" id="house_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('house_photo')" <?php echo e($existingHousePhoto ? 'data-populated=true' : ''); ?>>
                                     
                                     <input type="hidden" name="house_photo_removed" id="house_photo_removed_flag" value="0">
                                     <label for="house_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
@@ -530,7 +530,7 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                 </div>
 
                                 <div class="mt-2">
-                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')" <?php echo e($existingSurveyPhoto ? 'data-populated=true' : ''); ?>>
+                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('survey_photo')" <?php echo e($existingSurveyPhoto ? 'data-populated=true' : ''); ?>>
                                     <input type="hidden" name="survey_photo_removed" id="survey_photo_removed_flag" value="0">
                                     <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         <?php echo e($existingSurveyPhoto ? 'Ganti Foto ODP' : 'Pilih Foto ODP'); ?>

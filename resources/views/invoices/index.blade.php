@@ -141,6 +141,11 @@
                             default => 'bg-slate-50 dark:bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-100 dark:border-slate-500/20',
                         };
 
+                        $hasPiutang = $invoice->isPiutang() || (isset($customerIdsWithPiutang) && isset($customerIdsWithPiutang[$invoice->customer_id]));
+                        $invoiceNumberColor = $hasPiutang
+                            ? 'text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300'
+                            : 'text-sky-700 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300';
+
                         // Baris induk dapat tombol expand HANYA selama tagihan
                         // masih dicicil. Begitu lunas, riwayat cicilan tak lagi
                         // ditumpuk di list — cukup Total & Sisa (§D-4); rincian
@@ -170,7 +175,9 @@
                                 @else
                                     <span class="w-5 inline-block"></span>
                                 @endif
-                                <a href="{{ route('invoices.show', $invoice->id) }}" class="font-mono font-bold text-sky-700 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300">{{ $invoice->invoice_number }}</a>
+                                <a href="{{ route('invoices.show', $invoice->id) }}"
+                                   class="font-mono font-bold {{ $invoiceNumberColor }}"
+                                   @if($hasPiutang) title="Pelanggan memiliki piutang" @endif>{{ $invoice->invoice_number }}</a>
                             </div>
                             <div class="flex items-center flex-wrap gap-1.5 mt-1">
                                 @if($invoice->old_invoice_id || $invoice->old_cost_id)

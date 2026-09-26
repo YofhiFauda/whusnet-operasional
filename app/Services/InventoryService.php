@@ -178,6 +178,36 @@ class InventoryService
 
             $fromTechnicianId = $serial->current_technician_id;
 
+            // Transisikan modem lama jika pelanggan sebelumnya sudah memiliki SN lain yang INSTALLED
+            $oldSerials = InventorySerial::query()
+                ->where('customer_id', $customer->id)
+                ->where('id', '!=', $serial->id)
+                ->where('status', SerialStatus::INSTALLED->value)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($oldSerials as $oldSerial) {
+                $oldSerial->update([
+                    'status' => SerialStatus::RETURNED->value,
+                    'current_technician_id' => $fromTechnicianId,
+                    'customer_id' => null,
+                ]);
+
+                InventoryTransaction::create([
+                    'type' => InventoryTransactionType::RETURN,
+                    'reference_number' => $this->generateReferenceNumber('RET'),
+                    'item_id' => $oldSerial->item_id,
+                    'serial_id' => $oldSerial->id,
+                    'qty' => 1,
+                    'from_technician_id' => $fromTechnicianId,
+                    'to_pop_id' => $oldSerial->issued_from_pop_id,
+                    'fop_task_id' => $fopTask->id,
+                    'reason' => "Modem dicabut saat pekerjaan {$fopTask->task_number} (digantikan oleh SN {$serial->serial_number})",
+                    'notes' => "Pelanggan: {$customer->display_id} - {$customer->full_name}",
+                    'created_by' => $actor->id,
+                ]);
+            }
+
             $serial->update([
                 'status' => SerialStatus::INSTALLED,
                 'customer_id' => $customer->id,
@@ -186,16 +216,56 @@ class InventoryService
                 'current_technician_id' => null,
             ]);
 
+            // Sinkronisasi data perangkat ke Master Pelanggan
+            $customer->update(['ont_sn' => $serial->serial_number]);
+
+            if ($customer->customerTechnicalDetail) {
+                $customer->customerTechnicalDetail->update(['router_or_ont_serial' => $serial->serial_number]);
+            }
+
+            $brand = $serial->item?->brand ?: ($customer->customerDevice?->brand ?: 'ZTE');
+            $model = $serial->item?->model ?: ($customer->customerDevice?->model ?: $serial->item?->name);
+
+            $customer->customerDevice()->updateOrCreate(
+                ['customer_id' => $customer->id],
+                [
+                    'device_type' => 'ONT',
+                    'brand' => $brand,
+                    'model' => $model,
+                    'serial_number' => $serial->serial_number,
+                    'mac_address' => $serial->mac_address ?: $customer->customerDevice?->mac_address,
+                    'device_retrieved_at' => null,
+                ]
+            );
+
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::INSTALL,
+                'reference_number' => $this->generateReferenceNumber('INS'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
                 'from_technician_id' => $fromTechnicianId,
                 'fop_task_id' => $fopTask->id,
+                'notes' => "Pemasangan SN {$serial->serial_number} pada Task {$fopTask->task_number} untuk Pelanggan: {$customer->display_id} - {$customer->full_name}",
                 'created_by' => $actor->id,
             ]);
         });
+    }
+
+    /**
+     * Generate reference number untuk transaksi ledger (INSTALL/RETURN).
+     */
+    private function generateReferenceNumber(string $prefix = 'INS'): string
+    {
+        $yearMonth = date('Ym');
+        $today = date('Ymd');
+
+        $lastNum = InventoryTransaction::where('reference_number', 'like', "{$prefix}-{$yearMonth}%")
+            ->pluck('reference_number')
+            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
+            ->max() ?? 0;
+
+        return sprintf('%s-%s-%06d', $prefix, $today, $lastNum + 1);
     }
 
     /**

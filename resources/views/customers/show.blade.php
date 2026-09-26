@@ -158,7 +158,7 @@
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
             <div class="flex items-center justify-between mt-1">
                 <span class="text-xs font-bold {{ count($completeness['missing_required']) > 0 ? 'text-rose-600' : (count($completeness['missing_optional']) > 0 ? 'text-amber-600' : 'text-emerald-600') }}">{{ $completeness['percentage'] }}% Lengkap</span>
-                <span class="text-[10px] font-mono text-slate-400">{{ 28 - count($completeness['missing_required']) - count($completeness['missing_optional']) }}/28 Parameter</span>
+                <span class="text-[10px] font-mono text-slate-400">{{ $completeness['filled_count'] }}/{{ $completeness['total_count'] }} Parameter</span>
             </div>
             <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-1.5 overflow-hidden">
                 <div class="{{ count($completeness['missing_required']) > 0 ? 'bg-rose-500' : (count($completeness['missing_optional']) > 0 ? 'bg-amber-500' : 'bg-emerald-500') }} h-full rounded-full transition-all duration-300" style="width: {{ $completeness['percentage'] }}%"></div>
@@ -236,7 +236,7 @@
                         ● {{ Str::headline($customer->data_completeness_status) }}
                     </span>
                     <span class="text-xs text-slate-600 dark:text-slate-300">
-                        Profil data terisi <strong class="{{ count($completeness['missing_required']) > 0 ? 'text-rose-600' : 'text-emerald-600' }} font-bold">{{ $completeness['percentage'] }}%</strong> dari total 28 parameter evaluasi sistem.
+                        Profil data terisi <strong class="{{ count($completeness['missing_required']) > 0 ? 'text-rose-600' : 'text-emerald-600' }} font-bold">{{ $completeness['percentage'] }}%</strong> dari total {{ $completeness['total_count'] }} parameter evaluasi sistem.
                     </span>
                 </div>
             </div>

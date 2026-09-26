@@ -91,7 +91,6 @@ services:
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
       MAIL_FROM_NAME: ${APP_NAME:-Whusnet-Operasional}
       FILESYSTEM_DISK: local
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       QR_HMAC_SECRET: ${QR_HMAC_SECRET}
       QR_BASE_URL: ${APP_URL}
       PORTAL_BASE_URL: ${PORTAL_BASE_URL:-}

@@ -961,9 +961,15 @@
                 $materialsTerpakai = $maintenanceFopTask
                     ? $maintenanceFopTask->materials()->terpakai()->orderBy('id')->get()
                     : collect();
+                $installedSerials = $maintenanceFopTask
+                    ? \App\Models\InventoryTransaction::where('fop_task_id', $maintenanceFopTask->id)
+                        ->where('type', \App\Enums\InventoryTransactionType::INSTALL->value)
+                        ->with(['serial.item', 'item'])
+                        ->get()
+                    : collect();
                 $maintenanceReport = $task->maintenanceReport;
             ?>
-            <?php if($maintenanceReport || $materialsTerpakai->isNotEmpty()): ?>
+            <?php if($maintenanceReport || $materialsTerpakai->isNotEmpty() || $installedSerials->isNotEmpty()): ?>
             <div class="pt-5 border-t border-border space-y-4 select-text">
                 <div class="flex items-center gap-2 mb-1 select-none">
                     <svg class="h-4.5 w-4.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -981,6 +987,32 @@
                         <span class="text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui">Kendala &amp; Solusi</span>
                     </div>
                     <p class="text-xs text-text-main leading-relaxed font-ui whitespace-pre-line break-words [word-break:break-word] min-w-0 font-medium"><?php echo e($maintenanceReport->kendala_teknis); ?></p>
+                </div>
+                <?php endif; ?>
+
+                <?php if($installedSerials->isNotEmpty()): ?>
+                <div>
+                    <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui mb-2 select-none">Perangkat Terpasang (Modem/ONT)</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <?php $__currentLoopData = $installedSerials; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tx): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <div class="flex justify-between items-center bg-violet-50/60 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-900/50 p-3 rounded-xl shadow-xs">
+                            <div>
+                                <span class="text-violet-950 dark:text-violet-200 font-ui font-bold block"><?php echo e($tx->item->name); ?></span>
+                                <span class="font-mono text-[11px] text-violet-700 dark:text-violet-400">
+                                    <?php if(auth()->user()->hasPermission('warehouse_traceability.view') && $tx->serial): ?>
+                                        <a href="<?php echo e(route('warehouse.traceability.index', ['sn' => $tx->serial->serial_number])); ?>" class="hover:underline font-bold">SN: <?php echo e($tx->serial->serial_number); ?></a>
+                                    <?php else: ?>
+                                        SN: <?php echo e($tx->serial?->serial_number ?? '—'); ?>
+
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-violet-100 dark:bg-violet-900/60 text-violet-800 dark:text-violet-300 border border-violet-300 dark:border-violet-700">
+                                Terpasang di Pelanggan
+                            </span>
+                        </div>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </div>
                 </div>
                 <?php endif; ?>
 

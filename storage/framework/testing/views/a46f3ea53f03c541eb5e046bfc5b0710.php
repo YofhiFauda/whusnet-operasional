@@ -16,6 +16,10 @@
         'transfer' => 'Transfer Bank',
         'kolektor' => 'Kolektor',
         'lainnya' => 'Lainnya',
+        // ADHOC-92 — dibuat sistem (auto-pay/pakai saldo), bukan pilihan
+        // dropdown input, tapi tetap dibaca `PaymentMethod::cases()` di
+        // controller sebagai opsi FILTER laporan ini.
+        'saldo' => 'Saldo Pelanggan',
     ];
 ?>
 
@@ -98,7 +102,7 @@
                         <option value="">Semua Metode</option>
                         <?php $__currentLoopData = $allowedMethods; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                             <option value="<?php echo e($item); ?>" <?php if($paymentMethod === $item): echo 'selected'; endif; ?>>
-                                <?php echo e($methodLabels[$item]); ?>
+                                <?php echo e($methodLabels[$item] ?? strtoupper($item)); ?>
 
                             </option>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

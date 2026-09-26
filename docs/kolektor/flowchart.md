@@ -398,15 +398,7 @@ ADMIN                                          SISTEM
                                               │          eskalasi 400 DPI ≤3 hal)
                                               │       ┌──────┴───────┐
                                               │  terbaca            │ tidak
-                                              │       │              ▼
-                                              │       │      3. OCR Gemini tersedia?
-                                              │       │         (GEMINI_API_KEY)
-                                              │       │       ┌──────┴───────┐
-                                              │       │    ya │              │ tidak
-                                              │       │       ▼              │
-                                              │       │  baca via model      │
-                                              │       │   (temperature 0)    │
-                                              └───────┴───────┴──────────────┘
+                                              └───────┴──────────────┘
                                                       │
                               ada kegagalan TEKNIS & jatah percobaan tersisa?
                                      ya → lempar ulang ⇒ queue MENGULANG
@@ -445,7 +437,7 @@ TIDAK ADA satu pun panah dari diagram ini menuju status setoran.
 Setoran terverifikasi tanpa menunggu berkas apa pun (§13.2).
 ```
 
-**Kenapa dua gerbang.** Gerbang pola menyaring teks liar; gerbang keberadaan payment menyaring nomor yang bentuknya benar tapi tak menunjuk apa pun. Tanpa gerbang kedua, QR salah cetak atau halusinasi OCR akan menempelkan kwitansi ke pembayaran yang salah — kesalahan yang baru ketahuan saat pelanggan protes.
+**Kenapa dua gerbang.** Gerbang pola menyaring teks liar; gerbang keberadaan payment menyaring nomor yang bentuknya benar tapi tak menunjuk apa pun. Tanpa gerbang kedua, QR salah cetak akan menempelkan kwitansi ke pembayaran yang salah — kesalahan yang baru ketahuan saat pelanggan protes.
 
 **Siapa boleh membuka berkas:**
 

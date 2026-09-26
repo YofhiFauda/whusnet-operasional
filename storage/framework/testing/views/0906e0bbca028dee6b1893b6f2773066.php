@@ -576,7 +576,7 @@
 
                 <div class="md:col-span-2">
                     <label for="installation_photo" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Foto Pemasangan</label>
-                    <input type="file" name="installation_photo" id="installation_photo" accept="image/*" capture="environment"
+                    <input type="file" name="installation_photo" id="installation_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp"
                            class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200">
                     <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
                 </div>
@@ -673,7 +673,7 @@
 
                 <div class="md:col-span-2">
                     <label for="speedtest_photo" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Foto Hasil Speedtest</label>
-                    <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" capture="environment"
+                    <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp"
                            class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200">
                     <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
                 </div>

@@ -288,7 +288,7 @@
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_rumah')">
+                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('foto_rumah')">
                                     <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Foto Rumah
                                     </label>
@@ -376,7 +376,7 @@
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')">
+                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('survey_photo')">
                                     <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Foto ODP
                                     </label>
@@ -435,7 +435,7 @@
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ FAB Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="fab_document" id="fab_document" accept="image/*,application/pdf" class="hidden" onchange="onFileChange('fab_document')">
+                                    <input type="file" name="fab_document" id="fab_document" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.jpg,.jpeg,.png,.webp,.pdf" class="hidden" onchange="onFileChange('fab_document')">
                                     <label for="fab_document" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Berkas FAB
                                     </label>

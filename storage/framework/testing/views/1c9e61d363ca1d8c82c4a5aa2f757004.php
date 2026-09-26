@@ -157,7 +157,7 @@
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
             <div class="flex items-center justify-between mt-1">
                 <span class="text-xs font-bold <?php echo e(count($completeness['missing_required']) > 0 ? 'text-rose-600' : (count($completeness['missing_optional']) > 0 ? 'text-amber-600' : 'text-emerald-600')); ?>"><?php echo e($completeness['percentage']); ?>% Lengkap</span>
-                <span class="text-[10px] font-mono text-slate-400"><?php echo e(28 - count($completeness['missing_required']) - count($completeness['missing_optional'])); ?>/28 Parameter</span>
+                <span class="text-[10px] font-mono text-slate-400"><?php echo e($completeness['filled_count']); ?>/<?php echo e($completeness['total_count']); ?> Parameter</span>
             </div>
             <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-1.5 overflow-hidden">
                 <div class="<?php echo e(count($completeness['missing_required']) > 0 ? 'bg-rose-500' : (count($completeness['missing_optional']) > 0 ? 'bg-amber-500' : 'bg-emerald-500')); ?> h-full rounded-full transition-all duration-300" style="width: <?php echo e($completeness['percentage']); ?>%"></div>
@@ -236,7 +236,7 @@
 
                     </span>
                     <span class="text-xs text-slate-600 dark:text-slate-300">
-                        Profil data terisi <strong class="<?php echo e(count($completeness['missing_required']) > 0 ? 'text-rose-600' : 'text-emerald-600'); ?> font-bold"><?php echo e($completeness['percentage']); ?>%</strong> dari total 28 parameter evaluasi sistem.
+                        Profil data terisi <strong class="<?php echo e(count($completeness['missing_required']) > 0 ? 'text-rose-600' : 'text-emerald-600'); ?> font-bold"><?php echo e($completeness['percentage']); ?>%</strong> dari total <?php echo e($completeness['total_count']); ?> parameter evaluasi sistem.
                     </span>
                 </div>
             </div>

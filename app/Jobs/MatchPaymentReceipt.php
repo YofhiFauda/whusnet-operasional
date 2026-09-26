@@ -10,12 +10,11 @@ use Illuminate\Foundation\Queue\Queueable;
 /**
  * Membaca satu berkas kwitansi di latar belakang.
  *
- * Di queue, bukan di request: OCR bisa lambat dan upload bulk bisa puluhan
+ * Di queue, bukan di request: raster PDF bisa lambat dan upload bulk bisa puluhan
  * berkas sekaligus — admin tak boleh menunggu layar diam.
  *
  * `$tries` sengaja kecil. Berkas yang tak terbaca hampir selalu tetap tak
- * terbaca pada percobaan kelima; mengulangnya cuma membebani queue dan (kalau
- * OCR aktif) membakar biaya. Lebih cepat menyerahkannya ke manusia.
+ * terbaca pada percobaan kelima; mengulangnya cuma membebani queue. Lebih cepat menyerahkannya ke manusia.
  */
 class MatchPaymentReceipt implements ShouldQueue
 {

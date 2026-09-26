@@ -16,14 +16,14 @@
     .kw-sheet {
         font-family: Arial, Helvetica, sans-serif;
         font-size: 13px;
-        line-height: 1.4;
+        line-height: 1.25;
         color: #000000;
     }
 
     .kw-sheet .kw-header-row {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 14px;
+        margin-bottom: 8px;
     }
 
     .kw-sheet .kw-header-row > tbody > tr > td {
@@ -32,23 +32,27 @@
     }
 
     .kw-sheet .kw-header-row .kw-header-data {
-        width: 65%;
+        width: 55%;
     }
 
     .kw-sheet .kw-header-row .kw-header-date {
-        width: 35%;
+        width: 45%;
         text-align: right;
     }
 
     .kw-sheet .kw-date-table {
         margin-left: auto;
         border-collapse: collapse;
-        font-size: 13px;
+        /* Kertas fisik cuma 5,5in lebar (NCR staf & PDF Portal disamakan
+           2026-09-26) — 13px bikin "Tgl. Jatuh tempo :" patah di tengah
+           label. Diperkecil + nowrap biar selalu satu baris. */
+        font-size: 11px;
     }
 
     .kw-sheet .kw-date-table td {
         padding: 2px 0 2px 8px;
         text-align: left;
+        white-space: nowrap;
     }
 
     .kw-sheet .kw-company-name {
@@ -59,7 +63,7 @@
 
     .kw-sheet .kw-company-info {
         font-size: 12px;
-        margin-bottom: 14px;
+        margin-bottom: 8px;
     }
 
     .kw-sheet .kw-doc-number {
@@ -75,7 +79,7 @@
 
     .kw-sheet .kw-customer-address {
         font-size: 12px;
-        margin-bottom: 14px;
+        margin-bottom: 8px;
     }
 
     .kw-sheet .kw-invoice-table {
@@ -88,7 +92,7 @@
     .kw-sheet .kw-invoice-table th,
     .kw-sheet .kw-invoice-table td {
         border: 1px solid #000000;
-        padding: 6px 8px;
+        padding: 3px 5px;
         text-align: left;
     }
 
@@ -105,8 +109,11 @@
         text-align: right;
     }
 
-    .kw-sheet .kw-invoice-table tr.kw-empty-row td {
-        height: 22px;
+    /* Label & nominal di kolom sempit (Harga/Total/label ringkasan) —
+       tanpa ini, "Rp 4.900.000"/"Lebih Bayar"/"Titip Saldo" patah jadi 2
+       baris di kertas 5,5in (feedback 2026-09-26). */
+    .kw-sheet .kw-nowrap {
+        white-space: nowrap;
     }
 
     /* Baris Sub Total/DP/Total — cuma 2 kolom (sejajar Harga & Total),
@@ -122,16 +129,16 @@
     }
 
     .kw-sheet .kw-thank-you {
-        margin-top: 14px;
+        margin-top: 6px;
         text-align: right;
         font-size: 12px;
         padding-right: 8px;
     }
 
     .kw-sheet .kw-notes-section {
-        margin-top: 32px;
-        font-size: 11px;
-        line-height: 1.5;
+        margin-top: 4px;
+        font-size: 10px;
+        line-height: 1.25;
     }
 
     .kw-sheet .kw-notes-title {
@@ -184,10 +191,10 @@
         <thead>
             <tr>
                 <th style="width: 5%;">No</th>
-                <th style="width: 45%;">Keterangan</th>
+                <th style="width: 35%;">Keterangan</th>
                 <th style="width: 20%;">Paket</th>
-                <th style="width: 15%;">Harga</th>
-                <th style="width: 15%;">Total</th>
+                <th style="width: 20%;">Harga</th>
+                <th style="width: 20%;">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -195,25 +202,8 @@
                 <td class="kw-align-center">1</td>
                 <td>{{ $kwitansi['keterangan_item'] }}</td>
                 <td class="kw-align-center">{{ $kwitansi['invoice']['paket'] }}</td>
-                <td>{{ $kwitansi['dibayar'] }}</td>
-                <td class="kw-align-right">{{ $kwitansi['dibayar'] }}</td>
-            </tr>
-            {{-- 2 baris kosong — pengisi ruang biar tabel sejajar dgn Rincian
-                 Total di bawahnya (kwitansi.html acuan), bukan filler struk
-                 manual. Cuma kolom, tanpa isi apa pun. --}}
-            <tr class="kw-empty-row">
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-            </tr>
-            <tr class="kw-empty-row">
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
+                <td class="kw-align-right kw-nowrap">{{ $kwitansi['dibayar'] }}</td>
+                <td class="kw-align-right kw-nowrap">{{ $kwitansi['dibayar'] }}</td>
             </tr>
 
             {{-- ================= RINCIAN TOTAL =================
@@ -224,19 +214,19 @@
                  2026-09-23). --}}
             <tr>
                 <td class="kw-summary-blank" colspan="3"></td>
-                <td>Sub Total</td>
-                <td class="kw-align-right">{{ $kwitansi['dibayar'] }}</td>
+                <td class="kw-nowrap">Sub Total</td>
+                <td class="kw-align-right kw-nowrap">{{ $kwitansi['dibayar'] }}</td>
             </tr>
             <tr>
                 <td class="kw-summary-blank" colspan="3"></td>
-                <td>DP</td>
-                <td class="kw-align-right">{{ $kwitansi['invoice']['ada'] ? $kwitansi['invoice']['sisa'] : '-' }}</td>
+                <td class="kw-nowrap">DP</td>
+                <td class="kw-align-right kw-nowrap">{{ $kwitansi['invoice']['ada'] ? $kwitansi['invoice']['sisa'] : '-' }}</td>
             </tr>
             @if($kwitansi['lebih_bayar'])
                 <tr>
                     <td class="kw-summary-blank" colspan="3"></td>
-                    <td>Lebih Bayar</td>
-                    <td class="kw-align-right">{{ $kwitansi['lebih_bayar'] }}</td>
+                    <td class="kw-nowrap">Lebih Bayar</td>
+                    <td class="kw-align-right kw-nowrap">{{ $kwitansi['lebih_bayar'] }}</td>
                 </tr>
             @endif
             {{-- Titip Saldo (ADHOC-92) — cuma muncul untuk kredit sumber
@@ -245,14 +235,14 @@
             @if($kwitansi['titip_saldo'])
                 <tr>
                     <td class="kw-summary-blank" colspan="3"></td>
-                    <td>Titip Saldo</td>
-                    <td class="kw-align-right">{{ $kwitansi['titip_saldo'] }}</td>
+                    <td class="kw-nowrap">Titip Saldo</td>
+                    <td class="kw-align-right kw-nowrap">{{ $kwitansi['titip_saldo'] }}</td>
                 </tr>
             @endif
             <tr class="kw-total-row">
                 <td class="kw-summary-blank" colspan="3"></td>
-                <td>Total</td>
-                <td class="kw-align-right">{{ $kwitansi['dibayar'] }}</td>
+                <td class="kw-nowrap">Total</td>
+                <td class="kw-align-right kw-nowrap">{{ $kwitansi['dibayar'] }}</td>
             </tr>
         </tbody>
     </table>

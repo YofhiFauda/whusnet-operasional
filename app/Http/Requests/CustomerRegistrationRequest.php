@@ -124,8 +124,8 @@ class CustomerRegistrationRequest extends FormRequest
             'status' => 'nullable|string|max:50',
 
             // Documents
-            'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
-            'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
+            'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf|max:2048',
             // FAB (Formulir Akan Berlangganan Bisnis) — wajib kalau kategori
             // paket yang dipilih adalah kategori Bisnis (mis. "Paket Bisnis
             // Broadband/UKM/Dedicated"), BUKAN restricted_packages —
@@ -145,7 +145,7 @@ class CustomerRegistrationRequest extends FormRequest
 
                     return $category && stripos($category, 'bisnis') !== false;
                 }),
-                'file', 'mimes:jpeg,png,jpg,pdf', 'max:4096',
+                'file', 'mimes:jpeg,png,jpg,webp,pdf', 'max:4096',
             ],
 
             // Skip Survey — Sales input data survey langsung saat registrasi
@@ -155,7 +155,7 @@ class CustomerRegistrationRequest extends FormRequest
             'nearest_odp' => ['nullable', 'required_if:skip_survey,1', 'string', 'max:255'],
             'cable_estimation_meter' => ['nullable', 'required_if:skip_survey,1', 'integer', 'min:0'],
             'difficulty_level' => ['nullable', 'required_if:skip_survey,1', 'in:MUDAH,SEDANG,SULIT'],
-            'survey_photo' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
+            'survey_photo' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             // Opsional (sama seperti Lapor Survey teknisi) — diisi hanya kalau
             // pelanggan minta dipasang di tanggal tertentu. after_or_equal:today:
             // tanggal lampau gak ada artinya dan bikin task lahir langsung

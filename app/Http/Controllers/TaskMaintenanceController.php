@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EquipmentClass;
+use App\Enums\FopTaskPriority;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
 use App\Enums\RollStatus;
@@ -10,6 +11,7 @@ use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TrackingType;
+use App\Models\FopTask;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
@@ -19,6 +21,7 @@ use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\FileUploadService;
+use App\Services\FopTaskProvisioningService;
 use App\Services\InventoryService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
@@ -306,6 +309,22 @@ class TaskMaintenanceController extends Controller
             // terbentuk jelas lebih merugikan.
             $workToolService = app(TaskWorkToolService::class);
             $fopTask = $workToolService->resolveTaskFor($task);
+
+            if (! $fopTask && $task->customer) {
+                $fopTask = FopTask::create([
+                    'task_number' => app(FopTaskProvisioningService::class)->generateTaskNumber(),
+                    'task_id' => $task->id,
+                    'task_date' => $task->scheduled_at ?? now(),
+                    'category' => $task->task_type,
+                    'tugas' => $task->customer->display_id.'_'.$task->customer->full_name,
+                    'village_id' => $task->customer->village_id,
+                    'pop_id' => $task->pop_id,
+                    'customer_id' => $task->customer->id,
+                    'issue' => $task->description ?? $task->title,
+                    'status' => TaskStatus::SELESAI,
+                    'priority' => FopTaskPriority::MEDIUM,
+                ]);
+            }
 
             if ($fopTask) {
                 app(TaskMaterialService::class)->sync(

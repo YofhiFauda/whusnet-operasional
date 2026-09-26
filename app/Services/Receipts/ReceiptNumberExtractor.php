@@ -7,8 +7,8 @@ use App\Enums\ReceiptMatchMethod;
 /**
  * SATU-SATUNYA tempat urutan baca nomor kwitansi ditentukan.
  *
- * Urutannya: lapisan teks PDF → QR → OCR. Dari yang paling pasti ke yang
- * paling menebak, bukan sekadar preferensi teknis.
+ * Urutannya: lapisan teks PDF → QR → manual. Dari yang paling pasti ke yang
+ * butuh manusia, bukan sekadar preferensi teknis.
  *
  *   1. **Lapisan teks** — dokumen hasil "Print → Save as PDF" membawa nomor
  *      yang dicetak sistem apa adanya. Tak ada render, tak ada DPI, tak ada
@@ -18,17 +18,17 @@ use App\Enums\ReceiptMatchMethod;
  *   2. **QR** — untuk berkas yang isinya cuma piksel (foto/scan kertas), yang
  *      lapisan teksnya memang tidak ada. Deterministik, gratis, dan punya
  *      checksum: rusak = gagal baca, BUKAN salah baca.
- *   3. **OCR** — hanya kalau QR-nya sobek/buram. Berbayar dan probabilistik,
- *      karena itu paling belakang. QR TIDAK pernah diserahkan ke OCR: model
- *      bahasa buruk membaca matriks QR dan akan mengarang nomor berformat
- *      benar — kegagalan paling berbahaya karena lolos gerbang pola.
+ *
+ * OCR (Gemini) sengaja DIHAPUS: probabilistik dan berbiaya, bisa salah baca
+ * satu digit lalu menempelkan kwitansi diam-diam ke pelanggan lain dengan
+ * status "Cocok". QR sobek/buram jatuh ke pencocokan manual admin.
  *
  * Sebelum ini urutannya tersebar: lapisan teks diputuskan di
- * PaymentReceiptService, QR→OCR di sini. Dua tempat memutuskan satu aturan yang
+ * PaymentReceiptService, jalur gambar di sini. Dua tempat memutuskan satu aturan yang
  * sama — persis pola yang gampang menyimpang diam-diam.
  *
- * Reader yang `isAvailable()` false dilewati diam-diam (OCR tanpa API key
- * adalah keadaan normal). Kalau semua jalur habis tanpa hasil, itu bukan
+ * Reader yang `isAvailable()` false dilewati diam-diam (mis. server tanpa
+ * GD/Imagick). Kalau semua jalur habis tanpa hasil, itu bukan
  * kegagalan sistem — berkasnya tinggal menunggu manusia.
  */
 class ReceiptNumberExtractor
@@ -38,10 +38,9 @@ class ReceiptNumberExtractor
 
     public function __construct(
         QrReceiptNumberReader $qr,
-        GeminiOcrReceiptNumberReader $ocr,
         private readonly PdfTextNumberReader $pdfText,
     ) {
-        $this->readers = [$qr, $ocr];
+        $this->readers = [$qr];
     }
 
     /**
@@ -75,7 +74,7 @@ class ReceiptNumberExtractor
     }
 
     /**
-     * Satu nomor dari jalur GAMBAR saja (QR → OCR).
+     * Satu nomor dari jalur GAMBAR saja (QR).
      *
      * Dipakai internal oleh extractAll(); pemanggil di luar kelas ini sebaiknya
      * memakai extractAll() supaya lembar borongan tidak diam-diam terpotong
@@ -104,9 +103,9 @@ class ReceiptNumberExtractor
                 // `Zxing\QrReader` melempar untuk gambar yang GD-nya tak bisa
                 // buka (mis. WEBP di build tanpa dukungan WEBP) — dan
                 // `getimagesize()` tetap mengenali berkas itu, jadi penjaga
-                // isImage() pun lolos. Waktu exception-nya merambat keluar,
-                // OCR — yang justru ADA untuk kasus "QR tak terbaca" — tak
-                // pernah dicoba sama sekali.
+                // isImage() pun lolos. Exception-nya dikumpulkan jadi
+                // ReceiptReadFailure supaya queue bisa retry, bukan merambat
+                // mentah ke pemanggil.
                 $failures[] = $reader->method()->value.': '.$e->getMessage();
 
                 continue;
@@ -133,8 +132,7 @@ class ReceiptNumberExtractor
     /**
      * Ambil pola nomor pembayaran dari apa pun yang dikembalikan reader.
      *
-     * Perlu karena isi QR bisa saja URL lengkap dan jawaban OCR bisa membawa
-     * teks liar. Pola inilah gerbang pertama; gerbang kedua adalah keberadaan
+     * Perlu karena isi QR bisa saja URL lengkap atau membawa teks liar. Pola inilah gerbang pertama; gerbang kedua adalah keberadaan
      * payment-nya di database (PaymentReceiptService). Nomor yang lolos pola
      * tapi tak ada payment-nya berakhir `MISMATCH`, bukan tercocokkan asal.
      */

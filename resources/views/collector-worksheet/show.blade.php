@@ -939,7 +939,7 @@
 
                         @if ($receipt->status->needsAttention() && auth()->user()->hasPermission('collector_worksheet.upload'))
                             {{-- Override manual: status dokumen tidak boleh disandera
-                                 keberhasilan mesin. QR sobek & OCR mati adalah kejadian
+                                 keberhasilan mesin. QR sobek/buram adalah kejadian
                                  normal, kwitansinya tetap harus sampai ke pelanggan yang benar. --}}
                             <form action="{{ route('payment-receipts.match', $receipt->id) }}" method="POST" class="mt-3 flex flex-col sm:flex-row gap-2">
                                 @csrf

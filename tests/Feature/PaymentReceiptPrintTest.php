@@ -68,9 +68,11 @@ class PaymentReceiptPrintTest extends TestCase
         $response = $this->get(route('payments.receipt', $payment->id));
 
         $response->assertStatus(200);
+        // Lebar (9.5in) > tinggi (5.5in) — persegi panjang landscape ~16:9,
+        // sama seperti bentuk fisik continuous form 1/2 part-nya.
         $response->assertSee('size: 9.5in 5.5in;', false);
         // Jarak ke tepi kertas pindah ke lembarnya sendiri, bukan hilang.
-        $response->assertSee('padding: 6mm 5mm', false);
+        $response->assertSee('padding: 4mm 4mm', false);
     }
 
     public function test_receipt_blocked_for_user_outside_pop_scope(): void

@@ -61,4 +61,20 @@ class CustomerDevice extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    /**
+     * Trigger completeness recalculation on parent Customer.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::saved(function (CustomerDevice $device) {
+            $device->customer?->recalculateCompleteness();
+        });
+
+        static::deleted(function (CustomerDevice $device) {
+            $device->customer?->recalculateCompleteness();
+        });
+    }
 }

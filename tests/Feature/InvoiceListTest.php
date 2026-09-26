@@ -138,6 +138,34 @@ class InvoiceListTest extends TestCase
         $response->assertSee('Customer Sebagian');
     }
 
+    public function test_invoice_number_is_colored_red_if_customer_has_piutang_and_blue_for_normal_current_month(): void
+    {
+        $this->travelTo(now()->parse('2026-09-25'));
+        $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
+        $pop = $this->createPop('POP-D', 'POND', 'POP D');
+
+        // Customer 1: Hanya punya tagihan bulan ini (2026-09) -> No Piutang -> Biru (text-sky-700)
+        $invoiceBulanIni = $this->createInvoice($pop, 'Pelanggan Normal', 'INV-202609-0001', '2026-09', 'belum_dibayar');
+
+        // Customer 2: Punya tagihan bulan lalu (2026-08) belum lunas -> Piutang -> Merah (text-rose-600)
+        $invoicePiutang = $this->createInvoice($pop, 'Pelanggan Nunggak', 'INV-202608-0002', '2026-08', 'belum_dibayar');
+
+        $response = $this->actingAs($owner)->get(route('invoices.index'));
+
+        $response->assertOk();
+        // Cek bahwa invoice piutang (INV-202608-0002) memiliki class text-rose-600 (merah)
+        $response->assertSeeInOrder([
+            'text-rose-600',
+            $invoicePiutang->invoice_number,
+        ], false);
+
+        // Cek bahwa invoice normal bulan ini (INV-202609-0001) memiliki class text-sky-700 (biru)
+        $response->assertSeeInOrder([
+            'text-sky-700',
+            $invoiceBulanIni->invoice_number,
+        ], false);
+    }
+
     protected function createPop(string $code, string $popCode, string $name): Pop
     {
         return Pop::create([

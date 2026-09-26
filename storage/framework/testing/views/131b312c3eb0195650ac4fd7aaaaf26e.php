@@ -725,6 +725,8 @@
                                 
                                 <a href="<?php echo e(route('warehouse.retrievals.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/retrievals*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Riwayat Ambil Alat</a>
                                 
+                                <a href="<?php echo e(route('warehouse.usage.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/usage*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Pemakaian Material</a>
+                                
                                 <a href="<?php echo e(route('warehouse.scan.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/scan*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Scan Barang</a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_custody.view')): ?>
