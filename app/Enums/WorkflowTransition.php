@@ -47,8 +47,10 @@ enum WorkflowTransition: string
             self::REGISTERED => [self::WAITING_SURVEY, self::WAITING_INSTALLATION, self::REJECTED],
             self::WAITING_SURVEY => [self::SURVEY_IN_PROGRESS, self::REJECTED],
             self::SURVEY_IN_PROGRESS => [self::WAITING_ACC, self::SURVEYED, self::REJECTED],
-            self::SURVEYED => [self::WAITING_ACC, self::WAITING_INSTALLATION, self::REJECTED],
-            self::WAITING_ACC => [self::WAITING_INSTALLATION, self::SURVEY_IN_PROGRESS, self::REJECTED],
+            // → WAITING_SURVEY: FOP Review "Pending" atas survey yang sudah
+            // selesai — survey diulang dari antrean (2026-09-28).
+            self::SURVEYED => [self::WAITING_ACC, self::WAITING_INSTALLATION, self::WAITING_SURVEY, self::REJECTED],
+            self::WAITING_ACC => [self::WAITING_INSTALLATION, self::SURVEY_IN_PROGRESS, self::WAITING_SURVEY, self::REJECTED],
             self::WAITING_INSTALLATION => [self::INSTALLATION_IN_PROGRESS, self::REJECTED],
             self::INSTALLATION_IN_PROGRESS => [self::VERIFICATION_ADMIN, self::INSTALLED, self::WAITING_INSTALLATION, self::REJECTED],
             self::INSTALLED => [self::VERIFICATION_ADMIN, self::WAITING_INSTALLATION, self::REJECTED],
@@ -57,14 +59,19 @@ enum WorkflowTransition: string
             self::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION => [self::ACTIVE],
             self::ACTIVE => [self::INSTALLED, self::VERIFICATION_ADMIN, self::REVISION_INSTALLATION, self::SUSPENDED, self::TERMINATED],
             self::SUSPENDED => [self::ACTIVE, self::TERMINATED],
-            // TERMINATED → ACTIVE = "Langganan Lagi" (CustomerController::
-            // reactivate). Dulu [] (terminal) sementara tombolnya ada dan
-            // mem-bypass state machine lewat update() langsung — enum bilang
-            // "final", kode bilang sebaliknya, dan jalur bypass itu tidak
-            // menulis customer_status_logs. Sekarang diresmikan supaya lewat
-            // CustomerWorkflowService::transition(). Cuma ke ACTIVE: pelanggan
-            // putus tidak boleh loncat ke tahap survey/pemasangan/isolir.
-            self::TERMINATED => [self::ACTIVE],
+            // TERMINATED → ACTIVE/WAITING_SURVEY = "Langganan Lagi"
+            // (CustomerController::reactivate). Dulu [] (terminal) sementara
+            // tombolnya ada dan mem-bypass state machine lewat update()
+            // langsung — enum bilang "final", kode bilang sebaliknya, dan
+            // jalur bypass itu tidak menulis customer_status_logs. Sekarang
+            // diresmikan supaya lewat CustomerWorkflowService::transition().
+            // Cabang ditentukan `customer_devices.device_retrieved_at`:
+            // belum diambil → ACTIVE langsung (modem lama masih terpasang,
+            // tidak ada yang perlu disurvey ulang). Sudah diambil → WAITING_SURVEY
+            // (modem sudah ditarik, pelanggan diproses ulang dari survey
+            // seperti pemasangan baru — lihat rancangan-terminate-
+            // reactivate-state-machine.md §11/§13).
+            self::TERMINATED => [self::ACTIVE, self::WAITING_SURVEY],
             self::REJECTED => [],
         };
     }

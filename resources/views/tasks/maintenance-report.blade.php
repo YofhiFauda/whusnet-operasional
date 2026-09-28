@@ -83,6 +83,91 @@
                 </div>
             </div>
 
+            @if($task->task_type === \App\Enums\TaskType::CREQ)
+            {{-- ── Section 1b: Kategori C-REQ (docs/plan/task-teknisi/
+                 rancangan-biaya-creq-verifikasi-cs.md §2) ─────────────── --}}
+            <div class="px-6 py-4" style="border-bottom:1px solid var(--color-border)">
+                <p class="mb-4" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
+                    Kategori C-REQ
+                </p>
+
+                <div class="mb-4">
+                    <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                        Jenis Permintaan <span style="color:var(--color-error)">*</span>
+                    </label>
+                    <select name="creq_category" id="creq_category" required onchange="creqToggleFields()"
+                            class="w-full rounded-md text-sm"
+                            style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                        <option value="">Pilih kategori...</option>
+                        @foreach($creqCategories as $cat)
+                            <option value="{{ $cat['value'] }}" @selected(old('creq_category') === $cat['value'])>{{ $cat['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Tikor Lama & Baru — wajib untuk Pindah Lokasi / Pindah Kabel --}}
+                <div id="creq-tikor-wrap" class="hidden mb-2">
+                    <p class="text-[10px] mb-2 leading-relaxed font-normal" style="color:var(--color-text-muted)">
+                        Titik koordinat lama &amp; baru wajib diisi untuk kategori ini — ambil dari GPS HP.
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <span class="block mb-1.5" style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">Tikor Lama</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="number" step="0.0000001" name="creq_tikor_lama_lat" id="creq_tikor_lama_lat" value="{{ old('creq_tikor_lama_lat') }}" placeholder="Latitude"
+                                       class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                                <input type="number" step="0.0000001" name="creq_tikor_lama_lng" id="creq_tikor_lama_lng" value="{{ old('creq_tikor_lama_lng') }}" placeholder="Longitude"
+                                       class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                            </div>
+                        </div>
+                        <div>
+                            <span class="block mb-1.5" style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">Tikor Baru</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="number" step="0.0000001" name="creq_tikor_baru_lat" id="creq_tikor_baru_lat" value="{{ old('creq_tikor_baru_lat') }}" placeholder="Latitude"
+                                       class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                                <input type="number" step="0.0000001" name="creq_tikor_baru_lng" id="creq_tikor_baru_lng" value="{{ old('creq_tikor_baru_lng') }}" placeholder="Longitude"
+                                       class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Tambah Modem — pointer ke Section Modem/Perangkat Aktif di bawah --}}
+                <div id="creq-modem-wrap" class="hidden">
+                    <p class="text-[11px] font-semibold" style="color:var(--color-warning,#d97706)">
+                        Kategori ini wajib memilih SN modem di bagian "Modem/Perangkat Aktif" di bawah.
+                    </p>
+                </div>
+
+                {{-- Lainnya — nama kategori bebas --}}
+                <div id="creq-lainnya-wrap" class="hidden">
+                    <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                        Nama Kategori <span style="color:var(--color-error)">*</span>
+                    </label>
+                    <input type="text" name="creq_category_custom_name" id="creq_category_custom_name" value="{{ old('creq_category_custom_name') }}" maxlength="150"
+                           placeholder="mis. Pasang Repeater, Cek Redaman, dll."
+                           class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                </div>
+
+                {{-- Task Berbayar --}}
+                <div class="pt-4 mt-4" style="border-top:1px solid var(--color-border)">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="creq_is_billable" id="creq_is_billable" value="1" onchange="creqToggleBillable()" @checked(old('creq_is_billable'))>
+                        <span style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">Task ini berbayar (perlu verifikasi CS)</span>
+                    </label>
+                    <div id="creq-billing-note-wrap" class="hidden mt-2">
+                        <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                            Catatan Biaya <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <textarea name="creq_billing_note" id="creq_billing_note" rows="3" maxlength="1000"
+                                  placeholder="Jelaskan pekerjaan berbayar ini untuk ditinjau CS..."
+                                  class="w-full rounded-md text-sm"
+                                  style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;resize:vertical;outline:none">{{ old('creq_billing_note') }}</textarea>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             {{-- ── Section 2: Material Terpakai ────────────────────────
                  Menggantikan lima kolom teks lama (kabel/modem/patchcord/
                  sleeve/lainnya) — satu kolom per jenis barang, hardcode, tidak
@@ -431,5 +516,47 @@ function updateSnStockHint() {
 }
 
 document.addEventListener('DOMContentLoaded', updateSnStockHint);
+
+@if($task->task_type === \App\Enums\TaskType::CREQ)
+// Toggle field kondisional Kategori C-REQ (docs/plan/task-teknisi/
+// rancangan-biaya-creq-verifikasi-cs.md §2).
+function creqToggleFields() {
+    const category = document.getElementById('creq_category').value;
+    const tikorWrap = document.getElementById('creq-tikor-wrap');
+    const modemWrap = document.getElementById('creq-modem-wrap');
+    const lainnyaWrap = document.getElementById('creq-lainnya-wrap');
+    const customNameInput = document.getElementById('creq_category_custom_name');
+    const tikorInputIds = ['creq_tikor_lama_lat', 'creq_tikor_lama_lng', 'creq_tikor_baru_lat', 'creq_tikor_baru_lng'];
+
+    const requiresTikor = category === 'pindah_lokasi' || category === 'pindah_kabel';
+    const requiresModem = category === 'tambah_modem';
+    const requiresCustomName = category === 'lainnya';
+
+    tikorWrap.classList.toggle('hidden', !requiresTikor);
+    modemWrap.classList.toggle('hidden', !requiresModem);
+    lainnyaWrap.classList.toggle('hidden', !requiresCustomName);
+
+    tikorInputIds.forEach(function (id) {
+        const input = document.getElementById(id);
+        if (input) input.required = requiresTikor;
+    });
+    if (customNameInput) customNameInput.required = requiresCustomName;
+}
+
+function creqToggleBillable() {
+    const checkbox = document.getElementById('creq_is_billable');
+    const wrap = document.getElementById('creq-billing-note-wrap');
+    const note = document.getElementById('creq_billing_note');
+    if (!checkbox || !wrap) return;
+
+    wrap.classList.toggle('hidden', !checkbox.checked);
+    if (note) note.required = checkbox.checked;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    creqToggleFields();
+    creqToggleBillable();
+});
+@endif
 </script>
 @endsection

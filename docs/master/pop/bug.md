@@ -40,6 +40,16 @@ Form Edit Pelanggan (`customers/edit.blade.php`) sempat masih punya field `distr
 
 **Perbaikan:** field `distribution_id` + JS `filterDistributionsByPop()` dihapus total dari `customers/edit.blade.php`. `CustomerController::update()` gak lagi validasi/terima `distribution_id` — jadi field itu gak bisa ke-update lewat form edit sama sekali. **Satu-satunya jalur resmi sekarang: modal "Atur Mini POP & Distribusi"** di halaman detail pelanggan.
 
+> **Status 2026-09-26: sudah tidak berlaku.** Field `distribution_id` sempat balik ke form Edit tanpa scope (dropdown semua distribusi lintas cabang) dan jadi salah satu penyebab bug pindah POP (CID campuran `D1X6…`). ADHOC-104 menggantinya dengan dropdown berantai POP → Mini POP → Distribusi yang di-scope & divalidasi sama dengan modal, plus invariant di `CustomerObserver::updating()`. Lihat [business-logic.md §7a](business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26).
+
+## Bug Pindah POP — CID Campuran (✅ Fixed 2026-09-26, ADHOC-104)
+
+**Gejala:** pelanggan dipindah JETIS → SANDYA lewat Edit, CID `C1X4…` jadi `D1X6…` dan label Mini POP masih "C1".
+
+**Akar:** (1) Edit cuma mengganti `pop_id`, `mini_pop_id` tidak disentuh sehingga segmen OLT tetap dari Mini POP JETIS; (2) dropdown Distribusi memuat semua distribusi lintas cabang dan cuma divalidasi `exists`; (3) celah tambahan yang ketemu saat review: fallback segmen ke `olt_number` cabang lama, POP tujuan tanpa cek scope, tabrakan REQ ID di POP tujuan meledak 500, CID baru ditulis `updateQuietly()` tanpa audit.
+
+**Perbaikan:** lihat [business-logic.md §7a](business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26).
+
 ## Yang Belum Dikerjakan (Scope Lanjutan, Opsional)
 
 - **Data pelanggan lama** (yang udah aktif sebelum fix ini) masih pakai fallback `pop_code` Cabang buat segmen CID-nya — CID mereka **tidak otomatis berubah**. Kalau mau benerin retroaktif, perlu assign `mini_pop_id` manual per pelanggan lewat modal baru ini, lalu CID bakal regenerate otomatis.

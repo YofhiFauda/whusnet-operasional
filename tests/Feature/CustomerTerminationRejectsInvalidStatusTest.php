@@ -108,11 +108,18 @@ class CustomerTerminationRejectsInvalidStatusTest extends TestCase
         $this->assertSame('Kompetitor', $audit->new_values['reason']);
     }
 
+    /**
+     * TERMINATED cuma boleh ke ACTIVE (alat belum diambil, "Langganan Lagi"
+     * langsung aktif) atau WAITING_SURVEY (alat sudah diambil, diproses
+     * ulang dari survey) — cabangnya dipilih CustomerController::reactivate()
+     * berdasarkan `device_retrieved_at`, bukan pilihan manual admin. Tidak
+     * boleh loncat ke tahap lain (pemasangan/isolir/dst) di luar dua ini.
+     */
     #[Test]
-    public function terminated_hanya_boleh_kembali_ke_active(): void
+    public function terminated_hanya_boleh_kembali_ke_active_atau_waiting_survey(): void
     {
         $allowed = WorkflowTransition::TERMINATED->allowedNextTransitions();
 
-        $this->assertSame([WorkflowTransition::ACTIVE], $allowed);
+        $this->assertSame([WorkflowTransition::ACTIVE, WorkflowTransition::WAITING_SURVEY], $allowed);
     }
 }

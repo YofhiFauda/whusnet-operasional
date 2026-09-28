@@ -1,6 +1,6 @@
 # User Flow — Task Teknisi
 
-Aktor: **Teknisi** (kerjakan task), **FOP** (kelola/review task).
+Aktor: **Teknisi** (kerjakan task), **FOP** (kelola/review task), **CS/Helpdesk** (verifikasi biaya C-REQ).
 
 ## 1. Teknisi — Dashboard Sendiri (`/tasks-saya`)
 
@@ -22,9 +22,18 @@ Aktor: **Teknisi** (kerjakan task), **FOP** (kelola/review task).
      4. Submit (satu transaksi): SN diproses (terdaftar terpasang di pelanggan ini → `RETURNED`; belum pernah tercatat → didaftarkan otomatis `RETURNED`; sudah ada di pelanggan/status lain → **ditolak, seluruh laporan batal**), laporan tersimpan, task **Selesai**, `device_retrieved_at` terisi. Modem **masih dipegang teknisi (transit)** sampai gudang cabang menerimanya di Terima Retur. Task DEAC **tidak bisa diselesaikan tanpa laporan** (endpoint `tasks.complete` menolak).
      Alur inventori lengkap: [docs/warehouse/business-logic.md §12a](../warehouse/business-logic.md).
    - Task tipe **Maintenance/lainnya** (selain DEAC) → isi form laporan maintenance (`/tasks/{task}/maintenance-report`): kendala teknis, material terpakai, foto OPM + speedtest wajib. Submit langsung menyelesaikan task.
+     - **Khusus task tipe C-REQ** (2026-09-26) — form yang sama ditambah dropdown **Kategori C-REQ**: Pindah Lokasi/Pindah Kabel (wajib isi titik koordinat lama & baru), Tambah Modem (wajib pilih SN dari custody, bukan opsional seperti Maintenance biasa), Lainnya (wajib isi nama kategori bebas). Kalau pekerjaan ini **berbayar**, centang "Task ini berbayar" + isi catatan biaya — task tetap selesai seperti biasa, tapi masuk antrean **Verifikasi Biaya C-REQ** buat CS (lihat §2b).
    - Tombol "Kembali" di form laporan + redirect setelah submit sukses sekarang **ikut halaman asal** (`return_to`) — dari Detail Task balik ke Detail Task, dari Dashboard Task Saya balik ke situ juga (2026-08-06, sebelumnya hardcoded selalu ke Antrean Survey/Verifikasi Queue).
 4. Setelah selesai, isi laporan (kendala teknis, material terpakai, foto) **tampil balik** di Detail Task lewat blok "Laporan Pekerjaan Teknisi" — untuk task Maintenance/lainnya. Task **Ambil Modem (DEAC)** punya blok **"Laporan Pengambilan Alat"** sendiri (hasil, modem per SN dengan status *transit / sudah diterima gudang*, kelengkapan, foto kondisi, catatan/alasan, pelapor) — bukan blok Maintenance; instruksi statis "Aset ISP yang Wajib Ditarik" hanya tampil sebelum laporan masuk. Laporan yang sama tampil di **Riwayat Task FOP** (`/fop-tasks/history/{id}`) dengan foto terlampir. Task Survey/Pemasangan punya halaman laporan lengkap sendiri, diakses lewat link "Lihat/Lanjutkan Laporan".
 5. Kalau kerjaan gak bisa lanjut (misal alat kurang, customer gak di rumah) → klik "Pending", isi alasan. Task masuk antrean pending, timer survey/instalasi (kalau ada) otomatis ditutup.
+
+## 2b. CS (Helpdesk) — Verifikasi Biaya C-REQ (2026-09-26)
+
+1. Buka `/tasks-creq-billing` (permission `creq_billing_verification.view`) — daftar task C-REQ yang ditandai berbayar, filter status (menunggu/diverifikasi/ditolak).
+2. Klik "Tinjau" → lihat kendala teknis, kategori, tikor, catatan biaya, foto OPM/speedtest.
+3. **Setujui** (`creq_billing_verification.approve`) — status jadi *diverifikasi*, langsung diarahkan ke `/invoices/create` dengan pelanggan + kategori + deskripsi **sudah terisi**. CS tetap harus mengisi nominal & submit Tagihan Manual sendiri — tidak ada invoice yang terbit otomatis.
+4. **Tolak** (`creq_billing_verification.reject`) — wajib isi alasan, status jadi *ditolak*, tidak lanjut ke Tagihan Manual.
+5. Tiap task C-REQ berbayar cuma bisa diproses **sekali** — approve/reject kedua kali ditolak sistem (422).
 
 ## 3. FOP — Kelola Task
 
@@ -57,6 +66,7 @@ Aktor: **Teknisi** (kerjakan task), **FOP** (kelola/review task).
 | Mulai/Selesai/Pending task | Anggota tim task itu SAJA (`isMember()`), + permission/transition rule terpenuhi |
 | Lihat riwayat task selesai sendiri (`/tasks-saya/riwayat`) | Teknisi, `task.view.own` |
 | Edit/Cancel/Review/Reassign | FOP, sesuai kombinasi permission + `WorkflowTransitionPermission` (lihat [docs/rbac](../rbac/README.md)) |
+| Verifikasi Biaya C-REQ (approve/reject) | CS/Helpdesk, `creq_billing_verification.view/approve/reject` |
 
 ## Gotcha Penting
 

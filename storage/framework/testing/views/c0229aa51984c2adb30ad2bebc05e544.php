@@ -36,7 +36,7 @@ unset($__defined_vars, $__key, $__value); ?>
 
 <?php
     $dialogName = 'report-choice-' . $task->id;
-    $reasonModalName = 'report-choice-pending-' . $task->id;
+    $reasonModalName = 'report-choice-later-' . $task->id;
 ?>
 
 <button type="button" x-data @click="$dispatch('open-modal', '<?php echo e($dialogName); ?>')"
@@ -118,25 +118,24 @@ unset($__defined_vars, $__key, $__value); ?>
 <?php endif; ?>
 <?php $component->withAttributes(['name' => ''.e($reasonModalName).'','title' => 'Lapor Nanti','maxWidth' => 'sm']); ?>
     <p class="text-xs text-text-secondary mb-3 leading-relaxed font-ui">
-        Task akan disimpan sementara dengan status <span class="font-semibold text-text-main">Pending</span>. Anda dapat melanjutkan pengisian laporan sewaktu-waktu, task tetap terdaftar ke Anda.
+        Pekerjaan dianggap <span class="font-semibold text-text-main">sudah selesai di lapangan</span>, laporannya menyusul. Status task jadi <span class="font-semibold text-text-main">Lapor Nanti</span> — tetap terdaftar ke Anda, tidak masuk antrian jadwal ulang FOP. Lanjutkan laporannya kapan saja dari Tasks Saya.
     </p>
-    <form id="form-<?php echo e($reasonModalName); ?>" action="<?php echo e(route('tasks.pending', $task)); ?>" method="POST">
+    <form id="form-<?php echo e($reasonModalName); ?>" action="<?php echo e(route('tasks.report-later', $task)); ?>" method="POST">
         <?php echo csrf_field(); ?>
-        <input type="hidden" name="report_deferred" value="1">
         <div class="space-y-1.5 font-ui">
             <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                 Alasan Menunda Laporan <span class="text-error">*</span>
             </label>
             <?php if (isset($component)) { $__componentOriginal62d1193389a71cd99ff302a00abbf991 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal62d1193389a71cd99ff302a00abbf991 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.textarea','data' => ['name' => 'pending_reason','rows' => '3','placeholder' => 'Contoh: Kendala sinyal di lokasi...','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.textarea','data' => ['name' => 'pending_reason','rows' => '3','maxlength' => '255','placeholder' => 'Contoh: Kendala sinyal di lokasi...','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ui.textarea'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['name' => 'pending_reason','rows' => '3','placeholder' => 'Contoh: Kendala sinyal di lokasi...','required' => true]); ?>
+<?php $component->withAttributes(['name' => 'pending_reason','rows' => '3','maxlength' => '255','placeholder' => 'Contoh: Kendala sinyal di lokasi...','required' => true]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal62d1193389a71cd99ff302a00abbf991)): ?>

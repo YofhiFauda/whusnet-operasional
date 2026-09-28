@@ -81,17 +81,30 @@ class CustomerInstallationController extends Controller
             ->first();
 
         if ($activeTask) {
-            return redirect()->back()->with('error', "Tidak dapat memulai pemasangan karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu.");
+            return redirect()->back()->with('error', "Tidak dapat memulai pemasangan karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau tandai Lapor Nanti task sebelumnya terlebih dahulu.");
         }
 
         try {
             DB::transaction(function () use ($customer, $workflowService, $taskService, $task) {
                 $installation = $customer->installations()->latest()->first();
 
+                // Pemasangan dari masa langganan SEBELUM putus = siklus baru
+                // (Langganan Lagi → pemasangan ulang): record baru supaya
+                // foto/BAP/perangkat pemasangan lama tetap jadi riwayat, gak
+                // tertimpa. Alasan sama dengan CustomerSurveyController::start().
+                if ($installation && $customer->terminated_at && $installation->created_at?->lt($customer->terminated_at)) {
+                    $installation = null;
+                }
+
+                // "Mulai" = sesi kerja baru — waktu selesai sesi sebelumnya
+                // dikosongkan supaya laporan menghitung ulang completed_at.
                 $updateData = [
                     'started_at' => now(),
                     'start_time' => now()->toTimeString(),
                     'installation_status' => 'in_progress',
+                    'completed_at' => null,
+                    'finished_date' => null,
+                    'end_time' => null,
                 ];
                 if ($task) {
                     $updateData['fop_id'] = $task->fop_id ?? $task->created_by;
@@ -302,7 +315,7 @@ class CustomerInstallationController extends Controller
         // termasuk NOC (keputusan eksplisit: no exemption).
         $task = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::PEMASANGAN->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -433,7 +446,7 @@ class CustomerInstallationController extends Controller
         // pengecualian, keputusan eksplisit biar konsisten satu alur).
         $assignmentTask = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::PEMASANGAN->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -583,7 +596,7 @@ class CustomerInstallationController extends Controller
 
                 $task = Task::where('customer_id', $customer->id)
                     ->where('task_type', TaskType::PEMASANGAN->value)
-                    ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
+                    ->whereIn('status', [...TaskStatus::reportableValues(), TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
                     ->latest('id')
                     ->first();
                 if ($task && ! $installation->fop_id) {
@@ -723,7 +736,7 @@ class CustomerInstallationController extends Controller
                 // Selesaikan task pemasangan jika ada
                 $task = Task::where('customer_id', $customer->id)
                     ->where('task_type', TaskType::PEMASANGAN->value)
-                    ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                    ->whereIn('status', TaskStatus::reportableValues())
                     ->latest('id')
                     ->first();
 
@@ -793,7 +806,7 @@ class CustomerInstallationController extends Controller
 
         $assignmentTask = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::PEMASANGAN->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -985,7 +998,7 @@ class CustomerInstallationController extends Controller
 
             $task = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::PEMASANGAN->value)
-                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
+                ->whereIn('status', [...TaskStatus::reportableValues(), TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
                 ->latest('id')
                 ->first();
             if ($task && ! $installation->fop_id) {
@@ -1161,7 +1174,7 @@ class CustomerInstallationController extends Controller
 
         $assignmentTask = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::PEMASANGAN->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -1234,7 +1247,7 @@ class CustomerInstallationController extends Controller
 
             $task = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::PEMASANGAN->value)
-                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
+                ->whereIn('status', [...TaskStatus::reportableValues(), TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
                 ->latest('id')
                 ->first();
 

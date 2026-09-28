@@ -254,7 +254,7 @@ class BillingPeriodWaiverService
 
         if ($invoice) {
             // G1 — hanya tagihan langganan BULANAN. Aktivasi/Tagihan
-            // Manual/denda/reaktivasi tidak boleh dibebaskan lewat jalur ini.
+            // Manual/denda tidak boleh dibebaskan lewat jalur ini.
             if ($invoice->invoice_type?->value !== InvoiceType::BULANAN->value) {
                 return [false, 'Bukan tagihan langganan bulanan'];
             }

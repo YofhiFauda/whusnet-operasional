@@ -122,8 +122,11 @@ class FopDashboardController extends Controller
                         ->where('status', TaskStatus::SELESAI->value)
                         ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
                         ->count(),
+                    // Lapor Nanti ikut dihitung: task hari ini yang kerjanya
+                    // beres tapi laporannya menyusul tetap beban kerja hari
+                    // ini — dulu (pending + flag) ia hilang dari total.
                     'total_hari_ini' => Task::applyUserScope($user)
-                        ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::SELESAI->value])
+                        ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::LAPOR_NANTI->value, TaskStatus::SELESAI->value])
                         ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
                         ->count(),
                     // Overdue Survey: created_at + 1 hari < sekarang (SLA 1×24 jam)
@@ -292,20 +295,18 @@ class FopDashboardController extends Controller
             ->map(function (FopTaskTeam $team) {
                 $mappedTasks = $team->fopTasks->map(function (FopTask $t) {
                     // FopTask.status share vocab persis TaskStatus (unifikasi 2026-07-20)
-                    // — kalau ada Task eksekusi terhubung, pakai itu buat label/style
-                    // (bawa nuansa report_deferred "Lapor Nanti"); FopTask standalone
-                    // (task_id null, masih 'draft') pakai displayLabel() punya sendiri.
+                    // — kalau ada Task eksekusi terhubung, pakai itu buat label/style;
+                    // FopTask standalone (task_id null, masih 'draft') pakai punya sendiri.
                     $refStatus = $t->task?->status ?? $t->status;
-                    $reportDeferred = $t->task?->report_deferred ?? false;
                     $statusValue = $refStatus->value;
-                    $status = $refStatus->displayLabel($reportDeferred);
+                    $status = $refStatus->label();
 
                     $statusStyle = match (true) {
                         $statusValue === 'terjadwal' => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
                         $statusValue === 'in_progress' => 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
                         $statusValue === 'selesai' => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
                         $statusValue === 'dibatalkan' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
-                        $statusValue === 'pending' && $reportDeferred => 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
+                        $statusValue === TaskStatus::LAPOR_NANTI->value => 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
                         $statusValue === 'pending' => 'background:#fefce8; color:#a16207; border-color:#fde68a',
                         default => 'background:var(--color-surface-muted); color:var(--color-text-main); border-color:var(--color-border)',
                     };
@@ -318,7 +319,8 @@ class FopDashboardController extends Controller
                         'status' => $status,
                         'status_value' => $statusValue,
                         'status_style' => $statusStyle,
-                        'draggable' => ! in_array($statusValue, ['selesai', 'dibatalkan', 'in_progress'], true),
+                        // Lapor Nanti terkunci ke teknisi — gak boleh digeser ke team lain.
+                        'draggable' => ! in_array($statusValue, ['selesai', 'dibatalkan', 'in_progress', TaskStatus::LAPOR_NANTI->value], true),
                         'category_label' => $t->category->value,
                         'badge_classes' => $t->category->badgeClasses(),
                         'customer_name' => $t->customer?->full_name ?? '—',
@@ -389,6 +391,10 @@ class FopDashboardController extends Controller
 
         if (in_array($fopTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN], true)) {
             return $this->switchTeamError($request, 'fop_task_id', "Task {$fopTask->task_number} berstatus {$fopTask->status->value}, tidak bisa dipindah team.");
+        }
+
+        if ($fopTask->status->isLockedFromFop() || $fopTask->task?->status->isLockedFromFop()) {
+            return $this->switchTeamError($request, 'fop_task_id', "Task {$fopTask->task_number} berstatus Lapor Nanti — terkunci sampai teknisi mengirim laporan.");
         }
 
         if ($fopTask->task && $fopTask->task->status->value === TaskStatus::IN_PROGRESS->value) {

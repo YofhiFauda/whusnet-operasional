@@ -47,7 +47,7 @@ class FopTaskController extends Controller
         $query = FopTask::with([
             'village',
             'technicians',
-            'task:id,scheduled_at,status,report_deferred,fop_review_status',
+            'task:id,scheduled_at,status,fop_review_status',
             'statusHistories',
             'customer:id,full_name,primary_phone,cid,address,latitude,longitude,created_at,updated_at',
             'customer.tasks' => function ($q) {
@@ -204,8 +204,10 @@ class FopTaskController extends Controller
         // punya task_date: switchTeam() menolak task tanpa task_date (team tujuan
         // wajib se-tanggal), jadi task tanpa tanggal tidak pernah bisa jadi target
         // dan cuma membebani JSON yang di-render ke halaman.
+        // Lapor Nanti gak boleh jadi tujuan switch teknisi — terkunci ke tim
+        // teknisinya sendiri (switchTechnician() juga nolak).
         $switchTargetTasks = FopTask::applyUserScope()
-            ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
+            ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::LAPOR_NANTI])
             ->whereNotNull('task_date')
             ->with('technicians:id,name')
             ->get(['id', 'task_number', 'tugas', 'task_date'])
@@ -257,7 +259,7 @@ class FopTaskController extends Controller
         $fopTask->load([
             'technicians',
             'team:id,name',
-            'task:id,scheduled_at,status,report_deferred,fop_review_status',
+            'task:id,scheduled_at,status,fop_review_status',
             'ticket:id',
         ]);
 
@@ -373,7 +375,9 @@ class FopTaskController extends Controller
             'customer_id' => ['nullable', 'exists:customers,id'],
             'issue' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
-            'status' => ['required', 'string', Rule::enum(TaskStatus::class)],
+            // Lapor Nanti cuma lahir dari teknisi (TaskService::deferReport()),
+            // gak boleh dipilih manual dari papan FOP.
+            'status' => ['required', 'string', Rule::enum(TaskStatus::class)->except(TaskStatus::LAPOR_NANTI)],
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
             'pending_reason' => ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
@@ -463,6 +467,7 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
         $this->authorizeFopTaskScope($fopTask);
+        $this->abortIfReportDeferred($fopTask);
 
         // Task 14 — record existing Survey/Pemasangan cuma dibolehin submit balik
         // category yang sama (hidden input di form tetap ngirim nilai existing biar
@@ -483,7 +488,7 @@ class FopTaskController extends Controller
             'customer_id' => ['nullable', 'exists:customers,id'],
             'issue' => ['sometimes', 'required', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
-            'status' => ['sometimes', 'required', 'string', Rule::enum(TaskStatus::class)],
+            'status' => ['sometimes', 'required', 'string', Rule::enum(TaskStatus::class)->except(TaskStatus::LAPOR_NANTI)],
             'priority' => ['sometimes', 'required', 'string', Rule::enum(FopTaskPriority::class)],
             'pending_reason' => ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
@@ -791,6 +796,7 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
         $this->authorizeFopTaskScope($fopTask);
+        $this->abortIfReportDeferred($fopTask);
 
         // SRV/PSB gak boleh dihapus dari sini SAMA SEKALI — di bawah ini,
         // destroy() beneran mentransisikan customer ke status 'rejected' (efek
@@ -852,6 +858,7 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
         $this->authorizeFopTaskScope($fopTask);
+        $this->abortIfReportDeferred($fopTask);
 
         $validated = $request->validate([
             'team_id' => ['nullable', 'integer', 'exists:fop_task_teams,id'],
@@ -969,6 +976,15 @@ class FopTaskController extends Controller
 
         DB::transaction(function () use ($tasks, $team, $teamWorkDate, &$assignedCount, &$errors) {
             foreach ($tasks as $task) {
+                // FopTask DAN Task eksekusinya (yang otoritatif) — sama
+                // persis dengan abortIfReportDeferred(); kalau cuma cek
+                // FopTask, status yang tidak ikut ter-sync bikin kunci bocor.
+                if ($task->status->isLockedFromFop() || $task->task?->status?->isLockedFromFop()) {
+                    $errors[] = "Task {$task->task_number} berstatus Lapor Nanti — terkunci sampai teknisi mengirim laporan.";
+
+                    continue;
+                }
+
                 if (! $task->task_date) {
                     $errors[] = "Task {$task->task_number} belum memiliki tanggal jadwal.";
 
@@ -1061,6 +1077,8 @@ class FopTaskController extends Controller
         $toTask = FopTask::with('technicians')->findOrFail($validated['to_task_id']);
         $this->authorizeFopTaskScope($fromTask);
         $this->authorizeFopTaskScope($toTask);
+        $this->abortIfReportDeferred($fromTask);
+        $this->abortIfReportDeferred($toTask);
 
         if (! $fromTask->technicians->contains('id', $validated['technician_id'])) {
             return $this->switchTechnicianError($request, 'technician_id', 'Teknisi yang dipilih bukan anggota Task asal.');
@@ -1331,6 +1349,24 @@ class FopTaskController extends Controller
     }
 
     /**
+     * Task Lapor Nanti terkunci ke teknisi (keputusan user 2026-09-26) —
+     * papan FOP gak boleh mengedit, mengganti tim/teknisi, mem-pending,
+     * membatalkan, atau menghapusnya. Berlaku juga buat owner: kerja
+     * lapangannya sudah beres, satu-satunya langkah sah berikutnya adalah
+     * teknisi mengirim laporan (lalu status jadi Selesai lewat TaskObserver).
+     *
+     * Dicek terhadap FopTask DAN Task eksekusinya — dua kolom status itu
+     * biasanya identik (TaskObserver meng-copy), tapi yang otoritatif Task.
+     */
+    protected function abortIfReportDeferred(FopTask $fopTask): void
+    {
+        $locked = $fopTask->status?->isLockedFromFop()
+            || $fopTask->task?->status?->isLockedFromFop();
+
+        abort_if($locked, 422, "Task {$fopTask->task_number} berstatus Lapor Nanti — terkunci sampai teknisi mengirim laporan.");
+    }
+
+    /**
      * Display a listing of completed and cancelled FOP tasks.
      */
     public function history(Request $request)
@@ -1340,7 +1376,7 @@ class FopTaskController extends Controller
         $query = FopTask::with([
             'village',
             'technicians',
-            'task:id,status,report_deferred',
+            'task:id,status',
             'ticket:id,ticket_number,customer_name,customer_phone,customer_address,customer_latitude,customer_longitude',
             'ticket.customer:id,cid',
             'customer:id,full_name,primary_phone,cid,address,latitude,longitude',

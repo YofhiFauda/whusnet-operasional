@@ -167,5 +167,19 @@ Distribusi → 4 Dokumen → 5 Layanan & Paket → 6 Referral → 7 Parameter Te
    (survey/pemasangan/verifikasi/dll, lihat §1-§8 di
    `../customer-lifecycle/business-logic.md`).
 
-Test: `tests/Feature/CustomerEditTest.php`, `tests/Feature/CustomerRegistrationTest.php`.
+5. **Step 3 "POP & Distribusi" — dropdown berantai POP → Mini POP →
+   Distribusi (ADHOC-104, 2026-09-26).** Dulu cuma POP + Distribusi (semua
+   distribusi lintas cabang, tanpa scope) — penyebab CID campuran saat pindah
+   POP. Sekarang Mini POP & Distribusi di-scope ke Cabang dalam scope user,
+   difilter di klien lewat `data-pop-id`/`data-mini-pop-id` (script inline di
+   Blade, bukan Alpine), dan divalidasi ulang di `update()` dengan aturan yang
+   sama dengan modal "Atur Mini POP & Distribusi" — termasuk guard status:
+   **pra-pemasangan cuma POP Cabang yang boleh diatur**, dropdown Mini POP &
+   Distribusi `disabled` dan ditolak server
+   (`NetworkAssignmentService::BLOCKED_STATUSES`). Pindah POP: lihat
+   [`../master/pop/business-logic.md` §7a](../master/pop/business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26).
+6. **Perubahan CID dari Edit kini masuk audit log** — `update()` menulis CID
+   baru pakai `update()` (dulu `updateQuietly()`, CID lama hilang tanpa jejak).
+
+Test: `tests/Feature/CustomerEditTest.php`, `tests/Feature/CustomerRegistrationTest.php`, `tests/Feature/CustomerPindahPopResetMiniPopTest.php`.
 

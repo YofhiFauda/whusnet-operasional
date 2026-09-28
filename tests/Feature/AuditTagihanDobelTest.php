@@ -121,7 +121,7 @@ class AuditTagihanDobelTest extends TestCase
             ->assertExitCode(0);
     }
 
-    public function test_tagihan_batal_dan_reaktivasi_tidak_dihitung_dobel(): void
+    public function test_tagihan_batal_tidak_dihitung_dobel(): void
     {
         $customer = $this->createPelanggan();
 
@@ -129,7 +129,6 @@ class AuditTagihanDobelTest extends TestCase
         $this->tanamInvoice($customer, InvoiceType::BULANAN->value, '2026-07', [
             'invoice_status' => InvoiceStatus::BATAL->value,
         ]);
-        $this->tanamInvoice($customer, InvoiceType::REAKTIVASI->value, '2026-07');
 
         $this->artisan('billing:audit-duplicate-invoices')
             ->expectsOutputToContain('Tidak ada temuan.')

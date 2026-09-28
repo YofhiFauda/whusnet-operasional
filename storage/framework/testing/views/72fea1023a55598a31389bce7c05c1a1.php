@@ -27,8 +27,8 @@
                         default => 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
                     };
                     $statusLabel = $fopTask->task
-                        ? $fopTask->task->status->displayLabel($fopTask->task->report_deferred)
-                        : $fopTask->status->displayLabel();
+                        ? $fopTask->task->status->label()
+                        : $fopTask->status->label();
                 ?>
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border font-ui <?php echo e($statusBadge); ?>">
                     <?php echo e($statusLabel); ?>

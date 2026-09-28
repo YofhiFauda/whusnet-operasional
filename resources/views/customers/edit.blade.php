@@ -292,7 +292,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div>
                                 <label for="pop_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">POP Cabang <span class="text-rose-500">*</span></label>
-                                <select name="pop_id" id="pop_id" class="w-full text-xs font-sans px-3 py-2.5 border @error('pop_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <select name="pop_id" id="pop_id" data-original-pop-id="{{ $customer->pop_id }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('pop_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
                                     <option value="" disabled selected>Pilih POP Cabang</option>
                                     @foreach($pops as $pop)
                                         <option value="{{ $pop->id }}" {{ old('pop_id', $customer->pop_id) == $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
@@ -301,15 +301,36 @@
                                 @error('pop_id')
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
                                 @enderror
-                                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Mini POP diatur terpisah lewat modal "Atur Mini POP &amp; Distribusi" di halaman Detail Pelanggan (pasca pemasangan).</p>
+                                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Ganti POP = Mini POP &amp; Distribusi dipilih ulang. CID ikut berubah, REQ ID tetap. Syarat: semua tagihan pelanggan sudah lunas.</p>
+                            </div>
+
+                            <div>
+                                <label for="mini_pop_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Mini POP (OLT)</label>
+                                <select name="mini_pop_id" id="mini_pop_id" @disabled($networkAssignmentLocked) data-locked-by-status="{{ (int) $networkAssignmentLocked }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('mini_pop_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="">Pilih Mini POP</option>
+                                    {{-- Nilai saat ini tetap tampil walau di luar daftar (data legacy),
+                                         karena tanpa pindah Cabang dropdown ini cuma informasi. --}}
+                                    @if($customer->miniPop && ! $miniPops->contains('id', $customer->mini_pop_id))
+                                        <option value="{{ $customer->mini_pop_id }}" data-pop-id="{{ $customer->miniPop->parent_id }}" selected>{{ $customer->miniPop->name }}</option>
+                                    @endif
+                                    @foreach($miniPops as $miniPop)
+                                        <option value="{{ $miniPop->id }}" data-pop-id="{{ $miniPop->parent_id }}" {{ old('mini_pop_id', $customer->mini_pop_id) == $miniPop->id ? 'selected' : '' }}>{{ $miniPop->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('mini_pop_id')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
 
                             <div>
                                 <label for="distribution_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">KODE DISTRIBUSI (ODP)</label>
-                                <select name="distribution_id" id="distribution_id" class="w-full text-xs font-sans px-3 py-2.5 border @error('distribution_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <select name="distribution_id" id="distribution_id" @disabled($networkAssignmentLocked) class="w-full text-xs font-sans px-3 py-2.5 border @error('distribution_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
                                     <option value="">Pilih Kode Distribusi</option>
-                                    @foreach($distributions ?? [] as $dist)
-                                        <option value="{{ $dist->id }}" {{ old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : '' }}>{{ $dist->code }} - {{ $dist->name }}</option>
+                                    @if($customer->distribution && ! $distributions->contains('id', $customer->distribution_id))
+                                        <option value="{{ $customer->distribution_id }}" data-mini-pop-id="{{ $customer->distribution->pop_id }}" selected>{{ $customer->distribution->code }} - {{ $customer->distribution->name }}</option>
+                                    @endif
+                                    @foreach($distributions as $dist)
+                                        <option value="{{ $dist->id }}" data-mini-pop-id="{{ $dist->pop_id }}" {{ old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : '' }}>{{ $dist->code }} - {{ $dist->name }}</option>
                                     @endforeach
                                 </select>
                                 @error('distribution_id')
@@ -317,11 +338,11 @@
                                 @enderror
                             </div>
 
-                            <!-- Konteks read-only: POP saat ini & wilayah, biar operator lihat -->
-                            <div class="md:col-span-2 pt-3 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/50 rounded-xl p-4">
-                                <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Mini POP Saat Ini</span>
-                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-100">{{ $customer->miniPop->name ?? 'Belum diatur' }}</span>
-                            </div>
+                            @if($networkAssignmentLocked)
+                                <p class="md:col-span-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Pelanggan belum masuk tahap pemasangan — sekarang cuma POP Cabang yang bisa diatur. Mini POP &amp; Distribusi (penentu CID) diisi setelah pemasangan dimulai.</p>
+                            @else
+                                <p id="network-same-pop-hint" class="md:col-span-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Mini POP &amp; Distribusi cuma bisa diubah di sini kalau POP Cabang ikut dipindah. Tanpa pindah Cabang, atur lewat tombol "Atur Mini POP &amp; Distribusi" di Detail Pelanggan.</p>
+                            @endif
                         </div>
                     </div>
 
@@ -876,7 +897,7 @@
         },
         'pop': {
             required: ['pop_id'],
-            optional: ['distribution_id']
+            optional: ['mini_pop_id', 'distribution_id']
         },
         'dokumen': {
             required: [],
@@ -917,7 +938,58 @@
         7: 'operasional'
     };
 
+    /* ── Dropdown berantai POP → Mini POP → Distribusi ──
+       Cuma menyembunyikan opsi yang bukan milik induknya & mengosongkan
+       pilihan yang jadi tidak cocok (mis. setelah ganti POP). Validasi
+       aslinya tetap di CustomerController::update(). */
+    function filterChildOptions(select, dataKey, parentValue) {
+        Array.from(select.options).forEach(option => {
+            if (!option.value) {
+                return;
+            }
+            const cocok = parentValue !== '' && option.dataset[dataKey] === parentValue;
+            option.hidden = !cocok;
+            option.disabled = !cocok;
+            if (!cocok && option.selected) {
+                select.value = '';
+            }
+        });
+    }
+
+    function syncNetworkDropdowns() {
+        const popSelect = document.getElementById('pop_id');
+        const miniPopSelect = document.getElementById('mini_pop_id');
+        const distributionSelect = document.getElementById('distribution_id');
+        if (!popSelect || !miniPopSelect || !distributionSelect) {
+            return;
+        }
+
+        // Pra-pemasangan: dikunci server-side (atribut disabled), jangan dibuka JS.
+        if (miniPopSelect.dataset.lockedByStatus === '1') {
+            return;
+        }
+
+        // Mini POP & Distribusi cuma boleh diubah kalau POP Cabang dipindah
+        // (CustomerController::update() mengabaikannya selain itu). Selama
+        // Cabang sama: dropdown dikunci & TIDAK difilter, supaya nilai lama
+        // (termasuk data legacy di luar hierarki) tetap tampil apa adanya.
+        const popChanged = popSelect.value !== popSelect.dataset.originalPopId;
+        miniPopSelect.disabled = !popChanged;
+        distributionSelect.disabled = !popChanged;
+        document.getElementById('network-same-pop-hint')?.classList.toggle('hidden', popChanged);
+        if (!popChanged) {
+            return;
+        }
+
+        filterChildOptions(miniPopSelect, 'popId', popSelect.value);
+        filterChildOptions(distributionSelect, 'miniPopId', miniPopSelect.value);
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
+        syncNetworkDropdowns();
+        document.getElementById('pop_id')?.addEventListener('change', syncNetworkDropdowns);
+        document.getElementById('mini_pop_id')?.addEventListener('change', syncNetworkDropdowns);
+
         const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
         inputs.forEach(input => {
             input.addEventListener('input', runLiveProgressUpdates);
@@ -1273,6 +1345,7 @@
             latitude: 'Latitude',
             longitude: 'Longitude',
             pop_id: 'POP Cabang',
+            mini_pop_id: 'Mini POP',
             distribution_id: 'Kode Distribusi',
             foto_rumah: 'Foto Rumah',
             foto_kontrak: 'Foto Kontrak',

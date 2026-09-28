@@ -45,12 +45,21 @@ Mutasi data → halaman `/invoices/create` (aturan CLAUDE.md 2026-09-07: `back()
 Jenis Tagihan
 ├─ Aktivasi            (invoice_type `awal`, sudah ada)
 ├─ Bulanan             (invoice_type `bulanan`, sudah ada)
-├─ Reaktivasi          (invoice_type `reaktivasi`, sudah ada — pelanggan putus lalu berlangganan lagi)
 └─ Tagihan Manual      (invoice_type BARU — dokumen ini)
      ├─ Tagihan Perbaikan
      ├─ Tagihan Lainnya      (sub-nama diisi sendiri: over kabel, Pendapatan A, B, dst)
      └─ Tagihan Pindah Lokasi
 ```
+
+**Revisi 2026-09-26 — `Reaktivasi` dihapus dari taksonomi.** Baris di atas
+("pelanggan putus lalu berlangganan lagi") ternyata tidak pernah diimplementasikan
+sesuai definisinya sendiri — kode yang membaca kondisi ini mengecek status
+`suspended` (isolir), bukan `terminated` (putus), jadi kasus yang dimaksud di
+sini tidak pernah benar-benar menghasilkan invoice `reaktivasi`. Setelah ditelusuri
+ulang, kasus "putus lalu berlangganan lagi" secara bisnis ISP tidak butuh jenis
+tagihan sendiri: kalau alat sudah ditarik → masuk Antrean Survey → instalasi baru
+→ sudah tercover `awal`; kalau alat belum ditarik → lanjut tagihan `bulanan` biasa.
+`InvoiceType::REAKTIVASI` dihapus dari enum. Detail: `docs/plan/billing/rancangan-terminate-reactivate-state-machine.md` §11.
 
 - **Tagihan Manual = satu `invoice_type` baru** (nilai `manual`, label "Tagihan Manual"), di luar `Invoice::SUBSCRIPTION_TYPES` (alasan teknis: §3.3). Tiga anaknya bukan tipe invoice sendiri, melainkan **jenis** di dalam tagihan manual.
 - Jenis = satu enum PHP dengan tiga nilai (`Perbaikan`, `Lainnya`, `Pindah Lokasi`). **Bukan** tabel master, **bukan** subkategori berjenjang, **bukan** `invoice_items`.

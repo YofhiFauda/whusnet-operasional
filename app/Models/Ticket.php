@@ -480,7 +480,7 @@ class Ticket extends Model
         if ($this->handler === TicketHandler::FOP) {
             $status = $this->resolveStatus();
 
-            return $status ? $status->displayLabel() : 'Terputus';
+            return $status ? $status->label() : 'Terputus';
         }
 
         if ($this->status === TicketHandlingStatus::CLOSED) {

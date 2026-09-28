@@ -190,7 +190,7 @@ class TaskService
         if ($activeTask !== null) {
             abort(
                 422,
-                "Tidak dapat memulai task karena teknisi dalam tim sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu."
+                "Tidak dapat memulai task karena teknisi dalam tim sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau tandai Lapor Nanti task sebelumnya terlebih dahulu."
             );
         }
 
@@ -199,6 +199,9 @@ class TaskService
         $task->update([
             'status' => TaskStatus::IN_PROGRESS->value,
             'started_at' => now(),
+            // Sesi kerja baru (mis. task yang dijadwal ulang setelah Pending)
+            // — waktu selesai sesi lama gak boleh kebawa jadi acuan SLA.
+            'work_finished_at' => null,
             'updated_by' => $actor->id,
         ]);
 
@@ -227,9 +230,9 @@ class TaskService
     public function complete(Task $task, User $actor): Task
     {
         abort_unless(
-            in_array($task->status, [TaskStatus::IN_PROGRESS, TaskStatus::PENDING]),
+            $task->status->acceptsReport(),
             422,
-            'Task hanya bisa diselesaikan dari status In Progress atau Pending.'
+            'Task hanya bisa diselesaikan dari status Sedang Dikerjakan atau Lapor Nanti.'
         );
 
         abort_unless(
@@ -250,9 +253,17 @@ class TaskService
             'Isi laporan pengambilan alat dulu sebelum menyelesaikan task Ambil Modem.'
         );
 
+        // Dicatat sebelum update — asalnya bisa Sedang Dikerjakan atau Lapor
+        // Nanti, riwayat audit harus jujur soal mana.
+        $fromStatus = $task->status->value;
+
         $task->update([
             'status' => TaskStatus::SELESAI->value,
             'fop_review_status' => 'pending',
+            // Lapor Nanti: kerja lapangan sudah berhenti saat deferReport()
+            // (work_finished_at terisi) — dipertahankan. Dilaporkan langsung:
+            // kerja berhenti sekarang juga.
+            'work_finished_at' => $fromStatus === TaskStatus::LAPOR_NANTI->value ? $task->work_finished_at : now(),
             'completed_at' => now(),
             'completed_by' => $actor->id,
             'updated_by' => $actor->id,
@@ -301,39 +312,44 @@ class TaskService
             ));
         }
 
-        AuditLog::log($task, 'completed', ['status' => TaskStatus::IN_PROGRESS->value], ['status' => TaskStatus::SELESAI->value]);
+        AuditLog::log($task, 'completed', ['status' => $fromStatus], ['status' => TaskStatus::SELESAI->value]);
 
         return $task;
     }
 
     /**
-     * Teknisi set task ke Pending (butuh reschedule).
+     * Teknisi menunda pengisian laporan — "Lapor Nanti".
+     *
+     * Kerja lapangan SUDAH beres, laporannya menyusul. BUKAN Pending: tim
+     * tetap nempel, task gak balik ke antrian FOP, dan cuma teknisi yang
+     * bisa melanjutkan (kirim laporan). Pending/reschedule punya jalurnya
+     * sendiri (`TaskController::reschedule()` / `releaseTeamAndSetPending()`).
      */
-    public function setPending(Task $task, User $actor, string $reason, bool $reportDeferred = false): Task
+    public function deferReport(Task $task, User $actor, string $reason): Task
     {
         abort_unless(
             $task->status === TaskStatus::IN_PROGRESS,
             422,
-            'Task hanya bisa di-pending dari status In Progress.'
+            'Lapor Nanti hanya bisa dari task yang sedang dikerjakan.'
         );
 
-        DB::transaction(function () use ($task, $reason, $actor, $reportDeferred) {
-            // Dua peristiwa berbeda yang kebetulan berbagi kolom `status`:
-            // "Lapor Nanti" = kerja lapangan SUDAH selesai, laporannya menyusul;
-            // "Pending" = kerja berhenti, butuh jadwal ulang. Trait cuma bisa
-            // bilang "status jadi pending" — bedanya cuma kelihatan dari flag
-            // report_deferred, jadi namanya ditulis di sini.
+        DB::transaction(function () use ($task, $reason, $actor) {
+            // Nama aksi `report_deferred` dipertahankan (bukan diganti
+            // `lapor_nanti`) supaya baris audit lama & baru tampil dengan label
+            // yang sama di TaskAuditTimeline.
             AuditLog::log(
                 $task,
-                $reportDeferred ? 'report_deferred' : 'pending',
+                'report_deferred',
                 ['status' => $task->status->value],
-                ['status' => TaskStatus::PENDING->value, 'pending_reason' => $reason]
+                ['status' => TaskStatus::LAPOR_NANTI->value, 'pending_reason' => $reason]
             );
 
             $task->update([
-                'status' => TaskStatus::PENDING->value,
+                'status' => TaskStatus::LAPOR_NANTI->value,
+                // Kerja lapangan berhenti di titik ini — acuan SLA & durasi
+                // kerja (Task::slaReferenceTime()), bukan waktu laporan masuk.
+                'work_finished_at' => now(),
                 'pending_reason' => $reason,
-                'report_deferred' => $reportDeferred,
                 'updated_by' => $actor->id,
             ]);
 
@@ -402,9 +418,9 @@ class TaskService
      * Sinkron status Task eksekusi jadi Pending sebagai efek ikutan dari FOP
      * mengubah status FopTask ke Pending lewat papan /fop-tasks
      * (`FopTaskController::update()`) — BUKAN dari tombol "Isi Laporan/Pending"
-     * teknisi (itu jalurnya `setPending()`).
+     * teknisi (itu jalurnya `deferReport()`, status Lapor Nanti).
      *
-     * Beda dari `setPending()`: dipicu FOP (bukan teknisi anggota tim), bisa
+     * Beda dari `deferReport()`: dipicu FOP (bukan teknisi anggota tim), bisa
      * dari status Terjadwal ATAU In Progress (bukan cuma In Progress), dan
      * TIDAK melepas tim — mirror pola cascade status-only yang dipakai
      * `cancel()` di lokasi yang sama. Tanpa sinkron ini, Task tetap
@@ -414,7 +430,11 @@ class TaskService
      */
     public function syncPendingFromFopTask(Task $task, User $actor, string $reason): Task
     {
-        if (in_array($task->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::PENDING], true)) {
+        // Lapor Nanti terkunci ke teknisi — FopTaskController::update() sudah
+        // nolak duluan, ini cuma jaring kedua kalau ada pemanggil lain.
+        if (in_array($task->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::PENDING], true)
+            || $task->status->isLockedFromFop()
+        ) {
             return $task;
         }
 
@@ -432,23 +452,32 @@ class TaskService
     }
 
     /**
-     * Lepas tim + set Task jadi Pending — replikasi perilaku kanonis
-     * `TaskController::releaseTeamAndSetPending()` (dipakai `reschedule()`
-     * teknisi & `pending()` FOP), tapi versi yang bisa dipanggil TANPA actor
-     * login. Dipisah di sini (bukan manggil versi controller yang private
-     * & pakai `auth()->id()` langsung) supaya command sistem —
-     * `tasks:auto-pending-overdue`, jalan dari scheduler tanpa user — bisa
-     * pakai jalur yang SAMA PERSIS dengan pending manual, bukan reimplementasi
-     * kedua yang gampang menyimpang dari aslinya.
+     * Lepas tim + set Task jadi Pending + rebuild jadwal — SATU-SATUNYA
+     * implementasi perilaku "pending" di sistem (2026-07-15). Dipakai
+     * `TaskController::reschedule()` (teknisi), `TaskController::pending()`
+     * (FOP), dan command `tasks:auto-pending-overdue` (sistem, tanpa login).
+     * Dulu controller punya salinan private sendiri — dua implementasi yang
+     * harus dirawat paralel (guard Lapor Nanti sempat ditambal di dua
+     * tempat); sekarang controller cukup memanggil method ini.
      *
      * $actorId null berarti aksi sistem — `updated_by`/`AuditLog.user_id`
      * kosong menandakan bukan keputusan manusia, bukan bug.
+     *
+     * $notifyTeam false dipakai pemanggil yang mengirim notifikasinya
+     * sendiri (FOP `pending()` pakai pesan "ditangguhkan oleh FOP") atau
+     * memang tidak pernah menotifikasi (teknisi `reschedule()`).
      */
-    public function releaseTeamAndSetPending(Task $task, string $reason, string $auditAction, ?int $actorId = null): Task
+    public function releaseTeamAndSetPending(Task $task, string $reason, string $auditAction, ?int $actorId = null, bool $notifyTeam = true): Task
     {
+        abort_if(
+            $task->status->isLockedFromFop(),
+            422,
+            'Task Lapor Nanti terkunci — menunggu teknisi mengirim laporan.'
+        );
+
         // Notif dikirim SEBELUM tim dilepas — delete pivot bikin query tim
-        // sesudahnya kosong (comment sama persis di versi controller).
-        $members = $task->teamMembers()->with('user')->get();
+        // sesudahnya kosong.
+        $members = $notifyTeam ? $task->teamMembers()->with('user')->get() : collect();
         $url = route('tasks.show', $task->id);
 
         foreach ($members as $member) {

@@ -110,7 +110,7 @@
                                 <button type="submit"
                                         class="p-1 text-slate-400 dark:text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-md transition-colors cursor-pointer"
                                         title="{{ $reason->is_active ? 'Nonaktifkan' : 'Aktifkan' }} Alasan"
-                                        onclick="event.preventDefault(); window.confirmDelete('Apakah Anda yakin ingin {{ $reason->is_active ? 'menonaktifkan' : 'mengaktifkan' }} alasan {{ $reason->name }}?', this.closest('form'))">
+                                        onclick="event.preventDefault(); window.confirmDelete(@js('Apakah Anda yakin ingin '.($reason->is_active ? 'menonaktifkan' : 'mengaktifkan').' alasan '.($reason->name).'?'), this.closest('form'))">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                     </svg>
@@ -127,7 +127,7 @@
                                         class="p-1 rounded-md transition-colors {{ $reason->customers_count > 0 ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed' : 'text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer' }}"
                                         title="{{ $reason->customers_count > 0 ? 'Masih dipakai '.$reason->customers_count.' pelanggan, tidak bisa dihapus' : 'Hapus Alasan' }}"
                                         @if($reason->customers_count === 0)
-                                        onclick="event.preventDefault(); window.confirmDelete('Hapus permanen alasan {{ $reason->name }}? Tindakan ini tidak bisa dibatalkan.', this.closest('form'))"
+                                        onclick="event.preventDefault(); window.confirmDelete(@js('Hapus permanen alasan '.($reason->name).'? Tindakan ini tidak bisa dibatalkan.'), this.closest('form'))"
                                         @endif>
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

@@ -275,9 +275,10 @@ function taskWorksheet() {
 
         getStatusWeight(status) {
             if (status === 'in_progress') return 1;
-            if (status === 'pending') return 2;
+            if (status === 'lapor_nanti') return 2;
             if (status === 'terjadwal') return 3;
-            return 4;
+            if (status === 'pending') return 4;
+            return 5;
         },
 
         sortTasks() {

@@ -33,6 +33,7 @@
                     $statusStyle = match($task->status->value) {
                         'terjadwal'  => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
                         'in_progress'=> 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
+                        'lapor_nanti'=> 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
                         'selesai'    => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
                         'dibatalkan' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
                         default      => 'background:var(--color-surface-muted); color:var(--color-text-muted); border-color:var(--color-border)',
@@ -318,7 +319,8 @@
                             <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
-                            Alasan Pending
+                            <?php echo e($task->status === \App\Enums\TaskStatus::LAPOR_NANTI ? 'Alasan Lapor Nanti' : 'Alasan Pending'); ?>
+
                         </span>
                         <span class="font-bold flex-1 text-warning font-ui"><?php echo e($task->pending_reason); ?></span>
                     </div>
@@ -491,7 +493,8 @@
                         <div class="text-text-main font-semibold flex-1 font-ui">
                             <?php if($task->started_at && !$task->completed_at): ?>
                                 <?php
-                                    $elapsed = (int) $task->started_at->diffInMinutes(now());
+                                    // Lapor Nanti: berhenti di work_finished_at, bukan terus jalan.
+                                    $elapsed = (int) $task->started_at->diffInMinutes($task->slaReferenceTime());
                                     $remaining = $task->sla_minutes - $elapsed;
                                 ?>
                                 <div class="flex items-center gap-2">
@@ -1156,7 +1159,7 @@
     </div>
 
     
-    <?php if(in_array($task->status->value, ['terjadwal', 'in_progress', 'pending'])): ?>
+    <?php if(in_array($task->status->value, ['terjadwal', 'in_progress', 'lapor_nanti', 'pending'])): ?>
     <div class="flex flex-wrap items-center justify-end gap-2.5 pt-1.5 font-ui select-none">
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('statusReschedule', $task)): ?>
         <button type="button" x-data @click="$dispatch('open-modal', 'reschedule-task-<?php echo e($task->id); ?>')"
@@ -1222,8 +1225,9 @@
             <?php endif; ?>
         <?php endif; ?>
 
+        
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('statusComplete', $task)): ?>
-        <?php if(in_array($task->status->value, ['in_progress', 'pending'])): ?>
+        <?php if($task->status->acceptsReport()): ?>
             <?php
                 $reportUrl = match(true) {
                     $task->task_type->value === \App\Enums\TaskType::SURVEY->value => route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]),

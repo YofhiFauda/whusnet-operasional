@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Enums\CReqVerificationStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Models\Customer;
@@ -281,6 +282,7 @@ class AppServiceProvider extends ServiceProvider
             $surveyCount = 0;
             $verificationCount = 0;
             $registrationVerificationCount = 0;
+            $creqBillingVerificationCount = 0;
 
             if (auth()->check()) {
                 $user = auth()->user();
@@ -290,6 +292,19 @@ class AppServiceProvider extends ServiceProvider
                 if ($user->hasPermission('customer_registration_verification.view')) {
                     $registrationVerificationCount = Customer::applyUserScope($user)
                         ->where('status', WorkflowTransition::REGISTERED->value)
+                        ->count();
+                }
+
+                // Antrean "Verifikasi Biaya C-REQ" — task C-REQ berbayar yang
+                // menunggu disetujui/ditolak CS (docs/plan/task-teknisi/
+                // rancangan-biaya-creq-verifikasi-cs.md).
+                if ($user->hasPermission('creq_billing_verification.view')) {
+                    $creqBillingVerificationCount = Task::applyUserScope($user)
+                        ->where('task_type', TaskType::CREQ->value)
+                        ->whereHas('creqDetail', function ($q) {
+                            $q->where('is_billable', true)
+                                ->where('verification_status', CReqVerificationStatus::PENDING->value);
+                        })
                         ->count();
                 }
 
@@ -336,7 +351,8 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('badge_survey_count', $surveyCount)
                 ->with('badge_verification_count', $verificationCount)
-                ->with('badge_registration_verification_count', $registrationVerificationCount);
+                ->with('badge_registration_verification_count', $registrationVerificationCount)
+                ->with('badge_creq_billing_verification_count', $creqBillingVerificationCount);
         });
     }
 }

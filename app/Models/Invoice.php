@@ -24,8 +24,7 @@ class Invoice extends Model
     /**
      * Jenis tagihan yang mewakili langganan satu periode — hanya boleh ada
      * satu per pelanggan per periode (AWAL atau BULANAN, tidak pernah
-     * keduanya). REAKTIVASI sengaja tidak masuk: pelanggan yang disuspend
-     * lalu aktif lagi di bulan yang sama boleh punya record tambahan.
+     * keduanya).
      *
      * Dipakai bareng InvoiceObserver (guard insert) & GenerateMonthlyInvoicesCommand
      * (skip generate) — satu sumber, supaya "invoice BATAL tak dihitung"

@@ -1,6 +1,10 @@
 # Rancangan: Biaya C-REQ + Verifikasi CS + Tagihan Manual
 
-Status: **Rancangan disetujui, belum dikerjakan.**
+Status: **Selesai dikerjakan & direview — 2026-09-26** (ADHOC-100, lihat `docs/TASKS.md`). Implementasi + dokumentasi modul (`docs/task-teknisi/{README,business-logic,database-schema,user-flow,flowchart}.md`) sudah sinkron dengan kode. Hasil `/code-review high`: 5 temuan (active-state sidebar salah, race condition approve/reject, required attribute client-side hilang di field tikor, dead code, redundant enum re-derive) — **semua sudah diperbaiki**:
+- Sidebar: 4 titik `Request::is(...)` di menu Pelanggan ditambah `tasks-creq-billing*`.
+- `TaskCreqBillingController::approve()/reject()` — dibungkus `lockForUpdate()` **di dalam** `DB::transaction()`, cek `verification_status=pending` dipindah ke situ (menutup celah TOCTOU dua request approve/reject bersamaan).
+- `creqToggleFields()` (JS) — set `required` di 4 input tikor juga, bukan cuma custom-name.
+- `$access`/`$user` yang gak kepakai di `index()` dihapus; `CReqCategory::from($detail->category->value)` diganti `$detail->category` langsung (enum sudah ke-cast).
 
 ## 1. Latar Belakang
 

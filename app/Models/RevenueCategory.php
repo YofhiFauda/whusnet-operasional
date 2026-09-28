@@ -43,7 +43,7 @@ class RevenueCategory extends Model
     /**
      * Kategori langganan internet. Baris tagihan di kategori ini nominalnya
      * TIDAK diambil dari input admin melainkan dari `customer_services`, dan
-     * keberadaannya menentukan `invoice_type` harus `awal|bulanan|reaktivasi`
+     * keberadaannya menentukan `invoice_type` harus `awal|bulanan`
      * (bukan `insidental`).
      */
     public const CODE_JASA_LAYANAN_INTERNET = 'jasa_layanan_internet';

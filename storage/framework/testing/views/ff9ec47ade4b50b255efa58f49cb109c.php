@@ -44,7 +44,7 @@
             <span class="block text-[10px] font-bold text-orange-600 dark:text-orange-500 uppercase tracking-wider mb-1">Total Nunggak — Tagihan Awal</span>
             <span class="block text-lg font-bold text-slate-800 dark:text-slate-200 font-mono">Rp <?php echo e(number_format($unpaidAwalTotal, 0, ',', '.')); ?></span>
         </div>
-        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border uppercase tracking-wide bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20">Awal / Reaktivasi</span>
+        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border uppercase tracking-wide bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20">Awal</span>
     </div>
     <div class="bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-500/30 rounded-lg p-4 flex items-center justify-between">
         <div>
@@ -83,7 +83,6 @@
                 <option value="">Semua Jenis</option>
                 <option value="awal" <?php echo e(($invoiceType ?? '') === 'awal' ? 'selected' : ''); ?>>Aktivasi</option>
                 <option value="bulanan" <?php echo e(($invoiceType ?? '') === 'bulanan' ? 'selected' : ''); ?>>Tagihan Bulanan Rutin</option>
-                <option value="reaktivasi" <?php echo e(($invoiceType ?? '') === 'reaktivasi' ? 'selected' : ''); ?>>Tagihan Reaktivasi</option>
                 <option value="manual" <?php echo e(($invoiceType ?? '') === 'manual' ? 'selected' : ''); ?>>Tagihan Manual</option>
             </select>
         </div>

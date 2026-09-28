@@ -101,6 +101,32 @@ FOP review (approve/reject/pending) via TaskController::review()
 - Guard eksplisit menolak akses form ini kalau `task_type` Survey/Pemasangan — 2 form gak boleh dipakai silang.
 - Submit laporan maintenance **langsung** panggil `TaskService::complete()` di akhir — 1 submit = simpan laporan + selesaikan task sekaligus (beda dari Survey/Instalasi yang punya form "lapor" terpisah dari transisi status, laporan maintenance gak py status draft/progress).
 
+## 7b. Kategori C-REQ & Verifikasi Biaya (2026-09-26)
+
+Task tipe `C-REQ` pakai form yang **sama persis** dengan §7 di atas (`TaskMaintenanceController`), ditambah field khusus yang cuma tampil/divalidasi kalau `task_type = CREQ`:
+
+- Dropdown **Kategori C-REQ** (`App\Enums\CReqCategory`): `Pindah Lokasi`/`Pindah Kabel` (tikor lama+baru wajib), `Tambah Modem` (wajib pilih SN dari custody tim — memperketat `selected_inventory_serial_id` yang di form ini defaultnya opsional), `Lainnya` (nama kategori bebas wajib).
+- Checkbox **"Task ini berbayar"** + catatan biaya — kalau dicentang, tersimpan sebagai `TaskCreqDetail.is_billable=true`, `verification_status=pending`, masuk antrean **Verifikasi Biaya C-REQ**.
+
+Disimpan di tabel terpisah `task_creq_details` (lihat [database-schema.md](database-schema.md#tabel-task_creq_details-2026-09-26)) — bukan kolom tambahan di `task_maintenances`, karena field ini murni khusus C-REQ dan tak relevan buat MTN/O-REQ/INFR REQ yang berbagi controller/view yang sama.
+
+**Alur verifikasi:**
+
+```
+Teknisi submit (is_billable=true) → verification_status=pending (task tetap selesai seperti biasa)
+CS (role helpdesk, permission creq_billing_verification.*) buka /tasks-creq-billing
+  → Approve → verification_status=verified, redirect ke /invoices/create dengan
+    customer_id/manual_category/manual_subtype_name/description prefill dari
+    kategori C-REQ (CS TETAP submit Tagihan Manual secara sadar, nominal tetap manual)
+  → Reject  → verification_status=rejected + rejection_reason (wajib)
+```
+
+Kontrol race-condition: `approve()`/`reject()` (`TaskCreqBillingController`) mengunci baris (`lockForUpdate()`) **di dalam** `DB::transaction()` dan mengecek ulang `verification_status=pending` di situ — mencegah dua request approve/reject bersamaan saling menimpa hasil verifikasi.
+
+`ManualInvoiceCategory` (enum FINAL 3 nilai, ADHOC-70) **tidak ditambah** — mapping kategori C-REQ → kategori Tagihan Manual: `pindah_lokasi`→`pindah_lokasi`, `pindah_kabel`/`tambah_modem`→`perbaikan`, `lainnya`→`lainnya` (lihat `CReqCategory::toManualInvoiceCategory()`).
+
+Rancangan lengkap: [`docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md`](../plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md).
+
 ## 8. Audit
 
 - `Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` (otomatis dari Eloquent events) **plus** manual `AuditLog::log()` untuk peristiwa bisnis bernama yang tidak bisa disimpulkan dari perubahan kolom: `completed`, `cancelled`, `reassigned` (TaskService), `pending`/`reschedule`/`approved`/`rejected` (TaskController).

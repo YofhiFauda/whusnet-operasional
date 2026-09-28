@@ -137,7 +137,7 @@
         <div class="p-4 flex flex-col justify-center">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PPPOE</span>
             <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
-                <span>{{ $customer->customerTechnicalDetail->pppoe_username ?? ($customer->pppoe_username ?? '-') }}</span>
+                <span>{{ $customer->customerDevice?->pppoe_username ?: ($customer->customerTechnicalDetail?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?? '-'))) }}</span>
             </div>
         </div>
         <div class="p-4 flex flex-col justify-center">
@@ -726,7 +726,7 @@
                         </div>
                         <template x-if="terminateOpen">
                             <form action="{{ route('customers.terminate', $customer) }}" method="POST" class="mt-3 space-y-2"
-                                  onsubmit="event.preventDefault(); window.confirmDelete('Yakin memutuskan langganan pelanggan {{ $customer->full_name }}? Layanan akan dihentikan permanen dan tidak bisa diaktifkan lagi lewat toggle Isolir.', this);">
+                                  onsubmit="event.preventDefault(); window.confirmDelete(@js('Yakin memutuskan langganan pelanggan '.($customer->full_name).'? Layanan akan dihentikan permanen dan tidak bisa diaktifkan lagi lewat toggle Isolir.'), this);">
                                 @csrf
                                 <div>
                                     <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Alasan Putus <span class="text-rose-500">*</span></label>
@@ -960,7 +960,7 @@
                      extra_pole_fee, other_fee, discount, ppn). Tidak ada kolom
                      formula/qty di skema, jadi keterangan cuma label deskriptif. --}}
                 @php
-                    $initialInvoice = $customer->invoices->first(fn ($inv) => in_array($inv->invoice_type?->value, ['awal', 'reaktivasi'], true));
+                    $initialInvoice = $customer->invoices->first(fn ($inv) => $inv->invoice_type?->value === 'awal');
                 @endphp
                 @if($initialInvoice)
                     @php
@@ -1048,7 +1048,7 @@
 
             @if($customer->invoices && $customer->invoices->count() > 0)
                 @php
-                    $invoicesAwal = $customer->invoices->filter(fn($inv) => in_array($inv->invoice_type?->value, ['awal', 'reaktivasi'], true));
+                    $invoicesAwal = $customer->invoices->filter(fn($inv) => $inv->invoice_type?->value === 'awal');
                     $invoicesBulanan = $customer->invoices->filter(fn($inv) => $inv->invoice_type?->value === 'bulanan');
                 @endphp
 

@@ -87,7 +87,9 @@ docker compose exec app php artisan package:discover --ansi
 | `TelegramBotService` | notifikasi teknisi (opsional, pelengkap in-app notif) |
 
 ### Enum — jangan bikin string baru
-- `TaskStatus`: `draft`, `terjadwal`, `in_progress`, `selesai`, `dibatalkan`, `pending`
+- `TaskStatus`: `draft`, `terjadwal`, `in_progress`, `selesai`, `dibatalkan`, `pending`, `lapor_nanti`
+  → **`pending` ≠ `lapor_nanti`.** Pending = kerja berhenti, tim dilepas, balik ke antrian FOP buat dijadwal ulang. Lapor Nanti = kerja lapangan beres, laporan menyusul, tim tetap nempel, **terkunci ke teknisi** (FOP gak boleh reject/pending/batal/edit/ganti tim — `TaskStatus::isLockedFromFop()`, `TaskPolicy::before()`, `FopTaskController::abortIfReportDeferred()`). Dulu Lapor Nanti = `pending` + flag `report_deferred` (kolom sudah dihapus) → bug tombol laporan hilang, jangan dibalikin.
+  → "Boleh kirim laporan?" cuma ditanya ke `TaskStatus::acceptsReport()` / `reportableValues()`. **Jangan tulis daftar status sendiri** di policy/view/controller laporan.
 - `TaskType`: `SURVEY`, `PSB`, `MTN`, `DEAC`, `C-REQ`, `O-REQ`, `INFR REQ`. `SURVEY`/`PSB`/`DEAC` = `autoOnlyValues()` — gak bisa dipilih manual, `DEAC` cuma lewat tombol "Ambil Alat" di List Putus Langganan. `RELOKASI` dihapus permanen dari sistem.
 - `TicketHandler`: `helpdesk`, `noc`, `fop` — siapa yang lagi pegang tiket. Beku permanen begitu `fop`.
 - `TicketHandlingStatus`: `open`, `closed`, `cancelled` — status internal tiket, cuma bermakna selama `handler` ≠ `fop`.
@@ -196,6 +198,10 @@ Wajib untuk siap billing: nama lengkap, nomor HP, alamat lengkap, desa, kecamata
 ### Billing
 Tagihan turunan dari Pelanggan Aktif + Paket Aktif + Harga Layanan + Periode — bukan dibuat dari nol. Harga diambil dari `customer_services`. Tidak boleh dobel per periode (ada unique index, lihat migration `add_duplicate_guard_indexes_to_invoices_and_payments`). Tagihan lunas tidak dihapus sembarangan.
 
+**FK induk → `invoices`/`payments` = `restrictOnDelete`** (sejak 2026-09-28; dulu `cascadeOnDelete` sehingga hapus layanan/pelanggan menyapu seluruh riwayat keuangan tanpa audit). Jangan dikembalikan ke cascade. Pelanggan yang punya tagihan/pembayaran **diputus langganan, bukan dihapus**; paket di Edit wajib kalau layanan sudah pernah ditagih.
+
+**Pindah Cabang (pop_id) wajib lunas dulu** (validasi di `CustomerController::update()`). Tagihan **tidak** ikut dipindah: laporan pembayaran & piutang tetap milik cabang lama, tagihan bulanan berikutnya terbit di cabang baru (generator pakai `pop_id` pelanggan). Mini POP & Distribusi cuma berubah lewat Edit kalau Cabang ikut dipindah.
+
 ### Pembayaran
 Wajib terhubung invoice + pelanggan + POP. Penuh → `lunas`; kurang → `sebagian`; ditolak → tidak boleh jadi `lunas`. Semua perubahan masuk audit log.
 
@@ -218,6 +224,7 @@ Lampiran tiket disimpan di disk **`local` (privat)**, bukan `public` — isinya 
 ## Testing
 
 - ~90 file `tests/Feature`, 4 `tests/Unit`. **Fitur/perbaikan baru wajib ada test.**
+- **JANGAN jalankan full suite** (`composer test` / `php artisan test` tanpa filter) — aturan user 2026-09-26. Jalankan cuma file/filter test yang terdampak (`php artisan test --compact tests/Feature/XxxTest.php` atau `--filter=`). Full suite dijalankan user sendiri.
 - `RefreshDatabase`, sqlite `:memory:`, `QUEUE_CONNECTION=sync`, `BROADCAST_CONNECTION=null`, locale `id` / `Asia/Jakarta`.
 - Pakai atribut PHPUnit modern: `#[DataProvider]`, `#[Test]` — bukan anotasi docblock.
 - `Tests\TestCase::loginAsAdmin()` — helper login sebagai Owner (auto-seed `RoleSeeder` kalau perlu).

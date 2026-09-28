@@ -328,13 +328,15 @@ CID dibuat saat admin melakukan aktivasi layanan.
 
 Untuk MVP, pelanggan tidak disarankan pindah POP secara bebas.
 
-Jika pelanggan pindah POP:
+Jika pelanggan pindah POP (diperbarui 2026-09-26, keputusan user — ADHOC-104):
 
-1. `registration_number` lama tetap disimpan.
-2. CID lama tetap disimpan jika sudah aktif.
-3. Perubahan POP harus masuk audit log.
-4. Jika bisnis ingin ID berubah mengikuti POP baru, harus dibuat aturan migrasi khusus.
-5. Default MVP: ID tidak berubah saat pindah POP.
+1. **REQ ID (`customer_code`, mis. `RQ002231`) permanen** — tidak berubah saat pindah POP. Pindah ditolak kalau REQ ID yang sama sudah dipakai pelanggan lain di POP tujuan (unik per `pop_id, customer_code`).
+2. **CID boleh berubah.** CID = POP + Mini POP + Kode Distribusi, jadi ikut dibuat ulang begitu POP/Mini POP/Distribusi berganti. CID lama tidak hilang: jejaknya tercatat di audit log.
+3. Mini POP & Distribusi milik POP lama **dilepas** (`CustomerObserver::updating()`), lalu admin memilih Mini POP & Distribusi POP baru (dropdown di Edit Pelanggan atau modal "Atur Mini POP & Distribusi"). Sistem tidak menebak OLT pengganti.
+4. Tagihan yang masih berjalan (`belum_dibayar`/`sebagian`) ikut pindah ke POP baru. Tagihan lunas/batal/write-off & baris pembayaran tetap di POP lama (sudah masuk laporan & tutup buku cabang lama).
+5. Kolektor yang tidak punya akses ke POP baru dilepas; kolektor baru di-assign lewat Worksheet Kolektor.
+6. POP tujuan wajib berada dalam scope user yang memindahkan.
+7. Perubahan POP, Mini POP, Distribusi, CID & POP tagihan masuk audit log.
 
 ---
 

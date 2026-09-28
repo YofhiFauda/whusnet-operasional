@@ -223,7 +223,7 @@ class CustomerVerificationController extends Controller
             // kalau task PENDING/TERJADWAL/IN_PROGRESS udah ada).
             $installTaskForNotif = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::PEMASANGAN->value)
-                ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
+                ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::LAPOR_NANTI->value])
                 ->latest()
                 ->first();
 

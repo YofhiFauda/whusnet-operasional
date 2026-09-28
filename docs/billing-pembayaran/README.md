@@ -6,7 +6,7 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 | Entity | Peran |
 |--------|-------|
-| `Invoice` | 1 row = 1 tagihan periode tertentu. Tipe: `awal` (PSB/aktivasi), `bulanan` (rutin), `reaktivasi`, `manual` (Perbaikan/Lainnya/Pindah Lokasi — termasuk **Denda Putus Langganan**, ADHOC-69). |
+| `Invoice` | 1 row = 1 tagihan periode tertentu. Tipe: `awal` (PSB/aktivasi), `bulanan` (rutin), `insidental`, `manual` (Perbaikan/Lainnya/Pindah Lokasi — termasuk **Denda Putus Langganan**, ADHOC-69). `reaktivasi` **dihapus** 2026-09-26 (tidak pernah sesuai maksud aslinya — lihat `docs/plan/billing/rancangan-terminate-reactivate-state-machine.md` §11). |
 | `Payment` | 1 row = 1 transaksi pembayaran terhadap 1 Invoice. Invoice bisa punya banyak Payment (cicilan/partial) — urutannya dihitung `Payment::installmentContext()` ("Cicilan Ke-N"). Klasifikasi majemuk Bulanan/Piutang/Cicilan/Lebih Bayar (badge di laporan & audit) dihitung `Payment::classification()` (ADHOC-84 §8) — TIDAK disimpan sebagai kolom, selalu dihitung dari `invoice->billing_period`/`overpay_amount`/`installmentContext()`. |
 | `PaymentBatch` | 1 row = 1 sesi submit batch kolektor (idempotency + pengelompokan). BUKAN rekonsiliasi kas — fitur Setoran Kolektor di-drop dari scope. |
 
@@ -89,6 +89,16 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 Invoice gak punya unique index setara (data lama sebelum fix migrasi masih ada pelanggaran, dan invoice `batal` menempati slot periode — lihat catatan di `database-schema.md`) — guard invoice level DB tetap ditegakkan di `InvoiceObserver::creating()` (app-layer check), belum hard constraint.
 
+## Pelanggan Pindah POP — `invoices.pop_id` (ADHOC-104, 2026-09-26)
+
+Tagihan di-scope per `invoices.pop_id` (`applyUserScope`), bukan per POP pelanggan. Begitu `customers.pop_id` berganti, `CustomerObserver::updated()` memindahkan **tagihan outstanding** (`Invoice::OUTSTANDING_STATUSES` = `belum_dibayar`, `sebagian`) ke POP baru — penagihannya jadi tanggung jawab cabang baru; tanpa ini admin/kolektor cabang baru tidak melihat tunggakannya.
+
+**Sengaja TIDAK dipindah:**
+- Tagihan `lunas`/`batal`/write-off — sudah masuk laporan & tutup buku (`PeriodClosing`) cabang lama; memindahkannya mengubah angka pendapatan cabang lama secara retroaktif.
+- Baris `payments` (termasuk cicilan tagihan `sebagian` yang ikut pindah) — uang tetap tercatat di cabang yang menerimanya. Konsekuensi: satu tagihan `sebagian` bisa punya `pop_id` SANDYA sementara cicilan lamanya ber-`pop_id` JETIS.
+
+Dipindah per model (`$invoice->update()`), bukan query massal, supaya tiap perpindahan tercatat di `audit_logs`. Aturan pindah POP lengkap: [`../master/pop/business-logic.md` §7a](../master/pop/business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26).
+
 ## Denda Putus Langganan (ADHOC-69)
 
 Putus langganan (`CustomerTerminationController` → `CustomerTerminationService`) **tanpa prorate** — invoice Bulanan periode berjalan & tunggakan lama dibiarkan apa adanya, dua rancangan ini sengaja terpisah (prorate cuma milik Upgrade/Downgrade Paket, ADHOC-68).
@@ -112,7 +122,7 @@ Halaman `/reports/collector-monthly` (`collector_report.view`), export XLSX (`co
 | Tagihan | **Tagihan Terbit** = Σ `total_amount` invoice `bulanan` periode P (label kolom template lama "Terkini" diganti — gampang disalahartikan "sekarang"); Diskon = Σ `discount`; **Bulanan** = bagian yang sudah dibayar TUNAI (metode apa pun kecuali `saldo`, admin & kolektor digabung — tidak lagi dipecah); **Dimuka** = bagian yang dibayar dari **saldo pelanggan** (`payment_method = 'saldo'` — lihat catatan ADHOC-92 di bawah); **Total Pembayaran** = Bulanan + Dimuka + Diskon; Piutang = Σ sisa per akhir P. Persamaan block ini: `Tagihan Terbit = Total Pembayaran + Piutang` |
 | Piutang Bulan Lalu | pembuka = invoice `billing_period` < P yang masih bersisa pada awal P (dihitung ulang dari payment, tak bergantung snapshot bulan lalu); Sudah Dibayar = bayar bulan P atas invoice itu; Piutang tak Tertagih = Σ `written_off_amount` dengan `written_off_at` di P; Sisa Piutang = Belum Dibayar − Tak Tertagih |
 | Pelanggan | per invoice bulanan P: Belum Bayar = masih bersisa; **Dimuka** = lunas SELURUHNYA dari saldo pelanggan; Sudah Bayar = lunas lainnya |
-| Uang Diterima | payment VALID `payment_date` di P: Bulanan (invoice bulanan P), Piutang (invoice bulanan < P), Aktivasi (`awal`), Lainnya (`insidental`+`reaktivasi`), Lebih Bayar (`overpay_amount`); Total = semuanya. Empat kolom selain Lebih Bayar = total `/reports/payments` |
+| Uang Diterima | payment VALID `payment_date` di P: Bulanan (invoice bulanan P), Piutang (invoice bulanan < P), Aktivasi (`awal`), Lainnya (`insidental`), Lebih Bayar (`overpay_amount`); Total = semuanya. Empat kolom selain Lebih Bayar = total `/reports/payments` |
 
 Persentase bernilai 0 (bukan `#DIV/0!`) saat pembagi 0. Pendapatan % dan Piutang % dihitung atas dasar **Tagihan Terbit**, bukan Bulanan.
 

@@ -6,7 +6,6 @@ enum InvoiceType: string
 {
     case AWAL = 'awal';
     case BULANAN = 'bulanan';
-    case REAKTIVASI = 'reaktivasi';
 
     /**
      * Tagihan di luar langganan — jasa perbaikan, biaya instalasi tambahan,
@@ -36,7 +35,6 @@ enum InvoiceType: string
         return match ($this) {
             self::AWAL => 'Aktivasi',
             self::BULANAN => 'Tagihan Bulanan Rutin',
-            self::REAKTIVASI => 'Tagihan Reaktivasi',
             self::INSIDENTAL => 'Tagihan Lain-lain',
             self::MANUAL => 'Tagihan Manual',
         };
@@ -47,7 +45,6 @@ enum InvoiceType: string
         return match ($this) {
             self::AWAL => 'pembayaran-awal',
             self::BULANAN => 'bulan',
-            self::REAKTIVASI => 'reaktivasi',
             self::INSIDENTAL => 'insidental',
             self::MANUAL => 'manual',
         };

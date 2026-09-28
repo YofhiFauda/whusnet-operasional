@@ -567,9 +567,22 @@ class Customer extends Model
         $this->unsetRelation('customerService');
         $this->unsetRelation('customerAddress');
 
+        // validate() me-loadMissing relasi (customerDevice, detail teknis, ...)
+        // ke instance INI. Kalau dibiarkan, relasi yang saat itu belum ada
+        // tercache `null` — kode yang membuat device sesudah save lalu membaca
+        // $customer->customerDevice dapat null basi (ketahuan 2026-09-28 lewat
+        // 8 test DEAC yang gagal). Relasi yang di-load di sini dilepas lagi,
+        // yang sudah ter-load sebelumnya dibiarkan.
+        $loadedBefore = array_keys($this->getRelations());
+
         /** @var CustomerValidationService $service */
         $service = app(CustomerValidationService::class);
         $result = $service->validate($this);
+
+        foreach (array_diff(array_keys($this->getRelations()), $loadedBefore) as $relation) {
+            $this->unsetRelation($relation);
+        }
+
         $newStatus = $result['completeness_status'];
 
         if ($this->data_completeness_status !== $newStatus) {

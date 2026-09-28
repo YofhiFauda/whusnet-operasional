@@ -6,7 +6,7 @@ namespace App\Enums;
  * Jenis di dalam Tagihan Manual (ADHOC-70) — bukan `InvoiceType` sendiri,
  * cuma sub-klasifikasi di dalam `InvoiceType::MANUAL`. Tiga nilai ini FINAL
  * sesuai studi kasus user (docs/plan/billing/analisa-rancangan-tagihan-manual.md
- * §3.2) — Aktivasi/Bulanan/Reaktivasi BUKAN bagian dari Tagihan Manual.
+ * §3.2) — Aktivasi/Bulanan BUKAN bagian dari Tagihan Manual.
  */
 enum ManualInvoiceCategory: string
 {

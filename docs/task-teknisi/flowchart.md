@@ -240,3 +240,52 @@ Submit → TaskMaintenance::create() + TaskService::complete() — 1 aksi
         ▼
 Task langsung selesai, fop_review_status=pending (sama seperti alur complete biasa)
 ```
+
+## 8b. Laporan C-REQ + Verifikasi Biaya (2026-09-26)
+
+```
+Teknisi buka /tasks/{task}/maintenance-report (task_type=CREQ)
+        │
+        ▼
+Isi form sama seperti §8 + field khusus:
+  creq_category = pindah_lokasi|pindah_kabel|tambah_modem|lainnya
+  pindah_lokasi/pindah_kabel → tikor lama+baru WAJIB
+  tambah_modem               → selected_inventory_serial_id WAJIB (custody tim)
+  lainnya                    → creq_category_custom_name WAJIB
+  creq_is_billable dicentang → creq_billing_note WAJIB
+        │
+        ▼
+Submit → TaskMaintenance::create() + TaskCreqDetail::create() + TaskService::complete() — 1 aksi
+        │
+        ▼
+Task selesai. is_billable=true? ──tidak──▶ selesai, tidak masuk antrean verifikasi
+        │ ya
+        ▼
+TaskCreqDetail.verification_status = pending
+        │
+        ▼
+CS (helpdesk) buka /tasks-creq-billing, pilih task, approve atau reject
+        │
+   ┌────┴────┐
+   ▼         ▼
+approve()   reject() — wajib alasan
+   │         │
+   ▼         ▼
+lockForUpdate() dalam DB::transaction — cek ulang status=pending
+   │         │
+   ▼         ▼
+verification_status=verified          verification_status=rejected
+verified_by/verified_at diisi         verified_by/verified_at/rejection_reason diisi
+AuditLog (module Verifikasi Biaya     AuditLog (module Verifikasi Biaya
+C-REQ, action approve)                C-REQ, action reject)
+   │                                      │
+   ▼                                      ▼
+redirect /invoices/create prefill      redirect /tasks-creq-billing
+customer_id/manual_category/           (task tetap muncul, filter status
+manual_subtype_name/description        "Ditolak")
+dari kategori C-REQ — CS lanjut
+isi Tagihan Manual sendiri (TIDAK
+ada invoice otomatis)
+```
+
+Approve/reject kedua kali pada task yang sama (`verification_status` sudah bukan `pending`) ditolak **422**.

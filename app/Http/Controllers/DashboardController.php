@@ -616,6 +616,8 @@ class DashboardController extends Controller
             TaskStatus::TERJADWAL->value,
             TaskStatus::IN_PROGRESS->value,
             TaskStatus::PENDING->value,
+            // Laporan belum masuk = pekerjaan belum tuntas, tetap dihitung antrean.
+            TaskStatus::LAPOR_NANTI->value,
         ];
 
         $completedPsbTasks = $taskQuery()

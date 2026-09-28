@@ -120,16 +120,28 @@ class CustomerSurveyController extends Controller
             ->first();
 
         if ($activeTask) {
-            return redirect()->back()->with('error', "Tidak dapat memulai survey karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu.");
+            return redirect()->back()->with('error', "Tidak dapat memulai survey karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau tandai Lapor Nanti task sebelumnya terlebih dahulu.");
         }
 
         DB::transaction(function () use ($customer, $workflowService, $taskService, $task) {
             $survey = $customer->latestSurvey()->first();
 
-            if (! $survey) {
-                // Should not happen if assigned properly, but just in case
+            // Survey dari masa langganan SEBELUM putus (Langganan Lagi dengan
+            // alat sudah diambil → Antrean Survey, ADHOC-102) = siklus baru:
+            // record baru, riwayat survey lama tetap utuh. Dulu record lama
+            // dipakai ulang — hasil survey pertama tertimpa dan completed_at
+            // lamanya bikin durasi survey baru gak pernah tercatat.
+            if (! $survey || ($customer->terminated_at && $survey->created_at?->lt($customer->terminated_at))) {
                 $survey = new CustomerSurvey(['customer_id' => $customer->id]);
             }
+
+            // "Mulai" = sesi kerja baru. Waktu selesai sesi sebelumnya (mis.
+            // timer yang dihentikan saat Pending) wajib dikosongkan, kalau
+            // tidak store() melewati perhitungan completed_at/durasi.
+            $survey->completed_at = null;
+            $survey->end_date = null;
+            $survey->end_time = null;
+            $survey->duration_minutes = null;
 
             $survey->survey_status = 'pending'; // Or 'in_progress' if we add it to the enum
             $survey->started_at = now();
@@ -217,7 +229,7 @@ class CustomerSurveyController extends Controller
         // start()/store() — supervisi/koreksi data tetap lewat hasFullAccess).
         $task = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::SURVEY->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -293,7 +305,7 @@ class CustomerSurveyController extends Controller
         // pengecualian, keputusan eksplisit biar konsisten satu alur).
         $assignmentTask = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::SURVEY->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -506,7 +518,7 @@ class CustomerSurveyController extends Controller
 
             $task = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::SURVEY->value)
-                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                ->whereIn('status', TaskStatus::reportableValues())
                 ->latest('id')
                 ->first();
 

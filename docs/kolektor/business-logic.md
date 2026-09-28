@@ -234,6 +234,12 @@ Guard yang berlaku di kedua jalur: target wajib ber-role `kolektor`, dan **POP t
 
 > Menyalin guard ke method kedua dilarang. Dua jalur tulis dengan dua salinan guard adalah cara tercepat salah satunya ketinggalan.
 
+### Pelanggan pindah POP — kolektor dilepas otomatis (ADHOC-104, 2026-09-26)
+
+Kalau `customers.pop_id` berganti, `CustomerObserver::updating()` mengecek aturan yang sama dari arah sebaliknya: kolektor yang **tidak punya akses POP baru** dilepas (`collector_id` → NULL). Kolektor ber-`all_pop` atau yang scope-nya mencakup POP baru dipertahankan. Tanpa ini, pelanggan pindahan tetap milik kolektor lama padahal worklist-nya menyaring per POP scope (§7 dua lapis scope) → tidak ditagih siapa pun.
+
+Ini bukan salinan guard assign: arahnya **melepas**, bukan memberi, dan jalan dari semua jalur pindah POP (Edit, import, tinker). Admin cabang baru meng-assign kolektor lewat Worksheet Kolektor seperti biasa. **Belum ada:** notifikasi ke kolektor yang dilepas (`kabariPerubahanRute()` tidak dipanggil dari observer).
+
 ---
 
 ## 9. Notifikasi

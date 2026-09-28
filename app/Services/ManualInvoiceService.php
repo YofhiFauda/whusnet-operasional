@@ -62,7 +62,7 @@ class ManualInvoiceService
         $lines = $this->resolveLines($validated['lines'], (float) $service->monthly_price);
         $type = ! empty($validated['invoice_type'])
             ? InvoiceType::from($validated['invoice_type'])
-            : $this->resolveTypeFromLines($customer, $lines);
+            : $this->resolveTypeFromLines($lines);
 
         $this->assertTypeMatchesLines($type, $lines);
         $this->assertNotDuplicate($customer, $type, $validated['billing_period']);
@@ -246,7 +246,7 @@ class ManualInvoiceService
 
         if ($hasSubscriptionLine && $type === InvoiceType::INSIDENTAL) {
             throw ValidationException::withMessages([
-                'invoice_type' => 'Tagihan yang memuat baris Jasa Layanan Internet tidak boleh berjenis Insidental — pilih Bulanan atau Reaktivasi.',
+                'invoice_type' => 'Tagihan yang memuat baris Jasa Layanan Internet tidak boleh berjenis Insidental — pilih Bulanan.',
             ]);
         }
 
@@ -264,11 +264,8 @@ class ManualInvoiceService
      *
      * Cakupannya dibuat PERSIS sama dengan `InvoiceObserver`: hanya jenis di
      * `Invoice::SUBSCRIPTION_TYPES`. INSIDENTAL dilewati karena beberapa
-     * pekerjaan berbayar memang boleh ditagih di bulan yang sama, dan
-     * REAKTIVASI juga dilewati karena pelanggan yang disuspend lalu aktif lagi
-     * di bulan yang sama memang boleh punya record tambahan (lihat docblock
-     * `Invoice::SUBSCRIPTION_TYPES`). Menyaring lebih ketat di sini akan
-     * menolak kombinasi yang justru sudah dites boleh.
+     * pekerjaan berbayar memang boleh ditagih di bulan yang sama. Menyaring
+     * lebih ketat di sini akan menolak kombinasi yang justru sudah dites boleh.
      */
     private function assertNotDuplicate(Customer $customer, InvoiceType $type, string $billingPeriod): void
     {
@@ -294,7 +291,7 @@ class ManualInvoiceService
      *
      * @param  list<array{category_code: string, amount: float}>  $lines
      */
-    public function resolveTypeFromLines(Customer $customer, array $lines): InvoiceType
+    public function resolveTypeFromLines(array $lines): InvoiceType
     {
         $hasSubscriptionLine = in_array(
             RevenueCategory::CODE_JASA_LAYANAN_INTERNET,
@@ -303,9 +300,7 @@ class ManualInvoiceService
         );
 
         if ($hasSubscriptionLine) {
-            return $customer->status === 'suspended'
-                ? InvoiceType::REAKTIVASI
-                : InvoiceType::BULANAN;
+            return InvoiceType::BULANAN;
         }
 
         return InvoiceType::INSIDENTAL;

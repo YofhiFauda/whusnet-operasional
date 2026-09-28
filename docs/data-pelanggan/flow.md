@@ -37,7 +37,8 @@
 2. Sistem mengambil data pelanggan dan master pendukung.
 3. User mengubah data.
 4. User submit ke `PUT /customers/{customer}`.
-5. Sistem validasi field.
+5. Sistem validasi field. Step "POP & Distribusi" punya dropdown berantai POP → Mini POP → Distribusi (ADHOC-104): POP wajib dalam scope user, Mini POP wajib anak POP, Distribusi wajib anak Mini POP, REQ ID tidak boleh bentrok di POP tujuan. Pelanggan pra-pemasangan: cuma POP yang boleh diatur (Mini POP & Distribusi terkunci).
+   - Kalau POP diganti (pindah POP): Mini POP/Distribusi cabang lama dilepas, CID dibuat ulang (REQ ID tetap), tagihan belum lunas ikut pindah, kolektor tanpa akses POP baru dilepas. Detail: `docs/master/pop/business-logic.md` §7a.
 6. Jika ada dokumen yang dihapus, file lama dihapus dari storage.
 7. Jika ada dokumen baru, file lama diganti dengan file baru.
 8. Data pelanggan diperbarui.

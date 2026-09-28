@@ -166,7 +166,7 @@ sehingga beberapa pekerjaan berbayar boleh ditagih di bulan yang sama. Konsekuen
 ini tidak pernah dibuat `billing:generate-monthly-invoices` — selalu manual.
 
 Aturan turunannya di `ManualInvoiceService`: tagihan yang punya baris berkategori
-`jasa_layanan_internet` **wajib** bertipe `awal|bulanan|reaktivasi`; yang tidak punya baris itu
+`jasa_layanan_internet` **wajib** bertipe `awal|bulanan`; yang tidak punya baris itu
 **wajib** `insidental`. Ditegakkan di service, bukan cuma di form.
 
 ### Revisi 2026-09-09 — Jenis Tagihan di-AUTO-DETECT, bukan dropdown terpisah
@@ -182,10 +182,23 @@ isi baris rincian:
 
 ```
 ada baris kategori jasa_layanan_internet?
-  ya  → pelanggan sedang suspended? → REAKTIVASI
-        selain itu                 → BULANAN
+  ya  → BULANAN
   tidak → INSIDENTAL
 ```
+
+### Revisi 2026-09-26 — `InvoiceType::REAKTIVASI` dihapus
+
+Cabang "pelanggan sedang suspended? → REAKTIVASI" di atas **dihapus**. Ternyata
+kondisinya salah sasaran sejak awal: dia mengecek status `suspended` (isolir),
+padahal definisi yang disepakati §3.2 dokumen `analisa-rancangan-tagihan-manual.md`
+adalah "pelanggan **putus** lalu berlangganan lagi" (`terminated → active`, alur
+"Langganan Lagi"). Karena `reactivate()` mengubah status `terminated` langsung ke
+`active` (tidak pernah singgah di `suspended`), cabang ini **tidak pernah**
+menghasilkan kasus yang dimaksud §3.2 — yang kena justru pelanggan isolir nunggak
+yang secara bisnis cukup melunasi tagihan lama, bukan butuh invoice jenis baru.
+
+Analisis lengkap + opsi yang dipertimbangkan: `docs/plan/billing/rancangan-terminate-reactivate-state-machine.md` §11.
+Dicek DB dev (2026-09-26): 0 baris `invoice_type = reaktivasi` — aman dihapus tanpa migrasi data (perlu dicek ulang di produksi sebelum deploy).
 
 Ditegakkan dua lapis, keduanya WAJIB tetap ada — satu untuk UX, satu untuk keamanan:
 
@@ -378,7 +391,7 @@ Rancangan awal dokumen ini melakukan persis itu; dibatalkan.
 | invoice_type | Kategori | Sub | description |
 |---|---|---|---|
 | `awal` | Jasa Layanan Internet | Prorata | `"Migrasi data lama — rincian biaya tidak dapat diverifikasi"` |
-| `bulanan` / `reaktivasi` | Jasa Layanan Internet | Langganan Bulanan | idem |
+| `bulanan` | Jasa Layanan Internet | Langganan Bulanan | idem |
 
 Kolom biaya tambahan **sengaja tidak dipetakan** — nilainya tidak pernah ikut ditagihkan.
 Angkanya tetap utuh di `invoices`, tidak dihapus, jadi kalau suatu saat ada keputusan bisnis

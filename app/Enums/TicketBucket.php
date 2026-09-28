@@ -42,9 +42,8 @@ enum TicketBucket: string
     /**
      * Status FopTask yang masuk bucket ini.
      *
-     * NB: "Lapor Nanti" bukan status tersendiri — itu FopTask ber-status
-     * `pending` yang Task-nya `report_deferred` (lihat TaskStatus::displayLabel()),
-     * jadi udah otomatis ketarik lewat PENDING di bucket DIPROSES.
+     * Lapor Nanti (status sendiri sejak 2026-09-26) masih DIPROSES — kerja
+     * lapangannya beres tapi laporannya belum masuk, tiketnya belum selesai.
      *
      * @return TaskStatus[]
      */
@@ -52,7 +51,7 @@ enum TicketBucket: string
     {
         return match ($this) {
             self::MASUK => [TaskStatus::DRAFT],
-            self::DIPROSES => [TaskStatus::TERJADWAL, TaskStatus::IN_PROGRESS, TaskStatus::PENDING],
+            self::DIPROSES => [TaskStatus::TERJADWAL, TaskStatus::IN_PROGRESS, TaskStatus::PENDING, TaskStatus::LAPOR_NANTI],
             self::SELESAI => [TaskStatus::SELESAI],
             self::DIBATALKAN => [TaskStatus::DIBATALKAN],
         };

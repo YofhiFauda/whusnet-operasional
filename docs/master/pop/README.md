@@ -46,6 +46,8 @@ Pop (self-referencing parent_id, 3 level)
 | View | `resources/views/master/pop/{index,create,edit,show}.blade.php` |
 | Dipakai scope RBAC | `app/Services/EffectiveAccessService.php::resolvePopTree()` (lihat [docs/rbac/flowchart.md §4](../../rbac/flowchart.md#4-resolve-scope-pop-getallowedpopids)) |
 | Dipakai generate ID pelanggan | `CustomerController::store()` (`generateRegistrationNumber()`), `CustomerVerificationController::finalVerify()` (`generateComplexCid()`) — lihat [docs/customer-lifecycle](../../customer-lifecycle/README.md) |
+| Assign Mini POP & Distribusi ke pelanggan | `CustomerNetworkAssignmentController` (modal), `CustomerController::edit()/update()` + `resources/views/customers/edit.blade.php` (dropdown berantai, ADHOC-104) |
+| Invariant hierarki & pindah POP | `app/Observers/CustomerObserver.php` (`updating()` / `updated()`) — lihat [business-logic.md §7a](business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26) |
 
 ## Routes
 

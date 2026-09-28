@@ -113,14 +113,13 @@ class TaskOwnSortingTest extends TestCase
             'created_by' => $this->technician->id,
         ]);
 
-        // 3. Task Lapor Nanti (Pending + report_deferred=true)
+        // 3. Task Lapor Nanti
         $taskLaporNanti = Task::create([
             'task_number' => 'TASK-SORT-0003',
             'pop_id' => $this->pop->id,
             'task_type' => TaskType::MAINTENANCE->value,
             'title' => 'Task Lapor Nanti',
-            'status' => TaskStatus::PENDING->value,
-            'report_deferred' => true,
+            'status' => TaskStatus::LAPOR_NANTI->value,
             'scheduled_at' => now(),
             'sla_minutes' => 120,
             'created_by' => $this->technician->id,

@@ -5,7 +5,7 @@
 
 @php
     $dialogName = 'report-choice-' . $task->id;
-    $reasonModalName = 'report-choice-pending-' . $task->id;
+    $reasonModalName = 'report-choice-later-' . $task->id;
 @endphp
 
 <button type="button" x-data @click="$dispatch('open-modal', '{{ $dialogName }}')"
@@ -40,16 +40,15 @@
 
 <x-ui.modal name="{{ $reasonModalName }}" title="Lapor Nanti" maxWidth="sm">
     <p class="text-xs text-text-secondary mb-3 leading-relaxed font-ui">
-        Task akan disimpan sementara dengan status <span class="font-semibold text-text-main">Pending</span>. Anda dapat melanjutkan pengisian laporan sewaktu-waktu, task tetap terdaftar ke Anda.
+        Pekerjaan dianggap <span class="font-semibold text-text-main">sudah selesai di lapangan</span>, laporannya menyusul. Status task jadi <span class="font-semibold text-text-main">Lapor Nanti</span> — tetap terdaftar ke Anda, tidak masuk antrian jadwal ulang FOP. Lanjutkan laporannya kapan saja dari Tasks Saya.
     </p>
-    <form id="form-{{ $reasonModalName }}" action="{{ route('tasks.pending', $task) }}" method="POST">
+    <form id="form-{{ $reasonModalName }}" action="{{ route('tasks.report-later', $task) }}" method="POST">
         @csrf
-        <input type="hidden" name="report_deferred" value="1">
         <div class="space-y-1.5 font-ui">
             <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                 Alasan Menunda Laporan <span class="text-error">*</span>
             </label>
-            <x-ui.textarea name="pending_reason" rows="3" placeholder="Contoh: Kendala sinyal di lokasi..." required />
+            <x-ui.textarea name="pending_reason" rows="3" maxlength="255" placeholder="Contoh: Kendala sinyal di lokasi..." required />
         </div>
     </form>
     <x-slot name="footer">

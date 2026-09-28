@@ -270,7 +270,7 @@ class CustomerBalanceService
      * satu payment lintas-invoice — supaya `installmentContext()`/riwayat
      * cicilan tetap benar per invoice (KEPUTUSAN "bentuk catatan").
      *
-     * Hanya invoice `BULANAN` — AWAL/REAKTIVASI/INSIDENTAL/MANUAL tetap
+     * Hanya invoice `BULANAN` — AWAL/INSIDENTAL/MANUAL tetap
      * manual (asumsi rancangan §3.1 poin 1). `Invoice::OUTSTANDING_STATUSES`
      * (belum_dibayar/sebagian) otomatis mengecualikan batal & tak_tertagih.
      *

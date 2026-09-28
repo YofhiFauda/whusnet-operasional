@@ -354,10 +354,10 @@
                                 @php
                                     $statusValue = $task->status->value;
                                     $statusLabel = $task->task
-                                        ? $task->task->status->displayLabel($task->task->report_deferred)
-                                        : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->displayLabel());
+                                        ? $task->task->status->label()
+                                        : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->label());
                                     $statusClasses = $task->task
-                                        ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
+                                        ? $task->task->status->displayBadgeClasses()
                                         : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
                                 @endphp
                                 <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border {{ $statusClasses }}">

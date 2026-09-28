@@ -15,7 +15,10 @@
     $teamRelation = $task->relationLoaded('team') ? $task->team : null;
     $technicians = $task->relationLoaded('technicians') ? $task->technicians : collect([]);
 
-    $canDeleteTask = !in_array($task->category->value, ['SURVEY', 'PSB'], true) && !$ticket && !$isHistory;
+    // Lapor Nanti terkunci ke teknisi — semua aksi FOP (switch, cancel, edit,
+    // hapus, prioritas) dimatikan; server juga nolak (abortIfReportDeferred).
+    $lockedFromFop = $task->status->isLockedFromFop();
+    $canDeleteTask = !in_array($task->category->value, ['SURVEY', 'PSB'], true) && !$ticket && !$isHistory && !$lockedFromFop;
     
     // Pelanggan & Kontak (dari ticket atau customer relation)
     $customerName = $ticket?->customer_name ?? ($customer?->full_name ?? null);
@@ -29,10 +32,10 @@
     // Status Logic
     $statusValue = $task->status->value;
     $statusLabel = $taskRelation
-        ? $taskRelation->status->displayLabel($taskRelation->report_deferred)
-        : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->displayLabel());
+        ? $taskRelation->status->label()
+        : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->label());
     $statusClasses = $taskRelation
-        ? $taskRelation->status->displayBadgeClasses($taskRelation->report_deferred)
+        ? $taskRelation->status->displayBadgeClasses()
         : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
 
     // Urgency & Visual Indicator
@@ -154,7 +157,7 @@
         <div class="col-span-2 flex items-center justify-between pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60">
             <div>
                 <span class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1">Prioritas:</span>
-                @if($canEditFopTaskType && !$isHistory)
+                @if($canEditFopTaskType && !$isHistory && !$lockedFromFop)
                     <select @change="updatePriority({{ $task->id }}, $event.target.value)"
                             x-data="{ currentPriority: '{{ $task->priority->value }}' }"
                             x-model="currentPriority"
@@ -218,7 +221,7 @@
         <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Teknisi Bertugas</span>
         <div class="flex flex-wrap gap-1.5 items-center">
             @forelse($technicians as $tech)
-                @if(!$isHistory)
+                @if(!$isHistory && !$lockedFromFop)
                     <button type="button"
                             @click="openSwitchModal({{ $task->id }}, '{{ $task->task_number }}', @js($task->tugas), '{{ $task->task_date?->toDateString() }}', {{ $tech->id }}, @js($tech->name))"
                             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors shadow-2xs cursor-pointer"
@@ -304,7 +307,7 @@
         <div class="flex items-center gap-1.5 ml-auto">
             @if(!$isHistory)
                 @can('fop_tasks.cancel')
-                    @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']))
+                    @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']) && !$lockedFromFop)
                         <button type="button"
                                 @click="openCancelModal({{ $task->id }}, '{{ $task->task_number }}')"
                                 class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-900/50 hover:bg-red-100 transition-colors cursor-pointer">
@@ -320,7 +323,7 @@
                 <span>Detail</span>
             </a>
 
-            @if(!$isHistory)
+            @if(!$isHistory && !$lockedFromFop)
                 <button type="button"
                         @click="openEditModal({{ json_encode($task) }}, {{ json_encode($technicians->pluck('id')) }}, '{{ route('fop-tasks.update', $task->id) }}')"
                         class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 hover:bg-sky-100 transition-colors shadow-2xs cursor-pointer">

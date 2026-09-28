@@ -77,7 +77,7 @@ Kasus user: paket 150k, prorate aktivasi 100k, pelanggan bayar sekaligus 550k.
 
 ### 3.1 Asumsi rancangan (bukan keputusan user; ubah bila salah)
 
-1. **Hanya tagihan `BULANAN`** yang di-auto-pay. `AWAL`, `REAKTIVASI`, `INSIDENTAL` tetap manual.
+1. **Hanya tagihan `BULANAN`** yang di-auto-pay. `AWAL`, `INSIDENTAL` tetap manual.
 2. **Saldo ≤ 0 dilewati.** `PaymentObserver::creating` menolak nominal ≤ 0, jadi memang tidak boleh dibuat payment.
 3. **Kasus pinggiran di luar studi kasus user:** saldo yang masuk *setelah* sebuah tagihan bulanan sudah terbit (mis. pelanggan titip saldo di tengah bulan padahal tagihan bulan itu belum lunas). Pada studi kasus utama ini **tidak terjadi**: saldo dari pembayaran aktivasi selalu masuk sebelum tagihan bulanan pertama, karena generator melewati bulan aktivasi (`GenerateMonthlyInvoicesCommand.php:80`) — tagihan bulanan pertama terbit tanggal 1 bulan berikutnya. Untuk kasus pinggiran ini disediakan command manual `billing:apply-balance` (§4.3); tidak dibuat trigger otomatis supaya tidak mengubah tagihan yang sedang ditagih kolektor. Bila nanti ingin otomatis penuh, cukup memanggil `applyToOpenInvoices()` setelah credit masuk — tidak butuh perubahan skema.
 

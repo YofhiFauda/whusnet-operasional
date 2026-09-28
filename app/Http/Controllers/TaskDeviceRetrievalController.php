@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\DeviceRetrievalOutcome;
 use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
-use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TrackingType;
 use App\Models\InventorySerial;
@@ -158,7 +157,7 @@ class TaskDeviceRetrievalController extends Controller
             return redirect()->route('tasks.show', $task)->with('error', 'Form ini khusus task Ambil Modem (DEAC).');
         }
 
-        if (! in_array($task->status, [TaskStatus::IN_PROGRESS, TaskStatus::PENDING], true)) {
+        if (! $task->status->acceptsReport()) {
             return redirect()->route('tasks.show', $task)->with('error', 'Status task tidak valid untuk pelaporan pengambilan alat.');
         }
 

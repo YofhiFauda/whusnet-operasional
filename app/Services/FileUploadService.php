@@ -168,11 +168,10 @@ class FileUploadService
 
     /**
      * 6. Bukti Transfer Pembayaran
-     * Aturan folder: payments/{id_pelanggan}/{awal|bulanan|reaktivasi}
+     * Aturan folder: payments/{id_pelanggan}/{awal|bulanan}
      * Contoh format:
      * - pembayaran-awal_02-06-2026_RQ00012_Budi Santoso.jpg
      * - bulan_02-07-2026_RQ00012_Budi Santoso.jpg
-     * - reaktivasi_02-10-2026_RQ00012_Budi Santoso.jpg
      */
     public static function uploadPaymentProof(UploadedFile $file, ?Customer $customer, ?string $invoiceType, string $paymentDate): string
     {
@@ -188,9 +187,6 @@ class FileUploadService
         if ($type === 'awal') {
             $category = 'awal';
             $prefix = 'pembayaran-awal';
-        } elseif ($type === 'reaktivasi') {
-            $category = 'reaktivasi';
-            $prefix = 'reaktivasi';
         } else {
             $category = 'bulanan';
             $prefix = 'bulan';

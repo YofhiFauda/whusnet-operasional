@@ -687,6 +687,19 @@ return [
         'business_customers' => [
             ActionCode::VIEW->value,
         ],
+
+        // Antrean "Verifikasi Biaya C-REQ" — task C-REQ yang ditandai
+        // berbayar oleh teknisi (`TaskCreqDetail::is_billable`) menunggu
+        // disetujui/ditolak CS sebelum boleh diteruskan ke Tagihan Manual.
+        // Pola SAMA PERSIS `customer_registration_verification`: approve &
+        // reject permission STATIS terpisah dari view, bukan gerbang view +
+        // logic dinamis, karena dua aksi ini wajar dipisah PIC-nya.
+        // docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md §6.
+        'creq_billing_verification' => [
+            ActionCode::VIEW->value,
+            ActionCode::APPROVE->value,
+            ActionCode::REJECT->value,
+        ],
     ],
 
     /*
@@ -854,5 +867,10 @@ return [
         'sales_omset_dashboard.view' => 'Lihat Dashboard Omset Sales',
         'business_customers.view' => 'Lihat List Pelanggan Bisnis',
         'customer_balance.view' => 'Lihat Saldo Pelanggan',
+
+        // Verifikasi Biaya C-REQ (docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)
+        'creq_billing_verification.view' => 'Lihat Antrean Verifikasi Biaya C-REQ',
+        'creq_billing_verification.approve' => 'Setujui Biaya C-REQ (lanjut ke Tagihan Manual)',
+        'creq_billing_verification.reject' => 'Tolak Biaya C-REQ',
     ],
 ];

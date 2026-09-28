@@ -76,7 +76,7 @@
                         <select name="manual_category" id="manual_category" required onchange="miToggleCategoryFields()"
                                 class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-semibold bg-surface text-text-main transition-colors">
                             @foreach($categories as $category)
-                                <option value="{{ $category->value }}" @selected(old('manual_category') === $category->value)>{{ $category->label() }}</option>
+                                <option value="{{ $category->value }}" @selected(old('manual_category', $prefill['manual_category']) === $category->value)>{{ $category->label() }}</option>
                             @endforeach
                         </select>
                         @error('manual_category')<p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>@enderror
@@ -84,7 +84,7 @@
 
                     <div id="mi-subtype-wrap" class="hidden">
                         <label for="manual_subtype_name" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nama Sub (mis. Over Kabel, Pendapatan A)</label>
-                        <input type="text" name="manual_subtype_name" id="manual_subtype_name" value="{{ old('manual_subtype_name') }}" maxlength="150"
+                        <input type="text" name="manual_subtype_name" id="manual_subtype_name" value="{{ old('manual_subtype_name', $prefill['manual_subtype_name']) }}" maxlength="150"
                                class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main transition-colors">
                         @error('manual_subtype_name')<p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>@enderror
                     </div>
@@ -92,7 +92,7 @@
                     <div>
                         <label for="description" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Deskripsi Tagihan</label>
                         <textarea name="description" id="description" rows="3" required placeholder="Jelaskan pekerjaan/tagihan ini..."
-                                  class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main placeholder:text-text-muted/60 transition-colors">{{ old('description') }}</textarea>
+                                  class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs bg-surface text-text-main placeholder:text-text-muted/60 transition-colors">{{ old('description', $prefill['description']) }}</textarea>
                         @error('description')<p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>@enderror
                     </div>
 

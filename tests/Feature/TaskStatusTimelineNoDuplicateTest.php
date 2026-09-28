@@ -226,17 +226,17 @@ class TaskStatusTimelineNoDuplicateTest extends TestCase
         // memegang task lain berstatus in_progress.
         $service = app(TaskService::class);
         $service->start($pendingTask, $this->fopUser);
-        $service->setPending($pendingTask->fresh(), $this->fopUser, 'Material habis');
+        $service->releaseTeamAndSetPending($pendingTask->fresh(), 'Material habis', 'pending', $this->fopUser->id);
 
         $service->start($deferredTask, $this->fopUser);
-        $service->setPending($deferredTask->fresh(), $this->fopUser, 'Sinyal HP hilang', true);
+        $service->deferReport($deferredTask->fresh(), $this->fopUser, 'Sinyal HP hilang');
 
         $pendingRow = TaskAuditTimeline::for($pendingTask->fresh(['auditLogs']))->firstWhere('action', 'pending');
         $deferredRow = TaskAuditTimeline::for($deferredTask->fresh(['auditLogs']))->firstWhere('action', 'report_deferred');
 
-        // Keduanya berstatus `pending` di DB — bedanya cuma flag report_deferred,
-        // dan itu yang membuat maknanya berlawanan (kerja berhenti vs kerja
-        // selesai tapi laporan menyusul). Timeline harus membedakannya.
+        // Maknanya berlawanan (kerja berhenti vs kerja selesai tapi laporan
+        // menyusul) — status DB-nya pun beda sejak 2026-09-26. Timeline harus
+        // membedakannya.
         $this->assertNotNull($pendingRow);
         $this->assertNotNull($deferredRow);
         $this->assertSame('Ditunda (Pending)', TaskAuditTimeline::label($pendingRow));

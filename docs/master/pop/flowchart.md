@@ -109,6 +109,39 @@ status ∈ {active, suspended}? ──ya──▶ regenerate CID (Pop::generateC
 Save + AuditLog('update_network_assignment')
 ```
 
+## 4a. Pindah POP lewat Edit Pelanggan (ADHOC-104, 2026-09-26)
+
+```
+Admin buka /customers/{id}/edit → step "POP & Distribusi"
+        │
+        ▼
+Pilih POP Cabang (dropdown: Pop::forUser(), type=cabang)
+Pilih Mini POP   (dropdown ke-filter: parent_id = POP terpilih)
+Pilih Distribusi (dropdown ke-filter: pop_id = Mini POP terpilih) — boleh kosong
+        │
+        ▼
+Submit PUT /customers/{customer}
+        │
+        ▼
+Validasi: POP dalam scope user?                         ──tidak──▶ TOLAK (pop_id)
+          REQ ID sudah dipakai di POP tujuan?           ──ya─────▶ TOLAK (pop_id)
+          Mini POP.parent_id == pop_id?                 ──tidak──▶ TOLAK (mini_pop_id)
+          Distribusi tanpa Mini POP / beda Mini POP?    ──ya─────▶ TOLAK (distribution_id)
+        │ (lolos)
+        ▼
+$customer->update()
+  └─ CustomerObserver::updating()   ← jalan juga dari import/tinker
+       ├─ mini_pop bukan anak pop_id?        → mini_pop_id = NULL
+       ├─ distribusi bukan anak mini_pop_id? → distribution_id = NULL
+       └─ pop_id berubah & kolektor tak punya akses POP baru → collector_id = NULL
+  └─ CustomerObserver::updated() (pop_id berubah)
+       ├─ cabut token QR aktif
+       └─ tagihan belum_dibayar/sebagian → invoices.pop_id = POP baru
+        │
+        ▼
+status ∈ {active, suspended}? ──ya──▶ CID dibuat ulang (REQ ID tetap), dicatat audit log
+```
+
 ## 5. Resolve Display ID (dipanggil kapan pun UI perlu tampilkan identitas pelanggan)
 
 ```

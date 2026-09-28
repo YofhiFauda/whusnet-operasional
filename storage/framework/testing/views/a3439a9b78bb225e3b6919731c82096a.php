@@ -111,6 +111,13 @@
             <span>Pending</span>
         </a>
 
+        
+        <a href="<?php echo e(route('fop-tasks.index', array_merge(request()->except(['status', 'page']), ['status' => 'lapor_nanti']))); ?>"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-2xs <?php echo e($currentStatus === 'lapor_nanti' ? 'bg-violet-600 text-white shadow-violet-600/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'); ?>">
+            <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+            <span>Lapor Nanti</span>
+        </a>
+
         <button x-show="teamConflictModal.conflicts.length > 0"
                 @click="teamConflictModal.open = true"
                 type="button"
@@ -184,6 +191,7 @@
                     <option value="terjadwal" <?php echo e(request('status') === 'terjadwal' ? 'selected' : ''); ?>>Terjadwal</option>
                     <option value="in_progress" <?php echo e(request('status') === 'in_progress' ? 'selected' : ''); ?>>Sedang Dikerjakan</option>
                     <option value="pending" <?php echo e(request('status') === 'pending' ? 'selected' : ''); ?>>Pending</option>
+                    <option value="lapor_nanti" <?php echo e(request('status') === 'lapor_nanti' ? 'selected' : ''); ?>>Lapor Nanti</option>
                 </select>
             </div>
             <div>
@@ -404,6 +412,8 @@
                             <?php echo $__env->make('fop_tasks.partials.row-cells', ['task' => $task], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
                             <?php
                                 $canDeleteTask = !in_array($task->category->value, ['SURVEY', 'PSB'], true) && !$task->ticket;
+                                // Lapor Nanti terkunci ke teknisi — Edit/Hapus/Prioritas disembunyikan.
+                                $lockedFromFop = $task->status->isLockedFromFop();
                             ?>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 <?php if($task->isScheduledForFutureClientDate()): ?>
@@ -416,7 +426,7 @@
                                     </span>
                                 <?php endif; ?>
 
-                                <?php if($canEditFopTaskType): ?>
+                                <?php if($canEditFopTaskType && ! $lockedFromFop): ?>
                                     <select @change="updatePriority(<?php echo e($task->id); ?>, $event.target.value)"
                                             x-data="{ currentPriority: '<?php echo e($task->priority->value); ?>' }"
                                             x-model="currentPriority"
@@ -485,6 +495,12 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
                                     </a>
+                                    <?php if($lockedFromFop): ?>
+                                    <span class="text-[10px] font-semibold px-2 py-1 rounded border border-violet-200 text-violet-700 bg-violet-50 dark:border-violet-800/50 dark:text-violet-400 dark:bg-violet-900/20"
+                                          title="Lapor Nanti — terkunci sampai teknisi mengirim laporan">
+                                        Terkunci
+                                    </span>
+                                    <?php else: ?>
                                     <button @click="openEditModal(<?php echo e(json_encode($task)); ?>, <?php echo e(json_encode($task->technicians->pluck('id'))); ?>, '<?php echo e(route('fop-tasks.update', $task->id)); ?>')"
                                             class="text-slate-400 dark:text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 p-1.5 rounded cursor-pointer"
                                             title="Edit">
@@ -510,6 +526,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
                                     </button>
+                                    <?php endif; ?>
                                     <?php endif; ?>
                                 </div>
                             </td>

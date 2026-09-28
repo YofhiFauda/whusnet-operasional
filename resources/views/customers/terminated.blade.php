@@ -120,7 +120,7 @@
                             {{-- Tombol hanya untuk status "Belum Diambil": sudah diambil atau task-nya sedang berjalan → disembunyikan (server juga menolak duplikat). --}}
                             @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                             <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">
+                                  onsubmit="event.preventDefault(); window.confirmAction(@js('Buat Task FOP pengambilan alat untuk '.($customer->full_name).'?'), this);">
                                 @csrf
                                 <button type="submit" class="px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
                                     Ambil Alat
@@ -129,7 +129,7 @@
                             @endif
                             @if(auth()->user()->hasPermission('customers.detail.installation.validate'))
                             <form action="{{ route('customers.reactivate', $customer->id) }}" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan {{ $customer->full_name }}?', this);">
+                                  onsubmit="event.preventDefault(); window.confirmAction(@js(($isDeviceRetrieved ? 'Alat pelanggan ini sudah diambil — Langganan Lagi akan memasukkan '.$customer->full_name.' ke Antrean Survey untuk pemasangan ulang. Lanjutkan?' : 'Aktifkan kembali langganan '.$customer->full_name.'?')), this);">
                                 @csrf
                                 <button type="submit" class="px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer">
                                     Langganan Lagi
@@ -215,7 +215,7 @@
                     @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                     <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
                           class="flex-1 sm:flex-none flex"
-                          onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">
+                          onsubmit="event.preventDefault(); window.confirmAction(@js('Buat Task FOP pengambilan alat untuk '.($customer->full_name).'?'), this);">
                         @csrf
                         <button type="submit" class="w-full h-10 px-3.5 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
                             Ambil Alat
@@ -225,7 +225,7 @@
                     @if(auth()->user()->hasPermission('customers.detail.installation.validate'))
                     <form action="{{ route('customers.reactivate', $customer->id) }}" method="POST"
                           class="flex-1 sm:flex-none flex"
-                          onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan {{ $customer->full_name }}?', this);">
+                          onsubmit="event.preventDefault(); window.confirmAction(@js(($isDeviceRetrieved ? 'Alat pelanggan ini sudah diambil — Langganan Lagi akan memasukkan '.$customer->full_name.' ke Antrean Survey untuk pemasangan ulang. Lanjutkan?' : 'Aktifkan kembali langganan '.$customer->full_name.'?')), this);">
                         @csrf
                         <button type="submit" class="w-full h-10 px-3.5 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer">
                             Langganan Lagi

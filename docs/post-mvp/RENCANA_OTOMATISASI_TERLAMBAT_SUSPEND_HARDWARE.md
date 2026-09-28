@@ -39,11 +39,19 @@ Hari 3-5: kalau masih belum_dibayar/sebagian → kirim notifikasi (WA/SMS) "tagi
 Hari 7  : kalau masih nunggak → suspend otomatis (customer.status = suspended,
           suspension_reason = overdue) + panggil hardware disable
 Setelah suspend: pelanggan bayar lunas → auto-reactivate (customer.status = active)
-          + panggil hardware enable + (opsional) buat invoice_type REAKTIVASI
-          kalau ada biaya buka isolir
+          + panggil hardware enable + (opsional) buat tagihan biaya buka isolir
+          kalau bisnis memutuskan mau menagihnya
 ```
 
-Titik penting: `InvoiceType::REAKTIVASI` **sudah ada di enum** (`app/Enums/InvoiceType.php`) tapi belum ada consumer otomatis yang memakainya untuk kasus ini — saat ini cuma dipakai manual invoice. Auto-suspend/reaktivasi ini justru use-case aslinya.
+**Update 2026-09-26:** `InvoiceType::REAKTIVASI` **sudah dihapus** dari enum
+(`app/Enums/InvoiceType.php`) — kondisinya ternyata salah sasaran sejak awal
+(cek status `suspended`, padahal definisi resminya §3.2
+`analisa-rancangan-tagihan-manual.md` adalah "putus lalu berlangganan lagi",
+bukan isolir/suspend biasa). Detail: `docs/plan/billing/rancangan-terminate-reactivate-state-machine.md` §11.
+Kalau fitur "biaya buka isolir" di §3.3 ini suatu saat mau diimplementasi,
+jangan asumsikan `REAKTIVASI` tersedia lagi — pakai `InvoiceType::MANUAL`
+(kategori `LAINNYA`) atau ajukan jenis baru yang didefinisikan ulang dari nol,
+sesuai kebutuhan saat itu.
 
 ### 3.4 Denda (Opsional, Perlu Keputusan Bisnis)
 Kalau bisnis mau kenakan denda keterlambatan:

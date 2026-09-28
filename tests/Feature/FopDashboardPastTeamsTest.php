@@ -152,7 +152,7 @@ class FopDashboardPastTeamsTest extends TestCase
     public function test_pending_task_keeps_its_team_visible(): void
     {
         // Pending = kerja berhenti, tapi task belum tertutup. Timnya harus tetap
-        // terlihat koordinator: `setPending()` tidak mengubah task_date dan tidak
+        // terlihat koordinator: pending tidak mengubah task_date dan tidak
         // ada scheduler yang menjadwalkan ulang, jadi kalau hilang dari papan ia
         // mengendap tanpa ada yang tahu.
         [$team, $fopTask] = $this->makeTeamWithTask('Team Pending', 'TFOP-PAST-5', Carbon::today()->subDay(), TaskStatus::PENDING);

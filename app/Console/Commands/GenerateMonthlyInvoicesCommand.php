@@ -93,8 +93,6 @@ class GenerateMonthlyInvoicesCommand extends Command
             // (dulu terisi registration_date), pelanggan menerima AWAL + BULANAN
             // untuk periode yang sama.
             //
-            // REAKTIVASI sengaja tidak dihitung: pelanggan yang disuspend lalu
-            // aktif lagi di bulan yang sama memang boleh punya dua record.
             // Invoice BATAL juga tidak dihitung, kalau tidak tagihan yang sudah
             // dibatalkan akan memblokir penerbitan penggantinya. Aturan ini
             // sama persis dengan InvoiceObserver::rejectSecondSubscriptionInvoice

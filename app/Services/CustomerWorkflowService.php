@@ -93,7 +93,7 @@ class CustomerWorkflowService
                     $titlePrefix = $nextStatus->value === 'waiting_survey' ? 'Survey Pelanggan: ' : 'Pemasangan Baru: ';
                     $existingTask = Task::where('customer_id', $customer->id)
                         ->where('task_type', $taskType)
-                        ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
+                        ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::LAPOR_NANTI->value])
                         ->exists();
 
                     if (! $existingTask) {

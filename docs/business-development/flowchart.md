@@ -33,7 +33,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    Q[BD buka halaman detail] --> R{CustomerVerificationDetailService::load<br/>ada Invoice AWAL/REAKTIVASI sungguhan?}
+    Q[BD buka halaman detail] --> R{CustomerVerificationDetailService::load<br/>ada Invoice AWAL sungguhan?}
     R -->|Ya — initialInvoice| S[Kartu: nomor invoice sungguhan<br/>badge Lunas/Belum Dibayar<br/>link ke invoices.show]
     R -->|Belum — pendingInitialInvoice| T[Kartu: angka dari snapshot JSON<br/>badge amber Belum Terbit<br/>tanpa link — invoice belum ada]
 ```

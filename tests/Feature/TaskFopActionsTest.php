@@ -11,6 +11,7 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\TaskService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -130,7 +131,14 @@ class TaskFopActionsTest extends TestCase
         $this->assertEquals('Teknisi berhalangan', $task->pending_reason);
     }
 
-    public function test_fop_can_approve_completed_survey_task(): void
+    /**
+     * Approve Survey TIDAK lagi lewat halaman Task (commit 8dab63f,
+     * TaskController::review()): hasil survey wajib diverifikasi Admin/CS
+     * di halaman Verifikasi & Pemasangan (processToTeam), jalur yang juga
+     * meneruskan pelanggan ke TIM Pemasangan. Test lama masih mengharapkan
+     * approve langsung dari sini — diperbarui 2026-09-28 mengikuti aturan itu.
+     */
+    public function test_fop_approve_survey_dari_halaman_task_diarahkan_ke_verifikasi(): void
     {
         $customer = Customer::create([
             'customer_code' => 'CUST-001',
@@ -160,13 +168,14 @@ class TaskFopActionsTest extends TestCase
             ]);
 
         $response->assertRedirect();
-        $response->assertSessionHas('success');
+        $response->assertSessionHas('error');
 
+        // Tidak ada yang berubah — keputusan tetap di halaman Verifikasi.
         $task->refresh();
-        $this->assertEquals('approved', $task->fop_review_status);
+        $this->assertEquals('pending', $task->fop_review_status);
 
         $customer->refresh();
-        $this->assertEquals('waiting_installation', $customer->status);
+        $this->assertEquals('waiting_acc', $customer->status);
     }
 
     public function test_fop_can_reject_completed_survey_task(): void
@@ -237,6 +246,120 @@ class TaskFopActionsTest extends TestCase
         $this->assertEquals(TaskStatus::PENDING->value, $task->status->value);
         $this->assertEquals('pending', $task->fop_review_status);
         $this->assertEquals('Menunggu data tambahan', $task->pending_reason);
+    }
+
+    /**
+     * Review "Pending" = Pending ASLI (keputusan user 2026-09-28): tim
+     * dilepas, FopTask balik ke antrian, pelanggan kembali ke antrean survey
+     * supaya task yang dijadwal ulang bisa di-"Mulai" lagi. Dulu tim tetap
+     * nempel tapi teknisi gak bisa lapor ulang maupun Mulai — task tertahan.
+     */
+    public function test_review_pending_survey_melepas_tim_dan_mengembalikan_pelanggan_ke_antrean_survey(): void
+    {
+        $customer = Customer::create([
+            'customer_code' => 'CUST-RVP',
+            'full_name' => 'Pelanggan Review Pending',
+            'primary_phone' => '0812345678',
+            'status' => 'waiting_acc',
+            'pop_id' => $this->pop->id,
+            'data_completeness_status' => 'draft',
+            'registration_date' => now(),
+        ]);
+        $task = Task::create([
+            'task_number' => 'TASK-2026-0091',
+            'pop_id' => $this->pop->id,
+            'customer_id' => $customer->id,
+            'task_type' => TaskType::SURVEY->value,
+            'title' => 'Survey Selesai',
+            'status' => TaskStatus::SELESAI->value,
+            'fop_review_status' => 'pending',
+            'scheduled_at' => now(),
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $this->techUser->id, 'role_in_task' => 'lead']);
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-2026-0091',
+            'task_id' => $task->id,
+            'task_date' => now(),
+            'category' => TaskType::SURVEY->value,
+            'tugas' => 'Survey',
+            'issue' => 'Survey ulang',
+            'status' => TaskStatus::SELESAI->value,
+            'priority' => 'Medium',
+        ]);
+        $fopTask->technicians()->sync([$this->techUser->id]);
+
+        $this->actingAs($this->fopUser)
+            ->post(route('tasks.review', $task->id), ['action' => 'pending', 'reason' => 'Titik ODP salah, survey ulang'])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $task->refresh();
+        $this->assertEquals(TaskStatus::PENDING, $task->status);
+        $this->assertFalse($task->isMember($this->techUser->id));
+        $this->assertEquals(TaskStatus::PENDING, $fopTask->fresh()->status);
+        $this->assertSame([], $fopTask->fresh()->technicians()->pluck('users.id')->all());
+        $this->assertEquals('waiting_survey', $customer->fresh()->status);
+        // transition(WAITING_SURVEY) tidak membuat Task survey kedua — task Pending ini yang dijadwal ulang.
+        $this->assertSame(1, Task::where('customer_id', $customer->id)->where('task_type', TaskType::SURVEY->value)->count());
+    }
+
+    public function test_review_pending_pemasangan_mengembalikan_pelanggan_ke_antrean_pemasangan(): void
+    {
+        $customer = Customer::create([
+            'customer_code' => 'CUST-RVP2',
+            'full_name' => 'Pelanggan Review Pending PSB',
+            'primary_phone' => '0812345679',
+            'status' => 'installed',
+            'pop_id' => $this->pop->id,
+            'data_completeness_status' => 'draft',
+            'registration_date' => now(),
+        ]);
+        $task = Task::create([
+            'task_number' => 'TASK-2026-0092',
+            'pop_id' => $this->pop->id,
+            'customer_id' => $customer->id,
+            'task_type' => TaskType::PEMASANGAN->value,
+            'title' => 'Pemasangan Selesai',
+            'status' => TaskStatus::SELESAI->value,
+            'fop_review_status' => 'pending',
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+
+        $this->actingAs($this->fopUser)
+            ->post(route('tasks.review', $task->id), ['action' => 'pending', 'reason' => 'Kabel belum rapi'])
+            ->assertSessionHas('success');
+
+        $this->assertEquals(TaskStatus::PENDING, $task->fresh()->status);
+        $this->assertEquals('waiting_installation', $customer->fresh()->status);
+    }
+
+    public function test_mulai_ulang_mengosongkan_waktu_selesai_sesi_lama(): void
+    {
+        $task = Task::create([
+            'task_number' => 'TASK-2026-0093',
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::MAINTENANCE->value,
+            'title' => 'Maintenance dijadwal ulang',
+            'status' => TaskStatus::TERJADWAL->value,
+            'scheduled_at' => now(),
+            'work_finished_at' => now()->subDay(),
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $this->techUser->id, 'role_in_task' => 'lead']);
+
+        app(TaskService::class)->start($task, $this->techUser);
+
+        $this->assertNull($task->fresh()->work_finished_at);
+
+        app(TaskService::class)->complete($task->fresh(), $this->techUser);
+
+        $task->refresh();
+        $this->assertNotNull($task->work_finished_at);
+        $this->assertEquals($task->completed_at->toDateTimeString(), $task->work_finished_at->toDateTimeString());
     }
 
     /**

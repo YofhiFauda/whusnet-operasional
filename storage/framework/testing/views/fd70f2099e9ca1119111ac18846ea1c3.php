@@ -583,7 +583,7 @@ unset($__errorArgs, $__bag); ?>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div>
                                 <label for="pop_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">POP Cabang <span class="text-rose-500">*</span></label>
-                                <select name="pop_id" id="pop_id" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['pop_id'];
+                                <select name="pop_id" id="pop_id" data-original-pop-id="<?php echo e($customer->pop_id); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['pop_id'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -606,12 +606,43 @@ $message = $__bag->first($__errorArgs[0]); ?>
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
-                                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Mini POP diatur terpisah lewat modal "Atur Mini POP &amp; Distribusi" di halaman Detail Pelanggan (pasca pemasangan).</p>
+                                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Ganti POP = Mini POP &amp; Distribusi dipilih ulang. CID ikut berubah, REQ ID tetap. Syarat: semua tagihan pelanggan sudah lunas.</p>
+                            </div>
+
+                            <div>
+                                <label for="mini_pop_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Mini POP (OLT)</label>
+                                <select name="mini_pop_id" id="mini_pop_id" <?php if($networkAssignmentLocked): echo 'disabled'; endif; ?> data-locked-by-status="<?php echo e((int) $networkAssignmentLocked); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['mini_pop_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="">Pilih Mini POP</option>
+                                    
+                                    <?php if($customer->miniPop && ! $miniPops->contains('id', $customer->mini_pop_id)): ?>
+                                        <option value="<?php echo e($customer->mini_pop_id); ?>" data-pop-id="<?php echo e($customer->miniPop->parent_id); ?>" selected><?php echo e($customer->miniPop->name); ?></option>
+                                    <?php endif; ?>
+                                    <?php $__currentLoopData = $miniPops; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $miniPop): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($miniPop->id); ?>" data-pop-id="<?php echo e($miniPop->parent_id); ?>" <?php echo e(old('mini_pop_id', $customer->mini_pop_id) == $miniPop->id ? 'selected' : ''); ?>><?php echo e($miniPop->name); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                                <?php $__errorArgs = ['mini_pop_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
                             </div>
 
                             <div>
                                 <label for="distribution_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">KODE DISTRIBUSI (ODP)</label>
-                                <select name="distribution_id" id="distribution_id" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['distribution_id'];
+                                <select name="distribution_id" id="distribution_id" <?php if($networkAssignmentLocked): echo 'disabled'; endif; ?> class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['distribution_id'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -620,8 +651,11 @@ if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
                                     <option value="">Pilih Kode Distribusi</option>
-                                    <?php $__currentLoopData = $distributions ?? []; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $dist): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                        <option value="<?php echo e($dist->id); ?>" <?php echo e(old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : ''); ?>><?php echo e($dist->code); ?> - <?php echo e($dist->name); ?></option>
+                                    <?php if($customer->distribution && ! $distributions->contains('id', $customer->distribution_id)): ?>
+                                        <option value="<?php echo e($customer->distribution_id); ?>" data-mini-pop-id="<?php echo e($customer->distribution->pop_id); ?>" selected><?php echo e($customer->distribution->code); ?> - <?php echo e($customer->distribution->name); ?></option>
+                                    <?php endif; ?>
+                                    <?php $__currentLoopData = $distributions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $dist): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($dist->id); ?>" data-mini-pop-id="<?php echo e($dist->pop_id); ?>" <?php echo e(old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : ''); ?>><?php echo e($dist->code); ?> - <?php echo e($dist->name); ?></option>
                                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </select>
                                 <?php $__errorArgs = ['distribution_id'];
@@ -636,11 +670,11 @@ endif;
 unset($__errorArgs, $__bag); ?>
                             </div>
 
-                            <!-- Konteks read-only: POP saat ini & wilayah, biar operator lihat -->
-                            <div class="md:col-span-2 pt-3 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/50 rounded-xl p-4">
-                                <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Mini POP Saat Ini</span>
-                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-100"><?php echo e($customer->miniPop->name ?? 'Belum diatur'); ?></span>
-                            </div>
+                            <?php if($networkAssignmentLocked): ?>
+                                <p class="md:col-span-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Pelanggan belum masuk tahap pemasangan — sekarang cuma POP Cabang yang bisa diatur. Mini POP &amp; Distribusi (penentu CID) diisi setelah pemasangan dimulai.</p>
+                            <?php else: ?>
+                                <p id="network-same-pop-hint" class="md:col-span-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Mini POP &amp; Distribusi cuma bisa diubah di sini kalau POP Cabang ikut dipindah. Tanpa pindah Cabang, atur lewat tombol "Atur Mini POP &amp; Distribusi" di Detail Pelanggan.</p>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -1780,7 +1814,7 @@ unset($__errorArgs, $__bag); ?>
         },
         'pop': {
             required: ['pop_id'],
-            optional: ['distribution_id']
+            optional: ['mini_pop_id', 'distribution_id']
         },
         'dokumen': {
             required: [],
@@ -1821,7 +1855,58 @@ unset($__errorArgs, $__bag); ?>
         7: 'operasional'
     };
 
+    /* ── Dropdown berantai POP → Mini POP → Distribusi ──
+       Cuma menyembunyikan opsi yang bukan milik induknya & mengosongkan
+       pilihan yang jadi tidak cocok (mis. setelah ganti POP). Validasi
+       aslinya tetap di CustomerController::update(). */
+    function filterChildOptions(select, dataKey, parentValue) {
+        Array.from(select.options).forEach(option => {
+            if (!option.value) {
+                return;
+            }
+            const cocok = parentValue !== '' && option.dataset[dataKey] === parentValue;
+            option.hidden = !cocok;
+            option.disabled = !cocok;
+            if (!cocok && option.selected) {
+                select.value = '';
+            }
+        });
+    }
+
+    function syncNetworkDropdowns() {
+        const popSelect = document.getElementById('pop_id');
+        const miniPopSelect = document.getElementById('mini_pop_id');
+        const distributionSelect = document.getElementById('distribution_id');
+        if (!popSelect || !miniPopSelect || !distributionSelect) {
+            return;
+        }
+
+        // Pra-pemasangan: dikunci server-side (atribut disabled), jangan dibuka JS.
+        if (miniPopSelect.dataset.lockedByStatus === '1') {
+            return;
+        }
+
+        // Mini POP & Distribusi cuma boleh diubah kalau POP Cabang dipindah
+        // (CustomerController::update() mengabaikannya selain itu). Selama
+        // Cabang sama: dropdown dikunci & TIDAK difilter, supaya nilai lama
+        // (termasuk data legacy di luar hierarki) tetap tampil apa adanya.
+        const popChanged = popSelect.value !== popSelect.dataset.originalPopId;
+        miniPopSelect.disabled = !popChanged;
+        distributionSelect.disabled = !popChanged;
+        document.getElementById('network-same-pop-hint')?.classList.toggle('hidden', popChanged);
+        if (!popChanged) {
+            return;
+        }
+
+        filterChildOptions(miniPopSelect, 'popId', popSelect.value);
+        filterChildOptions(distributionSelect, 'miniPopId', miniPopSelect.value);
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
+        syncNetworkDropdowns();
+        document.getElementById('pop_id')?.addEventListener('change', syncNetworkDropdowns);
+        document.getElementById('mini_pop_id')?.addEventListener('change', syncNetworkDropdowns);
+
         const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
         inputs.forEach(input => {
             input.addEventListener('input', runLiveProgressUpdates);
@@ -2177,6 +2262,7 @@ unset($__errorArgs, $__bag); ?>
             latitude: 'Latitude',
             longitude: 'Longitude',
             pop_id: 'POP Cabang',
+            mini_pop_id: 'Mini POP',
             distribution_id: 'Kode Distribusi',
             foto_rumah: 'Foto Rumah',
             foto_kontrak: 'Foto Kontrak',

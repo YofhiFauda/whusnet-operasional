@@ -156,7 +156,7 @@
                                 <button type="submit"
                                         class="p-1 text-slate-400 dark:text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-md transition-colors cursor-pointer"
                                         title="<?php echo e($category->is_active ? 'Nonaktifkan' : 'Aktifkan'); ?> Kategori"
-                                        onclick="event.preventDefault(); window.confirmDelete('Apakah Anda yakin ingin <?php echo e($category->is_active ? 'menonaktifkan' : 'mengaktifkan'); ?> kategori <?php echo e($category->name); ?>?', this.closest('form'))">
+                                        onclick="event.preventDefault(); window.confirmDelete(<?php echo \Illuminate\Support\Js::from('Apakah Anda yakin ingin '.($category->is_active ? 'menonaktifkan' : 'mengaktifkan').' kategori '.($category->name).'?')->toHtml() ?>, this.closest('form'))">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                     </svg>

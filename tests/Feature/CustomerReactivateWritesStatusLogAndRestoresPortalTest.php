@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerDevice;
 use App\Models\CustomerPortalAccount;
 use App\Models\CustomerQrToken;
 use App\Models\CustomerService;
 use App\Models\CustomerStatusLog;
 use App\Models\CustomerTerminationReason;
 use App\Models\Pop;
+use App\Models\Task;
 use App\Services\CustomerQrTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -138,5 +140,67 @@ class CustomerReactivateWritesStatusLogAndRestoresPortalTest extends TestCase
         $account = CustomerPortalAccount::where('customer_id', $customer->id)->first();
         $this->assertNotNull($account);
         $this->assertSame('pending_claim', $account->status);
+    }
+
+    /**
+     * Cabang baru (lihat CustomerController::reactivate()): alat sudah
+     * diambil = tidak ada modem terpasang di lokasi, jadi tidak bisa
+     * langsung active — pelanggan diproses ulang dari survey seperti
+     * pemasangan baru, bukan lompat balik ke active tanpa alat.
+     */
+    #[Test]
+    public function langganan_lagi_masuk_antrean_survey_kalau_alat_sudah_diambil(): void
+    {
+        $this->loginAsAdmin();
+        $customer = $this->terminatedCustomer(['customer_code' => 'RQ003003']);
+        $device = CustomerDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => CustomerDevice::LEGACY_DEVICE_TYPE,
+            'device_retrieved_at' => now()->subDay(),
+        ]);
+
+        $this->post(route('customers.reactivate', $customer))->assertSessionHas('success');
+
+        $customer->refresh();
+        $this->assertSame('waiting_survey', $customer->status);
+
+        // Flag dicabut di kedua cabang (ADHOC-88) — modem baru akan dipasang.
+        $this->assertNull($device->fresh()->device_retrieved_at);
+
+        $this->assertDatabaseHas('customer_status_logs', [
+            'customer_id' => $customer->id,
+            'from_status' => 'terminated',
+            'to_status' => 'waiting_survey',
+        ]);
+
+        // Antrean Survey = Task SURVEY otomatis, sama seperti pendaftaran baru.
+        $this->assertTrue(
+            Task::where('customer_id', $customer->id)->where('task_type', 'SURVEY')->exists(),
+            'Task Survey wajib otomatis terbentuk saat masuk waiting_survey.'
+        );
+
+        // Portal tetap dipulihkan meski belum active — pelanggan yang di
+        // tengah survey/pemasangan ulang tetap butuh akses portal.
+        $account = CustomerPortalAccount::where('customer_id', $customer->id)->first();
+        $this->assertNotNull($account);
+        $this->assertSame('pending_claim', $account->status);
+    }
+
+    #[Test]
+    public function langganan_lagi_tetap_langsung_active_kalau_alat_belum_diambil(): void
+    {
+        $this->loginAsAdmin();
+        $customer = $this->terminatedCustomer(['customer_code' => 'RQ003004']);
+        CustomerDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => CustomerDevice::LEGACY_DEVICE_TYPE,
+            'device_retrieved_at' => null,
+        ]);
+
+        $this->post(route('customers.reactivate', $customer))->assertSessionHas('success');
+
+        $customer->refresh();
+        $this->assertSame('active', $customer->status);
+        $this->assertFalse(Task::where('customer_id', $customer->id)->where('task_type', 'SURVEY')->exists());
     }
 }

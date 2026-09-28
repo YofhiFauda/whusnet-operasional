@@ -39,8 +39,11 @@ class NetworkAssignmentService
      * `CustomerNetworkAssignmentController::BLOCKED_STATUSES`. Pemasangan
      * belum mulai, jadi belum ada dasar teknis buat nentuin OLT/Distribusi
      * mana. Kalau daftar di sana berubah, ubah juga di sini.
+     *
+     * Public sejak ADHOC-104: Edit Pelanggan (CustomerController::edit()/
+     * update()) merujuk konstanta ini langsung, bukan bikin salinan ketiga.
      */
-    private const BLOCKED_STATUSES = [
+    public const BLOCKED_STATUSES = [
         'registered',
         'waiting_survey',
         'survey_in_progress',

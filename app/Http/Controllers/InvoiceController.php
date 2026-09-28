@@ -96,7 +96,7 @@ class InvoiceController extends Controller
             ->piutang();
 
         $unpaidAwalTotal = (clone $unpaidBase)
-            ->whereIn('invoice_type', ['awal', 'reaktivasi'])
+            ->where('invoice_type', 'awal')
             ->sum('remaining_amount');
 
         $unpaidBulananTotal = (clone $unpaidBase)
@@ -189,7 +189,18 @@ class InvoiceController extends Controller
 
         $categories = ManualInvoiceCategory::cases();
 
-        return view('invoices.create', compact('customer', 'customerError', 'search', 'searchResults', 'categories'));
+        // Prefill dari Verifikasi Biaya C-REQ (docs/plan/task-teknisi/
+        // rancangan-biaya-creq-verifikasi-cs.md §4-5) — CS TETAP submit
+        // form ini secara sadar, cuma pelanggan/kategori/deskripsinya sudah
+        // terisi dari task yang baru disetujui. Nominal TETAP wajib diisi
+        // manual, tidak pernah dikirim lewat query.
+        $prefill = [
+            'manual_category' => $request->query('manual_category'),
+            'manual_subtype_name' => $request->query('manual_subtype_name'),
+            'description' => $request->query('description'),
+        ];
+
+        return view('invoices.create', compact('customer', 'customerError', 'search', 'searchResults', 'categories', 'prefill'));
     }
 
     /**

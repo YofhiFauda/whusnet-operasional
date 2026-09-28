@@ -8,6 +8,10 @@
 <td class="px-3 py-2" id="tech-cell-{{ $task->id }}">
     <div class="flex flex-wrap gap-1 items-start min-w-[150px]">
         @php
+            // Lapor Nanti terkunci ke teknisi — switch/cancel dinonaktifkan di
+            // sini, dan FopTaskController::abortIfReportDeferred() nolak kalau
+            // tetap dipaksa lewat request langsung.
+            $lockedFromFop = $task->status->isLockedFromFop();
             $visibleTechs = $task->technicians->take(2);
             $hiddenTechsCount = $task->technicians->count() - 2;
         @endphp
@@ -16,9 +20,9 @@
                 // Ambil nama depan saja untuk menghemat ruang
                 $firstName = explode(' ', trim($tech->name))[0];
             @endphp
-            <button type="button"
+            <button type="button" @disabled($lockedFromFop)
                 @click="openSwitchModal({{ $task->id }}, '{{ $task->task_number }}', @js($task->tugas), '{{ $task->task_date?->toDateString() }}', {{ $tech->id }}, @js($tech->name))"
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 title="{{ $tech->name }} — klik buat Switch Teknisi">
                 {{ \Illuminate\Support\Str::limit($firstName, 12) }}
             </button>
@@ -36,9 +40,9 @@
                     class="absolute z-40 mt-1 min-w-[140px] bg-surface border border-border rounded shadow-lg py-1"
                     style="display: none;">
                     @foreach($task->technicians->skip(2) as $tech)
-                        <button type="button"
+                        <button type="button" @disabled($lockedFromFop)
                             @click="openSwitchModal({{ $task->id }}, '{{ $task->task_number }}', @js($task->tugas), '{{ $task->task_date?->toDateString() }}', {{ $tech->id }}, @js($tech->name)); openHidden = false"
-                            class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-muted transition-colors">
+                            class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-muted transition-colors disabled:cursor-not-allowed disabled:opacity-60">
                             {{ $tech->name }}
                         </button>
                     @endforeach
@@ -84,16 +88,16 @@
     @php
         // FopTask.status share vocab persis sama TaskStatus (unifikasi
         // 2026-07-20) — kalau udah ada Task eksekusi terhubung, pakai label/
-        // badge dari situ (bawa nuansa report_deferred). Kalau belum (FopTask
+        // badge dari situ. Kalau belum (FopTask
         // standalone, task_id null, masih 'draft' — belum ada teknisi
         // di-assign), pakai punya FopTask sendiri, dikasih label khusus biar
         // gak nyesatin ("draft" doang kurang jelas buat FOP).
         $statusValue = $task->status->value;
         $statusLabel = $task->task
-            ? $task->task->status->displayLabel($task->task->report_deferred)
-            : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->displayLabel());
+            ? $task->task->status->label()
+            : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->label());
         $statusClasses = $task->task
-            ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
+            ? $task->task->status->displayBadgeClasses()
             : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
     @endphp
     <div class="flex flex-col gap-1 items-start">
@@ -106,7 +110,7 @@
                  Customer (tab Survey/Pemasangan), biar masuk List Pelanggan
                  Gagal. Lihat TaskPolicy::cancel() & FopTaskController::update(). --}}
             @can('fop_tasks.cancel')
-                @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']))
+                @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']) && ! $task->status->isLockedFromFop())
                     <button type="button"
                             @click="openCancelModal({{ $task->id }}, '{{ $task->task_number }}')"
                             class="text-[10px] text-red-600 dark:text-red-400 underline decoration-dotted text-left cursor-pointer">

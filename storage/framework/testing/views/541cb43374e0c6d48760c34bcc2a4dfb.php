@@ -2,6 +2,10 @@
 <td class="px-3 py-2" id="tech-cell-<?php echo e($task->id); ?>">
     <div class="flex flex-wrap gap-1 items-start min-w-[150px]">
         <?php
+            // Lapor Nanti terkunci ke teknisi — switch/cancel dinonaktifkan di
+            // sini, dan FopTaskController::abortIfReportDeferred() nolak kalau
+            // tetap dipaksa lewat request langsung.
+            $lockedFromFop = $task->status->isLockedFromFop();
             $visibleTechs = $task->technicians->take(2);
             $hiddenTechsCount = $task->technicians->count() - 2;
         ?>
@@ -10,9 +14,9 @@
                 // Ambil nama depan saja untuk menghemat ruang
                 $firstName = explode(' ', trim($tech->name))[0];
             ?>
-            <button type="button"
+            <button type="button" <?php if($lockedFromFop): echo 'disabled'; endif; ?>
                 @click="openSwitchModal(<?php echo e($task->id); ?>, '<?php echo e($task->task_number); ?>', <?php echo \Illuminate\Support\Js::from($task->tugas)->toHtml() ?>, '<?php echo e($task->task_date?->toDateString()); ?>', <?php echo e($tech->id); ?>, <?php echo \Illuminate\Support\Js::from($tech->name)->toHtml() ?>)"
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 title="<?php echo e($tech->name); ?> — klik buat Switch Teknisi">
                 <?php echo e(\Illuminate\Support\Str::limit($firstName, 12)); ?>
 
@@ -32,9 +36,9 @@
                     class="absolute z-40 mt-1 min-w-[140px] bg-surface border border-border rounded shadow-lg py-1"
                     style="display: none;">
                     <?php $__currentLoopData = $task->technicians->skip(2); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tech): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <button type="button"
+                        <button type="button" <?php if($lockedFromFop): echo 'disabled'; endif; ?>
                             @click="openSwitchModal(<?php echo e($task->id); ?>, '<?php echo e($task->task_number); ?>', <?php echo \Illuminate\Support\Js::from($task->tugas)->toHtml() ?>, '<?php echo e($task->task_date?->toDateString()); ?>', <?php echo e($tech->id); ?>, <?php echo \Illuminate\Support\Js::from($tech->name)->toHtml() ?>); openHidden = false"
-                            class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-muted transition-colors">
+                            class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-muted transition-colors disabled:cursor-not-allowed disabled:opacity-60">
                             <?php echo e($tech->name); ?>
 
                         </button>
@@ -82,16 +86,16 @@
     <?php
         // FopTask.status share vocab persis sama TaskStatus (unifikasi
         // 2026-07-20) — kalau udah ada Task eksekusi terhubung, pakai label/
-        // badge dari situ (bawa nuansa report_deferred). Kalau belum (FopTask
+        // badge dari situ. Kalau belum (FopTask
         // standalone, task_id null, masih 'draft' — belum ada teknisi
         // di-assign), pakai punya FopTask sendiri, dikasih label khusus biar
         // gak nyesatin ("draft" doang kurang jelas buat FOP).
         $statusValue = $task->status->value;
         $statusLabel = $task->task
-            ? $task->task->status->displayLabel($task->task->report_deferred)
-            : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->displayLabel());
+            ? $task->task->status->label()
+            : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->label());
         $statusClasses = $task->task
-            ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
+            ? $task->task->status->displayBadgeClasses()
             : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
     ?>
     <div class="flex flex-col gap-1 items-start">
@@ -103,7 +107,7 @@
         <div class="flex flex-col gap-0.5 mt-0.5">
             
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('fop_tasks.cancel')): ?>
-                <?php if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB'])): ?>
+                <?php if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']) && ! $task->status->isLockedFromFop()): ?>
                     <button type="button"
                             @click="openCancelModal(<?php echo e($task->id); ?>, '<?php echo e($task->task_number); ?>')"
                             class="text-[10px] text-red-600 dark:text-red-400 underline decoration-dotted text-left cursor-pointer">

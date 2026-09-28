@@ -244,7 +244,7 @@
                                 <button type="submit" 
                                         class="p-1 rounded-md transition-colors cursor-pointer {{ $pop->status === 'active' ? 'text-green-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20' }}"
                                         title="{{ $pop->status === 'active' ? 'Nonaktifkan POP' : 'Aktifkan POP' }}"
-                                        onclick="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengubah status POP {{ $pop->name }}?', this.closest('form'))">
+                                        onclick="event.preventDefault(); window.confirmAction(@js('Apakah Anda yakin ingin mengubah status POP '.($pop->name).'?'), this.closest('form'))">
                                     @if($pop->status === 'active')
                                     <!-- Toggle Active (Switch-on representation) -->
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

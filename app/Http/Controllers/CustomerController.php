@@ -54,6 +54,7 @@ use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
+use App\Services\NetworkAssignmentService;
 use App\Services\TelegramBotService;
 use App\Services\TicketService;
 use App\Support\IndonesianDate;
@@ -202,8 +203,15 @@ class CustomerController extends Controller
     }
 
     /**
-     * Aktifkan kembali pelanggan yang putus langganan ("Langganan Lagi"),
-     * langsung ke status active tanpa lewat survey/verifikasi ulang.
+     * Aktifkan kembali pelanggan yang putus langganan ("Langganan Lagi").
+     *
+     * Cabang ditentukan status pengambilan alat (`customer_devices.
+     * device_retrieved_at`), BUKAN pilihan manual admin — modem lama yang
+     * masih terpasang di lokasi berarti tidak ada yang perlu disurvey ulang:
+     * - Belum diambil → langsung `active` (perilaku asli sebelum branch ini).
+     * - Sudah diambil → `waiting_survey` (Antrean Survey), pelanggan diproses
+     *   ulang seperti pemasangan baru karena butuh modem baru + survey lokasi.
+     *   Rancangan & alasan bisnis: rancangan-terminate-reactivate-state-machine.md §13.
      */
     public function reactivate(Customer $customer)
     {
@@ -213,23 +221,39 @@ class CustomerController extends Controller
             return redirect()->back()->with('error', 'Pelanggan ini tidak dalam status putus langganan.');
         }
 
-        DB::transaction(function () use ($customer) {
-            // Lewat state machine (TERMINATED → ACTIVE diizinkan enum sejak
-            // ADHOC-85) — jejaknya masuk customer_status_logs + audit
-            // 'Customer Workflow' dengan note 'Langganan Lagi'. Audit khusus
-            // action 'reactivate' dihapus: tidak ada pembacanya di kode, dan
-            // baris lamanya di audit_logs tetap utuh. terminated_at SENGAJA
-            // tidak dikosongkan — dipakai DashboardController::growthStats
-            // untuk churn per periode; dikosongkan = churn bulan lalu ikut
-            // terhapus. Akun portal & QR dipulihkan CustomerObserver.
-            app(CustomerWorkflowService::class)->transition($customer, WorkflowTransition::ACTIVE, 'Langganan Lagi');
+        // Dibaca SEBELUM transaksi karena flag ini dicabut di dalamnya (lihat
+        // catatan ADHOC-88 di bawah) — begitu dicabut, informasi "sudah
+        // diambil atau belum" hilang buat pengecekan berikutnya.
+        $deviceAlreadyRetrieved = (bool) $customer->customerDevice?->device_retrieved_at;
 
-            if ($customer->customerService) {
-                $customer->customerService->update(['service_status' => 'aktif']);
+        DB::transaction(function () use ($customer, $deviceAlreadyRetrieved) {
+            if ($deviceAlreadyRetrieved) {
+                // Modem lama sudah ditarik dari lokasi — tidak bisa langsung
+                // aktif tanpa alat. Masuk WAITING_SURVEY: auto-create Task
+                // Survey + FopTask lewat CustomerWorkflowService::transition()
+                // (sama seperti pendaftaran baru), lanjut proses instalasi
+                // ulang penuh sampai VERIFICATION_ADMIN → ACTIVE lagi.
+                app(CustomerWorkflowService::class)->transition($customer, WorkflowTransition::WAITING_SURVEY, 'Langganan Lagi - Alat Sudah Diambil, Masuk Antrean Survey');
+            } else {
+                // Modem lama masih terpasang — lewat state machine (TERMINATED
+                // → ACTIVE diizinkan enum sejak ADHOC-85) — jejaknya masuk
+                // customer_status_logs + audit 'Customer Workflow' dengan note
+                // 'Langganan Lagi'. Audit khusus action 'reactivate' dihapus:
+                // tidak ada pembacanya di kode, dan baris lamanya di
+                // audit_logs tetap utuh. terminated_at SENGAJA tidak
+                // dikosongkan — dipakai DashboardController::growthStats
+                // untuk churn per periode; dikosongkan = churn bulan lalu ikut
+                // terhapus. Akun portal & QR dipulihkan CustomerObserver.
+                app(CustomerWorkflowService::class)->transition($customer, WorkflowTransition::ACTIVE, 'Langganan Lagi');
+
+                if ($customer->customerService) {
+                    $customer->customerService->update(['service_status' => 'aktif']);
+                }
             }
 
-            // Pelanggan yang Langganan Lagi akan dipasangi modem baru, jadi
-            // flag "alat sudah diambil" dari masa langganan lama dicabut —
+            // Pelanggan yang Langganan Lagi akan dipasangi modem baru (baik
+            // langsung aktif maupun lewat survey ulang), jadi flag "alat sudah
+            // diambil" dari masa langganan lama dicabut di kedua cabang —
             // kalau tidak, badge menyesatkan dan tombol Ambil Alat menolak
             // pemutusan berikutnya ("sudah diambil"). Riwayat pengambilan yang
             // sudah terjadi TIDAK hilang: ia tersimpan di `device_retrieval_logs`
@@ -237,7 +261,11 @@ class CustomerController extends Controller
             $customer->customerDevice?->update(['device_retrieved_at' => null]);
         });
 
-        return redirect()->back()->with('success', 'Pelanggan berhasil diaktifkan kembali.');
+        $message = $deviceAlreadyRetrieved
+            ? 'Pelanggan masuk Antrean Survey untuk pemasangan ulang (alat sebelumnya sudah diambil).'
+            : 'Pelanggan berhasil diaktifkan kembali.';
+
+        return redirect()->back()->with('success', $message);
     }
 
     /**
@@ -703,7 +731,20 @@ class CustomerController extends Controller
         }
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
-        $distributions = Distribution::orderBy('code')->get();
+        // Dropdown berantai POP → Mini POP → Distribusi. Dulu Distribusi
+        // memuat SEMUA baris lintas cabang (bocor ke pop_admin cabang lain,
+        // dan tetap pre-select distribusi lama saat pindah POP). Sekarang cuma
+        // Mini POP di bawah Cabang dalam scope user, dan Distribusi di bawah
+        // Mini POP itu — penyaringan per pilihan dilakukan di klien lewat
+        // data-* option, validasi aslinya tetap di update().
+        $miniPops = Pop::where('type', 'mini_pop')
+            ->whereIn('parent_id', $pops->pluck('id'))
+            ->orderBy('name')
+            ->get(['id', 'parent_id', 'name', 'pop_code']);
+        $distributions = Distribution::whereIn('pop_id', $miniPops->pluck('id'))->orderBy('code')->get();
+        // Pra-pemasangan: dropdown Mini POP & Distribusi dikunci, cuma POP
+        // Cabang yang bisa dipilih — lihat update().
+        $networkAssignmentLocked = in_array($customer->status, NetworkAssignmentService::BLOCKED_STATUSES, true);
 
         // Skema 3 (2026-09-12) — dropdown ID Sales/Agent di form Detail
         // Pelanggan. Berbasis `is_package_restricted`, bukan hardcode role
@@ -721,7 +762,7 @@ class CustomerController extends Controller
         // meledak di test & lokal.
         $customer->load(['customerDevice', 'customerTechnicalDetail']);
 
-        return view('customers.edit', compact('customer', 'packages', 'cities', 'pops', 'distributions', 'salesUsers', 'agents', 'restrictedRoleNames'));
+        return view('customers.edit', compact('customer', 'packages', 'cities', 'pops', 'miniPops', 'distributions', 'networkAssignmentLocked', 'salesUsers', 'agents', 'restrictedRoleNames'));
     }
 
     /**
@@ -745,6 +786,33 @@ class CustomerController extends Controller
             'other_fee',
         ));
 
+        // Pra-pemasangan cuma POP Cabang yang boleh diatur — Mini POP &
+        // Distribusi (bahan CID) belum punya dasar teknis sebelum pemasangan
+        // mulai. Aturan & daftar status sama dengan modal assignment
+        // (NetworkAssignmentService::BLOCKED_STATUSES). Pakai status di DB,
+        // bukan input `status` (hidden field yang bisa dikirim apa saja).
+        $networkAssignmentLocked = in_array($customer->status, NetworkAssignmentService::BLOCKED_STATUSES, true);
+
+        // Mini POP & Distribusi cuma boleh berubah lewat Edit kalau Cabang
+        // (pop_id) ikut dipindah — keputusan user 2026-09-28. Edit data lain
+        // (nomor HP, alamat, paket, ...) TIDAK menyentuh keduanya: rule
+        // `exclude` membuang field itu dari $validated, jadi
+        // $customer->update($validated) gak pernah menulisnya. Dulu form
+        // selalu mengirim nilai dropdown berantai — pelanggan legacy yang
+        // distribusinya belum di bawah Mini POP kehilangan distribution_id
+        // dan CID-nya dibuat ulang hanya karena admin ganti nomor HP.
+        // Atur Mini POP/Distribusi tanpa pindah Cabang tetap lewat modal
+        // "Atur Mini POP & Distribusi" (CustomerNetworkAssignmentController).
+        $popChanging = (int) $request->input('pop_id') !== (int) $customer->pop_id;
+
+        // Layanan yang sudah pernah ditagih TIDAK boleh dilepas dari Edit —
+        // paket kosong dulu berarti customer_services dihapus, dan FK
+        // invoices ikut menyapu seluruh tagihan + pembayaran pelanggan
+        // (keputusan user 2026-09-28). Sekarang paket jadi wajib; melepas
+        // layanan cuma boleh untuk calon pelanggan yang belum pernah ditagih.
+        $serviceHasInvoices = $customer->customerService
+            && Invoice::where('customer_service_id', $customer->customerService->id)->exists();
+
         $validated = $request->validate([
             'full_name' => 'required|string|max:150',
             'identity_number' => 'nullable|string|max:50',
@@ -754,8 +822,97 @@ class CustomerController extends Controller
             'npwp' => 'nullable|string|max:30',
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
-            'pop_id' => 'required|exists:pops,id',
-            'distribution_id' => 'nullable|exists:distributions,id',
+            'pop_id' => [
+                'required',
+                'exists:pops,id',
+                // Pindah POP cuma ke Cabang dalam scope user — dropdown sudah
+                // difilter Pop::forUser(), tapi PUT langsung ke endpoint bisa
+                // mengirim pop_id cabang mana pun (larangan RBAC #3).
+                function ($attribute, $value, $fail) use ($customer) {
+                    if ((int) $value === (int) $customer->pop_id) {
+                        return;
+                    }
+
+                    if (! Pop::forUser()->where('type', 'cabang')->whereKey($value)->exists()) {
+                        $fail('POP tujuan berada di luar akses Anda.');
+
+                        return;
+                    }
+
+                    // REQ ID (customer_code) permanen saat pindah POP, dan
+                    // unik per (pop_id, customer_code) — tanpa cek ini
+                    // tabrakan di POP tujuan meledak jadi QueryException 500.
+                    $bentrok = Customer::where('pop_id', $value)
+                        ->where('customer_code', $customer->customer_code)
+                        ->whereKeyNot($customer->id)
+                        ->exists();
+                    if ($bentrok) {
+                        $fail("REQ ID {$customer->customer_code} sudah dipakai pelanggan lain di POP tujuan.");
+
+                        return;
+                    }
+
+                    // Pindah Cabang wajib LUNAS dulu — keputusan user
+                    // 2026-09-28. Laporan pembayaran & piutang tetap milik
+                    // cabang lama, tagihan bulanan berikutnya terbit di cabang
+                    // baru (GenerateMonthlyInvoicesCommand pakai pop_id
+                    // pelanggan). Dengan syarat lunas ini gak ada tagihan
+                    // berjalan yang "nyeberang" cabang, jadi laporan tutup buku
+                    // cabang lama tidak pernah berubah retroaktif.
+                    $piutang = Invoice::query()
+                        ->where('customer_id', $customer->id)
+                        ->whereIn('invoice_status', Invoice::OUTSTANDING_STATUSES)
+                        ->get();
+                    if ($piutang->isNotEmpty()) {
+                        $sisa = (float) $piutang->sum('remaining_amount');
+                        $fail("Pelanggan masih punya {$piutang->count()} tagihan belum lunas (sisa Rp ".number_format($sisa, 0, ',', '.').'). Lunasi dulu sebelum pindah Cabang.');
+                    }
+                },
+            ],
+            // Mini POP & Distribusi — aturan hierarki sama persis dengan modal
+            // "Atur Mini POP & Distribusi" (CustomerNetworkAssignmentController)
+            // dan CustomerObserver::updating(): mini_pop.parent_id = pop_id,
+            // distribution.pop_id = mini_pop_id. Pilihan yang tidak cocok
+            // DITOLAK, bukan dikosongkan diam-diam, supaya admin tahu harus
+            // memilih ulang (terutama saat pindah POP).
+            'mini_pop_id' => ! $popChanging ? ['exclude'] : [
+                'nullable',
+                'exists:pops,id',
+                function ($attribute, $value, $fail) use ($request, $networkAssignmentLocked) {
+                    if ($networkAssignmentLocked) {
+                        $fail('Mini POP baru bisa diatur setelah pemasangan dimulai. Sebelum itu cuma POP Cabang yang boleh dipilih.');
+
+                        return;
+                    }
+                    $valid = Pop::whereKey($value)
+                        ->where('type', 'mini_pop')
+                        ->where('parent_id', $request->input('pop_id'))
+                        ->exists();
+                    if (! $valid) {
+                        $fail('Mini POP yang dipilih bukan milik POP Cabang ini.');
+                    }
+                },
+            ],
+            'distribution_id' => ! $popChanging ? ['exclude'] : [
+                'nullable',
+                'exists:distributions,id',
+                function ($attribute, $value, $fail) use ($request, $networkAssignmentLocked) {
+                    if ($networkAssignmentLocked) {
+                        $fail('Distribusi baru bisa diatur setelah pemasangan dimulai. Sebelum itu cuma POP Cabang yang boleh dipilih.');
+
+                        return;
+                    }
+                    $miniPopId = $request->input('mini_pop_id');
+                    if (! $miniPopId) {
+                        $fail('Pilih Mini POP dulu sebelum memilih Distribusi.');
+
+                        return;
+                    }
+                    if (! Distribution::whereKey($value)->where('pop_id', $miniPopId)->exists()) {
+                        $fail('Distribusi yang dipilih bukan milik Mini POP ini.');
+                    }
+                },
+            ],
             'address' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -763,7 +920,7 @@ class CustomerController extends Controller
             'district_id' => 'nullable|exists:districts,id',
             'village_id' => 'nullable|exists:villages,id',
             'internet_package_id' => [
-                'nullable',
+                $serviceHasInvoices ? 'required' : 'nullable',
                 'exists:internet_packages,id',
                 // Restriksi Paket per Role (Skema 1) — sama seperti
                 // CustomerRegistrationRequest, lihat komentar di sana.
@@ -896,6 +1053,9 @@ class CustomerController extends Controller
         }
 
         DB::transaction(function () use ($customer, $validated, $serviceStatus) {
+            // Snapshot bahan CID SEBELUM apa pun berubah — lihat langkah 1b.
+            $cidInputsBefore = $this->cidInputs($customer);
+
             // 1. Update customer record
             $customer->update($validated);
 
@@ -909,6 +1069,12 @@ class CustomerController extends Controller
             // Ditaruh SEBELUM langkah 1b (generate CID) supaya olt_number baru
             // yang diisi di sini ikut kepakai CID yang di-generate di bawah,
             // bukan nilai basi dari sebelum submit ini.
+            // Field yang TIDAK dikirim sama sekali tidak disentuh — dulu
+            // `$validated[...] ?? null` menyamakan "tidak dikirim" dengan
+            // "dikosongkan", jadi request yang tidak lengkap menghapus SN,
+            // PPPoE, nomor OLT (bahan CID), dst. Field yang dikirim kosong
+            // tetap mengosongkan (ConvertEmptyStringsToNull → null tapi
+            // key-nya ada), jadi admin masih bisa sengaja mengosongkan.
             $deviceFields = [
                 'device_type' => $validated['device_type'] ?? null,
                 'brand' => $validated['brand'] ?? null,
@@ -925,7 +1091,8 @@ class CustomerController extends Controller
             // baris ini (ip_address, technical_note, dst) tidak tersentuh. Baris
             // baru cuma dibuat kalau ADA isian ATAU barisnya sudah ada (biar admin
             // tetap bisa mengosongkan field yang sudah pernah diisi teknisi).
-            if (array_filter($deviceFields) || CustomerDevice::where('customer_id', $customer->id)->exists()) {
+            $deviceFields = array_intersect_key($deviceFields, $validated);
+            if ($deviceFields !== [] && (array_filter($deviceFields) || CustomerDevice::where('customer_id', $customer->id)->exists())) {
                 $customer->customerDevice()->updateOrCreate(['customer_id' => $customer->id], $deviceFields);
             }
 
@@ -939,7 +1106,8 @@ class CustomerController extends Controller
                 'router_number' => $validated['router_number'] ?? null,
                 'initial_attenuation' => $validated['initial_attenuation'] ?? null,
             ];
-            if (array_filter($technicalFields) || CustomerTechnicalDetail::where('customer_id', $customer->id)->exists()) {
+            $technicalFields = array_intersect_key($technicalFields, $validated);
+            if ($technicalFields !== [] && (array_filter($technicalFields) || CustomerTechnicalDetail::where('customer_id', $customer->id)->exists())) {
                 $customer->customerTechnicalDetail()->updateOrCreate(['customer_id' => $customer->id], $technicalFields);
             }
 
@@ -951,7 +1119,14 @@ class CustomerController extends Controller
             $newStatus = strtolower((string) ($validated['status'] ?? ''));
             $pop = $customer->pop;
 
-            if ($pop && in_array($newStatus, ['active', 'suspended'], true)) {
+            // CID cuma dibuat ulang kalau bahannya berubah (POP, Mini POP,
+            // Distribusi, nomor OLT fallback, status) atau belum ada. Dulu
+            // dihitung ulang di SETIAP simpan: pelanggan legacy yang CID-nya
+            // dibentuk aturan lama berganti CID hanya karena admin mengedit
+            // nomor HP — padahal CID tercetak di kwitansi/QR/PPPoE.
+            $cidInputsChanged = $cidInputsBefore !== $this->cidInputs($customer->fresh(['customerTechnicalDetail']));
+
+            if ($pop && in_array($newStatus, ['active', 'suspended'], true) && ($cidInputsChanged || ! $customer->cid)) {
                 $distribution = $customer->distribution;
                 if ($distribution) {
                     // Ada distribusi → generate CID lengkap
@@ -963,8 +1138,12 @@ class CustomerController extends Controller
                     $newCid = sprintf('%s00%s', $pop->cid_prefix, $reqId);
                 }
 
+                // update(), bukan updateQuietly(): CID berubah (mis. pindah
+                // POP) wajib punya jejak nilai lama di audit_logs
+                // (RecordsAuditLogs) — CID lama tercetak di kwitansi/QR/PPPoE.
+                // Aman dari loop: CustomerObserver tidak bereaksi pada kolom cid.
                 if ($customer->cid !== $newCid) {
-                    $customer->updateQuietly(['cid' => $newCid]);
+                    $customer->update(['cid' => $newCid]);
                 }
             } elseif ($newStatus === 'terminated') {
                 // Terminate: cid tidak lagi aktif, tapi simpan sebagai histori (jangan hapus)
@@ -1051,7 +1230,10 @@ class CustomerController extends Controller
                     'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
                     'contract_type' => $validated['jenis_kontrak'] ?? null,
                 ]);
-            } else {
+            } elseif (! $customer->customerService || ! Invoice::where('customer_service_id', $customer->customerService->id)->exists()) {
+                // Jaring kedua di bawah rule `required` di atas — layanan yang
+                // punya tagihan tidak pernah dihapus dari sini (FK invoices
+                // juga restrictOnDelete sejak 2026-09-28).
                 $customer->customerService()->delete();
             }
 
@@ -1083,12 +1265,37 @@ class CustomerController extends Controller
     }
 
     /**
+     * Bahan pembentuk CID (Pop::generateComplexCid()): POP, Mini POP (atau
+     * nomor OLT sebagai fallback segmennya), Distribusi, dan status.
+     *
+     * @return array<string, mixed>
+     */
+    private function cidInputs(Customer $customer): array
+    {
+        return [
+            'pop_id' => (int) $customer->pop_id,
+            'mini_pop_id' => (int) $customer->mini_pop_id,
+            'distribution_id' => (int) $customer->distribution_id,
+            'status' => (string) $customer->status,
+            'olt_number' => (string) $customer->customerTechnicalDetail?->olt_number,
+        ];
+    }
+
+    /**
      * Remove the specified customer from storage.
      */
     public function destroy(Customer $customer)
     {
         abort_unless(auth()->user()->hasPermission('customers.delete'), 403);
         $this->authorizeCustomerPopScope($customer);
+
+        // Pelanggan yang punya riwayat tagihan/pembayaran tidak boleh dihapus
+        // (hard delete) — FK-nya restrictOnDelete sejak 2026-09-28, dicek di
+        // sini supaya admin dapat pesan jelas, bukan error 500. Pelanggan
+        // seperti ini diputus langganan (terminated), bukan dihapus.
+        if (Invoice::where('customer_id', $customer->id)->exists() || Payment::where('customer_id', $customer->id)->exists()) {
+            return redirect()->back()->with('error', 'Pelanggan ini punya riwayat tagihan/pembayaran sehingga tidak bisa dihapus. Gunakan Putus Langganan.');
+        }
 
         DB::transaction(function () use ($customer) {
             $customer->delete();
@@ -1606,7 +1813,7 @@ class CustomerController extends Controller
             // Dropdown rekening tujuan metode Transfer (ADHOC-95).
             'available_bank_accounts' => BankAccount::activeOptions(),
             'technical' => [
-                'pppoe_username' => $service?->pppoe_username ?? '-',
+                'pppoe_username' => $device?->pppoe_username ?: ($service?->pppoe_username ?: '-'),
                 'onu_sn' => $device?->onu_sn ?? $device?->mac_address ?? '-',
                 'router_sn' => $device?->router_sn ?? '-',
                 'device_brand' => $device?->device_brand ?? '-',

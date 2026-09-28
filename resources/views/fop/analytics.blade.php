@@ -180,7 +180,7 @@
     <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
         <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
             <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Backlog Task Belum Dikerjakan</h3>
-            <p class="text-[10px] text-slate-400 mt-0.5">Draft/Terjadwal/Pending, terlama di atas · {{ $backlogStats['total'] }} total · <strong>gak ikut filter periode di atas</strong>, selalu tampilkan seluruh antrean aktif.</p>
+            <p class="text-[10px] text-slate-400 mt-0.5">Draft/Terjadwal/Pending/Lapor Nanti, terlama di atas · {{ $backlogStats['total'] }} total · <strong>gak ikut filter periode di atas</strong>, selalu tampilkan seluruh antrean aktif.</p>
         </div>
         @if($backlog->isEmpty())
         <div class="p-16 text-center">

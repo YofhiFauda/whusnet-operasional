@@ -46,6 +46,21 @@ use Illuminate\View\View;
 class FopAnalyticsController extends Controller
 {
     /**
+     * Status task yang masih jadi "antrean aktif" di backlog analytics.
+     * Lapor Nanti IKUT (keputusan user 2026-09-28) — laporannya belum masuk,
+     * jadi pekerjaannya belum tuntas; label "Lapor Nanti" membedakannya dari
+     * Pending, dan konsisten dengan DashboardController::fopDeliveryStats().
+     *
+     * @var string[]
+     */
+    private const BACKLOG_STATUSES = [
+        TaskStatus::DRAFT->value,
+        TaskStatus::TERJADWAL->value,
+        TaskStatus::PENDING->value,
+        TaskStatus::LAPOR_NANTI->value,
+    ];
+
+    /**
      * Tanggal mulai kolom `completed_by` reliable (commit f6a2f77, 2026-08-07
      * — tracking completed_by pada task). Leaderboard "solving terbanyak"
      * kasih badge peringatan kalau rentang filter menjangkau sebelum tanggal
@@ -488,7 +503,7 @@ class FopAnalyticsController extends Controller
             ->with('customer')
             ->applyUserScope($user)
             ->when($popFilter, fn ($q) => $q->where('tasks.pop_id', $popFilter))
-            ->whereIn('status', [TaskStatus::DRAFT->value, TaskStatus::TERJADWAL->value, TaskStatus::PENDING->value])
+            ->whereIn('status', self::BACKLOG_STATUSES)
             ->orderBy('created_at')
             ->paginate(15)
             ->withQueryString()
@@ -500,8 +515,7 @@ class FopAnalyticsController extends Controller
                 'umur_jam' => (int) $t->created_at->diffInHours(now()),
                 'sla_deadline' => $t->slaDeadline()?->toIso8601String(),
                 'over_sla' => $t->isOverSla(),
-                'report_deferred' => (bool) $t->report_deferred,
-                'status_label' => $t->status->displayLabel($t->report_deferred),
+                'status_label' => $t->status->label(),
             ]);
     }
 
@@ -522,8 +536,8 @@ class FopAnalyticsController extends Controller
         $rows = Task::query()
             ->applyUserScope($user)
             ->when($popFilter, fn ($q) => $q->where('tasks.pop_id', $popFilter))
-            ->whereIn('status', [TaskStatus::DRAFT->value, TaskStatus::TERJADWAL->value, TaskStatus::PENDING->value])
-            ->get(['id', 'task_type', 'scheduled_at', 'started_at', 'completed_at', 'sla_minutes']);
+            ->whereIn('status', self::BACKLOG_STATUSES)
+            ->get(['id', 'task_type', 'scheduled_at', 'started_at', 'work_finished_at', 'completed_at', 'sla_minutes']);
 
         return [
             'total' => $rows->count(),

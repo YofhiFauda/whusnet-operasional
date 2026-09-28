@@ -33,6 +33,8 @@ Lihat [docs/master/pop/business-logic.md §4](../pop/business-logic.md#4-generat
 
 **Bukan** di form laporan pemasangan — `CustomerInstallationController::store()` gak pernah menyentuh `distribution_id` (cuma isi `CustomerTechnicalDetail`/`CustomerDevice`). Distribusi (bareng Mini POP) di-assign lewat modal **"Atur Mini POP & Distribusi"** yang muncul saat klik CID/REQ ID di halaman detail pelanggan (`CustomerNetworkAssignmentController@update`) — **pasca pemasangan**, kapan pun sebelum atau sesudah aktivasi, dan bisa diganti-ganti belakangan (nyusul konfigurasi Mikrotik manual). Dropdown Distribusi di modal ini otomatis ke-filter ikut Mini POP yang dipilih (`Distribution.pop_id = mini_pop.id`).
 
+Jalur kedua (ADHOC-104, 2026-09-26): form **Edit Pelanggan** punya dropdown berantai POP → Mini POP → Distribusi dengan aturan yang sama (termasuk terkunci selama pra-pemasangan — cuma POP yang boleh diatur), dipakai terutama saat pindah POP. `CustomerObserver::updating()` menegakkan hierarki ini dari semua jalur: Mini POP/Distribusi yang bukan milik POP pelanggan dilepas. Distribusi yang terpasang langsung di Cabang (bukan Mini POP) tidak bisa dipilih di kedua jalur.
+
 Sebelum di-assign, sistem pakai placeholder `'XX'` (§4). Kalau Distribusi diganti setelah pelanggan `active`/`suspended`, CID di-regenerate otomatis. Riwayat gap sebelum fix ini: [../pop/bug.md](../pop/bug.md).
 
 ## 6. Tidak Ada Guard Penghapusan

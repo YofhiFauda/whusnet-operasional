@@ -353,6 +353,16 @@ class RolePermissionSeeder extends Seeder
                 'customer_registration_verification.view',
                 'customer_registration_verification.approve',
                 'customer_registration_verification.reject',
+                // Verifikasi Biaya C-REQ — task C-REQ berbayar (checkbox
+                // "Task ini berbayar" di Laporan C-REQ) menunggu disetujui
+                // CS sebelum lanjut ke Tagihan Manual. Sama alasan
+                // customer_registration_verification di atas: helpdesk =
+                // role terdekat "CS", murni RBAC, bisa dipindah lewat Role
+                // Matrix kapan saja.
+                // docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md
+                'creq_billing_verification.view',
+                'creq_billing_verification.approve',
+                'creq_billing_verification.reject',
             ],
 
             'fop' => [

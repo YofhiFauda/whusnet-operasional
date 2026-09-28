@@ -182,6 +182,10 @@ class NominalRupiahBertitikDiterimaTest extends TestCase
             'registration_date' => $customer->registration_date->toDateString(),
             'pop_id' => $customer->pop_id,
             'status' => $customer->status,
+            // Form Edit asli selalu mengirim paket. Tanpa paket, pelanggan
+            // bertagihan ditolak (ADHOC-110) — dulu request ini diam-diam
+            // menghapus layanan + tagihannya lewat FK cascade.
+            'internet_package_id' => $invoice->internet_package_id,
             'discount_amount' => '10.000',
             'tax_percent' => 11,
             'other_fee' => '5.000',

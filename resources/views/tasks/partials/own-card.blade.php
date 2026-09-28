@@ -14,9 +14,8 @@
         'in_progress' => 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50',
         'selesai' => 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50',
         'dibatalkan' => 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700/50',
-        'pending' => $task->report_deferred
-            ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50'
-            : 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50',
+        'lapor_nanti' => 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50',
+        'pending' => 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50',
         default => 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800/30 dark:text-slate-500 dark:border-slate-700/50',
     };
 
@@ -50,7 +49,7 @@
                         {{ $task->task_type->label() }}
                     </span>
                     <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md border {{ $statusClasses }}">
-                        {{ $task->status->displayLabel($task->report_deferred) }}
+                        {{ $task->status->label() }}
                     </span>
                     @if($task->isOverSla())
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/50 flex items-center gap-1">
@@ -128,7 +127,15 @@
                 $slaDeadline = $task->slaDeadline();
                 $slaWindowStart = $task->slaWindowStart();
             @endphp
-            @if(in_array($task->status->value, ['terjadwal', 'in_progress', 'pending']) && $slaDeadline && $slaWindowStart)
+            {{-- Lapor Nanti: countdown BERHENTI — kerja lapangan sudah selesai,
+                 jeda menunggu laporan bukan waktu kerja (Task::slaReferenceTime()). --}}
+            @if($task->status->value === 'lapor_nanti' && $task->work_finished_at)
+                <div class="mt-3 flex items-center gap-1.5 flex-wrap text-[11px] font-ui">
+                    <span class="font-medium text-text-secondary">Kerja selesai</span>
+                    <span class="font-mono font-semibold text-text-main">{{ $task->work_finished_at->format('H:i') }}</span>
+                    <span class="text-text-muted">&middot; menunggu laporan</span>
+                </div>
+            @elseif(in_array($task->status->value, ['terjadwal', 'in_progress', 'pending']) && $slaDeadline && $slaWindowStart)
                 @php
                     // Budget total buat threshold warna countdown: durasi asli slaWindowStart→deadline.
                     // Survey pakai sisa hari sejak jam jadwal (variabel), tipe lain sla_minutes tetap.
@@ -146,7 +153,10 @@
             {{-- Completion summary if finished --}}
             @if($task->status->value === 'selesai' && $task->started_at && $task->completed_at)
                 @php
-                    $actualMinutes = (int) $task->started_at->diffInMinutes($task->completed_at);
+                    // Durasi kerja lapangan — untuk task Lapor Nanti berhenti di
+                    // work_finished_at, bukan saat laporan masuk.
+                    $workFinishedAt = $task->work_finished_at ?? $task->completed_at;
+                    $actualMinutes = $task->actualDurationMinutes();
                     $actualHours = intdiv($actualMinutes, 60);
                     $actualRemMins = $actualMinutes % 60;
                     $durationLabel = $actualHours > 0 ? "{$actualHours} jam {$actualRemMins} menit" : "{$actualRemMins} menit";
@@ -159,7 +169,7 @@
                     </svg>
                     <span class="text-[11px] font-medium text-text-secondary font-ui">Waktu {{ $typeLabel }}:</span>
                     <span class="text-[11px] font-mono font-semibold text-text-main">
-                        {{ $task->started_at->format('H:i') }} &ndash; {{ $task->completed_at->format('H:i') }}
+                        {{ $task->started_at->format('H:i') }} &ndash; {{ $workFinishedAt->format('H:i') }}
                     </span>
                     <span class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border font-ui {{ $isOverSla ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/50' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50' }}">
                         {{ $durationLabel }}
@@ -229,8 +239,10 @@
                     @endif
                 @endif
 
+                {{-- Status yang boleh lapor diputuskan TaskStatus::acceptsReport() —
+                     jangan tulis daftar status sendiri di sini (bug 2026-09-26). --}}
                 @can('statusComplete', $task)
-                @if(in_array($task->status->value, ['in_progress', 'pending']))
+                @if($task->status->acceptsReport())
                     @php
                         $reportUrl = match(true) {
                             $task->task_type->value === 'SURVEY' => route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),

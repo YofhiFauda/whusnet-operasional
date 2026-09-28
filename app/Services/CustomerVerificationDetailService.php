@@ -91,7 +91,7 @@ class CustomerVerificationDetailService
         // (tanggal aktivasi, prorata, total tagihan real dari DB), bukan
         // cuma "Ringkasan Layanan" statis dari master paket.
         $initialInvoice = Invoice::where('customer_id', $customer->id)
-            ->whereIn('invoice_type', [InvoiceType::AWAL->value, InvoiceType::REAKTIVASI->value])
+            ->where('invoice_type', InvoiceType::AWAL->value)
             ->latest()
             ->first();
 

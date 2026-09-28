@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CReqCategory;
+use App\Enums\CReqVerificationStatus;
 use App\Enums\EquipmentClass;
 use App\Enums\FopTaskPriority;
 use App\Enums\MaterialKind;
@@ -17,6 +19,7 @@ use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Task;
+use App\Models\TaskCreqDetail;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
@@ -123,7 +126,7 @@ class TaskMaintenanceController extends Controller
     {
         $this->authorize('statusComplete', $task);
 
-        if (! in_array($task->status->value, [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])) {
+        if (! $task->status->acceptsReport()) {
             return redirect()->route('tasks.show', $task)->with('error', 'Status task tidak valid untuk pelaporan maintenance.');
         }
 
@@ -171,7 +174,12 @@ class TaskMaintenanceController extends Controller
         $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($task);
         $eligibleRolls = $this->eligibleRollsForTeam($task);
 
-        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls'));
+        // Dropdown Kategori C-REQ (docs/plan/task-teknisi/
+        // rancangan-biaya-creq-verifikasi-cs.md §2) — cuma dipakai view kalau
+        // task_type = CREQ, tapi selalu dioper biar view gak perlu query lagi.
+        $creqCategories = CReqCategory::options();
+
+        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
@@ -193,7 +201,14 @@ class TaskMaintenanceController extends Controller
         $eligibleSerialIds = $this->eligibleSerialsForTeam($task)->pluck('id');
         $eligibleRollIds = $this->eligibleRollsForTeam($task)->pluck('id');
 
-        $validated = $request->validate([
+        // Kategori C-REQ dibaca SEBELUM validate() supaya rule kondisional
+        // (tikor wajib, custom name wajib, dst — docs/plan/task-teknisi/
+        // rancangan-biaya-creq-verifikasi-cs.md §2) bisa dibentuk per kategori
+        // yang benar-benar dikirim, bukan ditebak setelah validasi lolos.
+        $isCreq = $task->task_type === TaskType::CREQ;
+        $creqCategory = $isCreq ? CReqCategory::tryFrom((string) $request->input('creq_category')) : null;
+
+        $rules = [
             'kendala_teknis' => 'required|string',
             // Lima kolom teks di bawah adalah pencatatan material versi lama —
             // satu kolom per jenis barang, hardcode. Dipertahankan karena ada
@@ -239,11 +254,42 @@ class TaskMaintenanceController extends Controller
             'work_tools_manual' => 'nullable|array',
             'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
             'work_tools_manual.*.note' => 'nullable|string|max:255',
-        ], [
+        ];
+
+        $messages = [
             'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
             'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
             'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
-        ]);
+        ];
+
+        if ($isCreq) {
+            $rules['creq_category'] = ['required', Rule::enum(CReqCategory::class)];
+            $rules['creq_category_custom_name'] = ['nullable', 'string', 'max:150', Rule::requiredIf($creqCategory === CReqCategory::LAINNYA)];
+            $requiresTikor = $creqCategory?->requiresTikor() ?? false;
+            $rules['creq_tikor_lama_lat'] = ['nullable', 'numeric', 'between:-90,90', Rule::requiredIf($requiresTikor)];
+            $rules['creq_tikor_lama_lng'] = ['nullable', 'numeric', 'between:-180,180', Rule::requiredIf($requiresTikor)];
+            $rules['creq_tikor_baru_lat'] = ['nullable', 'numeric', 'between:-90,90', Rule::requiredIf($requiresTikor)];
+            $rules['creq_tikor_baru_lng'] = ['nullable', 'numeric', 'between:-180,180', Rule::requiredIf($requiresTikor)];
+            $rules['creq_is_billable'] = ['nullable', 'boolean'];
+            $rules['creq_billing_note'] = ['nullable', 'string', 'max:1000', Rule::requiredIf($request->boolean('creq_is_billable'))];
+
+            // Tambah Modem: perketat field SN yang di form ini defaultnya
+            // opsional (Maintenance biasa boleh gak ganti modem) — kategori
+            // ini WAJIB pilih dari custody tim, gak ada "Tidak ganti modem".
+            if ($creqCategory?->requiresModem()) {
+                $rules['selected_inventory_serial_id'] = ['required', 'integer', Rule::in($eligibleSerialIds)];
+            }
+
+            $messages['creq_category_custom_name.required'] = 'Nama kategori wajib diisi untuk kategori Lainnya.';
+            $messages['creq_tikor_lama_lat.required'] = 'Titik koordinat lama wajib diisi untuk kategori ini.';
+            $messages['creq_tikor_lama_lng.required'] = 'Titik koordinat lama wajib diisi untuk kategori ini.';
+            $messages['creq_tikor_baru_lat.required'] = 'Titik koordinat baru wajib diisi untuk kategori ini.';
+            $messages['creq_tikor_baru_lng.required'] = 'Titik koordinat baru wajib diisi untuk kategori ini.';
+            $messages['creq_billing_note.required'] = 'Catatan biaya wajib diisi kalau task ini ditandai berbayar.';
+            $messages['selected_inventory_serial_id.required'] = 'Kategori Tambah Modem wajib memilih SN modem dari custody tim.';
+        }
+
+        $validated = $request->validate($rules, $messages);
 
         // Sisa custody Material Terpakai (koreksi lanjutan ADHOC-54,
         // 2026-09-12) — pagar UI/UX, SEBELUM data disimpan. Penegakan final
@@ -297,6 +343,33 @@ class TaskMaintenanceController extends Controller
                 'opm_photo' => $opmPhotoPath,
                 'speedtest_photo' => $speedtestPhotoPath,
             ]);
+
+            // Detail kategori C-REQ + antrean verifikasi biaya (§3-4 rancangan)
+            // — cuma dibuat untuk task_type CREQ, gak nyentuh MTN/O-REQ/INFR REQ.
+            //
+            // updateOrCreate (bukan create): laporan C-REQ bisa dikirim ulang
+            // setelah FOP menolak (review reject → in_progress). Dulu tiap
+            // kirim ulang menambah baris baru, sementara relasi hasOne
+            // creqDetail tetap membaca baris lama yang sudah diproses — CS
+            // kena 422 "sudah diproses" terus dan task nyangkut di antrean.
+            // Laporan baru = klaim biaya baru, jadi status verifikasi ikut
+            // dikembalikan ke Menunggu. Dijaga unique index task_id.
+            if ($isCreq) {
+                TaskCreqDetail::updateOrCreate(['task_id' => $task->id], [
+                    'category' => $validated['creq_category'],
+                    'category_custom_name' => $validated['creq_category_custom_name'] ?? null,
+                    'tikor_lama_lat' => $validated['creq_tikor_lama_lat'] ?? null,
+                    'tikor_lama_lng' => $validated['creq_tikor_lama_lng'] ?? null,
+                    'tikor_baru_lat' => $validated['creq_tikor_baru_lat'] ?? null,
+                    'tikor_baru_lng' => $validated['creq_tikor_baru_lng'] ?? null,
+                    'is_billable' => $request->boolean('creq_is_billable'),
+                    'billing_note' => $validated['creq_billing_note'] ?? null,
+                    'verification_status' => CReqVerificationStatus::PENDING->value,
+                    'verified_by' => null,
+                    'verified_at' => null,
+                    'rejection_reason' => null,
+                ]);
+            }
 
             // Material & alat menempel di FopTask, bukan di maintenance_reports.
             // Alasannya sama dengan ADHOC-11: FopTask entitas yang dimiliki

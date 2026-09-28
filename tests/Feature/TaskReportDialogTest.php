@@ -91,40 +91,39 @@ class TaskReportDialogTest extends TestCase
         return $task;
     }
 
-    public function test_lapor_nanti_reuses_status_pending_and_sets_report_deferred(): void
+    public function test_lapor_nanti_sets_its_own_status_not_pending(): void
     {
         $task = $this->makeInProgressTask('TASK-2026-9001');
 
         $response = $this->actingAs($this->techUser)
-            ->post(route('tasks.pending', $task->id), [
+            ->post(route('tasks.report-later', $task->id), [
                 'pending_reason' => 'Kendala sinyal di lokasi',
-                'report_deferred' => '1',
             ]);
 
         $response->assertRedirect();
         $response->assertSessionHas('success');
 
         $task->refresh();
-        $this->assertEquals(TaskStatus::PENDING->value, $task->status->value);
+        $this->assertEquals(TaskStatus::LAPOR_NANTI->value, $task->status->value);
+        $this->assertNotEquals(TaskStatus::PENDING->value, $task->status->value);
         $this->assertEquals('Kendala sinyal di lokasi', $task->pending_reason);
-        $this->assertTrue($task->report_deferred);
 
         // Assignment tidak lepas.
         $this->assertTrue($task->teamMembers()->where('user_id', $this->techUser->id)->exists());
     }
 
-    public function test_pending_without_report_deferred_flag_defaults_false(): void
+    public function test_lapor_nanti_rejected_when_task_not_in_progress(): void
     {
         $task = $this->makeInProgressTask('TASK-2026-9002');
+        $task->update(['status' => TaskStatus::TERJADWAL->value]);
 
         $this->actingAs($this->techUser)
-            ->post(route('tasks.pending', $task->id), [
+            ->post(route('tasks.report-later', $task->id), [
                 'pending_reason' => 'Alasan lain',
-            ]);
+            ])
+            ->assertForbidden();
 
-        $task->refresh();
-        $this->assertEquals(TaskStatus::PENDING->value, $task->status->value);
-        $this->assertFalse($task->report_deferred);
+        $this->assertEquals(TaskStatus::TERJADWAL->value, $task->fresh()->status->value);
     }
 
     public function test_report_choice_dialog_renders_on_task_show_page(): void
@@ -153,7 +152,7 @@ class TaskReportDialogTest extends TestCase
      * Nutup gap Task 6 checklist poin ke-4 ("Sinkron ke FopTask: status jadi
      * lapor_nanti") yang tadinya BLOCKED nunggu Task 9 (TaskObserver + tabel
      * fop_task_status_history). Sekarang Task 9 udah `Done` — verifikasi end-to-end
-     * lewat jalur HTTP asli Task 6 (`tasks.pending` + `report_deferred=1`), bukan
+     * lewat jalur HTTP asli (`tasks.report-later`), bukan
      * cuma lewat model langsung kayak `FopTaskStatusSyncTest`.
      */
     public function test_lapor_nanti_syncs_fop_task_status_and_writes_dedicated_history_row(): void
@@ -171,14 +170,13 @@ class TaskReportDialogTest extends TestCase
         ]);
 
         $this->actingAs($this->techUser)
-            ->post(route('tasks.pending', $task->id), [
+            ->post(route('tasks.report-later', $task->id), [
                 'pending_reason' => 'Kendala sinyal di lokasi',
-                'report_deferred' => '1',
             ])
             ->assertRedirect();
 
         $fopTask->refresh();
-        $this->assertEquals(TaskStatus::PENDING->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::LAPOR_NANTI->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
         $this->assertNotNull($history);
@@ -186,7 +184,7 @@ class TaskReportDialogTest extends TestCase
         $this->assertEquals('Lapor Nanti', $history->label());
 
         // Beda entry dari FOP-side "Set Pending" (pending_fop) & dari reschedule
-        // Task 7 (pending_reschedule) — walau fop_tasks.status sama-sama Pending.
+        // Task 7 (pending_reschedule).
         $this->assertNotEquals('pending_fop', $history->to_status);
         $this->assertNotEquals('pending_reschedule', $history->to_status);
     }
@@ -212,9 +210,8 @@ class TaskReportDialogTest extends TestCase
         ]);
 
         $this->actingAs($this->techUser)
-            ->post(route('tasks.pending', $task->id), [
+            ->post(route('tasks.report-later', $task->id), [
                 'pending_reason' => 'Kendala sinyal di lokasi',
-                'report_deferred' => '1',
             ]);
 
         $fopRole = Role::where('code', 'fop')->first();

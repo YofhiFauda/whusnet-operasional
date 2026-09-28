@@ -66,6 +66,7 @@ use App\Http\Controllers\QrTicketController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SalesOmsetDashboardController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskCreqBillingController;
 use App\Http\Controllers\TaskDeviceRetrievalController;
 use App\Http\Controllers\TaskMaintenanceController;
 use App\Http\Controllers\TaskStatusController;
@@ -1066,9 +1067,24 @@ Route::middleware('auth')->group(function () {
     Route::get('/tasks/{task}/device-retrieval-report', [TaskDeviceRetrievalController::class, 'report'])->name('tasks.device-retrieval.report');
     Route::post('/tasks/{task}/device-retrieval-report', [TaskDeviceRetrievalController::class, 'store'])->name('tasks.device-retrieval.store');
 
+    // Verifikasi Biaya C-REQ (CS/helpdesk) — pola sama persis
+    // customer-registration-verifications: approve & reject permission
+    // TERPISAH dari view. docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md
+    Route::middleware('permission:creq_billing_verification.view')->group(function () {
+        Route::get('/tasks-creq-billing', [TaskCreqBillingController::class, 'index'])->name('tasks.creq-billing.index');
+        Route::get('/tasks-creq-billing/{task}', [TaskCreqBillingController::class, 'show'])->name('tasks.creq-billing.show');
+    });
+    Route::middleware('permission:creq_billing_verification.approve')->group(function () {
+        Route::put('/tasks-creq-billing/{task}/approve', [TaskCreqBillingController::class, 'approve'])->name('tasks.creq-billing.approve');
+    });
+    Route::middleware('permission:creq_billing_verification.reject')->group(function () {
+        Route::put('/tasks-creq-billing/{task}/reject', [TaskCreqBillingController::class, 'reject'])->name('tasks.creq-billing.reject');
+    });
+
     Route::middleware('permission:task.execute')->group(function () {
-        Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');
-        // Pending top-level (reschedule penuh) — beda dari tasks.pending (Lapor Nanti) & tasks.fop-pending (FOP-side).
+        // Lapor Nanti — status sendiri (lapor_nanti), BUKAN pending. Lihat TaskStatus::LAPOR_NANTI.
+        Route::post('/tasks/{task}/lapor-nanti', [TaskStatusController::class, 'reportLater'])->name('tasks.report-later');
+        // Pending top-level (reschedule penuh) — beda dari tasks.report-later (Lapor Nanti) & tasks.fop-pending (FOP-side).
         Route::post('/tasks/{task}/reschedule', [TaskController::class, 'reschedule'])->name('tasks.reschedule');
     });
 

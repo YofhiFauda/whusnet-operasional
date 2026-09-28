@@ -37,6 +37,17 @@ Aktor: **Owner/Admin** (`pops.view`/`create`/`update`).
 
 Detail teknis & riwayat gap sebelum fix: [bug.md](bug.md).
 
+## 5a. Admin — Pindah POP Pelanggan (ADHOC-104, 2026-09-26)
+
+1. Buka `/customers/{customer}/edit` → step **3. POP & Distribusi**.
+2. Ganti **POP Cabang** (cuma Cabang dalam scope user). Dropdown **Mini POP** otomatis cuma nampilin Mini POP anak Cabang itu; pilihan Mini POP lama yang bukan milik Cabang baru otomatis dikosongkan.
+3. Pilih **Mini POP** → dropdown **Distribusi** ke-filter ke anak Mini POP itu. Boleh dikosongkan dan diatur belakangan lewat modal §5.
+   - Pelanggan **pra-pemasangan** (`registered` s/d `waiting_installation`, `rejected`): dropdown Mini POP & Distribusi terkunci — cuma POP Cabang yang bisa dipindah. Mini POP & Distribusi diisi setelah pemasangan dimulai.
+4. Simpan. Ditolak kalau: POP di luar scope, REQ ID sudah dipakai di POP tujuan, Mini POP bukan anak POP, atau Distribusi bukan anak Mini POP.
+5. Hasil: REQ ID tetap; CID dibuat ulang (kalau `active`/`suspended`); tagihan belum lunas ikut pindah; kolektor tanpa akses POP baru dilepas → assign kolektor baru lewat Worksheet Kolektor.
+
+Aturan lengkap: [business-logic.md §7a](business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26).
+
 ## Guard Ringkas
 
 | Aksi | Permission |

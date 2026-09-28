@@ -312,8 +312,8 @@ class FopAnalyticsDummySeeder extends Seeder
             // Tipe lain draft/pending — belum ada started_at, jadi SLA "—"
             // (sesuai perilaku produksi, Task::slaDeadline() null tanpa started_at).
             ['type' => TaskType::PEMASANGAN, 'status' => TaskStatus::DRAFT, 'scheduled_offset_days' => 2],
-            ['type' => TaskType::MAINTENANCE, 'status' => TaskStatus::PENDING, 'scheduled_offset_days' => 1, 'report_deferred' => true],
-            ['type' => TaskType::MAINTENANCE, 'status' => TaskStatus::PENDING, 'scheduled_offset_days' => 1, 'report_deferred' => false],
+            ['type' => TaskType::MAINTENANCE, 'status' => TaskStatus::PENDING, 'scheduled_offset_days' => 1],
+            ['type' => TaskType::MAINTENANCE, 'status' => TaskStatus::PENDING, 'scheduled_offset_days' => 2],
             ['type' => TaskType::CREQ, 'status' => TaskStatus::TERJADWAL, 'scheduled_offset_days' => 3],
         ];
 
@@ -330,7 +330,6 @@ class FopAnalyticsDummySeeder extends Seeder
                 'title' => sprintf('[Demo Backlog] %s — %s', $entry['type']->label(), $customer->full_name),
                 'status' => $entry['status']->value,
                 'scheduled_at' => $this->originalNow->copy()->addDays($entry['scheduled_offset_days']),
-                'report_deferred' => $entry['report_deferred'] ?? false,
                 'sla_minutes' => $entry['type']->slaMinutes(),
                 'created_by' => $this->actor->id,
                 'updated_by' => $this->actor->id,

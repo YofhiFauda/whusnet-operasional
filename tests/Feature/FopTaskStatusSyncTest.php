@@ -111,25 +111,24 @@ class FopTaskStatusSyncTest extends TestCase
         $this->assertEquals('Sedang Dikerjakan', $history->label());
     }
 
-    public function test_task_pending_with_report_deferred_syncs_lapor_nanti_label(): void
+    public function test_task_lapor_nanti_syncs_lapor_nanti_status_and_label(): void
     {
         [$task, $fopTask] = $this->makeLinkedTask('TASK-9203', 'in_progress');
 
         $task->update([
-            'status' => TaskStatus::PENDING,
+            'status' => TaskStatus::LAPOR_NANTI,
             'pending_reason' => 'Sinyal jelek',
-            'report_deferred' => true,
         ]);
 
         $fopTask->refresh();
-        $this->assertEquals(TaskStatus::PENDING->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::LAPOR_NANTI->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
         $this->assertEquals('lapor_nanti', $history->to_status);
         $this->assertEquals('Lapor Nanti', $history->label());
     }
 
-    public function test_task_pending_without_report_deferred_syncs_pending_fop_label(): void
+    public function test_task_pending_syncs_pending_fop_label(): void
     {
         [$task, $fopTask] = $this->makeLinkedTask('TASK-9204', 'in_progress');
 

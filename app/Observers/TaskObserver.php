@@ -26,7 +26,7 @@ class TaskObserver
     {
         $this->syncTaskReport($task);
 
-        if (! $task->wasChanged(['status', 'report_deferred', 'fop_review_status'])) {
+        if (! $task->wasChanged(['status', 'fop_review_status'])) {
             return;
         }
 
@@ -92,7 +92,10 @@ class TaskObserver
             return;
         }
 
-        if ($task->status === TaskStatus::PENDING) {
+        // Lapor Nanti menutup siklus kerja persis kayak Pending — kerja
+        // lapangannya berhenti di titik ini, jeda sampai laporan dikirim
+        // bukan waktu kerja.
+        if (in_array($task->status, [TaskStatus::PENDING, TaskStatus::LAPOR_NANTI], true)) {
             $report = TaskReport::where('task_id', $task->id)->first();
 
             if (! $report) {
@@ -113,7 +116,12 @@ class TaskObserver
                 return;
             }
 
-            $this->accumulateCycle($report);
+            // Dari Lapor Nanti siklusnya SUDAH ditutup waktu teknisi menunda
+            // laporan. Akumulasi lagi di sini = jeda nunggu laporan ikut
+            // kehitung sebagai waktu kerja (dan SLA pengerjaan jadi "over").
+            if ($task->getRawOriginal('status') !== TaskStatus::LAPOR_NANTI->value) {
+                $this->accumulateCycle($report);
+            }
             $report->completed_at = now();
 
             if ($report->sla_target_minutes !== null) {
@@ -158,8 +166,7 @@ class TaskObserver
         $isCustomerDecisionTask = in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN], true);
 
         $historyLabel = match (true) {
-            $task->status === TaskStatus::PENDING && $task->report_deferred => 'lapor_nanti',
-            $task->status === TaskStatus::PENDING && ! $task->report_deferred => 'pending_fop',
+            $task->status === TaskStatus::PENDING => 'pending_fop',
             $task->status === TaskStatus::SELESAI && $task->fop_review_status === 'approved' => 'selesai',
             $task->status === TaskStatus::SELESAI && $isCustomerDecisionTask && $task->fop_review_status === 'rejected' => 'selesai_ditolak_verifikasi',
             $task->status === TaskStatus::SELESAI && $isCustomerDecisionTask => 'selesai_menunggu_verifikasi',
