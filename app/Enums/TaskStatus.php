@@ -61,7 +61,7 @@ enum TaskStatus: string
     public function displayBadgeClasses(): string
     {
         return match ($this) {
-            self::DRAFT => 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50',
+            self::DRAFT => 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70',
             self::TERJADWAL => 'border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
             self::IN_PROGRESS => 'border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
             self::SELESAI => 'border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20',

@@ -549,12 +549,36 @@
             @if($maintenance)
             @php
                 $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+                // SN modem yang dipasang lewat laporan ini — sumber sama dengan
+                // Detail Task (transaksi INSTALL per fop_task), bukan
+                // inventory_serials.fop_task_id yang bisa berpindah kalau SN
+                // itu belakangan ditarik & dipasang ulang di task lain.
+                $maintenanceInstalledSerials = \App\Models\InventoryTransaction::where('fop_task_id', $fopTask->id)
+                    ->where('type', \App\Enums\InventoryTransactionType::INSTALL->value)
+                    ->with(['serial.item', 'item'])
+                    ->get();
             @endphp
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line break-words [word-break:break-word]">{{ $maintenance->kendala_teknis }}</p>
                 </div>
+                @if($fopTask->category === \App\Enums\TaskType::CREQ && $fopTask->task?->creqDetail)
+                <div class="col-span-2">
+                    @include('tasks.partials.creq-detail', ['task' => $fopTask->task])
+                </div>
+                @endif
+                @if($maintenanceInstalledSerials->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Modem/Perangkat Aktif Terpasang</p>
+                    @foreach($maintenanceInstalledSerials as $tx)
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400">{{ $tx->item->name ?? '-' }}</span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">SN {{ $tx->serial?->serial_number ?? '—' }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
                     <div class="flex flex-wrap gap-1.5 mt-1">
@@ -570,7 +594,7 @@
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Material Terpakai (Gudang)</p>
                     @foreach($materialTerpakai as $material)
                     <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
-                        <span class="text-slate-600 dark:text-slate-400">{{ $material->item_name }}@if($material->note)<span class="text-slate-400 dark:text-slate-500"> · {{ $material->note }}</span>@endif</span>
+                        <span class="text-slate-600 dark:text-slate-400">{{ $material->item_name }}@if($material->lot_no)<span class="font-mono text-slate-400 dark:text-slate-500"> · Roll {{ $material->lot_no }}</span>@endif @if($material->note)<span class="text-slate-400 dark:text-slate-500"> · {{ $material->note }}</span>@endif</span>
                         <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
                     </div>
                     @endforeach

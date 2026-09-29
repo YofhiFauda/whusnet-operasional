@@ -6,6 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
 use App\Enums\ManualInvoiceCategory;
 use App\Enums\WorkflowTransition;
+use App\Exceptions\DuplicateInvoiceException;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerTerminationReason;
@@ -121,28 +122,39 @@ class CustomerTerminationService
             if ($eligibleForPenalty && $penaltyAmount > 0 && $service) {
                 $billingPeriod = now()->format('Y-m');
 
-                $invoice = Invoice::create([
-                    'invoice_number' => $this->numbers->nextFor($billingPeriod),
-                    'invoice_type' => InvoiceType::MANUAL->value,
-                    'manual_category' => ManualInvoiceCategory::LAINNYA->value,
-                    'manual_subtype_name' => self::PENALTY_SUBTYPE_NAME,
-                    'description' => "Denda putus langganan — {$reason->name}",
-                    'customer_id' => $customer->id,
-                    'pop_id' => $customer->pop_id,
-                    'customer_service_id' => $service->id,
-                    'internet_package_id' => $service->internet_package_id,
-                    'billing_period' => $billingPeriod,
-                    'issue_date' => now()->toDateString(),
-                    'due_date' => now()->toDateString(),
-                    'subtotal' => $penaltyAmount,
-                    'discount' => 0,
-                    'ppn' => 0,
-                    'total_amount' => $penaltyAmount,
-                    'paid_amount' => 0,
-                    'remaining_amount' => $penaltyAmount,
-                    'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
-                    'created_by' => $actorId,
-                ]);
+                try {
+                    $invoice = Invoice::create([
+                        'invoice_number' => $this->numbers->nextFor($billingPeriod),
+                        'invoice_type' => InvoiceType::MANUAL->value,
+                        'manual_category' => ManualInvoiceCategory::LAINNYA->value,
+                        'manual_subtype_name' => self::PENALTY_SUBTYPE_NAME,
+                        'description' => "Denda putus langganan — {$reason->name}",
+                        'customer_id' => $customer->id,
+                        'pop_id' => $customer->pop_id,
+                        'customer_service_id' => $service->id,
+                        'internet_package_id' => $service->internet_package_id,
+                        'billing_period' => $billingPeriod,
+                        'issue_date' => now()->toDateString(),
+                        'due_date' => now()->toDateString(),
+                        'subtotal' => $penaltyAmount,
+                        'discount' => 0,
+                        'ppn' => 0,
+                        'total_amount' => $penaltyAmount,
+                        'paid_amount' => 0,
+                        'remaining_amount' => $penaltyAmount,
+                        'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
+                        'created_by' => $actorId,
+                    ]);
+                } catch (DuplicateInvoiceException) {
+                    // Pengaman anti double-submit InvoiceObserver: denda kembar
+                    // (nominal & periode sama) dalam 5 menit. Seluruh
+                    // transaksi putus langganan ikut batal; admin dapat pesan
+                    // jelas, bukan error 500 (ketahuan 2026-09-28: putus →
+                    // Langganan Lagi → putus lagi dalam 2 menit).
+                    throw ValidationException::withMessages([
+                        'penalty_amount' => 'Denda putus langganan dengan nominal yang sama baru saja diterbitkan untuk pelanggan ini. Tunggu beberapa menit, atau pastikan form tidak terkirim dua kali.',
+                    ]);
+                }
             }
         });
 

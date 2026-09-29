@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\InvoiceStatus;
-use App\Enums\InvoiceType;
 use App\Enums\ManualInvoiceCategory;
 use App\Enums\PaymentStatus;
 use App\Models\BankAccount;
@@ -12,15 +11,15 @@ use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\User;
 use App\Services\CustomerBalanceService;
-use App\Services\InvoiceNumberGenerator;
 use App\Services\InvoiceWriteOffService;
+use App\Services\ManualCategoryInvoiceService;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class InvoiceController extends Controller
@@ -229,41 +228,17 @@ class InvoiceController extends Controller
 
         abort_unless($customer, 403, 'Anda tidak memiliki akses ke pelanggan ini.');
 
-        $service = $customer->customerService;
-
-        if (! $service) {
-            return back()->withErrors(['customer_id' => 'Pelanggan ini belum memiliki layanan aktif — Tagihan Manual butuh layanan aktif untuk menentukan POP & paket.'])->withInput();
-        }
-
-        $category = ManualInvoiceCategory::from($validated['manual_category']);
-        $amount = $validated['amount'];
-
-        $invoice = DB::transaction(function () use ($customer, $service, $category, $validated, $amount) {
-            $billingPeriod = now()->format('Y-m');
-
-            return Invoice::create([
-                'invoice_number' => app(InvoiceNumberGenerator::class)->nextFor($billingPeriod),
-                'invoice_type' => InvoiceType::MANUAL->value,
-                'manual_category' => $category->value,
-                'manual_subtype_name' => $category->requiresSubtypeName() ? $validated['manual_subtype_name'] : null,
-                'description' => $validated['description'],
-                'customer_id' => $customer->id,
-                'pop_id' => $customer->pop_id,
-                'customer_service_id' => $service->id,
-                'internet_package_id' => $service->internet_package_id,
-                'billing_period' => $billingPeriod,
-                'issue_date' => now()->toDateString(),
-                'due_date' => now()->toDateString(),
-                'subtotal' => $amount,
-                'discount' => 0,
-                'ppn' => 0,
-                'total_amount' => $amount,
-                'paid_amount' => 0,
-                'remaining_amount' => $amount,
-                'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
-                'created_by' => auth()->id(),
-            ]);
-        });
+        // Logika penerbitan dipakai bersama Verifikasi Biaya C-REQ — lihat
+        // ManualCategoryInvoiceService. ValidationException (pelanggan belum
+        // punya layanan) otomatis kembali ke form dengan pesan & input lama.
+        $invoice = app(ManualCategoryInvoiceService::class)->issue(
+            $customer,
+            ManualInvoiceCategory::from($validated['manual_category']),
+            $validated['manual_subtype_name'] ?? null,
+            $validated['description'],
+            $validated['amount'],
+            auth()->id(),
+        );
 
         return redirect()
             ->route('invoices.show', $invoice)
@@ -361,11 +336,36 @@ class InvoiceController extends Controller
             ->with('success', 'Piutang dihapus buku (tak tertagih).');
     }
 
-    public function reverseWriteOff(Invoice $invoice, InvoiceWriteOffService $service): RedirectResponse
+    /**
+     * Batalkan hapus buku. Dipanggil dari Detail Tagihan (redirect ke tagihan
+     * itu) dan dari kolom Tagihan di List Putus Langganan (`redirect_to` =
+     * `customers.terminated`, ADHOC-105). `redirect_to` HANYA dicocokkan dengan
+     * satu nilai literal lalu dipetakan ke named route — bukan URL dari klien,
+     * jadi bukan open redirect.
+     */
+    public function reverseWriteOff(Request $request, Invoice $invoice, InvoiceWriteOffService $service): RedirectResponse
     {
         $this->authorizeScope($invoice);
 
-        $service->reverse($invoice);
+        $fromTerminatedList = $request->input('redirect_to') === 'customers.terminated';
+
+        try {
+            $service->reverse($invoice, $request->user());
+        } catch (ValidationException $e) {
+            // Halaman Putus Langganan tidak menampilkan @error('reason') seperti
+            // Detail Tagihan, jadi pesannya dibawa lewat flash `error`.
+            if (! $fromTerminatedList) {
+                throw $e;
+            }
+
+            return redirect()->route('customers.terminated')->with('error', (string) collect($e->errors())->flatten()->first());
+        }
+
+        if ($fromTerminatedList) {
+            return redirect()
+                ->route('customers.terminated')
+                ->with('success', "Tagihan {$invoice->invoice_number} dikembalikan ke tab Tagihan.");
+        }
 
         return redirect()
             ->route('invoices.show', $invoice)

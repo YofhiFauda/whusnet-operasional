@@ -153,22 +153,34 @@ class InvoiceWriteOffTest extends TestCase
         $this->assertEquals(0, $okt['pembuka']);
     }
 
+    /**
+     * ADHOC-105 (opsi A2) menggantikan aturan lama "batal hapus buku ditolak
+     * setelah bulan berganti": pelanggan putus harus selalu bisa membayar
+     * tagihannya, jadi Kembalikan tetap boleh di periode terkunci — tapi
+     * jejak hapus bukunya dipertahankan supaya laporan bulan lama tak bergeser.
+     * Kunci tetap diturunkan dari kalender, bukan dari baris period_closings.
+     */
     #[Test]
-    public function batalkan_hapus_buku_ditolak_setelah_bulan_berganti_walau_snapshot_belum_ada(): void
+    public function batalkan_hapus_buku_periode_terkunci_tetap_boleh_dan_jejak_dipertahankan(): void
     {
         $invoice = $this->piutang();
         $this->actingAs($this->owner)->post(route('invoices.write-off', $invoice), ['reason' => 'macet']);
 
-        // Bulan berganti = September tutup buku permanen. Kunci dari kalender,
-        // BUKAN dari baris period_closings (scheduler bisa telat jalan).
         Carbon::setTestNow('2026-10-01 00:01:00');
         $this->assertDatabaseCount('period_closings', 0);
 
         $this->actingAs($this->owner)
             ->post(route('invoices.write-off.reverse', $invoice))
-            ->assertSessionHasErrors('reason');
+            ->assertRedirect(route('invoices.show', $invoice))
+            ->assertSessionHasNoErrors();
 
-        $this->assertSame(InvoiceStatus::TAK_TERTAGIH, $invoice->refresh()->invoice_status);
+        $invoice->refresh();
+        $this->assertSame(InvoiceStatus::BELUM_DIBAYAR, $invoice->invoice_status);
+        $this->assertNotNull($invoice->written_off_at, 'Jejak hapus buku periode terkunci tidak boleh dihapus.');
+        $this->assertEquals(150000, $invoice->written_off_amount);
+        $this->assertNotNull($invoice->write_off_reversed_at);
+        $this->assertSame($this->owner->id, $invoice->write_off_reversed_by);
+        $this->assertTrue(Invoice::query()->piutang()->whereKey($invoice->id)->exists());
     }
 
     #[Test]

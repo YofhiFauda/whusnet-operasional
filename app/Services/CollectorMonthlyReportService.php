@@ -83,6 +83,33 @@ class CollectorMonthlyReportService
                 ->where($col('rejected_at'), '>=', $asOf));
     }
 
+    /**
+     * Invoice yang BUKAN sedang dihapus buku pada tanggal `$asOf` (awal periode):
+     * belum pernah dihapus buku, dihapus buku pada/sesudah `$asOf`, atau sudah
+     * dipulihkan sebelum `$asOf`. Pola sama `countedAsOf()` — "sah per tanggal".
+     *
+     * Kenapa: hapus buku periode terkunci yang dikembalikan belakangan (opsi A2,
+     * ADHOC-105) tidak boleh menggeser angka bulan hapus bukunya — di bulan itu
+     * hapus bukunya memang berlaku (`tak_tertagih` memakai syarat sejenis:
+     * `write_off_reversed_at` null atau `>=` awal bulan berikutnya). Pemulihannya
+     * dibukukan di bulan terjadinya (kolom `tak_tertagih_dipulihkan`). Hapus buku
+     * yang dibatalkan di periode berjalan mengosongkan kolomnya, jadi tidak
+     * pernah ikut hitungan ini.
+     *
+     * Ditulis eksplisit, BUKAN `whereNot()`: `written_off_at` NULL (invoice
+     * biasa) membuat NOT(NULL) bernilai NULL di SQL dan barisnya ikut terbuang.
+     */
+    private static function notWrittenOffAsOf(string $asOf, string $table = ''): Closure
+    {
+        $col = fn (string $column) => $table === '' ? $column : "{$table}.{$column}";
+
+        return fn ($q) => $q->whereNull($col('written_off_at'))
+            ->orWhere($col('written_off_at'), '>=', $asOf)
+            ->orWhere(fn ($reversed) => $reversed
+                ->whereNotNull($col('write_off_reversed_at'))
+                ->where($col('write_off_reversed_at'), '<', $asOf));
+    }
+
     public static function parsePeriod(string $period): Carbon
     {
         $start = Carbon::createFromFormat('!Y-m', $period);
@@ -132,7 +159,11 @@ class CollectorMonthlyReportService
     {
         return [
             'tagihan' => ['tagihan_terbit' => 0.0, 'dimuka' => 0.0, 'diskon' => 0.0, 'bulanan' => 0.0, 'total_pembayaran' => 0.0, 'piutang' => 0.0],
-            'piutang_lalu' => ['pembuka' => 0.0, 'sudah_dibayar' => 0.0, 'belum_dibayar' => 0.0, 'tak_tertagih' => 0.0],
+            // `tak_tertagih_dipulihkan` = pengurang tak tertagih: hapus buku
+            // periode terkunci yang di-Kembalikan bulan ini (lihat
+            // notWrittenOffAsOf()). Snapshot lama belum punya kunci ini —
+            // pembaca wajib `?? 0`.
+            'piutang_lalu' => ['pembuka' => 0.0, 'sudah_dibayar' => 0.0, 'belum_dibayar' => 0.0, 'tak_tertagih' => 0.0, 'tak_tertagih_dipulihkan' => 0.0],
             'pelanggan' => ['total' => 0, 'dimuka' => 0, 'sudah_bayar' => 0, 'belum_bayar' => 0],
             // `dikembalikan` = pengurang: pembayaran bulan terkunci yang
             // di-Kembalikan bulan ini (lihat countedAsOf()). Snapshot lama
@@ -296,8 +327,9 @@ class CollectorMonthlyReportService
             ->leftJoinSub($during, 'd', 'd.invoice_id', '=', 'i.id')
             ->where('i.billing_period', '<', $period)
             ->where('i.invoice_status', '!=', InvoiceStatus::BATAL->value)
-            // Sudah dihapus buku SEBELUM awal P → bukan piutang pembuka P lagi.
-            ->where(fn ($q) => $q->whereNull('i.written_off_at')->orWhere('i.written_off_at', '>=', $start))
+            // Sudah dihapus buku SEBELUM awal P (dan belum dipulihkan sebelum
+            // awal P) → bukan piutang pembuka P lagi.
+            ->where(self::notWrittenOffAsOf($start, 'i'))
             ->whereIn('i.pop_id', $popIds)
             ->get(['i.pop_id', 'i.total_amount', 'b.paid_before', 'd.paid_during']);
 
@@ -321,6 +353,8 @@ class CollectorMonthlyReportService
         $writeOffs = DB::table('invoices')
             ->where('written_off_at', '>=', $start)
             ->where('written_off_at', '<', $nextStart)
+            // Sah per akhir P: pemulihan bulan-bulan berikutnya tak menggeser P.
+            ->where(fn ($q) => $q->whereNull('write_off_reversed_at')->orWhere('write_off_reversed_at', '>=', $nextStart))
             ->whereIn('pop_id', $popIds)
             ->selectRaw('pop_id, SUM(written_off_amount) AS amount')
             ->groupBy('pop_id')
@@ -329,6 +363,26 @@ class CollectorMonthlyReportService
         foreach ($writeOffs as $row) {
             $block = &$figures[$map[$row->pop_id]]['piutang_lalu'];
             $block['tak_tertagih'] = Money::add($block['tak_tertagih'], $row->amount);
+        }
+
+        unset($block);
+
+        // Pemulihan di P atas hapus buku bertanggal SEBELUM P (periode yang
+        // sudah tutup buku) — pengurang di bulan terjadinya, laporan bulan
+        // hapus bukunya tidak berubah. Sisa piutangnya kembali masuk pembuka
+        // bulan berikutnya (lihat notWrittenOffAsOf()).
+        $recoveries = DB::table('invoices')
+            ->where('write_off_reversed_at', '>=', $start)
+            ->where('write_off_reversed_at', '<', $nextStart)
+            ->where('written_off_at', '<', $start)
+            ->whereIn('pop_id', $popIds)
+            ->selectRaw('pop_id, SUM(written_off_amount) AS amount')
+            ->groupBy('pop_id')
+            ->get();
+
+        foreach ($recoveries as $row) {
+            $block = &$figures[$map[$row->pop_id]]['piutang_lalu'];
+            $block['tak_tertagih_dipulihkan'] = Money::add($block['tak_tertagih_dipulihkan'], $row->amount);
         }
 
         unset($block);
@@ -506,7 +560,7 @@ class CollectorMonthlyReportService
     {
         return [
             'tagihan' => ['tagihan_terbit', 'dimuka', 'diskon', 'bulanan', 'piutang'],
-            'piutang_lalu' => ['pembuka', 'sudah_dibayar', 'belum_dibayar', 'tak_tertagih'],
+            'piutang_lalu' => ['pembuka', 'sudah_dibayar', 'belum_dibayar', 'tak_tertagih', 'tak_tertagih_dipulihkan'],
             'pelanggan' => ['total', 'dimuka', 'sudah_bayar', 'belum_bayar'],
             'uang_diterima' => ['bulanan', 'piutang', 'lebih_bayar', 'aktivasi', 'lainnya', 'dikembalikan', 'total'],
         ];
@@ -648,10 +702,24 @@ class CollectorMonthlyReportService
                 ->join('customers as c', 'c.id', '=', 'i.customer_id')
                 ->where('i.written_off_at', '>=', $start)
                 ->where('i.written_off_at', '<', $nextStart)
+                ->where(fn ($q) => $q->whereNull('i.write_off_reversed_at')->orWhere('i.write_off_reversed_at', '>=', $nextStart))
                 ->whereIn('i.pop_id', $popIds)
                 ->orderBy('i.written_off_at')
                 ->get(['c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'i.written_off_at', 'i.written_off_amount', 'i.write_off_reason'])
                 ->map(fn ($r) => $this->row($r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number, $r->written_off_at, (float) $r->written_off_amount, (string) $r->write_off_reason))
+                ->all();
+        }
+
+        if ($column === 'tak_tertagih_dipulihkan') {
+            return DB::table('invoices as i')
+                ->join('customers as c', 'c.id', '=', 'i.customer_id')
+                ->where('i.write_off_reversed_at', '>=', $start)
+                ->where('i.write_off_reversed_at', '<', $nextStart)
+                ->where('i.written_off_at', '<', $start)
+                ->whereIn('i.pop_id', $popIds)
+                ->orderBy('i.write_off_reversed_at')
+                ->get(['c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'i.write_off_reversed_at', 'i.written_off_amount', 'i.written_off_at'])
+                ->map(fn ($r) => $this->row($r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number, $r->write_off_reversed_at, (float) $r->written_off_amount, 'Hapus buku tgl '.Carbon::parse($r->written_off_at)->format('d/m/Y').' dipulihkan (Kembalikan)'))
                 ->all();
         }
 
@@ -666,7 +734,7 @@ class CollectorMonthlyReportService
             ->join('customers as c', 'c.id', '=', 'i.customer_id')
             ->where('i.billing_period', '<', $period)
             ->where('i.invoice_status', '!=', InvoiceStatus::BATAL->value)
-            ->where(fn ($q) => $q->whereNull('i.written_off_at')->orWhere('i.written_off_at', '>=', $start))
+            ->where(self::notWrittenOffAsOf($start, 'i'))
             ->whereIn('i.pop_id', $popIds)
             ->get(['i.id', 'i.invoice_number', 'i.billing_period', 'i.total_amount', 'b.paid_before', 'c.full_name', 'c.customer_code', 'c.cid']);
 

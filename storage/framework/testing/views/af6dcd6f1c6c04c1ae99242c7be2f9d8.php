@@ -324,14 +324,11 @@
                     <p class="mt-0.5"><?php echo e(optional($invoice->written_off_at)->format('d/m/Y')); ?> — <?php echo e($invoice->write_off_reason); ?></p>
                 </div>
                 
-                <?php if(\App\Support\BookPeriod::isLocked($invoice->written_off_at?->format('Y-m'))): ?>
-                    <span class="text-[11px] font-semibold text-rose-700 dark:text-rose-300">Periode sudah tutup buku — tidak bisa dibatalkan</span>
-                <?php else: ?>
-                    <form method="POST" action="<?php echo e(route('invoices.write-off.reverse', $invoice)); ?>" onsubmit="return confirm('Batalkan hapus buku? Tagihan kembali menjadi piutang.')">
-                        <?php echo csrf_field(); ?>
-                        <button type="submit" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors">Batalkan Hapus Buku</button>
-                    </form>
-                <?php endif; ?>
+                <?php $writeOffLocked = \App\Support\BookPeriod::isLocked($invoice->written_off_at?->format('Y-m')); ?>
+                <form method="POST" action="<?php echo e(route('invoices.write-off.reverse', $invoice)); ?>" onsubmit="return confirm(<?php echo \Illuminate\Support\Js::from($writeOffLocked ? 'Periode hapus buku ini sudah tutup buku. Tagihan tetap dikembalikan menjadi piutang dan pemulihannya dicatat di bulan ini; laporan bulan lama tidak berubah. Lanjutkan?' : 'Batalkan hapus buku? Tagihan kembali menjadi piutang.')->toHtml() ?>)">
+                    <?php echo csrf_field(); ?>
+                    <button type="submit" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors">Batalkan Hapus Buku</button>
+                </form>
             </div>
             <?php $__errorArgs = ['reason'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');

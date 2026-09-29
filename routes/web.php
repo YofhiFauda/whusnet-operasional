@@ -359,6 +359,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:invoices.approve')->group(function () {
         Route::post('/invoices/{invoice}/write-off', [InvoiceController::class, 'writeOff'])->name('invoices.write-off');
         Route::post('/invoices/{invoice}/write-off/reverse', [InvoiceController::class, 'reverseWriteOff'])->name('invoices.write-off.reverse');
+        // "Kembalikan Semua" dari kolom Tagihan List Putus Langganan (ADHOC-105).
+        Route::post('/customers/{customer}/write-off/reverse-all', [CustomerTerminatedController::class, 'reverseAllWriteOffs'])->name('customers.write-off.reverse-all');
     });
 
     Route::middleware('permission:payments.reject')->group(function () {

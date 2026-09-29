@@ -20,6 +20,12 @@ Schedule::command('billing:generate-monthly-invoices')->monthlyOn(1, '01:00');
 // Kuncinya sendiri sudah berlaku sejak 00:00 (BookPeriod::isLocked()),
 // jadi jam berapa pun command ini jalan tidak membuka celah.
 Schedule::command('billing:close-period')->monthlyOn(1, '00:10');
+// Hapus buku otomatis utang pelanggan putus yang masa tenggangnya habis
+// (ADHOC-105). Jalan SETELAH close-period: write-off distempel bulan berjalan
+// (bukan bulan yang sedang dibekukan), jadi urutannya tidak menggeser laporan
+// bulan lalu — tapi tetap dijadwalkan sesudahnya supaya snapshot bulan lalu
+// dipastikan sudah selesai dibuat sebelum data invoice berubah.
+Schedule::command('billing:write-off-terminated')->monthlyOn(1, '00:20');
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
 Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();
 // '01:15' — hindari bentrok dgn billing:generate-monthly-invoices (01:00,

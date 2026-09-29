@@ -1,6 +1,6 @@
 # Rancangan: Piutang/Denda Pelanggan Putus — Grace Period Otomatis → Tak Tertagih (ADHOC-105)
 
-**Status:** RANCANGAN, belum diimplementasi — **jangan dikerjakan sebelum ada perintah eksplisit dari user**. Di luar sprint aktif, permintaan eksplisit user (2026-09-26). Revisi 2026-09-28: 5 pertanyaan awal dan 2 pertanyaan lanjutan (A: tombol Kembalikan vs periode terkunci, B: penerima notifikasi) sudah dijawab user dan dimasukkan ke dokumen. Tidak ada pertanyaan terbuka tersisa; detail teknis opsi A2 (§3.4a) difinalisasi saat implementasi.
+**Status:** **SELESAI DIIMPLEMENTASI 2026-09-28** atas perintah eksplisit user. Di luar sprint aktif, permintaan eksplisit user (2026-09-26). Riwayat: 5 pertanyaan awal dan 2 pertanyaan lanjutan (A: tombol Kembalikan vs periode terkunci, B: penerima notifikasi) dijawab user 2026-09-28. Catatan implementasi (penyimpangan kecil dari sketsa rancangan) ada di §7.
 
 **Terkait:**
 - [`rancangan-terminate-reactivate-state-machine.md`](rancangan-terminate-reactivate-state-machine.md) §13 (Langganan Lagi bercabang berdasarkan status alat, ADHOC-102 — **sudah diimplementasi**, akan disentuh lagi oleh rancangan ini)
@@ -219,6 +219,25 @@ Catatan waktu: job jalan tanggal 1 pukul 00:10, sama dengan `billing:close-perio
 
 Tidak ada pertanyaan terbuka. Yang masih "difinalisasi saat implementasi" hanya detail teknis di §3.4a (bentuk kolom pemulihan, tampilan pengurang di laporan, dan apakah audit log cukup sebagai jejak bila satu invoice di-write-off lebih dari sekali).
 
-## 7. Rollback
+## 7. Catatan Implementasi (2026-09-28)
+
+Yang dibuat sesuai rancangan: migrasi `2026_09_28_120000_add_write_off_reversal_columns_to_invoices_table`; `TerminatedCustomerWriteOffService` + command `billing:write-off-terminated` (`--dry-run`, `--as-of=`, dijadwalkan tanggal 1 pukul 00:20 di `routes/console.php`); guard utang di `CustomerController::reactivate()`; `InvoiceWriteOffService::reverse()` opsi A2 + `reverseAllForCustomer()`; kolom Tagihan + dialog di `customers/terminated.blade.php` (partial `_terminated_write_offs`); `CustomerTerminatedController::reverseAllWriteOffs()` + route `customers.write-off.reverse-all`; `InvoiceController::reverseWriteOff()` menerima `redirect_to`; laporan bulanan (`CollectorMonthlyReportService`, view, ekspor CSV) membaca hapus buku "sah per tanggal" dan menampilkan kolom **Tak Tertagih Dipulihkan**.
+
+Keputusan yang diambil saat implementasi (di luar sketsa §3-§5):
+1. **Jadwal 00:20**, bukan 00:10 — supaya snapshot `billing:close-period` (00:10) pasti selesai sebelum data invoice berubah.
+2. **Dialog memakai `<dialog>.showModal()`**, bukan div `fixed`: halaman Putus Langganan dibungkus `@container` (layout containment) yang mengurung elemen `fixed` di dalamnya. Tetap view-only; tombol Kembalikan adalah form POST dengan `action` dirender server-side (aturan CLAUDE.md).
+3. **`invoices/show.blade.php` ikut diubah**: teks "Periode sudah tutup buku — tidak bisa dibatalkan" bertentangan dengan A2, jadi tombol Batalkan Hapus Buku selalu tampil (konfirmasinya menjelaskan efek periode terkunci). Docblock `BookPeriod` disesuaikan.
+4. **Test lama diperbarui** karena aturannya memang diganti rancangan ini: `InvoiceWriteOffTest::batalkan_hapus_buku_ditolak_setelah_bulan_berganti_walau_snapshot_belum_ada` → `batalkan_hapus_buku_periode_terkunci_tetap_boleh_dan_jejak_dipertahankan`.
+5. **"Sisa Piutang" laporan** = Belum Dibayar − Tak Tertagih + Tak Tertagih Dipulihkan. Pembayaran atas tagihan yang dipulihkan di bulan yang sama belum mengurangi angka itu (tercatat di Uang Diterima, masuk pembuka bulan berikutnya) — keterangan ada di catatan kaki view.
+6. Notifikasi Kembalikan (§3.5 baris 2) **tidak dikirim** sesuai default rancangan.
+7. Pelaku job = `User::find(1)` (fallback user pertama), pola `CustomerWorkflowService::transition()`.
+
+**Tambahan hasil code review (2026-09-28, keputusan user "opsi A"):**
+8. **Invoice yang pernah dikembalikan dikecualikan dari job otomatis.** Celah yang tidak dibahas di rancangan: tanpa ini Kembalikan cuma bertahan sampai tanggal 1 berikutnya karena job menghapus buku ulang, bertentangan dengan keputusan §2 #9. Cara kerja: pengembalian di periode berjalan kini juga mengisi `write_off_reversed_at/by` (penanda) walau `written_off_*` tetap dikosongkan; job hanya memilih invoice belum lunas dengan `write_off_reversed_at` kosong. Setelahnya invoice ditagih sampai lunas atau dihapus buku manual admin (`writeOff()` manual mengosongkan penanda = siklus baru). Efek samping baik: riwayat siklus hapus buku tidak lagi tertimpa oleh job, jadi laporan periode tutup buku tidak drift.
+9. Perbaikan kecil hasil review: `--dry-run` kini mencerminkan guard `writeOff()` (sisa nol dihitung "dilewati"); daftar penerima notifikasi dicari sekali per run; guard `reactivate()` memakai `Invoice::OUTSTANDING_STATUSES`; ditambah test atomisitas "Kembalikan Semua" (satu gagal = semua batal, disimulasikan lewat event model) dan test job melewati invoice yang pernah dikembalikan (periode terkunci maupun bulan yang sama).
+
+Yang belum dicakup: riwayat lebih dari satu siklus hapus buku per invoice hanya lewat audit log (sesuai rancangan §3.4a); pelanggan legacy tanpa `terminated_at` dilewati job.
+
+## 8. Rollback
 
 Rancangan ini penambahan (command baru + guard baru + kolom UI baru + dua kolom baru di `invoices` via migrasi, poin 5.2a), dan mengubah perilaku `reverse()` serta pembacaan laporan bulanan (poin 5.2/5.2b). Data lama tidak diubah. Kalau perlu dibatalkan pasca-implementasi: nonaktifkan scheduler command baru (poin 5.1/5.6), hapus guard di `reactivate()` (poin 5.3), sembunyikan kolom UI (poin 5.4), kembalikan guard periode terkunci di `reverse()` (poin 5.2). Kolom `write_off_reversed_*` boleh dibiarkan (nullable, tidak mengganggu). Catatan: pemulihan yang sudah terjadi di periode terkunci tidak bisa dibalik otomatis, cukup di-write-off ulang manual — invoice yang sudah kadung `tak_tertagih` oleh job ini bisa di-`reverse()` manual satu-satu lewat mekanisme ADHOC-90 yang sudah ada (tidak hilang, cuma butuh kerja manual kalau mau dibalikin massal).

@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\CReqVerificationStatus;
+use App\Enums\InvoiceType;
 use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
+use App\Models\CustomerService;
+use App\Models\InternetPackage;
+use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -25,9 +29,10 @@ use Tests\TestCase;
 
 /**
  * Antrean "Verifikasi Biaya C-REQ" — CS (role helpdesk) menyetujui/menolak
- * task C-REQ berbayar sebelum diteruskan ke Tagihan Manual. Approve TIDAK
- * membuat invoice otomatis, cuma menandai verified & redirect ke
- * /invoices/create dengan pelanggan+kategori+catatan sudah terisi.
+ * task C-REQ berbayar. Sejak 2026-09-28 approve = "Setujui & Terbitkan
+ * Tagihan": CS mengisi nominal di halaman C-REQ, Tagihan Manual terbit dan
+ * tertaut ke detail dalam SATU transaksi (dulu cuma redirect ke
+ * /invoices/create — tagihan bisa tidak pernah dibuat).
  *
  * docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md
  */
@@ -116,33 +121,116 @@ class CreqBillingVerificationTest extends TestCase
         $response->assertForbidden();
     }
 
-    #[Test]
-    public function approve_menandai_verified_dan_redirect_ke_tagihan_manual_prefill(): void
+    private function beriLayanan(): CustomerService
     {
-        $response = $this->actingAs($this->helpdesk)
-            ->put(route('tasks.creq-billing.approve', $this->task));
+        $package = InternetPackage::create([
+            'package_code' => 'PKT-CREQV',
+            'name' => 'Paket C-REQ',
+            'category' => 'Home Broadband',
+            'package_group' => 'Net',
+            'bandwidth_label' => '20 Mbps',
+            'monthly_price' => 150000,
+            'is_active' => true,
+        ]);
 
-        $response->assertRedirect();
-        $location = $response->headers->get('Location');
-        $this->assertStringContainsString('/invoices/create', $location);
-        $this->assertStringContainsString('customer_id='.$this->customer->id, $location);
-        $this->assertStringContainsString('manual_category=lainnya', $location);
+        return CustomerService::create([
+            'customer_id' => $this->customer->id,
+            'internet_package_id' => $package->id,
+            'package_name_snapshot' => $package->name,
+            'monthly_price' => 150000,
+            'discount' => 0,
+            'ppn' => 0,
+            'total_monthly_bill' => 150000,
+            'activation_date' => now()->subMonth()->toDateString(),
+            'due_date' => now()->toDateString(),
+            'service_status' => 'aktif',
+            'billing_status' => 'active',
+        ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function payloadSetujui(): array
+    {
+        return [
+            'manual_subtype_name' => 'Pasang Repeater',
+            'description' => 'Pasang repeater tambahan atas permintaan pelanggan.',
+            'amount' => '150.000',
+        ];
+    }
+
+    #[Test]
+    public function setujui_menerbitkan_tagihan_manual_dan_menautkannya_dalam_satu_langkah(): void
+    {
+        $this->beriLayanan();
+
+        $response = $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), $this->payloadSetujui());
+
+        $response->assertRedirect(route('tasks.creq-billing.show', $this->task));
+        $response->assertSessionHas('success');
 
         $this->detail->refresh();
         $this->assertSame(CReqVerificationStatus::VERIFIED, $this->detail->verification_status);
         $this->assertSame($this->helpdesk->id, $this->detail->verified_by);
         $this->assertNotNull($this->detail->verified_at);
+
+        $invoice = $this->detail->invoice;
+        $this->assertNotNull($invoice);
+        $this->assertSame(InvoiceType::MANUAL, $invoice->invoice_type);
+        // Kategori diturunkan dari C-REQ "lainnya", bukan input klien.
+        $this->assertSame('lainnya', $invoice->manual_category?->value ?? $invoice->manual_category);
+        $this->assertSame('Pasang Repeater', $invoice->manual_subtype_name);
+        $this->assertEquals(150000.0, (float) $invoice->total_amount);
+        $this->assertSame($this->customer->id, $invoice->customer_id);
+
+        // Halaman detail menampilkan tagihan yang terbit.
+        $this->actingAs($this->helpdesk)
+            ->get(route('tasks.creq-billing.show', $this->task))
+            ->assertOk()
+            ->assertSee($invoice->invoice_number);
     }
 
     #[Test]
-    public function approve_dua_kali_ditolak(): void
+    public function setujui_tanpa_nominal_ditolak_dan_tidak_ada_yang_berubah(): void
     {
-        $this->actingAs($this->helpdesk)->put(route('tasks.creq-billing.approve', $this->task));
+        $this->beriLayanan();
 
-        $response = $this->actingAs($this->helpdesk)
-            ->put(route('tasks.creq-billing.approve', $this->task));
+        $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), array_merge($this->payloadSetujui(), ['amount' => '']))
+            ->assertSessionHasErrors('amount');
 
-        $response->assertStatus(422);
+        $this->detail->refresh();
+        $this->assertSame(CReqVerificationStatus::PENDING, $this->detail->verification_status);
+        $this->assertSame(0, Invoice::count());
+    }
+
+    #[Test]
+    public function pelanggan_tanpa_layanan_tidak_bisa_disetujui_dan_tetap_pending(): void
+    {
+        $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), $this->payloadSetujui())
+            ->assertSessionHasErrors('customer_id');
+
+        $this->detail->refresh();
+        $this->assertSame(CReqVerificationStatus::PENDING, $this->detail->verification_status);
+        $this->assertNull($this->detail->invoice_id);
+        $this->assertSame(0, Invoice::count());
+    }
+
+    #[Test]
+    public function setujui_dua_kali_ditolak_dan_tagihan_tidak_terbit_dua_kali(): void
+    {
+        $this->beriLayanan();
+
+        $this->actingAs($this->helpdesk)->put(route('tasks.creq-billing.approve', $this->task), $this->payloadSetujui());
+
+        $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), $this->payloadSetujui())
+            ->assertStatus(422);
+
+        $this->assertSame(1, Invoice::count());
     }
 
     #[Test]

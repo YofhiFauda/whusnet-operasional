@@ -353,7 +353,7 @@
                 <thead>
                     <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                         <th class="w-8 px-2.5 py-2.5 text-center">
-                            <input type="checkbox" @change="toggleSelectAll($event.target.checked)" :checked="isAllSelected()" class="w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                            <input type="checkbox" @change="toggleSelectAll($event.target.checked)" :checked="isAllSelected()" class="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-sky-600 focus:ring-sky-500 cursor-pointer">
                         </th>
                         <th class="px-3 py-2.5">Kategori</th>
                         <th class="px-3 py-2.5">Tanggal</th>
@@ -373,9 +373,9 @@
                             $isTaskToday = $task->task_date && $task->task_date->isToday();
                             $isOverdue = $task->task_date && $task->task_date->isPast() && !in_array($task->status->value, ['selesai', 'dibatalkan']);
                         @endphp
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors align-top {{ $isOverdue ? 'border-l-4 border-l-rose-500 bg-rose-50/10' : ($isTaskToday ? 'border-l-4 border-l-amber-500 bg-amber-50/15' : '') }}" id="fop-task-row-{{ $task->id }}" data-pop-id="{{ $task->pop_id }}">
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors align-top {{ $isOverdue ? 'border-l-4 border-l-rose-500 bg-rose-50/10 dark:bg-rose-950/20' : ($isTaskToday ? 'border-l-4 border-l-amber-500 bg-amber-50/15 dark:bg-amber-950/20' : '') }}" id="fop-task-row-{{ $task->id }}" data-pop-id="{{ $task->pop_id }}">
                             <td class="w-8 px-2.5 py-2 text-center" @click.stop>
-                                <input type="checkbox" :checked="selectedTaskIds.includes({{ $task->id }})" @change="toggleSelectTask({{ $task->id }})" class="w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                                <input type="checkbox" :checked="selectedTaskIds.includes({{ $task->id }})" @change="toggleSelectTask({{ $task->id }})" class="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-sky-600 focus:ring-sky-500 cursor-pointer">
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border {{ $task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400' }}">
@@ -426,12 +426,12 @@
                                     <select @change="updatePriority({{ $task->id }}, $event.target.value)"
                                             x-data="{ currentPriority: '{{ $task->priority->value }}' }"
                                             x-model="currentPriority"
-                                            class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24 transition-colors duration-200"
+                                            class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24 transition-colors duration-200 dark:bg-slate-800 dark:text-slate-200"
                                             :class="{
-                                                'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50': currentPriority === 'low',
-                                                'border-yellow-300 text-yellow-800 bg-yellow-50': currentPriority === 'Medium',
-                                                'border-orange-300 text-orange-800 bg-orange-50': currentPriority === 'High',
-                                                'border-red-300 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 font-bold': currentPriority === 'Urgent'
+                                                'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/80': currentPriority === 'low',
+                                                'border-yellow-300 dark:border-yellow-700/60 text-yellow-800 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-950/40': currentPriority === 'Medium',
+                                                'border-orange-300 dark:border-orange-700/60 text-orange-800 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40': currentPriority === 'High',
+                                                'border-red-300 dark:border-red-700/60 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 font-bold': currentPriority === 'Urgent'
                                             }">
                                         <option value="low">Low</option>
                                         <option value="Medium">Medium</option>
@@ -463,14 +463,14 @@
                                         lat: '{{ $task->customer?->latitude ?? $task->ticket?->customer_latitude ?? '' }}',
                                         lng: '{{ $task->customer?->longitude ?? $task->ticket?->customer_longitude ?? '' }}'
                                     })"
-                                    class="text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 p-1.5 rounded cursor-pointer"
+                                    class="text-slate-400 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 p-1.5 rounded cursor-pointer"
                                     title="Salin Format WA ke Teknisi">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>
                                     </button>
                                     <a href="{{ route('fop-tasks.history.show', $task->id) }}"
-                                       class="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 p-1.5 rounded"
+                                       class="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-slate-200 dark:hover:bg-slate-600 p-1.5 rounded"
                                        title="Detail Task">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -484,7 +484,7 @@
                                     </span>
                                     @else
                                     <button @click="openEditModal({{ json_encode($task) }}, {{ json_encode($task->technicians->pluck('id')) }}, '{{ route('fop-tasks.update', $task->id) }}')"
-                                            class="text-slate-400 dark:text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 p-1.5 rounded cursor-pointer"
+                                            class="text-slate-400 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-blue-50 dark:hover:bg-blue-950/40 p-1.5 rounded cursor-pointer"
                                             title="Edit">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -494,7 +494,7 @@
                                     <form action="{{ route('fop-tasks.destroy', $task->id) }}" method="POST" data-confirm="Apakah Anda yakin ingin menghapus Task FOP ini?" class="inline-block">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded cursor-pointer" title="Hapus">
+                                        <button type="submit" class="text-slate-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-red-50 dark:hover:bg-red-900/40 p-1.5 rounded cursor-pointer" title="Hapus">
                                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
@@ -502,7 +502,7 @@
                                     </form>
                                     @elseif($task->ticket)
                                     <button type="button" disabled
-                                            class="text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded cursor-not-allowed"
+                                            class="text-slate-300 dark:text-slate-600 bg-slate-50 dark:bg-slate-800/40 p-1.5 rounded cursor-not-allowed"
                                             title="Task dari Ticketing gak bisa dihapus — batalkan lewat Cancel kalau salah input.">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -516,7 +516,7 @@
                     @empty
                         <tr>
                             <td colspan="11" class="px-3 py-10 text-center text-slate-500 dark:text-slate-400">
-                                <svg class="w-8 h-8 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg class="w-8 h-8 mx-auto mb-3 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
                                 <p class="text-[11px] font-medium">Tidak ada data task FOP.</p>
@@ -996,12 +996,12 @@
                                 <div>
                                     <span class="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium border w-fit"
                                           :class="{
-                                              'border-blue-200 text-blue-700 bg-blue-50': modal.data.status === 'terjadwal',
+                                              'border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20': modal.data.status === 'terjadwal',
                                               'border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20': modal.data.status === 'in_progress',
-                                              'border-yellow-200 text-yellow-700 bg-yellow-50': modal.data.status === 'pending',
-                                              'border-green-200 text-green-700 bg-green-50': modal.data.status === 'selesai',
-                                              'border-red-200 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20': modal.data.status === 'dibatalkan',
-                                              'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50': modal.data.status === 'draft',
+                                              'border-yellow-200 dark:border-yellow-800/50 text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20': modal.data.status === 'pending',
+                                              'border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20': modal.data.status === 'selesai',
+                                              'border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20': modal.data.status === 'dibatalkan',
+                                              'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70': modal.data.status === 'draft',
                                           }"
                                           x-text="modal.data.status"></span>
                                     <p class="text-[10px] text-text-muted mt-1">Status realtime — otomatis mengikuti status Task teknisi.</p>

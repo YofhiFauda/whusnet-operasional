@@ -154,7 +154,7 @@
             <table class="w-full border-collapse">
                 <thead>
                     <tr>
-                        @foreach(['No', 'OLT', 'Piutang Bulan Lalu', 'Sudah Dibayar', 'Belum Dibayar', 'Sudah Dibayar %', 'Belum Dibayar %', 'Piutang tak Tertagih', 'Sisa Piutang'] as $h)
+                        @foreach(['No', 'OLT', 'Piutang Bulan Lalu', 'Sudah Dibayar', 'Belum Dibayar', 'Sudah Dibayar %', 'Belum Dibayar %', 'Piutang tak Tertagih', 'Tak Tertagih Dipulihkan', 'Sisa Piutang'] as $h)
                             <th class="{{ $th }}">{{ $h }}</th>
                         @endforeach
                     </tr>
@@ -171,7 +171,9 @@
                             <td class="{{ $td }}">{{ $pct($p['sudah_dibayar'], $p['pembuka']) }}</td>
                             <td class="{{ $td }}">{{ $pct($p['belum_dibayar'], $p['pembuka']) }}</td>
                             <x-reports.detail-cell :cls="$td" :value="$rp($p['tak_tertagih'])" block="piutang_lalu" column="tak_tertagih" :pop-id="$pid" label="Piutang tak tertagih (hapus buku) — {{ $row['pop']->name }}" :clickable="$can('piutang_lalu', 'tak_tertagih')" />
-                            <td class="{{ $td }}">{{ $rp(max(0, $p['belum_dibayar'] - $p['tak_tertagih'])) }}</td>
+                            {{-- Pengurang tak tertagih: hapus buku periode terkunci yang di-Kembalikan bulan ini. Snapshot lama tak punya kuncinya. --}}
+                            <x-reports.detail-cell :cls="$td" :value="$rp($p['tak_tertagih_dipulihkan'] ?? 0)" block="piutang_lalu" column="tak_tertagih_dipulihkan" :pop-id="$pid" label="Tak tertagih dipulihkan (Kembalikan) — {{ $row['pop']->name }}" :clickable="$can('piutang_lalu', 'tak_tertagih_dipulihkan')" />
+                            <td class="{{ $td }}">{{ $rp(max(0, $p['belum_dibayar'] - $p['tak_tertagih'] + ($p['tak_tertagih_dipulihkan'] ?? 0))) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -186,12 +188,13 @@
                         <td class="{{ $tf }}">{{ $pct($p['sudah_dibayar'], $p['pembuka']) }}</td>
                         <td class="{{ $tf }}">{{ $pct($p['belum_dibayar'], $p['pembuka']) }}</td>
                         <td class="{{ $tf }}">{{ $rp($p['tak_tertagih']) }}</td>
-                        <td class="{{ $tf }}">{{ $rp(max(0, $p['belum_dibayar'] - $p['tak_tertagih'])) }}</td>
+                        <td class="{{ $tf }}">{{ $rp($p['tak_tertagih_dipulihkan'] ?? 0) }}</td>
+                        <td class="{{ $tf }}">{{ $rp(max(0, $p['belum_dibayar'] - $p['tak_tertagih'] + ($p['tak_tertagih_dipulihkan'] ?? 0))) }}</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
-        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Piutang tak tertagih = tagihan yang dihapus buku pada bulan ini (tombol "Hapus Buku" di detail tagihan).</p>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Piutang tak tertagih = tagihan yang dihapus buku pada bulan ini (tombol "Hapus Buku" di detail tagihan, atau otomatis untuk pelanggan putus yang masa tenggangnya habis). Tak tertagih dipulihkan = hapus buku bulan lalu (periode sudah tutup buku) yang dikembalikan menjadi tagihan pada bulan ini; angka bulan hapus bukunya tidak berubah. Pembayaran atas tagihan yang dipulihkan di bulan yang sama belum mengurangi Sisa Piutang di sini, dan tercatat di Uang Diterima.</p>
     </div>
 
     {{-- 3. Pelanggan --}}

@@ -110,20 +110,24 @@ Task tipe `C-REQ` pakai form yang **sama persis** dengan §7 di atas (`TaskMaint
 
 Disimpan di tabel terpisah `task_creq_details` (lihat [database-schema.md](database-schema.md#tabel-task_creq_details-2026-09-26)) — bukan kolom tambahan di `task_maintenances`, karena field ini murni khusus C-REQ dan tak relevan buat MTN/O-REQ/INFR REQ yang berbagi controller/view yang sama.
 
-**Alur verifikasi:**
+**Alur verifikasi** (sejak 2026-09-28 — "Setujui & Terbitkan Tagihan"):
 
 ```
 Teknisi submit (is_billable=true) → verification_status=pending (task tetap selesai seperti biasa)
-CS (role helpdesk, permission creq_billing_verification.*) buka /tasks-creq-billing
-  → Approve → verification_status=verified, redirect ke /invoices/create dengan
-    customer_id/manual_category/manual_subtype_name/description prefill dari
-    kategori C-REQ (CS TETAP submit Tagihan Manual secara sadar, nominal tetap manual)
-  → Reject  → verification_status=rejected + rejection_reason (wajib)
+CS (role helpdesk, permission creq_billing_verification.*) buka /tasks-creq-billing/{task}
+  → Setujui → CS isi nominal + deskripsi (+ nama sub kalau Lainnya) DI HALAMAN INI,
+              SATU transaksi: Tagihan Manual terbit (ManualCategoryInvoiceService::issue()),
+              verification_status=verified, task_creq_details.invoice_id = tagihan itu
+  → Tolak   → verification_status=rejected + rejection_reason (wajib), tanpa tagihan
 ```
 
-Kontrol race-condition: `approve()`/`reject()` (`TaskCreqBillingController`) mengunci baris (`lockForUpdate()`) **di dalam** `DB::transaction()` dan mengecek ulang `verification_status=pending` di situ — mencegah dua request approve/reject bersamaan saling menimpa hasil verifikasi.
+Awalnya (2026-09-26) Setujui cuma menandai verified lalu redirect ke `/invoices/create` dengan prefill. Diganti karena tagihannya tidak tertaut ke task, dan kalau CS tidak menuntaskan form itu, biaya tercatat "disetujui" tapi tidak pernah ditagih. Sekarang gagal di titik mana pun (mis. pelanggan belum punya layanan) = tidak ada yang berubah.
 
-`ManualInvoiceCategory` (enum FINAL 3 nilai, ADHOC-70) **tidak ditambah** — mapping kategori C-REQ → kategori Tagihan Manual: `pindah_lokasi`→`pindah_lokasi`, `pindah_kabel`/`tambah_modem`→`perbaikan`, `lainnya`→`lainnya` (lihat `CReqCategory::toManualInvoiceCategory()`).
+Kontrol race-condition: `approve()`/`reject()` (`TaskCreqBillingController`) mengunci baris (`lockForUpdate()`) **di dalam** `DB::transaction()` dan mengecek ulang `verification_status=pending` di situ — mencegah dua request bersamaan saling menimpa hasil verifikasi atau menerbitkan tagihan dua kali.
+
+**Jenis Tagihan diturunkan dari Jenis Permintaan, bukan input CS.** `ManualInvoiceCategory` (enum FINAL 3 nilai, ADHOC-70) **tidak ditambah**; `CReqCategory::toManualInvoiceCategory()`: `pindah_lokasi`→`pindah_lokasi`, `pindah_kabel`/`tambah_modem`→`perbaikan`, `lainnya`→`lainnya` (nama sub diisi awal dari `category_custom_name`). Konsekuensi: kategori salah pilih oleh teknisi = jenis tagihan ikut salah; koreksinya lewat **Tolak**, bukan ganti jenis tagihan.
+
+**Laporan tampil lengkap di 3 halaman (2026-09-29).** Isi laporan C-REQ yang dikirim teknisi wajib terlihat utuh di Detail Task (`/tasks/{task}`), Riwayat Task FOP (`/fop-tasks/history/{fop_task}`), dan Verifikasi Biaya (`/tasks-creq-billing/{task}`): kendala teknis, Jenis Permintaan + nama kategori, tikor lama/baru (+ link Maps), modem/SN terpasang, material terpakai (termasuk potongan roll kabel, kode roll dari `task_materials.lot_no`), alat kerja, foto OPM/speedtest, serta status berbayar/verifikasi/tagihan. Bagian khusus `task_creq_details` dirender satu partial bersama `tasks/partials/creq-detail.blade.php` (Detail Task & Riwayat FOP); halaman Verifikasi punya tata letak sendiri. Penjaga: `CreqReportIncompleteOnDetailPagesTest`.
 
 Rancangan lengkap: [`docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md`](../plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md).
 

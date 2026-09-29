@@ -329,15 +329,13 @@
                     <p class="font-bold">Piutang dihapus buku (tak tertagih) sebesar Rp {{ number_format((float) $invoice->written_off_amount, 0, ',', '.') }}</p>
                     <p class="mt-0.5">{{ optional($invoice->written_off_at)->format('d/m/Y') }} — {{ $invoice->write_off_reason }}</p>
                 </div>
-                {{-- Hapus buku di periode yang sudah tutup buku terkunci permanen (BookPeriod). --}}
-                @if(\App\Support\BookPeriod::isLocked($invoice->written_off_at?->format('Y-m')))
-                    <span class="text-[11px] font-semibold text-rose-700 dark:text-rose-300">Periode sudah tutup buku — tidak bisa dibatalkan</span>
-                @else
-                    <form method="POST" action="{{ route('invoices.write-off.reverse', $invoice) }}" onsubmit="return confirm('Batalkan hapus buku? Tagihan kembali menjadi piutang.')">
-                        @csrf
-                        <button type="submit" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors">Batalkan Hapus Buku</button>
-                    </form>
-                @endif
+                {{-- Selalu bisa dibatalkan (ADHOC-105, opsi A2): hapus buku di periode terkunci tetap boleh
+                     dikembalikan, jejaknya dipertahankan dan pemulihannya dibukukan di bulan ini. --}}
+                @php $writeOffLocked = \App\Support\BookPeriod::isLocked($invoice->written_off_at?->format('Y-m')); @endphp
+                <form method="POST" action="{{ route('invoices.write-off.reverse', $invoice) }}" onsubmit="return confirm(@js($writeOffLocked ? 'Periode hapus buku ini sudah tutup buku. Tagihan tetap dikembalikan menjadi piutang dan pemulihannya dicatat di bulan ini; laporan bulan lama tidak berubah. Lanjutkan?' : 'Batalkan hapus buku? Tagihan kembali menjadi piutang.'))">
+                    @csrf
+                    <button type="submit" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors">Batalkan Hapus Buku</button>
+                </form>
             </div>
             @error('reason')<p class="mt-2 text-xs text-red-600">{{ $message }}</p>@enderror
         </div>

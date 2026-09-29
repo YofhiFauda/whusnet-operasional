@@ -144,7 +144,12 @@ class FopTaskStatusSyncTest extends TestCase
         $this->assertEquals('pending_fop', $history->to_status);
     }
 
-    public function test_task_selesai_with_pending_review_syncs_selesai_menunggu_verifikasi_label(): void
+    /**
+     * Task MTN (non-Survey/PSB) tidak punya langkah Approve (keputusan user
+     * 2026-09-28) — begitu selesai, riwayat FOP langsung "Selesai", bukan
+     * "Menunggu Verifikasi" yang tidak pernah bisa berubah.
+     */
+    public function test_task_mtn_selesai_langsung_berlabel_selesai(): void
     {
         [$task, $fopTask] = $this->makeLinkedTask('TASK-9205', 'in_progress');
 
@@ -157,8 +162,8 @@ class FopTaskStatusSyncTest extends TestCase
         $this->assertEquals(TaskStatus::SELESAI->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
-        $this->assertEquals('selesai_menunggu_verifikasi', $history->to_status);
-        $this->assertEquals('Selesai — Menunggu Verifikasi', $history->label());
+        $this->assertEquals('selesai', $history->to_status);
+        $this->assertEquals('Selesai', $history->label());
     }
 
     public function test_task_approved_syncs_fop_task_to_selesai(): void

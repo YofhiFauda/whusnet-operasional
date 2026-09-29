@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Exceptions\DuplicateInvoiceException;
 use App\Models\CustomerBillingWaiver;
 use App\Models\Invoice;
 use BackedEnum;
@@ -38,7 +39,7 @@ class InvoiceObserver
             ->exists();
 
         if ($duplicate) {
-            throw new InvalidArgumentException('Duplicate invoice detected: same customer, type, period, and amount was just created.');
+            throw new DuplicateInvoiceException('Duplicate invoice detected: same customer, type, period, and amount was just created.');
         }
 
         $this->rejectSecondSubscriptionInvoice($invoice, $type);

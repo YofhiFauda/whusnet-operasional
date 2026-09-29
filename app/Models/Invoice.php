@@ -75,6 +75,8 @@ class Invoice extends Model
         'written_off_by',
         'written_off_amount',
         'write_off_reason',
+        'write_off_reversed_at',
+        'write_off_reversed_by',
     ];
 
     /**
@@ -97,6 +99,7 @@ class Invoice extends Model
             'other_fee' => 'decimal:2',
             'written_off_at' => 'datetime',
             'written_off_amount' => 'decimal:2',
+            'write_off_reversed_at' => 'datetime',
         ];
     }
 

@@ -970,8 +970,13 @@
                         ->get()
                     : collect();
                 $maintenanceReport = $task->maintenanceReport;
+                // Alat kerja & detail C-REQ ikut form laporan yang sama
+                // (TaskMaintenanceController) — sebelumnya tidak tampil di sini,
+                // jadi Detail Task tidak selengkap laporan yang dikirim teknisi.
+                $workToolsDipakai = $maintenanceFopTask ? $maintenanceFopTask->workTools()->orderBy('id')->get() : collect();
+                $creqDetailReport = $task->task_type === \App\Enums\TaskType::CREQ ? $task->creqDetail : null;
             @endphp
-            @if($maintenanceReport || $materialsTerpakai->isNotEmpty() || $installedSerials->isNotEmpty())
+            @if($maintenanceReport || $materialsTerpakai->isNotEmpty() || $installedSerials->isNotEmpty() || $creqDetailReport)
             <div class="pt-5 border-t border-border space-y-4 select-text">
                 <div class="flex items-center gap-2 mb-1 select-none">
                     <svg class="h-4.5 w-4.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -990,6 +995,10 @@
                     </div>
                     <p class="text-xs text-text-main leading-relaxed font-ui whitespace-pre-line break-words [word-break:break-word] min-w-0 font-medium">{{ $maintenanceReport->kendala_teknis }}</p>
                 </div>
+                @endif
+
+                @if($creqDetailReport)
+                @include('tasks.partials.creq-detail', ['task' => $task])
                 @endif
 
                 @if($installedSerials->isNotEmpty())
@@ -1023,9 +1032,20 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         @foreach($materialsTerpakai as $material)
                         <div class="flex justify-between items-center bg-surface-muted border border-border p-3 rounded-xl shadow-xs">
-                            <span class="text-text-secondary font-ui font-semibold">{{ $material->item_name }}@if($material->note)<span class="text-text-muted text-[10px]"> · {{ $material->note }}</span>@endif</span>
+                            <span class="text-text-secondary font-ui font-semibold">{{ $material->item_name }}@if($material->lot_no)<span class="text-text-muted text-[10px] font-mono"> · Roll {{ $material->lot_no }}</span>@endif @if($material->note)<span class="text-text-muted text-[10px]"> · {{ $material->note }}</span>@endif</span>
                             <span class="font-mono font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 rounded border border-sky-200 dark:border-sky-900/50">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
                         </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
+                @if($workToolsDipakai->isNotEmpty())
+                <div>
+                    <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui mb-2 select-none">Alat Kerja Dipakai</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach($workToolsDipakai as $tool)
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold font-ui bg-surface-muted text-text-secondary border border-border">{{ $tool->tool_name }}@if($tool->note)<span class="text-text-muted text-[10px] font-normal"> · {{ $tool->note }}</span>@endif</span>
                         @endforeach
                     </div>
                 </div>
@@ -1105,11 +1125,13 @@
         {{-- Review FOP --}}
         @if($task->status->value === 'selesai' && $task->fop_review_status === 'pending')
         @can('review', $task)
-        @if(in_array($task->task_type->value, ['PSB', 'SRV'], true))
+        {{-- Nilai enum Survey = 'SURVEY' (dulu dicek 'SRV' → Survey jatuh ke panel
+             Review generik dan tombol Approve-nya selalu error). --}}
+        @if(in_array($task->task_type->value, ['PSB', 'SURVEY'], true))
         <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
             <div class="min-w-0 flex-1">
-                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">{{ $task->task_type->value === 'SRV' ? 'Verifikasi Survey (Menunggu ACC)' : 'Approve Pemasangan (Verifikasi Admin)' }}</h4>
-                <p class="text-[11px] text-text-muted font-ui leading-relaxed">{{ $task->task_type->value === 'SRV' ? 'Verifikasi hasil survey dan penerusan ke tim pemasangan diproses melalui halaman Verifikasi oleh Admin/CS.' : 'Aktivasi layanan (CID + tagihan awal) hanya boleh diproses melalui halaman Verifikasi Admin.' }}</p>
+                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">{{ $task->task_type->value === 'SURVEY' ? 'Verifikasi Survey (Menunggu ACC)' : 'Approve Pemasangan (Verifikasi Admin)' }}</h4>
+                <p class="text-[11px] text-text-muted font-ui leading-relaxed">{{ $task->task_type->value === 'SURVEY' ? 'Verifikasi hasil survey dan penerusan ke tim pemasangan diproses melalui halaman Verifikasi oleh Admin/CS.' : 'Aktivasi layanan (CID + tagihan awal) hanya boleh diproses melalui halaman Verifikasi Admin.' }}</p>
             </div>
             @if($task->customer_id)
                 @if(auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasFullAccess())
@@ -1119,10 +1141,10 @@
                     Buka Verifikasi
                 </a>
                 @else
-                <a href="{{ $task->task_type->value === 'SRV' ? route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) : route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) }}"
+                <a href="{{ $task->task_type->value === 'SURVEY' ? route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) : route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) }}"
                    class="w-full sm:w-auto text-center inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-500/10 cursor-pointer font-ui active:scale-95"
                    style="background:var(--color-primary)">
-                    {{ $task->task_type->value === 'SRV' ? 'Lihat Laporan Survey' : 'Lihat Laporan Pemasangan' }}
+                    {{ $task->task_type->value === 'SURVEY' ? 'Lihat Laporan Survey' : 'Lihat Laporan Pemasangan' }}
                 </a>
                 @endif
             @endif
@@ -1130,8 +1152,8 @@
         @else
         <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
             <div>
-                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Review Hasil Pekerjaan (Khusus FOP)</h4>
-                <p class="text-[11px] text-text-muted font-ui">Task ini telah diselesaikan oleh teknisi dan sedang menunggu persetujuan Anda.</p>
+                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Laporan Teknisi (Khusus FOP)</h4>
+                <p class="text-[11px] text-text-muted font-ui">Task sudah diselesaikan teknisi. Kalau laporannya keliru, kembalikan ke teknisi lewat Reject Laporan.</p>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <button x-data @click="$dispatch('open-modal', 'reject-task')"
@@ -1139,15 +1161,6 @@
                         style="border-color:var(--color-error-border); color:var(--color-error)">
                     Reject Laporan
                 </button>
-                <form action="{{ route('tasks.review', $task) }}" method="POST" class="flex-1 sm:flex-initial">
-                    @csrf
-                    <input type="hidden" name="action" value="approve">
-                    <button type="submit"
-                            class="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-600/10 cursor-pointer font-ui active:scale-95"
-                            style="background:var(--color-primary)">
-                        Approve Task
-                    </button>
-                </form>
             </div>
         </div>
         @endif

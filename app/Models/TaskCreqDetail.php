@@ -23,6 +23,7 @@ class TaskCreqDetail extends Model
         'verified_by',
         'verified_at',
         'rejection_reason',
+        'invoice_id',
     ];
 
     protected function casts(): array
@@ -47,5 +48,13 @@ class TaskCreqDetail extends Model
     public function verifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    /**
+     * Tagihan Manual yang diterbitkan saat biaya C-REQ ini disetujui.
+     */
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class);
     }
 }

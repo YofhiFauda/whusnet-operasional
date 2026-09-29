@@ -264,28 +264,31 @@ Task selesai. is_billable=true? ──tidak──▶ selesai, tidak masuk antrea
 TaskCreqDetail.verification_status = pending
         │
         ▼
-CS (helpdesk) buka /tasks-creq-billing, pilih task, approve atau reject
+CS (helpdesk) buka /tasks-creq-billing/{task} — laporan teknisi lengkap
+(kendala, Jenis Permintaan, tikor, SN, material+roll, alat kerja, foto)
         │
    ┌────┴────┐
    ▼         ▼
 approve()   reject() — wajib alasan
+(nominal +  │
+deskripsi   │
+wajib)      │
    │         │
    ▼         ▼
 lockForUpdate() dalam DB::transaction — cek ulang status=pending
    │         │
    ▼         ▼
-verification_status=verified          verification_status=rejected
-verified_by/verified_at diisi         verified_by/verified_at/rejection_reason diisi
-AuditLog (module Verifikasi Biaya     AuditLog (module Verifikasi Biaya
-C-REQ, action approve)                C-REQ, action reject)
-   │                                      │
-   ▼                                      ▼
-redirect /invoices/create prefill      redirect /tasks-creq-billing
-customer_id/manual_category/           (task tetap muncul, filter status
-manual_subtype_name/description        "Ditolak")
-dari kategori C-REQ — CS lanjut
-isi Tagihan Manual sendiri (TIDAK
-ada invoice otomatis)
+ManualCategoryInvoiceService::issue()  verification_status=rejected
+  jenis = CReqCategory::               verified_by/verified_at/rejection_reason diisi
+  toManualInvoiceCategory()            AuditLog (action reject)
+verification_status=verified              │
+invoice_id = tagihan yang terbit          ▼
+AuditLog (action approve,              redirect /tasks-creq-billing
+  + invoice_number)                    (filter status "Ditolak")
+   │
+   ▼
+redirect /tasks-creq-billing/{task} — tagihan tampil di halaman ini
+(gagal di titik mana pun = rollback total, tidak ada tagihan setengah jadi)
 ```
 
 Approve/reject kedua kali pada task yang sama (`verification_status` sudah bukan `pending`) ditolak **422**.

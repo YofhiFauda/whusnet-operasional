@@ -221,4 +221,39 @@ class CustomerTerminationPenaltyTest extends TestCase
         $this->assertEquals(150000, (float) $oldInvoice->total_amount);
         $this->assertEquals(0.0, (float) $oldInvoice->paid_amount);
     }
+
+    /**
+     * Regresi 2026-09-28: putus → Langganan Lagi → putus lagi dalam hitungan
+     * menit dengan denda sama kena pengaman anti double-submit
+     * InvoiceObserver dan tampil sebagai error 500. Sekarang pesan validasi
+     * yang jelas, dan putus langganan kedua dibatalkan utuh.
+     */
+    #[Test]
+    public function putus_ulang_dengan_denda_sama_dalam_5_menit_dapat_pesan_jelas_bukan_error_500(): void
+    {
+        $this->loginAsAdmin();
+        [$customer] = $this->customerWithService(now()->subMonths(6));
+        $reason = CustomerTerminationReason::create(['name' => 'Kompetitor', 'default_penalty_amount' => 300000]);
+
+        $this->post(route('customers.terminate', $customer), [
+            'termination_reason_id' => $reason->id,
+            'penalty_amount' => 300000,
+        ])->assertSessionHas('success');
+
+        // Langganan Lagi (alat belum diambil → langsung aktif).
+        $customer->refresh();
+        $customer->update(['status' => 'active']);
+
+        $this->from(route('customers.show', $customer))
+            ->post(route('customers.terminate', $customer), [
+                'termination_reason_id' => $reason->id,
+                'penalty_amount' => 300000,
+            ])
+            ->assertRedirect(route('customers.show', $customer))
+            ->assertSessionHasErrors('penalty_amount');
+
+        // Transaksi putus kedua batal utuh: status tetap aktif, denda cuma satu.
+        $this->assertSame('active', $customer->fresh()->status);
+        $this->assertSame(1, Invoice::where('customer_id', $customer->id)->where('invoice_type', InvoiceType::MANUAL->value)->count());
+    }
 }

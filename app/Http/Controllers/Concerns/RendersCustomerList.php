@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Enums\InvoiceStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\AuditLog;
@@ -289,7 +290,19 @@ trait RendersCustomerList
                 ->pluck('customer_id')
                 ->flip();
 
+            // Kolom Tagihan (ADHOC-105): invoice tak tertagih per pelanggan,
+            // satu kueri untuk seluruh halaman (bukan per baris). Halaman ini
+            // sudah dibatasi POP scope lewat daftar `$customerIds` di atas.
+            $writtenOffByCustomer = Invoice::query()
+                ->whereIn('customer_id', $customerIds)
+                ->where('invoice_status', InvoiceStatus::TAK_TERTAGIH->value)
+                ->orderBy('written_off_at')
+                ->orderBy('id')
+                ->get()
+                ->groupBy('customer_id');
+
             foreach ($customers as $customer) {
+                $customer->tak_tertagih_invoices = $writtenOffByCustomer->get($customer->id, collect());
                 $log = $terminateLogs->get($customer->id);
                 // ADHOC-69: sumber utama sekarang relasi `terminationReason`
                 // (master, bisa di-filter/sort di level query — §2.3

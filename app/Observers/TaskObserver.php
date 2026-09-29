@@ -170,7 +170,11 @@ class TaskObserver
             $task->status === TaskStatus::SELESAI && $task->fop_review_status === 'approved' => 'selesai',
             $task->status === TaskStatus::SELESAI && $isCustomerDecisionTask && $task->fop_review_status === 'rejected' => 'selesai_ditolak_verifikasi',
             $task->status === TaskStatus::SELESAI && $isCustomerDecisionTask => 'selesai_menunggu_verifikasi',
-            $task->status === TaskStatus::SELESAI => 'selesai_menunggu_verifikasi',
+            // Task non-Survey/PSB TIDAK punya langkah Approve di project ini
+            // (keputusan user 2026-09-28, tombol Approve Task dihapus) — begitu
+            // teknisi melapor, pekerjaannya selesai. Dulu dicatat "menunggu
+            // verifikasi" yang tidak pernah bisa berubah tanpa tombol Approve.
+            $task->status === TaskStatus::SELESAI => 'selesai',
             default => $task->status->value,
         };
 

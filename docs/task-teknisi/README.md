@@ -57,7 +57,7 @@ Task (1 pekerjaan lapangan)
 | Controller Verifikasi Biaya C-REQ | `app/Http/Controllers/TaskCreqBillingController.php` |
 | Enum | `app/Enums/TaskStatus.php`, `TaskType.php`, `CReqCategory.php`, `CReqVerificationStatus.php` |
 | Workflow transition dinamis | `app/Models/WorkflowTransitionPermission.php` (lihat [docs/rbac](../rbac/README.md)) |
-| View | `resources/views/tasks/{own,own-history,show,edit,maintenance-report}.blade.php`, `resources/views/tasks/creq-billing/{index,show}.blade.php` |
+| View | `resources/views/tasks/{own,own-history,show,edit,maintenance-report}.blade.php`, `resources/views/tasks/creq-billing/{index,show}.blade.php`, partial `resources/views/tasks/partials/creq-detail.blade.php` (dipakai Detail Task & Riwayat Task FOP) |
 
 ## Routes
 
@@ -86,7 +86,7 @@ Task (1 pekerjaan lapangan)
 - [docs/fop-task](../fop-task/README.md) — `FopTaskController` auto-create `Task` saat teknisi di-assign ke tiket FOP. Sebaliknya, SETIAP perubahan `Task.status`/`report_deferred`/`fop_review_status` (lewat `start()`/`complete()`/`pending()`/`reschedule()`/`review()`/`cancel()` — semua jalur di modul ini) otomatis dipantau `App\Observers\TaskObserver` (registered di `AppServiceProvider`) buat sync status `FopTask` + tulis log `fop_task_status_history` + akumulasi durasi/SLA ke `task_reports` (Task 10, dual-cycle) — modul ini gak perlu manggil apa-apa secara eksplisit, semua kejadian otomatis lewat Observer hook.
 - [docs/customer-lifecycle](../customer-lifecycle/README.md) — `CustomerWorkflowService` auto-create `Task` (tipe Survey/Pemasangan) saat status Customer masuk `waiting_survey`/`waiting_installation`; `TaskController::review()` approve laporan Survey/Pemasangan ikut men-transisi status Customer. **Catatan penting:** ada 2 jalur "reject" yang beda efeknya — reject laporan di modul ini (`TaskController::review()`, kualitas laporan jelek → `Task.status` balik `in_progress`, teknisi redo) VS reject final customer di `CustomerVerificationController::reject()` (Customer module, gak eligible/belum bayar → `Task.status` TETAP `selesai`, cuma `fop_review_status=rejected`, terminal). Lihat `docs/project_verifikasi_reject_gap.md`.
 - [docs/rbac](../rbac/README.md) — sebagian transisi status Task (cancel, review, start dari kondisi non-standar) dikontrol dinamis lewat `WorkflowTransitionPermission`, bukan permission string statis biasa.
-- [docs/billing-pembayaran](../billing-pembayaran/README.md) — Verifikasi Biaya C-REQ approve mengarahkan ke `/invoices/create` (Tagihan Manual, `InvoiceController`) dengan pelanggan/kategori/deskripsi sudah terisi dari query prefill — CS tetap yang submit tagihannya, tidak ada invoice yang terbit otomatis dari modul ini.
+- [docs/billing-pembayaran](../billing-pembayaran/README.md) — "Setujui & Terbitkan Tagihan" di Verifikasi Biaya C-REQ menerbitkan Tagihan Manual langsung (`ManualCategoryInvoiceService::issue()`, satu transaksi dengan verifikasi) dan menautkannya ke `task_creq_details.invoice_id`. Jenis Tagihan diturunkan dari Jenis Permintaan C-REQ; nominal diketik CS.
 
 ---
 
@@ -97,4 +97,4 @@ pengecualian sadar). Aturan lengkap + kenapa: **[`docs/PRG_REDIRECT_CONVENTION.m
 
 ---
 
-**Last updated:** 2026-09-26 (Laporan C-REQ: dropdown Kategori C-REQ + tikor + checkbox "Task ini berbayar" → antrean Verifikasi Biaya C-REQ oleh CS/helpdesk → prefill Tagihan Manual; lihat [rancangan](../plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)). Sebelumnya 2026-08-06 (hapus fitur Foto Bukti/`TaskEvidence`, tambah blok Laporan Pekerjaan Teknisi + tile Durasi Aktual di Detail Task, tambah halaman Riwayat Task Saya `/tasks-saya/riwayat`, fix redirect `return_to` Laporan Survey/Pemasangan)
+**Last updated:** 2026-09-29 (laporan C-REQ tampil lengkap di Detail Task, Riwayat Task FOP & Verifikasi Biaya — partial `tasks/partials/creq-detail.blade.php`, + alat kerja & kode roll kabel). 2026-09-28: Setujui = terbitkan Tagihan Manual langsung (`invoice_id`). 2026-09-26: Laporan C-REQ — Kategori C-REQ + tikor + checkbox "Task ini berbayar" → antrean Verifikasi Biaya C-REQ oleh CS/helpdesk; lihat [rancangan](../plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md). Sebelumnya 2026-08-06 (hapus fitur Foto Bukti/`TaskEvidence`, tambah blok Laporan Pekerjaan Teknisi + tile Durasi Aktual di Detail Task, tambah halaman Riwayat Task Saya `/tasks-saya/riwayat`, fix redirect `return_to` Laporan Survey/Pemasangan)

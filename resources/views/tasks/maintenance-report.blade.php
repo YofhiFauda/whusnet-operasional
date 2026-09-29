@@ -305,7 +305,7 @@
                                 </svg>
                             </div>
                             <div>
-                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO HASIL OPM <span class="text-rose-500">*</span></span>
+                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO HASIL OPM <span class="font-normal normal-case text-slate-500 dark:text-slate-400">(opsional)</span></span>
                                 <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Gunakan tag lokasi · Maks 2MB</span>
                             </div>
                         </div>
@@ -340,7 +340,7 @@
                                 </svg>
                             </div>
                             <div>
-                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO HASIL SPEEDTEST <span class="text-rose-500">*</span></span>
+                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO HASIL SPEEDTEST <span class="font-normal normal-case text-slate-500 dark:text-slate-400">(opsional)</span></span>
                                 <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Screenshot Speedtest · Maks 2MB</span>
                             </div>
                         </div>
@@ -460,24 +460,10 @@ function showFormError(message, targetElement) {
 // Client validation and loading state on submit
 document.getElementById('maintenance-form')?.addEventListener('submit', function(e) {
     const kendalaInput = this.querySelector('textarea[name="kendala_teknis"]');
-    const opmInput = document.getElementById('opm_photo');
-    const speedtestInput = document.getElementById('speedtest_photo');
 
     if (!kendalaInput || !kendalaInput.value.trim()) {
         e.preventDefault();
         showFormError('Detail Kendala & Solusi wajib diisi.', kendalaInput);
-        return;
-    }
-
-    if (!opmInput || !opmInput.files || opmInput.files.length === 0) {
-        e.preventDefault();
-        showFormError('Foto Hasil OPM wajib dipilih.', document.getElementById('default-placeholder-opm_photo'));
-        return;
-    }
-
-    if (!speedtestInput || !speedtestInput.files || speedtestInput.files.length === 0) {
-        e.preventDefault();
-        showFormError('Foto Hasil Speedtest wajib dipilih.', document.getElementById('default-placeholder-speedtest_photo'));
         return;
     }
 

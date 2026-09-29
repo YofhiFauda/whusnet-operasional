@@ -75,10 +75,33 @@ class WarehouseHistoryController extends Controller
         $conditionFilter = $request->query('condition');
         $adjustmentReasonFilter = $request->query('adjustment_reason');
 
+        // Baris INSTALL (SN dipasang ke pelanggan) keluar dari tangan teknisi
+        // ke pelanggan — TIDAK punya from_pop_id maupun to_pop_id, jadi dulu
+        // tidak pernah lolos scope di bawah dan tab "Terpasang di Pelanggan"
+        // selalu kosong walau datanya ada (laporan user 2026-09-28). Scope-nya
+        // ikut POP pekerjaannya (fop_tasks.pop_id): POP dalam akses user
+        // (termasuk Mini POP turunannya lewat pop_tree), atau semua kalau
+        // ALL_POP. Scope kosong = deny (whereIn []), sama seperti baris lain.
+        $taskPopIds = $access->hasAllPopAccess($user) ? null : $access->getAllowedPopIds($user);
+        $withoutWarehouse = fn ($q) => $q->whereNull('from_pop_id')->whereNull('to_pop_id');
+
+        // Filter Gudang tertentu: baris INSTALL ikut kalau pekerjaannya di
+        // gudang (cabang) itu atau Mini POP di bawahnya.
+        $popFilterTaskPopIds = $popFilter
+            ? Pop::query()->whereKey($popFilter)->orWhere('parent_id', $popFilter)->pluck('id')
+            : collect();
+
         $ledger = InventoryTransaction::query()
-            ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)->orWhereIn('to_pop_id', $popIds))
+            ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)
+                ->orWhereIn('to_pop_id', $popIds)
+                ->orWhere(fn ($qq) => $withoutWarehouse($qq)->whereHas(
+                    'fopTask',
+                    fn ($tq) => $taskPopIds === null ? $tq : $tq->whereIn('pop_id', $taskPopIds)
+                )))
             ->when($typeFilter, fn ($q) => $q->where('type', $typeFilter))
-            ->when($popFilter, fn ($q) => $q->where(fn ($qq) => $qq->where('from_pop_id', $popFilter)->orWhere('to_pop_id', $popFilter)))
+            ->when($popFilter, fn ($q) => $q->where(fn ($qq) => $qq->where('from_pop_id', $popFilter)
+                ->orWhere('to_pop_id', $popFilter)
+                ->orWhere(fn ($qqq) => $withoutWarehouse($qqq)->whereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $popFilterTaskPopIds)))))
             // Filter Kondisi (analisa-gap-kondisi-barang.md rancangan poin 6)
             // — SERIALIZED-only, baca `serial.condition`/`condition_checked_at`,
             // BUKAN kolom sendiri di ledger (kondisi nempel di unit fisiknya,
@@ -128,7 +151,10 @@ class WarehouseHistoryController extends Controller
             // buat nampilin tujuan SEBENARNYA, bukan fallback "Pelanggan /
             // Luar" yang nyasar (laporan user 2026-09-07: transfer yang
             // masih in-transit kelihatan kayak dikirim ke pelanggan).
-            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial', 'roll', 'createdBy', 'transfer.toPop'])
+            // fopTask.customer & serial.customer — kolom tujuan baris INSTALL
+            // menampilkan pelanggannya (lihat view); tanpa eager load ini
+            // preventLazyLoading meledak di non-production.
+            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial.customer', 'roll', 'createdBy', 'transfer.toPop', 'fopTask.customer'])
             ->latest('id')
             ->get();
 

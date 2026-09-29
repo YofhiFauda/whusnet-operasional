@@ -221,6 +221,22 @@ class CustomerController extends Controller
             return redirect()->back()->with('error', 'Pelanggan ini tidak dalam status putus langganan.');
         }
 
+        // Gate utang (ADHOC-105): pelanggan wajib lunas dulu sebelum Langganan
+        // Lagi, di KEDUA cabang (langsung active maupun lewat waiting_survey).
+        // `tak_tertagih` ikut dicek walau sudah keluar dari tab Tagihan —
+        // statusnya cuma label pembukuan, utangnya masih ada. Adminnya harus
+        // menekan Kembalikan di List Putus Langganan dulu, lalu melunasi.
+        // Sengaja tanpa filter POP scope: ini penjaga per pelanggan, bukan
+        // daftar — invoice di POP lain milik pelanggan yang sama tetap utang.
+        $hasOutstandingInvoice = Invoice::query()
+            ->where('customer_id', $customer->id)
+            ->whereIn('invoice_status', [...Invoice::OUTSTANDING_STATUSES, InvoiceStatus::TAK_TERTAGIH->value])
+            ->exists();
+
+        if ($hasOutstandingInvoice) {
+            return redirect()->back()->with('error', 'Pelanggan ini masih punya tagihan/piutang yang belum lunas. Lunasi dulu (tagihan tak tertagih dikembalikan ke Tagihan lewat kolom Tagihan di halaman ini) sebelum Langganan Lagi.');
+        }
+
         // Dibaca SEBELUM transaksi karena flag ini dicabut di dalamnya (lihat
         // catatan ADHOC-88 di bawah) — begitu dicabut, informasi "sudah
         // diambil atau belum" hilang buat pengecekan berikutnya.

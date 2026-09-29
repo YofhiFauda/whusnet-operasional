@@ -240,15 +240,17 @@ class CollectorMonthlyReportController extends Controller
             ],
             [
                 'PIUTANG BULAN LALU (s.d. '.mb_strtoupper($lalu).')',
-                ['No', 'OLT', 'Piutang Bulan Lalu', 'Sudah Dibayar', 'Belum Dibayar', 'Sudah Dibayar %', 'Belum Dibayar %', 'Piutang tak Tertagih', 'Sisa Piutang'],
+                ['No', 'OLT', 'Piutang Bulan Lalu', 'Sudah Dibayar', 'Belum Dibayar', 'Sudah Dibayar %', 'Belum Dibayar %', 'Piutang tak Tertagih', 'Tak Tertagih Dipulihkan', 'Sisa Piutang'],
                 fn (array $f) => [
                     $f['piutang_lalu']['pembuka'], $f['piutang_lalu']['sudah_dibayar'], $f['piutang_lalu']['belum_dibayar'],
                     Report::percentage($f['piutang_lalu']['sudah_dibayar'], $f['piutang_lalu']['pembuka']),
                     Report::percentage($f['piutang_lalu']['belum_dibayar'], $f['piutang_lalu']['pembuka']),
                     $f['piutang_lalu']['tak_tertagih'],
-                    max(0, $f['piutang_lalu']['belum_dibayar'] - $f['piutang_lalu']['tak_tertagih']),
+                    // Snapshot sebelum kolom ini ada tidak punya kuncinya.
+                    $f['piutang_lalu']['tak_tertagih_dipulihkan'] ?? 0,
+                    max(0, $f['piutang_lalu']['belum_dibayar'] - $f['piutang_lalu']['tak_tertagih'] + ($f['piutang_lalu']['tak_tertagih_dipulihkan'] ?? 0)),
                 ],
-                'nnnppnn',
+                'nnnppnnn',
             ],
             [
                 'PELANGGAN ('.mb_strtoupper($bulan).')',

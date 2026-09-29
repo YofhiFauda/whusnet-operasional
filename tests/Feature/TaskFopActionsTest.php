@@ -249,6 +249,59 @@ class TaskFopActionsTest extends TestCase
     }
 
     /**
+     * Project ini tidak punya langkah "Approve Task" (keputusan user
+     * 2026-09-28): panel laporan task non-Survey/PSB cuma menyisakan Reject.
+     * Survey dulu jatuh ke panel generik karena view mengecek 'SRV' padahal
+     * nilai enum-nya 'SURVEY' — tombol Approve-nya selalu error.
+     */
+    public function test_panel_laporan_tidak_punya_tombol_approve_dan_survey_diarahkan_ke_verifikasi(): void
+    {
+        $mtn = Task::create([
+            'task_number' => 'TASK-2026-0094',
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::MAINTENANCE->value,
+            'title' => 'MTN Selesai',
+            'status' => TaskStatus::SELESAI->value,
+            'fop_review_status' => 'pending',
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+
+        $this->actingAs($this->fopUser)->get(route('tasks.show', $mtn))
+            ->assertOk()
+            ->assertSee('Reject Laporan')
+            ->assertDontSee('Approve Task');
+
+        $customer = Customer::create([
+            'customer_code' => 'CUST-SRVPANEL',
+            'full_name' => 'Pelanggan Panel Survey',
+            'primary_phone' => '0812345670',
+            'status' => 'waiting_acc',
+            'pop_id' => $this->pop->id,
+            'data_completeness_status' => 'draft',
+            'registration_date' => now(),
+        ]);
+        $survey = Task::create([
+            'task_number' => 'TASK-2026-0095',
+            'pop_id' => $this->pop->id,
+            'customer_id' => $customer->id,
+            'task_type' => TaskType::SURVEY->value,
+            'title' => 'Survey Selesai',
+            'status' => TaskStatus::SELESAI->value,
+            'fop_review_status' => 'pending',
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+
+        $this->actingAs($this->fopUser)->get(route('tasks.show', $survey))
+            ->assertOk()
+            ->assertSee('Verifikasi Survey')
+            ->assertDontSee('Approve Task')
+            // Modal reject selalu dirender; yang dicek tombol pemicunya.
+            ->assertDontSee('$dispatch(\'open-modal\', \'reject-task\')', false);
+    }
+
+    /**
      * Review "Pending" = Pending ASLI (keputusan user 2026-09-28): tim
      * dilepas, FopTask balik ke antrian, pelanggan kembali ke antrean survey
      * supaya task yang dijadwal ulang bisa di-"Mulai" lagi. Dulu tim tetap

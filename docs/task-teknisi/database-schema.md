@@ -81,8 +81,11 @@ Migrasi: `2026_09_26_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe `CR
 | `verified_by` | FK → `users.id`, null on delete | CS (role helpdesk) yang approve/reject |
 | `verified_at` | timestamp nullable | |
 | `rejection_reason` | text nullable | Wajib diisi saat reject |
+| `invoice_id` | FK → `invoices.id`, null on delete, nullable | Migrasi `2026_09_28_120000_add_invoice_id`. Tagihan Manual yang terbit saat "Setujui & Terbitkan Tagihan" (satu transaksi dengan verifikasi) |
 
-Relasi: `Task::creqDetail()` (HasOne), `TaskCreqDetail::task()`, `TaskCreqDetail::verifier()` (BelongsTo `User`, `verified_by`).
+`task_id` **unique** sejak migrasi `2026_09_28_100000_add_unique_task_id` — satu detail C-REQ per task.
+
+Relasi: `Task::creqDetail()` (HasOne), `TaskCreqDetail::task()`, `TaskCreqDetail::verifier()` (BelongsTo `User`, `verified_by`), `TaskCreqDetail::invoice()` (BelongsTo `Invoice`).
 
 ## Tabel `task_device_retrievals` (ADHOC-86)
 

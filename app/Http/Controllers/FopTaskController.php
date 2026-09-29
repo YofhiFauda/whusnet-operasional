@@ -1508,6 +1508,9 @@ class FopTaskController extends Controller
             // Laporan Ambil Modem (DEAC) — ADHOC-88; tanpa ini kategori itu jatuh
             // ke "tidak punya laporan lapangan terstruktur" di Riwayat Task FOP.
             'task.deviceRetrieval',
+            // Detail Laporan C-REQ (kategori, tikor, biaya & verifikasi) —
+            // dirender partial tasks.partials.creq-detail.
+            'task.creqDetail',
             'task.completedBy:id,name',
             // MTN & C-REQ yang asalnya dari Ticketing — detail keluhan/catatan
             // teknis/data pelanggan/lampiran/riwayat harus mengikuti apa yang

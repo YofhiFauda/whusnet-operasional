@@ -36,7 +36,7 @@
         : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->label());
     $statusClasses = $taskRelation
         ? $taskRelation->status->displayBadgeClasses()
-        : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
+        : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70' : $task->status->displayBadgeClasses());
 
     // Urgency & Visual Indicator
     $isTaskToday = !$isHistory && $task->task_date && $task->task_date->isToday();
@@ -55,7 +55,7 @@
                        value="{{ $task->id }}"
                        :checked="selectedTaskIds.includes({{ $task->id }})"
                        @click.stop="toggleSelectTask({{ $task->id }})"
-                       class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                       class="w-4 h-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-blue-600 focus:ring-blue-500 cursor-pointer">
             @endif
             <span class="px-2 py-0.5 rounded text-[11px] font-bold tracking-wide border {{ $task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400' }}">
                 {{ $task->category instanceof \App\Enums\TaskType ? $task->category->value : $task->category }}
@@ -161,12 +161,12 @@
                     <select @change="updatePriority({{ $task->id }}, $event.target.value)"
                             x-data="{ currentPriority: '{{ $task->priority->value }}' }"
                             x-model="currentPriority"
-                            class="text-xs font-semibold rounded-md border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                            class="text-xs font-semibold rounded-md border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 transition-colors dark:bg-slate-800 dark:text-slate-200"
                             :class="{
                                 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800': currentPriority === 'low',
-                                'border-yellow-300 text-yellow-800 bg-yellow-50 dark:bg-yellow-950/40 dark:text-yellow-300': currentPriority === 'Medium',
-                                'border-orange-300 text-orange-800 bg-orange-50 dark:orange-950/40 dark:text-orange-300': currentPriority === 'High',
-                                'border-red-300 text-red-700 bg-red-50 dark:bg-red-950/40 dark:text-red-300 font-bold': currentPriority === 'Urgent'
+                                'border-yellow-300 dark:border-yellow-700/60 text-yellow-800 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-950/40': currentPriority === 'Medium',
+                                'border-orange-300 dark:border-orange-700/60 text-orange-800 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40': currentPriority === 'High',
+                                'border-red-300 dark:border-red-700/60 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 font-bold': currentPriority === 'Urgent'
                             }">
                         <option value="low">Low</option>
                         <option value="Medium">Medium</option>
@@ -174,7 +174,7 @@
                         <option value="Urgent">Urgent</option>
                     </select>
                 @else
-                    <span class="font-bold text-xs {{ $task->priority->value === 'Urgent' ? 'text-red-600 dark:text-red-400' : ($task->priority->value === 'High' ? 'text-orange-600' : ($task->priority->value === 'Medium' ? 'text-yellow-600' : 'text-slate-600 dark:text-slate-400')) }}">
+                    <span class="font-bold text-xs {{ $task->priority->value === 'Urgent' ? 'text-red-600 dark:text-red-400' : ($task->priority->value === 'High' ? 'text-orange-600 dark:text-orange-400' : ($task->priority->value === 'Medium' ? 'text-yellow-600 dark:text-yellow-400' : 'text-slate-600 dark:text-slate-400')) }}">
                         {{ $task->priority->value }}
                     </span>
                 @endif
@@ -205,11 +205,11 @@
                     @if(count($candidates) >= 2)
                         <button type="button"
                                 @click="triggerConflictModal({{ $task->id }}, '{{ $task->task_number }}', {{ json_encode($candidates) }})"
-                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-red-50 text-red-700 border border-red-200 animate-pulse">
+                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50 animate-pulse">
                             ⚠️ Konflik Tim
                         </button>
                     @else
-                        <span class="text-slate-400 text-xs">—</span>
+                        <span class="text-slate-400 dark:text-slate-500 text-xs">—</span>
                     @endif
                 @endif
             </div>

@@ -60,6 +60,8 @@ Migrasi sumber: `2026_06_12_132728_create`, `2026_06_15_000002_add_legacy_ids`, 
 | `written_off_by` | FK → `users.id`, null on delete | ✔ | |
 | `written_off_amount` | decimal(15,2) | ✔ | Snapshot `remaining_amount` saat dihapus buku (`remaining_amount` sendiri tidak diubah) |
 | `write_off_reason` | string(500) | ✔ | Alasan wajib |
+| `write_off_reversed_at` | timestamp | ✔ | ADHOC-105: kapan hapus buku **periode terkunci** dipulihkan (Kembalikan). Baris `written_off_*` dipertahankan sebagai riwayat; laporan membaca hapus buku "sah per tanggal". Juga diisi saat hapus buku dibatalkan di periode berjalan (walau `written_off_*` dikosongkan) sebagai penanda "pernah dikembalikan" — job hapus buku otomatis melewati invoice bertanda ini. Null = belum pernah dikembalikan (dikosongkan lagi oleh `writeOff()` ulang) |
+| `write_off_reversed_by` | FK → `users.id`, null on delete | ✔ | Pelaku pemulihan |
 | `created_by` | FK → `users.id`, null on delete | ✔ | Null kalau dibuat via command (`billing:generate-monthly-invoices`) |
 | `created_at` / `updated_at` | timestamp | | |
 

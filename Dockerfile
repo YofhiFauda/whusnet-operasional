@@ -6,7 +6,8 @@
 # `public/build` ada di .gitignore, jadi tidak ikut `COPY . /var/www`; harus
 # dibangun di sini supaya image tidak bergantung pada host yang kebetulan
 # sudah menjalankan `npm run build`.
-FROM node:22-alpine AS assets
+FROM node:24-alpine AS assets
+
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci

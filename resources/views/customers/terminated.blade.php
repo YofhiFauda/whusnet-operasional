@@ -57,6 +57,7 @@
                     <th scope="col" class="py-3.5 px-4">Teknisi Survei</th>
                     <th scope="col" class="py-3.5 px-4">Tgl Pemutusan</th>
                     <th scope="col" class="py-3.5 px-4 text-center">Status Alat</th>
+                    <th scope="col" class="py-3.5 px-4 text-center">Tagihan</th>
                     <th scope="col" class="py-3.5 px-5 text-right">Aksi</th>
                 </tr>
             </thead>
@@ -111,6 +112,9 @@
                             {{ $deviceBadgeLabel }}
                         </span>
                     </td>
+                    <td class="px-4 py-3.5 text-center">
+                        @include('customers.partials._terminated_write_offs')
+                    </td>
                     <td class="px-5 py-3.5 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-2">
                             <a href="{{ route('customers.show', $customer->id) }}"
@@ -141,7 +145,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="10" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
+                    <td colspan="11" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -204,6 +208,10 @@
                     <div class="min-w-0">
                         <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Teknisi Survei</dt>
                         <dd class="text-slate-700 dark:text-slate-300 font-semibold mt-0.5">{{ $customer->latestSurvey->technician->name ?? '-' }}</dd>
+                    </div>
+                    <div class="col-span-2 min-w-0">
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tagihan</dt>
+                        <dd class="mt-0.5">@include('customers.partials._terminated_write_offs')</dd>
                     </div>
                 </dl>
 

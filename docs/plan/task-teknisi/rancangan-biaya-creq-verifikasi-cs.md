@@ -6,6 +6,12 @@ Status: **Selesai dikerjakan & direview — 2026-09-26** (ADHOC-100, lihat `docs
 - `creqToggleFields()` (JS) — set `required` di 4 input tikor juga, bukan cuma custom-name.
 - `$access`/`$user` yang gak kepakai di `index()` dihapus; `CReqCategory::from($detail->category->value)` diganti `$detail->category` langsung (enum sudah ke-cast).
 
+> **Perubahan setelah implementasi:**
+> - **2026-09-28 — §4 & §5 (redirect + prefill `/invoices/create`) SUDAH DIGANTI.** Setujui sekarang = "Setujui & Terbitkan Tagihan": CS mengisi nominal di halaman Verifikasi, Tagihan Manual terbit dalam satu transaksi dan tertaut lewat `task_creq_details.invoice_id`. Jenis Tagihan diturunkan dari Jenis Permintaan (tidak bisa diganti CS). Alasan: tagihan tadinya tidak tertaut ke task, dan biaya bisa tercatat "disetujui" tanpa pernah ditagih. Detail terkini: `docs/task-teknisi/business-logic.md` §7b.
+> - **2026-09-29 — laporan tampil lengkap di 3 halaman.** Detail Task, Riwayat Task FOP, dan Verifikasi Biaya kini menampilkan isi laporan C-REQ yang sama (Jenis Permintaan, tikor, SN, material + kode roll kabel, alat kerja, foto). Partial bersama `tasks/partials/creq-detail.blade.php`; penjaga `CreqReportIncompleteOnDetailPagesTest`.
+>
+> Bagian §4, §5, §8 di bawah dipertahankan sebagai catatan rancangan awal — jangan dipakai sebagai acuan perilaku saat ini.
+
 ## 1. Latar Belakang
 
 Task/Ticket bertipe `C-REQ` (`TaskType::CREQ`) kadang punya biaya tersendiri

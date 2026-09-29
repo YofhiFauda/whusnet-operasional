@@ -16,7 +16,8 @@
 #                   invalidasi tiap kali cuma resources/ yang berubah)
 #   3. runtime    — image akhir: PHP-FPM + kode + vendor + aset, non-root
 
-FROM node:22-alpine AS assets
+FROM node:24-alpine AS assets
+
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci

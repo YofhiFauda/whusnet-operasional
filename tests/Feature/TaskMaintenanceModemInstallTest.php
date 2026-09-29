@@ -184,4 +184,21 @@ class TaskMaintenanceModemInstallTest extends TestCase
         $this->task->refresh();
         $this->assertNotEquals(TaskStatus::SELESAI, $this->task->status);
     }
+
+    #[Test]
+    public function laporan_maintenance_bisa_disimpan_tanpa_foto_opm_dan_speedtest(): void
+    {
+        $response = $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), [
+            'kendala_teknis' => 'Maintenance kabel selesai tanpa upload foto.',
+        ]);
+
+        $response->assertStatus(302);
+        $response->assertSessionHasNoErrors();
+
+        $this->task->refresh();
+        $this->assertEquals(TaskStatus::SELESAI, $this->task->status);
+        $this->assertNotNull($this->task->maintenanceReport);
+        $this->assertNull($this->task->maintenanceReport->opm_photo);
+        $this->assertNull($this->task->maintenanceReport->speedtest_photo);
+    }
 }

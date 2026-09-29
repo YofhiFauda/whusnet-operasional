@@ -22,18 +22,18 @@
             @endphp
             <button type="button" @disabled($lockedFromFop)
                 @click="openSwitchModal({{ $task->id }}, '{{ $task->task_number }}', @js($task->tugas), '{{ $task->task_date?->toDateString() }}', {{ $tech->id }}, @js($tech->name))"
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800/60 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 title="{{ $tech->name }} — klik buat Switch Teknisi">
                 {{ \Illuminate\Support\Str::limit($firstName, 12) }}
             </button>
         @empty
-            <span class="text-slate-400 dark:text-slate-500 text-[10px] italic">Unassigned</span>
+            <span class="text-slate-400 dark:text-slate-400 text-[10px] italic">Unassigned</span>
         @endforelse
 
         @if($hiddenTechsCount > 0)
             <div class="relative" x-data="{ openHidden: false }">
                 <button type="button" @click="openHidden = !openHidden"
-                    class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-colors">
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
                     +{{ $hiddenTechsCount }}
                 </button>
                 <div x-show="openHidden" @click.away="openHidden = false"
@@ -59,7 +59,7 @@
     @elseif($task->technicians->count() === 1)
         <button type="button"
                 @click="openTeamSelectionModal({{ $task->id }}, '{{ $task->task_number }}', '{{ addslashes($task->tugas) }}', '{{ $task->task_date?->format('Y-m-d') }}')"
-                class="text-[10px] text-blue-600 hover:text-blue-800 font-medium underline decoration-dotted">
+                class="text-[10px] text-blue-600 dark:text-sky-400 hover:text-blue-800 dark:hover:text-sky-300 font-medium underline decoration-dotted">
             + Masukkan ke Team...
         </button>
     @else
@@ -75,12 +75,12 @@
         @if(count($candidates) >= 2)
             <button type="button"
                     @click="triggerConflictModal({{ $task->id }}, '{{ $task->task_number }}', {{ json_encode($candidates) }})"
-                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-800/30 hover:bg-red-100 transition-colors"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-800/30 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
                     title="Klik untuk memilih team">
                 ⚠️ Konflik Roster
             </button>
         @else
-            <span class="text-slate-300 text-[10px]">—</span>
+            <span class="text-slate-300 dark:text-slate-600 text-[10px]">—</span>
         @endif
     @endif
 </td>
@@ -98,7 +98,7 @@
             : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->label());
         $statusClasses = $task->task
             ? $task->task->status->displayBadgeClasses()
-            : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
+            : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70' : $task->status->displayBadgeClasses());
     @endphp
     <div class="flex flex-col gap-1 items-start">
         <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit {{ $statusClasses }}"

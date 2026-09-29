@@ -220,8 +220,8 @@ class TaskMaintenanceController extends Controller
             'patchcord' => 'nullable|string|max:100',
             'sleeve' => 'nullable|string|max:100',
             'lainnya' => 'nullable|string|max:255',
-            'opm_photo' => 'required|image|max:2048',
-            'speedtest_photo' => 'required|image|max:2048',
+            'opm_photo' => 'nullable|image|max:2048',
+            'speedtest_photo' => 'nullable|image|max:2048',
             // Modem/Perangkat Aktif — OPSIONAL (beda dari Laporan Pemasangan
             // yang wajib). Maintenance gak selalu ganti modem; kalau teknisi
             // gak bawa/ganti, dibiarkan kosong dan gak nyentuh SN sama

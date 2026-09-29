@@ -8,8 +8,10 @@ namespace App\Support;
  * Tutup buku bukan tombol: begitu bulan berganti, buku baru terbuka dan
  * seluruh periode sebelumnya terkunci PERMANEN — tidak ada buka ulang.
  * Transaksi yang menyentuh periode terkunci (bayar mundur, tolak pembayaran
- * lama, batal hapus buku lama) ditolak; koreksinya dicatat di periode
- * berjalan. Piutang yang dibayar belakangan masuk bulan uangnya diterima,
+ * lama) ditolak; koreksinya dicatat di periode berjalan. Batal hapus buku
+ * lama dikecualikan (ADHOC-105): tetap boleh, jejak hapus bukunya
+ * dipertahankan dan pemulihannya dibukukan di periode berjalan
+ * (`invoices.write_off_reversed_at`). Piutang yang dibayar belakangan masuk bulan uangnya diterima,
  * bukan menggeser bulan tagihannya.
  *
  * Kuncinya diturunkan dari kalender, BUKAN dari ada/tidaknya baris
