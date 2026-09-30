@@ -344,6 +344,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     });
 
+    // Edit Pembayaran PENUH (ADHOC-108) — permission SENDIRI (`payments.update`),
+    // BUKAN numpang `payments.create`. Route lama menumpang grup itu, jadi
+    // pop_admin & role ber-`payments.create` lain ikut bisa edit lewat celah
+    // yang tak disengaja; K6 (keputusan user 2026-09-28): jangan diberikan ke
+    // role lain dulu, tapi RBAC-nya disiapkan supaya bisa dibuka kapan pun
+    // dari Role Matrix tanpa deploy. `/payments/{payment}/edit` (3 segmen)
+    // tidak bentrok urutan dengan `/payments/{payment}` (2 segmen, grup di
+    // atas) — beda jumlah segmen, aman didaftarkan di grup terpisah begini.
+    Route::middleware('permission:payments.update')->group(function () {
+        Route::get('/payments/{payment}/edit', [PaymentController::class, 'edit'])->name('payments.edit');
+        Route::put('/payments/{payment}', [PaymentController::class, 'update'])->name('payments.update');
+    });
+
     Route::middleware('permission:audit_logs.view')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
     });
@@ -351,7 +364,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:payments.create')->group(function () {
         Route::get('/invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('invoices.payments.create');
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
-        Route::put('/payments/{payment}', [PaymentController::class, 'update'])->name('payments.update');
     });
 
     // Hapus buku piutang → Tak Tertagih (ADHOC-90). Permission sendiri
@@ -939,6 +951,18 @@ Route::middleware('auth')->group(function () {
         Route::post('/verifications/{customer}/final', [CustomerVerificationController::class, 'finalVerify'])->name('customers.verification.final');
         Route::post('/verifications/{customer}/revisi', [CustomerVerificationController::class, 'revisi'])->name('customers.verification.revisi');
         Route::post('/verifications/{customer}/reject', [CustomerVerificationController::class, 'reject'])->name('customers.verification.reject');
+        // Edit cepat dari layar Verifikasi Survey/Pemasangan/Validasi Admin
+        // (bug 2026-09-30) — Data Diri, Paket Internet, Data Survey. Guard
+        // status per aksi ada di controller (CustomerVerificationController::
+        // EDITABLE_STAGES), middleware di sini cuma permission dasarnya.
+        Route::put('/verifications/{customer}/identity', [CustomerVerificationController::class, 'updateIdentity'])->name('customers.verification.update-identity');
+        Route::put('/verifications/{customer}/package', [CustomerVerificationController::class, 'updatePackage'])->name('customers.verification.update-package');
+        Route::put('/verifications/{customer}/survey-data', [CustomerVerificationController::class, 'updateSurveyData'])->name('customers.verification.update-survey-data');
+        // Data Pemasangan + Data Pengujian — cuma tahap Validasi Admin
+        // (CustomerVerificationController::DEVICE_EDIT_STAGES), permintaan
+        // lanjutan user 2026-09-30.
+        Route::put('/verifications/{customer}/installation-data', [CustomerVerificationController::class, 'updateInstallationData'])->name('customers.verification.update-installation-data');
+        Route::put('/verifications/{customer}/test-report', [CustomerVerificationController::class, 'updateTestReport'])->name('customers.verification.update-test-report');
         Route::post('/customers/{customer}/restore-from-failed', [CustomerController::class, 'restoreFromFailed'])->name('customers.restore-from-failed');
         Route::post('/customers/{customer}/reactivate', [CustomerController::class, 'reactivate'])->name('customers.reactivate');
         Route::get('/customers/{customer}/network-assignment', [CustomerNetworkAssignmentController::class, 'data'])->name('customers.network-assignment.data');
@@ -1167,6 +1191,10 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('permission:customer_registration_verification.approve')->group(function () {
         Route::put('/customer-registration-verifications/{customer}/approve', [CustomerRegistrationVerificationController::class, 'approve'])->name('customer-registration-verifications.approve');
+        // Edit cepat Data Diri + Paket Internet (bug 2026-09-30) — permission
+        // sama dengan approve, actor yang sama yang memvalidasi datanya.
+        Route::put('/customer-registration-verifications/{customer}/identity', [CustomerRegistrationVerificationController::class, 'updateIdentity'])->name('customer-registration-verifications.update-identity');
+        Route::put('/customer-registration-verifications/{customer}/package', [CustomerRegistrationVerificationController::class, 'updatePackage'])->name('customer-registration-verifications.update-package');
     });
     Route::middleware('permission:customer_registration_verification.reject')->group(function () {
         Route::put('/customer-registration-verifications/{customer}/reject', [CustomerRegistrationVerificationController::class, 'reject'])->name('customer-registration-verifications.reject');

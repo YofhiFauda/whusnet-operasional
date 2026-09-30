@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentPeriodType;
 use App\Enums\PaymentStatus;
+use App\Support\BookPeriod;
 use App\Support\Money;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
@@ -373,6 +375,88 @@ class Payment extends Model
     public function auditLogs(): MorphMany
     {
         return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');
+    }
+
+    /**
+     * Payment `saldo` dibuat SISTEM lewat
+     * `CustomerBalanceService::applyToOpenInvoices()`, bukan input manusia.
+     * Dicek dari `idempotency_key` sebagai jaring pengaman tambahan kalau
+     * suatu saat sumber auto-pay lain memakai metode berbeda dari SALDO —
+     * lihat docs/plan/billing/rancangan-edit-pembayaran-penuh.md F5 (K5).
+     */
+    public function isAutoSaldoPayment(): bool
+    {
+        return $this->payment_method === PaymentMethod::SALDO->value
+            || str_starts_with((string) $this->idempotency_key, 'auto-saldo:');
+    }
+
+    /**
+     * SATU sumber kebenaran "boleh diedit lewat Edit Pembayaran?" — dipakai
+     * tombol Edit (view), `PaymentController::edit()`, dan
+     * `PaymentService::revise()` (guard ulang di bawah lock). Jangan tulis
+     * daftar syarat sendiri di tempat lain (pola `TaskStatus::acceptsReport()`).
+     *
+     * SENGAJA tidak mengecek status invoice (BATAL/TAK_TERTAGIH) — itu butuh
+     * baris invoice TERKUNCI supaya tak berubah di antara pengecekan dan
+     * penyimpanan, jadi dicek ulang sendiri di `PaymentService::revise()`.
+     *
+     * @return string|null pesan Indonesia kalau terkunci, `null` kalau boleh diedit.
+     */
+    public function editBlockedReason(): ?string
+    {
+        if ($this->payment_status === PaymentStatus::DITOLAK) {
+            return 'Pembayaran yang sudah dikembalikan tidak dapat diedit.';
+        }
+
+        if ($this->isAutoSaldoPayment()) {
+            return 'Pembayaran dari Saldo Pelanggan dibuat otomatis oleh sistem dan tidak bisa diedit. Koreksi lewat Kembalikan.';
+        }
+
+        // K3 — ketat: hanya payment bulan berjalan yang boleh diedit, sama
+        // persis definisi tutup buku (BookPeriod). Payment bulan lalu hanya
+        // bisa dikoreksi lewat Kembalikan + catat ulang.
+        $period = $this->payment_date?->format('Y-m');
+
+        if (BookPeriod::isLocked($period)) {
+            return "Pembayaran periode {$period} sudah tutup buku — hanya pembayaran bulan berjalan yang bisa diedit. Gunakan Kembalikan lalu catat ulang di periode berjalan.";
+        }
+
+        // K4 — payment yang masuk setoran BOLEH diedit selama setorannya
+        // belum diverifikasi (setoran turunan, otomatis mengikuti angka
+        // baru). Begitu terverifikasi, dokumennya sudah disepakati dua pihak
+        // — sama persis batas di PaymentController::reject().
+        if ($this->relationLoaded('collectorDeposit') ? $this->collectorDeposit : $this->collectorDeposit()->first()) {
+            $deposit = $this->collectorDeposit;
+            if ($deposit->status->isVerified()) {
+                return "Pembayaran ini sudah masuk setoran {$deposit->deposit_number} yang berstatus {$deposit->status->label()}. Setoran terverifikasi tidak boleh diubah.";
+            }
+        }
+
+        if ($this->relationLoaded('cashDeposit') ? $this->cashDeposit : $this->cashDeposit()->first()) {
+            $cashDeposit = $this->cashDeposit;
+            if ($cashDeposit->status->isVerified()) {
+                return "Pembayaran ini sudah masuk setoran kas {$cashDeposit->deposit_number} yang berstatus {$cashDeposit->status->label()}. Setoran terverifikasi tidak boleh diubah.";
+            }
+        }
+
+        return null;
+    }
+
+    public function isEditable(): bool
+    {
+        return $this->editBlockedReason() === null;
+    }
+
+    /**
+     * Catat alasan koreksi (K2, opsional) sebagai entri audit TERPISAH dari
+     * baris 'update' otomatis — `reason` bukan kolom `payments`, jadi tak
+     * ikut diff `static::updated()` di atas. Dipanggil
+     * `PaymentService::revise()` SETELAH `$payment->update()` supaya urut
+     * kronologis dengan baris 'update' yang sudah tercatat lebih dulu.
+     */
+    public function logCorrectionReason(string $reason): void
+    {
+        $this->writeAuditLog('koreksi', null, ['alasan' => $reason]);
     }
 
     /**

@@ -971,8 +971,13 @@
                         ->get()
                     : collect();
                 $maintenanceReport = $task->maintenanceReport;
+                // Alat kerja & detail C-REQ ikut form laporan yang sama
+                // (TaskMaintenanceController) — sebelumnya tidak tampil di sini,
+                // jadi Detail Task tidak selengkap laporan yang dikirim teknisi.
+                $workToolsDipakai = $maintenanceFopTask ? $maintenanceFopTask->workTools()->orderBy('id')->get() : collect();
+                $creqDetailReport = $task->task_type === \App\Enums\TaskType::CREQ ? $task->creqDetail : null;
             ?>
-            <?php if($maintenanceReport || $materialsTerpakai->isNotEmpty() || $installedSerials->isNotEmpty()): ?>
+            <?php if($maintenanceReport || $materialsTerpakai->isNotEmpty() || $installedSerials->isNotEmpty() || $creqDetailReport): ?>
             <div class="pt-5 border-t border-border space-y-4 select-text">
                 <div class="flex items-center gap-2 mb-1 select-none">
                     <svg class="h-4.5 w-4.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -991,6 +996,10 @@
                     </div>
                     <p class="text-xs text-text-main leading-relaxed font-ui whitespace-pre-line break-words [word-break:break-word] min-w-0 font-medium"><?php echo e($maintenanceReport->kendala_teknis); ?></p>
                 </div>
+                <?php endif; ?>
+
+                <?php if($creqDetailReport): ?>
+                <?php echo $__env->make('tasks.partials.creq-detail', ['task' => $task], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
                 <?php endif; ?>
 
                 <?php if($installedSerials->isNotEmpty()): ?>
@@ -1025,9 +1034,20 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         <?php $__currentLoopData = $materialsTerpakai; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <div class="flex justify-between items-center bg-surface-muted border border-border p-3 rounded-xl shadow-xs">
-                            <span class="text-text-secondary font-ui font-semibold"><?php echo e($material->item_name); ?><?php if($material->note): ?><span class="text-text-muted text-[10px]"> · <?php echo e($material->note); ?></span><?php endif; ?></span>
+                            <span class="text-text-secondary font-ui font-semibold"><?php echo e($material->item_name); ?><?php if($material->lot_no): ?><span class="text-text-muted text-[10px] font-mono"> · Roll <?php echo e($material->lot_no); ?></span><?php endif; ?> <?php if($material->note): ?><span class="text-text-muted text-[10px]"> · <?php echo e($material->note); ?></span><?php endif; ?></span>
                             <span class="font-mono font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 rounded border border-sky-200 dark:border-sky-900/50"><?php echo e(rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',')); ?> <?php echo e($material->unit); ?></span>
                         </div>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if($workToolsDipakai->isNotEmpty()): ?>
+                <div>
+                    <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui mb-2 select-none">Alat Kerja Dipakai</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        <?php $__currentLoopData = $workToolsDipakai; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tool): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold font-ui bg-surface-muted text-text-secondary border border-border"><?php echo e($tool->tool_name); ?><?php if($tool->note): ?><span class="text-text-muted text-[10px] font-normal"> · <?php echo e($tool->note); ?></span><?php endif; ?></span>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </div>
                 </div>
@@ -1107,11 +1127,12 @@
         
         <?php if($task->status->value === 'selesai' && $task->fop_review_status === 'pending'): ?>
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('review', $task)): ?>
-        <?php if(in_array($task->task_type->value, ['PSB', 'SRV'], true)): ?>
+        
+        <?php if(in_array($task->task_type->value, ['PSB', 'SURVEY'], true)): ?>
         <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
             <div class="min-w-0 flex-1">
-                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui"><?php echo e($task->task_type->value === 'SRV' ? 'Verifikasi Survey (Menunggu ACC)' : 'Approve Pemasangan (Verifikasi Admin)'); ?></h4>
-                <p class="text-[11px] text-text-muted font-ui leading-relaxed"><?php echo e($task->task_type->value === 'SRV' ? 'Verifikasi hasil survey dan penerusan ke tim pemasangan diproses melalui halaman Verifikasi oleh Admin/CS.' : 'Aktivasi layanan (CID + tagihan awal) hanya boleh diproses melalui halaman Verifikasi Admin.'); ?></p>
+                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui"><?php echo e($task->task_type->value === 'SURVEY' ? 'Verifikasi Survey (Menunggu ACC)' : 'Approve Pemasangan (Verifikasi Admin)'); ?></h4>
+                <p class="text-[11px] text-text-muted font-ui leading-relaxed"><?php echo e($task->task_type->value === 'SURVEY' ? 'Verifikasi hasil survey dan penerusan ke tim pemasangan diproses melalui halaman Verifikasi oleh Admin/CS.' : 'Aktivasi layanan (CID + tagihan awal) hanya boleh diproses melalui halaman Verifikasi Admin.'); ?></p>
             </div>
             <?php if($task->customer_id): ?>
                 <?php if(auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasFullAccess()): ?>
@@ -1121,10 +1142,10 @@
                     Buka Verifikasi
                 </a>
                 <?php else: ?>
-                <a href="<?php echo e($task->task_type->value === 'SRV' ? route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) : route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)])); ?>"
+                <a href="<?php echo e($task->task_type->value === 'SURVEY' ? route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) : route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)])); ?>"
                    class="w-full sm:w-auto text-center inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-500/10 cursor-pointer font-ui active:scale-95"
                    style="background:var(--color-primary)">
-                    <?php echo e($task->task_type->value === 'SRV' ? 'Lihat Laporan Survey' : 'Lihat Laporan Pemasangan'); ?>
+                    <?php echo e($task->task_type->value === 'SURVEY' ? 'Lihat Laporan Survey' : 'Lihat Laporan Pemasangan'); ?>
 
                 </a>
                 <?php endif; ?>
@@ -1133,8 +1154,8 @@
         <?php else: ?>
         <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
             <div>
-                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Review Hasil Pekerjaan (Khusus FOP)</h4>
-                <p class="text-[11px] text-text-muted font-ui">Task ini telah diselesaikan oleh teknisi dan sedang menunggu persetujuan Anda.</p>
+                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Laporan Teknisi (Khusus FOP)</h4>
+                <p class="text-[11px] text-text-muted font-ui">Task sudah diselesaikan teknisi. Kalau laporannya keliru, kembalikan ke teknisi lewat Reject Laporan.</p>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <button x-data @click="$dispatch('open-modal', 'reject-task')"
@@ -1142,15 +1163,6 @@
                         style="border-color:var(--color-error-border); color:var(--color-error)">
                     Reject Laporan
                 </button>
-                <form action="<?php echo e(route('tasks.review', $task)); ?>" method="POST" class="flex-1 sm:flex-initial">
-                    <?php echo csrf_field(); ?>
-                    <input type="hidden" name="action" value="approve">
-                    <button type="submit"
-                            class="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-600/10 cursor-pointer font-ui active:scale-95"
-                            style="background:var(--color-primary)">
-                        Approve Task
-                    </button>
-                </form>
             </div>
         </div>
         <?php endif; ?>

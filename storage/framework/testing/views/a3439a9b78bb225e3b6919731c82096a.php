@@ -236,7 +236,7 @@
 
     
     <div x-show="filterDrawerOpen"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:hidden"
+         class="fixed inset-0 z-50 overflow-hidden flex items-end md:hidden p-0"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -247,7 +247,7 @@
         
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="filterDrawerOpen = false"></div>
 
-        <div class="bg-surface border-t border-border w-full rounded-t-2xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden"
+        <div class="bg-surface border-t border-border w-full rounded-t-2xl shadow-2xl relative z-10 max-h-[85dvh] flex flex-col overflow-hidden font-ui"
              @click.away="filterDrawerOpen = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full"
@@ -255,21 +255,18 @@
              x-transition:leave="transition ease-in duration-200"
              x-transition:leave-start="translate-y-0"
              x-transition:leave-end="translate-y-full">
-            
-            
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0"></div>
 
-            <div class="px-5 py-3 border-b border-border flex items-center justify-between bg-surface-muted shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main font-ui">Filter Task FOP</h3>
-                <button type="button" @click="filterDrawerOpen = false" class="text-text-muted hover:text-text-main p-1">
+                <button type="button" @click="filterDrawerOpen = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
-            <form method="GET" action="<?php echo e(route('fop-tasks.index')); ?>" class="flex flex-col flex-1 overflow-hidden">
-                <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar font-ui">
+            <form method="GET" action="<?php echo e(route('fop-tasks.index')); ?>" class="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div class="p-5 overflow-y-auto space-y-4 flex-1 min-h-0 custom-scrollbar font-ui overscroll-contain">
                     <?php if(request('status')): ?>
                         <input type="hidden" name="status" value="<?php echo e(request('status')); ?>">
                     <?php endif; ?>
@@ -321,9 +318,9 @@
                     </div>
                 </div>
 
-                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-between gap-3 shrink-0">
-                    <a href="<?php echo e(route('fop-tasks.index')); ?>" class="btn-secondary text-xs">Reset</a>
-                    <button type="submit" class="btn-primary text-xs">Terapkan Filter</button>
+                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-between gap-3 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    <a href="<?php echo e(route('fop-tasks.index')); ?>" class="btn-secondary text-xs cursor-pointer">Reset</a>
+                    <button type="submit" class="btn-primary text-xs cursor-pointer">Terapkan Filter</button>
                 </div>
             </form>
         </div>
@@ -351,7 +348,7 @@
                 <thead>
                     <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                         <th class="w-8 px-2.5 py-2.5 text-center">
-                            <input type="checkbox" @change="toggleSelectAll($event.target.checked)" :checked="isAllSelected()" class="w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                            <input type="checkbox" @change="toggleSelectAll($event.target.checked)" :checked="isAllSelected()" class="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-sky-600 focus:ring-sky-500 cursor-pointer">
                         </th>
                         <th class="px-3 py-2.5">Kategori</th>
                         <th class="px-3 py-2.5">Tanggal</th>
@@ -371,9 +368,9 @@
                             $isTaskToday = $task->task_date && $task->task_date->isToday();
                             $isOverdue = $task->task_date && $task->task_date->isPast() && !in_array($task->status->value, ['selesai', 'dibatalkan']);
                         ?>
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors align-top <?php echo e($isOverdue ? 'border-l-4 border-l-rose-500 bg-rose-50/10' : ($isTaskToday ? 'border-l-4 border-l-amber-500 bg-amber-50/15' : '')); ?>" id="fop-task-row-<?php echo e($task->id); ?>" data-pop-id="<?php echo e($task->pop_id); ?>">
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors align-top <?php echo e($isOverdue ? 'border-l-4 border-l-rose-500 bg-rose-50/10 dark:bg-rose-950/20' : ($isTaskToday ? 'border-l-4 border-l-amber-500 bg-amber-50/15 dark:bg-amber-950/20' : '')); ?>" id="fop-task-row-<?php echo e($task->id); ?>" data-pop-id="<?php echo e($task->pop_id); ?>">
                             <td class="w-8 px-2.5 py-2 text-center" @click.stop>
-                                <input type="checkbox" :checked="selectedTaskIds.includes(<?php echo e($task->id); ?>)" @change="toggleSelectTask(<?php echo e($task->id); ?>)" class="w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
+                                <input type="checkbox" :checked="selectedTaskIds.includes(<?php echo e($task->id); ?>)" @change="toggleSelectTask(<?php echo e($task->id); ?>)" class="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-sky-600 focus:ring-sky-500 cursor-pointer">
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border <?php echo e($task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'); ?>">
@@ -430,12 +427,12 @@
                                     <select @change="updatePriority(<?php echo e($task->id); ?>, $event.target.value)"
                                             x-data="{ currentPriority: '<?php echo e($task->priority->value); ?>' }"
                                             x-model="currentPriority"
-                                            class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24 transition-colors duration-200"
+                                            class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24 transition-colors duration-200 dark:bg-slate-800 dark:text-slate-200"
                                             :class="{
-                                                'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50': currentPriority === 'low',
-                                                'border-yellow-300 text-yellow-800 bg-yellow-50': currentPriority === 'Medium',
-                                                'border-orange-300 text-orange-800 bg-orange-50': currentPriority === 'High',
-                                                'border-red-300 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 font-bold': currentPriority === 'Urgent'
+                                                'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/80': currentPriority === 'low',
+                                                'border-yellow-300 dark:border-yellow-700/60 text-yellow-800 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-950/40': currentPriority === 'Medium',
+                                                'border-orange-300 dark:border-orange-700/60 text-orange-800 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40': currentPriority === 'High',
+                                                'border-red-300 dark:border-red-700/60 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 font-bold': currentPriority === 'Urgent'
                                             }">
                                         <option value="low">Low</option>
                                         <option value="Medium">Medium</option>
@@ -481,14 +478,14 @@
                                         lat: '<?php echo e($task->customer?->latitude ?? $task->ticket?->customer_latitude ?? ''); ?>',
                                         lng: '<?php echo e($task->customer?->longitude ?? $task->ticket?->customer_longitude ?? ''); ?>'
                                     })"
-                                    class="text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 p-1.5 rounded cursor-pointer"
+                                    class="text-slate-400 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 p-1.5 rounded cursor-pointer"
                                     title="Salin Format WA ke Teknisi">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>
                                     </button>
                                     <a href="<?php echo e(route('fop-tasks.history.show', $task->id)); ?>"
-                                       class="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 p-1.5 rounded"
+                                       class="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-slate-200 dark:hover:bg-slate-600 p-1.5 rounded"
                                        title="Detail Task">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -502,7 +499,7 @@
                                     </span>
                                     <?php else: ?>
                                     <button @click="openEditModal(<?php echo e(json_encode($task)); ?>, <?php echo e(json_encode($task->technicians->pluck('id'))); ?>, '<?php echo e(route('fop-tasks.update', $task->id)); ?>')"
-                                            class="text-slate-400 dark:text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 p-1.5 rounded cursor-pointer"
+                                            class="text-slate-400 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-blue-50 dark:hover:bg-blue-950/40 p-1.5 rounded cursor-pointer"
                                             title="Edit">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -512,7 +509,7 @@
                                     <form action="<?php echo e(route('fop-tasks.destroy', $task->id)); ?>" method="POST" data-confirm="Apakah Anda yakin ingin menghapus Task FOP ini?" class="inline-block">
                                         <?php echo csrf_field(); ?>
                                         <?php echo method_field('DELETE'); ?>
-                                        <button type="submit" class="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded cursor-pointer" title="Hapus">
+                                        <button type="submit" class="text-slate-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-red-50 dark:hover:bg-red-900/40 p-1.5 rounded cursor-pointer" title="Hapus">
                                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
@@ -520,7 +517,7 @@
                                     </form>
                                     <?php elseif($task->ticket): ?>
                                     <button type="button" disabled
-                                            class="text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded cursor-not-allowed"
+                                            class="text-slate-300 dark:text-slate-600 bg-slate-50 dark:bg-slate-800/40 p-1.5 rounded cursor-not-allowed"
                                             title="Task dari Ticketing gak bisa dihapus — batalkan lewat Cancel kalau salah input.">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -534,7 +531,7 @@
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
                             <td colspan="11" class="px-3 py-10 text-center text-slate-500 dark:text-slate-400">
-                                <svg class="w-8 h-8 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg class="w-8 h-8 mx-auto mb-3 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
                                 <p class="text-[11px] font-medium">Tidak ada data task FOP.</p>
@@ -591,7 +588,7 @@
         
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="modal.open = false"></div>
 
-        <div class="bg-surface border-0 md:border border-border w-full max-w-2xl lg:max-w-3xl rounded-none md:rounded-xl shadow-2xl relative z-10 h-full md:h-auto max-h-dvh md:max-h-[85vh] flex flex-col overflow-hidden" 
+        <div class="bg-surface border-t md:border border-border w-full max-w-2xl lg:max-w-3xl rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[90dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui" 
              @click.away="modal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95 md:opacity-0"
@@ -600,7 +597,7 @@
              x-transition:leave-start="translate-y-0 md:translate-y-0 md:scale-100 md:opacity-100"
              x-transition:leave-end="translate-y-full md:translate-y-4 md:scale-95 md:opacity-0">
 
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-none md:rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main font-ui" x-text="modal.isEdit ? 'Edit Task FOP' : 'Tambah Task FOP'"></h3>
                 <button type="button" @click="modal.open = false" class="text-text-muted hover:text-text-main transition-colors p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1012,12 +1009,12 @@
                                 <div>
                                     <span class="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium border w-fit"
                                           :class="{
-                                              'border-blue-200 text-blue-700 bg-blue-50': modal.data.status === 'terjadwal',
+                                              'border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20': modal.data.status === 'terjadwal',
                                               'border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20': modal.data.status === 'in_progress',
-                                              'border-yellow-200 text-yellow-700 bg-yellow-50': modal.data.status === 'pending',
-                                              'border-green-200 text-green-700 bg-green-50': modal.data.status === 'selesai',
-                                              'border-red-200 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20': modal.data.status === 'dibatalkan',
-                                              'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50': modal.data.status === 'draft',
+                                              'border-yellow-200 dark:border-yellow-800/50 text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20': modal.data.status === 'pending',
+                                              'border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20': modal.data.status === 'selesai',
+                                              'border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20': modal.data.status === 'dibatalkan',
+                                              'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70': modal.data.status === 'draft',
                                           }"
                                           x-text="modal.data.status"></span>
                                     <p class="text-[10px] text-text-muted mt-1">Status realtime — otomatis mengikuti status Task teknisi.</p>
@@ -1058,7 +1055,7 @@
                     </div>
                 </div>
 
-                <div class="px-4 sm:px-5 py-3 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <div class="px-4 sm:px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
                     <button type="button" @click="modal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                     <button type="submit" :disabled="isSubmitting" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
                         <span x-show="!isSubmitting">Simpan</span>
@@ -1071,7 +1068,7 @@
 
     
     <div x-show="cancelModal.open"
-         class="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200" 
          x-transition:enter-start="opacity-0" 
          x-transition:enter-end="opacity-100" 
@@ -1082,21 +1079,31 @@
         
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="cancelModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 p-5 font-ui" 
+        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui" 
              @click.away="cancelModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
              x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
-            
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-3 md:hidden"></div>
 
-            <h4 class="text-sm font-bold text-text-main mb-1">Batalkan Task <span class="font-mono" x-text="cancelModal.taskNumber"></span></h4>
-            <p class="text-xs text-text-muted mb-4">Task akan dibatalkan. Tindakan ini tidak dapat dibatalkan.</p>
-            <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan Pembatalan <span class="text-error">*</span></label>
-            <textarea x-model="cancelModal.reason" rows="3" class="w-full text-xs border border-border rounded-lg px-3 py-2 mb-4 bg-surface text-text-main outline-none focus:ring-1 focus:ring-primary" placeholder="Contoh: Data ganda, pelanggan batal, salah input POP, dll."></textarea>
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
+                <h3 class="text-sm font-bold text-text-main">Batalkan Task <span class="font-mono" x-text="cancelModal.taskNumber"></span></h3>
+                <button type="button" @click="cancelModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-3 overflow-y-auto flex-1 min-h-0 custom-scrollbar overscroll-contain">
+                <p class="text-xs text-text-muted">Task akan dibatalkan. Tindakan ini tidak dapat dibatalkan.</p>
+                <div>
+                    <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan Pembatalan <span class="text-error">*</span></label>
+                    <textarea x-model="cancelModal.reason" rows="3" class="w-full text-xs border border-border rounded-lg px-3 py-2 bg-surface text-text-main outline-none focus:ring-1 focus:ring-primary" placeholder="Contoh: Data ganda, pelanggan batal, salah input POP, dll."></textarea>
+                </div>
+            </div>
             
-            <div class="flex justify-end gap-2">
-                <button type="button" @click="cancelModal.open = false" class="btn-secondary text-xs px-3 py-2 cursor-pointer">Batal</button>
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-2.5 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
+                <button type="button" @click="cancelModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="cancelModal.isSubmitting || !cancelModal.reason.trim()"
                         @click="submitCancelModal()"
                         class="text-xs px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-50 cursor-pointer" style="background:var(--color-error);">
@@ -1109,7 +1116,7 @@
 
     
     <div x-show="teamConflictModal.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -1120,15 +1127,13 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="teamConflictModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-ui"
+        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
              @click.away="teamConflictModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
              x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
 
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
-
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main">Konflik Tim Terdeteksi</h3>
                 <button type="button" @click="teamConflictModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1137,7 +1142,7 @@
                 </button>
             </div>
 
-            <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+            <div class="p-5 overflow-y-auto space-y-4 flex-1 min-h-0 custom-scrollbar overscroll-contain pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-5">
                 <template x-for="c in teamConflictModal.conflicts" :key="c.task_id">
                     <div class="border border-border rounded-lg p-3 bg-surface-muted/40">
                         <p class="text-xs text-text-secondary mb-2.5">
@@ -1158,7 +1163,7 @@
 
     
     <div x-show="teamSelectionModal.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -1169,15 +1174,13 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="teamSelectionModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-ui"
+        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
              @click.away="teamSelectionModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
              x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
 
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
-
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main">Pilih Tim untuk Task</h3>
                 <button type="button" @click="teamSelectionModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1186,7 +1189,7 @@
                 </button>
             </div>
 
-            <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+            <div class="p-5 overflow-y-auto space-y-4 flex-1 min-h-0 custom-scrollbar overscroll-contain">
                 <div class="border border-border rounded-lg p-3 bg-surface-muted/50">
                     <p class="text-xs text-text-secondary leading-relaxed">
                         Pilih tim kerja pada tanggal <span class="font-semibold text-text-main" x-text="teamSelectionModal.taskDate"></span> untuk memasukkan task <span class="font-semibold text-text-main font-mono" x-text="teamSelectionModal.taskNumber"></span> (<span x-text="teamSelectionModal.taskTugas"></span>):
@@ -1218,22 +1221,22 @@
                         </p>
                     </div>
                 </div>
+            </div>
 
-                <div class="pt-2 border-t border-border">
-                    <button type="button" @click="assignToTeam(teamSelectionModal.taskId, null); teamSelectionModal.open = false" class="btn-primary text-xs w-full py-2.5 flex justify-center items-center gap-2 cursor-pointer">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Buat Tim Baru
-                    </button>
-                </div>
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted shrink-0 rounded-b-none md:rounded-b-xl pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
+                <button type="button" @click="assignToTeam(teamSelectionModal.taskId, null); teamSelectionModal.open = false" class="btn-primary text-xs w-full py-2.5 flex justify-center items-center gap-2 cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Buat Tim Baru
+                </button>
             </div>
         </div>
     </div>
 
     
     <div x-show="switchTechModal.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -1244,15 +1247,13 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="switchTechModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-ui"
+        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
              @click.away="switchTechModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
              x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
 
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
-
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main">Switch Teknisi antar Team</h3>
                 <button type="button" @click="switchTechModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1261,7 +1262,7 @@
                 </button>
             </div>
 
-            <div class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+            <div class="p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar overscroll-contain">
                 <p class="text-xs text-text-secondary leading-relaxed bg-surface-muted p-3 rounded-lg border border-border">
                     Pindahkan <span class="font-bold text-text-main" x-text="switchTechModal.technicianName"></span>
                     dari task <span class="font-bold text-text-main font-mono" x-text="switchTechModal.fromTaskNumber"></span>
@@ -1290,7 +1291,7 @@
                 </div>
             </div>
 
-            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-xl shrink-0">
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
                 <button type="button" @click="switchTechModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="switchTechModal.isSubmitting || !switchTechModal.toTaskId || !switchTechModal.replacementId"
                         @click="submitSwitchTechnician()" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
@@ -1330,7 +1331,7 @@
 
     
     <div x-show="bulkTeamModal.open"
-         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -1339,22 +1340,34 @@
          x-transition:leave-end="opacity-0"
          style="display: none;">
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="bulkTeamModal.open = false"></div>
-        <div class="bg-surface border border-border w-full max-w-md rounded-2xl shadow-2xl relative z-10 p-5 font-ui"
-             @click.away="bulkTeamModal.open = false">
-            <h3 class="text-sm font-bold text-text-main mb-1">Tugaskan Massal ke Tim</h3>
-            <p class="text-xs text-text-muted mb-4">Pilih tim tujuan untuk <span class="font-bold text-text-main font-mono" x-text="selectedTaskIds.length"></span> task yang dipilih.</p>
-            
-            <div class="space-y-3 mb-4">
-                <label class="block text-xs font-semibold text-text-secondary">Pilih Tim</label>
-                <select x-model="bulkTeamModal.selectedTeamId" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary">
-                    <option value="">— Pilih Tim —</option>
-                    <?php $__currentLoopData = $teams; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($t['id']); ?>"><?php echo e($t['name']); ?> (<?php echo e($t['work_date']); ?>) · <?php echo e($t['task_count']); ?> Task</option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                </select>
+        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
+             @click.away="bulkTeamModal.open = false"
+             x-transition:enter="transition ease-out duration-250"
+             x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
+             x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
+                <h3 class="text-sm font-bold text-text-main">Tugaskan Massal ke Tim</h3>
+                <button type="button" @click="bulkTeamModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
 
-            <div class="flex justify-end gap-2">
+            <div class="p-5 space-y-3 overflow-y-auto flex-1 min-h-0 custom-scrollbar overscroll-contain">
+                <p class="text-xs text-text-muted mb-2">Pilih tim tujuan untuk <span class="font-bold text-text-main font-mono" x-text="selectedTaskIds.length"></span> task yang dipilih.</p>
+                <div>
+                    <label class="block text-xs font-semibold text-text-secondary mb-1">Pilih Tim <span class="text-error">*</span></label>
+                    <select x-model="bulkTeamModal.selectedTeamId" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                        <option value="">— Pilih Tim —</option>
+                        <?php $__currentLoopData = $teams; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($t['id']); ?>"><?php echo e($t['name']); ?> (<?php echo e($t['work_date']); ?>) · <?php echo e($t['task_count']); ?> Task</option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </select>
+                </div>
+            </div>
+
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-2.5 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
                 <button type="button" @click="bulkTeamModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="bulkTeamModal.isSubmitting || !bulkTeamModal.selectedTeamId" @click="submitBulkAssignTeam()" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
                     <span x-show="!bulkTeamModal.isSubmitting">Tugaskan Sekarang</span>

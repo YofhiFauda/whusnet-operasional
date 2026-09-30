@@ -24,14 +24,18 @@ class AgentController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%");
+                        ->orWhere('name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
                 });
             })
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
 
-        return view('business-development.agents.index', compact('agents', 'search'));
+        $totalActive = Agent::where('is_active', true)->count();
+        $totalInactive = Agent::where('is_active', false)->count();
+
+        return view('business-development.agents.index', compact('agents', 'search', 'totalActive', 'totalInactive'));
     }
 
     public function create(): View

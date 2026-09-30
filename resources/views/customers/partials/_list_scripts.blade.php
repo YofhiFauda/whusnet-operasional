@@ -486,6 +486,7 @@
         setElemText('hub-fin-due-date', selectedCustomerData.dueDate);
 
         setElemText('hub-tech-pppoe', selectedCustomerData.pppoe);
+        document.getElementById('hub-tech-pppoe-warning')?.classList.add('hidden');
         setElemText('hub-tech-vlan', selectedCustomerData.vlan);
         setElemText('hub-tech-bandwidth', selectedCustomerData.bandwidth);
         setElemText('hub-tech-onu', selectedCustomerData.onu);
@@ -624,6 +625,12 @@
                 if (data.technical) {
                     const elPppoe = document.getElementById('hub-tech-pppoe');
                     if (elPppoe) elPppoe.innerText = data.technical.pppoe_username || selectedCustomerData.pppoe;
+                    // Peringatan PPPoE ≠ CID (ADHOC-107 K2) — teks dari server, klien cuma menampilkan.
+                    const elPppoeWarning = document.getElementById('hub-tech-pppoe-warning');
+                    if (elPppoeWarning) {
+                        elPppoeWarning.innerText = data.technical.pppoe_warning || '';
+                        elPppoeWarning.classList.toggle('hidden', !data.technical.pppoe_warning);
+                    }
                     const elOnu = document.getElementById('hub-tech-onu');
                     if (elOnu) elOnu.innerText = data.technical.onu_sn || selectedCustomerData.onu;
                     const elRouter = document.getElementById('hub-tech-router');

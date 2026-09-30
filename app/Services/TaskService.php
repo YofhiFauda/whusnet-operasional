@@ -93,6 +93,92 @@ class TaskService
     }
 
     /**
+     * Task eksekusi untuk FopTask yang baru pertama kali dijadwalkan.
+     *
+     * Survey/PSB: CustomerWorkflowService (dan registrasi) sudah membuat Task
+     * `pending` tanpa tim begitu pelanggan masuk antrean — Task itu yang
+     * DIPAKAI, bukan dibuatkan kembaran. Dulu FopTaskController selalu
+     * `create()`, jadi tiap survey/pemasangan meninggalkan satu Task yatim
+     * `pending` tanpa teknisi selamanya (bug 2026-09-29, Testing 7: TASK-17 &
+     * TASK-20). Kategori lain (MTN/C-REQ/…) tidak punya Task antrean → create biasa.
+     *
+     * @param  array  $data  Bentuk sama dengan `create()`
+     */
+    public function createForFopTask(FopTask $fopTask, array $data, User $actor): Task
+    {
+        $queuedTask = $this->findQueuedTaskFor($fopTask);
+
+        if (! $queuedTask) {
+            return $this->create($data, $actor);
+        }
+
+        $task = DB::transaction(function () use ($queuedTask, $data, $actor) {
+            $memberIds = $data['team_member_ids'] ?? [];
+            $scheduledAt = $data['scheduled_at'] ?? null;
+
+            // Kolom yang di-set sama persis dengan `create()` — Task antrean
+            // lahir tanpa fop_id & sla_minutes (bukan lewat service ini), dan
+            // tanpa sla_minutes SLA pengerjaannya tidak pernah terhitung.
+            $queuedTask->update([
+                'pop_id' => $data['pop_id'],
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'status' => (! empty($memberIds) && ! empty($scheduledAt))
+                    ? TaskStatus::TERJADWAL->value
+                    : TaskStatus::PENDING->value,
+                'scheduled_at' => $scheduledAt,
+                'fop_id' => $actor->id,
+                'sla_minutes' => $queuedTask->task_type->slaMinutes(),
+                'conflict_override' => (bool) ($data['conflict_override'] ?? false),
+                'updated_by' => $actor->id,
+            ]);
+
+            $queuedTask->teamMembers()->delete();
+            foreach ($memberIds as $index => $userId) {
+                TaskTeam::create([
+                    'task_id' => $queuedTask->id,
+                    'user_id' => $userId,
+                    'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
+                ]);
+            }
+
+            $this->syncToCustomerActivity($queuedTask);
+
+            return $queuedTask->refresh();
+        });
+
+        // Bagi teknisi ini tetap penugasan BARU — pesannya sama dengan create().
+        if (! empty($data['team_member_ids'])) {
+            $this->notifyTeam($task, 'Task baru dijadwalkan untuk Anda', 'created');
+        }
+
+        return $task;
+    }
+
+    /**
+     * Task antrean Survey/PSB milik pelanggan FopTask ini yang belum dipegang
+     * FopTask mana pun. Cuma `pending` tanpa tim — Task yang sudah pernah
+     * dijadwalkan/dikerjakan punya riwayatnya sendiri dan tidak diambil alih.
+     */
+    private function findQueuedTaskFor(FopTask $fopTask): ?Task
+    {
+        if (! $fopTask->customer_id
+            || ! in_array($fopTask->category, [TaskType::SURVEY, TaskType::PEMASANGAN], true)
+        ) {
+            return null;
+        }
+
+        return Task::where('customer_id', $fopTask->customer_id)
+            ->where('task_type', $fopTask->category->value)
+            ->where('status', TaskStatus::PENDING->value)
+            ->whereDoesntHave('teamMembers')
+            ->whereNotIn('id', FopTask::whereNotNull('task_id')->select('task_id'))
+            ->latest('id')
+            ->lockForUpdate()
+            ->first();
+    }
+
+    /**
      * Update jadwal dan/atau tim task (guard: task.edit + task.schedule).
      */
     public function update(Task $task, array $data, User $actor): Task

@@ -9,13 +9,13 @@
 --}}
 
 @php
-    $device = $customer->customerDevice;
-    $tech = $customer->customerTechnicalDetail;
-    $installedInventorySerial = \App\Models\InventorySerial::where('customer_id', $customer->id)
-        ->where('status', \App\Enums\SerialStatus::INSTALLED->value)
-        ->with('item')
-        ->latest('installed_at')
-        ->first();
+    // Urutan cadangan data perangkat (Gudang → customer_devices → detail
+    // teknis → kolom lama) SATU sumber dengan prefill Edit Pelanggan —
+    // lihat CustomerDeviceProfileService. Jangan tulis ulang di sini.
+    $deviceProfile = \App\Services\CustomerDeviceProfileService::resolve($customer);
+    $device = $deviceProfile['device'];
+    $tech = $deviceProfile['tech'];
+    $installedInventorySerial = $deviceProfile['installedInventorySerial'];
 
     $canViewSensitiveDeviceFields = auth()->user()->hasPermission('customers.detail.devices.view_sensitive');
     $maskSensitive = fn ($value) => $canViewSensitiveDeviceFields ? ($value ?: '-') : ($value ? '********' : '-');
@@ -25,34 +25,18 @@
     $passiveDeviceCategories = \App\Models\ItemCategory::active()->ordered()->get();
     $passiveDeviceTypeLabel = fn ($code) => \App\Models\ItemCategory::labelFor($code);
 
-    // Jenis perangkat: kalau tabel perangkat belum terisi, diturunkan dari tipe
-    // koneksi migrasi (wireless → ROUTER, fiber/ont → ONT).
-    $deviceType = $device?->device_type ? strtoupper($device->device_type) : null;
-    if (! $deviceType) {
-        $connType = strtolower((string) $tech?->connection_type);
-        if ($connType && (str_contains($connType, 'wireless') || str_contains($connType, 'radio'))) {
-            $deviceType = 'ROUTER';
-        } elseif ($connType && (str_contains($connType, 'fiber') || str_contains($connType, 'ont') || str_contains($connType, 'onu') || str_contains($connType, 'kabel'))) {
-            $deviceType = 'ONT';
-        } elseif ($customer->ont_sn || $installedInventorySerial) {
-            $deviceType = 'ONT';
-        }
-    }
-
-    $brandModel = ($installedInventorySerial?->item?->name ?? trim(($device?->brand ?? '').' '.($device?->model ?? ''))) ?: ($tech?->passive_device ?: null);
-    $serialNumber = $installedInventorySerial?->serial_number ?: ($device?->serial_number ?: ($tech?->router_or_ont_serial ?: $customer->ont_sn));
-    $macAddress = $installedInventorySerial?->mac_address ?: ($device?->mac_address ?: ($tech?->router_mac ?: $tech?->antenna_mac));
-    $vlanId = $device?->vlan_id ?: ($tech?->vlan ?: $customer->vlan_id);
-    $ssid = $device?->wifi_ssid ?: $tech?->ssid;
-    $odpCode = $device?->odp ?: ($tech?->odp_number ?: $customer->odp_code);
-    $odpPort = $device?->odp_port ?: $tech?->odp_port;
-    $rxPower = $device?->signal_rx_power !== null
-        ? $device->signal_rx_power.' dBm'
-        : (($tech?->fiber_signal ?: $tech?->wireless_signal) ?: null);
-    $technicalNote = $device?->technical_note ?: $tech?->note;
-
-    $isFallbackOnly = ! $device && ($tech || $customer->ont_sn);
-    $hasAnyDeviceData = $device || $isFallbackOnly;
+    $deviceType = $deviceProfile['deviceType'];
+    $brandModel = $deviceProfile['brandModel'];
+    $serialNumber = $deviceProfile['serialNumber'];
+    $macAddress = $deviceProfile['macAddress'];
+    $vlanId = $deviceProfile['vlanId'];
+    $ssid = $deviceProfile['ssid'];
+    $odpCode = $deviceProfile['odpCode'];
+    $odpPort = $deviceProfile['odpPort'];
+    $rxPower = $deviceProfile['rxPower'];
+    $technicalNote = $deviceProfile['technicalNote'];
+    $isFallbackOnly = $deviceProfile['isFallbackOnly'];
+    $hasAnyDeviceData = $deviceProfile['hasAnyDeviceData'];
 
     // Material pasif yang benar-benar terpakai saat pemasangan.
     $materialPasif = \App\Models\TaskMaterial::where('customer_id', $customer->id)
@@ -119,6 +103,12 @@
                     <span class="text-slate-400">Username PPPoE</span>
                     <span class="font-mono font-bold text-slate-900 dark:text-slate-100 searchable-text">{{ $device?->pppoe_username ?: '-' }}</span>
                 </div>
+                @php
+                    $devicePppoeWarning = \App\Services\CustomerCidService::pppoeMismatchWarning($customer, $device?->pppoe_username);
+                @endphp
+                @if($devicePppoeWarning)
+                    <p class="text-[11px] text-amber-600 dark:text-amber-400 leading-snug">{{ $devicePppoeWarning }}</p>
+                @endif
                 <div class="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-1">
                     <span class="text-slate-400">Password PPPoE</span>
                     <span class="font-mono text-slate-500">{{ $maskSensitive($device?->pppoe_password) }}</span>

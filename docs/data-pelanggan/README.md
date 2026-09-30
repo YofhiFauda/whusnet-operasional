@@ -168,18 +168,51 @@ Distribusi → 4 Dokumen → 5 Layanan & Paket → 6 Referral → 7 Parameter Te
    `../customer-lifecycle/business-logic.md`).
 
 5. **Step 3 "POP & Distribusi" — dropdown berantai POP → Mini POP →
-   Distribusi (ADHOC-104, 2026-09-26).** Dulu cuma POP + Distribusi (semua
-   distribusi lintas cabang, tanpa scope) — penyebab CID campuran saat pindah
-   POP. Sekarang Mini POP & Distribusi di-scope ke Cabang dalam scope user,
-   difilter di klien lewat `data-pop-id`/`data-mini-pop-id` (script inline di
-   Blade, bukan Alpine), dan divalidasi ulang di `update()` dengan aturan yang
-   sama dengan modal "Atur Mini POP & Distribusi" — termasuk guard status:
-   **pra-pemasangan cuma POP Cabang yang boleh diatur**, dropdown Mini POP &
-   Distribusi `disabled` dan ditolak server
-   (`NetworkAssignmentService::BLOCKED_STATUSES`). Pindah POP: lihat
-   [`../master/pop/business-logic.md` §7a](../master/pop/business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26).
-6. **Perubahan CID dari Edit kini masuk audit log** — `update()` menulis CID
-   baru pakai `update()` (dulu `updateQuietly()`, CID lama hilang tanpa jejak).
+   Distribusi (ADHOC-104/109/107).** Mini POP & Distribusi di-scope ke Cabang
+   dalam scope user, difilter di klien lewat `data-pop-id`/`data-mini-pop-id`
+   (script inline di Blade, bukan Alpine), dan divalidasi ulang di `update()`
+   dengan aturan satu sumber `NetworkAssignmentService` (sama dengan modal).
+   Aturan final:
+   - Mini POP & Distribusi **cuma ditulis kalau Cabang ikut dipindah** (rule
+     `exclude`); Edit data lain tidak menyentuhnya — distribusi legacy yang
+     menempel ke Cabang (hasil migrasi) tetap utuh.
+   - Terkunci (`disabled` + ditolak server) kalau pelanggan pra-pemasangan
+     **atau** user tidak punya `customers.detail.installation.validate`
+     (`CustomerController::networkLockReason()`). User tanpa izin tetap boleh
+     pindah Cabang; jaringan cabang lama dilepas.
+   - Pindah Cabang ditolak selama ada piutang / tagihan yang sudah dicicil
+     (`CustomerRelocationService`); form menampilkan jumlahnya, atau tagihan
+     bulan berjalan yang akan ikut pindah. Pindah POP: lihat
+     [`../master/pop/business-logic.md` §7a](../master/pop/business-logic.md#7a-pindah-pop-adhoc-104--adhoc-107-final-2026-09-29).
+6. **CID tidak lagi dihitung controller** — `CustomerObserver::updating()`
+   membuatnya ulang lewat `CustomerCidService` kalau POP/Mini POP/Distribusi
+   berubah atau CID kosong, dan perubahannya masuk audit log. Edit data lain
+   tidak mengubah CID (dulu 43 pelanggan dev berganti CID tiap disimpan).
+   PPPoE tidak diubah otomatis; Detail & Quick Hub memberi peringatan kalau
+   tidak cocok dengan CID.
+7. **Step 7 menampilkan data perangkat yang SAMA dengan Detail Pelanggan
+   (ADHOC-116, 2026-09-29).** Dulu field perangkat Edit cuma membaca
+   `customer_devices`, sementara tab Perangkat di Detail membaca urutan
+   cadangan Gudang → `customer_devices` → `customer_technical_details` →
+   kolom lama `customers` (`ont_sn`/`vlan_id`/`odp_code`). Akibatnya SN
+   pelanggan migrasi (mis. Siti Juariyah `ZTEGC7DD8857`) tampil di Detail tapi
+   kosong di Edit — 1.681 pelanggan dev. Sekarang keduanya memakai satu
+   sumber, `CustomerDeviceProfileService` (`resolve()` untuk Detail,
+   `editPrefill()` untuk Edit). Aturan (keputusan user opsi A):
+   - Nilai cadangan diisi ke field; saat disimpan masuk ke `customer_devices`
+     / `customer_technical_details`. Kolom lama tidak dihapus. Detail tetap
+     mendahulukan Inventori Gudang.
+   - Nilai cadangan yang tidak lolos validasi Edit TIDAK diisi (supaya simpan
+     tidak tertolak di field yang tidak disentuh admin) — ditampilkan sebagai
+     keterangan "Data lama …". MAC yang cuma beda cara tulis (`-`, huruf kecil,
+     tanpa pemisah) dirapikan ke `AA:BB:CC:DD:EE:FF`.
+   - Jenis Perangkat: diturunkan seperti Detail (tipe koneksi KABEL/fiber →
+     ONT, wireless → Router); kalau tidak bisa diturunkan tapi ada data
+     perangkat, "Lainnya". Server tidak pernah menulis `device_type` kosong
+     (kolom NOT NULL — dulu memilih "Belum diisi" pada perangkat yang ada =
+     error 500): jenis lama dipertahankan, perangkat baru jadi "Lainnya".
+   - Keterangan "Nomor OLT dipakai generator CID" dibetulkan — sejak
+     ADHOC-107 `olt_number` tidak lagi dipakai membentuk CID.
 
-Test: `tests/Feature/CustomerEditTest.php`, `tests/Feature/CustomerRegistrationTest.php`, `tests/Feature/CustomerPindahPopResetMiniPopTest.php`.
+Test: `tests/Feature/CustomerEditTest.php`, `tests/Feature/CustomerRegistrationTest.php`, `tests/Feature/CustomerPindahPopResetMiniPopTest.php`, `tests/Feature/CustomerEditJaringanButuhIzinValidasiTest.php`, `tests/Feature/CustomerEditDistribusiLegacyTidakHilangTest.php`, `tests/Feature/CidSatuRumusEditModalApiTest.php`, `tests/Feature/PindahPopDitolakSelamaAdaPiutangTest.php`, `tests/Feature/EditPelangganMenampilkanDataPerangkatLamaTest.php`, `tests/Feature/CustomerDistributionEditTest.php`.
 

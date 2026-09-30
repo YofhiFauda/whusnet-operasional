@@ -234,11 +234,13 @@ Guard yang berlaku di kedua jalur: target wajib ber-role `kolektor`, dan **POP t
 
 > Menyalin guard ke method kedua dilarang. Dua jalur tulis dengan dua salinan guard adalah cara tercepat salah satunya ketinggalan.
 
-### Pelanggan pindah POP — kolektor dilepas otomatis (ADHOC-104, 2026-09-26)
+### Pelanggan pindah POP — kolektor selalu dilepas (ADHOC-107, final 2026-09-29)
 
-Kalau `customers.pop_id` berganti, `CustomerObserver::updating()` mengecek aturan yang sama dari arah sebaliknya: kolektor yang **tidak punya akses POP baru** dilepas (`collector_id` → NULL). Kolektor ber-`all_pop` atau yang scope-nya mencakup POP baru dipertahankan. Tanpa ini, pelanggan pindahan tetap milik kolektor lama padahal worklist-nya menyaring per POP scope (§7 dua lapis scope) → tidak ditagih siapa pun.
+Kalau `customers.pop_id` berganti, `CustomerObserver::updating()` men-NULL-kan `collector_id` **tanpa syarat** — termasuk kolektor ber-`all_pop` atau yang scope-nya mencakup POP baru (keputusan user 2026-09-28: "pelanggan A di JETIS dengan kolektor Wahyu pindah ke SANDYA → lepas dari Wahyu"). Pelanggan tidak terikat kolektor siapa pun sampai admin cabang baru meng-assign lewat Worksheet Kolektor (daftar pelanggan tanpa kolektor). Dulu (ADHOC-104) kolektor cuma dilepas kalau tidak punya akses POP baru.
 
-Ini bukan salinan guard assign: arahnya **melepas**, bukan memberi, dan jalan dari semua jalur pindah POP (Edit, import, tinker). Admin cabang baru meng-assign kolektor lewat Worksheet Kolektor seperti biasa. **Belum ada:** notifikasi ke kolektor yang dilepas (`kabariPerubahanRute()` tidak dipanggil dari observer).
+Aman terhadap uang: piutang wajib lunas dulu sebelum pindah, dan tagihan bulan berjalan yang belum dibayar ikut pindah ke cabang baru (lihat `docs/billing-pembayaran/README.md` §Pelanggan Pindah POP) — kolektor lama tidak meninggalkan tagihan yang belum tertagih di cabangnya. Konsekuensi: tagihan bulan pertama di cabang baru tidak masuk worklist siapa pun sampai kolektor baru di-assign.
+
+Ini bukan salinan guard assign: arahnya **melepas**, bukan memberi, dan jalan dari semua jalur pindah POP. Perubahan `collector_id` tercatat di `audit_logs` (save yang sama). **Belum ada:** notifikasi ke kolektor yang dilepas (`kabariPerubahanRute()` tidak dipanggil dari observer).
 
 ---
 

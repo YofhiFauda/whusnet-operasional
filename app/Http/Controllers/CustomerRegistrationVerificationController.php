@@ -7,10 +7,14 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Models\AuditLog;
+use App\Models\City;
 use App\Models\Customer;
+use App\Models\InternetPackage;
+use App\Models\Pop;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskProvisioningService;
@@ -46,24 +50,35 @@ class CustomerRegistrationVerificationController extends Controller
         $access = app(EffectiveAccessService::class);
         $user = $request->user();
 
-        $query = Customer::with(['pop', 'customerService.internetPackage', 'village.district'])
+        $query = Customer::with(['pop', 'customerService.internetPackage', 'village.district', 'city', 'creator'])
             ->where('status', WorkflowTransition::REGISTERED->value)
             ->when(! $access->hasAllPopAccess($user), function ($q) use ($access, $user) {
                 $q->whereIn('pop_id', $access->getAllowedPopIds($user));
             });
+
+        $popsQuery = Pop::orderBy('name');
+        if (! $access->hasAllPopAccess($user)) {
+            $popsQuery->whereIn('id', $access->getAllowedPopIds($user));
+        }
+        $pops = $popsQuery->get(['id', 'name']);
+
+        if ($request->filled('pop_id')) {
+            $query->where('pop_id', $request->pop_id);
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
                     ->orWhere('identity_number', 'like', "%{$search}%")
+                    ->orWhere('primary_phone', 'like', "%{$search}%")
                     ->orWhere('customer_code', 'like', "%{$search}%");
             });
         }
 
         $customers = $query->orderBy('created_at')->paginate(15)->withQueryString();
 
-        return view('customer-registration-verifications.index', compact('customers'));
+        return view('customer-registration-verifications.index', compact('customers', 'pops'));
     }
 
     public function show(Request $request, Customer $customer): View
@@ -77,7 +92,12 @@ class CustomerRegistrationVerificationController extends Controller
 
         $this->authorizePopScope($request, $customer);
 
-        return view('customer-registration-verifications.show', compact('customer'));
+        // Dipakai form edit cepat Data Diri + Paket (verifications.partials.
+        // _registration-info) — cuma query ringan, aman dimuat tiap buka halaman.
+        $verifCities = City::orderBy('name')->get(['id', 'name']);
+        $verifPackages = InternetPackage::orderBy('name')->get(['id', 'name', 'package_code', 'monthly_price']);
+
+        return view('customer-registration-verifications.show', compact('customer', 'verifCities', 'verifPackages'));
     }
 
     public function approve(Request $request, Customer $customer): RedirectResponse
@@ -164,6 +184,52 @@ class CustomerRegistrationVerificationController extends Controller
         return redirect()
             ->route('customer-registration-verifications.index')
             ->with('success', "Registrasi {$customer->full_name} ditolak.");
+    }
+
+    /**
+     * Data Diri + Paket Internet — satu-satunya yang boleh dikoreksi CS di
+     * tahap ini (bug 2026-09-30). Data survey/pemasangan belum ada sama
+     * sekali pada status `registered`, jadi tidak relevan ditawarkan di sini.
+     */
+    public function updateIdentity(Request $request, Customer $customer): RedirectResponse
+    {
+        abort_unless($customer->status === WorkflowTransition::REGISTERED->value, 404, 'Pelanggan ini tidak sedang menunggu Verifikasi Registrasi.');
+        $this->authorizePopScope($request, $customer);
+        abort_unless($request->user()->hasPermission('customer_registration_verification.approve'), 403);
+
+        $validated = $request->validate([
+            'full_name' => 'required|string|max:150',
+            'identity_number' => 'nullable|string|size:16|regex:/^[0-9]+$/',
+            'primary_phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'email' => 'nullable|email|max:100',
+            'address' => 'required|string',
+            'city_id' => 'nullable|exists:cities,id',
+            'district_id' => 'nullable|exists:districts,id',
+            'village_id' => 'nullable|exists:villages,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateIdentity($customer, $validated, $request->user());
+
+        return redirect()->route('customer-registration-verifications.show', $customer)
+            ->with('success', 'Data diri pelanggan diperbarui.');
+    }
+
+    public function updatePackage(Request $request, Customer $customer): RedirectResponse
+    {
+        abort_unless($customer->status === WorkflowTransition::REGISTERED->value, 404, 'Pelanggan ini tidak sedang menunggu Verifikasi Registrasi.');
+        $this->authorizePopScope($request, $customer);
+        abort_unless($request->user()->hasPermission('customer_registration_verification.approve'), 403);
+
+        $validated = $request->validate([
+            'internet_package_id' => 'required|exists:internet_packages,id',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+
+        return redirect()->route('customer-registration-verifications.show', $customer)
+            ->with('success', 'Paket internet pelanggan diperbarui.');
     }
 
     private function authorizePopScope(Request $request, Customer $customer): void

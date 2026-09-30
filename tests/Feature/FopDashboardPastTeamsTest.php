@@ -12,6 +12,8 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use App\Services\EffectiveAccessService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
@@ -137,6 +139,179 @@ class FopDashboardPastTeamsTest extends TestCase
         $response->assertOk();
         $response->assertDontSee($teamSelesai->name);
         $response->assertDontSee($teamBatal->name);
+    }
+
+    /**
+     * Bug 2026-09-29: tim kemarin yang masih punya task aktif tetap tampil
+     * (benar), tapi task yang SUDAH selesai/batal ikut nempel di kartunya.
+     * Setelah ganti hari task itu harus lepas dari tim dan cukup ada di
+     * Riwayat Task FOP.
+     */
+    public function test_completed_task_leaves_past_team_and_moves_to_history(): void
+    {
+        [$team, $aktif] = $this->makeTeamWithTask('Team Kemarin', 'TFOP-PAST-6', Carbon::today()->subDay());
+
+        $customer = Customer::factory()->create(['pop_id' => $this->pop->id]);
+        $selesai = FopTask::create([
+            'task_number' => 'TFOP-PAST-7',
+            'tugas' => 'Perbaikan sudah beres kemarin',
+            'category' => TaskType::MAINTENANCE->value,
+            'status' => TaskStatus::SELESAI->value,
+            'task_date' => Carbon::today()->subDay(),
+            'customer_id' => $customer->id,
+            'pop_id' => $this->pop->id,
+            'team_id' => $team->id,
+            'created_by' => $this->fopUser->id,
+        ]);
+
+        $this->actingAs($this->fopUser)->get(route('fop.dashboard'))
+            ->assertOk()
+            ->assertSee($team->name)
+            ->assertSee($aktif->tugas)
+            ->assertDontSee($selesai->tugas);
+
+        $this->actingAs($this->fopUser)->get(route('fop-tasks.history'))
+            ->assertOk()
+            ->assertSee($selesai->task_number);
+    }
+
+    public function test_completed_task_stays_on_today_team(): void
+    {
+        [$team] = $this->makeTeamWithTask('Team Hari Ini', 'TFOP-TODAY-2', Carbon::today()->setTime(8, 0));
+
+        $customer = Customer::factory()->create(['pop_id' => $this->pop->id]);
+        $selesai = FopTask::create([
+            'task_number' => 'TFOP-TODAY-3',
+            'tugas' => 'Perbaikan beres pagi ini',
+            'category' => TaskType::MAINTENANCE->value,
+            'status' => TaskStatus::SELESAI->value,
+            'task_date' => Carbon::today()->setTime(8, 0),
+            'customer_id' => $customer->id,
+            'pop_id' => $this->pop->id,
+            'team_id' => $team->id,
+            'created_by' => $this->fopUser->id,
+        ]);
+
+        $this->actingAs($this->fopUser)->get(route('fop.dashboard'))
+            ->assertOk()
+            ->assertSee($selesai->tugas);
+    }
+
+    private function addTaskToTeam(FopTaskTeam $team, string $taskNumber, TaskStatus $status, ?Pop $pop = null): FopTask
+    {
+        $pop ??= $this->pop;
+        $customer = Customer::factory()->create(['pop_id' => $pop->id]);
+
+        return FopTask::create([
+            'task_number' => $taskNumber,
+            'tugas' => 'Tugas '.$taskNumber,
+            'category' => TaskType::MAINTENANCE->value,
+            'status' => $status->value,
+            'task_date' => $team->work_date,
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'team_id' => $team->id,
+            'created_by' => $this->fopUser->id,
+        ]);
+    }
+
+    /**
+     * Regresi dari perbaikan ADHOC-114: task selesai dibuang dari kartu tim
+     * kemarin, tapi progres dihitung dari task yang TAMPIL — tim 4/5 selesai
+     * terbaca "0/1". Progres harus tetap dari seluruh task tim.
+     */
+    public function test_past_team_progress_counts_tasks_already_moved_to_history(): void
+    {
+        [$team] = $this->makeTeamWithTask('Team Hampir Rampung', 'TFOP-PROG-1', Carbon::today()->subDay());
+        foreach (range(2, 5) as $i) {
+            $this->addTaskToTeam($team, 'TFOP-PROG-'.$i, TaskStatus::SELESAI);
+        }
+
+        $response = $this->actingAs($this->fopUser)->get(route('fop.dashboard'))->assertOk();
+
+        $card = $response->viewData('activeFopTeams')->firstWhere('id', $team->id);
+        $this->assertCount(1, $card['tasks']);
+        $this->assertSame(5, $card['total_tasks']);
+        $this->assertSame(4, $card['completed_tasks']);
+        $this->assertSame(80, $card['progress_percent']);
+    }
+
+    /**
+     * Regresi dari perbaikan ADHOC-114: syarat "punya task aktif" dan "punya
+     * task dalam scope" dulu dicek terpisah. Tim kemarin berisi task JETIS
+     * (selesai) + task SANDYA (terjadwal) lolos untuk user scope JETIS, lalu
+     * kartunya cuma memuat task SANDYA — data pelanggan cabang lain bocor.
+     */
+    public function test_past_team_does_not_leak_other_pop_task_to_scoped_user(): void
+    {
+        $sandya = Pop::create([
+            'code' => 'SND',
+            'pop_code' => 'SND',
+            'registration_prefix' => 'E',
+            'cid_prefix' => 'F',
+            'name' => 'POP Sandya',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $team = FopTaskTeam::create([
+            'name' => 'Team Campuran',
+            'work_date' => Carbon::today()->subDay()->startOfDay(),
+            'created_by' => $this->fopUser->id,
+        ]);
+        $this->addTaskToTeam($team, 'TFOP-MIX-1', TaskStatus::SELESAI);
+        $taskLain = $this->addTaskToTeam($team, 'TFOP-MIX-2', TaskStatus::TERJADWAL, $sandya);
+
+        $this->actingAs($this->scopedFopUser($this->pop))->get(route('fop.dashboard'))
+            ->assertOk()
+            ->assertDontSee($team->name)
+            ->assertDontSee($taskLain->tugas);
+    }
+
+    public function test_team_card_only_lists_tasks_within_user_scope(): void
+    {
+        $sandya = Pop::create([
+            'code' => 'SND',
+            'pop_code' => 'SND',
+            'registration_prefix' => 'E',
+            'cid_prefix' => 'F',
+            'name' => 'POP Sandya',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        [$team, $milikSaya] = $this->makeTeamWithTask('Team Lintas', 'TFOP-MIX-3', Carbon::today()->setTime(8, 0));
+        $taskLain = $this->addTaskToTeam($team, 'TFOP-MIX-4', TaskStatus::TERJADWAL, $sandya);
+
+        $response = $this->actingAs($this->scopedFopUser($this->pop))->get(route('fop.dashboard'))
+            ->assertOk()
+            ->assertSee($milikSaya->tugas)
+            ->assertDontSee($taskLain->tugas);
+
+        $card = $response->viewData('activeFopTeams')->firstWhere('id', $team->id);
+        $this->assertSame(1, $card['total_tasks']);
+    }
+
+    private function scopedFopUser(Pop $pop): User
+    {
+        $user = User::factory()->create();
+        $fopRole = Role::firstOrCreate(['code' => 'fop'], ['name' => 'FOP']);
+        $user->role_id = $fopRole->id;
+        $user->save();
+
+        app(EffectiveAccessService::class)->clearCache($user);
+
+        $scope = UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $fopRole->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $pop->id,
+        ]);
+
+        return $user;
     }
 
     public function test_team_older_than_window_is_hidden(): void

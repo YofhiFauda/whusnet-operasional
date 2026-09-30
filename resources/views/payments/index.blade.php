@@ -4,7 +4,7 @@
 @section('page_title', 'Riwayat Transaksi Pembayaran')
 
 @section('content')
-<div class="space-y-6" x-data="paymentManager()">
+<div class="space-y-6">
     @include('payments.partials.riwayat-banner')
 
     <!-- Naked Page Header -->
@@ -357,32 +357,24 @@
                             <!-- Action Buttons -->
                             <td class="px-4 py-3.5 text-right whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-1.5">
-                                    <!-- Button Edit (Trigger Modal Kelola Gudang Style) -->
-                                    <button type="button" 
-                                            @click="openEditModal(@js([
-                                                'id' => $payment->id,
-                                                'payment_number' => $payment->payment_number,
-                                                'invoice_number' => $payment->invoice?->invoice_number ?? '-',
-                                                'customer_name' => $payment->customer?->full_name ?? '-',
-                                                'amount' => (float) $payment->amount,
-                                                'payment_date' => optional($payment->payment_date)->format('Y-m-d'),
-                                                'payment_method' => $payment->payment_method,
-                                                'bank_account_id' => $payment->bank_account_id,
-                                                'bank_name' => $payment->bank_name,
-                                                'account_number' => $payment->account_number,
-                                                'sender_name' => $payment->sender_name,
-                                                'collected_by' => $payment->collected_by,
-                                                'note' => $payment->note,
-                                                'update_url' => route('payments.update', $payment->id),
-                                                'is_ditolak' => $statusVal === 'ditolak',
-                                            ]))"
-                                            class="inline-flex items-center gap-1 px-2.5 py-1 border border-sky-200 dark:border-sky-500/30 bg-sky-50/80 dark:bg-sky-500/10 hover:bg-sky-100 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 rounded-md transition-colors text-xs font-semibold cursor-pointer shadow-2xs"
-                                            title="Edit Pembayaran">
-                                        <svg class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                                        </svg>
-                                        <span>Edit</span>
-                                    </button>
+                                    {{-- Edit Pembayaran (ADHOC-108) — halaman tersendiri, bukan modal
+                                         (aturan CLAUDE.md: mutasi data + validasi server majemuk wajib
+                                         halaman sendiri). Gerbang GANDA: permission `payments.update`
+                                         (siapa boleh mencoba) DAN Payment::isEditable() (apakah payment
+                                         INI sedang boleh, mis. bukan bulan lalu/Saldo/setoran
+                                         terverifikasi) — dua hal berbeda, jangan digabung jadi satu. --}}
+                                    @can('payments.update')
+                                        @if($payment->isEditable())
+                                            <a href="{{ route('payments.edit', $payment->id) }}"
+                                               class="inline-flex items-center gap-1 px-2.5 py-1 border border-sky-200 dark:border-sky-500/30 bg-sky-50/80 dark:bg-sky-500/10 hover:bg-sky-100 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 rounded-md transition-colors text-xs font-semibold shadow-2xs"
+                                               title="Edit Pembayaran">
+                                                <svg class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                                </svg>
+                                                <span>Edit</span>
+                                            </a>
+                                        @endif
+                                    @endcan
 
                                     <!-- Button Detail -->
                                     <a href="{{ route('payments.show', $payment->id) }}" class="inline-flex items-center gap-1 px-2.5 py-1 border border-border bg-surface hover:bg-surface-muted text-text-main rounded-md transition-colors text-xs font-semibold shadow-2xs">
@@ -424,195 +416,6 @@
         </div>
     </div>
 
-    <!-- Modal: Edit Pembayaran (Kelola Gudang Modal Style) -->
-    <div x-show="editModalOpen" 
-         x-cloak
-         @keydown.escape.window="closeEditModal()"
-         class="fixed inset-0 z-[80] overflow-y-auto" 
-         aria-labelledby="modal-edit-payment-title" 
-         role="dialog" 
-         aria-modal="true"
-         style="display: none;">
-        
-        <!-- Backdrop Overlay -->
-        <div x-show="editModalOpen" 
-             x-transition.opacity 
-             @click="closeEditModal()" 
-             class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-xs transition-opacity"></div>
-
-        <!-- Modal Center Dialog -->
-        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div x-show="editModalOpen"
-                 x-transition:enter="ease-out duration-200"
-                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave="ease-in duration-150"
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 @click.stop
-                 class="relative transform overflow-hidden rounded-xl bg-surface text-left shadow-xl transition-all w-full sm:max-w-lg sm:my-8 border border-border">
-                
-                <!-- Modal Header -->
-                <div class="px-5 py-4 border-b border-border bg-surface-muted/50 flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-text-main flex items-center gap-2" id="modal-edit-payment-title">
-                            <span class="p-1.5 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                                </svg>
-                            </span>
-                            <span>Edit Pembayaran</span>
-                        </h3>
-                        <p class="text-[11px] text-text-muted mt-0.5">Koreksi detail metode pembayaran, bank, atau catatan transaksi.</p>
-                    </div>
-                    <button type="button" @click="closeEditModal()" class="text-text-muted hover:text-text-main p-1 rounded-lg hover:bg-surface-muted transition-colors">
-                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                    </button>
-                </div>
-
-                <!-- Form Section -->
-                <form :action="editData.update_url" method="POST" enctype="multipart/form-data" class="p-5 space-y-4">
-                    @csrf
-                    @method('PUT')
-
-                    <!-- Read-Only Payment Info Card -->
-                    <div class="bg-surface-muted/60 border border-border/80 rounded-lg p-3 space-y-1.5 text-xs">
-                        <div class="flex items-center justify-between">
-                            <span class="text-[11px] text-text-muted">No. Transaksi</span>
-                            <span class="font-mono font-bold text-primary" x-text="editData.payment_number"></span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-[11px] text-text-muted">Invoice / Pelanggan</span>
-                            <span class="font-semibold text-text-main" x-text="editData.invoice_number + ' • ' + editData.customer_name"></span>
-                        </div>
-                        <div class="flex items-center justify-between pt-1 border-t border-border/60">
-                            <span class="text-[11px] text-text-muted">Nominal Pembayaran</span>
-                            <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400" x-text="'Rp ' + Number(editData.amount || 0).toLocaleString('id-ID')"></span>
-                        </div>
-                    </div>
-
-                    <!-- Tanggal Pembayaran -->
-                    <div>
-                        <label for="modal_payment_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Tanggal Bayar</label>
-                        <input type="date" name="payment_date" id="modal_payment_date" x-model="editData.payment_date" required
-                               max="{{ now()->format('Y-m-d') }}"
-                               class="w-full px-3 py-2 text-xs font-mono border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors">
-                    </div>
-
-                    <!-- Metode Pembayaran -->
-                    <div>
-                        <label for="modal_payment_method" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Metode Bayar</label>
-                        <select name="payment_method" id="modal_payment_method" x-model="editData.payment_method" required
-                                class="w-full px-3 py-2 text-xs font-semibold border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors">
-                            <option value="cash">CASH (Tunai)</option>
-                            <option value="transfer">TRANSFER (Bank)</option>
-                            <option value="kolektor">KOLEKTOR</option>
-                            <option value="saldo">SALDO PELANGGAN</option>
-                            <option value="lainnya">LAINNYA</option>
-                        </select>
-                    </div>
-
-                    <!-- Dynamic Section: Transfer Bank Details -->
-                    <div x-show="editData.payment_method === 'transfer'" x-cloak class="space-y-3 p-3 rounded-lg bg-sky-50/50 dark:bg-sky-950/30 border border-sky-200/80 dark:border-sky-800/60">
-                        <div>
-                            <label for="modal_bank_account_id" class="block text-[10px] font-bold text-sky-800 dark:text-sky-300 uppercase tracking-wider mb-1">Rekening Tujuan (Master Bank)</label>
-                            <select name="bank_account_id" id="modal_bank_account_id" x-model="editData.bank_account_id"
-                                    :required="editData.payment_method === 'transfer'"
-                                    class="w-full px-3 py-2 text-xs font-semibold border border-sky-300 dark:border-sky-700 rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/25 transition-colors">
-                                <option value="">— Pilih Rekening Bank Tujuan —</option>
-                                @foreach($bankAccounts as $bankAccount)
-                                    <option value="{{ $bankAccount->id }}">{{ $bankAccount->displayName() }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label for="modal_sender_name" class="block text-[10px] font-bold text-sky-800 dark:text-sky-300 uppercase tracking-wider mb-1">Nama Pengirim (Opsional)</label>
-                            <input type="text" name="sender_name" id="modal_sender_name" x-model="editData.sender_name" maxlength="150"
-                                   placeholder="Nama pemilik rekening pengirim transfer..."
-                                   class="w-full px-3 py-2 text-xs border border-sky-300 dark:border-sky-700 rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/25 transition-colors">
-                        </div>
-                    </div>
-
-                    <!-- Dynamic Section: Kolektor Selection -->
-                    <div x-show="editData.payment_method === 'kolektor'" x-cloak class="space-y-2 p-3 rounded-lg bg-violet-50/50 dark:bg-violet-950/30 border border-violet-200/80 dark:border-violet-800/60">
-                        <label for="modal_collected_by" class="block text-[10px] font-bold text-violet-800 dark:text-violet-300 uppercase tracking-wider mb-1">Kolektor Penagih</label>
-                        <select name="collected_by" id="modal_collected_by" x-model="editData.collected_by"
-                                :required="editData.payment_method === 'kolektor'"
-                                class="w-full px-3 py-2 text-xs font-semibold border border-violet-300 dark:border-violet-700 rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-violet-500/25 transition-colors">
-                            <option value="">— Pilih Petugas Kolektor —</option>
-                            @foreach($collectors as $collector)
-                                <option value="{{ $collector->id }}">{{ $collector->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Bukti Pembayaran -->
-                    <div>
-                        <label for="modal_proof_file" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Bukti Pembayaran (Opsional)</label>
-                        <input type="file" name="proof_file" id="modal_proof_file" accept=".jpg,.jpeg,.png,.pdf"
-                               class="w-full px-3 py-1.5 border border-border rounded-lg text-xs bg-surface text-text-main file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-surface-muted file:text-text-main hover:file:bg-border transition-colors">
-                        <p class="text-[10px] text-text-muted mt-1">Unggah untuk memperbarui berkas bukti (JPG, PNG, PDF maks 2MB).</p>
-                    </div>
-
-                    <!-- Catatan -->
-                    <div>
-                        <label for="modal_note" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Catatan Pembayaran</label>
-                        <textarea name="note" id="modal_note" x-model="editData.note" rows="2"
-                                  :required="editData.payment_method === 'lainnya'"
-                                  placeholder="Catatan transaksi atau keterangan tambahan..."
-                                  class="w-full px-3 py-2 border border-border rounded-lg text-xs bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-colors"></textarea>
-                    </div>
-
-                    <!-- Modal Actions -->
-                    <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
-                        <button type="button" @click="closeEditModal()"
-                                class="px-4 py-2 border border-border text-text-secondary bg-surface hover:bg-surface-muted font-semibold rounded-lg shadow-2xs transition-colors text-xs cursor-pointer">
-                            Batal
-                        </button>
-                        <button type="submit"
-                                class="px-4 py-2 bg-primary hover:bg-primary-focus text-white font-semibold rounded-lg shadow-2xs transition-colors text-xs flex items-center gap-1.5 cursor-pointer">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            <span>Simpan Perubahan</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 </div>
 
-<script>
-    function paymentManager() {
-        return {
-            editModalOpen: false,
-            editData: {
-                id: null,
-                payment_number: '',
-                invoice_number: '',
-                customer_name: '',
-                amount: 0,
-                payment_date: '',
-                payment_method: 'cash',
-                bank_account_id: '',
-                bank_name: '',
-                account_number: '',
-                sender_name: '',
-                collected_by: '',
-                note: '',
-                update_url: '',
-            },
-            openEditModal(data) {
-                this.editData = Object.assign({}, data);
-                this.editModalOpen = true;
-                document.body.classList.add('overflow-hidden');
-            },
-            closeEditModal() {
-                this.editModalOpen = false;
-                document.body.classList.remove('overflow-hidden');
-            }
-        };
-    }
-</script>
 @endsection

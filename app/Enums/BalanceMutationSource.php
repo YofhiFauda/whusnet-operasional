@@ -30,6 +30,15 @@ enum BalanceMutationSource: string
     /** Baris migrasi/backfill data lama tanpa konteks payment spesifik. */
     case BACKFILL = 'backfill';
 
+    /**
+     * Delta saldo akibat Edit Pembayaran (ADHOC-108) — payment yang nominal
+     * atau pemakaian saldonya dikoreksi setelah tersimpan. SATU baris per
+     * revisi (kolom `revision`, lihat migrasi ADHOC-108), berisi SELISIH
+     * bersih terhadap keadaan sebelumnya — BUKAN pembalikan penuh seperti
+     * `PEMBATALAN`. Lihat CustomerBalanceService::applyCorrection().
+     */
+    case KOREKSI = 'koreksi';
+
     public function label(): string
     {
         return match ($this) {
@@ -39,6 +48,7 @@ enum BalanceMutationSource: string
             self::PAKAI_MANUAL => 'Dipakai Manual',
             self::PEMBATALAN => 'Pembatalan',
             self::BACKFILL => 'Backfill',
+            self::KOREKSI => 'Koreksi Edit Pembayaran',
         };
     }
 }

@@ -330,16 +330,16 @@
                                         <?php 
                                             $firstName = explode(' ', trim($tech->name))[0]; 
                                         ?>
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 cursor-help" title="<?php echo e($tech->name); ?>">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800/60 cursor-help" title="<?php echo e($tech->name); ?>">
                                             <?php echo e(\Illuminate\Support\Str::limit($firstName, 12)); ?>
 
                                         </span>
                                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_2): ?>
-                                        <span class="text-slate-400 dark:text-slate-500 text-[10px] italic">Unassigned</span>
+                                        <span class="text-slate-400 dark:text-slate-400 text-[10px] italic">Unassigned</span>
                                     <?php endif; ?>
                                     
                                     <?php if($hiddenTechsCount > 0): ?>
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 cursor-help font-ui" title="<?php echo e($task->technicians->skip(2)->pluck('name')->implode(', ')); ?>">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-help font-ui" title="<?php echo e($task->technicians->skip(2)->pluck('name')->implode(', ')); ?>">
                                             +<?php echo e($hiddenTechsCount); ?>
 
                                         </span>
@@ -353,7 +353,7 @@
 
                                     </span>
                                 <?php else: ?>
-                                    <span class="text-slate-300 text-[10px]">—</span>
+                                    <span class="text-slate-300 dark:text-slate-600 text-[10px]">—</span>
                                 <?php endif; ?>
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap font-ui">
@@ -364,7 +364,7 @@
                                         : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->label());
                                     $statusClasses = $task->task
                                         ? $task->task->status->displayBadgeClasses()
-                                        : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
+                                        : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70' : $task->status->displayBadgeClasses());
                                 ?>
                                 <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border <?php echo e($statusClasses); ?>">
                                     <?php echo e($statusLabel); ?>
@@ -376,7 +376,7 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap text-right font-ui">
                                 <a href="<?php echo e(route('fop-tasks.history.show', $task->id)); ?>"
-                                   class="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 p-1.5 rounded inline-block"
+                                   class="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors bg-slate-100 dark:bg-slate-700/60 hover:bg-slate-200 dark:hover:bg-slate-600 p-1.5 rounded inline-block"
                                    title="Detail Riwayat">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

@@ -32,8 +32,12 @@ class PopCidGenerationTest extends TestCase
         ]);
 
         // customer_code menggunakan format baru: {cid_prefix}00{registration_prefix}{######}
+        // Segmen Mini POP cuma dari mini_pop_id yang di-assign (ADHOC-107 K3) —
+        // dulu test ini lolos lewat fallback pop_code Cabang/olt_number, yang
+        // sudah dihapus karena jadi sumber CID campuran saat pindah POP.
         $customer = Customer::create([
-            'pop_id' => $pop->id,
+            'pop_id' => $branch->id,
+            'mini_pop_id' => $pop->id,
             'customer_code' => 'C00RQ000001',
             'full_name' => 'DYAH PURBA',
             'primary_phone' => '08123456789',

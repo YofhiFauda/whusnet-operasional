@@ -51,33 +51,31 @@ DB transaction:
 return candidate (e.g. RQ000021)
 ```
 
-## 3. Generate CID (`generateComplexCid()`, dipanggil dari `finalVerify()`)
+## 3. Generate CID — satu rumus (`CustomerCidService` → `Pop::generateComplexCid()`, ADHOC-107)
 
 ```
-Verifikasi Admin approve aktivasi (lihat docs/customer-lifecycle/flowchart.md §5)
+Dipicu oleh:
+  ├─ CustomerObserver::updating()  — pop_id/mini_pop_id/distribution_id berubah, atau CID kosong
+  ├─ Modal "Atur Mini POP & Distribusi" / API network-assignment — sync() eksplisit tiap simpan
+  └─ Aktivasi (finalVerify(), activate()) & import (updateQuietly) — resolve() eksplisit
         │
         ▼
-Pop::generateComplexCid(customer, distribution)
+status ∈ {active, suspended}? ──tidak──▶ CID tidak disentuh
+        │ ya
+        ▼
+Cabang (query by pop_id) punya cid_prefix? ──tidak──▶ CID lama dibiarkan
+        │ ya
+        ▼
+reqId   = extractBareRegistrationId(customer_code)        — REQ ID permanen
+segMini = mini_pop_id ada? → pop_code Mini POP − cid_prefix  :  '0'
+          (TANPA fallback pop_code Cabang / olt_number — dihapus K3)
+distCode= distribution_id ada? → distribution.code : '0'
         │
         ▼
-reqId = extractBareRegistrationId(customer.customer_code)  — strip prefix lama kalau ada
+CID = "{cid_prefix}{segMini}{distCode}{reqId}"   mis. C00RQ… / C10RQ… / C14ARQ…
         │
         ▼
-oltNumber = resolveMiniPopSegment(customer, technicalDetail?.olt_number)
-        │
-        ├─ customer.miniPop ADA? ──ya──▶ ambil pop_code Mini POP itu, strip cid_prefix
-        ├─ tidak → customer.pop.pop_code (Cabang) diawali cid_prefix? ──ya──▶ ambil sisa string (legacy, konstan per-Cabang)
-        ├─ tidak → pakai fallback olt_number (dibersihkan sama)
-        └─ tidak ada juga → default '1'
-        │
-        ▼
-distCode = distribution?.code ?? 'XX'
-        │
-        ▼
-CID = "{cid_prefix}{oltNumber}{distCode}{reqId}"
-        │
-        ▼
-(dipakai lagi oleh) generatePppoeUsername() → CID + "_{DESA}_{NAMA}"
+PPPoE username TIDAK diubah otomatis → peringatan kalau tidak diawali "{CID}_"
 ```
 
 ## 4. Assign/Ganti Mini POP & Distribusi (✅ Fixed 2026-07-07, lihat [bug.md](bug.md))
@@ -103,43 +101,48 @@ Validasi silang: Mini POP.parent_id == customer.pop_id?
 customer.mini_pop_id = ..., customer.distribution_id = ...
         │
         ▼
-status ∈ {active, suspended}? ──ya──▶ regenerate CID (Pop::generateComplexCid, pakai Mini POP/Distribusi baru)
+status ∈ {active, suspended}? ──ya──▶ CustomerCidService::sync() — rumus §3, juga saat pilihan tidak berubah (perbaikan manual)
         │
         ▼
 Save + AuditLog('update_network_assignment')
 ```
 
-## 4a. Pindah POP lewat Edit Pelanggan (ADHOC-104, 2026-09-26)
+## 4a. Pindah POP lewat Edit Pelanggan (ADHOC-104 → ADHOC-107, final 2026-09-29)
 
 ```
 Admin buka /customers/{id}/edit → step "POP & Distribusi"
+  (form sudah menampilkan: piutang penghalang, atau tagihan bulan ini yang akan ikut pindah)
         │
         ▼
 Pilih POP Cabang (dropdown: Pop::forUser(), type=cabang)
-Pilih Mini POP   (dropdown ke-filter: parent_id = POP terpilih)
-Pilih Distribusi (dropdown ke-filter: pop_id = Mini POP terpilih) — boleh kosong
+Mini POP & Distribusi terbuka HANYA kalau Cabang diganti DAN
+  pelanggan pasca-pemasangan DAN user punya customers.detail.installation.validate
         │
         ▼
 Submit PUT /customers/{customer}
         │
         ▼
-Validasi: POP dalam scope user?                         ──tidak──▶ TOLAK (pop_id)
-          REQ ID sudah dipakai di POP tujuan?           ──ya─────▶ TOLAK (pop_id)
-          Mini POP.parent_id == pop_id?                 ──tidak──▶ TOLAK (mini_pop_id)
-          Distribusi tanpa Mini POP / beda Mini POP?    ──ya─────▶ TOLAK (distribution_id)
+Validasi: POP dalam scope user?                                  ──tidak──▶ TOLAK (pop_id)
+          REQ ID sudah dipakai di POP tujuan?                    ──ya─────▶ TOLAK (pop_id)
+          Ada piutang / tagihan `sebagian` / tagihan sudah dibayar sebagian?
+                                                                 ──ya─────▶ TOLAK (pop_id, jumlah & total)
+          Mini POP/Distribusi diisi padahal terkunci?            ──ya─────▶ TOLAK
+          Mini POP bukan anak POP / Distribusi bukan anak Mini POP? ─ya──▶ TOLAK
         │ (lolos)
         ▼
 $customer->update()
-  └─ CustomerObserver::updating()   ← jalan juga dari import/tinker
-       ├─ mini_pop bukan anak pop_id?        → mini_pop_id = NULL
-       ├─ distribusi bukan anak mini_pop_id? → distribution_id = NULL
-       └─ pop_id berubah & kolektor tak punya akses POP baru → collector_id = NULL
+  └─ CustomerObserver::updating()      ← jalan juga dari import/tinker/API
+       1. masih ada tagihan penghalang? → CustomerRelocationBlockedException (rollback)
+       2. mini_pop bukan anak pop_id → NULL; distribusi bukan anak mini_pop_id → NULL
+       3. collector_id = NULL (selalu)
+       4. CID dibuat ulang (active/suspended)
   └─ CustomerObserver::updated() (pop_id berubah)
        ├─ cabut token QR aktif
-       └─ tagihan belum_dibayar/sebagian → invoices.pop_id = POP baru
+       └─ tagihan bulan berjalan/sesudahnya `belum_dibayar` tanpa pembayaran valid
+          → invoices.pop_id = POP baru (per model, tercatat audit)
         │
         ▼
-status ∈ {active, suspended}? ──ya──▶ CID dibuat ulang (REQ ID tetap), dicatat audit log
+Tagihan periode lalu & pembayaran lama tetap di POP lama; tagihan bulan depan terbit di POP baru
 ```
 
 ## 5. Resolve Display ID (dipanggil kapan pun UI perlu tampilkan identitas pelanggan)

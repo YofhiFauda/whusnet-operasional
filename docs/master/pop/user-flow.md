@@ -37,16 +37,25 @@ Aktor: **Owner/Admin** (`pops.view`/`create`/`update`).
 
 Detail teknis & riwayat gap sebelum fix: [bug.md](bug.md).
 
-## 5a. Admin — Pindah POP Pelanggan (ADHOC-104, 2026-09-26)
+## 5a. Admin — Pindah POP Pelanggan (ADHOC-104 → ADHOC-107, final 2026-09-29)
 
-1. Buka `/customers/{customer}/edit` → step **3. POP & Distribusi**.
-2. Ganti **POP Cabang** (cuma Cabang dalam scope user). Dropdown **Mini POP** otomatis cuma nampilin Mini POP anak Cabang itu; pilihan Mini POP lama yang bukan milik Cabang baru otomatis dikosongkan.
-3. Pilih **Mini POP** → dropdown **Distribusi** ke-filter ke anak Mini POP itu. Boleh dikosongkan dan diatur belakangan lewat modal §5.
-   - Pelanggan **pra-pemasangan** (`registered` s/d `waiting_installation`, `rejected`): dropdown Mini POP & Distribusi terkunci — cuma POP Cabang yang bisa dipindah. Mini POP & Distribusi diisi setelah pemasangan dimulai.
-4. Simpan. Ditolak kalau: POP di luar scope, REQ ID sudah dipakai di POP tujuan, Mini POP bukan anak POP, atau Distribusi bukan anak Mini POP.
-5. Hasil: REQ ID tetap; CID dibuat ulang (kalau `active`/`suspended`); tagihan belum lunas ikut pindah; kolektor tanpa akses POP baru dilepas → assign kolektor baru lewat Worksheet Kolektor.
+1. Buka `/customers/{customer}/edit` → step **3. POP & Distribusi**. Di bawah dropdown POP, form sudah memberi tahu:
+   - **"Belum bisa pindah Cabang: N tagihan wajib lunas dulu (sisa Rp …)"** — piutang bulan-bulan sebelumnya atau tagihan yang sudah dicicil sebagian. Tagih/lunasi dulu.
+   - atau **"Kalau pindah Cabang, N tagihan bulan berjalan … ikut pindah"** — tagihan bulan ini yang belum dibayar sama sekali akan dibayar ke Cabang baru.
+2. Ganti **POP Cabang** (cuma Cabang dalam scope user).
+3. **Mini POP & Distribusi** baru bisa dipilih kalau Cabang sudah diganti, dan hanya kalau:
+   - pelanggan sudah masuk tahap pemasangan (pra-pemasangan: cuma POP Cabang yang boleh diatur), **dan**
+   - user punya izin atur jaringan (`customers.detail.installation.validate`).
+   Selain itu dropdown terkunci dengan keterangan alasannya; Mini POP & Distribusi cabang lama tetap dilepas, dan yang baru diatur pemegang izin lewat modal §5.
+   Tanpa ganti Cabang, dropdown hanya informasi (nilai legacy tetap tampil apa adanya) — ubah Mini POP/Distribusi lewat modal §5.
+4. Simpan. Ditolak kalau: POP di luar scope, REQ ID sudah dipakai di POP tujuan, masih ada tagihan penghalang, Mini POP/Distribusi terkunci tapi diisi, atau hierarkinya tidak cocok.
+5. Hasil:
+   - REQ ID tetap; CID dibuat ulang otomatis (kalau `active`/`suspended`).
+   - Tagihan bulan berjalan yang belum dibayar pindah ke Cabang baru; tagihan & pembayaran lama tetap di Cabang lama.
+   - **Kolektor dilepas** → admin Cabang baru meng-assign kolektor lewat Worksheet Kolektor (daftar "tanpa kolektor").
+   - Username PPPoE tidak berubah; kalau tidak lagi cocok dengan CID, Detail Pelanggan & Quick Hub menampilkan peringatan → NOC ubah di Mikrotik lalu di Edit Pelanggan.
 
-Aturan lengkap: [business-logic.md §7a](business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26).
+Aturan lengkap: [business-logic.md §7a](business-logic.md#7a-pindah-pop-adhoc-104--adhoc-107-final-2026-09-29).
 
 ## Guard Ringkas
 

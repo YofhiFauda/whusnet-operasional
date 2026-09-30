@@ -735,7 +735,9 @@ class FopTaskController extends Controller
                     ];
 
                     if (! $fopTask->task_id && ! empty($technicians)) {
-                        $task = app(TaskService::class)->create($taskData, auth()->user());
+                        // createForFopTask(), bukan create(): Survey/PSB memakai
+                        // Task antrean yang sudah ada — lihat docblock-nya.
+                        $task = app(TaskService::class)->createForFopTask($fopTask, $taskData, auth()->user());
                         $fopTask->task_id = $task->id;
                         $fopTask->save();
                     } elseif ($fopTask->task_id) {

@@ -249,6 +249,13 @@ class FopDashboardController extends Controller
         // berubah jadi arsip.
         $boardFloor = $today->copy()->subDays(self::BOARD_MAX_PAST_DAYS)->startOfDay();
 
+        $inScope = fn (FopTask $t): bool => $hasAllPopAccess || in_array($t->pop_id, $allowedPopIds);
+        $isClosed = fn (FopTask $t): bool => in_array(
+            $t->status,
+            [TaskStatus::SELESAI, TaskStatus::DIBATALKAN],
+            true
+        );
+
         $activeFopTeams = FopTaskTeam::with([
             'members',
             'fopTasks.technicians',
@@ -280,20 +287,31 @@ class FopDashboardController extends Controller
             // isActive() memanggil relasi fopTasks() lewat query baru, jadi
             // eager load di atas terbuang dan lahir 1 query per team.
             // Pola ini menyalin FopTaskController:153-156 yang sudah benar.
+            //
+            // Syarat tampil = punya task AKTIF yang DALAM SCOPE — dua syarat itu
+            // wajib dicek pada task yang sama. Dulu dicek terpisah ("ada task
+            // aktif" + "ada task di POP saya"), jadi tim kemarin dengan task
+            // JETIS yang sudah selesai + task SANDYA yang masih terjadwal lolos
+            // untuk pop_admin JETIS, lalu kartunya cuma berisi task SANDYA —
+            // bocor lintas cabang (CLAUDE.md larangan #3).
             ->filter(fn (FopTaskTeam $team) => $team->fopTasks->contains(
-                fn (FopTask $t) => ! in_array(
-                    $t->status->value,
-                    [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value],
-                    true
-                )
+                fn (FopTask $t) => $inScope($t) && ! $isClosed($t)
             ))
-            ->when(! $hasAllPopAccess, fn ($teams) => $teams->filter(
-                fn (FopTaskTeam $team) => $team->fopTasks->contains(
-                    fn (FopTask $t) => in_array($t->pop_id, $allowedPopIds)
-                )
-            ))
-            ->map(function (FopTaskTeam $team) {
-                $mappedTasks = $team->fopTasks->map(function (FopTask $t) {
+            ->map(function (FopTaskTeam $team) use ($startOfToday, $inScope, $isClosed) {
+                // Task POP lain tidak pernah dirender, walau satu tim dengan
+                // task yang dalam scope user.
+                $scopedTasks = $team->fopTasks->filter($inScope);
+
+                // Tim tanggal lampau tampil di papan HANYA karena masih punya
+                // task aktif — task selesai/batal miliknya sudah jadi arsip di
+                // Riwayat Task FOP (/fop-tasks/history), jadi ikut ditampilkan di
+                // sini cuma bikin papan kerja harian penuh task kemarin yang sudah
+                // beres. Tim hari ini tetap menampilkan semuanya.
+                $tasks = $team->work_date->lt($startOfToday)
+                    ? $scopedTasks->reject($isClosed)
+                    : $scopedTasks;
+
+                $mappedTasks = $tasks->map(function (FopTask $t) {
                     // FopTask.status share vocab persis TaskStatus (unifikasi 2026-07-20)
                     // — kalau ada Task eksekusi terhubung, pakai itu buat label/style;
                     // FopTask standalone (task_id null, masih 'draft') pakai punya sendiri.
@@ -329,8 +347,14 @@ class FopDashboardController extends Controller
                     ];
                 })->values();
 
-                $totalTasks = $mappedTasks->count();
-                $completedTasks = $mappedTasks->filter(fn ($t) => $t['status_value'] === 'selesai')->count();
+                // Progres dihitung dari SEMUA task tim (dalam scope), bukan dari
+                // yang tampil di kartu — tim kemarin yang tinggal 1 dari 5 task
+                // harus terbaca "4/5 Selesai", bukan "0/1" hanya karena 4 task
+                // selesainya sudah pindah ke Riwayat.
+                $totalTasks = $scopedTasks->count();
+                $completedTasks = $scopedTasks->filter(
+                    fn (FopTask $t) => ($t->task?->status ?? $t->status) === TaskStatus::SELESAI
+                )->count();
 
                 return [
                     'id' => $team->id,

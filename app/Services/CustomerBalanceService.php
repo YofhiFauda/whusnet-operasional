@@ -61,8 +61,13 @@ class CustomerBalanceService
      *
      * Kalau pelanggan belum pernah punya mutasi sama sekali, tak ada baris
      * untuk dikunci — itu sudah pasti berarti saldo 0, aman tanpa lock.
+     *
+     * PUBLIC (bukan cuma dipakai `debit()`/`applyToOpenInvoices()` di sini) —
+     * `PaymentService::revise()` (ADHOC-108) juga memanggilnya untuk mengecek
+     * kecukupan saldo NILAI BARU sebelum `applyCorrection()` menulis delta,
+     * di dalam transaction yang sama yang sudah mengunci payment & invoice.
      */
-    private function lockedBalance(Customer $customer): float
+    public function lockedBalance(Customer $customer): float
     {
         CustomerBalanceMutation::query()
             ->where('customer_id', $customer->id)
@@ -168,6 +173,84 @@ class CustomerBalanceService
             'pop_id' => $popId,
             'created_by' => auth()->id(),
             'note' => $note,
+        ]);
+    }
+
+    /**
+     * Koreksi saldo dari Edit Pembayaran (ADHOC-108, K7) — SATU baris DELTA
+     * per revisi, BUKAN balik-lalu-terapkan-ulang seperti
+     * `reverseCreditForPayment()`/`reverseDebitForPayment()` (keduanya
+     * dibuat untuk Kembalikan: sekali-jalan, dan akan bentrok unique index
+     * kalau dipanggil dua kali untuk payment yang sama — lihat
+     * docs/plan/billing/rancangan-edit-pembayaran-penuh.md §F2).
+     *
+     * ```
+     * Δoverpay = overpayBaru − overpayLama
+     * Δpakai   = saldoDipakaiBaru − saldoDipakaiLama
+     * net      = Δoverpay − Δpakai   // efek bersih ke saldo pelanggan
+     * ```
+     * `net > 0` → CREDIT sebesar net; `net < 0` → DEBIT sebesar |net|;
+     * `net = 0` → tidak menulis apa pun. Nilai LAMA diambil dari
+     * kolom `payments` (parameter, bukan dibaca ulang dari ledger) supaya
+     * tetap benar untuk payment lama/backfill yang ledger-nya tak lengkap.
+     *
+     * SENGAJA tidak lewat `debit()` (yang menolak kalau saldo tak cukup):
+     * pembalikan overpay yang sudah terlanjur dipakai pelanggan BOLEH
+     * membuat saldo negatif (piutang terlihat) — filosofi sama dengan
+     * `reverseCreditForPayment()`. Kecukupan saldo untuk NILAI BARU yang
+     * mau dipakai divalidasi terpisah oleh pemanggil (PaymentService::revise())
+     * SEBELUM method ini dipanggil.
+     *
+     * Wajib dipanggil di dalam transaction yang sudah mengunci baris
+     * payment ini (mencegah dua koreksi berebut nomor `revision`).
+     */
+    public function applyCorrection(
+        Payment $payment,
+        float $oldOverpayAmount,
+        float $oldBalanceUsedAmount,
+        float $newOverpayAmount,
+        float $newBalanceUsedAmount,
+    ): ?CustomerBalanceMutation {
+        $deltaOverpay = Money::sub($newOverpayAmount, $oldOverpayAmount);
+        $deltaPakai = Money::sub($newBalanceUsedAmount, $oldBalanceUsedAmount);
+        $net = Money::sub($deltaOverpay, $deltaPakai);
+
+        if (Money::isZero($net)) {
+            return null;
+        }
+
+        $customer = $payment->customer;
+
+        if (! $customer) {
+            // Tak mungkin terjadi dalam praktik (use_balance_amount/overpay
+            // mensyaratkan invoice ber-customer) — dijaga eksplisit supaya
+            // gagal jelas alih-alih menulis mutasi tanpa pemilik saldo.
+            throw new InvalidArgumentException('Payment ini tidak terhubung pelanggan — saldo tidak bisa dikoreksi.');
+        }
+
+        // Revisi ke-berapa untuk payment ini — dihitung dari baris KOREKSI
+        // yang sudah ada (lintas type: net cuma pernah CREDIT atau DEBIT per
+        // panggilan, tak pernah dua-duanya sekaligus, jadi satu urutan global
+        // per payment sudah cukup dan tak pernah bentrok unique index).
+        $revision = (int) (CustomerBalanceMutation::query()
+            ->where('payment_id', $payment->id)
+            ->where('source', BalanceMutationSource::KOREKSI->value)
+            ->max('revision') ?? 0) + 1;
+
+        $type = Money::greaterThan($net, 0)
+            ? CustomerBalanceMutationType::CREDIT
+            : CustomerBalanceMutationType::DEBIT;
+
+        return CustomerBalanceMutation::create([
+            'customer_id' => $customer->id,
+            'type' => $type->value,
+            'source' => BalanceMutationSource::KOREKSI->value,
+            'revision' => $revision,
+            'amount' => abs($net),
+            'payment_id' => $payment->id,
+            'pop_id' => $payment->pop_id,
+            'created_by' => auth()->id(),
+            'note' => "Koreksi Edit Pembayaran {$payment->payment_number} (revisi ke-{$revision}).",
         ]);
     }
 

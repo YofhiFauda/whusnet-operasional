@@ -76,7 +76,7 @@
             </div>
 
             <!-- Footer Buttons -->
-            <div class="pt-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 shrink-0">
+            <div class="pt-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0">
                 <button type="button" onclick="closeNetworkAssignmentModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-center btn-interactive">Batal</button>
                 <button type="submit" id="na-submit-btn" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-md shadow-sky-600/20 text-center btn-interactive">Simpan Perubahan</button>
             </div>

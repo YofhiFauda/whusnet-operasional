@@ -606,12 +606,17 @@ $message = $__bag->first($__errorArgs[0]); ?>
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
-                                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Ganti POP = Mini POP &amp; Distribusi dipilih ulang. CID ikut berubah, REQ ID tetap. Syarat: semua tagihan pelanggan sudah lunas.</p>
+                                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Ganti POP = Mini POP &amp; Distribusi dipilih ulang, kolektor dilepas. CID ikut berubah, REQ ID tetap. Syarat: piutang bulan-bulan sebelumnya &amp; tagihan yang sudah dicicil sebagian lunas dulu.</p>
+                                <?php if($relocationBlocking['count'] > 0): ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1 leading-relaxed">Belum bisa pindah Cabang: <?php echo e($relocationBlocking['count']); ?> tagihan wajib lunas dulu (sisa Rp <?php echo e(number_format($relocationBlocking['total'], 0, ',', '.')); ?>).</p>
+                                <?php elseif($relocationMovable['count'] > 0): ?>
+                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-relaxed">Kalau pindah Cabang, <?php echo e($relocationMovable['count']); ?> tagihan bulan berjalan yang belum dibayar (Rp <?php echo e(number_format($relocationMovable['total'], 0, ',', '.')); ?>) ikut pindah dan dibayar ke Cabang baru.</p>
+                                <?php endif; ?>
                             </div>
 
                             <div>
                                 <label for="mini_pop_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Mini POP (OLT)</label>
-                                <select name="mini_pop_id" id="mini_pop_id" <?php if($networkAssignmentLocked): echo 'disabled'; endif; ?> data-locked-by-status="<?php echo e((int) $networkAssignmentLocked); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['mini_pop_id'];
+                                <select name="mini_pop_id" id="mini_pop_id" <?php if($networkLockReason !== null): echo 'disabled'; endif; ?> data-network-locked="<?php echo e($networkLockReason !== null ? 1 : 0); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['mini_pop_id'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -642,7 +647,7 @@ unset($__errorArgs, $__bag); ?>
 
                             <div>
                                 <label for="distribution_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">KODE DISTRIBUSI (ODP)</label>
-                                <select name="distribution_id" id="distribution_id" <?php if($networkAssignmentLocked): echo 'disabled'; endif; ?> class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['distribution_id'];
+                                <select name="distribution_id" id="distribution_id" <?php if($networkLockReason !== null): echo 'disabled'; endif; ?> class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['distribution_id'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -670,8 +675,8 @@ endif;
 unset($__errorArgs, $__bag); ?>
                             </div>
 
-                            <?php if($networkAssignmentLocked): ?>
-                                <p class="md:col-span-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Pelanggan belum masuk tahap pemasangan — sekarang cuma POP Cabang yang bisa diatur. Mini POP &amp; Distribusi (penentu CID) diisi setelah pemasangan dimulai.</p>
+                            <?php if($networkLockMessage): ?>
+                                <p class="md:col-span-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed"><?php echo e($networkLockMessage); ?></p>
                             <?php else: ?>
                                 <p id="network-same-pop-hint" class="md:col-span-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Mini POP &amp; Distribusi cuma bisa diubah di sini kalau POP Cabang ikut dipindah. Tanpa pindah Cabang, atur lewat tombol "Atur Mini POP &amp; Distribusi" di Detail Pelanggan.</p>
                             <?php endif; ?>
@@ -1238,8 +1243,10 @@ unset($__errorArgs, $__bag); ?>
                             // aslinya Laporan Pemasangan (CustomerInstallationController::
                             // storePemasangan()), sekarang juga bisa dikoreksi dari sini.
                             // Sudah di-eager-load di CustomerController::edit().
-                            $dev7 = $customer->customerDevice;
-                            $tech7 = $customer->customerTechnicalDetail;
+                            // Nilai awal = nilai yang tampil di Detail Pelanggan (CustomerDeviceProfileService::
+                            // editPrefill()) — termasuk data migrasi di detail teknis & kolom lama.
+                            $devPrefill = $devicePrefill['values'];
+                            $devHints = $devicePrefill['hints'];
                         ?>
                         
                         <input type="hidden" name="status" id="status" value="<?php echo e(old('status', $customer->status)); ?>">
@@ -1287,11 +1294,11 @@ if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         <option value="">— Belum diisi —</option>
-                                        <option value="ont" <?php echo e(old('device_type', $dev7->device_type ?? '') === 'ont' ? 'selected' : ''); ?>>ONT</option>
-                                        <option value="modem" <?php echo e(old('device_type', $dev7->device_type ?? '') === 'modem' ? 'selected' : ''); ?>>Modem</option>
-                                        <option value="onu" <?php echo e(old('device_type', $dev7->device_type ?? '') === 'onu' ? 'selected' : ''); ?>>ONU</option>
-                                        <option value="router" <?php echo e(old('device_type', $dev7->device_type ?? '') === 'router' ? 'selected' : ''); ?>>Router</option>
-                                        <option value="other" <?php echo e(old('device_type', $dev7->device_type ?? '') === 'other' ? 'selected' : ''); ?>>Lainnya</option>
+                                        <option value="ont" <?php echo e(old('device_type', $devPrefill['device_type'] ?? '') === 'ont' ? 'selected' : ''); ?>>ONT</option>
+                                        <option value="modem" <?php echo e(old('device_type', $devPrefill['device_type'] ?? '') === 'modem' ? 'selected' : ''); ?>>Modem</option>
+                                        <option value="onu" <?php echo e(old('device_type', $devPrefill['device_type'] ?? '') === 'onu' ? 'selected' : ''); ?>>ONU</option>
+                                        <option value="router" <?php echo e(old('device_type', $devPrefill['device_type'] ?? '') === 'router' ? 'selected' : ''); ?>>Router</option>
+                                        <option value="other" <?php echo e(old('device_type', $devPrefill['device_type'] ?? '') === 'other' ? 'selected' : ''); ?>>Lainnya</option>
                                     </select>
                                     <?php $__errorArgs = ['device_type'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
@@ -1314,12 +1321,12 @@ if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         <option value="">— Belum diisi —</option>
-                                        <option value="pppoe" <?php echo e(old('connection_mode', $dev7->connection_mode ?? '') === 'pppoe' ? 'selected' : ''); ?>>PPPoE</option>
-                                        <option value="bridge" <?php echo e(old('connection_mode', $dev7->connection_mode ?? '') === 'bridge' ? 'selected' : ''); ?>>Bridge</option>
-                                        <option value="static" <?php echo e(old('connection_mode', $dev7->connection_mode ?? '') === 'static' ? 'selected' : ''); ?>>Static IP</option>
-                                        <option value="dhcp" <?php echo e(old('connection_mode', $dev7->connection_mode ?? '') === 'dhcp' ? 'selected' : ''); ?>>DHCP</option>
-                                        <option value="router" <?php echo e(old('connection_mode', $dev7->connection_mode ?? '') === 'router' ? 'selected' : ''); ?>>Router</option>
-                                        <option value="other" <?php echo e(old('connection_mode', $dev7->connection_mode ?? '') === 'other' ? 'selected' : ''); ?>>Lainnya</option>
+                                        <option value="pppoe" <?php echo e(old('connection_mode', $devPrefill['connection_mode'] ?? '') === 'pppoe' ? 'selected' : ''); ?>>PPPoE</option>
+                                        <option value="bridge" <?php echo e(old('connection_mode', $devPrefill['connection_mode'] ?? '') === 'bridge' ? 'selected' : ''); ?>>Bridge</option>
+                                        <option value="static" <?php echo e(old('connection_mode', $devPrefill['connection_mode'] ?? '') === 'static' ? 'selected' : ''); ?>>Static IP</option>
+                                        <option value="dhcp" <?php echo e(old('connection_mode', $devPrefill['connection_mode'] ?? '') === 'dhcp' ? 'selected' : ''); ?>>DHCP</option>
+                                        <option value="router" <?php echo e(old('connection_mode', $devPrefill['connection_mode'] ?? '') === 'router' ? 'selected' : ''); ?>>Router</option>
+                                        <option value="other" <?php echo e(old('connection_mode', $devPrefill['connection_mode'] ?? '') === 'other' ? 'selected' : ''); ?>>Lainnya</option>
                                     </select>
                                     <?php $__errorArgs = ['connection_mode'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
@@ -1333,7 +1340,7 @@ unset($__errorArgs, $__bag); ?>
 
                                 <div>
                                     <label for="brand" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Merk Perangkat</label>
-                                    <input type="text" name="brand" id="brand" value="<?php echo e(old('brand', $dev7->brand ?? '')); ?>" class="w-full text-xs font-sans px-3 py-2 border <?php $__errorArgs = ['brand'];
+                                    <input type="text" name="brand" id="brand" value="<?php echo e(old('brand', $devPrefill['brand'] ?? '')); ?>" class="w-full text-xs font-sans px-3 py-2 border <?php $__errorArgs = ['brand'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1349,11 +1356,12 @@ $message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                    <?php if(isset($devHints['brand'])): ?><p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">Data lama (tidak diisi otomatis karena formatnya tidak valid): <span class="font-mono"><?php echo e($devHints['brand']); ?></span></p><?php endif; ?>
                                 </div>
 
                                 <div>
                                     <label for="model" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Tipe Model</label>
-                                    <input type="text" name="model" id="model" value="<?php echo e(old('model', $dev7->model ?? '')); ?>" class="w-full text-xs font-sans px-3 py-2 border <?php $__errorArgs = ['model'];
+                                    <input type="text" name="model" id="model" value="<?php echo e(old('model', $devPrefill['model'] ?? '')); ?>" class="w-full text-xs font-sans px-3 py-2 border <?php $__errorArgs = ['model'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1369,11 +1377,12 @@ $message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                    <?php if(isset($devHints['model'])): ?><p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">Data lama (tidak diisi otomatis karena formatnya tidak valid): <span class="font-mono"><?php echo e($devHints['model']); ?></span></p><?php endif; ?>
                                 </div>
 
                                 <div>
                                     <label for="serial_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Serial Number (SN) Perangkat</label>
-                                    <input type="text" name="serial_number" id="serial_number" value="<?php echo e(old('serial_number', $dev7->serial_number ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['serial_number'];
+                                    <input type="text" name="serial_number" id="serial_number" value="<?php echo e(old('serial_number', $devPrefill['serial_number'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['serial_number'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1389,11 +1398,12 @@ $message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                    <?php if(isset($devHints['serial_number'])): ?><p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">Data lama (tidak diisi otomatis karena formatnya tidak valid): <span class="font-mono"><?php echo e($devHints['serial_number']); ?></span></p><?php endif; ?>
                                 </div>
 
                                 <div>
                                     <label for="mac_address" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">MAC Address</label>
-                                    <input type="text" name="mac_address" id="mac_address" value="<?php echo e(old('mac_address', $dev7->mac_address ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['mac_address'];
+                                    <input type="text" name="mac_address" id="mac_address" value="<?php echo e(old('mac_address', $devPrefill['mac_address'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['mac_address'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1409,11 +1419,12 @@ $message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                    <?php if(isset($devHints['mac_address'])): ?><p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">Data lama (tidak diisi otomatis karena formatnya tidak valid): <span class="font-mono"><?php echo e($devHints['mac_address']); ?></span></p><?php endif; ?>
                                 </div>
 
                                 <div>
                                     <label for="pppoe_username" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Username PPPoE</label>
-                                    <input type="text" name="pppoe_username" id="pppoe_username" value="<?php echo e(old('pppoe_username', $dev7->pppoe_username ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['pppoe_username'];
+                                    <input type="text" name="pppoe_username" id="pppoe_username" value="<?php echo e(old('pppoe_username', $devPrefill['pppoe_username'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['pppoe_username'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1433,7 +1444,7 @@ unset($__errorArgs, $__bag); ?>
 
                                 <div>
                                     <label for="pppoe_password" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Password PPPoE</label>
-                                    <input type="text" name="pppoe_password" id="pppoe_password" value="<?php echo e(old('pppoe_password', $dev7->pppoe_password ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['pppoe_password'];
+                                    <input type="text" name="pppoe_password" id="pppoe_password" value="<?php echo e(old('pppoe_password', $devPrefill['pppoe_password'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['pppoe_password'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1453,7 +1464,7 @@ unset($__errorArgs, $__bag); ?>
 
                                 <div>
                                     <label for="wifi_ssid" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">SSID WiFi</label>
-                                    <input type="text" name="wifi_ssid" id="wifi_ssid" value="<?php echo e(old('wifi_ssid', $dev7->wifi_ssid ?? '')); ?>" class="w-full text-xs font-sans px-3 py-2 border <?php $__errorArgs = ['wifi_ssid'];
+                                    <input type="text" name="wifi_ssid" id="wifi_ssid" value="<?php echo e(old('wifi_ssid', $devPrefill['wifi_ssid'] ?? '')); ?>" class="w-full text-xs font-sans px-3 py-2 border <?php $__errorArgs = ['wifi_ssid'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1469,11 +1480,12 @@ $message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                    <?php if(isset($devHints['wifi_ssid'])): ?><p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">Data lama (tidak diisi otomatis karena formatnya tidak valid): <span class="font-mono"><?php echo e($devHints['wifi_ssid']); ?></span></p><?php endif; ?>
                                 </div>
 
                                 <div>
                                     <label for="wifi_password" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Password WiFi</label>
-                                    <input type="text" name="wifi_password" id="wifi_password" value="<?php echo e(old('wifi_password', $dev7->wifi_password ?? '')); ?>" class="w-full text-xs font-sans px-3 py-2 border <?php $__errorArgs = ['wifi_password'];
+                                    <input type="text" name="wifi_password" id="wifi_password" value="<?php echo e(old('wifi_password', $devPrefill['wifi_password'] ?? '')); ?>" class="w-full text-xs font-sans px-3 py-2 border <?php $__errorArgs = ['wifi_password'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1517,13 +1529,13 @@ unset($__errorArgs, $__bag); ?>
 <?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
 <?php endif; ?> Distribusi Jaringan Detail (ODP / OLT)
                             </h5>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">"Nomor OLT" di sini (bukan "Nama/Kode Perangkat OLT" di atas) yang dipakai generator CID begitu status jadi Active/Suspended.</p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Nomor OLT di sini cuma catatan teknis — TIDAK lagi dipakai membentuk CID. Segmen OLT di CID diambil dari Mini POP yang di-assign (ADHOC-107).</p>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                                 <div class="grid grid-cols-2 gap-2">
                                     <div>
                                         <label for="odp_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor ODP</label>
-                                        <input type="text" name="odp_number" id="odp_number" value="<?php echo e(old('odp_number', $tech7->odp_number ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['odp_number'];
+                                        <input type="text" name="odp_number" id="odp_number" value="<?php echo e(old('odp_number', $devPrefill['odp_number'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['odp_number'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1539,10 +1551,11 @@ $message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                        <?php if(isset($devHints['odp_number'])): ?><p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">Data lama (tidak diisi otomatis karena formatnya tidak valid): <span class="font-mono"><?php echo e($devHints['odp_number']); ?></span></p><?php endif; ?>
                                     </div>
                                     <div>
                                         <label for="odp_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Port ODP</label>
-                                        <input type="text" name="odp_port" id="odp_port" value="<?php echo e(old('odp_port', $tech7->odp_port ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['odp_port'];
+                                        <input type="text" name="odp_port" id="odp_port" value="<?php echo e(old('odp_port', $devPrefill['odp_port'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['odp_port'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1558,13 +1571,14 @@ $message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                        <?php if(isset($devHints['odp_port'])): ?><p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">Data lama (tidak diisi otomatis karena formatnya tidak valid): <span class="font-mono"><?php echo e($devHints['odp_port']); ?></span></p><?php endif; ?>
                                     </div>
                                 </div>
 
                                 <div class="grid grid-cols-3 gap-2">
                                     <div class="min-w-0">
                                         <label for="olt_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300 truncate">Nomor OLT</label>
-                                        <input type="text" name="olt_number" id="olt_number" value="<?php echo e(old('olt_number', $tech7->olt_number ?? '')); ?>" placeholder="1" class="w-full min-w-0 text-xs font-mono px-2.5 py-2 border <?php $__errorArgs = ['olt_number'];
+                                        <input type="text" name="olt_number" id="olt_number" value="<?php echo e(old('olt_number', $devPrefill['olt_number'] ?? '')); ?>" placeholder="1" class="w-full min-w-0 text-xs font-mono px-2.5 py-2 border <?php $__errorArgs = ['olt_number'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1583,7 +1597,7 @@ unset($__errorArgs, $__bag); ?>
                                     </div>
                                     <div class="min-w-0">
                                         <label for="olt_slot" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300 truncate">Slot OLT</label>
-                                        <input type="text" name="olt_slot" id="olt_slot" value="<?php echo e(old('olt_slot', $tech7->olt_slot ?? '')); ?>" placeholder="2" class="w-full min-w-0 text-xs font-mono px-2.5 py-2 border <?php $__errorArgs = ['olt_slot'];
+                                        <input type="text" name="olt_slot" id="olt_slot" value="<?php echo e(old('olt_slot', $devPrefill['olt_slot'] ?? '')); ?>" placeholder="2" class="w-full min-w-0 text-xs font-mono px-2.5 py-2 border <?php $__errorArgs = ['olt_slot'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1602,7 +1616,7 @@ unset($__errorArgs, $__bag); ?>
                                     </div>
                                     <div class="min-w-0">
                                         <label for="olt_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300 truncate">Port OLT</label>
-                                        <input type="text" name="olt_port" id="olt_port" value="<?php echo e(old('olt_port', $tech7->olt_port ?? '')); ?>" placeholder="3" class="w-full min-w-0 text-xs font-mono px-2.5 py-2 border <?php $__errorArgs = ['olt_port'];
+                                        <input type="text" name="olt_port" id="olt_port" value="<?php echo e(old('olt_port', $devPrefill['olt_port'] ?? '')); ?>" placeholder="3" class="w-full min-w-0 text-xs font-mono px-2.5 py-2 border <?php $__errorArgs = ['olt_port'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1624,7 +1638,7 @@ unset($__errorArgs, $__bag); ?>
                                 <div class="grid grid-cols-2 gap-2">
                                     <div>
                                         <label for="vlan" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">VLAN (Jaringan)</label>
-                                        <input type="text" name="vlan" id="vlan" value="<?php echo e(old('vlan', $tech7->vlan ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['vlan'];
+                                        <input type="text" name="vlan" id="vlan" value="<?php echo e(old('vlan', $devPrefill['vlan'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['vlan'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1640,10 +1654,11 @@ $message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>
+                                        <?php if(isset($devHints['vlan'])): ?><p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">Data lama (tidak diisi otomatis karena formatnya tidak valid): <span class="font-mono"><?php echo e($devHints['vlan']); ?></span></p><?php endif; ?>
                                     </div>
                                     <div>
                                         <label for="router_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor Router</label>
-                                        <input type="text" name="router_number" id="router_number" value="<?php echo e(old('router_number', $tech7->router_number ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['router_number'];
+                                        <input type="text" name="router_number" id="router_number" value="<?php echo e(old('router_number', $devPrefill['router_number'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['router_number'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1664,7 +1679,7 @@ unset($__errorArgs, $__bag); ?>
 
                                 <div>
                                     <label for="initial_attenuation" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Redaman Awal Pemasangan (dBm)</label>
-                                    <input type="text" name="initial_attenuation" id="initial_attenuation" value="<?php echo e(old('initial_attenuation', $tech7->initial_attenuation ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['initial_attenuation'];
+                                    <input type="text" name="initial_attenuation" id="initial_attenuation" value="<?php echo e(old('initial_attenuation', $devPrefill['initial_attenuation'] ?? '')); ?>" class="w-full text-xs font-mono px-3 py-2 border <?php $__errorArgs = ['initial_attenuation'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1881,8 +1896,10 @@ unset($__errorArgs, $__bag); ?>
             return;
         }
 
-        // Pra-pemasangan: dikunci server-side (atribut disabled), jangan dibuka JS.
-        if (miniPopSelect.dataset.lockedByStatus === '1') {
+        // Pra-pemasangan / tanpa izin atur jaringan: dikunci server-side
+        // (atribut disabled), jangan dibuka JS. Validasi aslinya tetap di
+        // CustomerController::update() (networkLockReason()).
+        if (miniPopSelect.dataset.networkLocked === '1') {
             return;
         }
 

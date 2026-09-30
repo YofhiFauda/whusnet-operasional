@@ -267,7 +267,7 @@
 
     {{-- ══ Mobile Step 1 Modal: Pilih Tim Tujuan untuk Switch ══ --}}
     <div x-show="mobileSwitchSelectTeamModal.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:hidden"
+         class="fixed inset-0 z-50 overflow-hidden flex items-end md:hidden p-0"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -278,7 +278,7 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="mobileSwitchSelectTeamModal.open = false"></div>
 
-        <div class="bg-surface border-t border-border w-full rounded-t-2xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-sans"
+        <div class="bg-surface border-t border-border w-full rounded-t-2xl shadow-2xl relative z-10 max-h-[85dvh] flex flex-col overflow-hidden font-sans pb-[max(0.75rem,env(safe-area-inset-bottom))]"
              @click.away="mobileSwitchSelectTeamModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full"
@@ -291,7 +291,7 @@
                     <h3 class="text-sm font-bold text-text-main">Pindahkan Task ke Tim Lain</h3>
                     <p class="text-[11px] text-text-muted truncate mt-0.5" x-text="mobileSwitchSelectTeamModal.tugas"></p>
                 </div>
-                <button type="button" @click="mobileSwitchSelectTeamModal.open = false" class="text-text-muted hover:text-text-main p-1">
+                <button type="button" @click="mobileSwitchSelectTeamModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -304,7 +304,7 @@
                     <template x-for="team in teamsData.filter(t => t.id !== mobileSwitchSelectTeamModal.fromTeamId)" :key="team.id">
                         <button type="button" 
                                 @click="selectTargetTeamForMobileSwitch(team.id)"
-                                class="w-full text-left p-3 border border-border rounded-lg bg-surface hover:bg-surface-muted transition-colors flex items-center justify-between">
+                                class="w-full text-left p-3 border border-border rounded-lg bg-surface hover:bg-surface-muted transition-colors flex items-center justify-between cursor-pointer">
                             <div>
                                 <span class="text-xs font-bold text-text-main" x-text="team.name"></span>
                                 <p class="text-[10px] text-text-muted mt-0.5" x-text="team.members.map(m => m.name).join(', ') || 'Belum ada anggota'"></p>
@@ -319,7 +319,7 @@
 
     {{-- ══ TEAM DETAIL MODAL (Adaptive Mobile Bottom-Sheet & Desktop Dialog) ══ --}}
     <div x-show="teamDetail.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -330,7 +330,7 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="teamDetail.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-sans"
+        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[90dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-sans"
              x-show="teamDetail.open"
              @click.away="teamDetail.open = false"
              x-transition:enter="transition ease-out duration-250"
@@ -421,7 +421,7 @@
                     </div>
 
                     {{-- Modal Footer --}}
-                    <div class="px-5 py-3 border-t border-border bg-surface-muted flex justify-end shrink-0">
+                    <div class="px-5 py-3 border-t border-border bg-surface-muted flex justify-end shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3">
                         <a href="{{ route('fop-tasks.index') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
                             <span>Kelola di Task FOP</span>
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
@@ -434,7 +434,7 @@
 
     {{-- ══ SWITCH TEAM MODAL (Adaptive Mobile Bottom-Sheet & Desktop Dialog) ══ --}}
     <div x-show="switchTeamModal.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -445,7 +445,7 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="switchTeamModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-sans"
+        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[90dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-sans"
              @click.away="switchTeamModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
@@ -506,7 +506,7 @@
                 </div>
             </div>
 
-            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex justify-end gap-2.5 shrink-0">
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex justify-end gap-2.5 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3.5">
                 <button type="button" @click="switchTeamModal.open = false" class="btn-secondary text-xs cursor-pointer">
                     Batal
                 </button>

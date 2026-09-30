@@ -104,15 +104,25 @@ class PaymentEditUpdateTest extends TestCase
         $response->assertSee('Lunas dari Saldo');
     }
 
+    /**
+     * ADHOC-108 — Edit Pembayaran sekarang halaman tersendiri (`payments.edit`),
+     * bukan modal, dan `amount` WAJIB dikirim (nominal ikut bisa diedit).
+     * Tanggal dibuat DINAMIS (bukan string hard-code seperti versi lama) —
+     * K3 membatasi edit hanya untuk pembayaran bulan berjalan, jadi tanggal
+     * tetap di dalam bulan berjalan berapa pun `now()` saat test dijalankan.
+     */
     public function test_authorized_user_can_update_payment(): void
     {
-        $invoice = $this->createInvoice('Test Edit Customer', 'INV-202609-8003');
+        $invoice = $this->createInvoice('Test Edit Customer', 'INV-'.now()->format('Ym').'-8003');
+        $oldDate = now()->startOfMonth()->format('Y-m-d');
+        $newDate = now()->format('Y-m-d');
+
         $payment = Payment::create([
-            'payment_number' => 'PAY-202609-8003',
+            'payment_number' => 'PAY-'.now()->format('Ym').'-8003',
             'invoice_id' => $invoice->id,
             'customer_id' => $invoice->customer_id,
             'pop_id' => $invoice->pop_id,
-            'payment_date' => '2026-09-24',
+            'payment_date' => $oldDate,
             'payment_method' => 'cash',
             'amount' => 150000,
             'received_by' => $this->owner->id,
@@ -121,23 +131,25 @@ class PaymentEditUpdateTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)->put(route('payments.update', $payment->id), [
-            'payment_date' => '2026-09-25',
+            'payment_date' => $newDate,
             'payment_method' => 'transfer',
             'bank_account_id' => $this->bankAccount->id,
             'sender_name' => 'Budi Santoso',
+            'amount' => 150000,
             'note' => 'Koreksi: Pembayaran ternyata via transfer BCA',
         ]);
 
-        $response->assertRedirect();
+        $response->assertRedirect(route('payments.show', $payment->id));
         $response->assertSessionHas('success');
 
         $payment->refresh();
-        $this->assertEquals('2026-09-25', $payment->payment_date->format('Y-m-d'));
+        $this->assertEquals($newDate, $payment->payment_date->format('Y-m-d'));
         $this->assertEquals('transfer', $payment->payment_method);
         $this->assertEquals('BCA', $payment->bank_name);
         $this->assertEquals('1234567890', $payment->account_number);
         $this->assertEquals('Budi Santoso', $payment->sender_name);
         $this->assertEquals('Koreksi: Pembayaran ternyata via transfer BCA', $payment->note);
+        $this->assertEquals(150000, (float) $payment->amount);
     }
 
     protected function createInvoice(string $customerName, string $invoiceNumber): Invoice

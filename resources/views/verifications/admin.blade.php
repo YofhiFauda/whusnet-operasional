@@ -17,6 +17,14 @@
     $showTabPengujian = $isVerifAdminStage;
     $showTabVerifikasi = $isVerifAdminStage;
 
+    // Data Pemasangan (Data Perangkat + ODP/OLT) & Data Pengujian (speedtest)
+    // cuma boleh diedit CS di tahap Validasi Admin, BUKAN sepanjang tahap
+    // Pemasangan masih berjalan — tim di lapangan masih bisa mengubahnya lewat
+    // laporan sendiri (CustomerInstallationController), dua penulis pada data
+    // yang sama tanpa saling tahu itu yang mau dihindari (permintaan lanjutan
+    // user 2026-09-30). Lihat CustomerVerificationController::DEVICE_EDIT_STAGES.
+    $canEditDeviceData = $isVerifAdminStage && auth()->user()->hasPermission('customers.detail.installation.validate');
+
     $breadcrumbQueueName = match(true) {
         $isSurveyStage => 'Antrean Survey',
         $isWaitingBdStageForBadge => 'Menunggu Verifikasi BD',
@@ -131,7 +139,13 @@
         {{-- TAB 0: DATA REGISTRASI --}}
         {{-- ============================================================ --}}
         <div id="tab-registrasi" class="tab-panel p-6 md:p-8">
-            @include('verifications.partials._registration-info')
+            @include('verifications.partials._registration-info', [
+                'canEditVerificationData' => auth()->user()->hasPermission('customers.detail.installation.validate'),
+                'identityUpdateRoute' => 'customers.verification.update-identity',
+                'packageUpdateRoute' => 'customers.verification.update-package',
+                'verifCities' => $verifCities ?? [],
+                'verifPackages' => $verifPackages ?? [],
+            ])
         </div>
 
         {{-- ============================================================ --}}
@@ -197,10 +211,64 @@
                 </div>
             </div>
 
-            <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Hasil Survey Teknis
-            </h4>
+            @php
+                $canEditSurveyData = auth()->user()->hasPermission('customers.detail.installation.validate');
+            @endphp
+            <div @if($canEditSurveyData) x-data="{ editingSurvey: false }" @endif>
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Hasil Survey Teknis
+                    </h4>
+                    @if($canEditSurveyData)
+                        <button type="button" @click="editingSurvey = ! editingSurvey"
+                                class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover px-3 py-1.5 rounded-lg border border-primary-border hover:bg-primary-soft transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            <span x-text="editingSurvey ? 'Batal' : 'Edit Data Survey'"></span>
+                        </button>
+                    @endif
+                </div>
+
+                @if($canEditSurveyData)
+                    <form action="{{ route('customers.verification.update-survey-data', $customer) }}" method="POST"
+                          x-show="editingSurvey" x-cloak x-collapse
+                          class="mb-4 p-4 sm:p-5 rounded-xl border border-primary-border bg-primary-soft/30 space-y-3.5">
+                        @csrf
+                        @method('PUT')
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                            <div>
+                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">ODP Terdekat</label>
+                                <input type="text" name="nearest_odp" value="{{ old('nearest_odp', $survey->nearest_odp) }}" maxlength="255"
+                                       class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                @error('nearest_odp')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Estimasi Kabel (Meter)</label>
+                                <input type="number" name="cable_estimation_meter" value="{{ old('cable_estimation_meter', $survey->cable_estimation_meter) }}" min="0"
+                                       class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                @error('cable_estimation_meter')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Request Pemasangan Pelanggan</label>
+                                <input type="date" name="requested_installation_date" value="{{ old('requested_installation_date', $survey->requested_installation_date?->toDateString()) }}"
+                                       class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                @error('requested_installation_date')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Catatan Surveyor</label>
+                                <textarea name="survey_note" rows="3"
+                                          class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">{{ old('survey_note', $survey->survey_note) }}</textarea>
+                                @error('survey_note')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-1">
+                            <button type="button" @click="editingSurvey = false" class="px-3.5 py-2 text-xs font-semibold text-text-secondary hover:text-text-main border border-border rounded-lg bg-surface">Batal</button>
+                            <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors">Simpan Data Survey</button>
+                        </div>
+                    </form>
+                @endif
+            </div>
+
             <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-5 mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
@@ -376,6 +444,126 @@
             </div>
             @endif
 
+            @if($canEditDeviceData)
+            <div class="mb-6" x-data="{ editingInstallation: false }">
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs text-text-muted">Data Perangkat & Distribusi Jaringan bisa dikoreksi selama Validasi Admin.</p>
+                    <button type="button" @click="editingInstallation = ! editingInstallation"
+                            class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover px-3 py-1.5 rounded-lg border border-primary-border hover:bg-primary-soft transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <span x-text="editingInstallation ? 'Batal' : 'Edit Data Pemasangan'"></span>
+                    </button>
+                </div>
+                <form action="{{ route('customers.verification.update-installation-data', $customer) }}" method="POST"
+                      x-show="editingInstallation" x-cloak x-collapse
+                      class="mb-6 p-4 sm:p-5 rounded-xl border border-primary-border bg-primary-soft/30 space-y-3.5">
+                    @csrf
+                    @method('PUT')
+                    <h5 class="text-[10px] font-bold uppercase tracking-wider text-primary">Data Perangkat</h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Jenis Perangkat</label>
+                            <select name="device_type" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <option value="">-</option>
+                                @foreach(['modem' => 'Modem', 'ont' => 'ONT', 'onu' => 'ONU', 'router' => 'Router', 'other' => 'Lainnya'] as $val => $label)
+                                    <option value="{{ $val }}" {{ old('device_type', $device?->device_type) === $val ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('device_type')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Mode Koneksi</label>
+                            <select name="connection_mode" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <option value="">-</option>
+                                @foreach(['bridge' => 'Bridge', 'router' => 'Router', 'pppoe' => 'PPPoE', 'static' => 'Static', 'dhcp' => 'DHCP', 'other' => 'Lainnya'] as $val => $label)
+                                    <option value="{{ $val }}" {{ old('connection_mode', $device?->connection_mode) === $val ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Merk</label>
+                            <input type="text" name="brand" value="{{ old('brand', $device?->brand) }}" maxlength="100" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Tipe / Model</label>
+                            <input type="text" name="model" value="{{ old('model', $device?->model) }}" maxlength="100" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Serial Number</label>
+                            <input type="text" name="serial_number" value="{{ old('serial_number', $device?->serial_number) }}" maxlength="100" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">MAC Address</label>
+                            <input type="text" name="mac_address" value="{{ old('mac_address', $device?->mac_address) }}" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            @error('mac_address')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Username PPPoE</label>
+                            <input type="text" name="pppoe_username" value="{{ old('pppoe_username', $device?->pppoe_username) }}" maxlength="150" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Password PPPoE</label>
+                            <input type="text" name="pppoe_password" value="{{ old('pppoe_password', $device?->pppoe_password) }}" maxlength="150" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">SSID WiFi</label>
+                            <input type="text" name="wifi_ssid" value="{{ old('wifi_ssid', $device?->wifi_ssid) }}" maxlength="150" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Password WiFi</label>
+                            <input type="text" name="wifi_password" value="{{ old('wifi_password', $device?->wifi_password) }}" maxlength="150" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                    </div>
+
+                    <h5 class="text-[10px] font-bold uppercase tracking-wider text-primary pt-2">Distribusi Jaringan (ODP / OLT)</h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Nomor ODP</label>
+                            <input type="text" name="odp_number" value="{{ old('odp_number', $techDetail?->odp_number) }}" maxlength="100" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Port ODP</label>
+                            <input type="text" name="odp_port" value="{{ old('odp_port', $techDetail?->odp_port) }}" maxlength="50" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Nomor OLT</label>
+                            <input type="text" name="olt_number" value="{{ old('olt_number', $techDetail?->olt_number) }}" maxlength="50" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Slot OLT</label>
+                            <input type="text" name="olt_slot" value="{{ old('olt_slot', $techDetail?->olt_slot) }}" maxlength="20" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Port OLT</label>
+                            <input type="text" name="olt_port" value="{{ old('olt_port', $techDetail?->olt_port) }}" maxlength="50" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">VLAN</label>
+                            <input type="text" name="vlan" value="{{ old('vlan', $techDetail?->vlan) }}" maxlength="20" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Nomor Router</label>
+                            <input type="text" name="router_number" value="{{ old('router_number', $techDetail?->router_number) }}" maxlength="50" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Redaman Awal (dBm)</label>
+                            <input type="text" name="initial_attenuation" value="{{ old('initial_attenuation', $techDetail?->initial_attenuation) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Catatan Pemasangan</label>
+                        <textarea name="installation_note" rows="2" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">{{ old('installation_note', $installation?->installation_note) }}</textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-1">
+                        <button type="button" @click="editingInstallation = false" class="px-3.5 py-2 text-xs font-semibold text-text-secondary hover:text-text-main border border-border rounded-lg bg-surface">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors">Simpan Data Pemasangan</button>
+                    </div>
+                </form>
+            </div>
+            @endif
+
             {{-- DATA PERANGKAT --}}
             <div class="mb-6">
                 <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -547,6 +735,58 @@
         {{-- TAB 2: PENGUJIAN --}}
         {{-- ============================================================ --}}
         <div id="tab-pengujian" class="tab-panel p-6 md:p-8 hidden">
+
+            @if($canEditDeviceData)
+            <div class="mb-6" x-data="{ editingTestReport: false }">
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs text-text-muted">Hasil speedtest & kualitas sinyal bisa dikoreksi selama Validasi Admin.</p>
+                    <button type="button" @click="editingTestReport = ! editingTestReport"
+                            class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover px-3 py-1.5 rounded-lg border border-primary-border hover:bg-primary-soft transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <span x-text="editingTestReport ? 'Batal' : 'Edit Data Pengujian'"></span>
+                    </button>
+                </div>
+                <form action="{{ route('customers.verification.update-test-report', $customer) }}" method="POST"
+                      x-show="editingTestReport" x-cloak x-collapse
+                      class="mb-6 p-4 sm:p-5 rounded-xl border border-primary-border bg-primary-soft/30 space-y-3.5">
+                    @csrf
+                    @method('PUT')
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Download (Mbps)</label>
+                            <input type="number" step="0.01" name="test_download" value="{{ old('test_download', $techDetail?->test_download) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            @error('test_download')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Upload (Mbps)</label>
+                            <input type="number" step="0.01" name="test_upload" value="{{ old('test_upload', $techDetail?->test_upload) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Latency (ms)</label>
+                            <input type="number" step="0.01" name="latency_ms" value="{{ old('latency_ms', $techDetail?->latency_ms) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Jitter (ms)</label>
+                            <input type="number" step="0.01" name="jitter_ms" value="{{ old('jitter_ms', $techDetail?->jitter_ms) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Packet Loss (%)</label>
+                            <input type="number" step="0.01" name="packet_loss_percent" value="{{ old('packet_loss_percent', $techDetail?->packet_loss_percent) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            @error('packet_loss_percent')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Redaman Aktual (dBm)</label>
+                            <input type="number" step="0.01" name="actual_attenuation" value="{{ old('actual_attenuation', $techDetail?->actual_attenuation) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-text-muted">% Sesuai Paket dihitung ulang otomatis dari Download & paket pelanggan.</p>
+                    <div class="flex justify-end gap-2 pt-1">
+                        <button type="button" @click="editingTestReport = false" class="px-3.5 py-2 text-xs font-semibold text-text-secondary hover:text-text-main border border-border rounded-lg bg-surface">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors">Simpan Data Pengujian</button>
+                    </div>
+                </form>
+            </div>
+            @endif
 
             @if($techDetail)
             {{-- Speed Metrics --}}

@@ -20,6 +20,8 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 **Saldo Pelanggan — auto-pakai (ADHOC-92, 2026-09-24):** saldo aktif dipakai **OTOMATIS** ke tagihan `bulanan` terbuka begitu terbit, FIFO periode terlama dulu (`CustomerBalanceService::applyToOpenInvoices()`, dipanggil dari `GenerateMonthlyInvoicesCommand` dalam transaksi yang sama, dan dari command catch-up `billing:apply-balance` untuk saldo yang masuk setelah tagihan terbit). Satu `Payment` per invoice, method `PaymentMethod::SALDO`, ditandai `balance_used_amount` supaya laporan kas (`AdminCashBalanceService`/`CollectorBalanceService`) tidak menghitungnya sebagai uang fisik. Sumber kredit dibedakan lewat `BalanceMutationSource`: `bayar_di_muka` (overpay invoice AWAL) vs `kelebihan_bayar` (overpay lainnya) vs `pakai_otomatis`/`pakai_manual` (debit). Saldo kurang dari tagihan tetap dipakai semua → `sebagian`/cicilan. Rancangan: [plan/billing/analisa-rancangan-saldo-pelanggan.md](../plan/billing/analisa-rancangan-saldo-pelanggan.md).
 
+**Edit Pembayaran PENUH (ADHOC-108, 2026-09-29):** `/payments/{id}/edit` (halaman tersendiri, bukan modal — permission `payments.update` TERPISAH dari `payments.create`, default **hanya owner/admin**, role lain diatur lewat Role Matrix kapan pun tanpa deploy) mengizinkan koreksi nominal, saldo dipakai, tanggal, metode, rekening, kolektor, bukti, dan catatan pada payment yang sudah tersimpan — dulu cuma metode/tanggal/rekening/catatan yang bisa diedit. Batas (`Payment::editBlockedReason()`, satu sumber dipakai tombol Edit/`edit()`/`PaymentService::revise()`): hanya payment **bulan berjalan** (`BookPeriod`, payment bulan lalu wajib lewat Kembalikan + catat ulang), bukan payment metode `saldo` (auto-pay sistem), dan bukan payment yang setorannya (kolektor/kas) sudah **terverifikasi**. Payment yang masuk setoran **belum** terverifikasi boleh diedit nominalnya — `CollectorDeposit`/`CashDeposit::computedAmount()` turunan, otomatis mengikuti angka baru — tapi metode & kolektornya DIBEKUKAN (mencegah payment tersangkut di setoran yang salah). Koreksi saldo memakai **baris delta** (`BalanceMutationSource::KOREKSI`, kolom `revision`) lewat `CustomerBalanceService::applyCorrection()` — BUKAN `reverseCreditForPayment()`/`reverseDebitForPayment()` (keduanya untuk Kembalikan, sekali-jalan, bentrok index kalau payment yang sama diedit dua kali). Rancangan lengkap + analisa: [plan/billing/rancangan-edit-pembayaran-penuh.md](../plan/billing/rancangan-edit-pembayaran-penuh.md).
+
 ## Dokumen
 
 | Dokumen | Isi |
@@ -49,6 +51,8 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 | `/payments/{payment}` | GET | `payments.view` | `PaymentController@show` |
 | `/payments/{payment}/kwitansi` | GET | `payments.view` | `PaymentController@receipt` |
 | `/payments/{payment}/reject` | POST | `payments.reject` | `PaymentController@reject` |
+| `/payments/{payment}/edit` | GET | `payments.update` | `PaymentController@edit` |
+| `/payments/{payment}` | PUT | `payments.update` | `PaymentController@update` |
 | `/invoices/{invoice}/payments/create` | GET | `payments.create` | `PaymentController@create` |
 | `/invoices/{invoice}/payments` | POST | `payments.create` | `PaymentController@store` |
 | `/collector-worksheet` | GET | `collector_worksheet.view` | `CollectorWorksheetController@index` |
@@ -89,15 +93,23 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 Invoice gak punya unique index setara (data lama sebelum fix migrasi masih ada pelanggaran, dan invoice `batal` menempati slot periode — lihat catatan di `database-schema.md`) — guard invoice level DB tetap ditegakkan di `InvoiceObserver::creating()` (app-layer check), belum hard constraint.
 
-## Pelanggan Pindah POP — `invoices.pop_id` (ADHOC-104, 2026-09-26)
+## Pelanggan Pindah POP — piutang lunas dulu, tagihan lama tetap (ADHOC-107, final 2026-09-29)
 
-Tagihan di-scope per `invoices.pop_id` (`applyUserScope`), bukan per POP pelanggan. Begitu `customers.pop_id` berganti, `CustomerObserver::updated()` memindahkan **tagihan outstanding** (`Invoice::OUTSTANDING_STATUSES` = `belum_dibayar`, `sebagian`) ke POP baru — penagihannya jadi tanggung jawab cabang baru; tanpa ini admin/kolektor cabang baru tidak melihat tunggakannya.
+Keputusan user 2026-09-28 (rancangan: `docs/plan/rancangan-pindah-pop-lanjutan.md`). Satu sumber aturan: `App\Services\CustomerRelocationService`; ditegakkan validasi Edit **dan** `CustomerObserver` (semua jalur). Garis batasnya **bulan berjalan** — sama dengan garis kunci buku kalender (`BookPeriod::isLocked()`, bulan berjalan tidak pernah terkunci).
 
-**Sengaja TIDAK dipindah:**
-- Tagihan `lunas`/`batal`/write-off — sudah masuk laporan & tutup buku (`PeriodClosing`) cabang lama; memindahkannya mengubah angka pendapatan cabang lama secara retroaktif.
-- Baris `payments` (termasuk cicilan tagihan `sebagian` yang ikut pindah) — uang tetap tercatat di cabang yang menerimanya. Konsekuensi: satu tagihan `sebagian` bisa punya `pop_id` SANDYA sementara cicilan lamanya ber-`pop_id` JETIS.
+| Tagihan | Saat pindah POP |
+|---|---|
+| **Piutang** — `belum_dibayar`/`sebagian` dengan `billing_period` < bulan berjalan (`Invoice::scopePiutang()`) | **Penghalang**: pindah ditolak sampai lunas |
+| Bulan berjalan/sesudahnya berstatus `sebagian`, atau sudah punya pembayaran `valid` | **Penghalang** (K8): kalau ikut pindah, cicilannya tercatat di cabang lama sementara tagihannya di cabang baru → laporan dua cabang tidak sinambung |
+| Bulan berjalan/sesudahnya `belum_dibayar` tanpa pembayaran valid | **Ikut pindah** ke POP baru (per model, tercatat di `audit_logs`) → pembayarannya masuk cabang baru (`payments.pop_id = invoice.pop_id`) |
+| Lunas / batal / write-off | **Tidak pernah dipindah** — laporan pembayaran & piutang tetap milik cabang lama |
+| Tagihan bulan berikutnya | Terbit di cabang baru (`GenerateMonthlyInvoicesCommand` memakai `customers.pop_id`) |
 
-Dipindah per model (`$invoice->update()`), bukan query massal, supaya tiap perpindahan tercatat di `audit_logs`. Aturan pindah POP lengkap: [`../master/pop/business-logic.md` §7a](../master/pop/business-logic.md#7a-pindah-pop-adhoc-104-2026-09-26).
+- Baris `payments` & `customer_balance_mutations` **tidak pernah disentuh**. Pembayaran `ditolak` tidak dihitung sebagai uang masuk (sama dengan laporan bulanan).
+- **Saldo lebih bayar terbawa** (K7): kredit dari cabang lama dipakai `billing:apply-balance` untuk tagihan cabang baru; debitnya ber-`pop_id` cabang baru, kredit asal tetap cabang lama — jejak lintas cabang jelas per baris ledger.
+- Hasilnya snapshot tutup buku (`PeriodClosing`) cabang lama tidak pernah *drift* karena pindah POP. Perilaku ADHOC-104 (semua outstanding ikut pindah) **dibatalkan** karena memecah rekonsiliasi dua cabang.
+
+Aturan pindah POP lengkap: [`../master/pop/business-logic.md` §7a](../master/pop/business-logic.md#7a-pindah-pop-adhoc-104--adhoc-107-final-2026-09-29).
 
 ## Denda Putus Langganan (ADHOC-69)
 

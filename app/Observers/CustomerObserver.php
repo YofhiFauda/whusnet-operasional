@@ -4,111 +4,94 @@ namespace App\Observers;
 
 use App\Enums\WorkflowTransition;
 use App\Events\CustomerVerificationStatusChanged;
+use App\Exceptions\CustomerRelocationBlockedException;
 use App\Models\Customer;
 use App\Models\CustomerAcquisition;
 use App\Models\CustomerPortalToken;
-use App\Models\Distribution;
-use App\Models\Pop;
-use App\Models\User;
+use App\Services\CustomerCidService;
 use App\Services\CustomerPortal\PortalAuthService;
 use App\Services\CustomerQrTokenService;
-use App\Services\EffectiveAccessService;
+use App\Services\CustomerRelocationService;
+use App\Services\NetworkAssignmentService;
 
 class CustomerObserver
 {
     /**
-     * Hierarki jaringan pelanggan `Cabang → Mini POP → Distribusi` wajib
-     * konsisten: mini_pop.parent_id = pop_id, distribution.pop_id = mini_pop_id.
-     * Aturannya sama persis dengan modal "Atur Mini POP & Distribusi"
-     * (CustomerNetworkAssignmentController) dan validasi Edit Pelanggan.
+     * Invariant pindah Cabang & jaringan pelanggan — di observer, bukan
+     * controller, supaya berlaku dari SEMUA jalur yang bisa mengganti pop_id /
+     * mini_pop_id / distribution_id (Edit, modal staf, API, import, tinker).
+     * Rancangan lengkap: docs/plan/rancangan-pindah-pop-lanjutan.md (ADHOC-107).
      *
-     * Ketiganya disimpan sebagai kolom terpisah di customers. Sebelum guard
-     * ini, pindah POP lewat Edit cuma mengganti `pop_id`; `mini_pop_id` tetap
-     * menunjuk OLT cabang lama, dan Pop::resolveMiniPopSegment() mengambil
-     * segmen CID dari situ duluan — hasilnya CID campuran: prefix cabang baru
-     * + segmen OLT cabang lama (kasus D1X6… hasil pindah JETIS → SANDYA).
+     * Urutan di bawah penting:
+     * 1. Guard piutang (R4) dulu — kalau ditolak, tidak ada yang berubah.
+     * 2. Hierarki Cabang → Mini POP → Distribusi (R6) — yang tidak cocok
+     *    DILEPAS, bukan ditebak: pilihan OLT itu keputusan teknis admin.
+     *    Sebelum ini, pindah POP cuma mengganti pop_id sementara mini_pop_id
+     *    tetap menunjuk OLT cabang lama → CID campuran (kasus D1X6… JETIS →
+     *    SANDYA).
+     * 3. Kolektor dilepas (R8).
+     * 4. CID dihitung ulang (R3) — SETELAH hierarki dibereskan, supaya CID
+     *    dibentuk dari Mini POP/Distribusi yang sudah sah.
      *
-     * Ditaruh di observer, bukan controller, supaya berlaku dari semua jalur
-     * yang bisa mengganti pop_id (Edit, import, tinker). Yang tidak lagi
-     * cocok DILEPAS, bukan ditebak penggantinya: pilihan OLT itu keputusan
-     * teknis admin (dropdown Mini POP di Edit, atau modal assignment).
-     *
-     * Distribusi tanpa Mini POP yang cocok ikut dilepas — kalau dibiarkan,
-     * segmen OLT CID jatuh ke fallback customerTechnicalDetail->olt_number
-     * yang masih berisi nomor OLT cabang lama, dan CID campuran terbentuk lagi.
-     *
-     * CID sendiri TIDAK disentuh di sini: CID = POP + Mini POP + Distribusi,
-     * boleh berubah dan dibuat ulang oleh penulisnya (CustomerController
-     * ::update() / modal assignment). Yang permanen REQ ID (customer_code).
+     * Semua perubahan terjadi pada save yang sama, jadi RecordsAuditLogs
+     * mencatat satu baris audit berisi POP, Mini POP, Distribusi, kolektor,
+     * dan CID lama/baru sekaligus.
      */
     public function updating(Customer $customer): void
     {
-        if (! $customer->isDirty(['pop_id', 'mini_pop_id', 'distribution_id'])) {
-            return;
-        }
+        $networkChanging = $customer->isDirty(['pop_id', 'mini_pop_id', 'distribution_id']);
+        $popChanging = $customer->isDirty('pop_id');
 
-        if ($customer->mini_pop_id) {
-            $miniPopMatchesPop = Pop::whereKey($customer->mini_pop_id)
-                ->where('type', 'mini_pop')
-                ->where('parent_id', $customer->pop_id)
-                ->exists();
-
-            if (! $miniPopMatchesPop) {
-                $customer->mini_pop_id = null;
+        // 1. Pindah Cabang wajib lunas piutang dulu (keputusan user
+        // 2026-09-28, K6/K8). Lapis kedua di belakang validasi Edit — tanpa
+        // ini import/tinker/command bisa memindah pelanggan yang masih punya
+        // tunggakan, dan tunggakan itu yatim: laporannya di cabang lama,
+        // kolektornya sudah dilepas. Pelanggan yang belum punya POP (NULL →
+        // terisi pertama kali) bukan "pindah", jadi tidak dicegat.
+        if ($popChanging && $customer->getOriginal('pop_id') !== null) {
+            $summary = CustomerRelocationService::blockingSummary($customer);
+            if ($summary['count'] > 0) {
+                throw new CustomerRelocationBlockedException(CustomerRelocationService::blockingMessage($summary));
             }
         }
 
-        if ($customer->distribution_id) {
-            $distributionMatchesMiniPop = $customer->mini_pop_id
-                && Distribution::whereKey($customer->distribution_id)
-                    ->where('pop_id', $customer->mini_pop_id)
-                    ->exists();
+        // 2. Hierarki jaringan. Distribusi tanpa Mini POP yang cocok ikut
+        // dilepas — Distribusi tanpa Mini POP tidak punya sumber segmen OLT
+        // untuk CID. Hanya dicek kalau salah satu kolomnya berubah: nilai
+        // legacy yang tidak disentuh (di luar hierarki, hasil migrasi lama)
+        // dibiarkan apa adanya (keputusan user no. 8).
+        if ($networkChanging) {
+            if ($customer->mini_pop_id && ! NetworkAssignmentService::miniPopBelongsToPop($customer->mini_pop_id, $customer->pop_id)) {
+                $customer->mini_pop_id = null;
+            }
 
-            if (! $distributionMatchesMiniPop) {
+            if ($customer->distribution_id && ! NetworkAssignmentService::distributionBelongsToMiniPop($customer->distribution_id, $customer->mini_pop_id)) {
                 $customer->distribution_id = null;
             }
         }
 
-        if ($customer->isDirty('pop_id')) {
-            $this->releaseCollectorOutsideNewPop($customer);
+        // 3. Kolektor SELALU dilepas saat pindah Cabang (keputusan user
+        // 2026-09-28, R8) — termasuk kolektor yang punya akses ke kedua
+        // cabang. Pelanggan tidak terikat kolektor siapa pun sampai admin
+        // cabang baru meng-assign lewat Worksheet Kolektor. Aman terhadap
+        // uang: piutang lama sudah lunas (langkah 1) dan tagihan bulan
+        // berjalan ikut pindah ke cabang baru (updated()).
+        if ($popChanging) {
+            $customer->collector_id = null;
         }
 
-        // Relasi yang sudah ter-load masih berisi objek cabang/OLT lama —
-        // kalau tidak dibuang, generate CID setelah save (CustomerController
-        // ::update() langkah 1b) tetap membaca segmen lama dari cache relasi.
+        // Relasi yang sudah ter-load masih berisi objek cabang/OLT lama.
         $customer->unsetRelation('pop');
         $customer->unsetRelation('miniPop');
         $customer->unsetRelation('distribution');
-    }
 
-    /**
-     * Kolektor yang tidak punya akses ke POP baru dilepas. Guard yang sama
-     * dengan CollectorWorksheetController::assign() ("POP pelanggan wajib
-     * masuk scope kolektor") — kalau dibiarkan, pelanggan tetap tercatat
-     * milik kolektor lama padahal worklist-nya menyaring per POP scope, jadi
-     * pelanggan pindahan tidak ditagih siapa pun. Admin SANDYA meng-assign
-     * kolektor baru lewat Worksheet Kolektor.
-     */
-    private function releaseCollectorOutsideNewPop(Customer $customer): void
-    {
-        if (! $customer->collector_id) {
-            return;
-        }
-
-        $collector = User::find($customer->collector_id);
-        if (! $collector) {
-            $customer->collector_id = null;
-
-            return;
-        }
-
-        $access = app(EffectiveAccessService::class);
-        if ($access->hasAllPopAccess($collector)) {
-            return;
-        }
-
-        if (! in_array((int) $customer->pop_id, $access->getAllowedPopIds($collector), true)) {
-            $customer->collector_id = null;
+        // 4. CID — satu rumus (CustomerCidService, K3). Dibuat ulang kalau
+        // bahannya (POP/Mini POP/Distribusi) berubah, atau pelanggan yang
+        // seharusnya punya CID belum punya. Tidak dihitung ulang di setiap
+        // simpan: CID tercetak di kwitansi/QR/PPPoE, jadi CID legacy yang
+        // jaringannya tidak disentuh tetap stabil.
+        if ($networkChanging || blank($customer->cid)) {
+            CustomerCidService::sync($customer);
         }
     }
 
@@ -188,12 +171,15 @@ class CustomerObserver
         if ($customer->wasChanged('pop_id')) {
             $this->revokeActiveQrToken($customer, 'Pelanggan pindah POP — token lama tidak lagi cocok dengan pop_id baru');
 
-            // Tagihan TIDAK ikut dipindah (keputusan user 2026-09-28):
-            // laporan pembayaran & piutang tetap milik cabang lama, tagihan
-            // bulanan berikutnya terbit di cabang baru karena generator
-            // memakai pop_id pelanggan. Pindah lewat Edit wajib lunas dulu
-            // (CustomerController::update()), jadi normalnya memang tidak ada
-            // tagihan berjalan yang tertinggal.
+            // Tagihan bulan berjalan yang BELUM dibayar sama sekali ikut
+            // pindah ke cabang baru, supaya pembayarannya tercatat di cabang
+            // baru (keputusan user 2026-09-28, K6). Tagihan periode lalu
+            // tidak pernah dipindah — guard di updating() menjamin semuanya
+            // sudah lunas — jadi laporan pembayaran & piutang cabang lama
+            // tidak berubah. Tagihan bulan berikutnya terbit di cabang baru
+            // dengan sendirinya (GenerateMonthlyInvoicesCommand memakai
+            // pop_id pelanggan). Aturan lengkap: CustomerRelocationService.
+            CustomerRelocationService::moveCurrentInvoices($customer, (int) $customer->pop_id);
         }
     }
 

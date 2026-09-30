@@ -1,6 +1,6 @@
 # Rancangan: Pindah POP — Perbaikan Lanjutan ADHOC-104 (ADHOC-107)
 
-**Status:** RANCANGAN FINAL, belum diimplementasi. Di luar sprint aktif (Sprint 8.10), dibuat atas permintaan eksplisit user sebagai panduan implementasi. **Semua keputusan (K2–K8) sudah dijawab user per 2026-09-28** — tidak ada keputusan tertunda. Implementasi menunggu instruksi user.
+**Status:** ✅ DIIMPLEMENTASI 2026-09-29 (ADHOC-107). Di luar sprint aktif (Sprint 8.10), dibuat atas permintaan eksplisit user. Semua keputusan (K2–K8) dijawab user per 2026-09-28. Penyimpangan dari rancangan saat implementasi dicatat di §11.
 
 **Alur kerja (instruksi user 2026-09-28):** analisa → dokumentasi → implementasi **hanya setelah diinstruksikan user**.
 
@@ -12,6 +12,8 @@
 | 2026-09-28 | K2–K4 diputuskan user. |
 | 2026-09-28 | **Revisi keputusan keuangan** setelah user konfirmasi ke pihak terkait: pindah POP wajib lunas dulu, tagihan & laporan lama tetap di cabang lama, tagihan bulanan berikutnya di cabang baru, kolektor selalu dilepas (§3). Keputusan K1 & K5 sebelumnya **dibatalkan** (jejak di §4.4). |
 | 2026-09-28 | K6 & K7 diputuskan user: yang wajib lunas = **piutang** (`scopePiutang`, tunggakan bulan-bulan sebelumnya); **tagihan bulan ini ikut pindah** dan dibayar ke cabang baru; saldo lebih bayar terbawa. Muncul keputusan turunan **K8** (tagihan bulan ini yang sudah dicicil), §4.6. |
+| 2026-09-28 | K8 diputuskan user (A: tagihan bulan ini yang sudah dicicil wajib lunas dulu). Rancangan final. |
+| 2026-09-29 | Diimplementasi. Kode ADHOC-104 + ADHOC-109 (commit `bb15742`) jadi titik awal; lihat §11. |
 
 **Terkait:**
 - [`../ID_NUMBERING_RULES.md`](../ID_NUMBERING_RULES.md) §10 — aturan pindah POP (REQ ID permanen, CID boleh berubah)
@@ -410,3 +412,18 @@ Beberapa dokumen di bawah **saat ini masih menjelaskan perilaku ADHOC-104 yang a
 | Tagihan bulan berjalan pindah menjelang pergantian bulan | Konsisten: besoknya menjadi piutang cabang baru (R4 "Batas waktu"). Periode terkunci cabang lama tidak terusik. |
 | Pelanggan pindah tanpa kolektor → tagihan bulan pertama di cabang baru tidak masuk worklist siapa pun sampai di-assign | Worksheet Kolektor sudah punya daftar pelanggan tanpa kolektor (`whereNull('collector_id')`); sebutkan di catatan rilis untuk admin cabang baru. |
 | Angka dampak §4.5 diambil dari DB dev | Ulangi query read-only yang sama di produksi sebelum rilis. |
+
+## 11. Catatan Implementasi (2026-09-29)
+
+Titik awal implementasi adalah kode yang sudah di-commit di `bb15742` (ADHOC-104 + **ADHOC-109**), bukan working tree saat rancangan ditulis. ADHOC-109 sudah menerapkan aturan yang **lebih ketat** dari R1/R2: di Edit, Mini POP & Distribusi hanya ditulis kalau Cabang ikut dipindah (rule `exclude` selain itu). Aturan itu dipertahankan — regresi T1 otomatis tertutup, dan penyesuaian jaringan tanpa pindah Cabang tetap lewat modal ber-izin.
+
+| # | Hal | Keputusan implementasi |
+|---|---|---|
+| 1 | R1 opsi legacy di dropdown | Tidak perlu penanda `data-legacy`: ADHOC-109 sudah menampilkan nilai legacy dan tidak menulisnya selama Cabang tidak dipindah. Dikunci `CustomerEditDistribusiLegacyTidakHilangTest`. |
+| 2 | R2 | Diterapkan pada kasus pindah Cabang (satu-satunya kasus Edit menulis jaringan). `CustomerController::networkLockReason()` = `'status'` / `'permission'` / null. |
+| 3 | R3 — **cacat logika yang ketemu saat test** | Kalau CID cuma dibuat ulang observer saat kolom jaringan *dirty*, simpan ulang modal tanpa perubahan pilihan tidak membetulkan CID yang terlanjur campuran — padahal itu jalur perbaikan manual data lama (keputusan no. 9). Perbaikan: `CustomerCidService::sync()` dipanggil eksplisit oleh modal & API setiap simpan; observer tetap menangani jalur lain. |
+| 4 | R4 "tagihan tanpa `billing_period`" | Tidak diimplementasi: kolom `invoices.billing_period` NOT NULL di skema, jadi kasusnya tidak mungkin terjadi. |
+| 5 | R4 pembayaran | Hanya pembayaran `valid` yang dihitung (penghalang & syarat ikut pindah) — sama dengan laporan bulanan. Pembayaran `ditolak` tidak menahan pelanggan. |
+| 6 | R4 penghalang di form | Form Edit menampilkan "Belum bisa pindah Cabang: N tagihan …" atau "N tagihan bulan berjalan … ikut pindah". |
+| 7 | R5 | Tidak perlu kode tambahan: dengan `exclude` saat Cabang tidak dipindah, closure validasi hanya jalan saat pindah Cabang, dan saat itu nilai Mini POP lama memang tidak berlaku. |
+| 8 | Guard observer vs jalur lain | Diperiksa: satu-satunya penulis `customers.pop_id` pada pelanggan yang sudah ada adalah Edit Pelanggan; import membuat pelanggan baru (dan memakai `updateQuietly`). Guard lapis 2 tidak memutus jalur lain. |

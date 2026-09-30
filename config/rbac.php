@@ -742,9 +742,21 @@ return [
     | admin pandangan yang justru sengaja dipisahkan darinya.
     |
     | docs/plan/kolektor/analisa-setoran-kas-admin.md §10.
+    |
+    | `customers` (bug 2026-09-29): `customers.view` = halaman List Data
+    | Pelanggan (lintas status, dalam scope) — BUKAN syarat aksi lain. Tambah
+    | (`customers.create`), Edit, Putus Langganan, Hapus punya route +
+    | permission sendiri, dan setelah simpan diarahkan lewat
+    | CustomerController::redirectToCustomer() yang sudah menangani user tanpa
+    | akses List/Detail. Dulu role Teknisi yang cuma dicentang "Tambah/Buat"
+    | diam-diam ikut dapat List Data Pelanggan begitu matrix disimpan.
+    | Sub-fitur (Import, Detail) tetap dirantai di UI matrix seperti biasa;
+    | pengecualian ini cuma menghentikan server menambah `customers.view`
+    | tanpa dicentang admin.
     */
     'view_autogrant_exempt' => [
         'cash_deposit',
+        'customers',
     ],
 
     /*
@@ -771,11 +783,28 @@ return [
     | ITU SENDIRI lalu tetap naik ke induknya. Daftar ini menghentikan
     | rantai TOTAL begitu ketemu kode fiturnya: tidak menambah `.view`
     | fitur ini MAUPUN fitur induk mana pun di atasnya.
+    |
+    | Daftar ini juga dibaca UI Role Matrix (roles/matrix.blade.php →
+    | `data-independent-channel`): checkbox fitur di sini TIDAK dikunci
+    | menunggu "Lihat Data" induknya dan tidak memaksa-centang induknya.
+    | Satu daftar untuk server & UI — dulu UI menebak sendiri lewat akhiran
+    | `.qr`, jadi fitur independen non-QR tetap terkunci di layar.
+    |
+    | `customers.terminated` / `customers.failed` / `customers.registration`
+    | (bug 2026-09-29): cuma menumpang tree `customers` supaya rapi di
+    | matrix. List Putus & List Gagal punya route + controller + permission
+    | sendiri (routes/web.php), Skip Survey cuma kemampuan di form Registrasi
+    | (digerbangi `customers.create` + `customers.registration.skip_survey`).
+    | Tanpa batas ini, role yang cuma boleh buka List Putus terpaksa ikut
+    | dapat `customers.view` = List Data Pelanggan aktif lintas status.
     */
     'view_autogrant_chain_boundary' => [
         'customers.qr',
         'tickets.qr',
         'kolektor.qr',
+        'customers.terminated',
+        'customers.failed',
+        'customers.registration',
     ],
 
     /*

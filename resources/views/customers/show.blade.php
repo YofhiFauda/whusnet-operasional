@@ -136,9 +136,16 @@
         </div>
         <div class="p-4 flex flex-col justify-center">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PPPOE</span>
+            @php
+                $pppoeShown = $customer->customerDevice?->pppoe_username ?: ($customer->customerTechnicalDetail?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?? '-')));
+                $pppoeWarning = \App\Services\CustomerCidService::pppoeMismatchWarning($customer, $pppoeShown);
+            @endphp
             <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
-                <span>{{ $customer->customerDevice?->pppoe_username ?: ($customer->customerTechnicalDetail?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?? '-'))) }}</span>
+                <span>{{ $pppoeShown }}</span>
             </div>
+            @if($pppoeWarning)
+                <span class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">{{ $pppoeWarning }}</span>
+            @endif
         </div>
         <div class="p-4 flex flex-col justify-center">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>

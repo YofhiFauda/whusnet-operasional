@@ -525,12 +525,36 @@
             <?php if($maintenance): ?>
             <?php
                 $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+                // SN modem yang dipasang lewat laporan ini — sumber sama dengan
+                // Detail Task (transaksi INSTALL per fop_task), bukan
+                // inventory_serials.fop_task_id yang bisa berpindah kalau SN
+                // itu belakangan ditarik & dipasang ulang di task lain.
+                $maintenanceInstalledSerials = \App\Models\InventoryTransaction::where('fop_task_id', $fopTask->id)
+                    ->where('type', \App\Enums\InventoryTransactionType::INSTALL->value)
+                    ->with(['serial.item', 'item'])
+                    ->get();
             ?>
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line break-words [word-break:break-word]"><?php echo e($maintenance->kendala_teknis); ?></p>
                 </div>
+                <?php if($fopTask->category === \App\Enums\TaskType::CREQ && $fopTask->task?->creqDetail): ?>
+                <div class="col-span-2">
+                    <?php echo $__env->make('tasks.partials.creq-detail', ['task' => $fopTask->task], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+                </div>
+                <?php endif; ?>
+                <?php if($maintenanceInstalledSerials->isNotEmpty()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Modem/Perangkat Aktif Terpasang</p>
+                    <?php $__currentLoopData = $maintenanceInstalledSerials; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tx): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400"><?php echo e($tx->item->name ?? '-'); ?></span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">SN <?php echo e($tx->serial?->serial_number ?? '—'); ?></span>
+                    </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </div>
+                <?php endif; ?>
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
                     <div class="flex flex-wrap gap-1.5 mt-1">
@@ -546,7 +570,7 @@
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Material Terpakai (Gudang)</p>
                     <?php $__currentLoopData = $materialTerpakai; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
-                        <span class="text-slate-600 dark:text-slate-400"><?php echo e($material->item_name); ?><?php if($material->note): ?><span class="text-slate-400 dark:text-slate-500"> · <?php echo e($material->note); ?></span><?php endif; ?></span>
+                        <span class="text-slate-600 dark:text-slate-400"><?php echo e($material->item_name); ?><?php if($material->lot_no): ?><span class="font-mono text-slate-400 dark:text-slate-500"> · Roll <?php echo e($material->lot_no); ?></span><?php endif; ?> <?php if($material->note): ?><span class="text-slate-400 dark:text-slate-500"> · <?php echo e($material->note); ?></span><?php endif; ?></span>
                         <span class="font-mono font-semibold text-slate-800 dark:text-slate-200"><?php echo e(rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',')); ?> <?php echo e($material->unit); ?></span>
                     </div>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

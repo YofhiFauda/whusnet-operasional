@@ -238,7 +238,7 @@
 
     {{-- ══ Mobile Filter Drawer (Slide-Up Bottom Sheet on Mobile) ══ --}}
     <div x-show="filterDrawerOpen"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:hidden"
+         class="fixed inset-0 z-50 overflow-hidden flex items-end md:hidden p-0"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -249,7 +249,7 @@
         
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="filterDrawerOpen = false"></div>
 
-        <div class="bg-surface border-t border-border w-full rounded-t-2xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden"
+        <div class="bg-surface border-t border-border w-full rounded-t-2xl shadow-2xl relative z-10 max-h-[85dvh] flex flex-col overflow-hidden font-ui"
              @click.away="filterDrawerOpen = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full"
@@ -257,21 +257,18 @@
              x-transition:leave="transition ease-in duration-200"
              x-transition:leave-start="translate-y-0"
              x-transition:leave-end="translate-y-full">
-            
-            {{-- Drag Pill --}}
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0"></div>
 
-            <div class="px-5 py-3 border-b border-border flex items-center justify-between bg-surface-muted shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main font-ui">Filter Task FOP</h3>
-                <button type="button" @click="filterDrawerOpen = false" class="text-text-muted hover:text-text-main p-1">
+                <button type="button" @click="filterDrawerOpen = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
-            <form method="GET" action="{{ route('fop-tasks.index') }}" class="flex flex-col flex-1 overflow-hidden">
-                <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar font-ui">
+            <form method="GET" action="{{ route('fop-tasks.index') }}" class="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div class="p-5 overflow-y-auto space-y-4 flex-1 min-h-0 custom-scrollbar font-ui overscroll-contain">
                     @if(request('status'))
                         <input type="hidden" name="status" value="{{ request('status') }}">
                     @endif
@@ -324,8 +321,8 @@
                 </div>
 
                 <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-between gap-3 shrink-0">
-                    <a href="{{ route('fop-tasks.index') }}" class="btn-secondary text-xs">Reset</a>
-                    <button type="submit" class="btn-primary text-xs">Terapkan Filter</button>
+                    <a href="{{ route('fop-tasks.index') }}" class="btn-secondary text-xs cursor-pointer">Reset</a>
+                    <button type="submit" class="btn-primary text-xs cursor-pointer">Terapkan Filter</button>
                 </div>
             </form>
         </div>
@@ -559,20 +556,30 @@
         </button>
     </div>
 
-    {{-- ══ CREATE/EDIT TASK MODAL (Adaptive Mobile Bottom-Sheet & Desktop Dialog) ══ --}}
-    <div x-show="modal.open" 
-         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4" 
-         x-transition:enter="transition ease-out duration-200" 
-         x-transition:enter-start="opacity-0" 
-         x-transition:enter-end="opacity-100" 
-         x-transition:leave="transition ease-in duration-150" 
-         x-transition:leave-start="opacity-100" 
+    {{-- ══ CREATE/EDIT TASK MODAL (Adaptive Fullscreen Mobile & Desktop Dialog) ══ --}}
+    {{--
+        h-dvh WAJIB di wrapper ini, BUKAN di kotak modal di bawahnya. `fixed inset-0`
+        di-size browser mobile pakai large viewport, sedangkan unit dvh pakai
+        small/dynamic viewport — begitu kotak modal punya height eksplisit sendiri
+        (dulu: h-dvh di situ juga), flexbox `items-stretch` diabaikan (item dengan
+        cross-size definit gak di-stretch) dan modal berhenti duluan sebelum dasar
+        layar sungguhan, nyisain celah kosong di bawah footer sebesar toolbar browser.
+        Samakan sumber tinggi di satu tempat (wrapper), kotak modal tinggal ngikut
+        lewat stretch.
+    --}}
+    <div x-show="modal.open"
+         class="fixed inset-0 z-50 flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden h-dvh md:h-auto"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          style="display: none;">
-        
+
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="modal.open = false"></div>
 
-        <div class="bg-surface border-0 md:border border-border w-full max-w-2xl lg:max-w-3xl rounded-none md:rounded-xl shadow-2xl relative z-10 h-full md:h-auto max-h-dvh md:max-h-[85vh] flex flex-col overflow-hidden" 
+        <div class="bg-surface border-0 md:border border-border w-full md:h-auto max-w-full md:max-w-2xl lg:max-w-3xl rounded-none md:rounded-xl shadow-2xl relative z-10 max-h-dvh md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
              @click.away="modal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95 md:opacity-0"
@@ -687,10 +694,6 @@
 
                     <input type="hidden" name="customer_id" :value="modal.data.customer_id">
                     <input type="hidden" name="origin" value="fop_tasks">
-                    {{-- Mode Ticketing POST ke tickets.store yang mewajibkan `type`, sedang
-                         dropdown di atas bernama `category` (dipakai bareng fop-tasks.store).
-                         Tanpa input ini submit MTN/C-REQ selalu 422 "Bidang type wajib diisi".
-                         Di-disable di luar mode Ticketing biar gak ikut terkirim ke fop-tasks. --}}
                     <input type="hidden" name="type" :value="modal.data.category" :disabled="!isTicketMode">
 
                     {{-- Mode Ticketing (MTN/C-REQ): CID lookup + panel auto-fill --}}
@@ -875,7 +878,7 @@
                         </div>
 
                         {{-- Interactive Technician Cards Grid --}}
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-66 overflow-y-auto pr-1 custom-scrollbar">
                             <template x-for="tech in filteredTechList" :key="tech.id">
                                 <div @click="toggleTech(tech.id)"
                                      :class="modal.techs.includes(tech.id)
@@ -1042,7 +1045,7 @@
                     </div>
                 </div>
 
-                <div class="px-4 sm:px-5 py-3 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0">
                     <button type="button" @click="modal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                     <button type="submit" :disabled="isSubmitting" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
                         <span x-show="!isSubmitting">Simpan</span>
@@ -1055,7 +1058,7 @@
 
     {{-- ══ CANCEL TASK MODAL (Adaptive Mobile Bottom-Sheet) ══ --}}
     <div x-show="cancelModal.open"
-         class="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200" 
          x-transition:enter-start="opacity-0" 
          x-transition:enter-end="opacity-100" 
@@ -1066,21 +1069,31 @@
         
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="cancelModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 p-5 font-ui" 
+        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui" 
              @click.away="cancelModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
              x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
-            
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-3 md:hidden"></div>
 
-            <h4 class="text-sm font-bold text-text-main mb-1">Batalkan Task <span class="font-mono" x-text="cancelModal.taskNumber"></span></h4>
-            <p class="text-xs text-text-muted mb-4">Task akan dibatalkan. Tindakan ini tidak dapat dibatalkan.</p>
-            <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan Pembatalan <span class="text-error">*</span></label>
-            <textarea x-model="cancelModal.reason" rows="3" class="w-full text-xs border border-border rounded-lg px-3 py-2 mb-4 bg-surface text-text-main outline-none focus:ring-1 focus:ring-primary" placeholder="Contoh: Data ganda, pelanggan batal, salah input POP, dll."></textarea>
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
+                <h3 class="text-sm font-bold text-text-main">Batalkan Task <span class="font-mono" x-text="cancelModal.taskNumber"></span></h3>
+                <button type="button" @click="cancelModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-3 overflow-y-auto flex-1 min-h-0 custom-scrollbar overscroll-contain">
+                <p class="text-xs text-text-muted">Task akan dibatalkan. Tindakan ini tidak dapat dibatalkan.</p>
+                <div>
+                    <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan Pembatalan <span class="text-error">*</span></label>
+                    <textarea x-model="cancelModal.reason" rows="3" class="w-full text-xs border border-border rounded-lg px-3 py-2 bg-surface text-text-main outline-none focus:ring-1 focus:ring-primary" placeholder="Contoh: Data ganda, pelanggan batal, salah input POP, dll."></textarea>
+                </div>
+            </div>
             
-            <div class="flex justify-end gap-2">
-                <button type="button" @click="cancelModal.open = false" class="btn-secondary text-xs px-3 py-2 cursor-pointer">Batal</button>
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-2.5 rounded-b-none md:rounded-b-xl shrink-0">
+                <button type="button" @click="cancelModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="cancelModal.isSubmitting || !cancelModal.reason.trim()"
                         @click="submitCancelModal()"
                         class="text-xs px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-50 cursor-pointer" style="background:var(--color-error);">
@@ -1093,7 +1106,7 @@
 
     {{-- ══ KONFLIK TEAM MODAL (Adaptive Mobile Bottom-Sheet) ══ --}}
     <div x-show="teamConflictModal.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -1104,15 +1117,13 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="teamConflictModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-ui"
+        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
              @click.away="teamConflictModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
              x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
 
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
-
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main">Konflik Tim Terdeteksi</h3>
                 <button type="button" @click="teamConflictModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1121,7 +1132,7 @@
                 </button>
             </div>
 
-            <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+            <div class="p-5 overflow-y-auto space-y-4 flex-1 min-h-0 custom-scrollbar overscroll-contain pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-5">
                 <template x-for="c in teamConflictModal.conflicts" :key="c.task_id">
                     <div class="border border-border rounded-lg p-3 bg-surface-muted/40">
                         <p class="text-xs text-text-secondary mb-2.5">
@@ -1142,7 +1153,7 @@
 
     {{-- ══ PEMILIHAN TEAM MODAL (Adaptive Mobile Bottom-Sheet) ══ --}}
     <div x-show="teamSelectionModal.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -1153,15 +1164,13 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="teamSelectionModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-ui"
+        <div class="bg-surface border-t md:border border-border w-full max-w-lg rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
              @click.away="teamSelectionModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
              x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
 
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
-
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main">Pilih Tim untuk Task</h3>
                 <button type="button" @click="teamSelectionModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1170,7 +1179,7 @@
                 </button>
             </div>
 
-            <div class="p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+            <div class="p-5 overflow-y-auto space-y-4 flex-1 min-h-0 custom-scrollbar overscroll-contain">
                 <div class="border border-border rounded-lg p-3 bg-surface-muted/50">
                     <p class="text-xs text-text-secondary leading-relaxed">
                         Pilih tim kerja pada tanggal <span class="font-semibold text-text-main" x-text="teamSelectionModal.taskDate"></span> untuk memasukkan task <span class="font-semibold text-text-main font-mono" x-text="teamSelectionModal.taskNumber"></span> (<span x-text="teamSelectionModal.taskTugas"></span>):
@@ -1202,22 +1211,22 @@
                         </p>
                     </div>
                 </div>
+            </div>
 
-                <div class="pt-2 border-t border-border">
-                    <button type="button" @click="assignToTeam(teamSelectionModal.taskId, null); teamSelectionModal.open = false" class="btn-primary text-xs w-full py-2.5 flex justify-center items-center gap-2 cursor-pointer">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Buat Tim Baru
-                    </button>
-                </div>
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted shrink-0 rounded-b-none md:rounded-b-xl">
+                <button type="button" @click="assignToTeam(teamSelectionModal.taskId, null); teamSelectionModal.open = false" class="btn-primary text-xs w-full py-2.5 flex justify-center items-center gap-2 cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Buat Tim Baru
+                </button>
             </div>
         </div>
     </div>
 
     {{-- ══ SWITCH TEKNISI MODAL (Adaptive Mobile Bottom-Sheet) ══ --}}
     <div x-show="switchTechModal.open"
-         class="fixed inset-0 z-50 overflow-y-auto flex items-end md:items-center justify-center"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -1228,15 +1237,13 @@
 
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="switchTechModal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85vh] flex flex-col overflow-hidden font-ui"
+        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
              @click.away="switchTechModal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
              x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
 
-            <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto my-2 shrink-0 md:hidden"></div>
-
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main">Switch Teknisi antar Team</h3>
                 <button type="button" @click="switchTechModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1245,7 +1252,7 @@
                 </button>
             </div>
 
-            <div class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+            <div class="p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar overscroll-contain">
                 <p class="text-xs text-text-secondary leading-relaxed bg-surface-muted p-3 rounded-lg border border-border">
                     Pindahkan <span class="font-bold text-text-main" x-text="switchTechModal.technicianName"></span>
                     dari task <span class="font-bold text-text-main font-mono" x-text="switchTechModal.fromTaskNumber"></span>
@@ -1274,7 +1281,7 @@
                 </div>
             </div>
 
-            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-xl shrink-0">
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0">
                 <button type="button" @click="switchTechModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="switchTechModal.isSubmitting || !switchTechModal.toTaskId || !switchTechModal.replacementId"
                         @click="submitSwitchTechnician()" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
@@ -1314,7 +1321,7 @@
 
     {{-- ══ Modal Bulk Assign Team ══ --}}
     <div x-show="bulkTeamModal.open"
-         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -1323,22 +1330,34 @@
          x-transition:leave-end="opacity-0"
          style="display: none;">
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="bulkTeamModal.open = false"></div>
-        <div class="bg-surface border border-border w-full max-w-md rounded-2xl shadow-2xl relative z-10 p-5 font-ui"
-             @click.away="bulkTeamModal.open = false">
-            <h3 class="text-sm font-bold text-text-main mb-1">Tugaskan Massal ke Tim</h3>
-            <p class="text-xs text-text-muted mb-4">Pilih tim tujuan untuk <span class="font-bold text-text-main font-mono" x-text="selectedTaskIds.length"></span> task yang dipilih.</p>
-            
-            <div class="space-y-3 mb-4">
-                <label class="block text-xs font-semibold text-text-secondary">Pilih Tim</label>
-                <select x-model="bulkTeamModal.selectedTeamId" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary">
-                    <option value="">— Pilih Tim —</option>
-                    @foreach($teams as $t)
-                        <option value="{{ $t['id'] }}">{{ $t['name'] }} ({{ $t['work_date'] }}) · {{ $t['task_count'] }} Task</option>
-                    @endforeach
-                </select>
+        <div class="bg-surface border-t md:border border-border w-full max-w-md rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[85dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
+             @click.away="bulkTeamModal.open = false"
+             x-transition:enter="transition ease-out duration-250"
+             x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95"
+             x-transition:enter-end="translate-y-0 md:translate-y-0 md:scale-100">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
+                <h3 class="text-sm font-bold text-text-main">Tugaskan Massal ke Tim</h3>
+                <button type="button" @click="bulkTeamModal.open = false" class="text-text-muted hover:text-text-main p-1 cursor-pointer">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
 
-            <div class="flex justify-end gap-2">
+            <div class="p-5 space-y-3 overflow-y-auto flex-1 min-h-0 custom-scrollbar overscroll-contain">
+                <p class="text-xs text-text-muted mb-2">Pilih tim tujuan untuk <span class="font-bold text-text-main font-mono" x-text="selectedTaskIds.length"></span> task yang dipilih.</p>
+                <div>
+                    <label class="block text-xs font-semibold text-text-secondary mb-1">Pilih Tim <span class="text-error">*</span></label>
+                    <select x-model="bulkTeamModal.selectedTeamId" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                        <option value="">— Pilih Tim —</option>
+                        @foreach($teams as $t)
+                            <option value="{{ $t['id'] }}">{{ $t['name'] }} ({{ $t['work_date'] }}) · {{ $t['task_count'] }} Task</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-2.5 rounded-b-none md:rounded-b-xl shrink-0">
                 <button type="button" @click="bulkTeamModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="bulkTeamModal.isSubmitting || !bulkTeamModal.selectedTeamId" @click="submitBulkAssignTeam()" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
                     <span x-show="!bulkTeamModal.isSubmitting">Tugaskan Sekarang</span>

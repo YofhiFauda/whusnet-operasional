@@ -459,7 +459,8 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
     {
         $this->loginAsAdmin();
         $customer = $this->pelangganAktifDiJetis();
-        $this->buatInvoice($customer, '2026-08', InvoiceStatus::SEBAGIAN);
+        // Piutang = tunggakan bulan sebelumnya (Invoice::scopePiutang()).
+        $this->buatInvoice($customer, $this->periodeLalu(), InvoiceStatus::BELUM_DIBAYAR);
 
         $this->put(route('customers.update', $customer->id), $this->payloadEdit($customer, [
             'pop_id' => $this->sandya->id,
@@ -475,7 +476,7 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
     {
         $this->loginAsAdmin();
         $customer = $this->pelangganAktifDiJetis();
-        $lunas = $this->buatInvoice($customer, '2026-07', InvoiceStatus::LUNAS);
+        $lunas = $this->buatInvoice($customer, $this->periodeLalu(), InvoiceStatus::LUNAS);
 
         // Paket ikut dikirim seperti form asli — tanpa paket, update()
         // menghapus customer_services (dan tagihannya ikut ter-cascade).
@@ -492,17 +493,20 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
     }
 
     #[Test]
-    public function pindah_pop_di_luar_form_edit_tidak_memindahkan_tagihan(): void
+    public function pindah_pop_di_luar_form_edit_cuma_memindah_tagihan_bulan_ini_yang_belum_dibayar(): void
     {
         $customer = $this->pelangganAktifDiJetis();
-        $lunas = $this->buatInvoice($customer, '2026-07', InvoiceStatus::LUNAS);
-        $belum = $this->buatInvoice($customer, '2026-09', InvoiceStatus::BELUM_DIBAYAR);
+        $lunas = $this->buatInvoice($customer, $this->periodeLalu(), InvoiceStatus::LUNAS);
+        $belum = $this->buatInvoice($customer, $this->periodeIni(), InvoiceStatus::BELUM_DIBAYAR);
 
         // Jalur import/tinker — tanpa validasi controller.
         $customer->update(['pop_id' => $this->sandya->id]);
 
+        // Laporan pembayaran & piutang tetap milik cabang lama (keputusan
+        // user 2026-09-28); tagihan bulan berjalan yang belum dibayar ikut
+        // pindah supaya pembayarannya masuk cabang baru (K6).
         $this->assertSame($this->jetis->id, (int) $lunas->fresh()->pop_id);
-        $this->assertSame($this->jetis->id, (int) $belum->fresh()->pop_id);
+        $this->assertSame($this->sandya->id, (int) $belum->fresh()->pop_id);
     }
 
     #[Test]
@@ -569,7 +573,7 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
     }
 
     #[Test]
-    public function kolektor_yang_punya_akses_pop_baru_dipertahankan(): void
+    public function kolektor_yang_punya_akses_kedua_cabang_tetap_dilepas(): void
     {
         $role = Role::create(['code' => 'uji_kolektor2', 'name' => 'Uji Kolektor 2', 'guard_name' => 'web']);
         $kolektor = User::factory()->create(['status' => 'active', 'role_id' => $role->id]);
@@ -583,6 +587,18 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
 
         $customer->update(['pop_id' => $this->sandya->id]);
 
-        $this->assertSame($kolektor->id, (int) $customer->fresh()->collector_id);
+        // Kolektor SELALU dilepas saat pindah Cabang (keputusan user
+        // 2026-09-28, R8), walau aksesnya mencakup cabang baru.
+        $this->assertNull($customer->fresh()->collector_id);
+    }
+
+    private function periodeLalu(): string
+    {
+        return now()->subMonthNoOverflow()->format('Y-m');
+    }
+
+    private function periodeIni(): string
+    {
+        return now()->format('Y-m');
     }
 }

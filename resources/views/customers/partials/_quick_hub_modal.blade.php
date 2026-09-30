@@ -356,6 +356,7 @@
                         <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 text-[10px] block">Username PPPoE</span>
                             <span id="hub-tech-pppoe" class="font-mono font-bold text-slate-900 dark:text-white">-</span>
+                            <span id="hub-tech-pppoe-warning" class="hidden text-[11px] text-amber-600 dark:text-amber-400 block mt-1 leading-snug"></span>
                         </div>
                         <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 text-[10px] block">VLAN ID</span>

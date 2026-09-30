@@ -23,6 +23,7 @@ class CustomerBalanceMutation extends Model
         'customer_id',
         'type',
         'source',
+        'revision',
         'amount',
         'payment_id',
         'pop_id',

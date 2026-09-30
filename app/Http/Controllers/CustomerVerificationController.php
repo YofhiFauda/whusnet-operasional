@@ -8,17 +8,22 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Models\AuditLog;
+use App\Models\City;
 use App\Models\Customer;
+use App\Models\InternetPackage;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Services\CustomerCidService;
 use App\Services\CustomerVerificationDetailService;
+use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
 use App\Services\TeknisiWorkloadService;
 use App\Services\TelegramBotService;
 use App\Support\RupiahInput;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -182,7 +187,13 @@ class CustomerVerificationController extends Controller
         // gak tau apa-apa soal permission.
         $detail = app(CustomerVerificationDetailService::class)->load($customer);
 
-        return view('verifications.admin', array_merge(['customer' => $customer], $detail));
+        // Dipakai form edit cepat Data Diri + Paket (verifications.partials.
+        // _registration-info, tab Data Registrasi) — cuma query ringan, aman
+        // dimuat tiap buka halaman.
+        $verifCities = City::orderBy('name')->get(['id', 'name']);
+        $verifPackages = InternetPackage::orderBy('name')->get(['id', 'name', 'package_code', 'monthly_price']);
+
+        return view('verifications.admin', array_merge(['customer' => $customer, 'verifCities' => $verifCities, 'verifPackages' => $verifPackages], $detail));
     }
 
     public function processToTeam(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -380,8 +391,9 @@ class CustomerVerificationController extends Controller
             }
 
             // 2. Activate Customer
-            $customer->loadMissing(['customerTechnicalDetail', 'distribution', 'village']);
-            $cid = $pop->generateComplexCid($customer, $customer->distribution);
+            // Rumus CID satu pintu (CustomerCidService, ADHOC-107 R3).
+            // cid_prefix sudah dipastikan terisi di atas, jadi tidak null.
+            $cid = CustomerCidService::resolve($customer) ?? $customer->cid;
 
             $oldValues = [
                 'cid' => $customer->cid,
@@ -623,6 +635,181 @@ class CustomerVerificationController extends Controller
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Status yang boleh dikoreksi lewat aksi edit di bawah — tab Registrasi
+     * (Data Diri + Paket) & tab Survey (Data Survey) di `verifications/admin`
+     * tampil sejak `waiting_acc` sampai pelanggan aktif (lihat $isVerifAdminStage
+     * di admin.blade.php). Sebelum itu (waiting_survey/survey_in_progress) FopTask
+     * Survey belum tentu ada teknisinya, dan `showAdmin()` bukan halaman utama
+     * di tahap itu (surveys.report yang dipakai) — edit cuma dibuka begitu
+     * pelanggan sudah masuk antrean ini.
+     */
+    private const EDITABLE_STAGES = [
+        'waiting_acc', 'surveyed',
+        'waiting_installation', 'installation_in_progress', 'revision_installation',
+        'installed', 'verification_admin', 'active',
+        'waiting_business_development_verification',
+    ];
+
+    /**
+     * Data Pemasangan (Data Perangkat + ODP/OLT) & Data Pengujian (speedtest) —
+     * cuma dibuka di tahap Validasi Admin (bug 2026-09-30 lanjutan, permintaan
+     * eksplisit user), BUKAN sepanjang EDITABLE_STAGES. Alasan: selama
+     * `waiting_installation`/`installation_in_progress`/`revision_installation`
+     * tim masih di lapangan dan datanya masih bisa berubah lewat laporan
+     * mereka sendiri (`CustomerInstallationController`) — membuka edit CS di
+     * saat yang sama membuka jalan dua penulis berebut baris yang sama tanpa
+     * saling tahu. Sama persis dengan `$isVerifAdminStage` di
+     * verifications/admin.blade.php.
+     */
+    private const DEVICE_EDIT_STAGES = [
+        'installed', 'verification_admin', 'active',
+        'waiting_business_development_verification',
+    ];
+
+    /**
+     * Data Diri + Paket Internet — sama seperti Verifikasi Registrasi, dibuka
+     * kembali di sini karena CS masih sering perlu koreksi di tahap
+     * Survey/Pemasangan/Validasi Admin (bug 2026-09-30). Permission
+     * `customers.detail.installation.validate` DISENGAJA (bukan `.view`) —
+     * cuma actor yang boleh memutuskan hasil verifikasi (approve/reject/final)
+     * yang boleh mengubah datanya, konsisten dengan aksi tulis lain di
+     * controller ini.
+     */
+    public function updateIdentity(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::EDITABLE_STAGES, true), 422, 'Data pelanggan ini tidak bisa diedit dari tahap saat ini.');
+
+        $validated = $request->validate([
+            'full_name' => 'required|string|max:150',
+            'identity_number' => 'nullable|string|size:16|regex:/^[0-9]+$/',
+            'primary_phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'email' => 'nullable|email|max:100',
+            'address' => 'required|string',
+            'city_id' => 'nullable|exists:cities,id',
+            'district_id' => 'nullable|exists:districts,id',
+            'village_id' => 'nullable|exists:villages,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateIdentity($customer, $validated, $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Data diri pelanggan diperbarui.');
+    }
+
+    public function updatePackage(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::EDITABLE_STAGES, true), 422, 'Data pelanggan ini tidak bisa diedit dari tahap saat ini.');
+
+        $validated = $request->validate([
+            'internet_package_id' => 'required|exists:internet_packages,id',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Paket internet pelanggan diperbarui.');
+    }
+
+    /**
+     * Data Survey — koreksi hasil laporan teknisi (ODP terdekat, estimasi
+     * kabel, tanggal request pemasangan, catatan surveyor). Cuma masuk akal
+     * kalau laporan survey memang sudah ada.
+     */
+    public function updateSurveyData(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::EDITABLE_STAGES, true), 422, 'Data pelanggan ini tidak bisa diedit dari tahap saat ini.');
+
+        $survey = $customer->latestSurvey()->first();
+        abort_unless($survey !== null, 422, 'Pelanggan ini belum punya data survey untuk dikoreksi.');
+
+        $validated = $request->validate([
+            'nearest_odp' => 'nullable|string|max:255',
+            'cable_estimation_meter' => 'nullable|integer|min:0',
+            'requested_installation_date' => 'nullable|date',
+            'survey_note' => 'nullable|string',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateSurveyData($survey, $validated, $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Data survey pelanggan diperbarui.');
+    }
+
+    /**
+     * Data Pemasangan — Data Perangkat + Distribusi Jaringan (ODP/OLT) +
+     * catatan pemasangan. Cuma tahap Validasi Admin (self::DEVICE_EDIT_STAGES),
+     * BUKAN sepanjang tahap Pemasangan masih berjalan — lihat docblock konstanta.
+     * Rules SAMA PERSIS dengan `CustomerController::update()` supaya tidak ada
+     * aturan kedua yang menyimpang untuk field yang sama.
+     */
+    public function updateInstallationData(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::DEVICE_EDIT_STAGES, true), 422, 'Data Pemasangan pelanggan ini cuma bisa diedit dari sini saat status Validasi Admin.');
+
+        $validated = $request->validate([
+            'device_type' => 'nullable|string|in:modem,ont,onu,router,other',
+            'brand' => 'nullable|string|max:100',
+            'model' => 'nullable|string|max:100',
+            'serial_number' => 'nullable|string|max:100',
+            'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
+            'connection_mode' => 'nullable|string|in:bridge,router,pppoe,static,dhcp,other',
+            'pppoe_username' => 'nullable|string|max:150',
+            'pppoe_password' => 'nullable|string|max:150',
+            'wifi_ssid' => 'nullable|string|max:150',
+            'wifi_password' => 'nullable|string|max:150',
+            'odp_number' => 'nullable|string|max:100',
+            'odp_port' => 'nullable|string|max:50',
+            'olt_number' => 'nullable|string|max:50',
+            'olt_slot' => 'nullable|string|max:20',
+            'olt_port' => 'nullable|string|max:50',
+            'vlan' => 'nullable|string|max:20',
+            'router_number' => 'nullable|string|max:50',
+            'initial_attenuation' => 'nullable|numeric',
+            'installation_note' => 'nullable|string',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateInstallationData($customer, $validated, $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Data pemasangan pelanggan diperbarui.');
+    }
+
+    /**
+     * Data Pengujian — hasil speedtest & kualitas sinyal. Cuma tahap Validasi
+     * Admin, sama seperti Data Pemasangan.
+     */
+    public function updateTestReport(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::DEVICE_EDIT_STAGES, true), 422, 'Data Pengujian pelanggan ini cuma bisa diedit dari sini saat status Validasi Admin.');
+
+        $validated = $request->validate([
+            'test_download' => 'nullable|numeric|min:0',
+            'test_upload' => 'nullable|numeric|min:0',
+            'latency_ms' => 'nullable|numeric|min:0',
+            'jitter_ms' => 'nullable|numeric|min:0',
+            'packet_loss_percent' => 'nullable|numeric|min:0|max:100',
+            'actual_attenuation' => 'nullable|numeric',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateTestReport($customer, $validated, $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Data pengujian pelanggan diperbarui.');
     }
 
     /**

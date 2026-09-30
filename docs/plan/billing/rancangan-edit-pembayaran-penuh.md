@@ -1,8 +1,8 @@
 # Rancangan: Edit Pembayaran Penuh (setara form Bayar)
 
-> Status: **Rancangan v2 — analisa selesai, BELUM diimplementasi** (2026-09-28). Di luar sprint aktif, permintaan eksplisit user.
+> Status: **Diimplementasikan** (2026-09-29). Di luar sprint aktif, permintaan eksplisit user.
 > Task: ADHOC-108 (`docs/TASKS.md`).
-> Urutan kerja atas instruksi user: **analisa → dokumentasi (file ini) → implementasi**. K1–K7 sudah dijawab user (bagian 2 & 9). **Jangan mulai coding sampai user memberi aba-aba implementasi.**
+> K1–K7 dijawab user (bagian 2 & 9), lalu diimplementasikan sesuai urutan bagian 5. Penyimpangan dari rancangan yang ditemukan saat coding dicatat di §10 di bawah.
 
 ---
 
@@ -252,3 +252,25 @@ Catatan migrasi K7 (untuk implementasi):
 - Pola drop/create index ikuti `2026_09_24_103221_add_source_to_customer_balance_mutations_table.php` (termasuk `down()`); uji di sqlite `:memory:` (test) dan DB dev.
 - Revisi ke-n = (jumlah baris `KOREKSI` payment tsb, semua tipe, dibagi per revisi) + 1; hitung di dalam transaksi yang sudah mengunci payment supaya dua koreksi tak berebut nomor.
 - `CustomerBalanceMutationObserver` bersifat append-only — baris koreksi hanya `create`, tidak pernah update/hapus.
+
+## 10. Catatan Implementasi (2026-09-29)
+
+Diimplementasikan sesuai bagian 4–9. Penyimpangan dari rancangan tertulis:
+
+1. **Urutan lock jadi PAYMENT → SETORAN → INVOICE**, bukan "setoran → invoice → payment" seperti tertulis di §4.4/F3.1. Alasan: setoran mana yang menautkan payment ini baru diketahui SETELAH baris payment dibaca (`collector_deposit_id`/`cash_deposit_id` ada di tabel `payments`), jadi urutan tekstual tak bisa dieksekusi apa adanya. Mengunci payment PALING AWAL justru memperkuat maksud rancangan: itu mencegah `CollectorDepositService::submit()` (yang juga `lockForUpdate()` baris payment saat menyusun setoran baru) menautkan payment ini ke setoran lain di tengah proses edit. Lihat `PaymentService::revise()` docblock.
+2. **`CustomerBalanceService::lockedBalance()` diubah dari `private` ke `public`** — dibutuhkan `revise()` untuk mengecek kecukupan saldo NILAI BARU dengan lock yang sama (mencegah dua edit simultan pada pelanggan yang sama lolos berbarengan), pola yang sama dengan pemakaian internalnya di `debit()`.
+3. **`store()` (form Bayar) ikut dipindah ke `paymentRules()`** bersama `update()`, sesuai §4.5, dan sebagai efek sampingnya `payment_method=saldo` kini eksplisit DITOLAK oleh validasi `store()` juga (sebelumnya cuma tidak pernah dipilih dari UI, bukan ditolak server) — pengerasan yang selaras K5, bukan pengetatan yang tidak diminta.
+4. **`use_balance_amount` di `update()` ikut dinormalkan `RupiahInput::parse()`** sebelum divalidasi — `store()` TIDAK melakukan ini (celah lama, di luar scope ADHOC-108, dilaporkan di temuan tambahan bagian ini, bukan diperbaiki di `store()`).
+5. **Partial `_form.blade.php` TIDAK dibuat** (berbeda dari §4.2) — `payments/edit.blade.php` ditulis berdiri sendiri karena field yang tersedia berbeda dari `create` (Edit punya opsi Kolektor & field Alasan Koreksi, tidak punya Saldo sebagai metode). Konsekuensinya markup toggle metode terduplikasi antar dua file; diterima demi kecepatan, dicatat sebagai utang teknis kecil kalau nanti field-nya makin banyak menyimpang.
+6. **Dispatch `CollectorDepositUpdated` untuk setoran pending yang totalnya berubah TIDAK dilakukan** (F3.5 sengaja dilewati, bukan bug) — event itu string `$aksi`-nya (`diajukan|diverifikasi|dilunasi|dihapus_buku`) tidak punya nilai yang tepat untuk "nominal diedit sambil pending". `CollectorActivityUpdated` dengan `$aksi='pembayaran_dikoreksi'` (nilai baru, event ini bukan enum) tetap di-dispatch ke kolektor terkait supaya Worklist yang terbuka tak memajang saldo lama — frontend yang belum mengenali aksi ini akan mengabaikannya (fallback aman, bukan error).
+7. **Migrasi `2026_09_29_000001_add_revision_to_customer_balance_mutations_table` ditulis ulang jadi idempotent** setelah gagal dua kali berturut-turut saat dijalankan user di DB dev MySQL (`docker exec whusnet-app php artisan migrate`, 2026-09-29) — dua bug berbeda, keduanya cuma muncul di MySQL (sqlite test tidak pernah menyentuhnya):
+   - **Bug A — kolom `revision` sudah ada tapi migrasi tercatat "Pending".** MySQL meng-commit tiap statement DDL sendiri-sendiri (tak ada rollback sebagian); proses migrate awal berhenti di tengah (`ADD COLUMN` sukses, langkah berikutnya belum sempat jalan) sebelum baris `migrations` ditulis. Run ulang mengulang `up()` dari awal → `ADD COLUMN revision` gagal "Duplicate column name". **Fix:** tiap langkah dibungkus `Schema::hasColumn()`/`Schema::hasIndex()` — migrasi sekarang aman dijalankan ulang dari state manapun.
+   - **Bug B — index unik lama tak bisa di-drop.** `customer_balance_mutations_payment_type_source_unique` (diawali `payment_id`) ternyata satu-satunya index yang menutupi kolom `payment_id` (foreign key ke `payments`) — tak ada index `payment_id_foreign` terpisah. MySQL/InnoDB menolak `DROP INDEX` index semacam ini selama belum ada index pengganti yang menutupi kolom FK yang sama ("Cannot drop index ...: needed in a foreign key constraint"). **Fix:** urutan dibalik — index BARU (`..._revision_unique`, sama-sama diawali `payment_id`) dibuat LEBIH DULU, index LAMA baru dihapus SETELAHNYA (bukan drop-dulu-baru-add). `down()` disimetriskan (tambah index lama dulu, baru hapus index baru, baru drop kolom).
+
+   Diverifikasi ulang: sqlite `RefreshDatabase` (21 test `PaymentEditFullRevisionTest`+`PaymentEditUpdateTest` tetap hijau) DAN langsung di MySQL dev (`php artisan migrate` → `DONE`, `SHOW INDEX` mengonfirmasi index akhir 4 kolom, index lama sudah hilang, kolom FK `payment_id` tetap tertutupi index sepanjang waktu).
+
+### Temuan tambahan (dilaporkan, TIDAK diperbaiki — di luar scope ADHOC-108)
+
+- **`PaymentController::store()` tidak menormalkan `use_balance_amount` lewat `RupiahInput::parse()`** (hanya `amount` yang dinormalkan). Kalau JS mask gagal/nonaktif, input "50.000" tervalidasi `numeric` tapi dibaca 50.0 (seribu kali lebih kecil) — kelas bug yang sama yang `RupiahInput` dibuat untuk cegah, tapi belum ditambal di jalur ini. Sudah ditambal di `update()` (poin 4 di atas) karena itu kode baru; `store()` dibiarkan sesuai instruksi "jangan ubah di luar scope".
+- **`CashDeposit::computedAmount()` menjumlah `manualPayments()->sum('amount')` mentah**, bukan `Payment::physicalAmount()` seperti `CollectorDeposit::computedAmount()`/`AdminCashBalanceService`/`CollectorBalanceService` (ADHOC-92 G4). Payment manual tunai yang overpay/pakai-saldo tidak terhitung benar di setoran kas admin. Pre-existing, tidak disentuh — tapi relevan karena payment yang diedit di sini bisa saja payment manual dalam `cash_deposit_id` yang menunggu verifikasi.
+- **`MiddlewarePermissionTest::admin_has_access_to_all…` gagal (403) di `/users`** di working tree ini — ditelusuri BUKAN akibat perubahan ADHOC-108 (dikonfirmasi lewat `git stash` ke commit terakhir: test itu hijau di HEAD). Penyebabnya perubahan lain yang SUDAH ada di working tree sebelum sesi ini dimulai (`config/rbac.php` `view_autogrant_exempt`/`view_autogrant_chain_boundary` untuk `customers.*`, tertanggal komentar "bug 2026-09-29", di luar scope ADHOC-108 — kemungkinan pekerjaan ADHOC-107 yang belum selesai). Dilaporkan, tidak diperbaiki.

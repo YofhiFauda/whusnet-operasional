@@ -64,8 +64,10 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($hasSensitiveView, 'POP Admin should not have sensitive device view permission');
     }
 
-    public function test_it_does_not_assign_sensitive_device_view_to_admin(): void
+    public function test_it_assigns_sensitive_device_view_to_admin_per_ui_matrix(): void
     {
+        // Dibalik 2026-09-29: Role Matrix UI memberi Admin view_sensitive,
+        // seeder menyalin UI.
         $this->seed(RolePermissionSeeder::class);
 
         $admin = Role::where('code', 'admin')->firstOrFail();
@@ -74,7 +76,40 @@ class RolePermissionSeederTest extends TestCase
             ->where('code', 'customers.detail.devices.view_sensitive')
             ->exists();
 
-        $this->assertFalse($hasSensitiveView, 'Admin should not have sensitive device view permission');
+        $this->assertTrue($hasSensitiveView, 'Admin should have sensitive device view permission');
+    }
+
+    public function test_customer_service_role_is_seeded_with_its_permissions(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        $customerService = Role::where('code', 'customer_service')->firstOrFail();
+        $codes = $customerService->permissions()->pluck('code');
+
+        // Permission verifikasi registrasi/C-REQ datang dari feature seeder
+        // yang tak dijalankan di setUp — cukup cek yang dari PermissionSeeder.
+        $this->assertContains('customers.view', $codes);
+        $this->assertContains('users.create', $codes);
+        $this->assertNotContains('payments.create', $codes);
+    }
+
+    public function test_all_seeded_roles_are_system_roles_so_their_code_is_locked(): void
+    {
+        // Role code dirujuk langsung oleh kode aplikasi & seeder — role
+        // non-sistem bisa diganti code-nya di UI dan fiturnya rusak diam-diam.
+        $unlocked = Role::where('is_system', false)->pluck('code')->all();
+
+        $this->assertSame([], $unlocked, 'Role berikut belum is_system: '.implode(', ', $unlocked));
+    }
+
+    public function test_reseeding_roles_does_not_merge_customer_service_into_helpdesk(): void
+    {
+        // Regresi: mapping lama 'Customer Service' -> 'Helpdesk' di RoleSeeder
+        // memindah user CS ke Helpdesk lalu menghapus role-nya tiap db:seed.
+        $this->seed(RoleSeeder::class);
+
+        $this->assertTrue(Role::where('code', 'customer_service')->exists());
+        $this->assertTrue(Role::where('code', 'helpdesk')->exists());
     }
 
     public function test_it_does_not_assign_invoice_update_to_helpdesk(): void

@@ -4,6 +4,11 @@
 <?php $__env->startSection('content'); ?>
 
 <?php
+// Fitur yang checkbox-nya lepas dari rantai "wajib centang Lihat Data induk".
+// Sumbernya SAMA dengan batas auto-grant di server
+// (RoleManagementService::syncPermissions) supaya UI & server tidak menyimpang.
+$independentFeatureCodes = config('rbac.view_autogrant_chain_boundary', []);
+
 // 1. Pemetaan Kategori Fungsional (Grouping Berdasarkan Fungsi)
 $functionalCategories = [
     'group_users' => [
@@ -303,7 +308,7 @@ $permissionDescMap = [
     'payments.view' => 'Buka daftar Pembayaran, detail pembayaran, halaman lebih-bayar, dan cetak kwitansi.',
     'payments.create' => 'Catat pembayaran atas invoice mana pun, termasuk mencatat setoran mewakili kolektor.',
     'payments.reject' => 'Kembalikan pembayaran yang salah input (pembayaran yang dikembalikan tidak boleh jadi lunas).',
-    'payments.update' => '[Belum aktif] Belum ada route ubah pembayaran — koreksi dilakukan lewat tolak + catat ulang.',
+    'payments.update' => 'Edit Pembayaran (ADHOC-108): ubah tanggal, metode, nominal, saldo pelanggan yang dipakai, bukti, catatan — HANYA pembayaran bulan berjalan, setoran/tagihan ikut terhitung ulang. Tidak berlaku untuk pembayaran bulan lalu, pembayaran Saldo, atau yang sudah masuk setoran terverifikasi (jalur itu tetap lewat Kembalikan). Permission ini mengubah UANG, bukan cuma metode — berikan hanya ke peran yang memegang kas.',
     'payments.delete' => '[Belum aktif] Belum ada route hapus pembayaran — jejak kas tidak dihapus.',
     'payments.validate' => '[Belum aktif] Verifikasi kas kolektor memakai `collector_worksheet.validate`, bukan permission ini.',
     'payments.approve' => '[Belum aktif] Belum dipakai route mana pun.',
@@ -697,7 +702,7 @@ foreach ($features as $f) {
                                                data-parent-feature-id="<?php echo e($feature->parent_id ?? ''); ?>"
                                                data-permission-code="<?php echo e($perm->code); ?>"
                                                data-is-view="<?php echo e(str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false'); ?>"
-                                               data-independent-channel="<?php echo e(str_ends_with($feature->code, '.qr') ? 'true' : 'false'); ?>"
+                                               data-independent-channel="<?php echo e(in_array($feature->code, $independentFeatureCodes, true) ? 'true' : 'false'); ?>"
                                                onchange="handleCheckboxChange(this)"
                                                class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                       <?php echo e($isSensitive
@@ -783,7 +788,7 @@ foreach ($features as $f) {
                                                            data-parent-feature-id="<?php echo e($child->parent_id ?? ''); ?>"
                                                            data-permission-code="<?php echo e($perm->code); ?>"
                                                            data-is-view="<?php echo e(str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false'); ?>"
-                                                           data-independent-channel="<?php echo e(str_ends_with($child->code, '.qr') ? 'true' : 'false'); ?>"
+                                                           data-independent-channel="<?php echo e(in_array($child->code, $independentFeatureCodes, true) ? 'true' : 'false'); ?>"
                                                            onchange="handleCheckboxChange(this)"
                                                            class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                                   <?php echo e($isSensitive
@@ -855,7 +860,7 @@ foreach ($features as $f) {
                                                                    data-parent-feature-id="<?php echo e($grandchild->parent_id ?? ''); ?>"
                                                                    data-permission-code="<?php echo e($perm->code); ?>"
                                                                    data-is-view="<?php echo e(str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false'); ?>"
-                                                                   data-independent-channel="<?php echo e(str_ends_with($grandchild->code, '.qr') ? 'true' : 'false'); ?>"
+                                                                   data-independent-channel="<?php echo e(in_array($grandchild->code, $independentFeatureCodes, true) ? 'true' : 'false'); ?>"
                                                                    onchange="handleCheckboxChange(this)"
                                                                    class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                                           <?php echo e($isSensitive

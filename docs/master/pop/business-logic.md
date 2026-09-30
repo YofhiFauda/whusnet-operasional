@@ -31,19 +31,30 @@ Dipanggil saat registrasi pelanggan baru (`CustomerController::store()`).
 - **Self-healing terhadap data import:** sebelum increment, sistem cek angka REQ ID tertinggi yang sudah ada di `customers` untuk POP itu (`MAX(SUBSTRING(customer_code...))`) — kalau counter di `pop_sequences` ternyata lebih rendah dari data riil (misal abis migrasi data lama), counter di-sync naik dulu. Ini mencegah collision kalau data lama pernah insert kode lebih tinggi dari counter yang tercatat.
 - Loop `do...while` cek `Customer::where('customer_code', $candidate)->exists()` — extra safety net di luar lock, walau practically jarang kepakai karena lock udah cukup.
 
-## 4. Generate CID (`Pop::generateComplexCid()`)
+## 4. Generate CID — satu rumus, satu pintu (ADHOC-107, 2026-09-29)
 
-Dipanggil **cuma** di `CustomerVerificationController::finalVerify()` — satu-satunya jalur resmi aktivasi (lihat [docs/customer-lifecycle](../../customer-lifecycle/README.md) & [docs/task-teknisi/bug.md](../../task-teknisi/bug.md) soal kenapa harus satu jalur ini).
+**Rumus:** `Pop::generateComplexCid()` — `{cid_prefix Cabang}{segmen Mini POP}{kode Distribusi}{REQ ID}`, e.g. `D2X6CRQ000021`.
 
-Format: `{cid_prefix}{segmen_mini_pop}{kode_distribusi}{req_id}` — e.g. `D2X6CRQ000021` (sebelum suffix `_DESA_NAMA` yang ditambah terpisah di `generatePppoeUsername()`).
+- **Segmen Mini POP** — cuma dari Mini POP yang di-assign (`customers.mini_pop_id`): `pop_code` Mini POP dikurangi `cid_prefix`-nya; **`0` kalau belum ada**. Dibaca lewat query by id, bukan relasi (dipanggil dari hook `updating` saat nilainya baru di-set).
+- **Kode Distribusi** — `Distribution.code`; **`0` kalau belum ada**.
 
-**Resolusi segmen Mini POP** (`resolveMiniPopSegment()`) — urutan prioritas (✅ fixed 2026-07-07, lihat [bug.md](bug.md)):
-1. **`customer.miniPop`** (`customers.mini_pop_id`, di-assign eksplisit lewat modal pasca pemasangan) → segmen dari `pop_code` Mini POP itu sendiri.
-2. Fallback legacy: `customer.pop.pop_code` (Cabang POP pelanggan) — dipertahankan buat pelanggan lama yang belum di-assign `mini_pop_id`. **Nilai ini konstan per-Cabang**, gak bisa beda per pelanggan.
-3. Fallback terakhir: `customerTechnicalDetail.olt_number` (free-text teknisi).
-4. Kalau semua gagal, default `'1'`.
+| Mini POP | Distribusi | CID |
+|---|---|---|
+| — | — | `C00RQ000631` |
+| C1 | — | `C10RQ000631` |
+| C1 | 4A | `C14ARQ000631` |
 
-**Kode Distribusi** — dari `Distribution.code` yang di-assign ke pelanggan; kalau belum ada distribusi, pakai placeholder `'XX'`.
+Fallback lama **dihapus** (keputusan user 2026-09-28, K3): `pop_code` Cabang, lalu `customer_technical_details.olt_number` (teks bebas teknisi). `olt_number` tidak ikut dilepas saat pindah POP dan jadi sumber CID campuran (prefix cabang baru + OLT cabang lama). Simulasi DB dev: hanya 3 dari 1.492 CID aktif yang hasil hitung ulangnya berbeda, dan CID itu cuma berubah kalau jaringannya disentuh.
+
+**Pintu:** `App\Services\CustomerCidService` — `resolve()` (hitung), `sync()` (isi `cid` kalau status `active`/`suspended`), `shouldHaveCid()`. **Jangan panggil `generateComplexCid()` langsung dari controller.**
+
+| Penulis CID | Kapan |
+|---|---|
+| `CustomerObserver::updating()` | Setiap `pop_id`/`mini_pop_id`/`distribution_id` berubah, atau CID masih kosong, dari jalur mana pun (Edit, modal, API, tinker). Tidak dihitung ulang di setiap simpan — CID legacy yang jaringannya tidak disentuh tetap stabil |
+| Modal "Atur Mini POP & Distribusi" & API `network-assignment` | `sync()` eksplisit — simpan ulang tanpa perubahan pilihan tetap membetulkan CID yang terlanjur campuran (jalur perbaikan manual) |
+| Aktivasi (`CustomerVerificationController::finalVerify()`, `CustomerController::activate()`) & import (`updateQuietly`, melewati observer) | `resolve()` eksplisit — status berubah ke active di sana |
+
+Dulu Edit menghitung `sprintf('%s00%s')` kalau distribusi kosong (Mini POP diabaikan) sementara modal memakai `generateComplexCid()` → CID pelanggan yang sama bolak-balik tiap disimpan dari jalur berbeda (43 pelanggan dev "Mini POP tanpa distribusi").
 
 ## 5. Resolve Display ID per Status (`Pop::resolveDisplayId()`)
 
@@ -66,44 +77,56 @@ Aturan tampilan ID pelanggan berbeda tergantung status — ini **bukan** kolom t
 
 **Registrasi cuma pilih Cabang POP** (`Pop::where('type','cabang')`) — Mini POP sengaja **gak** ditawarkan di sini, biar REQ ID/CID gak berantakan sebelum pemasangan kelar (keputusan produk, bukan keterbatasan teknis).
 
-> **Diubah 2026-09-26 (ADHOC-104, keputusan user):** Edit Pelanggan **sekarang punya** dropdown berantai POP → Mini POP → Distribusi (step "POP & Distribusi"), terutama untuk kasus pindah POP. Keputusan lama "modal = satu-satunya jalur" (lihat [bug.md](bug.md) §Susulan) tidak berlaku lagi. Aturan hierarki **dan guard status**-nya sama persis dengan modal (lihat bawah): **pra-pemasangan cuma POP Cabang yang boleh diatur** — dropdown Mini POP & Distribusi dikunci (`disabled`) dan ditolak server; daftar statusnya satu sumber, `NetworkAssignmentService::BLOCKED_STATUSES`. Detail pindah POP: §7a.
-
-Jalur utama Mini POP + Distribusi tetap **pasca pemasangan/aktivasi**, lewat modal "Atur Mini POP & Distribusi" (klik CID/REQ ID di halaman detail pelanggan → `CustomerNetworkAssignmentController@update`, route `PUT /customers/{customer}/network-assignment`):
+**Jalur utama** Mini POP + Distribusi: **pasca pemasangan/aktivasi**, lewat modal "Atur Mini POP & Distribusi" (klik CID/REQ ID di halaman detail pelanggan → `CustomerNetworkAssignmentController@update`, route `PUT /customers/{customer}/network-assignment`, permission `customers.detail.installation.validate`):
 
 - Dropdown Mini POP di-scope ke anak (`parent_id`) Cabang POP pelanggan.
 - Dropdown Distribusi di-scope ke anak Mini POP yang dipilih (`Distribution.pop_id = mini_pop.id`, sesuai struktur data seeder — lihat [docs/master/distribution/business-logic.md](../distribution/business-logic.md)).
 - Guard status: ditolak kalau pelanggan masih pra-pemasangan (`registered`…`waiting_installation`) atau `rejected`.
-- Bisa diganti-ganti berkali-kali pasca aktivasi (nyusul konfigurasi Mikrotik manual, belum ada integrasi hardware) — tiap ganti, kalau pelanggan udah `active`/`suspended`, CID **di-regenerate otomatis**.
+- Bisa diganti-ganti berkali-kali pasca aktivasi (nyusul konfigurasi Mikrotik manual, belum ada integrasi hardware). CID pelanggan `active`/`suspended` disinkronkan tiap simpan (§4) — termasuk simpan ulang tanpa perubahan, yang jadi jalur perbaikan manual CID campuran.
+
+**Jalur kedua — Edit Pelanggan** (ADHOC-104/109/107): dropdown berantai POP → Mini POP → Distribusi, tapi Mini POP & Distribusi **cuma ditulis kalau Cabang ikut dipindah** (selain itu rule `exclude`, nilainya tidak disentuh — nilai legacy di luar hierarki tetap utuh). Dropdown dikunci (`disabled` + ditolak server) kalau:
+- pelanggan **pra-pemasangan** — cuma POP Cabang yang boleh diatur; atau
+- user **tidak** punya `customers.detail.installation.validate` — permission yang sama dengan modal. Tanpa gerbang ini Edit (cukup `customers.update`) jadi pintu belakang untuk mengubah OLT/ODP & CID. User tanpa izin tetap boleh pindah Cabang; Mini POP & Distribusi cabang lama dilepas, yang baru diatur pemegang izin lewat modal.
+
+Alasan kunci dihitung satu method (`CustomerController::networkLockReason()`) untuk tampilan & validasi.
+
+**Satu sumber aturan** (ADHOC-107 R6) di `NetworkAssignmentService`: daftar status pra-pemasangan `BLOCKED_STATUSES`, serta `miniPopBelongsToPop()` & `distributionBelongsToMiniPop()` — dipakai Edit, modal, endpoint API, dan `CustomerObserver`. Jangan menulis ulang query hierarki di tempat lain.
 
 Riwayat gap sebelum fix ini (Mini POP gak pernah nyambung ke pelanggan sama sekali): [bug.md](bug.md).
 
-## 7a. Pindah POP (ADHOC-104, 2026-09-26)
+## 7a. Pindah POP (ADHOC-104 → ADHOC-107, final 2026-09-29)
 
-Kasus pemicu: pelanggan dipindah JETIS → SANDYA lewat Edit, CID jadi campuran `D1X6…` (prefix SANDYA + segmen OLT JETIS) karena cuma `pop_id` yang berganti; `mini_pop_id` masih menunjuk Mini POP JETIS dan `resolveMiniPopSegment()` mengambil segmen dari situ duluan.
+Kasus pemicu: pelanggan dipindah JETIS → SANDYA lewat Edit, CID jadi campuran `D1X6…` (prefix SANDYA + segmen OLT JETIS) karena cuma `pop_id` yang berganti. Rancangan & semua keputusan user: [`../../plan/rancangan-pindah-pop-lanjutan.md`](../../plan/rancangan-pindah-pop-lanjutan.md).
 
-**Invariant hierarki** — ditegakkan `CustomerObserver::updating()` dari **semua** jalur (Edit, modal, import, tinker), tiap kali `pop_id`/`mini_pop_id`/`distribution_id` berubah:
-- `mini_pop.type = mini_pop` **dan** `mini_pop.parent_id = customer.pop_id` — kalau tidak, `mini_pop_id` → NULL.
-- `distribution.pop_id = customer.mini_pop_id` — kalau tidak (termasuk distribusi tanpa Mini POP), `distribution_id` → NULL. Distribusi tanpa Mini POP sengaja ikut dilepas: kalau dibiarkan, segmen CID jatuh ke fallback `olt_number` yang masih berisi OLT cabang lama.
-- Yang tidak cocok **dilepas, tidak ditebak** — OLT pengganti keputusan teknis admin.
+**`CustomerObserver::updating()`** — berlaku dari **semua** jalur (Edit, modal, API, tinker), urutannya:
+1. **Guard piutang** — kalau `pop_id` berubah dan masih ada tagihan penghalang (lihat tabel), lempar `CustomerRelocationBlockedException`; tidak ada yang berubah. Lapis kedua di belakang validasi Edit.
+2. **Hierarki** — `mini_pop.type = mini_pop` & `parent_id = pop_id`, `distribution.pop_id = mini_pop_id`; yang tidak cocok **dilepas, tidak ditebak**. Hanya dicek kalau salah satu kolom jaringan berubah.
+3. **Kolektor dilepas** kalau `pop_id` berubah.
+4. **CID dibuat ulang** (§4).
 
-**Saat pindah POP:**
+**`CustomerObserver::updated()`** — kalau `pop_id` berubah: cabut token QR, pindahkan tagihan bulan berjalan yang belum dibayar.
 
-| Data | Perlakuan |
+**Aturan tagihan** — satu sumber: `App\Services\CustomerRelocationService`. Garis batasnya **bulan berjalan**, sama dengan garis kunci buku (`BookPeriod::isLocked()`; bulan berjalan tidak pernah terkunci).
+
+| Data | Perlakuan saat pindah POP |
 |---|---|
 | REQ ID (`customer_code`) | **Permanen.** Pindah ditolak kalau REQ ID sama sudah dipakai di POP tujuan (unique `pop_id, customer_code`) |
-| CID | **Boleh berubah** — dibuat ulang dari POP + Mini POP + Distribusi baru (pelanggan `active`/`suspended`). CID lama tercatat di `audit_logs` |
-| Mini POP / Distribusi | Dilepas kalau milik cabang lama; admin pilih ulang di Edit/modal |
-| Tagihan `belum_dibayar`/`sebagian` | Ikut pindah `pop_id` (lihat [billing-pembayaran](../../billing-pembayaran/README.md)) |
-| Tagihan lunas/batal/write-off, pembayaran | Tetap di POP lama (sudah masuk laporan & tutup buku) |
-| Kolektor | Dilepas kalau tak punya akses POP baru (lihat [kolektor](../../kolektor/business-logic.md)) |
-| Token QR | Dicabut (sudah ada sebelumnya) |
-| Tiket/Task/FopTask terbuka | **Belum ditangani** — tetap di POP lama |
+| CID | **Boleh berubah** — dibuat ulang dari POP + Mini POP + Distribusi (pelanggan `active`/`suspended`). CID lama tercatat di `audit_logs` |
+| Piutang (`belum_dibayar`/`sebagian`, periode < bulan berjalan = `Invoice::scopePiutang()`) | **Penghalang** — wajib lunas dulu |
+| Tagihan bulan berjalan/sesudahnya berstatus `sebagian`, atau yang sudah punya pembayaran `valid` | **Penghalang** — kalau ikut pindah, cicilannya tercatat di cabang lama sementara tagihannya di cabang baru |
+| Tagihan bulan berjalan/sesudahnya `belum_dibayar` tanpa pembayaran valid | **Ikut pindah** (per model, tercatat di audit) — pembayarannya masuk cabang baru |
+| Tagihan lunas/batal/write-off, baris `payments` | **Tidak pernah disentuh** — laporan pembayaran & piutang tetap milik cabang lama |
+| Tagihan bulan berikutnya | Terbit di cabang baru (`GenerateMonthlyInvoicesCommand` memakai `pop_id` pelanggan) |
+| Saldo lebih bayar | Terbawa; dipakai untuk tagihan cabang baru (ledger mencatat POP per baris) |
+| Mini POP / Distribusi | Dilepas kalau milik cabang lama; dipilih ulang di Edit (dengan izin) / modal |
+| Kolektor | **Selalu dilepas** — termasuk yang punya akses ke cabang baru (lihat [kolektor](../../kolektor/business-logic.md)) |
+| Username PPPoE | **Tidak diubah otomatis** — peringatan tampil di Detail & Quick Hub kalau tidak diawali CID baru (`CustomerCidService::pppoeMismatchWarning()`) |
+| Token QR | Dicabut |
+| Tiket/Task/FopTask terbuka | **Belum ditangani** — tetap di POP lama (usulan task terpisah) |
 
-**Validasi Edit (`CustomerController::update()`):** POP tujuan wajib dalam scope user (`Pop::forUser()`), Mini POP wajib anak POP terpilih, Distribusi wajib anak Mini POP terpilih (tanpa Mini POP = ditolak), dan Mini POP/Distribusi ditolak selama pelanggan pra-pemasangan (`registered` s/d `waiting_installation`, `rejected`) — pada status itu cuma POP yang boleh dipindah. Dropdown Edit juga di-scope: cuma Mini POP/Distribusi di bawah Cabang dalam scope user.
+**Validasi Edit (`CustomerController::update()`, rule `pop_id`):** POP tujuan wajib dalam scope user (`Pop::forUser()`), REQ ID tidak bentrok, dan tidak ada tagihan penghalang (pesan menyebut jumlah & total). Form Edit menampilkan keterangan sebelum submit: jumlah tagihan penghalang, atau tagihan bulan berjalan yang akan ikut pindah. Exception observer yang lolos validasi (race) diterjemahkan jadi error `pop_id`, bukan 500.
 
-Aturan penomoran lengkap: [ID_NUMBERING_RULES.md §10](../../ID_NUMBERING_RULES.md). Test: `tests/Feature/CustomerPindahPopResetMiniPopTest.php`.
-
-> **Akan berubah (ADHOC-107, rancangan belum diimplementasi):** keputusan user 2026-09-28 mengganti dua baris tabel di atas — pindah POP **wajib lunas piutang dulu** (`scopePiutang`), tagihan periode lalu **tidak pernah dipindah** (laporan pembayaran & piutang tetap di cabang lama), sedangkan tagihan bulan berjalan yang belum dibayar ikut pindah dan dibayar ke cabang baru; kolektor **selalu** dilepas. Ditambah perbaikan celah: distribusi legacy hilang saat Edit, gerbang izin Mini POP/Distribusi di Edit, rumus CID Edit ≠ modal, CID basi dari import/tinker. Lihat [`../../plan/rancangan-pindah-pop-lanjutan.md`](../../plan/rancangan-pindah-pop-lanjutan.md).
+Aturan penomoran lengkap: [ID_NUMBERING_RULES.md §10](../../ID_NUMBERING_RULES.md). Test: `CustomerPindahPopResetMiniPopTest`, `PindahPopDitolakSelamaAdaPiutangTest`, `CustomerEditJaringanButuhIzinValidasiTest`, `CidSatuRumusEditModalApiTest`, `CustomerEditDistribusiLegacyTidakHilangTest`, `KolektorSelaluDilepasSaatPindahPopTest`, `PppoeTidakCocokCidDiberiPeringatanTest`.
 
 ## 8. Hal yang Belum/Sengaja Tidak Divalidasi
 

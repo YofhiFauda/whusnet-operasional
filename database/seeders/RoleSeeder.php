@@ -15,13 +15,16 @@ class RoleSeeder extends Seeder
     {
         // Update user's old roles to new roles based on instructions
         // 1. Admin Pusat -> Admin
-        // 2. Customer Service -> Helpdesk
-        // 3. Finance/Kasir -> Admin (Opsi A)
-        // 4. Admin Cabang -> POP Admin
+        // 2. Finance/Kasir -> Admin (Opsi A)
+        // 3. Admin Cabang -> POP Admin
+        //
+        // Mapping lama 'Customer Service' -> 'Helpdesk' SENGAJA dibuang
+        // (2026-09-29): Customer Service sekarang role sendiri (dibuat lewat
+        // UI, disalin ke bawah). Kalau mapping itu dibalikin, tiap db:seed
+        // bakal memindah semua user CS ke Helpdesk lalu menghapus role-nya.
 
         $mappings = [
             'Admin Pusat' => 'Admin',
-            'Customer Service' => 'Helpdesk',
             'Finance/Kasir' => 'Admin',
             'Admin Cabang' => 'POP Admin',
         ];
@@ -47,14 +50,18 @@ class RoleSeeder extends Seeder
             [
                 'code' => 'owner',
                 'name' => 'Owner',
-                'description' => 'Owner Perusahaan (Akses Penuh)',
+                'description' => 'Owner Perusahaan',
                 'is_system' => true,
             ],
             [
+                // is_system = true (2026-09-29) supaya code-nya terkunci di UI:
+                // kode aplikasi memberi akses semua POP lewat code 'atasan'
+                // (HasPopScope, EffectiveAccessService) — code diganti di UI =
+                // Atasan diam-diam kehilangan akses lintas cabang.
                 'code' => 'atasan',
                 'name' => 'Atasan',
                 'description' => 'Atasan / Manajemen',
-                'is_system' => false,
+                'is_system' => true,
             ],
             [
                 'code' => 'admin',
@@ -75,6 +82,17 @@ class RoleSeeder extends Seeder
                 'is_system' => true,
             ],
             [
+                // Dibuat lewat UI Role Matrix (2026-09-29), disalin ke seeder.
+                // Pemegang Verifikasi Registrasi & Verifikasi Biaya C-REQ
+                // bareng Helpdesk — lihat RolePermissionSeeder. is_system =
+                // true supaya code-nya terkunci: RolePermissionSeeder mencari
+                // role ini lewat code.
+                'code' => 'customer_service',
+                'name' => 'Customer Service',
+                'description' => 'Customer Service',
+                'is_system' => true,
+            ],
+            [
                 'code' => 'fop',
                 'name' => 'FOP',
                 'description' => 'Field Operations',
@@ -91,7 +109,7 @@ class RoleSeeder extends Seeder
             [
                 'code' => 'sales',
                 'name' => 'Sales',
-                'description' => 'Sales dan Pendaftaran',
+                'description' => 'Pemasaran di lapangan',
                 'is_system' => true,
                 // Restriksi Paket per Role (Skema 1, 2026-09-12) — Sales
                 // cuma boleh pilih paket dari `restricted_packages`, diatur
@@ -105,7 +123,7 @@ class RoleSeeder extends Seeder
                 // user.
                 'code' => 'business_development',
                 'name' => 'Business Development',
-                'description' => 'Mengatur Restriksi Paket, Master Agent, dan Dashboard Omset Sales',
+                'description' => 'Pengembangan dan Pertumbuhan Bisnis',
                 'is_system' => true,
             ],
             [
@@ -122,7 +140,7 @@ class RoleSeeder extends Seeder
                 // docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §B-8 no. 4.
                 'code' => 'kolektor',
                 'name' => 'Kolektor',
-                'description' => 'Penagih Lapangan (Worklist Read-Only, Tidak Bisa Input Pembayaran)',
+                'description' => 'Penagih Lapangan',
                 'is_system' => true,
             ],
         ];

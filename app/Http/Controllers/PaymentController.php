@@ -17,6 +17,7 @@ use App\Services\CustomerBalanceService;
 use App\Services\FileUploadService;
 use App\Services\PaymentService;
 use App\Services\Receipts\ReceiptPresenter;
+use App\Support\Money;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -48,7 +49,7 @@ class PaymentController extends Controller
 
         $query = Payment::query()
             ->applyUserScope()
-            ->with(['invoice', 'customer', 'pop', 'receiver', 'collector', 'bankAccount'])
+            ->with(['invoice', 'customer', 'pop', 'receiver', 'collector', 'bankAccount', 'collectorDeposit', 'cashDeposit'])
             ->latest('payment_date')
             ->latest('id');
 
@@ -112,18 +113,10 @@ class PaymentController extends Controller
 
         $payments = $query->paginate(10)->withQueryString();
         $pops = Pop::forUser()->orderBy('name')->get();
-        $bankAccounts = BankAccount::query()->active()->orderBy('bank_name')->orderBy('account_number')->get();
-        $collectors = User::query()
-            ->whereHas('role', fn ($q) => $q->where('name', 'kolektor')->orWhere('code', 'kolektor'))
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get();
 
         return view('payments.index', compact(
             'payments',
             'pops',
-            'bankAccounts',
-            'collectors',
             'search',
             'popId',
             'dateFrom',
@@ -190,7 +183,7 @@ class PaymentController extends Controller
             'Anda tidak memiliki akses ke pembayaran POP ini.'
         );
 
-        $relations = ['invoice.customerService', 'invoice.internetPackage', 'customer', 'pop', 'receiver', 'collector', 'bankAccount'];
+        $relations = ['invoice.customerService', 'invoice.internetPackage', 'customer', 'pop', 'receiver', 'collector', 'bankAccount', 'collectorDeposit', 'cashDeposit'];
 
         if (auth()->user()->hasPermission('audit_logs.view')) {
             $relations[] = 'auditLogs.user';
@@ -332,63 +325,14 @@ class PaymentController extends Controller
         // pembayaran tercatat 1.000 kali lebih kecil TANPA satu pun error.
         $request->merge(['amount' => RupiahInput::parse($request->input('amount'))]);
 
-        $validated = $request->validate([
-            // Batas atas WAJIB, sejajar dengan jalur kolektor
-            // (RecordsCollectorBatch::batchValidationRules()). Tanggal masa
-            // depan merusak pemotongan pendapatan per periode dan membuat
-            // laporan bulan berjalan memuat uang yang belum ada.
-            'payment_date' => 'required|date|before_or_equal:today',
-            'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
-            // Transfer & Kolektor punya field pendukung wajib — lihat
-            // PaymentMethod::requiresBankDetails()/requiresCollector().
-            // Transfer: pilih rekening dari Master Rekening Bank (ADHOC-95),
-            // bukan ketik nama bank/nomor rekening. Status aktifnya dicek
-            // PaymentService (pesan lebih jelas daripada rule `exists`), dan
-            // `bank_name`/`account_number` diisi di sana sebagai snapshot —
-            // SENGAJA tak lagi diterima dari request.
-            'bank_account_id' => 'required_if:payment_method,transfer|nullable|integer|exists:bank_accounts,id',
-            // Opsional, cuma disimpan untuk Transfer/Kolektor —
-            // PaymentMethod::requiresSenderName().
-            'sender_name' => 'nullable|string|max:150',
-            'collected_by' => [
-                'required_if:payment_method,kolektor',
-                'nullable',
-                'exists:users,id',
-                function ($attribute, $value, $fail) {
-                    if (! $value) {
-                        return;
-                    }
-
-                    $collector = User::find($value);
-
-                    if (! $collector || ! $collector->hasRole('kolektor')) {
-                        $fail('User yang dipilih bukan kolektor.');
-                    }
-                },
-            ],
-            // Nominal saldo pelanggan yang dipakai untuk pembayaran ini.
-            // Dicek ulang (dengan lock) di PaymentService::record() — di
-            // sini cuma validasi bentuk, bukan kecukupan saldo.
-            'use_balance_amount' => 'nullable|numeric|min:0',
-            // Nullable, bukan required: endpoint ini juga dipakai dari JSON
-            // oleh pemanggil yang tak punya form untuk menaruh kuncinya.
-            // Tanpa kunci, perilakunya persis seperti dulu.
-            'idempotency_key' => 'nullable|string|max:191',
-            // `amount` = TOTAL uang tunai/transfer/kolektor yang diserahkan
-            // pelanggan (di luar saldo), bukan lagi dibatasi sisa tagihan.
-            // Kalau amount+saldo melebihi sisa, kelebihannya otomatis
-            // dipisah jadi overpay_amount di transaction di bawah — admin
-            // tak perlu hitung sendiri "sisa tagihan dikurangi total"
-            // (2026-08-04: versi lama minta itu, gampang salah ketik/hitung
-            // di lapangan, lihat docs/plan/analisa-billing-tagihan-
-            // pembayaran-kolektor.md §D-5).
-            'amount' => 'required|numeric|min:1|max:99999999.99',
-            'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
-            // Metode Lainnya wajib menjelaskan metode apa persisnya — lihat
-            // PaymentMethod::requiresDescription(). Dipakai juga sebagai
-            // catatan umum untuk metode lain, jadi tetap satu kolom `note`.
-            'note' => 'required_if:payment_method,lainnya|nullable|string|max:1000',
-        ]);
+        // Aturan bersama dengan update() (Edit Pembayaran, ADHOC-108) — lihat
+        // paymentRules(). `amount` = TOTAL uang tunai/transfer/kolektor yang
+        // diserahkan pelanggan (di luar saldo), tidak dibatasi sisa tagihan:
+        // kalau amount+saldo melebihi sisa, kelebihannya otomatis dipisah
+        // jadi overpay_amount di transaction PaymentService — admin tak
+        // perlu hitung sendiri "sisa tagihan dikurangi total" (2026-08-04,
+        // lihat docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §D-5).
+        $validated = $request->validate($this->paymentRules(forUpdate: false));
 
         $proofPath = null;
         if ($request->hasFile('proof_file')) {
@@ -611,9 +555,13 @@ class PaymentController extends Controller
     }
 
     /**
-     * Update payment details via Modal.
+     * Halaman Edit Pembayaran (ADHOC-108) — bukan modal. Aturan CLAUDE.md
+     * "aksi baru: 3 pola" — mutasi data (nulis ledger, validasi server
+     * majemuk) wajib halaman tersendiri: `back()->withErrors()->withInput()`
+     * kembali ke *referer*, dan modal di atas halaman List akan menutup diri
+     * lalu menampilkan List kosong tanpa pesan error yang nyantol.
      */
-    public function update(Request $request, Payment $payment): RedirectResponse|JsonResponse
+    public function edit(Payment $payment): View|RedirectResponse
     {
         abort_unless(
             Payment::query()->applyUserScope()->whereKey($payment->id)->exists(),
@@ -621,20 +569,77 @@ class PaymentController extends Controller
             'Anda tidak memiliki akses ke pembayaran POP ini.'
         );
 
-        if ($payment->payment_status === PaymentStatus::DITOLAK) {
-            $message = 'Pembayaran yang sudah ditolak tidak dapat diubah.';
-            if ($request->expectsJson()) {
-                return response()->json(['success' => false, 'message' => $message], 422);
-            }
+        $payment->load(['invoice', 'customer', 'bankAccount', 'collectorDeposit', 'cashDeposit']);
 
+        // Satu sumber "boleh diedit?" (Payment::editBlockedReason()) — kalau
+        // sudah terkunci, jangan render form yang toh akan ditolak service.
+        if (($blockedReason = $payment->editBlockedReason()) !== null) {
             return redirect()
-                ->route('payments.index')
-                ->withErrors(['payment' => $message]);
+                ->route('payments.show', $payment->id)
+                ->withErrors(['payment' => $blockedReason]);
         }
 
-        $validated = $request->validate([
+        $bankAccounts = BankAccount::query()->active()->orderBy('bank_name')->orderBy('account_number')->get();
+        $collectors = User::query()
+            ->whereHas('role', fn ($q) => $q->where('name', 'kolektor')->orWhere('code', 'kolektor'))
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+
+        $customerBalance = $payment->customer
+            ? app(CustomerBalanceService::class)->balance($payment->customer)
+            : 0.0;
+
+        // Sisa tagihan TANPA payment ini sendiri — sama rumus dengan
+        // PaymentService::revise() (di sana dihitung ulang dengan lock,
+        // di sini murni tampilan). Kalau payment ini dihapus, ini sisanya.
+        $remainingWithoutThisPayment = Money::atLeastZero(Money::sub(
+            $payment->invoice->total_amount,
+            Money::of(
+                $payment->invoice->payments()
+                    ->where('payment_status', PaymentStatus::VALID->value)
+                    ->where('id', '!=', $payment->id)
+                    ->sum('amount')
+            )
+        ));
+
+        // Nominal tunai awal form = kebalikan auto-split record()/revise():
+        // amount (diterapkan) + overpay (lebih) − saldo dipakai = tunai yang
+        // dulu diserahkan pelanggan di luar saldo.
+        $initialTunaiAmount = Money::atLeastZero(Money::sub(
+            Money::add($payment->amount, (float) ($payment->overpay_amount ?? 0)),
+            (float) $payment->balance_used_amount
+        ));
+
+        // Payment yang tertaut setoran APA PUN (pending sekalipun): metode &
+        // kolektor dibekukan di form — lihat PaymentService::revise() F3.4.
+        $isFrozenToDeposit = $payment->collector_deposit_id !== null || $payment->cash_deposit_id !== null;
+
+        return view('payments.edit', compact(
+            'payment',
+            'bankAccounts',
+            'collectors',
+            'customerBalance',
+            'remainingWithoutThisPayment',
+            'initialTunaiAmount',
+            'isFrozenToDeposit'
+        ));
+    }
+
+    /**
+     * Aturan validasi BERSAMA `store()` (form Bayar) & `update()` (Edit
+     * Pembayaran, ADHOC-108) — satu sumber, supaya field yang bisa diisi
+     * saat bayar tidak diam-diam berbeda aturannya di form Edit. Payment
+     * metode Saldo SENGAJA dikecualikan dari pilihan (K5) — itu cuma
+     * dibuat sistem, tidak pernah dipilih manual dari form mana pun.
+     *
+     * @return array<string, mixed>
+     */
+    private function paymentRules(bool $forUpdate): array
+    {
+        $rules = [
             'payment_date' => 'required|date|before_or_equal:today',
-            'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
+            'payment_method' => ['required', Rule::enum(PaymentMethod::class)->except(PaymentMethod::SALDO)],
             'bank_account_id' => 'required_if:payment_method,transfer|nullable|integer|exists:bank_accounts,id',
             'sender_name' => 'nullable|string|max:150',
             'collected_by' => [
@@ -645,37 +650,73 @@ class PaymentController extends Controller
                     if (! $value) {
                         return;
                     }
+
                     $collector = User::find($value);
+
                     if (! $collector || ! $collector->hasRole('kolektor')) {
                         $fail('User yang dipilih bukan kolektor.');
                     }
                 },
             ],
-            'note' => 'required_if:payment_method,lainnya|nullable|string|max:1000',
+            'use_balance_amount' => 'nullable|numeric|min:0',
+            'amount' => 'required|numeric|min:1|max:99999999.99',
             'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
-        ]);
-
-        $method = PaymentMethod::from($validated['payment_method']);
-
-        $bankAccount = null;
-        if ($method->requiresBankDetails() && ! empty($validated['bank_account_id'])) {
-            $bankAccount = BankAccount::find($validated['bank_account_id']);
-        }
-
-        $updateData = [
-            'payment_date' => $validated['payment_date'],
-            'payment_method' => $method->value,
-            'bank_account_id' => $bankAccount?->id,
-            'bank_name' => $bankAccount?->bank_name,
-            'account_number' => $bankAccount?->account_number,
-            'sender_name' => $method->requiresSenderName() ? ($validated['sender_name'] ?? null) : null,
-            'collected_by' => $method->requiresCollector() ? ($validated['collected_by'] ?? null) : null,
-            'note' => $validated['note'] ?? null,
+            'note' => 'required_if:payment_method,lainnya|nullable|string|max:1000',
         ];
 
+        if ($forUpdate) {
+            // K2 — alasan koreksi OPSIONAL (keputusan user 2026-09-28).
+            $rules['reason'] = 'nullable|string|max:1000';
+        } else {
+            $rules['idempotency_key'] = 'nullable|string|max:191';
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Edit Pembayaran PENUH (ADHOC-108) — bukan cuma metode/tanggal seperti
+     * jalur lama, nominal & saldo dipakai ikut bisa dikoreksi. Semua guard
+     * (tutup buku, setoran terverifikasi, payment Saldo, invoice batal) ada
+     * di `PaymentService::revise()`, dicek ulang DI BAWAH LOCK — method ini
+     * cuma menyiapkan input & menyerahkan ke sana.
+     */
+    public function update(Request $request, Payment $payment): RedirectResponse|JsonResponse
+    {
+        abort_unless(
+            Payment::query()->applyUserScope()->whereKey($payment->id)->exists(),
+            403,
+            'Anda tidak memiliki akses ke pembayaran POP ini.'
+        );
+
+        $payment->load(['collectorDeposit', 'cashDeposit', 'invoice', 'customer']);
+
+        if (($blockedReason = $payment->editBlockedReason()) !== null) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $blockedReason], 422);
+            }
+
+            return redirect()
+                ->route('payments.show', $payment->id)
+                ->withErrors(['payment' => $blockedReason]);
+        }
+
+        // Sama alasannya dengan store(): kasir mengetik "150.000" = seratus
+        // lima puluh ribu, bukan 150,0. use_balance_amount ikut dinormalkan
+        // di sini (beda dari store() yang belum menormalkannya) — field ini
+        // baru pertama kali WAJIB bisa diisi manusia lewat form Edit dengan
+        // masking ribuan yang sama seperti Nominal Diterima.
+        $request->merge(['amount' => RupiahInput::parse($request->input('amount'))]);
+        if ($request->filled('use_balance_amount')) {
+            $request->merge(['use_balance_amount' => RupiahInput::parse($request->input('use_balance_amount'))]);
+        }
+
+        $validated = $request->validate($this->paymentRules(forUpdate: true));
+
+        $proofPath = null;
         if ($request->hasFile('proof_file')) {
             $payment->loadMissing('customer', 'invoice');
-            $updateData['proof_file'] = FileUploadService::uploadPaymentProof(
+            $proofPath = FileUploadService::uploadPaymentProof(
                 $request->file('proof_file'),
                 $payment->customer,
                 $payment->invoice?->invoice_type?->value,
@@ -683,9 +724,36 @@ class PaymentController extends Controller
             );
         }
 
-        $payment->update($updateData);
+        $oldAmount = (float) $payment->amount;
+        $oldCollectedBy = $payment->collected_by;
+
+        // ValidationException dari revise() (tutup buku, setoran
+        // terverifikasi, saldo tak cukup, dst) SENGAJA tidak ditangkap di
+        // sini — biar Laravel redirect back() ke halaman Edit (referer)
+        // dengan error + input lama, pola PRG yang sama dengan store().
+        $payment = app(PaymentService::class)->revise($payment, $validated, $proofPath);
+
+        // Kolektor terkait (lama ATAU baru) & nominal berubah → Worklist
+        // yang sedang terbuka tak memajang saldo lama (pola sama reject()).
+        $affectedCollectorId = $payment->collected_by ?? $oldCollectedBy;
+        if ($affectedCollectorId && $payment->pop_id && ! Money::equals($oldAmount, (float) $payment->amount)) {
+            $kolektor = User::find($affectedCollectorId);
+
+            if ($kolektor) {
+                CollectorActivityUpdated::dispatch(
+                    $kolektor,
+                    (int) $payment->pop_id,
+                    'pembayaran_dikoreksi',
+                    1,
+                    (float) $payment->amount,
+                    $payment->payment_number,
+                );
+            }
+        }
 
         if ($request->expectsJson()) {
+            $payment->invoice->refresh();
+
             return response()->json([
                 'success' => true,
                 'message' => "Pembayaran {$payment->payment_number} berhasil diperbarui.",
@@ -694,6 +762,7 @@ class PaymentController extends Controller
                     'payment_number' => $payment->payment_number,
                     'payment_method' => $payment->payment_method,
                     'payment_date' => $payment->payment_date?->format('Y-m-d'),
+                    'amount' => (float) $payment->amount,
                     'bank_name' => $payment->bank_name,
                     'account_number' => $payment->account_number,
                     'sender_name' => $payment->sender_name,
@@ -703,7 +772,7 @@ class PaymentController extends Controller
         }
 
         return redirect()
-            ->back()
+            ->route('payments.show', $payment->id)
             ->with('success', "Pembayaran {$payment->payment_number} berhasil diperbarui.");
     }
 
