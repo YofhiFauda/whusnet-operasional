@@ -144,6 +144,7 @@ class TaskMaintenanceModemInstallTest extends TestCase
             'opm_photo' => UploadedFile::fake()->image('opm.jpg'),
             'speedtest_photo' => UploadedFile::fake()->image('speed.jpg'),
             'selected_inventory_serial_id' => $serial->id,
+            'modem_ownership_choice' => 'sewa_gudang',
         ]);
 
         $response->assertStatus(302);
@@ -192,6 +193,7 @@ class TaskMaintenanceModemInstallTest extends TestCase
             'opm_photo' => UploadedFile::fake()->image('opm.jpg'),
             'speedtest_photo' => UploadedFile::fake()->image('speed.jpg'),
             'selected_inventory_serial_id' => $newSerial->id,
+            'modem_ownership_choice' => 'sewa_gudang',
         ])->assertSessionHasNoErrors();
 
         $oldSerial->refresh();
