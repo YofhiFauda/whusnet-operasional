@@ -11,6 +11,7 @@ use App\Enums\ScopeType;
 use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Enums\WorkflowTransition;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
@@ -22,6 +23,7 @@ use App\Models\InventorySerialSale;
 use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\PackageCategory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -32,6 +34,8 @@ use App\Services\InventoryIssueService;
 use App\Services\InventoryReceiveService;
 use App\Services\InventoryTransferService;
 use Database\Seeders\ActionSeeder;
+use Database\Seeders\BusinessDevelopmentVerificationFeatureSeeder;
+use Database\Seeders\CustomerAcquisitionFeatureSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\InternetPackageSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -64,6 +68,8 @@ class CustomerInstallationOwnershipTest extends TestCase
         $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
+        $this->seed(CustomerAcquisitionFeatureSeeder::class);
+        $this->seed(BusinessDevelopmentVerificationFeatureSeeder::class);
         $this->seed(RolePermissionSeeder::class);
         $this->seed(SubscriptionStatusSeeder::class);
         $this->seed(InternetPackageSeeder::class);
@@ -73,7 +79,7 @@ class CustomerInstallationOwnershipTest extends TestCase
     /**
      * @return array{0: Customer, 1: User, 2: Task, 3: Pop, 4: Pop}
      */
-    private function setupInstallingCustomer(string $contractType): array
+    private function setupInstallingCustomer(string $contractType, ?InternetPackage $package = null): array
     {
         $pusat = Pop::create(['code' => 'PUSAT-OWN', 'pop_code' => 'PST', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'Pusat Ownership Test', 'type' => 'pusat', 'status' => 'active']);
         $pop = Pop::create(['code' => 'CABANG-OWN', 'pop_code' => 'CBG', 'registration_prefix' => 'C', 'cid_prefix' => 'E', 'name' => 'Cabang Ownership Test', 'type' => 'cabang', 'status' => 'active']);
@@ -86,7 +92,7 @@ class CustomerInstallationOwnershipTest extends TestCase
         $city = City::query()->where('name', 'Ponorogo')->firstOrFail();
         $district = District::query()->where('city_id', $city->id)->firstOrFail();
         $village = Village::query()->where('district_id', $district->id)->firstOrFail();
-        $package = InternetPackage::query()->firstOrFail();
+        $package ??= InternetPackage::query()->firstOrFail();
 
         $customer = Customer::create([
             'customer_code' => 'TEST-OWN-'.strtoupper($contractType).'-001',
@@ -375,6 +381,84 @@ class CustomerInstallationOwnershipTest extends TestCase
         $jualModemItem = $invoice->items()->whereHas('subcategory', fn ($q) => $q->where('code', 'jual_modem'))->first();
         $this->assertNotNull($jualModemItem, 'Invoice AWAL wajib punya baris Jual Modem.');
         $this->assertEquals(150000.00, (float) $jualModemItem->amount);
+    }
+
+    /**
+     * Kategori Bisnis — BD-routing (`Customer::needsBusdevInstallationFeeVerification()`)
+     * ditentukan dari `internet_packages.category`/`package_categories`,
+     * INDEPENDEN dari `contract_type`. Nothing di storePemasangan()/
+     * storeSpeedtest() membedakan kategori paket, jadi pelanggan Bisnis bisa
+     * juga pilih 'beli_gudang' — Invoice AWAL-nya cuma terbit lewat jalur BD
+     * (`BusinessDevelopmentVerificationController::verify()`), bukan
+     * `finalVerify()` langsung. `CustomerAcquisitionFeatureSeeder` (lihat
+     * setUp()) memetakan kategori apa pun bernama "...Bisnis..." ke role
+     * Business Development — nama ini HARUS match persis kategori yang sudah
+     * disiapkan migration (`PackageCategory::firstOrCreate()` di bawah
+     * nemu baris yang sudah ada, bukan bikin baru tanpa role).
+     */
+    #[Test]
+    public function contract_type_beli_beli_dari_gudang_kategori_bisnis_invoice_dapat_baris_jual_modem_lewat_bd(): void
+    {
+        Storage::fake('public');
+
+        PackageCategory::firstOrCreate(['name' => 'Paket Bisnis Broadband']);
+        $bisnisPackage = InternetPackage::create([
+            'package_code' => 'PKG-OWN-BISNIS-001',
+            'name' => 'Paket Bisnis Broadband 50 Mbps',
+            'category' => 'Paket Bisnis Broadband',
+            'package_group' => 'Paket Bisnis Broadband',
+            'bandwidth_label' => '50 Mbps',
+            'monthly_price' => 500000,
+            'is_active' => true,
+        ]);
+
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInstallingCustomer('beli', $bisnisPackage);
+        $serial = $this->issueSerialToTechnician($pusat, $cabang, $technician, 'SN-OWN-BISNIS-001');
+
+        $pemasanganResponse = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePemasanganPayload($technician, $cabang) + [
+            'selected_inventory_serial_id' => $serial->id,
+            'modem_acquisition_choice' => 'beli_gudang',
+            'modem_sale_price' => 150000,
+        ]);
+        $pemasanganResponse->assertSessionHasNoErrors();
+
+        $speedtestResponse = $this->actingAs($technician)->post(route('customers.installation.speedtest', $customer->id), $this->baseSpeedtestPayload());
+        $speedtestResponse->assertSessionHasNoErrors();
+
+        $customer->refresh();
+        $this->assertEquals('verification_admin', $customer->status);
+
+        // CS finalVerify() — kategori Bisnis TIDAK langsung ACTIVE, Invoice
+        // AWAL ditunda ke pending_initial_invoice sampai BD verifikasi.
+        $admin = $this->loginAsAdmin();
+        $finalVerifyResponse = $this->actingAs($admin)->post(route('customers.verification.final', $customer->id), [
+            'issue_date' => now()->format('Y-m-d'),
+        ]);
+        $finalVerifyResponse->assertSessionHasNoErrors();
+
+        $customer->refresh();
+        $this->assertEquals(WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value, $customer->status);
+        $this->assertDatabaseMissing('invoices', ['customer_id' => $customer->id, 'invoice_type' => 'awal']);
+        $this->assertEqualsWithDelta(150000.00, (float) $customer->pending_initial_invoice['billing']['modem_sale_amount'], 0.01);
+
+        // BD verify() — menerbitkan SATU invoice AWAL yang menyatukan biaya
+        // CS + BD. modem_sale_amount harus ikut nyampe ke invoice_items di
+        // sini juga, bukan cuma di jalur finalVerify() langsung.
+        $bdResponse = $this->actingAs($admin)->put(route('business-development-verifications.verify', $customer), [
+            'installation_fee' => 300000,
+        ]);
+        $bdResponse->assertSessionHasNoErrors();
+
+        $invoice = Invoice::where('customer_id', $customer->id)->where('invoice_type', 'awal')->firstOrFail();
+        $jualModemItem = $invoice->items()->whereHas('subcategory', fn ($q) => $q->where('code', 'jual_modem'))->first();
+        $this->assertNotNull($jualModemItem, 'Invoice AWAL kategori Bisnis wajib tetap punya baris Jual Modem lewat jalur BD.');
+        $this->assertEquals(150000.00, (float) $jualModemItem->amount);
+
+        // Modem beneran kejual di sisi Gudang juga — regresi sisi Task 4
+        // tidak berubah hanya karena kategori paketnya Bisnis.
+        $serial->refresh();
+        $this->assertEquals(DeviceOwnership::CUSTOMER, $serial->ownership);
+        InventorySerialSale::where('inventory_serial_id', $serial->id)->firstOrFail();
     }
 
     private function finalVerifyAsAdmin(Customer $customer): void

@@ -145,4 +145,30 @@ class InitialInvoiceModemSaleLineTest extends TestCase
             'subcategory_name_snapshot' => 'Jual Modem',
         ]);
     }
+
+    /**
+     * Koreksi (jalur BD/kategori Bisnis) — `withInstallationFee()` dulu
+     * cuma menjumlah LIMA suku ke `subtotal` (tanpa `modem_sale_amount`),
+     * jadi kategori Bisnis yang pilih "Beli dari Gudang" kehilangan nominal
+     * modem dari `subtotal` begitu BD menyuntik Biaya Instalasi — padahal
+     * SN-nya sudah kejual (ownership CUSTOMER, custody kepotong). Sekarang
+     * `withInstallationFee()` WAJIB mengikutkan `modem_sale_amount` yang
+     * sudah ada di `$billing` (dititipkan `calculate()` lewat
+     * `finalVerify()`), PERSIS cara `calculate()` menjumlahkannya sendiri.
+     */
+    #[Test]
+    public function with_installation_fee_tetap_mengikutkan_modem_sale_amount_ke_subtotal(): void
+    {
+        $customer = $this->createCustomerSiapVerifikasi(300000);
+        $service = $customer->customerService;
+
+        $invoiceService = app(InitialInvoiceService::class);
+        $billing = $invoiceService->calculate($service, '2026-06-16', [], 150000.0);
+
+        $billingAfterBd = $invoiceService->withInstallationFee($billing, 300000.0);
+
+        $this->assertEqualsWithDelta(150000.0, $billingAfterBd['modem_sale_amount'], 0.01);
+        $expectedSubtotal = $billing['prorate_amount'] + 300000.0 + 150000.0;
+        $this->assertEqualsWithDelta($expectedSubtotal, $billingAfterBd['subtotal'], 0.01);
+    }
 }

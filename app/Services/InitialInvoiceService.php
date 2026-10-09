@@ -224,14 +224,26 @@ class InitialInvoiceService
      * lunas), yang WAJIB tetap pakai invoice terpisah supaya tidak menimpa
      * tagihan yang sudah ada.
      *
-     * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}  $billing
-     * @return array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}
+     * `modem_sale_amount` (ownership modem sewa/beli, 2026-10-09, task 4
+     * koreksi) — kalau sudah ada di `$billing` (dititipkan CS lewat
+     * `calculate()` di `finalVerify()`, lihat docblock situ), diikutkan lagi
+     * ke rekomputasi `subtotal` di sini, PERSIS cara `calculate()`
+     * menjumlahkannya. Sebelum koreksi ini method ini cuma menjumlah lima
+     * suku (tanpa modem) — kategori Bisnis yang pilih "Beli dari Gudang" jadi
+     * SN-nya kejual (ownership CUSTOMER, `InventorySerialSale` tercatat,
+     * custody kepotong) TAPI baris tagihannya ikut lenyap dari subtotal di
+     * sini (silent, invoice tetap terbit tanpa error) — modem keluar gudang
+     * tanpa pernah ditagih. Default `?? 0` kalau key-nya belum ada
+     * (pemanggil lama yang belum tahu soal ownership modem).
+     *
+     * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount?: float, total_amount: float}  $billing
+     * @return array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount?: float, total_amount: float}
      */
     public function withInstallationFee(array $billing, float $installationFee): array
     {
         $billing['extra_installation_fee'] = Money::atLeastZero($installationFee);
 
-        // Sama persis lima suku yang dijumlahkan di calculate() — cuma
+        // Enam suku — sama persis yang dijumlahkan di calculate() — cuma
         // extra_installation_fee-nya sekarang bukan 0 lagi.
         $billing['subtotal'] = Money::sum([
             $billing['prorate_amount'],
@@ -239,6 +251,7 @@ class InitialInvoiceService
             $billing['extra_cable_fee'],
             $billing['extra_pole_fee'],
             $billing['other_fee'],
+            $billing['modem_sale_amount'] ?? 0,
         ]);
 
         $afterDiscount = Money::atLeastZero(Money::sub($billing['subtotal'], $billing['discount']));
