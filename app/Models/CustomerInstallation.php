@@ -30,6 +30,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'selected_inventory_serial_id',
     'selected_inventory_roll_id',
     'roll_meters_used',
+    'modem_acquisition_choice',
+    'manual_device_brand',
+    'manual_device_model',
+    'manual_device_serial_number',
+    'modem_sale_price',
 ])]
 class CustomerInstallation extends Model
 {
@@ -52,6 +57,7 @@ class CustomerInstallation extends Model
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
             'roll_meters_used' => 'decimal:2',
+            'modem_sale_price' => 'decimal:2',
         ];
     }
 

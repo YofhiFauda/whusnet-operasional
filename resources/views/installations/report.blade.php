@@ -633,7 +633,8 @@
 
                     <!-- STEP 5 PANEL: Laporan Pemasangan & Perangkat -->
                     <div id="step-panel-5" class="step-panel space-y-5 hidden">
-                    <form id="form-pemasangan" action="{{ route('customers.installation.pemasangan', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+                    <form id="form-pemasangan" action="{{ route('customers.installation.pemasangan', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-5"
+                          x-data="{ modemAcquisition: @js(old('modem_acquisition_choice', $installation->modem_acquisition_choice ?? '')) }">
                         @csrf
                         <input type="hidden" name="return_to" value="{{ $returnTo }}">
                         <input type="hidden" name="started_at" id="hidden_started_at">
@@ -705,6 +706,32 @@
                                         <input type="text" name="model" id="model" value="{{ old('model', $dev->model ?? '') }}" class="w-full text-xs font-sans px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-sm" placeholder="Contoh: F609 / HG8245H">
                                     </div>
 
+                                    {{-- Ownership modem (rancangan ownership modem sewa/beli, 2026-10-09,
+                                         task 4) — radio 2 opsi CUMA muncul kalau `contract_type`
+                                         pelanggan 'beli'. Pelanggan 'sewa' (default) gak pernah lihat
+                                         ini sama sekali, SN tetap wajib seperti biasa (ownership COMPANY
+                                         di storeSpeedtest()). --}}
+                                    @if(($customer->customerService?->contract_type ?? 'sewa') === 'beli')
+                                    <div class="sm:col-span-2">
+                                        <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Cara Pemilikan Modem <span class="text-rose-500">*</span></label>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            @foreach([
+                                                'beli_sendiri' => 'Beli Sendiri',
+                                                'beli_gudang' => 'Beli dari Gudang',
+                                            ] as $value => $label)
+                                            <label class="flex items-center gap-2 rounded-xl px-3 py-2.5 cursor-pointer transition-colors border"
+                                                   :class="modemAcquisition === '{{ $value }}' ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'">
+                                                <input type="radio" name="modem_acquisition_choice" value="{{ $value }}" x-model="modemAcquisition"
+                                                       @checked(old('modem_acquisition_choice', $installation->modem_acquisition_choice ?? '') === $value)
+                                                       class="h-3.5 w-3.5">
+                                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $label }}</span>
+                                            </label>
+                                            @endforeach
+                                        </div>
+                                        <p class="text-[10px] mt-1 leading-relaxed text-slate-500 dark:text-slate-400">Pelanggan kontrak Beli — pilih apakah modem dibeli sendiri (tidak lewat Gudang) atau dibeli dari Gudang (SN custody dijual).</p>
+                                    </div>
+                                    @endif
+
                                     @php
                                         $oldSelectedSerialId = old('selected_inventory_serial_id', $installation->selected_inventory_serial_id ?? null);
                                         $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)->map->count();
@@ -716,7 +743,11 @@
                                         ])->values();
                                     @endphp
 
-                                    <div class="sm:col-span-2">
+                                    {{-- Disembunyikan kalau 'Beli Sendiri' dipilih — modem itu gak pernah
+                                         lewat Gudang, gak ada SN custody buat dipilih sama sekali.
+                                         Default (belum pilih radio apa pun, termasuk semua pelanggan
+                                         'sewa') tetap tampil seperti biasa. --}}
+                                    <div class="sm:col-span-2" x-show="modemAcquisition !== 'beli_sendiri'" x-cloak>
                                         <label for="selected_inventory_serial_id-search" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Serial Number (SN) — Custody Gudang <span class="text-rose-500">*</span></label>
                                         <div class="mb-2"><x-estimasi-patokan :rows="$estimasiPerangkatAktif" title="Estimasi Perangkat Aktif" /></div>
                                         @if($eligibleSerials->isNotEmpty())
@@ -727,6 +758,32 @@
                                             </select>
                                             <p class="text-[11px] text-rose-500 mt-1 leading-relaxed">Anda belum mengambil barang dari Gudang — hubungi Admin/FOP.</p>
                                         @endif
+
+                                        {{-- Harga jual — wajib hanya untuk "Beli dari Gudang". --}}
+                                        <div x-show="modemAcquisition === 'beli_gudang'" x-cloak class="mt-3">
+                                            <label for="modem_sale_price" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Harga Jual Modem <span class="text-rose-500">*</span></label>
+                                            <input type="number" step="0.01" min="0.01" name="modem_sale_price" id="modem_sale_price" value="{{ old('modem_sale_price', $installation->modem_sale_price ?? '') }}" placeholder="Contoh: 150000" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-sm">
+                                            <p class="text-[10px] mt-1 leading-relaxed text-slate-500 dark:text-slate-400">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, ditagihkan di tagihan AWAL.</p>
+                                        </div>
+                                    </div>
+
+                                    {{-- Beli Sendiri — modem milik pelanggan sendiri, gak pernah lewat
+                                         Gudang. Input manual, BUKAN dari custody/SN gudang (field
+                                         brand/model di atas & serial_number tetap 'prohibited'). --}}
+                                    <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-2.5" x-show="modemAcquisition === 'beli_sendiri'" x-cloak>
+                                        <div>
+                                            <label for="manual_device_brand" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Brand <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="manual_device_brand" id="manual_device_brand" value="{{ old('manual_device_brand', $installation->manual_device_brand ?? '') }}" maxlength="100" placeholder="mis. TP-Link" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-sm">
+                                        </div>
+                                        <div>
+                                            <label for="manual_device_model" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Model <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="manual_device_model" id="manual_device_model" value="{{ old('manual_device_model', $installation->manual_device_model ?? '') }}" maxlength="100" placeholder="mis. Archer C6" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-sm">
+                                        </div>
+                                        <div>
+                                            <label for="manual_device_serial_number" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Serial Number <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="manual_device_serial_number" id="manual_device_serial_number" value="{{ old('manual_device_serial_number', $installation->manual_device_serial_number ?? '') }}" maxlength="100" placeholder="SN di stiker perangkat" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-sm">
+                                        </div>
+                                        <p class="col-span-1 sm:col-span-3 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">Modem milik pelanggan sendiri — tidak lewat Gudang, tidak ada SN custody yang terpakai.</p>
                                     </div>
 
                                     @php
@@ -1190,13 +1247,28 @@
         document.getElementById('form-pemasangan').submit();
     }
 
-    const aktivasiRequiredFields = [
-        'device_type', 'connection_mode', 'selected_inventory_serial_id', 'wifi_ssid', 'wifi_password',
-        'odp_number', 'odp_port',
-    ];
+    // Ownership modem (rancangan ownership modem sewa/beli, 2026-10-09, task 4)
+    // — SN Perangkat Aktif TIDAK wajib kalau radio 'Beli Sendiri' dipilih
+    // (modem gak lewat Gudang sama sekali). Radio-nya cuma dirender kalau
+    // contract_type pelanggan 'beli' (lihat blade di atas) — buat pelanggan
+    // 'sewa' querySelector di bawah selalu null, jadi daftar wajibnya PERSIS
+    // sama seperti sebelum task ini (regresi byte-identik).
+    function modemAcquisitionIsBeliSendiri() {
+        return document.querySelector('input[name="modem_acquisition_choice"]:checked')?.value === 'beli_sendiri';
+    }
+
+    function getAktivasiRequiredFields() {
+        const base = ['device_type', 'connection_mode', 'selected_inventory_serial_id', 'wifi_ssid', 'wifi_password', 'odp_number', 'odp_port'];
+        return modemAcquisitionIsBeliSendiri() ? base.filter(field => field !== 'selected_inventory_serial_id') : base;
+    }
+
+    function getPemasanganRequiredFields() {
+        const base = ['device_type', 'connection_mode', 'selected_inventory_serial_id', 'wifi_ssid', 'wifi_password', 'odp_number', 'odp_port', 'installation_photo', 'contract_photo', 'signature_photo'];
+        return modemAcquisitionIsBeliSendiri() ? base.filter(field => field !== 'selected_inventory_serial_id') : base;
+    }
 
     function attemptActivate() {
-        const missing = getMissingFieldsFrom(aktivasiRequiredFields);
+        const missing = getMissingFieldsFrom(getAktivasiRequiredFields());
         if (missing.length > 0) {
             if (window.Toast) {
                 window.Toast.warning('Data Aktivasi Belum Lengkap', 'Wajib diisi dulu: ' + missing.join(', '));
@@ -1266,7 +1338,7 @@
 
     const formFields = {
         'pemasangan': {
-            required: ['device_type', 'connection_mode', 'selected_inventory_serial_id', 'wifi_ssid', 'wifi_password', 'odp_number', 'odp_port', 'installation_photo', 'contract_photo', 'signature_photo'],
+            get required() { return getPemasanganRequiredFields(); },
             optional: ['brand', 'model', 'mac_address', 'pppoe_username', 'pppoe_password', 'olt_number', 'olt_slot', 'olt_port', 'vlan', 'router_number', 'initial_attenuation', 'installation_note']
         },
         'uji': {

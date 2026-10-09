@@ -352,10 +352,24 @@ class CustomerVerificationController extends Controller
             $validated['extra_installation_fee'] = 0;
         }
 
+        // Harga "Jual Modem" (ownership modem sewa/beli, 2026-10-09, task 4)
+        // — dibaca dari draft pointer `CustomerInstallation.modem_sale_price`
+        // yang diisi teknisi di storePemasangan()/storeSpeedtest(), BUKAN
+        // dari request ini: form finalVerify tidak pernah mengirim field ini,
+        // CS cuma menyetujui nominal yang sudah ditentukan di lapangan. Cuma
+        // dipakai kalau pilihannya beneran 'beli_gudang' — 'beli_sendiri'
+        // modem gak dijual (harga NULL), dan pelanggan 'sewa' kolom ini
+        // selamanya null.
+        $latestInstallation = $customer->installations()->latest()->first();
+        $modemSaleAmount = $latestInstallation && $latestInstallation->modem_acquisition_choice === 'beli_gudang'
+            ? (float) $latestInstallation->modem_sale_price
+            : 0.0;
+
         $billing = app(InitialInvoiceService::class)->calculate(
             $service,
             $validated['issue_date'],
-            $validated
+            $validated,
+            $modemSaleAmount
         );
 
         $pop = $customer->pop;
@@ -388,7 +402,7 @@ class CustomerVerificationController extends Controller
                     'issue_date' => $validated['issue_date'],
                 ];
             } else {
-                app(InitialInvoiceService::class)->issue($customer, $service, $billing, $validated['issue_date'], auth()->id());
+                app(InitialInvoiceService::class)->issue($customer, $service, $billing, $validated['issue_date'], auth()->id(), $modemSaleAmount);
             }
 
             // 2. Activate Customer
