@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\CustomerService;
 use App\Services\InitialInvoiceService;
+use App\Services\InvoiceNumberGenerator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -39,7 +40,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     #[Test]
     public function pasang_21_juli_paket_110rb_menghasilkan_35484(): void
     {
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21');
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000), '2026-07-21');
 
         $this->assertSame(10, $result['prorate_days'], 'Hari aktivasi digratiskan (22-31 Juli = 10 hari).');
         $this->assertSame(31, $result['days_in_month']);
@@ -50,7 +51,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     #[Test]
     public function hari_aktivasi_tidak_boleh_ikut_ditagih(): void
     {
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21');
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000), '2026-07-21');
 
         // 11/31 × 110.000 = 39.032 — angka yang muncul kalau hari aktivasi ikut ditagih.
         $this->assertNotEqualsWithDelta(39032, $result['prorate_amount'], 0.01);
@@ -61,7 +62,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     {
         // 10 × (110.000 / 31) = 35.483,87. Legacy memakai round() — nominal
         // tagihan awal hasil migrasi dicocokkan angka per angka dengan ini.
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21');
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000), '2026-07-21');
 
         $this->assertEqualsWithDelta(35484, $result['prorate_amount'], 0.01);
         $this->assertNotEqualsWithDelta(35483, $result['prorate_amount'], 0.01);
@@ -72,7 +73,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     {
         // 31 - 31 = 0 hari sisa. Keputusan bisnis: tagih penuh, bukan gratis dan
         // bukan 1 hari. Tebing di ujung bulan disengaja — lihat docblock service.
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-31');
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000), '2026-07-31');
 
         $this->assertSame(31, $result['prorate_days']);
         $this->assertEqualsWithDelta(110000, $result['prorate_amount'], 0.01);
@@ -102,7 +103,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
         int $expectedDaysInMonth,
         float $expectedProrate,
     ): void {
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith($monthlyPrice), $issueDate);
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith($monthlyPrice), $issueDate);
 
         $this->assertSame($expectedDays, $result['prorate_days']);
         $this->assertSame($expectedDaysInMonth, $result['days_in_month']);
@@ -114,7 +115,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     {
         // PPN sudah termasuk harga paket untuk semua paket; master ppn = 0.
         // Field-nya tetap ada sebagai cadangan, tapi tidak boleh memungut ulang.
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000, ppn: 0), '2026-07-21');
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000, ppn: 0), '2026-07-21');
 
         $this->assertEqualsWithDelta(0, $result['ppn_amount'], 0.01);
         $this->assertEqualsWithDelta($result['subtotal'], $result['total_amount'], 0.01);
@@ -123,7 +124,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     #[Test]
     public function biaya_sekali_bayar_masuk_subtotal_tapi_bukan_basis_prorata(): void
     {
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21', [
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000), '2026-07-21', [
             'extra_installation_fee' => 100000,
             'extra_cable_fee' => 25000,
             'extra_pole_fee' => 0,
@@ -137,7 +138,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     #[Test]
     public function materai_masuk_subtotal_tapi_bukan_basis_prorata(): void
     {
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21', [
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000), '2026-07-21', [
             'extra_installation_fee' => 125000,
             'other_fee' => 10000,
         ]);
@@ -151,7 +152,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     #[Test]
     public function materai_negatif_dianggap_nol(): void
     {
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21', [
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000), '2026-07-21', [
             'other_fee' => -50000,
         ]);
 
@@ -165,7 +166,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
         // Baris terakhir kwitansi: "Mulai bulan depan Rp X/bulan". Harus sama
         // dengan yang nanti diterbitkan GenerateMonthlyInvoicesCommand, kalau
         // tidak admin menjanjikan angka yang berbeda dari tagihan yang datang.
-        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21', [
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate($this->serviceWith(110000), '2026-07-21', [
             'extra_installation_fee' => 125000,
             'other_fee' => 10000,
         ]);
@@ -176,7 +177,7 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     #[Test]
     public function nominal_bulan_berikutnya_ikut_diskon_dan_ppn(): void
     {
-        $result = (new InitialInvoiceService)->calculate(
+        $result = (new InitialInvoiceService(new InvoiceNumberGenerator))->calculate(
             $this->serviceWith(200000, ppn: 11, discount: 20000),
             '2026-07-21'
         );

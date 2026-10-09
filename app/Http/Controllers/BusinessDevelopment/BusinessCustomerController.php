@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\PackageCategory;
 use App\Models\SubscriptionStatus;
 use App\Services\EffectiveAccessService;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -58,7 +59,7 @@ class BusinessCustomerController extends Controller
         $access = app(EffectiveAccessService::class);
         $user = $request->user();
 
-        $search = trim((string) $request->query('q', ''));
+        $search = LikeSearch::sanitize((string) $request->query('q', ''));
         $category = $request->query('category');
         $status = $request->query('status');
 

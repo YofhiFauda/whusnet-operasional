@@ -106,6 +106,14 @@ class CustomerAcquisition extends Model
      * (pola sama getCleanAddressAttribute() di Customer — accessor tidak
      * boleh memicu query tersembunyi).
      */
+    /** @var array<string, PackageCategory|null> */
+    protected static array $packageCategoryCache = [];
+
+    public static function flushPackageCategoryCache(): void
+    {
+        static::$packageCategoryCache = [];
+    }
+
     public function packageCategory(): ?PackageCategory
     {
         $categoryName = $this->customer?->customerService?->internetPackage?->category;
@@ -114,12 +122,7 @@ class CustomerAcquisition extends Model
             return null;
         }
 
-        // Memoized per-request per nama kategori — halaman list bisa
-        // punya puluhan baris, tanpa ini tiap baris query PackageCategory
-        // sendiri-sendiri padahal jumlah kategori riil cuma segelintir.
-        static $cache = [];
-
-        return $cache[$categoryName] ??= PackageCategory::with('installationFeeApprovalRole')->where('name', $categoryName)->first();
+        return static::$packageCategoryCache[$categoryName] ??= PackageCategory::with('installationFeeApprovalRole')->where('name', $categoryName)->first();
     }
 
     /**

@@ -2,18 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Enums\FopTaskPriority;
+use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
 use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\FopTask;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
+use App\Models\TaskMaterial;
 use App\Models\User;
 use App\Services\InventoryIssueService;
 use App\Services\InventoryReceiveService;
@@ -190,6 +194,95 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
         $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePayload());
 
         $response->assertSessionHasErrors('selected_inventory_serial_id');
+    }
+
+    /**
+     * Combobox (bukan <select>): SN dirender sebagai nilai hidden + opsi
+     * JSON yang bisa dicari, dan kategori barang pasif ikut combobox.
+     * Regresi: komponen combobox harus tetap menaruh `id` di input hidden,
+     * karena validasi wajib isi di JS membaca nilai dari id itu.
+     */
+    #[Test]
+    public function laporan_pemasangan_render_combobox_sn_roll_dan_kategori_barang(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInProgressInstallation();
+
+        $catAktif = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $ont = Item::create([
+            'code' => 'ONT-SN-03', 'name' => 'ONT Combo Test', 'item_category_id' => $catAktif->id,
+            'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => OwnershipMode::INSTALLABLE->value,
+        ]);
+
+        $admin = User::factory()->create();
+        app(InventoryReceiveService::class)->receiveSerialized($pusat, $ont, ['ZTE-COMBO-001'], 250000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-COMBO-001']]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, ['ZTE-COMBO-001'], [], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-COMBO-001']]], $admin);
+
+        $response = $this->actingAs($technician)->get(route('customers.installation.report', $customer->id));
+
+        $response->assertOk();
+        $response->assertSee('<input type="hidden" id="selected_inventory_serial_id" name="selected_inventory_serial_id"', false);
+        $response->assertSee('ZTE-COMBO-001');
+        $response->assertSee('Semua Kategori');
+        $response->assertDontSee('updateSnStockHint', false);
+    }
+
+    /**
+     * Estimasi survey dibaca per kategori: kategori AKTIF jadi patokan di seksi
+     * SN, kabel satuan meter jadi patokan Roll, sisanya patokan Perangkat Pasif.
+     * Estimasi tidak di-prefill jadi baris realisasi. Regresi: dulu semua
+     * estimasi masuk daftar Perangkat Pasif dan teknisi harus membuang baris
+     * yang salah kolom.
+     */
+    #[Test]
+    public function estimasi_survey_dipetakan_ke_seksi_sn_roll_dan_pasif_sesuai_jenis_barang(): void
+    {
+        [$customer, $technician, , , $cabang] = $this->setupInProgressInstallation();
+
+        $catAktif = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $catPasif = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+
+        $ont = Item::create(['code' => 'ONT-EST-01', 'name' => 'ONT Estimasi', 'item_category_id' => $catAktif->id, 'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => OwnershipMode::INSTALLABLE->value]);
+        $roll = Item::create(['code' => 'KABEL-ROLL-EST', 'name' => 'Kabel Roll Estimasi', 'item_category_id' => $catPasif->id, 'unit' => 'meter', 'tracking_type' => 'roll']);
+        $qtyItem = Item::create(['code' => 'KLEM-EST', 'name' => 'Klem Estimasi', 'item_category_id' => $catPasif->id, 'unit' => 'pcs', 'tracking_type' => 'quantity']);
+
+        $surveyUser = User::factory()->create();
+        $surveyFop = FopTask::create([
+            'task_number' => 'TFOP-EST-SURVEY-01',
+            'task_date' => now(),
+            'category' => TaskType::SURVEY,
+            'tugas' => 'Survey Estimasi Test',
+            'pop_id' => $cabang->id,
+            'issue' => 'Survey',
+            'status' => TaskStatus::DRAFT,
+            'priority' => FopTaskPriority::MEDIUM,
+            'handling_sla_hours' => 1,
+        ]);
+        foreach ([[$ont, 1, 'unit'], [$roll, 50, 'meter'], [$qtyItem, 4, 'pcs']] as [$item, $qty, $unit]) {
+            TaskMaterial::create([
+                'fop_task_id' => $surveyFop->id,
+                'customer_id' => $customer->id,
+                'kind' => MaterialKind::ESTIMASI->value,
+                'item_id' => $item->id,
+                'item_type' => $item->category->code,
+                'item_category_id' => $item->item_category_id,
+                'item_name' => $item->name,
+                'qty' => $qty,
+                'unit' => $unit,
+                'recorded_by' => $surveyUser->id,
+            ]);
+        }
+
+        $response = $this->actingAs($technician)->get(route('customers.installation.report', $customer->id));
+
+        $response->assertOk();
+        $response->assertViewHas('estimasiPerangkatAktif', fn ($rows) => $rows->pluck('item_name')->all() === ['ONT Estimasi']);
+        $response->assertViewHas('estimasiRoll', fn ($rows) => $rows->pluck('item_name')->all() === ['Kabel Roll Estimasi']);
+        // Estimasi tidak lagi di-prefill jadi baris realisasi (harus dari custody).
+        $response->assertViewHas('estimasiPasif', fn ($rows) => $rows->pluck('item_name')->all() === ['Klem Estimasi']);
+        $response->assertViewHas('materialRows', fn ($rows) => collect($rows)->isEmpty());
     }
 
     #[Test]

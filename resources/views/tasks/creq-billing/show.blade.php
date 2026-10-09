@@ -389,10 +389,10 @@
                     </div>
                     @endif
 
-                    {{-- Alat Kerja Dipakai --}}
+                    {{-- Alat Kerja Opsional --}}
                     @if($reportWorkTools->isNotEmpty())
                     <div class="space-y-1.5 pt-1">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">ALAT KERJA DIPAKAI</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">ALAT KERJA OPSIONAL</span>
                         <div class="flex flex-wrap gap-1.5">
                             @foreach($reportWorkTools as $tool)
                             <span class="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">{{ $tool->tool_name }}@if($tool->note)<span class="text-slate-400 text-[10px]"> · {{ $tool->note }}</span>@endif</span>

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Support\LikeSearch;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -41,6 +42,9 @@ class CollectorWorklistService
      */
     public function outstandingInvoices(User $collector, ?User $viewer = null, ?string $search = null): Builder
     {
+        // Wildcard `%`/`_` dibuang, bukan dibiarkan jadi pola (lihat LikeSearch).
+        $search = $search !== null ? LikeSearch::sanitize($search) : null;
+
         return Invoice::query()
             ->applyUserScope($viewer)
             ->whereIn('invoice_status', self::OUTSTANDING_STATUSES)

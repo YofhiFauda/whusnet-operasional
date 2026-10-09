@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\CustomerTerminationReason;
+use App\Support\LikeSearch;
 use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class CustomerTerminationReasonController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $status = $request->query('status');
 
         $reasons = CustomerTerminationReason::query()

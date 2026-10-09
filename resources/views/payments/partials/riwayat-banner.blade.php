@@ -12,7 +12,7 @@
             Halaman ini riwayat kas. Untuk input pembayaran, buka Tagihan.
         </p>
     </div>
-    <a href="{{ route('invoices.index') }}" class="shrink-0 inline-flex items-center px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold">
+    <a href="{{ route('invoices.belum-lunas') }}" class="shrink-0 inline-flex items-center px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold">
         Buka Tagihan
     </a>
 </div>

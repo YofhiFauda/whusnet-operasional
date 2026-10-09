@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\CustodyStatus;
+use App\Enums\DeviceRetrievalSource;
 use App\Enums\InventoryTransactionType;
+use App\Enums\ItemCondition;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
 use App\Enums\RollStatus;
@@ -11,6 +13,7 @@ use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Exceptions\InsufficientCustodyException;
 use App\Models\Customer;
+use App\Models\DeviceRetrievalLog;
 use App\Models\FopTask;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
@@ -146,16 +149,26 @@ class InventoryService
      * yang bisa diabaikan pemanggilnya, method ini yang jadi satu-satunya
      * pintu transisi ke `SerialStatus::INSTALLED`.
      */
+    /**
+     * `$returnExistingSerial` (ADHOC-108, koreksi 2026-10-08) — default
+     * `true` (perilaku lama: GANTI modem, SN lain yang `INSTALLED` milik
+     * pelanggan ini otomatis diretur). Set `false` buat kategori C-REQ
+     * `TAMBAH_MODEM` — pelanggan beneran NAMBAH (lebih dari satu modem
+     * aktif bersamaan, mis. repeater/ONT kedua), modem lama TIDAK BOLEH
+     * ketarik. Caller (`TaskMaintenanceController`) yang nentuin — method
+     * ini gak bisa nebak sendiri dari task_type/kategori.
+     */
     public function installSerial(
         InventorySerial $serial,
         Customer $customer,
         FopTask $fopTask,
         iterable $technicians,
         User $actor,
+        bool $returnExistingSerial = true,
     ): InventoryTransaction {
         $technicianIds = Collection::make($technicians)->pluck('id')->all();
 
-        return DB::transaction(function () use ($serial, $customer, $fopTask, $actor, $technicianIds) {
+        return DB::transaction(function () use ($serial, $customer, $fopTask, $actor, $technicianIds, $returnExistingSerial) {
             // Re-fetch + lockForUpdate() DI DALAM transaction — semua guard
             // di bawah dicek dari kopi yang di-lock, bukan $serial parameter
             // yang bisa stale. Dua submit "selesaikan instalasi" bersamaan
@@ -178,21 +191,36 @@ class InventoryService
 
             $fromTechnicianId = $serial->current_technician_id;
 
-            // Transisikan modem lama jika pelanggan sebelumnya sudah memiliki SN lain yang INSTALLED
-            $oldSerials = InventorySerial::query()
-                ->where('customer_id', $customer->id)
-                ->where('id', '!=', $serial->id)
-                ->where('status', SerialStatus::INSTALLED->value)
-                ->lockForUpdate()
-                ->get();
+            // Transisikan modem lama jika pelanggan sebelumnya sudah memiliki
+            // SN lain yang INSTALLED — CUMA kalau ini GANTI (`$returnExistingSerial`).
+            // Kategori TAMBAH_MODEM lewat sini dengan `false`: modem lama
+            // dibiarkan tetap INSTALLED, pelanggan punya >1 modem aktif.
+            $oldSerials = $returnExistingSerial
+                ? InventorySerial::query()
+                    ->where('customer_id', $customer->id)
+                    ->where('id', '!=', $serial->id)
+                    ->where('status', SerialStatus::INSTALLED->value)
+                    ->lockForUpdate()
+                    ->get()
+                : collect();
 
             foreach ($oldSerials as $oldSerial) {
                 $oldSerial->update([
                     'status' => SerialStatus::RETURNED->value,
                     'current_technician_id' => $fromTechnicianId,
+                    'current_pop_id' => null,
                     'customer_id' => null,
                 ]);
 
+                // Transit dulu — BUKAN langsung ke_pop_id (C1, ADHOC-108). Dulu
+                // baris ini nulis `to_pop_id` = gudang asal, jadi langsung
+                // keitung stok gudang (`WarehouseStockAsOfService`) PADAHAL
+                // fisik modem masih di tangan teknisi, belum dicek, belum ada
+                // konfirmasi gudang — beda sama jalur DEAC yang bener. Samakan:
+                // `to_technician_id`, stok baru nambah setelah lewat Terima
+                // Retur → Kirim ke Pusat → Pusat konfirmasi (lihat
+                // InventoryReassignService::confirmReturnedSerial() dan
+                // InventoryReturnTransferService).
                 InventoryTransaction::create([
                     'type' => InventoryTransactionType::RETURN,
                     'reference_number' => $this->generateReferenceNumber('RET'),
@@ -200,11 +228,28 @@ class InventoryService
                     'serial_id' => $oldSerial->id,
                     'qty' => 1,
                     'from_technician_id' => $fromTechnicianId,
-                    'to_pop_id' => $oldSerial->issued_from_pop_id,
+                    'to_technician_id' => $fromTechnicianId,
                     'fop_task_id' => $fopTask->id,
                     'reason' => "Modem dicabut saat pekerjaan {$fopTask->task_number} (digantikan oleh SN {$serial->serial_number})",
                     'notes' => "Pelanggan: {$customer->display_id} - {$customer->full_name}",
                     'created_by' => $actor->id,
+                ]);
+
+                // Jejak per SN (ADHOC-108) — supaya "modem ini dari pelanggan
+                // siapa, kapan dicabut, siapa yang pegang" tetap terlacak
+                // sampai diterima gudang, sama seperti jalur DEAC (ADHOC-88).
+                // Tanpa ini, modem hasil Ganti Modem/Migrasi hilang jejak
+                // begitu customer_id dikosongkan di atas.
+                DeviceRetrievalLog::create([
+                    'customer_id' => $customer->id,
+                    'serial_id' => $oldSerial->id,
+                    'serial_number' => $oldSerial->serial_number,
+                    'item_id' => $oldSerial->item_id,
+                    'source' => DeviceRetrievalSource::CREQ_SWAP,
+                    'task_id' => $fopTask->task_id,
+                    'retrieved_by' => $actor->id,
+                    'condition' => ItemCondition::USED_GOOD,
+                    'retrieved_at' => now(),
                 ]);
             }
 
@@ -216,27 +261,36 @@ class InventoryService
                 'current_technician_id' => null,
             ]);
 
-            // Sinkronisasi data perangkat ke Master Pelanggan
-            $customer->update(['ont_sn' => $serial->serial_number]);
+            // Sinkronisasi data perangkat ke Master Pelanggan — CUMA kalau SN
+            // ini jadi SATU-SATUNYA/UTAMA (`$returnExistingSerial`). Kalau
+            // TAMBAH_MODEM (`false`), `customer_devices` TETAP nunjuk ke
+            // modem pertama/utama — tabel ini cuma 1 baris per pelanggan
+            // (`hasOne`), gak ada tempat buat nyimpen detail modem kedua.
+            // Modem tambahan tetap tertrack benar di `inventory_serials`
+            // (status INSTALLED, customer_id terisi) — cukup buat inventory,
+            // cuma gak muncul sebagai "device utama" di Detail Pelanggan.
+            if ($returnExistingSerial) {
+                $customer->update(['ont_sn' => $serial->serial_number]);
 
-            if ($customer->customerTechnicalDetail) {
-                $customer->customerTechnicalDetail->update(['router_or_ont_serial' => $serial->serial_number]);
+                if ($customer->customerTechnicalDetail) {
+                    $customer->customerTechnicalDetail->update(['router_or_ont_serial' => $serial->serial_number]);
+                }
+
+                $brand = $serial->item?->brand ?: ($customer->customerDevice?->brand ?: 'ZTE');
+                $model = $serial->item?->model ?: ($customer->customerDevice?->model ?: $serial->item?->name);
+
+                $customer->customerDevice()->updateOrCreate(
+                    ['customer_id' => $customer->id],
+                    [
+                        'device_type' => 'ONT',
+                        'brand' => $brand,
+                        'model' => $model,
+                        'serial_number' => $serial->serial_number,
+                        'mac_address' => $serial->mac_address ?: $customer->customerDevice?->mac_address,
+                        'device_retrieved_at' => null,
+                    ]
+                );
             }
-
-            $brand = $serial->item?->brand ?: ($customer->customerDevice?->brand ?: 'ZTE');
-            $model = $serial->item?->model ?: ($customer->customerDevice?->model ?: $serial->item?->name);
-
-            $customer->customerDevice()->updateOrCreate(
-                ['customer_id' => $customer->id],
-                [
-                    'device_type' => 'ONT',
-                    'brand' => $brand,
-                    'model' => $model,
-                    'serial_number' => $serial->serial_number,
-                    'mac_address' => $serial->mac_address ?: $customer->customerDevice?->mac_address,
-                    'device_retrieved_at' => null,
-                ]
-            );
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::INSTALL,

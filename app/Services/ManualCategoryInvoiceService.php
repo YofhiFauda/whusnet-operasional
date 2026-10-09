@@ -50,9 +50,10 @@ class ManualCategoryInvoiceService
 
         return DB::transaction(function () use ($customer, $service, $category, $subtypeName, $description, $amount, $actorId) {
             $billingPeriod = now()->format('Y-m');
+            $issueDate = now()->toDateString();
 
             return Invoice::create([
-                'invoice_number' => $this->numbers->nextFor($billingPeriod),
+                'invoice_number' => $this->numbers->nextFor(InvoiceType::MANUAL, $category, $issueDate),
                 'invoice_type' => InvoiceType::MANUAL->value,
                 'manual_category' => $category->value,
                 'manual_subtype_name' => $category->requiresSubtypeName() ? $subtypeName : null,
@@ -62,8 +63,8 @@ class ManualCategoryInvoiceService
                 'customer_service_id' => $service->id,
                 'internet_package_id' => $service->internet_package_id,
                 'billing_period' => $billingPeriod,
-                'issue_date' => now()->toDateString(),
-                'due_date' => now()->toDateString(),
+                'issue_date' => $issueDate,
+                'due_date' => $issueDate,
                 'subtotal' => $amount,
                 'discount' => 0,
                 'ppn' => 0,

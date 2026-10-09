@@ -56,6 +56,7 @@ class DatabaseSeeder extends Seeder
         // $this->call(MasterPopSeeder::class);
 
         // $this->call(TechnicianSeeder::class);
+        // $this->call(PicGudangSeeder::class); // Demo PIC Gudang Jetis & Sandya (ADHOC-120), WAJIB setelah RoleSeeder/RolePermissionSeeder
         // $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
         // $this->call(BusinessCustomerSeeder::class); // Data List Pelanggan Bisnis (7 pelanggan dari docs/plan/bussiness-development/tabel_paket_bisnis.md) — WAJIB setelah ItemCategorySeeder & CustomerAcquisitionFeatureSeeder
         // $this->call(BusinessDevelopmentSeeder::class); // Data demo Busdev: Restriksi Paket, Master Agent, Omset Sales (Skema 1-3) — reuse Sales/Teknisi di atas, WAJIB setelah keduanya
@@ -68,29 +69,5 @@ class DatabaseSeeder extends Seeder
 
         // User::factory(10)->create();
 
-        // $ownerRole = \App\Models\Role::where('name', 'Owner')->first();
-        // $adminRole = \App\Models\Role::where('name', 'Admin')->first();
-
-        // User::updateOrCreate([
-        //     'email' => 'owner@whusnet.net',
-        // ], [
-        //     'name' => 'Owner Whusnet',
-        //     'email_verified_at' => now(),
-        //     'phone' => '081234567890',
-        //     'password' => bcrypt('password'),
-        //     'status' => 'active',
-        //     'role_id' => $ownerRole ? $ownerRole->id : null,
-        // ]);
-
-        // User::updateOrCreate([
-        //     'email' => 'admin@whusnet.net',
-        // ], [
-        //     'name' => 'Admin Whusnet',
-        //     'email_verified_at' => now(),
-        //     'phone' => '081234567890',
-        //     'password' => bcrypt('password'),
-        //     'status' => 'active',
-        //     'role_id' => $adminRole ? $adminRole->id : null,
-        // ]);
     }
 }

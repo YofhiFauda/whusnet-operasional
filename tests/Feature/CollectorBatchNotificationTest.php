@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\NotificationType;
 use App\Enums\ScopeType;
+use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -150,7 +151,7 @@ class CollectorBatchNotificationTest extends TestCase
             'idempotency_key' => 'notif-batch-001',
             'rows' => [
                 ['invoice_id' => $invoice1->id, 'amount' => 100000, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
-                ['invoice_id' => $invoice2->id, 'amount' => 200000, 'payment_method' => 'transfer', 'collected_date' => '2026-06-13'],
+                ['invoice_id' => $invoice2->id, 'amount' => 200000, 'payment_method' => 'transfer', 'bank_account_id' => BankAccount::factory()->create()->id, 'collected_date' => '2026-06-13'],
             ],
         ]);
 

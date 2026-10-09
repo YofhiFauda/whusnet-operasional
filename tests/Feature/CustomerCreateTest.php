@@ -30,6 +30,19 @@ class CustomerCreateTest extends TestCase
         $response->assertSee('LAYANAN');
     }
 
+    public function test_referral_pelanggan_field_hidden_from_registration_form(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $response = $this->get('/customers/create');
+
+        $response->assertStatus(200);
+        // Field disembunyikan sementara (Blade comment) — tidak boleh terender.
+        $response->assertDontSee('name="referral_customer_id"', false);
+        $response->assertDontSee('Cari nama/CID pelanggan existing...');
+    }
+
     public function test_submitting_valid_customer_data_stores_customer_and_redirects(): void
     {
         $this->seed(DatabaseSeeder::class);
@@ -183,8 +196,8 @@ class CustomerCreateTest extends TestCase
             'tax_percent' => 11,
             'status' => 'registered',
 
-            // Faked uploads
-            'foto_rumah' => UploadedFile::fake()->image('rumah.jpg'),
+            // Faked uploads. Foto Rumah sengaja tidak dikirim: di jalur registrasi
+            // biasa field-nya sudah dihapus (hanya ada di Skip Survey).
             'foto_kontrak' => UploadedFile::fake()->create('contract.pdf', 500),
         ];
 
@@ -194,10 +207,9 @@ class CustomerCreateTest extends TestCase
         $response->assertRedirect("/customers/{$customer->id}");
         $response->assertSessionHas('success');
 
-        $this->assertNotNull($customer->foto_rumah);
+        $this->assertNull($customer->foto_rumah);
         $this->assertNotNull($customer->foto_kontrak);
 
-        Storage::disk('public')->assertExists($customer->foto_rumah);
         Storage::disk('public')->assertExists($customer->foto_kontrak);
     }
 }

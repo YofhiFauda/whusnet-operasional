@@ -43,4 +43,20 @@ enum RollStatus: string
             self::QUARANTINE => 'Karantina',
         };
     }
+
+    /**
+     * Varian badge (.badge-* di app.css) — selaras `SerialStatus::badgeVariant()`
+     * biar warna status konsisten lintas jenis barang (analisa-ui-ux §U4/V6).
+     * DEPLETED = netral (habis wajar, bukan masalah).
+     */
+    public function badgeVariant(): string
+    {
+        return match ($this) {
+            self::AVAILABLE => 'success',
+            self::RECEIVED, self::ISSUED, self::IN_USE => 'info',
+            self::TRANSFERRED, self::RETURNED => 'warning',
+            self::DAMAGED, self::LOST, self::SCRAPPED, self::QUARANTINE => 'error',
+            self::DEPLETED => 'neutral',
+        };
+    }
 }

@@ -340,6 +340,12 @@ document.addEventListener('DOMContentLoaded', function () {
         'helpdesk':  ['selected_pop'],
         'fop':       ['selected_pop'],
         'teknisi':   ['selected_pop'],
+        // pic_gudang BEBAS all_pop/selected_pop (beda dari teknisi/pop_admin)
+        // — cabang yang dia PIC-i ditentukan tabel warehouse_pop_pics, BUKAN
+        // scope, jadi scope-nya boleh luas (mis. teknisi keliling lintas
+        // cabang yang PIC cuma di 1 cabang tertentu). Lihat docs/plan/
+        // warehouse/rancangan-teknisi-pic-gudang-cabang.md §5.3.5.
+        'pic_gudang': ['all_pop', 'selected_pop'],
         'sales':     ['selected_pop'],
         'pop_admin': ['selected_pop'],
     };

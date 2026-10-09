@@ -578,7 +578,7 @@
                 <?php endif; ?>
                 <?php if($fopTask->workTools->isNotEmpty()): ?>
                 <div class="col-span-2">
-                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Alat Kerja Dipinjam</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Alat Kerja Opsional</p>
                     <div class="flex flex-wrap gap-1.5 mt-1">
                         <?php $__currentLoopData = $fopTask->workTools; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tool): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600"><?php echo e($tool->tool_name); ?></span>

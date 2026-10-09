@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\ItemCategory;
+use App\Services\MasterRecordRemovalService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,7 +28,7 @@ class ItemCategoryController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $status = $request->query('status');
 
         $categories = ItemCategory::query()
@@ -85,6 +87,23 @@ class ItemCategoryController extends Controller
         return redirect()
             ->route('master.item-categories.index')
             ->with('success', 'Kategori "'.$itemCategory->name.'" berhasil diperbarui.');
+    }
+
+    public function destroy(ItemCategory $itemCategory, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        if ($itemCategory->code === ItemCategory::CODE_LAINNYA) {
+            return back()->with('error', 'Kategori "Lainnya" tidak bisa dihapus — dipakai sebagai kategori jatuh terakhir untuk barang di luar master.');
+        }
+
+        $deleted = $removal->remove($itemCategory, ['is_active' => false]);
+        ItemCategory::flushLabelCache();
+
+        return back()->with(
+            $deleted ? 'success' : 'warning',
+            $deleted
+                ? "Kategori \"{$itemCategory->name}\" berhasil dihapus."
+                : "Kategori \"{$itemCategory->name}\" masih dipakai barang, jadi hanya dinonaktifkan."
+        );
     }
 
     public function toggleStatus(ItemCategory $itemCategory): RedirectResponse

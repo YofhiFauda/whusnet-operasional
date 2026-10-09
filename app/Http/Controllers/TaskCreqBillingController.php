@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\TaskCreqDetail;
 use App\Services\EffectiveAccessService;
 use App\Services\ManualCategoryInvoiceService;
+use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
@@ -39,7 +40,7 @@ class TaskCreqBillingController extends Controller
             $statusFilter = CReqVerificationStatus::PENDING->value;
         }
 
-        $search = trim((string) $request->query('q'));
+        $search = LikeSearch::sanitize((string) $request->query('q'));
 
         $baseQuery = Task::query()
             ->applyUserScope()

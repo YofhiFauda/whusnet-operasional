@@ -1,0 +1,743 @@
+{
+  "config": {
+    "argv": [
+      "/home/yopi/.nvm/versions/node/v24.20.0/bin/node",
+      "/home/yopi/whusnet/whusnet-operasional/node_modules/.bin/playwright",
+      "test",
+      "tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+      "--project=desktop-hd"
+    ],
+    "configFile": "/home/yopi/whusnet/whusnet-operasional/playwright.config.js",
+    "rootDir": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/yopi/whusnet/whusnet-operasional/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "desktop-hd",
+        "name": "desktop-hd",
+        "testDir": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/yopi/whusnet/whusnet-operasional/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "laptop",
+        "name": "laptop",
+        "testDir": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/yopi/whusnet/whusnet-operasional/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "tablet",
+        "name": "tablet",
+        "testDir": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/yopi/whusnet/whusnet-operasional/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile",
+        "name": "mobile",
+        "testDir": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "docs/audits/reports/html-report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "docs/audits/reports/audit-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "gudang/01-akses-dan-navigasi.spec.js",
+      "file": "gudang/01-akses-dan-navigasi.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "WH-E2E-01 Akses & navigasi gudang",
+          "file": "gudang/01-akses-dan-navigasi.spec.js",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "owner: dashboard gudang tampil dengan judul, tab, dan tanpa error server",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-hd",
+                  "projectName": "desktop-hd",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 4392,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n\n    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:16:16",
+                        "location": {
+                          "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                          "column": 16,
+                          "line": 16
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 14 |\u001b[39m     \u001b[36mconst\u001b[39m health \u001b[33m=\u001b[39m watchPageHealth(page)\u001b[33m;\u001b[39m\n \u001b[90m 15 |\u001b[39m     \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'OWNER'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 16 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mindex)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 17 |\u001b[39m\n \u001b[90m 18 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'h1'\u001b[39m)\u001b[33m.\u001b[39mfirst())\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 19 |\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                            "column": 16,
+                            "line": 16
+                          },
+                          "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 14 |\u001b[39m     \u001b[36mconst\u001b[39m health \u001b[33m=\u001b[39m watchPageHealth(page)\u001b[33m;\u001b[39m\n \u001b[90m 15 |\u001b[39m     \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'OWNER'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 16 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mindex)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 17 |\u001b[39m\n \u001b[90m 18 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'h1'\u001b[39m)\u001b[33m.\u001b[39mfirst())\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 19 |\u001b[39m\u001b[0m\n\u001b[2m    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:16:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-07T07:53:30.137Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-d4404--tab-dan-tanpa-error-server-desktop-hd/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-d4404--tab-dan-tanpa-error-server-desktop-hd/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-d4404--tab-dan-tanpa-error-server-desktop-hd/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                        "column": 16,
+                        "line": 16
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ab3f484390938fc8e7df-9049e039f110e2c91d7f",
+              "file": "gudang/01-akses-dan-navigasi.spec.js",
+              "line": 13,
+              "column": 3
+            },
+            {
+              "title": "owner: dari dashboard ke Stok langsung lewat link navigasi",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-hd",
+                  "projectName": "desktop-hd",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 4387,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n\n    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:30:16",
+                        "location": {
+                          "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                          "column": 16,
+                          "line": 30
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 28 |\u001b[39m   test(\u001b[32m'owner: dari dashboard ke Stok langsung lewat link navigasi'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m 29 |\u001b[39m     \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'OWNER'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mindex)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m\n \u001b[90m 32 |\u001b[39m     \u001b[36mconst\u001b[39m stockLink \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mlocator(\u001b[32m'a[href$=\"/warehouse/stock\"], a:has-text(\"Kelola Stok\"), a:has-text(\"Stok\")'\u001b[39m)\u001b[33m.\u001b[39mfirst()\u001b[33m;\u001b[39m\n \u001b[90m 33 |\u001b[39m     \u001b[36mawait\u001b[39m expect(stockLink\u001b[33m,\u001b[39m \u001b[32m'Link \"Stok\" tidak ditemukan di navigasi gudang'\u001b[39m)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                            "column": 16,
+                            "line": 30
+                          },
+                          "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 28 |\u001b[39m   test(\u001b[32m'owner: dari dashboard ke Stok langsung lewat link navigasi'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m 29 |\u001b[39m     \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'OWNER'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 30 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mindex)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 31 |\u001b[39m\n \u001b[90m 32 |\u001b[39m     \u001b[36mconst\u001b[39m stockLink \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mlocator(\u001b[32m'a[href$=\"/warehouse/stock\"], a:has-text(\"Kelola Stok\"), a:has-text(\"Stok\")'\u001b[39m)\u001b[33m.\u001b[39mfirst()\u001b[33m;\u001b[39m\n \u001b[90m 33 |\u001b[39m     \u001b[36mawait\u001b[39m expect(stockLink\u001b[33m,\u001b[39m \u001b[32m'Link \"Stok\" tidak ditemukan di navigasi gudang'\u001b[39m)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:30:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-07T07:53:29.911Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-bed34-angsung-lewat-link-navigasi-desktop-hd/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-bed34-angsung-lewat-link-navigasi-desktop-hd/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-bed34-angsung-lewat-link-navigasi-desktop-hd/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                        "column": 16,
+                        "line": 30
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ab3f484390938fc8e7df-f5387e3c18e8a0f4a81f",
+              "file": "gudang/01-akses-dan-navigasi.spec.js",
+              "line": 28,
+              "column": 3
+            },
+            {
+              "title": "pop_admin: baris stok tidak memuat cabang di luar scope",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-hd",
+                  "projectName": "desktop-hd",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 820,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse/stock\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse/stock\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse/stock\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse/stock\", waiting until \"load\"\u001b[22m\n\n    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:44:16",
+                        "location": {
+                          "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                          "column": 16,
+                          "line": 44
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 42 |\u001b[39m\n \u001b[90m 43 |\u001b[39m     \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'POP_ADMIN'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 44 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mstock)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 45 |\u001b[39m\n \u001b[90m 46 |\u001b[39m     \u001b[36mconst\u001b[39m stockRows \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mlocator(\u001b[32m'tbody tr, .block.lg\\\\:hidden .rounded-2xl, [data-stock-item]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 47 |\u001b[39m     \u001b[36mawait\u001b[39m expectSeededRows(stockRows\u001b[33m,\u001b[39m \u001b[32m'stok'\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                            "column": 16,
+                            "line": 44
+                          },
+                          "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse/stock\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse/stock\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 42 |\u001b[39m\n \u001b[90m 43 |\u001b[39m     \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'POP_ADMIN'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 44 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mstock)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 45 |\u001b[39m\n \u001b[90m 46 |\u001b[39m     \u001b[36mconst\u001b[39m stockRows \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mlocator(\u001b[32m'tbody tr, .block.lg\\\\:hidden .rounded-2xl, [data-stock-item]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 47 |\u001b[39m     \u001b[36mawait\u001b[39m expectSeededRows(stockRows\u001b[33m,\u001b[39m \u001b[32m'stok'\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:44:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-07T07:53:37.058Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-fbb0c-memuat-cabang-di-luar-scope-desktop-hd/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-fbb0c-memuat-cabang-di-luar-scope-desktop-hd/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-fbb0c-memuat-cabang-di-luar-scope-desktop-hd/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                        "column": 16,
+                        "line": 44
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ab3f484390938fc8e7df-266308bbea6171b037b5",
+              "file": "gudang/01-akses-dan-navigasi.spec.js",
+              "line": 39,
+              "column": 3
+            },
+            {
+              "title": "teknisi: tidak boleh membuka form transfer (izin gudang tidak ada)",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-hd",
+                  "projectName": "desktop-hd",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 735,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse/transfers/create\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse/transfers/create\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse/transfers/create\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse/transfers/create\", waiting until \"load\"\u001b[22m\n\n    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:57:33",
+                        "location": {
+                          "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                          "column": 33,
+                          "line": 57
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 55 |\u001b[39m   test(\u001b[32m'teknisi: tidak boleh membuka form transfer (izin gudang tidak ada)'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'TEKNISI'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 57 |\u001b[39m     \u001b[36mconst\u001b[39m response \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mtransferCreate)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 58 |\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mconst\u001b[39m blocked \u001b[33m=\u001b[39m response\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m403\u001b[39m \u001b[33m||\u001b[39m response\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m404\u001b[39m \u001b[33m||\u001b[39m \u001b[33m!\u001b[39mpage\u001b[33m.\u001b[39murl()\u001b[33m.\u001b[39mincludes(\u001b[32m'/transfers/create'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 60 |\u001b[39m     expect(blocked\u001b[33m,\u001b[39m \u001b[32m`Teknisi mendapat ${response.status()} dan halaman ${page.url()}`\u001b[39m)\u001b[33m.\u001b[39mtoBeTruthy()\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                            "column": 33,
+                            "line": 57
+                          },
+                          "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse/transfers/create\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse/transfers/create\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 55 |\u001b[39m   test(\u001b[32m'teknisi: tidak boleh membuka form transfer (izin gudang tidak ada)'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'TEKNISI'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 57 |\u001b[39m     \u001b[36mconst\u001b[39m response \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mtransferCreate)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 58 |\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mconst\u001b[39m blocked \u001b[33m=\u001b[39m response\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m403\u001b[39m \u001b[33m||\u001b[39m response\u001b[33m.\u001b[39mstatus() \u001b[33m===\u001b[39m \u001b[35m404\u001b[39m \u001b[33m||\u001b[39m \u001b[33m!\u001b[39mpage\u001b[33m.\u001b[39murl()\u001b[33m.\u001b[39mincludes(\u001b[32m'/transfers/create'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 60 |\u001b[39m     expect(blocked\u001b[33m,\u001b[39m \u001b[32m`Teknisi mendapat ${response.status()} dan halaman ${page.url()}`\u001b[39m)\u001b[33m.\u001b[39mtoBeTruthy()\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:57:33\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-07T07:53:37.061Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-da693-sfer-izin-gudang-tidak-ada--desktop-hd/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-da693-sfer-izin-gudang-tidak-ada--desktop-hd/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-da693-sfer-izin-gudang-tidak-ada--desktop-hd/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                        "column": 33,
+                        "line": 57
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ab3f484390938fc8e7df-8c4bc3c27f0bca719362",
+              "file": "gudang/01-akses-dan-navigasi.spec.js",
+              "line": 55,
+              "column": 3
+            },
+            {
+              "title": "dashboard gudang tidak scroll horizontal di 1920x1080",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-hd",
+                  "projectName": "desktop-hd",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 872,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n\n    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:67:18",
+                        "location": {
+                          "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                          "column": 18,
+                          "line": 67
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 65 |\u001b[39m       \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'OWNER'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 66 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39msetViewportSize({ width\u001b[33m:\u001b[39m vp\u001b[33m.\u001b[39mwidth\u001b[33m,\u001b[39m height\u001b[33m:\u001b[39m vp\u001b[33m.\u001b[39mheight })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 67 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mindex)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                  \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 68 |\u001b[39m\n \u001b[90m 69 |\u001b[39m       \u001b[36mconst\u001b[39m overflow \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m horizontalOverflowPx(page)\u001b[33m;\u001b[39m\n \u001b[90m 70 |\u001b[39m       \u001b[36mawait\u001b[39m attachMetrics(testInfo\u001b[33m,\u001b[39m \u001b[32m`overflow-${vp.name}`\u001b[39m\u001b[33m,\u001b[39m { overflowPx\u001b[33m:\u001b[39m overflow })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                            "column": 18,
+                            "line": 67
+                          },
+                          "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 65 |\u001b[39m       \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'OWNER'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 66 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39msetViewportSize({ width\u001b[33m:\u001b[39m vp\u001b[33m.\u001b[39mwidth\u001b[33m,\u001b[39m height\u001b[33m:\u001b[39m vp\u001b[33m.\u001b[39mheight })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 67 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mindex)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                  \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 68 |\u001b[39m\n \u001b[90m 69 |\u001b[39m       \u001b[36mconst\u001b[39m overflow \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m horizontalOverflowPx(page)\u001b[33m;\u001b[39m\n \u001b[90m 70 |\u001b[39m       \u001b[36mawait\u001b[39m attachMetrics(testInfo\u001b[33m,\u001b[39m \u001b[32m`overflow-${vp.name}`\u001b[39m\u001b[33m,\u001b[39m { overflowPx\u001b[33m:\u001b[39m overflow })\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:67:18\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-07T07:53:38.607Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-300f4-oll-horizontal-di-1920x1080-desktop-hd/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-300f4-oll-horizontal-di-1920x1080-desktop-hd/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-300f4-oll-horizontal-di-1920x1080-desktop-hd/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                        "column": 18,
+                        "line": 67
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ab3f484390938fc8e7df-c8c6dcd7e0671b186bd7",
+              "file": "gudang/01-akses-dan-navigasi.spec.js",
+              "line": 64,
+              "column": 5
+            },
+            {
+              "title": "dashboard gudang tidak scroll horizontal di 1366x768",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-hd",
+                  "projectName": "desktop-hd",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 870,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n\n    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:67:18",
+                        "location": {
+                          "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                          "column": 18,
+                          "line": 67
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 65 |\u001b[39m       \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'OWNER'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 66 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39msetViewportSize({ width\u001b[33m:\u001b[39m vp\u001b[33m.\u001b[39mwidth\u001b[33m,\u001b[39m height\u001b[33m:\u001b[39m vp\u001b[33m.\u001b[39mheight })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 67 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mindex)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                  \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 68 |\u001b[39m\n \u001b[90m 69 |\u001b[39m       \u001b[36mconst\u001b[39m overflow \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m horizontalOverflowPx(page)\u001b[33m;\u001b[39m\n \u001b[90m 70 |\u001b[39m       \u001b[36mawait\u001b[39m attachMetrics(testInfo\u001b[33m,\u001b[39m \u001b[32m`overflow-${vp.name}`\u001b[39m\u001b[33m,\u001b[39m { overflowPx\u001b[33m:\u001b[39m overflow })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                            "column": 18,
+                            "line": 67
+                          },
+                          "message": "Error: page.goto: net::ERR_SSL_PROTOCOL_ERROR at http://localhost:8000/warehouse\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8000/warehouse\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 65 |\u001b[39m       \u001b[36mawait\u001b[39m loginAs(page\u001b[33m,\u001b[39m \u001b[32m'OWNER'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 66 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39msetViewportSize({ width\u001b[33m:\u001b[39m vp\u001b[33m.\u001b[39mwidth\u001b[33m,\u001b[39m height\u001b[33m:\u001b[39m vp\u001b[33m.\u001b[39mheight })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 67 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[33mGUDANG_ROUTES\u001b[39m\u001b[33m.\u001b[39mindex)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                  \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 68 |\u001b[39m\n \u001b[90m 69 |\u001b[39m       \u001b[36mconst\u001b[39m overflow \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m horizontalOverflowPx(page)\u001b[33m;\u001b[39m\n \u001b[90m 70 |\u001b[39m       \u001b[36mawait\u001b[39m attachMetrics(testInfo\u001b[33m,\u001b[39m \u001b[32m`overflow-${vp.name}`\u001b[39m\u001b[33m,\u001b[39m { overflowPx\u001b[33m:\u001b[39m overflow })\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:67:18\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-07T07:53:38.673Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-12afc-roll-horizontal-di-1366x768-desktop-hd/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-12afc-roll-horizontal-di-1366x768-desktop-hd/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-12afc-roll-horizontal-di-1366x768-desktop-hd/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js",
+                        "column": 18,
+                        "line": 67
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "ab3f484390938fc8e7df-91c701280f677c00d52d",
+              "file": "gudang/01-akses-dan-navigasi.spec.js",
+              "line": 64,
+              "column": 5
+            },
+            {
+              "title": "dashboard gudang tidak scroll horizontal di 1024x768",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-hd",
+                  "projectName": "desktop-hd",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "interrupted",
+                      "duration": 704,
+                      "error": {
+                        "message": "Error: page.waitForURL: Test ended.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+                        "stack": "Error: page.waitForURL: Test ended.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n    at loginAs (/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs:29:14)\n    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:65:7",
+                        "location": {
+                          "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs",
+                          "column": 14,
+                          "line": 29
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../helpers/gudang-helpers.mjs:29\n\n\u001b[0m \u001b[90m 27 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m password)\u001b[33m;\u001b[39m\n \u001b[90m 28 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 29 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL((url) \u001b[33m=>\u001b[39m \u001b[33m!\u001b[39murl\u001b[33m.\u001b[39mpathname\u001b[33m.\u001b[39mincludes(\u001b[32m'/login'\u001b[39m)\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m15000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 30 |\u001b[39m }\n \u001b[90m 31 |\u001b[39m\n \u001b[90m 32 |\u001b[39m \u001b[90m/**\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs",
+                            "column": 14,
+                            "line": 29
+                          },
+                          "message": "Error: page.waitForURL: Test ended.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\n\u001b[90m   at \u001b[39m../helpers/gudang-helpers.mjs:29\n\n\u001b[0m \u001b[90m 27 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m password)\u001b[33m;\u001b[39m\n \u001b[90m 28 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 29 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL((url) \u001b[33m=>\u001b[39m \u001b[33m!\u001b[39murl\u001b[33m.\u001b[39mpathname\u001b[33m.\u001b[39mincludes(\u001b[32m'/login'\u001b[39m)\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m15000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 30 |\u001b[39m }\n \u001b[90m 31 |\u001b[39m\n \u001b[90m 32 |\u001b[39m \u001b[90m/**\u001b[39m\u001b[0m\n\u001b[2m    at loginAs (/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs:29:14)\u001b[22m\n\u001b[2m    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:65:7\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-07T07:53:40.106Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-3ac10-roll-horizontal-di-1024x768-desktop-hd/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-3ac10-roll-horizontal-di-1024x768-desktop-hd/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-3ac10-roll-horizontal-di-1024x768-desktop-hd/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs",
+                        "column": 14,
+                        "line": 29
+                      }
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "ab3f484390938fc8e7df-d46dff5c2ae280d69b22",
+              "file": "gudang/01-akses-dan-navigasi.spec.js",
+              "line": 64,
+              "column": 5
+            },
+            {
+              "title": "dashboard gudang tidak scroll horizontal di 375x812",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-hd",
+                  "projectName": "desktop-hd",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 1,
+                      "status": "interrupted",
+                      "duration": 672,
+                      "error": {
+                        "message": "Error: page.waitForURL: Test ended.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+                        "stack": "Error: page.waitForURL: Test ended.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n    at loginAs (/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs:29:14)\n    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:65:7",
+                        "location": {
+                          "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs",
+                          "column": 14,
+                          "line": 29
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../helpers/gudang-helpers.mjs:29\n\n\u001b[0m \u001b[90m 27 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m password)\u001b[33m;\u001b[39m\n \u001b[90m 28 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 29 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL((url) \u001b[33m=>\u001b[39m \u001b[33m!\u001b[39murl\u001b[33m.\u001b[39mpathname\u001b[33m.\u001b[39mincludes(\u001b[32m'/login'\u001b[39m)\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m15000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 30 |\u001b[39m }\n \u001b[90m 31 |\u001b[39m\n \u001b[90m 32 |\u001b[39m \u001b[90m/**\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs",
+                            "column": 14,
+                            "line": 29
+                          },
+                          "message": "Error: page.waitForURL: Test ended.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\n\u001b[90m   at \u001b[39m../helpers/gudang-helpers.mjs:29\n\n\u001b[0m \u001b[90m 27 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m password)\u001b[33m;\u001b[39m\n \u001b[90m 28 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 29 |\u001b[39m   \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL((url) \u001b[33m=>\u001b[39m \u001b[33m!\u001b[39murl\u001b[33m.\u001b[39mpathname\u001b[33m.\u001b[39mincludes(\u001b[32m'/login'\u001b[39m)\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m15000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 30 |\u001b[39m }\n \u001b[90m 31 |\u001b[39m\n \u001b[90m 32 |\u001b[39m \u001b[90m/**\u001b[39m\u001b[0m\n\u001b[2m    at loginAs (/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs:29:14)\u001b[22m\n\u001b[2m    at /home/yopi/whusnet/whusnet-operasional/tests/Browser/scenarios/gudang/01-akses-dan-navigasi.spec.js:65:7\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-07T07:53:40.150Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-366fa-croll-horizontal-di-375x812-desktop-hd/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-366fa-croll-horizontal-di-375x812-desktop-hd/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/yopi/whusnet/whusnet-operasional/test-results/gudang-01-akses-dan-naviga-366fa-croll-horizontal-di-375x812-desktop-hd/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/yopi/whusnet/whusnet-operasional/tests/Browser/helpers/gudang-helpers.mjs",
+                        "column": 14,
+                        "line": 29
+                      }
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "ab3f484390938fc8e7df-ff1df00a7a39cbd81ed8",
+              "file": "gudang/01-akses-dan-navigasi.spec.js",
+              "line": 64,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-07T07:53:25.666Z",
+    "duration": 15316.606999999998,
+    "expected": 0,
+    "skipped": 2,
+    "unexpected": 6,
+    "flaky": 0
+  }
+}

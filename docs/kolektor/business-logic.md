@@ -52,7 +52,8 @@ Satu endpoint logika, dua jalur masuk:
 
 | Aturan | Alasan |
 |---|---|
-| `amount` BOLEH > sisa tagihan | **Diubah ADHOC-84 (2026-09-23)** — aturan lama "kelebihan dikembalikan fisik" dibalik: kelebihannya otomatis dipisah jadi `overpay_amount` & masuk saldo pelanggan (`CustomerBalanceService::credit()`), pola sama `PaymentService::record()` jalur admin. Isian awal FIFO (uang total pelanggan disebar ke invoice tertua dulu) murni kemudahan klien (`cbApplyFifo()` di `collector-pay-script.blade.php`), server tetap validasi per baris independen |
+| `amount` + saldo yang dipakai ≤ sisa tagihan | **Diubah 2026-10-05** (keputusan user, opsi 2). Batch kolektor, teknisi, dan portal staf **tidak menerima lebih bayar**. Sebelumnya (ADHOC-84, 2026-09-23) kelebihan otomatis masuk saldo; sekarang kelebihan hanya bisa dicatat lewat form Tagihan admin (`quick-payment-modal`), yang tetap membolehkan lebih bayar dengan konfirmasi. Penjaga: `CollectorPaymentService::validateRows()` (per baris, pesan "Kelebihan hanya bisa dicatat lewat Tagihan admin") dan validasi klien di `collector-pay-script`/`StaffKolektorPaymentForm` |
+| `use_balance_amount` ≤ sisa tagihan | Saldo dipakai per tagihan hanya sampai sisanya. Saldo satu pelanggan dijumlahkan **per pelanggan** di seluruh baris batch (`validateRows()` menyimpan `$balanceUsedByCustomer`), jadi dua tagihan tidak bisa sama-sama memakai saldo penuh |
 | `amount` > 0 | `PaymentObserver::creating()` menolak ≤ 0 dari semua jalur |
 | `collected_date` ≤ hari ini | Tanggal masa depan merusak pemotongan pendapatan per periode dan melahirkan kunjungan bertanggal besok |
 
@@ -61,6 +62,33 @@ Satu endpoint logika, dua jalur masuk:
 ### Cicilan
 
 Nominal boleh di bawah sisa. Invoice jadi `sebagian`, sisanya tetap muncul di worklist sampai lunas, dan saldo kolektor bertambah **sebesar uang yang diterima** — bukan sebesar nilai tagihan.
+
+### Pakai saldo pelanggan (2026-10-05)
+
+Pola sama dengan form Bayar admin, tampil sebagai checkbox **"Pakai saldo"** per tagihan (default tidak dicentang):
+
+- Dicentang → saldo terisi otomatis `min(saldo tersisa, sisa tagihan)`, dan uang tunai = sisa tagihan − saldo.
+- Dilepas → saldo 0, tunai kembali ke sisa tagihan penuh.
+- Saldo tetap bisa diubah manual, tapi selalu dibatasi `min(saldo tersedia, sisa tagihan)`.
+- Saldo satu pelanggan dibagi berurutan antar tagihannya dalam satu batch.
+- Bayar penuh dari saldo (tunai 0) tercatat sebagai metode `saldo`, sama seperti admin.
+- Saldo **bukan** uang fisik: total yang masuk setoran kolektor hanya `amount` (tunai).
+
+Tabel bayar kolektor dan worksheet admin memakai markup yang sama (`partials/collector-pay-table.blade.php`). Di portal staf, saldo tampil sebagai kartu per tagihan (`StaffKolektorPaymentForm.tsx`) dengan rincian "Sisa tagihan / Dari saldo / Uang tunai".
+
+### Transfer dan Lainnya
+
+- **Transfer** wajib memilih rekening aktif dari master (`bank_accounts`); `bank_name` dan `account_number` di payment diambil sebagai snapshot dari master, bukan dari input. Nama pengirim opsional.
+- **Lainnya** wajib mengisi keterangan metode (mis. OVO, Dana).
+- Metode batch: `cash`, `transfer`, `lainnya`, plus `saldo` otomatis. `qris` sudah dihapus dari sistem.
+
+### Jalur masuk selain kolektor
+
+| Jalur | Endpoint | Aturan |
+|---|---|---|
+| Teknisi | `POST /technician-payments` | Sama dengan kolektor, tanpa cek `collector_id`. Batas POP scope tetap. Tidak menulis buku kunjungan. |
+| Portal staf (QR) | `POST /customer-portal/kolektor/payments`, `…/teknisi/payments` | Token one-shot, aturan batch yang sama. Worklist mengirim `customer.balance` dan `bank_accounts` untuk form. |
+| Worksheet admin | `POST /payment-batches/{collector}` | Memakai tabel bayar yang sama, jadi juga tidak menerima lebih bayar. Untuk kelebihan, pakai Tagihan admin. |
 
 ---
 
@@ -304,7 +332,7 @@ Dispatch-nya menumpang `safelyNotify()` yang sama dengan notifikasi — kegagala
 | Entitas | Format |
 |---|---|
 | Setoran | `SETOR-{tahun}-{4 digit}` |
-| Payment | `PAY-{YYYYMM}-{4 digit}` (mekanisme lama, tak berubah) |
+| Payment | `PAY-{invoice_number}-{NN}` (BUG 13, ID_NUMBERING_RULES §16.2) |
 
 `deposit_number` dijaga unique index; generator memakai `max + 1` per tahun.
 
@@ -492,7 +520,7 @@ upload → queue → TEKS PDF ─ kosong ─→ QR (khanamiryan) ─ gagal ─�
                        ya → MATCHED        tidak → MISMATCH
 ```
 
-**Dua gerbang, bukan satu.** Gerbang pertama pola `PAY-YYYYMM-NNNN`; gerbang kedua keberadaan payment-nya di database. Nomor yang lolos pola tapi tak menunjuk pembayaran mana pun berakhir `MISMATCH` — **tidak pernah** dicocokkan asal. Inilah yang menahan QR salah cetak.
+**Dua gerbang, bukan satu.** Gerbang pertama pola `PAY-[A-Z0-9-]{5,40}` (longgar, lihat ID_NUMBERING_RULES §16.3); gerbang kedua keberadaan payment-nya di database. Nomor yang lolos pola tapi tak menunjuk pembayaran mana pun berakhir `MISMATCH` — **tidak pernah** dicocokkan asal. Inilah yang menahan QR salah cetak.
 
 ### Override manual wajib ada
 

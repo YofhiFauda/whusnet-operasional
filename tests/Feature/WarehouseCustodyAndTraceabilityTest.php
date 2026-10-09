@@ -109,6 +109,58 @@ class WarehouseCustodyAndTraceabilityTest extends TestCase
             ->assertDontSee('Teknisi CTT B');
     }
 
+    /**
+     * Analisa UI/UX §U6 — mode "Saldo per Teknisi": satu baris per teknisi,
+     * menjumlah barang yang dipegang. Default tetap per barang.
+     */
+    #[Test]
+    public function mode_teknisi_menampilkan_satu_baris_per_teknisi(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('warehouse.custody.index', ['view' => 'teknisi']));
+
+        $response->assertOk()
+            ->assertSee('Saldo per Teknisi')
+            ->assertSee('Teknisi CTT A')
+            ->assertSee('Teknisi CTT B');
+
+        $this->assertSame('teknisi', $response->viewData('viewMode'));
+
+        $perTech = $response->viewData('perTechnician');
+        $this->assertCount(2, $perTech);
+
+        $rowA = $perTech->firstWhere(fn ($r) => $r['technician']->id === $this->teknisiA->id);
+        $this->assertNotNull($rowA);
+        $itemA = $rowA['items']->firstWhere('name', 'Kabel CTT');
+        $this->assertSame(40.0, $itemA['qty']);
+    }
+
+    #[Test]
+    public function mode_default_tetap_per_barang(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('warehouse.custody.index'));
+
+        $response->assertOk();
+        $this->assertSame('barang', $response->viewData('viewMode'));
+        $this->assertCount(0, $response->viewData('perTechnician'));
+    }
+
+    #[Test]
+    public function mode_teknisi_discope_pop_admin_tidak_bocor_lintas_cabang(): void
+    {
+        $popAdminRole = Role::where('code', 'pop_admin')->firstOrFail();
+        $popAdminA = User::factory()->create(['role_id' => $popAdminRole->id]);
+        $scope = UserRoleScope::create(['user_id' => $popAdminA->id, 'role_id' => $popAdminRole->id, 'scope_type' => 'selected_pop']);
+        $scope->targets()->create(['pop_id' => $this->cabangA->id]);
+
+        $response = $this->actingAs($popAdminA)->get(route('warehouse.custody.index', ['view' => 'teknisi']));
+
+        $response->assertOk()
+            ->assertSee('Teknisi CTT A')
+            ->assertDontSee('Teknisi CTT B');
+
+        $this->assertCount(1, $response->viewData('perTechnician'));
+    }
+
     #[Test]
     public function pop_admin_tidak_bisa_trace_sn_di_luar_scope(): void
     {

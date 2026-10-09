@@ -25,4 +25,20 @@ enum ItemCondition: string
             self::USED_DAMAGED => 'Bekas — Rusak',
         };
     }
+
+    /**
+     * Varian badge (dipetakan ke .badge-* design token di app.css) — SATU
+     * sumber kebenaran warna kondisi, dipakai `<x-warehouse.condition-badge>`
+     * biar tidak lagi di-hardcode beda-beda per view (analisa-ui-ux §U4/V6).
+     * "Belum dicek" bukan case enum (itu kombinasi condition + checked flag),
+     * jadi ditangani di komponen, bukan di sini.
+     */
+    public function badgeVariant(): string
+    {
+        return match ($this) {
+            self::NEW => 'success',
+            self::USED_GOOD => 'info',
+            self::USED_DAMAGED => 'error',
+        };
+    }
 }

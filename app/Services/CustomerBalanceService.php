@@ -53,6 +53,49 @@ class CustomerBalanceService
     }
 
     /**
+     * Saldo berjalan banyak pelanggan sekaligus — satu query agregat untuk
+     * seluruh baris tabel bayar, bukan `balance()` per baris (N+1).
+     *
+     * @param  array<int, int>  $customerIds
+     * @return array<int, float> saldo per customer_id (0 kalau belum punya mutasi)
+     */
+    public function balancesForCustomers(array $customerIds): array
+    {
+        $customerIds = array_values(array_unique(array_map('intval', $customerIds)));
+
+        if ($customerIds === []) {
+            return [];
+        }
+
+        $totals = CustomerBalanceMutation::query()
+            ->whereIn('customer_id', $customerIds)
+            ->selectRaw('customer_id, type, SUM(amount) as total')
+            ->groupBy('customer_id', 'type')
+            ->get();
+
+        $credit = [];
+        $debit = [];
+        foreach ($totals as $row) {
+            $key = (int) $row->customer_id;
+
+            // `type` di-cast ke enum oleh model (`casts()`), jadi dibanding enum-nya,
+            // BUKAN string — string compare selalu false → semua kredit terbaca debit.
+            if ($row->type === CustomerBalanceMutationType::CREDIT) {
+                $credit[$key] = Money::of($row->total);
+            } else {
+                $debit[$key] = Money::of($row->total);
+            }
+        }
+
+        $result = [];
+        foreach ($customerIds as $customerId) {
+            $result[$customerId] = Money::sub($credit[$customerId] ?? 0, $debit[$customerId] ?? 0);
+        }
+
+        return $result;
+    }
+
+    /**
      * Saldo berjalan dengan baris ledger customer ini DIKUNCI
      * (`lockForUpdate`) — dipanggil di dalam transaction yang sama dengan
      * penguncian invoice, supaya dua pembayaran simultan yang sama-sama
@@ -399,13 +442,12 @@ class CustomerBalanceService
                 // disentuh auto-pay lebih dari sekali (saldo baru masuk lagi
                 // sebelum invoice ini lunas/berganti admin/kolektor yang
                 // melunasi sisanya). `idempotency_key` per invoice SAJA akan
-                // bertabrakan pada sentuhan kedua tanpa nomor urut ini.
-                $urutan = Payment::where('invoice_id', $invoice->id)
-                    ->where('payment_method', PaymentMethod::SALDO->value)
-                    ->count() + 1;
+                // bertabrakan pada sentuhan kedua tanpa nomor urut ini. Urutan
+                // diambil dari NumberSequenceService (atomik), bukan count()+1.
+                $urutan = app(NumberSequenceService::class)->autoSaldoOrdinal($invoice);
 
                 $payment = Payment::create([
-                    'payment_number' => Payment::generatePaymentNumber(now()->format('Y-m-d')),
+                    'payment_number' => Payment::generatePaymentNumber($invoice, $pakai),
                     'idempotency_key' => "auto-saldo:{$invoice->id}:{$urutan}",
                     'invoice_id' => $invoice->id,
                     'customer_id' => $customer->id,

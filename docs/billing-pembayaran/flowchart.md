@@ -94,7 +94,7 @@ DB transaction:
   appliedAmount = min(amount_diketik, remaining)
   overpayAmount = amount_diketik − appliedAmount
   Payment::create(amount=appliedAmount, overpay_amount=overpayAmount>0?..:null,
-                   status=valid, payment_number=PAY-YYYYMM-NNNN)
+                   status=valid, payment_number=PAY-{invoice_number}-{NN})
   Invoice::recalculateFromPayments() → paid_amount, remaining_amount, invoice_status
         │
         ▼

@@ -11,7 +11,7 @@ internet_packages ───┼──▶ invoices ──1:N──▶ payments ◀
             │        │        ▲                  │
 pops ───────┴────────┘        │                  ├──▶ payment_batches ◀── users (submitted_by, collector_id)
             │                 │                  │
-users (created_by) ───────────┘                  └──▶ payment_number_sequences (counter, bukan FK)
+users (created_by) ───────────┘                  └──▶ payment_number_sequences (legacy, tidak dipakai penomoran baru — lihat bawah)
 
 customers.collector_id ──▶ users (role kolektor)
 ```
@@ -26,14 +26,14 @@ customers.collector_id ──▶ users (role kolektor)
 
 ## Tabel `invoices`
 
-Migrasi sumber: `2026_06_12_132728_create`, `2026_06_15_000002_add_legacy_ids`, `2026_06_16_103000_add_extended_attributes`, `2026_06_17_150000_add_other_fee`, `2026_07_02_133000_add_invoice_type`, `2026_07_04_091633_remove_default_from_invoice_type`, `2026_09_23_085400_add_manual_invoice_columns` (ADHOC-70).
+Migrasi sumber: `2026_06_12_132728_create`, `2026_06_15_000002_add_legacy_ids`, `2026_06_16_103000_add_extended_attributes`, `2026_06_17_150000_add_other_fee`, `2026_07_02_133000_add_invoice_type`, `2026_07_04_091633_remove_default_from_invoice_type`, `2026_09_23_085400_add_manual_invoice_columns` (ADHOC-70), `2026_10_05_100000_add_customer_issue_date_index_to_invoices_table` (index `invoices_customer_issue_date_index` `(customer_id, issue_date)` untuk list tagihan Portal Pelanggan yang diurutkan `issue_date DESC`). Migration idempoten: melewati pembuatan index bila `invoices_customer_issue_date_index` sudah ada (kasus lokal 2026-10-05).
 
 | Kolom | Tipe | Nullable | Keterangan |
 |-------|------|----------|------------|
 | `id` | bigint PK | | |
-| `invoice_number` | string(50), unique | | Format `INV-{periode}-{urutan}` |
+| `invoice_number` | string(50), unique | | Format `{PREFIX}-{YYYYMMDD}-{NNNNNN}` (`ACT`/`TAG`/`MTN`/`OTH`/`REL`, BUG 13). Tagihan lama `INV-{YYYYMM}-{NNNN}` belum di-backfill. Lihat `ID_NUMBERING_RULES.md` §16 |
 | `old_invoice_id` / `old_cost_id` / `old_request_id` | string(50) | ✔ | ID referensi data legacy (migrasi dari sistem lama) |
-| `invoice_type` | string(30), **NOT NULL, no default** | | Enum `App\Enums\InvoiceType`: `awal`, `bulanan`, `reaktivasi`, `insidental`, `manual` (ADHOC-70, Tagihan Manual) — wajib diisi eksplisit tiap insert (default DB sengaja dihapus, lihat catatan di bawah) |
+| `invoice_type` | string(30), **NOT NULL, no default** | | Enum `App\Enums\InvoiceType`: `awal`, `bulanan`, `manual` (ADHOC-70, Tagihan Manual; `reaktivasi` dihapus ADHOC-101, `insidental` digabung ke `manual`) — wajib diisi eksplisit tiap insert (default DB sengaja dihapus, lihat catatan di bawah) |
 | `manual_category` | string(30) | ✔ | Enum `App\Enums\ManualInvoiceCategory`: `perbaikan`, `lainnya`, `pindah_lokasi` — cuma diisi untuk `invoice_type=manual` (ADHOC-70), NULL untuk jenis lain |
 | `manual_subtype_name` | string(150) | ✔ | Nama sub bebas untuk `manual_category=lainnya` (mis. "Over Kabel") — NULL untuk kategori lain |
 | `description` | text | ✔ | Deskripsi tagihan diketik manual — cuma dipakai `invoice_type=manual` |
@@ -117,7 +117,7 @@ Migrasi sumber: `2026_06_13_000001_create`, `2026_06_15_000002_add_legacy_ids`, 
 | Kolom | Tipe | Nullable | Keterangan |
 |-------|------|----------|------------|
 | `id` | bigint PK | | |
-| `payment_number` | string(50), unique | | Format `PAY-{periode}-{urutan}`, digenerate `Payment::generatePaymentNumber()` via `payment_number_sequences` (lihat di bawah) |
+| `payment_number` | string(50), unique | | Format `PAY-{invoice_number}-{NN}` (BUG 13), digenerate `Payment::generatePaymentNumber(Invoice $invoice)` — `NN` = urutan pembayaran ke-N pada tagihan itu (2 digit). Lihat `ID_NUMBERING_RULES.md` §16 |
 | `idempotency_key` | string(191), **unique** | ✔ | Penahan submit dobel jalur Tagihan (migrasi `2026_08_10_154725`). Nullable: seluruh pembayaran lama — hasil migrasi legacy maupun batch kolektor — tidak punya kunci ini dan tak boleh dipaksa punya; unique memperlakukan NULL sebagai berbeda satu sama lain sehingga baris lama tidak saling bertabrakan. Jalur batch kolektor tetap memakai `payment_batches.idempotency_key` (satu kunci per sesi submit, bukan per pembayaran) |
 | `old_payment_id` / `old_transaction_id` / `old_request_id` | string(50) | ✔ | Referensi data legacy |
 | `billing_period` | string(50) | ✔ | Legacy — periode bayar dari data lama |
@@ -184,10 +184,13 @@ Wadah RINGAN untuk satu sesi submit batch pembayaran kolektor — cuma untuk ded
 | `submitted_at` | timestamp | | |
 | `created_at` / `updated_at` | timestamp | | |
 
-## Tabel `payment_number_sequences`
+## Tabel `payment_number_sequences` (LEGACY — tidak dipakai lagi)
 
 Migrasi sumber: `2026_08_03_090930_create_payment_number_sequences_table`.
 
+**Sejak BUG 13 (2026-10-01) generator pembayaran tidak lagi membaca tabel ini.** Nomor sekarang `PAY-{invoice_number}-{NN}`, urutan dihitung langsung dari `count()` baris `payments` per `invoice_id`. Tabel & baris lama dibiarkan apa adanya (tidak dihapus, tidak ada data yang bergantung padanya).
+
+Sejarah (format lama, sudah tidak berlaku):
 Pengganti MAX+1 di `Payment::generatePaymentNumber()` (dulu `orderBy('payment_number','desc')->lockForUpdate()->first()` — phantom read kalau periode masih kosong dan dua request pertama bulan itu jalan bersamaan). Pola sama `PopSequence`: kunci baris counter yang SELALU ada, baru increment. `current_number` unsigned tanpa batas atas — lebar digit format `PAY-{periode}-%0Nd` naik otomatis kalau lewat 9999.
 
 | Kolom | Tipe | Nullable | Keterangan |

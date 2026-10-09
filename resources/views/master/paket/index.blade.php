@@ -190,6 +190,15 @@
                     <a href="{{ route('master.paket.edit', $package) }}" class="px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/30 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/40">
                         Edit
                     </a>
+                    @if(auth()->user()->hasPermission('packages.delete'))
+                    <form action="{{ route('master.paket.destroy', $package) }}" method="POST">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-400 bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20" onclick="event.preventDefault(); window.confirmDelete(@js('Hapus paket '.($package->package_code).'? Jika sudah pernah ditagih, paket hanya dinonaktifkan.'), this.closest('form'))">
+                            Hapus
+                        </button>
+                    </form>
+                    @endif
                     <form action="{{ route('master.paket.toggle', $package) }}" method="POST">
                         @csrf
                         <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50" onclick="event.preventDefault(); window.confirmAction(@js('Ubah status package '.($package->package_code).'?'), this.closest('form'))">

@@ -14,6 +14,7 @@ use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use Illuminate\Http\JsonResponse;
@@ -88,9 +89,10 @@ class WarehouseScanController extends Controller
             ->get();
 
         // Sama query `WarehouseIssueController::create()` — lihat docblock
-        // di sana soal kenapa belum discope per-cabang.
+        // di sana soal kenapa belum discope per-cabang. Role::TECHNICIAN_CODES
+        // — PIC gudang (role 'pic_gudang') ikut muncul.
         $technicians = User::query()
-            ->whereHas('role', fn ($q) => $q->whereIn('code', ['teknisi', 'fop']))
+            ->whereHas('role', fn ($q) => $q->whereIn('code', [...Role::TECHNICIAN_CODES, 'fop']))
             ->orderBy('name')
             ->get();
 

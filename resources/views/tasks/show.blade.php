@@ -728,7 +728,7 @@
                 @endif
             </div>
 
-            {{-- Alat Kerja Yang Perlu Dibawa --}}
+            {{-- Alat Kerja Opsional — semua alat kerja bersifat opsional (boleh dibawa bila dibutuhkan). --}}
             @php
                 $workToolRows = app(\App\Services\TaskWorkToolService::class)->displayRowsForTask($task);
             @endphp
@@ -738,7 +738,7 @@
                     <svg class="h-4.5 w-4.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
                     </svg>
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-text-main font-ui">Alat Kerja Wajib</h3>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-text-main font-ui">Alat Kerja Opsional</h3>
                 </div>
                 <div class="flex flex-wrap gap-2 select-text">
                     @foreach($workToolRows as $row)
@@ -1042,7 +1042,7 @@
 
                 @if($workToolsDipakai->isNotEmpty())
                 <div>
-                    <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui mb-2 select-none">Alat Kerja Dipakai</span>
+                    <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui mb-2 select-none">Alat Kerja Opsional</span>
                     <div class="flex flex-wrap gap-1.5">
                         @foreach($workToolsDipakai as $tool)
                         <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold font-ui bg-surface-muted text-text-secondary border border-border">{{ $tool->tool_name }}@if($tool->note)<span class="text-text-muted text-[10px] font-normal"> · {{ $tool->note }}</span>@endif</span>

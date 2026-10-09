@@ -164,6 +164,34 @@ class Pop extends Model
     }
 
     /**
+     * User yang ditunjuk jadi PIC Gudang cabang ini (role `pic_gudang`,
+     * `status = active`). SENGAJA bersumber dari tabel `warehouse_pop_pics`,
+     * BUKAN dari scope POP user (`user_role_scopes`) — scope cuma menjawab
+     * "data mana yang boleh dia lihat", sedangkan penunjukan PIC menjawab
+     * "gudang mana yang dia urus". Teknisi keliling (scope `all_pop`) bisa
+     * saja cuma PIC di 1 cabang; menyimpulkan dari scope akan salah.
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function gudangPics(): BelongsToMany
+    {
+        // withPivot('id') — view "Kelola PIC Gudang per Cabang" butuh id
+        // baris pivot buat tombol cabut penunjukan (WarehousePopPicController::destroy()).
+        return $this->belongsToMany(User::class, 'warehouse_pop_pics')->withPivot('id')->where('status', 'active');
+    }
+
+    /**
+     * Satu-satunya definisi "apakah cabang ini sudah punya PIC Gudang aktif?"
+     * — dipakai buat membedakan hak POP Admin cabang ber-PIC vs cabang
+     * belum ber-PIC (docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md §7.2).
+     * Jangan ditulis ulang di controller/service lain.
+     */
+    public function hasActivePicGudang(): bool
+    {
+        return $this->gudangPics()->exists();
+    }
+
+    /**
      * Scope a query to only include POPs accessible by the given user.
      *
      * @param  Builder  $query

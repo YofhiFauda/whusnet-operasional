@@ -38,7 +38,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
 
-            $table->string('purpose', 20); // 'tickets' | 'kolektor'
+            $table->string('purpose', 20); // 'tickets' | 'kolektor' | 'teknisi_bayar' (ADHOC-122, tanpa perubahan skema)
 
             $table->string('token_hash', 64)->index();
 

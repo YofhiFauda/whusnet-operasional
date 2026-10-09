@@ -149,6 +149,56 @@ class WarehouseDashboardPageTest extends TestCase
         $response->assertSee('DO-88912');
     }
 
+    /**
+     * Analisa UI/UX Fase 9 (§B4/U7) — blok "Perlu Tindakan" di atas dasbor:
+     * stok kritis muncul sebagai item aksi dengan tautan ke daftar terfilter.
+     */
+    #[Test]
+    public function blok_perlu_tindakan_menampilkan_stok_kritis(): void
+    {
+        InventoryBalance::create([
+            'pop_id' => $this->cabangSiman->id,
+            'item_id' => $this->dropcoreItem->id,
+            'lot_no' => 'LOT-KRITIS',
+            'qty' => 50,
+            'minimum_stock' => 500, // di bawah ambang → kritis
+        ]);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.index'));
+
+        $response->assertOk()
+            ->assertSee('Perlu Tindakan', false)
+            ->assertSee('hal menunggu', false)
+            ->assertSee(route('warehouse.stock.index', ['low_stock_only' => 1]), false);
+    }
+
+    #[Test]
+    public function blok_perlu_tindakan_status_aman_saat_tidak_ada_apa_apa(): void
+    {
+        InventoryBalance::create([
+            'pop_id' => $this->pusat->id,
+            'item_id' => $this->ontItem->id,
+            'qty' => 50,
+            'minimum_stock' => 10, // aman
+        ]);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.index'));
+
+        $response->assertOk()
+            ->assertSee('Perlu Tindakan', false)
+            ->assertSee('Semua aman', false);
+    }
+
+    #[Test]
+    public function header_punya_tautan_daftar_transfer(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('warehouse.index'));
+
+        $response->assertOk()
+            ->assertSee(route('warehouse.transfers.index'), false)
+            ->assertSee('Daftar Transfer', false);
+    }
+
     #[Test]
     public function dashboard_can_filter_by_pop_id(): void
     {

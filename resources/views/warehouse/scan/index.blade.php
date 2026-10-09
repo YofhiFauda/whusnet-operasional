@@ -100,13 +100,15 @@
                         <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100" x-text="result.item_name"></h3>
                         <div class="flex items-center gap-2 mt-1 flex-wrap">
                             <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300" x-text="result.status_label"></span>
+                            {{-- Badge kondisi: design token .badge-* (analisa-ui-ux §U4/V6),
+                                 selaras <x-warehouse.condition-badge> & modal SN Kelola Stok --}}
                             <template x-if="result.condition_label">
-                                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold"
+                                <span class="badge"
                                     :class="{
-                                        'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400': result.condition_label === 'Baru',
-                                        'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400': result.condition_label === 'Bekas — Rusak',
-                                        'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400': result.condition_label === 'Bekas — Sudah Dicek',
-                                        'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400': result.condition_label === 'Bekas — Belum Dicek',
+                                        'badge-success': result.condition_label === 'Baru',
+                                        'badge-error': result.condition_label === 'Bekas — Rusak',
+                                        'badge-info': result.condition_label === 'Bekas — Sudah Dicek',
+                                        'badge-warning': result.condition_label === 'Bekas — Belum Dicek',
                                     }"
                                     x-text="result.condition_label"></span>
                             </template>

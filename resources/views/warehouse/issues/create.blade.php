@@ -288,7 +288,7 @@
 
                                         <template x-if="row.tracking_type === 'serialized'">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-                                                SERIAL NUMBER
+                                                SN
                                             </span>
                                         </template>
                                         <template x-if="row.tracking_type === 'quantity'">

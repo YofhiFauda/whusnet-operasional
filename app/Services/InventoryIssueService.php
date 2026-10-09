@@ -45,6 +45,8 @@ class InventoryIssueService
             throw new InvalidArgumentException('Issue wajib py minimal 1 baris barang.');
         }
 
+        $this->assertIssueAllowed($cabang, $technician, $actor);
+
         // Urutkan per item_id — cegah deadlock lock-ordering (lihat catatan
         // sama di InventoryReceiveService::receiveBatch()).
         usort($lines, fn ($a, $b) => $a['item_id'] <=> $b['item_id']);
@@ -286,5 +288,47 @@ class InventoryIssueService
             ->max() ?? 0;
 
         return sprintf('ISS-%s-%06d', $today, $lastNum + 1);
+    }
+
+    /**
+     * Pembagian tugas PIC Gudang vs POP Admin (ADHOC-120,
+     * docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md §7, §8
+     * Kelompok H2). Berlaku dari SEMUA jalur masuk — jangan diduplikasi di
+     * controller.
+     *
+     * 1. Siapa pun gak boleh issue ke diri sendiri (§7.3) — bukan cuma PIC,
+     *    gak pernah masuk akal pengeluar = penerima.
+     * 2. `pop_admin` di cabang yang SUDAH punya PIC aktif cuma boleh issue ke
+     *    salah satu PIC cabang itu (§7.1) — barang buat PIC lewat POP Admin,
+     *    PIC gak boleh issue ke dirinya sendiri (poin 1 di atas sudah
+     *    menutup itu).
+     * 3. `pic_gudang` cuma boleh issue dari gudang cabang yang jadi
+     *    penunjukannya (`warehouse_pop_pics`) — PENTING buat PIC yang
+     *    scope-nya `all_pop` (teknisi keliling): scope mengizinkan dia
+     *    MELIHAT semua cabang, tapi hak TULIS gudang tetap dibatasi ke
+     *    cabang penunjukannya saja (§5.3.6).
+     */
+    private function assertIssueAllowed(Pop $cabang, User $technician, User $actor): void
+    {
+        if ($actor->is($technician)) {
+            throw new InvalidArgumentException('Barang tidak bisa dikeluarkan untuk diri sendiri.');
+        }
+
+        $actorRoleCode = $actor->role?->code;
+
+        if ($actorRoleCode === 'pop_admin' && $cabang->hasActivePicGudang()) {
+            $picIds = $cabang->gudangPics()->pluck('users.id');
+            if (! $picIds->contains($technician->id)) {
+                throw new InvalidArgumentException(
+                    "Gudang {$cabang->name} sudah punya PIC Gudang — POP Admin cuma boleh keluarkan barang untuk PIC Gudang cabang ini."
+                );
+            }
+        }
+
+        if ($actorRoleCode === 'pic_gudang' && ! $actor->isPicGudangOf($cabang)) {
+            throw new InvalidArgumentException(
+                "Cabang {$cabang->name} bukan gudang yang Anda kelola sebagai PIC Gudang."
+            );
+        }
     }
 }

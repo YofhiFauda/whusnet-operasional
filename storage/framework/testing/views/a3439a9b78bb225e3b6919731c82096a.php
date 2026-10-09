@@ -318,7 +318,7 @@
                     </div>
                 </div>
 
-                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-between gap-3 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-between gap-3 shrink-0">
                     <a href="<?php echo e(route('fop-tasks.index')); ?>" class="btn-secondary text-xs cursor-pointer">Reset</a>
                     <button type="submit" class="btn-primary text-xs cursor-pointer">Terapkan Filter</button>
                 </div>
@@ -576,19 +576,20 @@
     </div>
 
     
-    <div x-show="modal.open" 
-         class="fixed inset-0 z-50 overflow-hidden md:overflow-y-auto flex items-end md:items-center justify-center p-0 md:p-4" 
-         x-transition:enter="transition ease-out duration-200" 
-         x-transition:enter-start="opacity-0" 
-         x-transition:enter-end="opacity-100" 
-         x-transition:leave="transition ease-in duration-150" 
-         x-transition:leave-start="opacity-100" 
+    
+    <div x-show="modal.open"
+         class="fixed inset-0 z-50 flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden h-dvh md:h-auto"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          style="display: none;">
-        
+
         <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" @click="modal.open = false"></div>
 
-        <div class="bg-surface border-t md:border border-border w-full max-w-2xl lg:max-w-3xl rounded-t-2xl md:rounded-xl shadow-2xl relative z-10 max-h-[90dvh] md:max-h-[85vh] flex flex-col overflow-hidden font-ui" 
+        <div class="bg-surface border-0 md:border border-border w-full md:h-auto max-w-full md:max-w-2xl lg:max-w-3xl rounded-none md:rounded-xl shadow-2xl relative z-10 max-h-dvh md:max-h-[85vh] flex flex-col overflow-hidden font-ui"
              @click.away="modal.open = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="translate-y-full md:translate-y-4 md:scale-95 md:opacity-0"
@@ -597,7 +598,7 @@
              x-transition:leave-start="translate-y-0 md:translate-y-0 md:scale-100 md:opacity-100"
              x-transition:leave-end="translate-y-full md:translate-y-4 md:scale-95 md:opacity-0">
 
-            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-2xl md:rounded-t-xl shrink-0">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-none md:rounded-t-xl shrink-0">
                 <h3 class="text-sm font-bold text-text-main font-ui" x-text="modal.isEdit ? 'Edit Task FOP' : 'Tambah Task FOP'"></h3>
                 <button type="button" @click="modal.open = false" class="text-text-muted hover:text-text-main transition-colors p-1 cursor-pointer">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -703,7 +704,6 @@
 
                     <input type="hidden" name="customer_id" :value="modal.data.customer_id">
                     <input type="hidden" name="origin" value="fop_tasks">
-                    
                     <input type="hidden" name="type" :value="modal.data.category" :disabled="!isTicketMode">
 
                     
@@ -773,7 +773,7 @@
                         </div>
                         <div x-show="!modal.isEdit">
                             <label class="block text-xs font-semibold text-text-secondary mb-1">Lampiran</label>
-                            <input type="file" name="attachments[]" multiple accept="image/jpeg,image/png,image/webp,application/pdf"
+                            <input type="file" name="attachments[]" multiple accept="image/*,application/pdf"
                                    class="w-full text-xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-surface-muted file:text-text-main hover:file:bg-border file:cursor-pointer">
                             <p class="text-[10px] text-text-muted mt-1">Maks. 5 file, tiap file maks. 5 MB. Format: JPG, PNG, WEBP, PDF.</p>
                         </div>
@@ -888,7 +888,7 @@
                         </div>
 
                         
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-66 overflow-y-auto pr-1 custom-scrollbar">
                             <template x-for="tech in filteredTechList" :key="tech.id">
                                 <div @click="toggleTech(tech.id)"
                                      :class="modal.techs.includes(tech.id)
@@ -1055,7 +1055,7 @@
                     </div>
                 </div>
 
-                <div class="px-4 sm:px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
+                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0">
                     <button type="button" @click="modal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                     <button type="submit" :disabled="isSubmitting" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
                         <span x-show="!isSubmitting">Simpan</span>
@@ -1102,7 +1102,7 @@
                 </div>
             </div>
             
-            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-2.5 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-2.5 rounded-b-none md:rounded-b-xl shrink-0">
                 <button type="button" @click="cancelModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="cancelModal.isSubmitting || !cancelModal.reason.trim()"
                         @click="submitCancelModal()"
@@ -1223,7 +1223,7 @@
                 </div>
             </div>
 
-            <div class="px-5 py-3.5 border-t border-border bg-surface-muted shrink-0 rounded-b-none md:rounded-b-xl pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted shrink-0 rounded-b-none md:rounded-b-xl">
                 <button type="button" @click="assignToTeam(teamSelectionModal.taskId, null); teamSelectionModal.open = false" class="btn-primary text-xs w-full py-2.5 flex justify-center items-center gap-2 cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -1291,7 +1291,7 @@
                 </div>
             </div>
 
-            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-none md:rounded-b-xl shrink-0">
                 <button type="button" @click="switchTechModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="switchTechModal.isSubmitting || !switchTechModal.toTaskId || !switchTechModal.replacementId"
                         @click="submitSwitchTechnician()" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
@@ -1367,7 +1367,7 @@
                 </div>
             </div>
 
-            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-2.5 rounded-b-none md:rounded-b-xl shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-3.5">
+            <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-2.5 rounded-b-none md:rounded-b-xl shrink-0">
                 <button type="button" @click="bulkTeamModal.open = false" class="btn-secondary text-xs cursor-pointer">Batal</button>
                 <button type="button" :disabled="bulkTeamModal.isSubmitting || !bulkTeamModal.selectedTeamId" @click="submitBulkAssignTeam()" class="btn-primary text-xs disabled:opacity-50 cursor-pointer">
                     <span x-show="!bulkTeamModal.isSubmitting">Tugaskan Sekarang</span>

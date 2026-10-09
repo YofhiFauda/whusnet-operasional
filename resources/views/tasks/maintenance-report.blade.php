@@ -3,7 +3,7 @@
 @section('title', 'Laporan Maintenance — ' . $task->task_number)
 
 @section('content')
-<div class="mx-auto px-4 py-6 sm:px-6" style="max-width:960px">
+<div class="mx-auto px-2 py-4 sm:px-4" style="max-width:960px">
 
     {{-- ══ Page Header — naked, no card ══════════════════════════════════ --}}
     <div class="mb-5">
@@ -132,6 +132,23 @@
                     </div>
                 </div>
 
+                {{-- POP Tujuan — wajib untuk Migrasi (pindah lokasi LINTAS POP, beda
+                     dari Pindah Lokasi yang POP-nya tetap sama) --}}
+                <div id="creq-target-pop-wrap" class="hidden mb-4">
+                    <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                        POP Tujuan <span style="color:var(--color-error)">*</span>
+                    </label>
+                    <select name="creq_target_pop_id" id="creq_target_pop_id"
+                            class="w-full rounded-md text-sm"
+                            style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                        <option value="">Pilih POP tujuan...</option>
+                        @foreach($cabangPops as $pop)
+                            <option value="{{ $pop->id }}" @selected((string) old('creq_target_pop_id') === (string) $pop->id)>{{ $pop->name }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Pelanggan dipindah ke POP ini begitu laporan disimpan — piutang yang belum lunas wajib dibersihkan dulu, kalau tidak penyimpanan ditolak.</p>
+                </div>
+
                 {{-- Tambah Modem — pointer ke Section Modem/Perangkat Aktif di bawah --}}
                 <div id="creq-modem-wrap" class="hidden">
                     <p class="text-[11px] font-semibold" style="color:var(--color-warning,#d97706)">
@@ -218,24 +235,19 @@
                         // ISSUED di custody tim, dikelompokkan per nama barang.
                         $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)
                             ->map->count();
+                        // Combobox (components/combobox.blade.php): SN dicari lewat
+                        // ketikan, bukan scroll <select>. Opsi "Tidak ganti modem"
+                        // (value kosong) = default, jadi SN tidak tersimpan.
+                        $serialOptions = collect([['value' => '', 'label' => 'Tidak ganti modem', 'search' => 'tidak ganti modem']])
+                            ->concat($eligibleSerials->map(fn ($serial) => [
+                                'value' => $serial->id,
+                                'label' => 'SN ' . $serial->serial_number . ' — ' . $serial->item->name,
+                                'search' => $serial->serial_number . ' ' . $serial->item->name,
+                                'hint' => 'Sisa custody tim: ' . $serialCountsByItem[$serial->item->name] . ' unit',
+                            ]))->values();
                     @endphp
-                    <select name="selected_inventory_serial_id" id="selected_inventory_serial_id" onchange="updateSnStockHint()"
-                            class="w-full rounded-md text-sm"
-                            style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
-                        <option value="">Tidak ganti modem</option>
-                        @foreach($eligibleSerials as $serial)
-                            <option value="{{ $serial->id }}" data-item-name="{{ $serial->item->name }}" data-available="{{ $serialCountsByItem[$serial->item->name] }}" @selected(old('selected_inventory_serial_id') == $serial->id)>
-                                {{ $serial->item->name }} — SN {{ $serial->serial_number }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-combobox id="selected_inventory_serial_id" name="selected_inventory_serial_id" :options-expr="json_encode($serialOptions)" :value-expr="json_encode((string) old('selected_inventory_serial_id', ''))" placeholder="Ketik SN atau nama perangkat..." />
                     <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Perangkat yang diambil lewat Gudang (custody Anda) — SN yang tersimpan otomatis sama persis dengan yang dipilih di sini.</p>
-                    {{-- Sisa custody CUMA tampil kalau SN-nya lagi dipilih (revisi user
-                         2026-09-12: ringkasan statis makan tempat) — updateSnStockHint() di
-                         <script> bawah file ini, duplikasi persis installations/report.blade.php
-                         (view terpisah, bukan partial/push bersama — sama pola duplikasi
-                         eligibleSerialsForTeam()/eligiblePassiveCustodyForTeam() di controller). --}}
-                    <p id="sn-stock-hint" class="text-[10px] mt-1 font-semibold" style="color:var(--color-success,#059669); {{ old('selected_inventory_serial_id') ? '' : 'display:none' }}"></p>
                 @else
                     <select disabled class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-surface-muted);color:var(--color-text-muted);padding:10px 12px">
                         <option>Tidak ada SN di custody Anda</option>
@@ -255,17 +267,16 @@
                     Isi HANYA kalau teknisi potong kabel dari roll yang ke-track per-roll. Kalau tidak, biarkan kosong.
                 </p>
                 @if($eligibleRolls->isNotEmpty())
+                    @php
+                        $rollOptions = collect([['value' => '', 'label' => 'Tidak pakai roll kabel', 'search' => 'tidak pakai roll']])->concat($eligibleRolls->map(fn ($roll) => [
+                            'value' => $roll->id,
+                            'label' => ($roll->item->name ?? '(barang dihapus)') . ' — ' . $roll->roll_code,
+                            'search' => $roll->roll_code . ' ' . ($roll->item->name ?? ''),
+                            'hint' => 'Sisa ' . rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') . ' m',
+                        ]))->values();
+                    @endphp
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <select name="selected_inventory_roll_id" id="selected_inventory_roll_id"
-                                class="w-full rounded-md text-sm"
-                                style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
-                            <option value="">Tidak pakai roll kabel</option>
-                            @foreach($eligibleRolls as $roll)
-                                <option value="{{ $roll->id }}" @selected(old('selected_inventory_roll_id') == $roll->id)>
-                                    {{ $roll->item->name ?? '(barang dihapus)' }} — {{ $roll->roll_code }} (sisa {{ rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') }} m)
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-combobox id="selected_inventory_roll_id" name="selected_inventory_roll_id" :options-expr="json_encode($rollOptions)" :value-expr="json_encode((string) old('selected_inventory_roll_id', ''))" placeholder="Ketik kode roll atau nama kabel..." />
                         <input type="number" step="0.01" min="0.01" name="roll_meters_used" id="roll_meters_used" value="{{ old('roll_meters_used') }}" placeholder="Meter terpakai"
                                class="w-full rounded-md text-sm"
                                style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
@@ -282,8 +293,8 @@
                     name="work_tools"
                     :tools="$workTools"
                     :rows="$workToolRows"
-                    label="Alat Kerja Yang Dipakai"
-                    hint="Peralatan yang dibawa ke lokasi lalu dibawa pulang — tangga, splicer, OPM. Bukan material yang ditinggal di pelanggan."
+                    label="Alat Kerja Opsional"
+                    hint="Alat yang boleh dibawa bila dibutuhkan di lokasi lalu dibawa pulang — tangga, splicer, OPM. Bukan material yang ditinggal di pelanggan."
                 />
             </div>
 
@@ -323,7 +334,7 @@
                         </div>
 
                         <div class="mt-2">
-                            <input type="file" name="opm_photo" id="opm_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('opm_photo')">
+                            <input type="file" name="opm_photo" id="opm_photo" accept="image/*" class="hidden" onchange="onFileChange('opm_photo')">
                             <label for="opm_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-xs focus:outline-none">
                                 Pilih Foto OPM
                             </label>
@@ -358,7 +369,7 @@
                         </div>
 
                         <div class="mt-2">
-                            <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('speedtest_photo')">
+                            <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" class="hidden" onchange="onFileChange('speedtest_photo')">
                             <label for="speedtest_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-xs focus:outline-none">
                                 Pilih Foto Speedtest
                             </label>
@@ -391,7 +402,7 @@
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    Selesaikan &amp; Simpan Laporan
+                    Simpan Laporan
                 </button>
             </div>
 
@@ -482,27 +493,6 @@ document.getElementById('maintenance-form')?.addEventListener('submit', function
     }
 });
 
-// Sisa custody Perangkat Aktif — CUMA tampil kalau SN-nya lagi dipilih
-function updateSnStockHint() {
-    const select = document.getElementById('selected_inventory_serial_id');
-    const hint = document.getElementById('sn-stock-hint');
-    if (! select || ! hint) return;
-
-    const opt = select.options[select.selectedIndex];
-    const available = opt?.dataset.available;
-
-    if (! opt || ! opt.value || ! available) {
-        hint.style.display = 'none';
-        hint.textContent = '';
-        return;
-    }
-
-    hint.textContent = `Sisa custody tim: ${opt.dataset.itemName} (${available} unit)`;
-    hint.style.display = '';
-}
-
-document.addEventListener('DOMContentLoaded', updateSnStockHint);
-
 @if($task->task_type === \App\Enums\TaskType::CREQ)
 // Toggle field kondisional Kategori C-REQ (docs/plan/task-teknisi/
 // rancangan-biaya-creq-verifikasi-cs.md §2).
@@ -511,22 +501,29 @@ function creqToggleFields() {
     const tikorWrap = document.getElementById('creq-tikor-wrap');
     const modemWrap = document.getElementById('creq-modem-wrap');
     const lainnyaWrap = document.getElementById('creq-lainnya-wrap');
+    const targetPopWrap = document.getElementById('creq-target-pop-wrap');
     const customNameInput = document.getElementById('creq_category_custom_name');
+    const targetPopInput = document.getElementById('creq_target_pop_id');
     const tikorInputIds = ['creq_tikor_lama_lat', 'creq_tikor_lama_lng', 'creq_tikor_baru_lat', 'creq_tikor_baru_lng'];
 
-    const requiresTikor = category === 'pindah_lokasi' || category === 'pindah_kabel';
+    // Migrasi juga pindah lokasi fisik (tikor wajib sama seperti Pindah
+    // Lokasi/Pindah Kabel), ditambah dropdown POP tujuan.
+    const requiresTikor = category === 'pindah_lokasi' || category === 'pindah_kabel' || category === 'migrasi';
     const requiresModem = category === 'tambah_modem';
     const requiresCustomName = category === 'lainnya';
+    const requiresTargetPop = category === 'migrasi';
 
     tikorWrap.classList.toggle('hidden', !requiresTikor);
     modemWrap.classList.toggle('hidden', !requiresModem);
     lainnyaWrap.classList.toggle('hidden', !requiresCustomName);
+    targetPopWrap.classList.toggle('hidden', !requiresTargetPop);
 
     tikorInputIds.forEach(function (id) {
         const input = document.getElementById(id);
         if (input) input.required = requiresTikor;
     });
     if (customNameInput) customNameInput.required = requiresCustomName;
+    if (targetPopInput) targetPopInput.required = requiresTargetPop;
 }
 
 function creqToggleBillable() {

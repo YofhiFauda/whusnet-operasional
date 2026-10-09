@@ -4,6 +4,7 @@ namespace App\Http\Controllers\BusinessDevelopment;
 
 use App\Http\Controllers\Controller;
 use App\Models\Agent;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,7 +19,7 @@ class AgentController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
 
         $agents = Agent::query()
             ->when($search !== '', function ($query) use ($search) {

@@ -313,9 +313,14 @@ class InventoryReassignService
 
     /**
      * ADHOC-88 — pelanggan mengantar modem sendiri ke gudang, TANPA task DEAC.
-     * Satu langkah: staf gudang sudah memegang fisiknya, jadi tidak ada transit
-     * `RETURNED` — langsung `AVAILABLE` dengan kondisi yang dinilai saat itu
-     * juga (melepas gate `isClearedForIssue()`).
+     * Staf gudang Cabang sudah memegang fisiknya saat itu juga, jadi
+     * langsung mendarat di STATE YANG SAMA dengan hasil Tahap 1
+     * `confirmReturnedSerial()` (ADHOC-108) — TETAP `RETURNED` (bukan
+     * `AVAILABLE`), `current_pop_id` = Cabang penerima (penanda lokasi,
+     * BUKAN klaim stok), `condition_checked_at` TETAP NULL. Modem ini ikut
+     * masuk antrean "Kirim ke Pusat" (Tahap 2) yang SAMA dengan hasil DEAC —
+     * SEMUA retur (apa pun asalnya) wajib verifikasi Pusat sebelum jadi
+     * stok (keputusan user 2026-10-08).
      *
      * Kenapa bukan `InventoryReceiveService` (Barang Masuk): itu jalur
      * PENGADAAN — kondisi dipaksa `new`, harga wajib > 0, hanya Gudang Pusat,
@@ -357,10 +362,10 @@ class InventoryReassignService
             $existing = InventorySerial::query()->where('serial_number', $serialNumber)->lockForUpdate()->first();
 
             [$serial, $isLegacy] = $this->claimSerialFromCustomer($serialNumber, $existing, $item, $customer, [
-                'status' => SerialStatus::AVAILABLE,
+                'status' => SerialStatus::RETURNED,
                 'condition' => $condition,
-                'condition_checked_at' => now(),
-                'condition_checked_by' => $actor->id,
+                'condition_checked_at' => null,
+                'condition_checked_by' => null,
                 'current_pop_id' => $cabang->id,
                 'current_technician_id' => null,
                 'customer_id' => null,
@@ -371,6 +376,9 @@ class InventoryReassignService
             $value = $estimatedValue !== null && $estimatedValue > 0 ? $estimatedValue : null;
             $ledgerNotes = collect([$isLegacy ? self::LEGACY_SERIAL_NOTE : null, $notes])->filter()->join(' | ') ?: null;
 
+            // TANPA `to_pop_id` (ADHOC-108) — transit, belum keitung stok
+            // Cabang. Sama seperti hasil Tahap 1 DEAC, menunggu Tahap 2/3
+            // (kirim ke Pusat, Pusat konfirmasi) sebelum jadi `AVAILABLE`.
             InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETURN,
                 'reference_number' => $this->generateReferenceNumber(),
@@ -378,8 +386,7 @@ class InventoryReassignService
                 'serial_id' => $serial->id,
                 'qty' => 1,
                 'unit_price_snapshot' => $value,
-                'to_pop_id' => $cabang->id,
-                'reason' => 'Modem diantar pelanggan ke gudang (tanpa task pengambilan).',
+                'reason' => 'Modem diantar pelanggan ke gudang (tanpa task pengambilan) — menunggu dikirim ke Gudang Pusat untuk verifikasi.',
                 'notes' => $ledgerNotes,
                 'created_by' => $actor->id,
             ]);
@@ -457,15 +464,27 @@ class InventoryReassignService
     }
 
     /**
-     * ADHOC-86 — staf gudang cabang menerima modem hasil DEAC:
-     * RETURNED → AVAILABLE di `issued_from_pop_id`. Kondisi dinilai di sini
-     * (`used_good`/`used_damaged`), jadi sekaligus mengisi
-     * `condition_checked_*` dan melepas gate `isClearedForIssue()` —
-     * tidak perlu langkah "Sudah Dicek" terpisah untuk SN jalur ini.
+     * TAHAP 1 dari 3 (ADHOC-108, menggantikan makna ADHOC-86) — staf gudang
+     * Cabang menerima custody FISIK dari teknisi. **BUKAN LAGI titik final**:
+     * SN TETAP `RETURNED` (transit), gak jadi `AVAILABLE`, `to_pop_id` ledger
+     * SENGAJA tidak diisi (gak keitung stok Cabang) — Cabang bukan lagi
+     * pemilik stok hasil retur (keputusan user 2026-10-08). `condition_checked_at`
+     * TETAP NULL — kondisi final cuma ditentukan Pusat (Tahap 3,
+     * `InventoryReturnTransferService::confirmAtPusat()`), gate
+     * `isClearedForIssue()` sengaja tetap tertutup di sini.
      *
-     * `$correctedItem` untuk SN legacy yang didaftarkan dengan item
-     * placeholder/tebakan teknisi: staf yang memegang fisiknya yang tahu
-     * model sebenarnya.
+     * `current_pop_id` diisi Cabang murni buat PENANDA LOKASI FISIK (dibaca
+     * UI "ada di Cabang mana sekarang"), BUKAN klaim kepemilikan stok —
+     * `WarehouseStockAsOfService` baca ledger (`to_pop_id`), bukan kolom ini.
+     *
+     * SN hasil Tahap 1 ini masuk antrean "Kirim ke Pusat" (Tahap 2,
+     * `current_technician_id IS NULL AND current_pop_id IS NOT NULL`), beda
+     * dari antrean Tahap 1 sendiri (`current_technician_id IS NOT NULL`) —
+     * guard di bawah (cek `current_technician_id`, bukan cuma `status`)
+     * menegakkan itu, supaya tombol ini gak bisa diklik dua kali.
+     *
+     * `$condition`/`$correctedItem` di sini CUMA observasi awal staf Cabang
+     * (non-final, boleh ditimpa lagi Pusat) — bukan gate.
      */
     public function confirmReturnedSerial(InventorySerial $serial, ItemCondition $condition, ?Item $correctedItem, User $actor, ?string $notes = null, ?float $estimatedValue = null): InventoryTransaction
     {
@@ -480,8 +499,8 @@ class InventoryReassignService
         return DB::transaction(function () use ($serial, $condition, $correctedItem, $actor, $notes, $estimatedValue) {
             $serial = InventorySerial::query()->lockForUpdate()->findOrFail($serial->id);
 
-            if ($serial->status !== SerialStatus::RETURNED) {
-                throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->label()}', bukan menunggu diterima gudang.");
+            if ($serial->status !== SerialStatus::RETURNED || $serial->current_technician_id === null) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->label()}', bukan menunggu diterima dari teknisi.");
             }
 
             // Nilai taksiran opsional (ADHOC-88): kosong/0 → null, dihitung Rp 0
@@ -494,10 +513,7 @@ class InventoryReassignService
 
             $serial->update([
                 'item_id' => $correctedItem?->id ?? $serial->item_id,
-                'status' => SerialStatus::AVAILABLE,
                 'condition' => $condition,
-                'condition_checked_at' => now(),
-                'condition_checked_by' => $actor->id,
                 'current_pop_id' => $cabang->id,
                 'current_technician_id' => null,
                 'customer_id' => null,
@@ -513,17 +529,17 @@ class InventoryReassignService
                 'qty' => 1,
                 'unit_price_snapshot' => $value,
                 'from_technician_id' => $fromTechnicianId,
-                'to_pop_id' => $cabang->id,
+                'to_technician_id' => null,
                 'fop_task_id' => $fopTaskId,
-                'reason' => 'Konfirmasi penerimaan retur pengambilan alat.',
+                'reason' => 'Diterima gudang Cabang dari teknisi — menunggu dikirim ke Gudang Pusat untuk verifikasi.',
                 'notes' => $notes,
                 'created_by' => $actor->id,
             ]);
 
-            // Lengkapi jejak per SN: siapa yang menerima, kapan, kondisi akhir,
-            // dan model final (bisa dikoreksi dari tebakan teknisi). Log yang
-            // dicari = yang masih menunggu diterima; kosong berarti SN ini
-            // RETURNED sebelum ADHOC-88 dan tidak punya jejak — dilewati.
+            // Lengkapi jejak per SN: siapa yang menerima di Cabang, kapan,
+            // kondisi AWAL (observasi Cabang, bisa ditimpa Pusat di Tahap 3).
+            // Log yang dicari = yang masih menunggu diterima; kosong berarti
+            // SN ini RETURNED sebelum ADHOC-88 dan tidak punya jejak — dilewati.
             DeviceRetrievalLog::query()
                 ->where('serial_id', $serial->id)
                 ->whereNull('received_at')
@@ -647,6 +663,7 @@ class InventoryReassignService
     public function transferRollToTechnician(InventoryRoll $roll, User $newTechnician, string $reason, User $actor, ?string $notes = null): InventoryTransaction
     {
         $this->assertReason($reason);
+        $this->assertReassignAllowed($roll->issued_from_pop_id, $newTechnician, $actor);
 
         return DB::transaction(function () use ($roll, $newTechnician, $reason, $actor, $notes) {
             $roll = InventoryRoll::query()->lockForUpdate()->findOrFail($roll->id);
@@ -685,6 +702,7 @@ class InventoryReassignService
     public function transferCustodyToTechnician(TechnicianCustody $custody, User $newTechnician, string $reason, User $actor, ?string $notes = null): TechnicianCustody
     {
         $this->assertReason($reason);
+        $this->assertReassignAllowed($custody->issued_from_pop_id, $newTechnician, $actor);
 
         if ((float) $custody->qty_remaining <= 0) {
             throw new InvalidArgumentException('Custody ini sudah habis/kosong — tidak ada yang bisa dialihkan.');
@@ -731,6 +749,7 @@ class InventoryReassignService
     public function transferSerialToTechnician(InventorySerial $serial, User $newTechnician, string $reason, User $actor, ?string $notes = null): InventoryTransaction
     {
         $this->assertReason($reason);
+        $this->assertReassignAllowed($serial->issued_from_pop_id, $newTechnician, $actor);
 
         return DB::transaction(function () use ($serial, $newTechnician, $reason, $actor, $notes) {
             $serial = InventorySerial::query()->lockForUpdate()->findOrFail($serial->id);
@@ -762,6 +781,33 @@ class InventoryReassignService
     {
         if (trim($reason) === '') {
             throw new InvalidArgumentException('Alasan reassign wajib diisi (resign/cuti/rotasi/dll) — kontrol-anti-manipulasi.md §1-2.');
+        }
+    }
+
+    /**
+     * Pembagian tugas PIC Gudang vs POP Admin — pola sama
+     * `InventoryIssueService::assertIssueAllowed()` (ADHOC-120,
+     * docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md §7.3, §8
+     * Kelompok H4):
+     *   1. Gak boleh reassign custody ke diri sendiri.
+     *   2. `pic_gudang` cuma boleh reassign custody yang asal gudangnya
+     *      (`issued_from_pop_id`) salah satu cabang penunjukannya — penting
+     *      buat PIC scope `all_pop` yang hak gudangnya tetap dibatasi ke
+     *      cabang yang dia PIC-i (§5.3.6).
+     */
+    private function assertReassignAllowed(?int $issuedFromPopId, User $newTechnician, User $actor): void
+    {
+        if ($actor->is($newTechnician)) {
+            throw new InvalidArgumentException('Custody tidak bisa dialihkan ke diri sendiri.');
+        }
+
+        if ($actor->role?->code === 'pic_gudang' && $issuedFromPopId !== null) {
+            $pop = Pop::find($issuedFromPopId);
+            if ($pop && ! $actor->isPicGudangOf($pop)) {
+                throw new InvalidArgumentException(
+                    "Gudang asal {$pop->name} bukan gudang yang Anda kelola sebagai PIC Gudang."
+                );
+            }
         }
     }
 

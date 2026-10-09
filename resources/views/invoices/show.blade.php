@@ -540,24 +540,6 @@
                 <!-- TAB PANE 2: Riwayat Pembayaran -->
                 <div id="pane-payments" class="hidden">
                     @if($invoice->payments->count() > 0)
-                        @php
-                            $validPayments = $invoice->payments
-                                ->filter(fn ($p) => $p->payment_status === \App\Enums\PaymentStatus::VALID)
-                                ->sortBy([['payment_date', 'asc'], ['id', 'asc']])
-                                ->values();
-
-                            $invoiceTotal = round((float) $invoice->total_amount, 2);
-                            $installmentMeta = [];
-                            $runningPaid = 0.0;
-
-                            foreach ($validPayments as $index => $validPayment) {
-                                $runningPaid = round($runningPaid + (float) $validPayment->amount, 2);
-                                $installmentMeta[$validPayment->id] = [
-                                    'number' => $index + 1,
-                                    'settles' => $runningPaid >= $invoiceTotal,
-                                ];
-                            }
-                        @endphp
                         <div class="overflow-x-auto custom-scrollbar">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
@@ -574,7 +556,11 @@
                                 </thead>
                                 <tbody class="divide-y divide-border text-text-secondary">
                                     @foreach($invoice->payments as $payment)
-                                        @php $meta = $installmentMeta[$payment->id] ?? null; @endphp
+                                        {{-- Satu sumber kebenaran "Cicilan Ke-N" dengan payments/show &
+                                             receipt (Payment::installmentContext()) — dulu dihitung ulang
+                                             manual di sini, pola yang sama persis tapi dua salinan yang
+                                             gampang menyimpang diam-diam begitu salah satunya diubah. --}}
+                                        @php $meta = $payment->installmentContext(); @endphp
                                         <tr class="hover:bg-surface-muted/50 transition-colors">
                                             <td class="px-5 py-3.5 font-semibold text-text-main">
                                                 @if($meta)

@@ -33,7 +33,7 @@ class TeknisiWorkloadService
         $today ??= Carbon::today();
 
         $teknisi = User::query()
-            ->whereHas('role', fn ($q) => $q->where('code', 'teknisi'))
+            ->technicians()
             ->when(
                 ! $hasAllPopAccess,
                 fn ($q) => $q->whereHas('roleScopes.targets', fn ($t) => $t->whereIn('pop_id', $allowedPopIds))

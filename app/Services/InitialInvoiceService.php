@@ -27,6 +27,8 @@ use Carbon\Carbon;
  */
 class InitialInvoiceService
 {
+    public function __construct(private readonly InvoiceNumberGenerator $numbers) {}
+
     /**
      * Hitung rincian tagihan awal dari data layanan + tanggal terbit.
      *
@@ -148,10 +150,12 @@ class InitialInvoiceService
         $billingPeriod = $issueDate->format('Y-m');
         $dueDate = $issueDate->format('Y-m-d');
 
-        $invoiceNumber = 'INV-'.now()->format('Ymd').'-'.strtoupper(uniqid());
-
         $invoice = Invoice::create([
-            'invoice_number' => $invoiceNumber,
+            // Dipanggil DI DALAM transaksi — kedua pemanggil (`CustomerVerificationController::
+            // finalVerify()`, `BusinessDevelopmentVerificationController::verify()`) sudah
+            // membungkus ini dengan `DB::transaction()`/`DB::beginTransaction()`, jadi
+            // `lockForUpdate()` di generator bermakna.
+            'invoice_number' => $this->numbers->nextFor(InvoiceType::AWAL, null, $issueDateStr),
             'invoice_type' => InvoiceType::AWAL->value,
             'customer_id' => $customer->id,
             'pop_id' => $customer->pop_id,

@@ -21,8 +21,7 @@ use Tests\TestCase;
  * RBAC modul Ticketing — 5 halaman, 5 permission KEPISAH:
  *
  *   New Ticket        /tickets/new            tickets.create
- *   Worksheet NOC     /noc/worksheet/masuk    noc_worksheet.masuk.view
- *                     /noc/worksheet/diproses noc_worksheet.diproses.view
+ *   Worksheet NOC     /noc/worksheet         noc_worksheet.view
  *   Dashboard NOC     /noc/dashboard          noc_dashboard.view
  *   Ticket Selesai    /tickets/selesai        tickets.selesai.view
  *   Ticket Dibatalkan /tickets/dibatalkan     tickets.dibatalkan.view
@@ -130,14 +129,17 @@ class TicketingRbacTest extends TestCase
      * Inti pemisahan: cabut permission SATU halaman → cuma halaman itu yang
      * ketutup, sisanya tetap kebuka.
      *
-     * Pakai `admin`, BUKAN `owner` — owner permission-nya wildcard `*` yang
-     * di-bypass duluan di EffectiveAccessService::userCan(), jadi nyabut baris
-     * permission spesifik gak ngefek apa-apa buat dia.
+     * Pakai `noc` — satu-satunya role non-wildcard yang masih pegang kelima
+     * permission ini sekaligus (snapshot UI 2026-09-29 di RolePermissionSeeder
+     * nyabut semua permission tickets & noc dari `admin`). `owner` gak bisa dipakai karena
+     * permission-nya wildcard `*`, di-bypass duluan di
+     * EffectiveAccessService::userCan(), jadi nyabut baris permission
+     * spesifik gak ngefek apa-apa buat dia.
      */
     #[DataProvider('ticketingPageProvider')]
     public function test_revoking_one_permission_only_closes_that_page(string $routeName, string $permission): void
     {
-        $user = $this->makeUser('admin');
+        $user = $this->makeUser('noc');
 
         $this->revokePermission($user, $permission);
 
@@ -213,7 +215,7 @@ class TicketingRbacTest extends TestCase
 
     public function test_forbidden_archive_page_is_not_rendered_in_navigation(): void
     {
-        $user = $this->makeUser('admin');
+        $user = $this->makeUser('noc');
         $this->revokePermission($user, 'tickets.dibatalkan.view');
 
         $this->actingAs($user)

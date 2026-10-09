@@ -17,8 +17,6 @@ use Illuminate\Database\Seeder;
  *     ├─ tickets.dibatalkan         — halaman arsip Ticket Dibatalkan
  *     └─ tickets.history            — halaman History Ticketing (semua tiket + ekspor)
  *   noc_worksheet            (root) — Worksheet NOC (SATU halaman, tanpa tab)
- *     ├─ noc_worksheet.masuk        — DINONAKTIFKAN (ADHOC-06), tab dilebur
- *     └─ noc_worksheet.diproses     — DINONAKTIFKAN (ADHOC-06), tab dilebur
  *   noc_dashboard            (root) — Dashboard NOC
  *     └─ noc_dashboard.performance   — Leaderboard performa individu Helpdesk/NOC
  *
@@ -79,34 +77,12 @@ class TicketFeatureSeeder extends Seeder
             );
         }
 
-        // Dua tab Worksheet NOC dilebur jadi satu halaman (ADHOC-06,
-        // 2026-07-29) — feature-nya DINONAKTIFKAN, bukan dihapus: role yang
-        // terlanjur punya permission ini gak boleh error, dan barisnya masih
-        // dipakai buat membaca audit log lama. Halaman Worksheet NOC sekarang
-        // digerbangi `noc_worksheet.view` (feature root).
-        //
-        // updateOrCreate (bukan cuma update) — di DB baru (fresh install) baris
-        // ini belum pernah ada sama sekali, cuma warisan DB lama yang sempat
-        // punya dua tab aktif. Tanpa create, config/rbac.php tetap minta
-        // permission `noc_worksheet.masuk.view`/`.diproses.view` digenerate
-        // tapi Feature-nya gak ada → rbac:generate-permissions error.
-        $retiredNocTabs = [
-            ['parent' => 'noc_worksheet', 'code' => 'noc_worksheet.masuk', 'name' => 'Ticket Masuk (Nonaktif)', 'sort_order' => 1],
-            ['parent' => 'noc_worksheet', 'code' => 'noc_worksheet.diproses', 'name' => 'Ticket Diproses (Nonaktif)', 'sort_order' => 2],
-        ];
-
-        foreach ($retiredNocTabs as $sf) {
-            Feature::updateOrCreate(
-                ['code' => $sf['code']],
-                [
-                    'name' => $sf['name'],
-                    'type' => FeatureType::SUB_FEATURE,
-                    'sort_order' => $sf['sort_order'],
-                    'is_active' => false,
-                    'parent_id' => $rootIds[$sf['parent']],
-                ]
-            );
-        }
+        // Dua tab lama Worksheet NOC (noc_worksheet.masuk/diproses, dilebur
+        // ADHOC-06 2026-07-29) dulu sengaja dipertahankan nonaktif di sini.
+        // Dibersihkan total atas permintaan user (2026-10-02) — lihat migration
+        // `remove_retired_noc_worksheet_tab_features`. JANGAN tambah lagi
+        // Feature::updateOrCreate buat kode ini, nanti seeder balik
+        // menghidupkan baris yang sudah sengaja dihapus migration itu.
 
         app(PermissionGeneratorService::class)->generate();
 

@@ -41,22 +41,29 @@ class CollectorDepositController extends Controller
     {
         $collector = $request->user();
 
-        abort_unless($collector->hasRole('kolektor'), 403, 'Hanya kolektor yang bisa menyetorkan hasil tagihan.');
+        // Teknisi ikut menyetor saldo pembayaran yang dia catat
+        // (rancangan-pembayaran-teknisi §7) — jalur setoran sama persis.
+        abort_unless($collector->hasRole('kolektor') || $collector->isTechnician(), 403, 'Hanya kolektor atau teknisi yang bisa menyetorkan hasil tagihan.');
 
         $validated = $request->validate([
             'idempotency_key' => 'nullable|string|max:191',
         ]);
 
+        // Teknisi tidak punya Worklist; kembali ke halaman inputnya.
+        $backRoute = $collector->isTechnician() && ! $collector->hasRole('kolektor')
+            ? 'technician-payments.index'
+            : 'collector-worklist.index';
+
         try {
             $deposit = $this->deposits->submit($collector, $validated['idempotency_key'] ?? null);
         } catch (\Throwable $e) {
             return redirect()
-                ->route('collector-worklist.index')
+                ->route($backRoute)
                 ->withErrors(['deposit' => $e->getMessage()]);
         }
 
         return redirect()
-            ->route('collector-worklist.index')
+            ->route($backRoute)
             ->with('success', "Setoran {$deposit->deposit_number} terkirim. Menunggu verifikasi admin — saldo Anda kembali nol.");
     }
 

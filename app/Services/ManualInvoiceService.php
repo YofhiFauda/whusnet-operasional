@@ -70,10 +70,10 @@ class ManualInvoiceService
         $subtotal = Money::sum(array_column($lines, 'amount'));
 
         // Diskon & PPN mengikuti layanan pelanggan, tidak diketik admin —
-        // sama seperti GenerateMonthlyInvoicesCommand. Tagihan INSIDENTAL
+        // sama seperti GenerateMonthlyInvoicesCommand. Tagihan MANUAL
         // sengaja TIDAK kena diskon langganan: diskon itu melekat ke harga
         // paket bulanan, bukan ke jasa perbaikan yang ditagih terpisah.
-        $discount = $type === InvoiceType::INSIDENTAL
+        $discount = $type === InvoiceType::MANUAL
             ? 0.0
             : Money::atLeastZero($service->discount ?? 0);
         $ppnRate = max(0, (float) ($service->ppn ?? 0));
@@ -87,7 +87,7 @@ class ManualInvoiceService
                 $invoice = Invoice::create([
                     // Dipanggil DI DALAM transaksi — lockForUpdate() di
                     // generator baru bermakna selama transaksinya hidup.
-                    'invoice_number' => $this->numbers->nextFor($validated['billing_period']),
+                    'invoice_number' => $this->numbers->nextFor($type, null, $validated['issue_date']),
                     'invoice_type' => $type->value,
                     'customer_id' => $customer->id,
                     'pop_id' => $customer->pop_id,
@@ -244,15 +244,15 @@ class ManualInvoiceService
             true
         );
 
-        if ($hasSubscriptionLine && $type === InvoiceType::INSIDENTAL) {
+        if ($hasSubscriptionLine && $type === InvoiceType::MANUAL) {
             throw ValidationException::withMessages([
-                'invoice_type' => 'Tagihan yang memuat baris Jasa Layanan Internet tidak boleh berjenis Insidental — pilih Bulanan.',
+                'invoice_type' => 'Tagihan yang memuat baris Jasa Layanan Internet tidak boleh berjenis Manual — pilih Bulanan.',
             ]);
         }
 
-        if (! $hasSubscriptionLine && $type !== InvoiceType::INSIDENTAL) {
+        if (! $hasSubscriptionLine && $type !== InvoiceType::MANUAL) {
             throw ValidationException::withMessages([
-                'invoice_type' => "Tagihan tanpa baris Jasa Layanan Internet harus berjenis Insidental, bukan {$type->label()}.",
+                'invoice_type' => "Tagihan tanpa baris Jasa Layanan Internet harus berjenis Manual, bukan {$type->label()}.",
             ]);
         }
     }
@@ -263,9 +263,8 @@ class ManualInvoiceService
      * jalur lain (import, tinker) dan untuk balapan dua request bersamaan.
      *
      * Cakupannya dibuat PERSIS sama dengan `InvoiceObserver`: hanya jenis di
-     * `Invoice::SUBSCRIPTION_TYPES`. INSIDENTAL dilewati karena beberapa
-     * pekerjaan berbayar memang boleh ditagih di bulan yang sama. Menyaring
-     * lebih ketat di sini akan menolak kombinasi yang justru sudah dites boleh.
+     * `Invoice::SUBSCRIPTION_TYPES`. MANUAL dilewati karena beberapa
+     * pekerjaan berbayar memang boleh ditagih di bulan yang sama.
      */
     private function assertNotDuplicate(Customer $customer, InvoiceType $type, string $billingPeriod): void
     {
@@ -303,6 +302,6 @@ class ManualInvoiceService
             return InvoiceType::BULANAN;
         }
 
-        return InvoiceType::INSIDENTAL;
+        return InvoiceType::MANUAL;
     }
 }

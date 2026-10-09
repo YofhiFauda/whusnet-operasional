@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Master;
 use App\Http\Controllers\Controller;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
+use App\Services\MasterRecordRemovalService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -19,7 +21,7 @@ class PopController extends Controller
      */
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $type = $request->query('type');
         $status = $request->query('status');
 
@@ -232,6 +234,22 @@ class PopController extends Controller
         $statusText = $pop->status === 'active' ? 'diaktifkan' : 'dinonaktifkan';
 
         return back()->with('success', "POP/Cabang {$pop->name} berhasil {$statusText}.");
+    }
+
+    public function destroy(Pop $pop, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        $this->authorizePopScope($pop);
+
+        $deleted = $removal->remove($pop, ['status' => 'inactive']);
+
+        return redirect()
+            ->route('master.pop.index')
+            ->with(
+                $deleted ? 'success' : 'warning',
+                $deleted
+                    ? "POP/Cabang {$pop->name} berhasil dihapus."
+                    : "POP/Cabang {$pop->name} masih dipakai data lain, jadi hanya dinonaktifkan."
+            );
     }
 
     /**

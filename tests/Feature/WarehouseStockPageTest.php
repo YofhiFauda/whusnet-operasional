@@ -11,6 +11,7 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
+use App\Services\InventoryIssueService;
 use App\Services\InventoryReceiveService;
 use App\Services\InventoryTransferService;
 use Database\Seeders\ActionSeeder;
@@ -343,5 +344,32 @@ class WarehouseStockPageTest extends TestCase
         $balances = $response->viewData('balances');
         $this->assertTrue($balances->contains(fn ($b) => $b->item_id === $modem->id && $b->pop_id === $this->cabangA->id));
         $this->assertFalse($balances->contains(fn ($b) => $b->item_id === $this->kabel->id));
+    }
+
+    /**
+     * Analisa §U3/V4 — mode per-lot menampilkan "Pemegang & Penginput":
+     * qty di teknisi per (pop,item) + penginput transaksi terakhir.
+     */
+    #[Test]
+    public function mode_per_lot_menampilkan_pemegang_dan_penginput(): void
+    {
+        $teknisiRole = Role::where('name', 'Teknisi')->firstOrFail();
+        $teknisi = User::factory()->create(['role_id' => $teknisiRole->id]);
+        app(InventoryIssueService::class)->issue($this->cabangA, $teknisi, [
+            ['item_id' => $this->kabel->id, 'qty' => 40],
+        ], $this->owner);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index'));
+
+        $response->assertOk()->assertSee('Pemegang &amp; Penginput', false);
+        $held = $response->viewData('heldByPopItem');
+        $key = $this->cabangA->id.'-'.$this->kabel->id;
+        $this->assertArrayHasKey($key, $held);
+        $this->assertSame(40.0, $held[$key]['qty']);
+        $this->assertSame(1, $held[$key]['techs']);
+
+        $lastActor = $response->viewData('lastActorByKey');
+        $this->assertArrayHasKey($key, $lastActor);
+        $this->assertSame($this->owner->id, $lastActor[$key]->created_by);
     }
 }

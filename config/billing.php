@@ -22,6 +22,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Jam Tutup Hari Setor Teknisi (ADHOC-122)
+    |--------------------------------------------------------------------------
+    | Saldo teknisi yang belum disetor pada/after jam ini ditandai "belum
+    | setor" — PERINGATAN SAJA, tidak memblokir pencatatan. Format HH:MM WIB.
+    |
+    | docs/plan/kolektor/rancangan-pembayaran-teknisi.md §7.1.
+    */
+    'technician_close_time' => env('TECHNICIAN_CLOSE_TIME', '23:59'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Jendela Mundur Pembebasan Tagihan (ADHOC-87)
     |--------------------------------------------------------------------------
     |

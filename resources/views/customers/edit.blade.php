@@ -384,7 +384,7 @@
                                 </div>
 
                                 <div class="mt-2">
-                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('foto_rumah')" @if($customer->foto_rumah) data-populated="true" @endif>
+                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" class="hidden" onchange="onFileChange('foto_rumah')" @if($customer->foto_rumah) data-populated="true" @endif>
                                     <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         {{ $customer->foto_rumah ? 'Ganti Foto Rumah' : 'Pilih Foto Rumah' }}
                                     </label>
@@ -438,7 +438,7 @@
                                 </div>
 
                                 <div class="mt-2">
-                                    <input type="file" name="foto_kontrak" id="foto_kontrak" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.jpg,.jpeg,.png,.webp,.pdf" class="hidden" onchange="onFileChange('foto_kontrak')" @if($customer->foto_kontrak) data-populated="true" @endif>
+                                    <input type="file" name="foto_kontrak" id="foto_kontrak" accept="image/*,application/pdf" class="hidden" onchange="onFileChange('foto_kontrak')" @if($customer->foto_kontrak) data-populated="true" @endif>
                                     <label for="foto_kontrak" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         {{ $customer->foto_kontrak ? 'Ganti Foto Kontrak' : 'Pilih Foto Kontrak' }}
                                     </label>

@@ -517,3 +517,39 @@ Fitur ID numbering dianggap selesai jika:
 * [ ] CID tidak dibuat sebelum pelanggan siap billing/aktif.
 * [ ] Sistem aman dari duplikasi saat dua admin input bersamaan.
 * [ ] Perubahan POP/CID masuk audit log jika relevan.
+
+---
+
+# 16. Nomor Tagihan (Invoice) dan Pembayaran (Payment) — BUG 13
+
+Rancangan lengkap & riwayat keputusan: `docs/plan/billing/rancangan-prefix-nomor-invoice.md`.
+
+## 16.1 Tagihan — `{PREFIX}-{YYYYMMDD}-{NNNNNN}`
+
+| Jenis Tagihan | Prefix | Sumber (`invoice_type` + `manual_category`) |
+|---|---|---|
+| Aktivasi | `ACT` | `awal` |
+| Bulanan | `TAG` | `bulanan` |
+| Perbaikan | `MTN` | `manual` + `perbaikan` |
+| Lainnya (termasuk Biaya Instalasi Bisnis & Denda Putus Langganan) | `OTH` | `manual` + `lainnya` |
+| Pindah Lokasi | `REL` | `manual` + `pindah_lokasi` |
+
+- `YYYYMMDD` = tanggal terbit (`issue_date`), zona waktu `Asia/Jakarta`.
+- `NNNNNN` = urutan per kombinasi prefix + tanggal, reset tiap hari, 6 digit (lewat 999999 tetap sah, tidak dipotong).
+- Pemetaan prefix hanya ada di `InvoiceNumberGenerator::resolvePrefix()`. Penomoran wajib lewat `InvoiceNumberGenerator::nextFor()` dalam transaksi (`lockForUpdate()`).
+- `manual` tanpa `manual_category` (jalur ADHOC-60, `ManualInvoiceService`) dipetakan ke `ACT`.
+- Tagihan lama berformat `INV-{YYYYMM}-{NNNN}` belum di-backfill (lihat rancangan §7.2) dan tetap valid apa adanya.
+
+## 16.2 Pembayaran — `PAY-{invoice_number}` / `PAY-{invoice_number}-{NN}`
+
+- `invoice_number` tagihan DITEMPEL APA ADANYA (tidak dipetakan ulang), sehingga pembayaran dan tagihan langsung terlihat berpasangan.
+- Lunas sekali bayar (pembayaran pertama yang langsung menutup sisa tagihan): tanpa suffix. Contoh: `PAY-TAG-20260919-000012`.
+- Cicilan: `NN` = urutan pembayaran ke-berapa pada tagihan itu, 2 digit. Suffix muncul begitu pembayaran bukan yang pertama, atau pembayaran pertama belum menutup sisa. Contoh: `PAY-TAG-20260919-000012-01` (cicilan ke-1), `PAY-TAG-20260919-000012-02` (cicilan ke-2 / pelunasan sisa).
+- Urutan dihitung dari counter `number_sequences` (key `PAY:{invoice_id}`) — dihitung dari semua pembayaran (termasuk yang ditolak), dan TIDAK turun walau baris di-hard delete.
+- Beda dengan "Cicilan Ke-N" di UI (`Payment::installmentContext()`), yang hanya menghitung pembayaran VALID dan bisa bergeser. Nomor = identitas historis (beku), badge = status terkini.
+- Dibuat via `Payment::generatePaymentNumber(Invoice $invoice, $appliedAmount)`, dengan urutan dari `NumberSequenceService::paymentOrdinal()`. Wajib dipanggil dalam transaksi yang sama dengan `Payment::create()`.
+- Tabel `payment_number_sequences` (legacy) TIDAK dipakai lagi. Counter aktif ada di `number_sequences`.
+
+## 16.3 Gerbang pencocokan kwitansi (OCR / QR)
+
+Pola pencarian `PAY-[A-Z0-9-]{5,40}` (`ReceiptNumberExtractor::normalize()`, `PdfTextNumberReader::read()`). Pola sengaja longgar karena badan nomor mengikuti bentuk invoice. Gerbang sebenarnya tetap pencarian di DB: nomor yang tidak ada di `payments` berakhir `MISMATCH`, tidak pernah dicocokkan asal.

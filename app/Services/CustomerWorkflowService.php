@@ -100,10 +100,8 @@ class CustomerWorkflowService
                         ->exists();
 
                     if (! $existingTask) {
-                        $year = date('Y');
-                        $count = Task::whereYear('created_at', $year)->count() + 1;
                         Task::create([
-                            'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                            'task_number' => app(NumberSequenceService::class)->taskNumber(),
                             'task_type' => $taskType,
                             'title' => $titlePrefix.$customer->full_name,
                             'description' => null,

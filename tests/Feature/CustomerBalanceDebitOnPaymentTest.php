@@ -77,6 +77,57 @@ class CustomerBalanceDebitOnPaymentTest extends TestCase
         $this->assertSame(0.0, app(CustomerBalanceService::class)->balance($customer));
     }
 
+    public function test_paying_with_full_customer_balance_and_zero_cash_amount_is_successful(): void
+    {
+        $admin = $this->loginAsAdmin();
+        $pop = $this->createPop('POP-BAL-FULL', 'BALFULL', 'POP Balance Full Test');
+        $customer = $this->makeCustomer($pop, 'C-BAL-FULL-0001');
+
+        $this->giveCustomerBalance($customer, $pop, 150000);
+        $this->assertSame(150000.0, app(CustomerBalanceService::class)->balance($customer));
+
+        $invoice = $this->createInvoice($pop, $customer, 'INV-BAL-FULL-0001');
+
+        // Bayar 100% pakai saldo: amount = 0, use_balance_amount = 150.000
+        $response = $this->actingAs($admin)->post(route('invoices.payments.store', $invoice->id), [
+            'payment_date' => '2026-06-14',
+            'payment_method' => 'cash',
+            'amount' => 0,
+            'use_balance_amount' => 150000,
+        ]);
+
+        $response->assertRedirect(route('invoices.show', $invoice->id));
+
+        $invoice->refresh();
+        $this->assertSame('150000.00', $invoice->paid_amount);
+        $this->assertSame('0.00', $invoice->remaining_amount);
+        $this->assertSame('lunas', $invoice->invoice_status->value);
+
+        $this->assertSame(0.0, app(CustomerBalanceService::class)->balance($customer));
+
+        $payment = Payment::where('invoice_id', $invoice->id)->firstOrFail();
+        $this->assertSame('saldo', $payment->payment_method);
+        $this->assertSame('150000.00', $payment->amount);
+        $this->assertSame('150000.00', $payment->balance_used_amount);
+    }
+
+    public function test_paying_with_zero_amount_and_zero_balance_is_rejected(): void
+    {
+        $admin = $this->loginAsAdmin();
+        $pop = $this->createPop('POP-BAL-ZERO', 'BALZERO', 'POP Balance Zero Test');
+        $customer = $this->makeCustomer($pop, 'C-BAL-ZERO-0001');
+        $invoice = $this->createInvoice($pop, $customer, 'INV-BAL-ZERO-0001');
+
+        $response = $this->actingAs($admin)->post(route('invoices.payments.store', $invoice->id), [
+            'payment_date' => '2026-06-14',
+            'payment_method' => 'cash',
+            'amount' => 0,
+            'use_balance_amount' => 0,
+        ]);
+
+        $response->assertSessionHasErrors('amount');
+    }
+
     public function test_full_page_payment_form_shows_balance_checklist_only_when_customer_has_balance(): void
     {
         $admin = $this->loginAsAdmin();

@@ -4,9 +4,16 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "test:browser": "playwright test",
+        "test:browser:ui": "playwright test --ui",
+        "test:browser:report": "playwright show-report docs/audits/reports/html-report",
+        "audit:auth": "node tests/Browser/helpers/auth-bootstrap.mjs",
+        "audit:uiux": "node scripts/run-uiux-audit.mjs"
     },
     "devDependencies": {
+        "@axe-core/playwright": "^4.13.0",
+        "@playwright/test": "^1.63.0",
         "@tailwindcss/vite": "^4.0.0",
         "axios": "^1.11.0",
         "concurrently": "^9.0.1",
@@ -17,8 +24,8 @@
     "dependencies": {
         "@alpinejs/collapse": "^3.16.1",
         "@alpinejs/focus": "^3.16.1",
-        "alpinejs": "^3.16.1",
         "@zxing/library": "^0.23.0",
+        "alpinejs": "^3.16.1",
         "chart.js": "^4.5.1",
         "jsqr": "^1.4.0",
         "laravel-echo": "^2.3.7",

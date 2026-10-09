@@ -763,7 +763,7 @@
                         </div>
                         <div x-show="!modal.isEdit">
                             <label class="block text-xs font-semibold text-text-secondary mb-1">Lampiran</label>
-                            <input type="file" name="attachments[]" multiple accept="image/jpeg,image/png,image/webp,application/pdf"
+                            <input type="file" name="attachments[]" multiple accept="image/*,application/pdf"
                                    class="w-full text-xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-surface-muted file:text-text-main hover:file:bg-border file:cursor-pointer">
                             <p class="text-[10px] text-text-muted mt-1">Maks. 5 file, tiap file maks. 5 MB. Format: JPG, PNG, WEBP, PDF.</p>
                         </div>

@@ -40,7 +40,14 @@
     // Collection/array of {item_id, code, name, unit, type, available} — lihat
     // CustomerInstallationController::eligiblePassiveCustodyForTeam().
     'custodyOptions' => null,
+    // 'barang' (default) = pilih kategori lalu nama barang dari master/custody.
+    // 'kategori' = estimasi survey: cukup kategori + jumlah, tanpa nama barang.
+    'mode' => 'barang',
 ])
+
+@php
+    $kategoriOnly = $mode === 'kategori';
+@endphp
 
 @php
     // Fallback query kalau pemanggil belum mengirim prop — komponen ini dipakai
@@ -94,7 +101,8 @@
         @js($initialRows),
         '{{ $name }}',
         @js($fallbackType),
-        @js((bool) $restrictToCustody)
+        @js((bool) $restrictToCustody),
+        @js($kategoriOnly)
     )"
     class="space-y-3"
 >
@@ -104,29 +112,35 @@
 
     <template x-for="(row, index) in rows" :key="index">
         <div class="grid grid-cols-12 gap-2 items-start bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700/50 rounded-lg p-3">
-            {{-- Barang --}}
-            <div class="col-span-12 md:col-span-4">
-                <label class="block mb-1 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Barang</label>
-                <select
-                    :name="`${fieldName}[${index}][item_id]`"
-                    x-model="row.item_id"
-                    @change="onItemChange(index)"
-                    class="w-full text-xs font-sans px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 dark:focus:border-sky-400"
-                >
-                    {{-- Mode custody: TIDAK ada opsi "Lainnya (isi manual)" —
-                         barang harus dari custody Gudang, gak boleh nama
-                         karangan. Placeholder kosong tetap ada biar select
-                         gak "nyangkut" ke opsi pertama tanpa sengaja. --}}
-                    <template x-if="restrictToCustody">
-                        <option value="">— Pilih Barang —</option>
-                    </template>
-                    <template x-if="!restrictToCustody">
-                        <option value="">— Lainnya (isi manual) —</option>
-                    </template>
-                    <template x-for="opt in itemOptionsFor(row)" :key="opt.id">
-                        <option :value="opt.id" x-text="itemOptionLabel(opt)"></option>
-                    </template>
-                </select>
+            {{-- Kategori — combobox, memfilter daftar Barang di baris ini.
+                 Pilih barang dulu = kategorinya ikut terisi otomatis. --}}
+            <div class="col-span-6" :class="kategoriOnly ? 'md:col-span-5' : 'md:col-span-3'">
+                <label class="block mb-1 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Kategori</label>
+                <x-combobox
+                    name-expr="`${fieldName}[${index}][item_type]`"
+                    options-expr="() => categoryComboOptions(row)"
+                    value-expr="() => row.item_type"
+                    on-select-expr="onCategoryChoose(index, value)"
+                    placeholder="Ketik kategori..."
+                />
+            </div>
+
+            {{-- Barang — combobox. Opsi dibatasi kategori yang dipilih.
+                 Mode kategoriOnly (estimasi survey) TIDAK memakai ini: estimasi
+                 cukup kategori + jumlah, nama model baru diisi saat realisasi. --}}
+            <template x-if="!kategoriOnly">
+            <div class="col-span-6 md:col-span-3">
+                <label class="block mb-1 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Nama Barang</label>
+                {{-- Mode custody: tidak ada opsi "Lainnya (isi manual)" —
+                     barang harus dari custody Gudang, gak boleh nama
+                     karangan (itemComboOptions() yang menentukan). --}}
+                <x-combobox
+                    name-expr="`${fieldName}[${index}][item_id]`"
+                    options-expr="() => itemComboOptions(row)"
+                    value-expr="() => row.item_id"
+                    on-select-expr="onItemChoose(index, value)"
+                    placeholder="Ketik nama barang..."
+                />
 
                 {{-- Nama manual cuma buat mode LAMA (Survey/Maintenance) untuk
                      barang di luar master — mode custody gak punya jalur ini
@@ -150,24 +164,7 @@
                     </p>
                 </template>
             </div>
-
-            {{-- Tipe --}}
-            <div class="col-span-6 md:col-span-2">
-                <label class="block mb-1 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Tipe</label>
-                <select
-                    :name="`${fieldName}[${index}][item_type]`"
-                    x-model="row.item_type"
-                    @change="onTypeChange(index)"
-                    :disabled="!!row.item_id"
-                    class="w-full text-xs font-sans px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 dark:focus:border-sky-400 disabled:opacity-60"
-                >
-                    {{-- Opsi dari master, plus kategori lama baris ini kalau
-                         sudah dinonaktifkan admin — lihat catatan di typeOptionsFor(). --}}
-                    <template x-for="opt in typeOptionsFor(row)" :key="opt.code">
-                        <option :value="opt.code" x-text="opt.name"></option>
-                    </template>
-                </select>
-            </div>
+            </template>
 
             {{-- Qty --}}
             <div class="col-span-3 md:col-span-2">
@@ -199,7 +196,7 @@
             </div>
 
             {{-- Catatan --}}
-            <div class="col-span-10 md:col-span-2">
+            <div class="col-span-10" :class="kategoriOnly ? 'md:col-span-3' : 'md:col-span-2'">
                 <label class="block mb-1 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Catatan</label>
                 <input
                     type="text"
@@ -240,7 +237,7 @@
 @once
 @push('scripts')
 <script>
-function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fallbackType, restrictToCustody) {
+function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fallbackType, restrictToCustody, kategoriOnly) {
     return {
         itemOptions: itemOptions,
         categoryOptions: categoryOptions,
@@ -248,14 +245,19 @@ function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fall
         fieldName: fieldName,
         fallbackType: fallbackType,
         restrictToCustody: restrictToCustody,
+        kategoriOnly: kategoriOnly,
 
         addRow() {
+            // Mode custody mulai dari "Semua Kategori" supaya teknisi bisa
+            // langsung mengetik nama barang; mode lama tetap kategori default.
+            const initialType = this.restrictToCustody || this.kategoriOnly ? '' : this.fallbackType;
+
             this.rows.push({
                 item_id: '',
                 item_name: '',
-                item_type: this.fallbackType,
+                item_type: initialType,
                 qty: '',
-                unit: this.defaultUnitFor(this.fallbackType),
+                unit: initialType ? this.defaultUnitFor(initialType) : '',
                 note: '',
             });
         },
@@ -329,6 +331,87 @@ function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fall
             return opt && opt.available !== undefined ? opt.available : null;
         },
 
+        // Opsi combobox Kategori. Mode custody dapat "Semua Kategori" (value
+        // kosong) supaya teknisi bisa mengetik nama barang tanpa harus pilih
+        // kategori dulu. Mode lama tidak — kategori wajib terisi di sana.
+        // Mode custody: kategori CUMA yang benar-benar dibawa tim ini (dari
+        // custody), bukan seluruh master — supaya teknisi tahu persis apa yang
+        // dibawa dan tidak tercampur barang yang tidak ada di tangannya.
+        categoryComboOptions(row) {
+            let categories = this.typeOptionsFor(row);
+
+            if (this.restrictToCustody) {
+                const carriedTypes = new Set(this.itemOptions.map(opt => opt.type).filter(Boolean));
+
+                categories = categories.filter(opt => carriedTypes.has(opt.code) || opt.code === row.item_type);
+            }
+
+            const options = categories.map(opt => ({
+                value: opt.code,
+                label: opt.name,
+                search: `${opt.name} ${opt.code}`,
+            }));
+
+            if (this.restrictToCustody) {
+                options.unshift({ value: '', label: 'Semua Kategori', search: 'semua kategori' });
+            }
+
+            return options;
+        },
+
+        // Opsi combobox Nama Barang, sudah dibatasi kategori baris ini. Barang
+        // yang sedang terpilih selalu ikut ditampilkan walau kategorinya beda,
+        // supaya pilihan yang tersimpan tidak hilang dari layar.
+        itemComboOptions(row) {
+            const options = this.itemOptionsFor(row)
+                .filter(opt => ! row.item_type || opt.type === row.item_type || String(opt.id) === String(row.item_id))
+                .map(opt => ({
+                    value: opt.id,
+                    label: this.itemOptionLabel(opt),
+                    search: `${opt.code ?? ''} ${opt.name}`,
+                }));
+
+            if (! this.restrictToCustody) {
+                options.unshift({ value: '', label: '— Lainnya (isi manual) —', search: 'lainnya manual' });
+            }
+
+            return options;
+        },
+
+        // Kategori dipilih. Kalau barang di baris ini tidak termasuk kategori
+        // baru, barangnya dilepas — lebih aman daripada menyimpan kombinasi
+        // kategori-barang yang salah.
+        onCategoryChoose(index, code) {
+            const row = this.rows[index];
+            const selectedItem = this.itemOptions.find(o => String(o.id) === String(row.item_id));
+
+            row.item_type = code ?? '';
+
+            if (selectedItem && code && selectedItem.type !== code) {
+                row.item_id = '';
+                row.item_name = '';
+            }
+
+            if (! row.item_id) {
+                row.unit = code ? this.defaultUnitFor(code) : row.unit;
+            }
+        },
+
+        // Barang dipilih dari combobox. Kosong = "Lainnya (isi manual)" (mode
+        // lama) — tipe & satuan tetap seperti yang sudah dipilih.
+        onItemChoose(index, id) {
+            const row = this.rows[index];
+
+            row.item_id = id ?? '';
+
+            if (! row.item_id) {
+                row.item_name = '';
+                return;
+            }
+
+            this.onItemChange(index);
+        },
+
         removeRow(index) {
             this.rows.splice(index, 1);
         },
@@ -346,18 +429,6 @@ function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fall
             }
         },
 
-        // Barang "lainnya": satuan default ikut kategori (dari master, bukan
-        // if-else 'kabel_dropcore' yang dulu di-hardcode di sini), tapi tetap
-        // boleh diubah teknisi.
-        onTypeChange(index) {
-            const row = this.rows[index];
-
-            if (row.item_id) {
-                return;
-            }
-
-            row.unit = this.defaultUnitFor(row.item_type);
-        },
     };
 }
 </script>

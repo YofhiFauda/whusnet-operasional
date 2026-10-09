@@ -67,7 +67,7 @@ class PaymentInputTest extends TestCase
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('payments', [
-            'payment_number' => 'PAY-202606-0001',
+            'payment_number' => 'PAY-INV-202606-8001-01',
             'invoice_id' => $invoice->id,
             'customer_id' => $invoice->customer_id,
             'pop_id' => $pop->id,

@@ -240,7 +240,7 @@ Dashboard Portal) tidak terpengaruh sama sekali, `batal` memang tidak pernah
 masuk di sana. Item:
 ```json
 {
-  "invoice_number": "INV-2026-08-000123",
+  "invoice_number": "TAG-20260810-000123",
   "invoice_type": {"value": "bulanan", "label": "Tagihan Bulanan Rutin"},
   "billing_period": "2026-08", "issue_date": "2026-08-01T00:00:00+07:00",
   "due_date": "2026-08-15T00:00:00+07:00", "total_amount": "150000.00",
@@ -261,8 +261,8 @@ atau milik pelanggan lain.
 10/halaman. Item:
 ```json
 {
-  "payment_number": "PAY-202608-0042", "payment_date": "2026-08-10T00:00:00+07:00",
-  "billing_period": "2026-08", "invoice_number": "INV-2026-08-000123",
+  "payment_number": "PAY-TAG-20260810-000042-01", "payment_date": "2026-08-10T00:00:00+07:00",
+  "billing_period": "2026-08", "invoice_number": "TAG-20260810-000123",
   "amount": "150000.00", "overpay_amount": "0.00", "payment_method": "cash",
   "payment_status": {"value": "valid", "label": "Valid"}, "has_receipt": true
 }
@@ -275,11 +275,11 @@ muncul. `bank_name`/`account_number` juga tidak pernah muncul (whitelist ketat).
 dipangkas:
 ```json
 {
-  "nomor": "PAY-202608-0042", "status": "Valid", "status_valid": true,
+  "nomor": "PAY-TAG-20260810-000042-01", "status": "Valid", "status_valid": true,
   "keterangan_cicilan": null, "tanggal_bayar": "10/08/2026",
   "tanggal_ditagih": "10/08/2026", "metode": "CASH", "pop": "Jetis",
   "pelanggan": {"nama": "...", "cid": "...", "hp": "...", "alamat": "...", "alamat_baris": ["..."]},
-  "invoice": {"ada": true, "nomor": "INV-2026-08-000123", "periode": "2026-08", "paket": "Home 20 Mbps", "total": "Rp 150.000", "sisa": "Rp 0", "lunas": true},
+  "invoice": {"ada": true, "nomor": "TAG-20260810-000123", "periode": "2026-08", "paket": "Home 20 Mbps", "total": "Rp 150.000", "sisa": "Rp 0", "lunas": true},
   "dibayar": "Rp 150.000", "lebih_bayar": null,
   "dibayar_raw": "150000.00", "tanggal_bayar_iso": "2026-08-10T00:00:00+07:00"
 }
@@ -296,7 +296,7 @@ route-model-binding by `id` (404 kalau nomor gak ada/milik pelanggan lain).
   "data": {
     "balance": "50000.00",
     "mutations": [
-      {"date": "2026-08-20T10:00:00+07:00", "type": "credit", "type_label": "Masuk", "amount": "50000.00", "note": "Lebih bayar dari PAY-202608-0042"}
+      {"date": "2026-08-20T10:00:00+07:00", "type": "credit", "type_label": "Masuk", "amount": "50000.00", "note": "Lebih bayar dari PAY-TAG-20260810-000042-01"}
     ]
   },
   "meta": {"generated_at": "..."}
@@ -560,12 +560,18 @@ token yang sama.
 **`GET /kolektor/worklist/{code}`** — `{code}` SAMA PERSIS `code` dari query
 string redirect (bukan token baru). Response 200:
 ```json
-{"data": {"customer": {"customer_code": "...", "full_name": "..."}, "invoices": [
-  {"id": 1, "invoice_number": "INV-...", "billing_period": "2026-08", "due_date": "2026-08-15", "remaining_amount": "150000.00"}
-]}}
+{"data": {
+  "customer": {"customer_code": "...", "full_name": "...", "balance": "1835000.00"},
+  "bank_accounts": [{"id": 1, "name": "BCA — 1234567890 (a.n. ...)"}],
+  "invoices": [
+    {"id": 1, "invoice_number": "INV-...", "billing_period": "2026-08", "due_date": "2026-08-15", "remaining_amount": "150000.00"}
+  ]
+}}
 ```
-`remaining_amount` string desimal (konvensi sama seluruh Portal — JANGAN
-parse ke float sebelum kirim balik). Error: 401 (sama seperti di atas); 403
+`customer.balance` = saldo pelanggan (angka turunan, string desimal) untuk
+checkbox "Pakai saldo". `bank_accounts` = rekening aktif master untuk metode
+Transfer (`BankAccount::activeOptions()`). `remaining_amount` string desimal
+(konvensi sama seluruh Portal — JANGAN parse ke float sebelum kirim balik). Error: 401 (sama seperti di atas); 403
 (pelanggan bukan tanggung jawab kolektor ini — `collector_id` gak cocok);
 404 (`code` gak cocok pelanggan yang tertaut ke token — cegah tukar `code`
 manual buat "pinjam" token).
@@ -576,9 +582,16 @@ manual buat "pinjam" token).
 apa adanya:
 ```json
 {"idempotency_key": "<uuid>", "rows": [
-  {"invoice_id": 1, "amount": 150000, "payment_method": "cash", "collected_date": "2026-08-29"}
+  {"invoice_id": 1, "amount": 150000, "use_balance_amount": 0, "payment_method": "cash",
+   "bank_account_id": null, "sender_name": "", "note": "", "collected_date": "2026-08-29"}
 ]}
 ```
+Field baru 2026-10-05: `use_balance_amount` (saldo yang ikut menutup tagihan,
+0 kalau tidak), `bank_account_id` (wajib untuk `transfer`, rekening aktif),
+`sender_name` (opsional, hanya transfer), `note` (wajib untuk `lainnya`).
+`payment_method` = `cash | transfer | lainnya` (`qris` sudah dihapus).
+Aturan nominal: `amount + use_balance_amount` ≤ sisa tagihan. Lebih bayar
+DITOLAK di jalur ini (422 "Kelebihan hanya bisa dicatat lewat Tagihan admin").
 Response 200 `{"success": true, "message": "...", "processed": 1, "results": [...]}`
 atau `{"success": true, "already_processed": true, "batch_id": ...}` (replay
 idempotency key). Error 422 `{"success": false, "failures": [{"reason": "..."}]}`

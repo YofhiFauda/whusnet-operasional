@@ -243,7 +243,7 @@ class CollectorSelfPaymentTest extends TestCase
      * eksplisit user — sekarang identik jalur admin (`PaymentService::record()`):
      * kelebihan otomatis dipisah jadi `overpay_amount` & masuk saldo pelanggan.
      */
-    public function test_kolektor_overpay_is_auto_split_and_credited_to_customer_balance(): void
+    public function test_kolektor_overpay_is_rejected_so_kelebihan_is_recorded_only_through_admin(): void
     {
         $invoice = $this->createUnpaidInvoice($this->pop, 'C-CSP-LEBIH', $this->kolektor->id);
 
@@ -254,17 +254,12 @@ class CollectorSelfPaymentTest extends TestCase
             ],
         ]);
 
-        $response->assertOk();
-        $this->assertDatabaseCount('payments', 1);
-
-        $payment = Payment::where('invoice_id', $invoice->id)->firstOrFail();
-        $this->assertSame('150000.00', $payment->amount);
-        $this->assertSame('50000.00', $payment->overpay_amount);
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('payments', 0);
 
         $invoice->refresh();
-        $this->assertSame('lunas', $invoice->invoice_status->value);
-
-        $this->assertSame(50000.0, app(CustomerBalanceService::class)->balance($invoice->customer));
+        $this->assertNotSame('lunas', $invoice->invoice_status->value);
+        $this->assertSame(0.0, app(CustomerBalanceService::class)->balance($invoice->customer));
     }
 
     public function test_batch_is_all_or_nothing(): void

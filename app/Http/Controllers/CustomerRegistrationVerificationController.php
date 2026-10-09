@@ -18,6 +18,8 @@ use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskProvisioningService;
+use App\Services\NumberSequenceService;
+use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -67,7 +69,7 @@ class CustomerRegistrationVerificationController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = LikeSearch::sanitize((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
                     ->orWhere('identity_number', 'like', "%{$search}%")
@@ -110,10 +112,8 @@ class CustomerRegistrationVerificationController extends Controller
             // ADHOC-73) — Task antrean (Survey) + FopTask anchor-nya. FopTask
             // wajib ada sebelum Laporan Survey disubmit: dia anchor
             // task_materials & task_work_tools (lihat FopTaskProvisioningService).
-            $year = date('Y');
-            $count = Task::whereYear('created_at', $year)->count() + 1;
             Task::create([
-                'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                'task_number' => app(NumberSequenceService::class)->taskNumber(),
                 'task_type' => TaskType::SURVEY->value,
                 'title' => 'Survey Calon Pelanggan: '.$customer->full_name,
                 'description' => null,

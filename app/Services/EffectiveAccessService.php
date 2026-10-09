@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ScopeType;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
@@ -37,6 +38,51 @@ class EffectiveAccessService
 
             return $role->permissions()->pluck('code')->toArray();
         });
+    }
+
+    /**
+     * Apakah $actor boleh menetapkan role $role ke user (create/update user).
+     *
+     * Aturannya: actor hanya boleh memberi role yang SEMUA izinnya sudah dia
+     * pegang sendiri (atau dia `*`). Tanpa ini, user dengan `users.update` (mis.
+     * NOC) bisa menjadikan dirinya Owner — izin itu diberikan lewat role-nya,
+     * jadi aksi "ganti role" ikut melewati batas role.
+     */
+    public function canGrantRole(User $actor, Role $role): bool
+    {
+        if ($this->userCan($actor, '*')) {
+            return true;
+        }
+
+        // Owner diperlakukan khusus di getPermissions() (`['*']`), jadi di sini juga:
+        // role ini hanya boleh diberikan oleh actor yang sudah `*`.
+        if ($role->code === 'owner') {
+            return false;
+        }
+
+        return $this->canGrantPermissionCodes($actor, $role->permissions()->pluck('code')->filter()->all());
+    }
+
+    /**
+     * Apakah $actor boleh memberikan SEMUA izin di $codes ke sebuah role — dipakai
+     * saat mengubah matriks permission role. Izin yang belum dipegang actor
+     * tidak boleh ikut diberikan, sama seperti role utuh di canGrantRole().
+     *
+     * @param  list<string>  $codes
+     */
+    public function canGrantPermissionCodes(User $actor, array $codes): bool
+    {
+        if ($this->userCan($actor, '*')) {
+            return true;
+        }
+
+        foreach ($codes as $code) {
+            if (! $this->userCan($actor, $code)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

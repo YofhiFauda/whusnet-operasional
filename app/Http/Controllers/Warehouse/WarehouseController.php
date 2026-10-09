@@ -8,6 +8,7 @@ use App\Enums\SerialStatus;
 use App\Enums\StockRequestStatus;
 use App\Enums\TransferStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Warehouse\Concerns\ResolvesSelectedPop;
 use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
@@ -33,6 +34,8 @@ use Illuminate\View\View;
  */
 class WarehouseController extends Controller
 {
+    use ResolvesSelectedPop;
+
     public function index(EffectiveAccessService $access): View
     {
         $user = auth()->user();
@@ -44,8 +47,11 @@ class WarehouseController extends Controller
             ->orderBy('name')
             ->get();
 
-        $selectedPopId = request('pop_id');
-        $activePop = $selectedPopId ? $pops->firstWhere('id', (int) $selectedPopId) : null;
+        // Konteks cabang global (analisa-ui-ux-warehouse.md §S1) — `pop_id` di
+        // query string tetap menang (dropdown scope di halaman ini sendiri);
+        // kalau benar-benar absen, pakai pilihan switcher header dari session.
+        $selectedPopId = $this->resolveSelectedPopId(request(), $access, $user);
+        $activePop = $selectedPopId ? $pops->firstWhere('id', $selectedPopId) : null;
         $popIds = $activePop ? collect([$activePop->id]) : $pops->pluck('id');
 
         $canActAsPusat = $pops->contains(fn ($p) => $p->type === 'pusat');

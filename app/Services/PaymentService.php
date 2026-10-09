@@ -73,13 +73,14 @@ class PaymentService
                 ]);
             }
 
-            $method = PaymentMethod::from($validated['payment_method']);
+            $useBalanceAmount = Money::of($validated['use_balance_amount'] ?? 0);
+            $isFullSaldo = Money::isZero($validated['amount']) && Money::greaterThan($useBalanceAmount, 0);
+
+            $method = $isFullSaldo ? PaymentMethod::SALDO : PaymentMethod::from($validated['payment_method']);
 
             $bankAccount = $method->requiresBankDetails()
                 ? $this->resolveActiveBankAccount($validated['bank_account_id'] ?? null)
                 : null;
-
-            $useBalanceAmount = Money::of($validated['use_balance_amount'] ?? 0);
 
             if (Money::compare($useBalanceAmount, 0) > 0) {
                 $customer = $lockedInvoice->customer;
@@ -107,7 +108,7 @@ class PaymentService
             [$appliedAmount, $overpayAmount] = $this->splitAmount($validated['amount'], $useBalanceAmount, $remaining);
 
             $payment = Payment::create([
-                'payment_number' => Payment::generatePaymentNumber($validated['payment_date']),
+                'payment_number' => Payment::generatePaymentNumber($lockedInvoice, $appliedAmount),
                 'idempotency_key' => $validated['idempotency_key'] ?? null,
                 'invoice_id' => $lockedInvoice->id,
                 'customer_id' => $lockedInvoice->customer_id,
@@ -268,7 +269,10 @@ class PaymentService
                 ]);
             }
 
-            $method = PaymentMethod::from($validated['payment_method']);
+            $newUseBalanceAmount = Money::of($validated['use_balance_amount'] ?? 0);
+            $isFullSaldo = Money::isZero($validated['amount']) && Money::greaterThan($newUseBalanceAmount, 0);
+
+            $method = $isFullSaldo ? PaymentMethod::SALDO : PaymentMethod::from($validated['payment_method']);
 
             // Payment yang tertaut setoran APA PUN (pending sekalipun):
             // metode & kolektor DIBEKUKAN. Mengubahnya membuat payment

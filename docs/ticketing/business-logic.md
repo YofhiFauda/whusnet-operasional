@@ -176,9 +176,7 @@ Sebelumnya semua daftar tiket numpang satu route `/tickets/{bucket}` dengan `tic
 tickets              (root)   → view, create, update, cancel
   ├─ tickets.selesai          → view
   └─ tickets.dibatalkan       → view
-noc_worksheet        (root)   → view          (penanda modul, buat dependency chaining)
-  ├─ noc_worksheet.masuk      → view
-  └─ noc_worksheet.diproses   → view
+noc_worksheet        (root)   → view          (satu halaman, tab via ?tab=; tab lama masuk/diproses sudah dihapus 2026-10-02)
 noc_dashboard        (root)   → view
 ```
 

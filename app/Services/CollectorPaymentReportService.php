@@ -28,7 +28,7 @@ class CollectorPaymentReportService
     /**
      * @return array{groups: Collection<int, array{date: Carbon, subtotal: float, payments: Collection<int, Payment>}>, total: float, count: int}
      */
-    public function build(User $viewer, ?int $collectorId, string $startDate, string $endDate, ?string $method): array
+    public function build(User $viewer, ?int $collectorId, string $startDate, string $endDate, ?string $method, ?string $source = null): array
     {
         $start = Carbon::parse($startDate)->toDateString();
         // Batas atas setengah-terbuka pada string tanggal polos — alasan sama
@@ -39,8 +39,10 @@ class CollectorPaymentReportService
             ->applyUserScope($viewer)
             ->with(['customer', 'collector', 'invoice:id,billing_period'])
             ->where('payment_status', PaymentStatus::VALID->value)
-            // Hanya uang yang ditagih kolektor; `collected_by` null = bayar di kantor.
+            // Hanya uang yang ditagih lapangan; `collected_by` null = bayar di kantor.
             ->when($collectorId, fn ($q) => $q->where('collected_by', $collectorId), fn ($q) => $q->whereNotNull('collected_by'))
+            // Sumber pencatat (ADHOC-122): kolektor atau teknisi. Null = semua.
+            ->when($source, fn ($q) => $q->where('collected_by_role', $source))
             ->when($method, fn ($q) => $q->where('payment_method', $method))
             // Tanggal uang diterima di lapangan; jatuh ke `payment_date` bila kolektor tak mengisinya.
             ->whereRaw('COALESCE(collected_date, payment_date) >= ?', [$start])

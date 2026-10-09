@@ -262,44 +262,6 @@
                             </div>
                         </div>
 
-                        <!-- Foto Rumah — SELALU tampil & opsional untuk semua paket (Home
-                             maupun Bisnis), gak digantung permission/checkbox Skip Survey.
-                             Sebelumnya field ini cuma dirender di dalam blok Skip Survey, jadi
-                             hilang total buat actor tanpa permission itu / yang gak centang
-                             checkbox — padahal aturannya "opsional", bukan "gak ada". Jadi
-                             wajib (asterisk & required_if) begitu Skip Survey aktif, lihat
-                             toggleSkipSurvey() & CustomerRegistrationRequest::rules(). -->
-                        <div class="pt-2">
-                            <div class="border-2 border-dashed @error('foto_rumah') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm">
-                                <div id="default-placeholder-foto_rumah" class="py-4 space-y-2">
-                                    <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
-                                        <x-ui.icon name="house" class="w-4 h-4" />
-                                    </div>
-                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO RUMAH <span class="text-rose-500 hidden" id="foto-rumah-required-mark">*</span></span>
-                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Opsional (JPG, PNG) — wajib kalau Skip Survey diaktifkan</span>
-                                </div>
-                                <div id="preview-container-foto_rumah" style="display: none;" class="py-2 flex flex-col items-center justify-center">
-                                    <div class="relative inline-block w-full">
-                                        <img id="preview-img-foto_rumah" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Rumah">
-                                        <button type="button" onclick="clearFile('foto_rumah')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
-                                            <x-ui.icon name="x" class="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
-                                </div>
-                                <div class="mt-2">
-                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('foto_rumah')">
-                                    <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                        Pilih Foto Rumah
-                                    </label>
-                                    <span id="file-label-foto_rumah" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
-                                </div>
-                                @error('foto_rumah')
-                                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
-                                @enderror
-                            </div>
-                        </div>
-
                         @can('customers.registration.skip_survey')
                         {{-- Skip Survey — Sales lompat tahap survey lapangan, input data
                              survey langsung di sini. Permission sempit
@@ -357,6 +319,37 @@
                                 @enderror
                             </div>
 
+                            <!-- Foto Rumah — cuma ada & wajib di Skip Survey (tidak ada di jalur
+                                 registrasi biasa). Validasi: CustomerRegistrationRequest::rules(). -->
+                            <div class="border-2 border-dashed @error('foto_rumah') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm">
+                                <div id="default-placeholder-foto_rumah" class="py-4 space-y-2">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                        <x-ui.icon name="house" class="w-4 h-4" />
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO RUMAH <span class="text-rose-500">*</span></span>
+                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib Diisi (JPG, PNG)</span>
+                                </div>
+                                <div id="preview-container-foto_rumah" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                    <div class="relative inline-block w-full">
+                                        <img id="preview-img-foto_rumah" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Rumah">
+                                        <button type="button" onclick="clearFile('foto_rumah')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                            <x-ui.icon name="x" class="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
+                                </div>
+                                <div class="mt-2">
+                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" class="hidden" onchange="onFileChange('foto_rumah')">
+                                    <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                        Pilih Foto Rumah
+                                    </label>
+                                    <span id="file-label-foto_rumah" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                </div>
+                                @error('foto_rumah')
+                                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
+                                @enderror
+                            </div>
+
                             <!-- Foto ODP -->
                             <div class="border-2 border-dashed @error('survey_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm">
                                 <div id="default-placeholder-survey_photo" class="py-4 space-y-2">
@@ -376,7 +369,7 @@
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp" class="hidden" onchange="onFileChange('survey_photo')">
+                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" class="hidden" onchange="onFileChange('survey_photo')">
                                     <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Foto ODP
                                     </label>
@@ -435,7 +428,7 @@
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ FAB Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="fab_document" id="fab_document" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.jpg,.jpeg,.png,.webp,.pdf" class="hidden" onchange="onFileChange('fab_document')">
+                                    <input type="file" name="fab_document" id="fab_document" accept="image/*,application/pdf" class="hidden" onchange="onFileChange('fab_document')">
                                     <label for="fab_document" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Berkas FAB
                                     </label>
@@ -550,6 +543,10 @@
                             </div>
                             @endif
 
+                            {{-- Disembunyikan sementara (permintaan user). Field tidak dikirim,
+                                 jadi referral_customer_id tersimpan null. Aktifkan lagi dengan
+                                 menghapus pembungkus Blade comment ini. --}}
+                            {{--
                             <div class="relative" x-data="referralSearch()">
                                 <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Referral Pelanggan</label>
                                 <input type="text" x-model="query" @input.debounce.400ms="search()" placeholder="Cari nama/CID pelanggan existing..."
@@ -562,6 +559,7 @@
                                 </ul>
                                 @error('referral_customer_id')<p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
                             </div>
+                            --}}
                         </div>
 
                     </div>
@@ -630,7 +628,7 @@
     const formFields = {
         'data-diri': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
-            optional: ['email', 'alternative_phone', 'npwp', 'latitude', 'longitude', 'foto_rumah']
+            optional: ['email', 'alternative_phone', 'npwp', 'latitude', 'longitude']
         },
         'layanan': {
             required: ['internet_package_id', 'jenis_kontrak', 'contract_period_months', 'discount_amount'],
@@ -680,7 +678,6 @@
         setElementVisible(panel, enabled);
         setElementVisible(document.getElementById('latitude-required-mark'), enabled);
         setElementVisible(document.getElementById('longitude-required-mark'), enabled);
-        setElementVisible(document.getElementById('foto-rumah-required-mark'), enabled);
 
         formFields['data-diri'].required = formFields['data-diri'].required.filter(f => ! skipSurveyRequiredFields.includes(f));
         formFields['data-diri'].optional = formFields['data-diri'].optional.filter(f => ! skipSurveyRequiredFields.includes(f));
@@ -688,7 +685,7 @@
         if (enabled) {
             formFields['data-diri'].required = formFields['data-diri'].required.concat(skipSurveyRequiredFields);
         } else {
-            formFields['data-diri'].optional = formFields['data-diri'].optional.concat(['latitude', 'longitude', 'foto_rumah']);
+            formFields['data-diri'].optional = formFields['data-diri'].optional.concat(['latitude', 'longitude']);
         }
 
         runLiveProgressUpdates();

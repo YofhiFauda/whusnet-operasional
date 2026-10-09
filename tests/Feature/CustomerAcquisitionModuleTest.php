@@ -161,11 +161,11 @@ class CustomerAcquisitionModuleTest extends TestCase
 
     public function test_pop_scoped_user_cannot_see_record_outside_scope(): void
     {
-        $salesRole = Role::where('name', 'Sales')->first();
+        $bdRole = Role::where('code', 'business_development')->firstOrFail();
         $allowedPop = Pop::factory()->create();
         $otherPop = Pop::factory()->create();
 
-        $user = User::factory()->create(['status' => 'active', 'role_id' => $salesRole->id]);
+        $user = User::factory()->create(['status' => 'active', 'role_id' => $bdRole->id]);
         // RefreshDatabase mengulang ID user dari 1 tiap test, tapi cache
         // permission/scope (`array` store) TIDAK ikut ke-reset — tanpa
         // clearCache() di sini, user id=1 di test ini bisa mewarisi cache

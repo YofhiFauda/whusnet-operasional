@@ -23,7 +23,9 @@ use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskProvisioningService;
 use App\Services\FopTaskTeamService;
+use App\Services\NumberSequenceService;
 use App\Services\TaskService;
+use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -96,7 +98,7 @@ class FopTaskController extends Controller
 
         // Search filter
         if ($request->filled('search')) {
-            $search = $request->input('search');
+            $search = LikeSearch::sanitize((string) $request->input('search', ''));
             $query->where(function ($q) use ($search) {
                 $q->where('task_number', 'like', "%{$search}%")
                     ->orWhere('tugas', 'like', "%{$search}%")
@@ -149,9 +151,10 @@ class FopTaskController extends Controller
         $pops = Pop::orderBy('name', 'asc')->get();
 
         // Get technicians for assignee selector
-        $technicians = User::whereHas('role', function ($q) {
-            $q->where('code', 'teknisi');
-        })->where('status', 'active')->orderBy('name', 'asc')->get();
+        // ->technicians() = Role::TECHNICIAN_CODES ('teknisi' + 'pic_gudang') —
+        // jangan balikin ke where('code','teknisi') manual, PIC gudang hilang
+        // dari dropdown assign (docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md).
+        $technicians = User::technicians()->where('status', 'active')->orderBy('name', 'asc')->get();
 
         // Categories mapping using Enum
         $categories = collect(TaskType::cases())->mapWithKeys(function ($category) {
@@ -283,9 +286,10 @@ class FopTaskController extends Controller
 
         $excludeTaskId = $request->input('exclude_task_id');
 
-        $technicians = User::whereHas('role', function ($q) {
-            $q->where('code', 'teknisi');
-        })->where('status', 'active')->orderBy('name', 'asc')->get();
+        // ->technicians() = Role::TECHNICIAN_CODES ('teknisi' + 'pic_gudang') —
+        // jangan balikin ke where('code','teknisi') manual, PIC gudang hilang
+        // dari dropdown assign (docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md).
+        $technicians = User::technicians()->where('status', 'active')->orderBy('name', 'asc')->get();
 
         $fopTasksQuery = FopTask::with(['technicians:id,name', 'village:id,name'])
             ->applyUserScope()
@@ -389,7 +393,7 @@ class FopTaskController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated) {
-            $taskNumber = $this->generateTaskNumber();
+            $taskNumber = app(NumberSequenceService::class)->fopTaskNumber();
 
             $fopTask = new FopTask;
             $fopTask->task_number = $taskNumber;
@@ -1389,7 +1393,7 @@ class FopTaskController extends Controller
 
         // Search filter
         if ($request->filled('search')) {
-            $search = $request->input('search');
+            $search = LikeSearch::sanitize((string) $request->input('search', ''));
             $query->where(function ($q) use ($search) {
                 $q->where('task_number', 'like', "%{$search}%")
                     ->orWhere('tugas', 'like', "%{$search}%")
@@ -1432,9 +1436,10 @@ class FopTaskController extends Controller
         $pops = Pop::orderBy('name', 'asc')->get();
 
         // Get technicians for assignee selector
-        $technicians = User::whereHas('role', function ($q) {
-            $q->where('code', 'teknisi');
-        })->where('status', 'active')->orderBy('name', 'asc')->get();
+        // ->technicians() = Role::TECHNICIAN_CODES ('teknisi' + 'pic_gudang') —
+        // jangan balikin ke where('code','teknisi') manual, PIC gudang hilang
+        // dari dropdown assign (docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md).
+        $technicians = User::technicians()->where('status', 'active')->orderBy('name', 'asc')->get();
 
         // Categories mapping using Enum
         $categories = collect(TaskType::cases())->mapWithKeys(function ($category) {
@@ -1736,22 +1741,5 @@ class FopTaskController extends Controller
             ->sortBy(fn (FopTaskPriority $p) => $p->sortOrder())
             ->map(fn (FopTaskPriority $p) => $p->value)
             ->all();
-    }
-
-    /**
-     * Generate a unique sequential task number for the current year.
-     *
-     * Nomor urut dihitung di PHP (bukan `ORDER BY` SQL raw kayak
-     * `SUBSTRING_INDEX`) biar portable — jalan di MySQL (prod) maupun SQLite
-     * (test env), bukan cuma di salah satu driver.
-     */
-    /**
-     * Nomor TFOP untuk form manual /fop-tasks. Didelegasikan ke
-     * FopTaskProvisioningService supaya deret yang sama tidak punya dua
-     * implementasi generator di file ini.
-     */
-    private function generateTaskNumber(): string
-    {
-        return app(FopTaskProvisioningService::class)->generateTaskNumber();
     }
 }

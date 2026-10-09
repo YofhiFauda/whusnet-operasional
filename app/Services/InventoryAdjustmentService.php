@@ -48,9 +48,11 @@ class InventoryAdjustmentService
 
     /**
      * Kategori yang WAJIB bukti fisik — klaim kerugian nyata, beda dari
-     * quarantine (status sementara) atau selisih administratif.
+     * quarantine (status sementara) atau selisih administratif. Public —
+     * dipakai juga `WarehouseDamagedStockController` buat filter tab
+     * Custody di halaman "Barang Rusak".
      */
-    private const EVIDENCE_REQUIRED_REASONS = ['lost', 'damaged'];
+    public const EVIDENCE_REQUIRED_REASONS = ['lost', 'damaged'];
 
     /**
      * `$qtyDelta` SIGNED — negatif buat kerugian/susut, positif buat
@@ -72,6 +74,16 @@ class InventoryAdjustmentService
 
         if ($qtyDelta == 0.0) {
             throw new InvalidArgumentException('Qty adjustment tidak boleh nol — itu bukan koreksi apa pun.');
+        }
+
+        // Kelompok H8, docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md:
+        // adjustment level SALDO POP (beda dari adjustCustody/adjustSerialStatus/
+        // adjustRollStatus di bawah yang nempel ke custody teknisi sendiri,
+        // gak terikat cabang mana pun) dibatasi ke cabang penunjukan PIC.
+        if ($actor->role?->code === 'pic_gudang' && ! $actor->isPicGudangOf($pop)) {
+            throw new InvalidArgumentException(
+                "Gudang {$pop->name} bukan gudang yang Anda kelola sebagai PIC Gudang."
+            );
         }
 
         $lotNo = $lotNo ?? '';
@@ -380,6 +392,13 @@ class InventoryAdjustmentService
 
         if ($countedQty < 0) {
             throw new InvalidArgumentException('Hasil hitung fisik tidak boleh negatif.');
+        }
+
+        // Kelompok H8 — sama aturan adjustPopBalance() di atas.
+        if ($actor->role?->code === 'pic_gudang' && ! $actor->isPicGudangOf($pop)) {
+            throw new InvalidArgumentException(
+                "Gudang {$pop->name} bukan gudang yang Anda kelola sebagai PIC Gudang."
+            );
         }
 
         $lotNo = $lotNo ?? '';

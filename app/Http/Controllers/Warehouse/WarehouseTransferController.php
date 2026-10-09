@@ -37,6 +37,56 @@ class WarehouseTransferController extends Controller
 {
     use AuthorizesWarehousePop;
 
+    /**
+     * Daftar Transfer tunggal (analisa-ui-ux §S3/M3) — gabung semua transfer
+     * (bukan cuma in-transit seperti pending()) jadi satu tempat: nomor, rute,
+     * tanggal kirim/terima, status, jumlah baris, plus aksi langsung ke Surat
+     * Jalan & Invoice. Menjawab "surat jalan tidak punya tempat tinggal" —
+     * transfer yang sudah diterima tidak lagi hilang dari daftar operasional.
+     *
+     * Scope: transfer terlihat kalau from_pop ATAU to_pop ada dalam scope aktor
+     * (sama prinsip assertViewableByEitherSide). Filter di luar scope cukup
+     * tidak match, bukan 403 (pola list controller).
+     */
+    public function index(Request $request, EffectiveAccessService $access): View
+    {
+        $user = auth()->user();
+        $hasAllAccess = $access->hasAllPopAccess($user);
+        $allowedPopIds = $hasAllAccess ? [] : $access->getAllowedPopIds($user);
+
+        $pops = Pop::query()
+            ->warehouse()
+            ->when(! $hasAllAccess, fn ($q) => $q->whereIn('id', $allowedPopIds))
+            ->orderBy('type')->orderBy('name')
+            ->get();
+
+        $statusFilter = in_array($request->query('status'), array_column(TransferStatus::cases(), 'value'), true)
+            ? $request->query('status') : null;
+        $fromFilter = $request->integer('from_pop_id') ?: null;
+        $toFilter = $request->integer('to_pop_id') ?: null;
+        $dateFrom = $request->date('date_from');
+        $dateTo = $request->date('date_to');
+
+        $transfers = InventoryTransfer::query()
+            ->when(! $hasAllAccess, fn ($q) => $q->where(
+                fn ($qq) => $qq->whereIn('from_pop_id', $allowedPopIds)->orWhereIn('to_pop_id', $allowedPopIds)
+            ))
+            ->when($statusFilter, fn ($q) => $q->where('status', $statusFilter))
+            ->when($fromFilter, fn ($q) => $q->where('from_pop_id', $fromFilter))
+            ->when($toFilter, fn ($q) => $q->where('to_pop_id', $toFilter))
+            ->when($dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
+            ->withCount(['transactions as line_count' => fn ($q) => $q->whereNotNull('from_pop_id')])
+            ->with(['fromPop', 'toPop', 'createdBy', 'receivedBy'])
+            ->latest('id')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('warehouse.transfers.index', compact(
+            'transfers', 'pops', 'statusFilter', 'fromFilter', 'toFilter', 'dateFrom', 'dateTo'
+        ));
+    }
+
     public function create(EffectiveAccessService $access): View
     {
         $user = auth()->user();
@@ -235,6 +285,9 @@ class WarehouseTransferController extends Controller
         // Cuma Cabang TUJUAN yang boleh konfirmasi terima — beda dari show()
         // yang boleh dua sisi, receive() itu aksi tulis milik satu sisi doang.
         $this->assertPopInScope($transfer->toPop, auth()->user(), $access);
+        // Pembagian tugas PIC Gudang vs POP Admin (Kelompok H5).
+        $this->assertPopAdminNotBlockedByActivePicGudang($transfer->toPop, auth()->user());
+        $this->assertPicGudangCanActOnPop($transfer->toPop, auth()->user());
 
         $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll'])->get();
 

@@ -447,6 +447,41 @@ class WarehouseReportLossValueTest extends TestCase
         @unlink($tempPath);
     }
 
+    /**
+     * BUG 9 (laporan user 2026-10-01): "Stok Awal pada Gudang selalu
+     * kosong" — tab Pergerakan Barang (`viewData('movementRows')`) cuma
+     * nampilin item yang py pergerakan BULAN INI (`receiveByItem` dkk di
+     * `buildMovementSummary()`). Barang yang nongkrong di rak (sudah ada
+     * saldo dari bulan lalu, gak disentuh sama sekali bulan ini) gak
+     * pernah masuk `$itemIdsForPop` → Stok Awal-nya keliatan selalu
+     * kosong karena barisnya sendiri gak pernah muncul.
+     */
+    #[Test]
+    public function item_idle_tanpa_pergerakan_bulan_ini_tetap_tampil_dengan_stok_awal_di_tab_pergerakan(): void
+    {
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabel = Item::create(['code' => 'RLV-IDLE', 'name' => 'Kabel Idle Stok Awal Test', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
+
+        // Bulan LALU — satu-satunya transaksi. Bulan INI sama sekali gak
+        // ada pergerakan buat item ini (gak RECEIVE/TRANSFER/ISSUE).
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $kabel, 75, 4000, $this->owner);
+        InventoryTransaction::query()->where('item_id', $kabel->id)->update(['created_at' => now()->subMonth()]);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.reports.index'));
+        $response->assertOk();
+
+        $movementRows = collect($response->viewData('movementRows'));
+        $popRow = $movementRows->firstWhere(fn ($row) => $row['pop']->id === $this->pusat->id);
+
+        $this->assertNotNull($popRow, 'POP dengan stok idle (tanpa pergerakan bulan ini) harus tetap muncul.');
+
+        $itemRow = collect($popRow['items'])->firstWhere('item_name', 'Kabel Idle Stok Awal Test');
+        $this->assertNotNull($itemRow, 'Item idle harus tetap tampil supaya Stok Awal-nya kebaca.');
+        $this->assertEquals(75.0, $itemRow['stok_awal_qty']);
+        $this->assertEquals(300000.0, $itemRow['stok_awal_nilai']);
+        $this->assertEquals(75.0, $itemRow['stok_akhir_qty']);
+    }
+
     // Indeks kolom (0-based) sheet per-POP — header-nya 2 baris gabungan
     // warna (ADHOC-79 ronde ke-6, layout persis test1.html), gak bisa
     // dibaca asosiatif by nama header biasa (baris 1 sisa "" buat sel yang

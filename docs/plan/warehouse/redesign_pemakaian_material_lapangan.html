@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="id" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pemakaian Material Lapangan - Whusnet Operasional System</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Alpine.js CDN -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.25);
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.45);
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Smooth glassmorphism header */
+        .glass-header {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+        }
+        .dark .glass-header {
+            background-color: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-sky-500 selection:text-white"
+      x-data="materialUsageApp()"
+      x-cloak>
+
+    <div class="flex h-dvh overflow-hidden">
+
+        <!-- ================= SIDEBAR ================= -->
+        <aside class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-slate-800/95 border-r border-slate-200/80 dark:border-slate-800 flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0"
+               :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'">
+
+            <!-- Brand Header -->
+            <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-base shadow-md shadow-sky-500/20 shrink-0">
+                        W
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-extrabold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight">WHUSNET</span>
+                        <span class="text-[10px] font-semibold text-sky-600 dark:text-sky-400 tracking-wider uppercase mt-1">Operasional System</span>
+                    </div>
+                </div>
+                <button @click="sidebarOpen = false" class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6 custom-scrollbar text-xs font-medium">
+                <div>
+                    <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Operasional</p>
+                    <div class="space-y-1">
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                            <span>Dashboard Utama</span>
+                        </a>
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            <span>Pelanggan & Tiket</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Gudang & Logistik</p>
+                    <div class="space-y-1">
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                            <span>Kelola Stok Gudang</span>
+                        </a>
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 font-bold border border-sky-200/60 dark:border-sky-800/60 shadow-xs">
+                            <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            <span>Pemakaian Material</span>
+                        </a>
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span>Riwayat Mutasi</span>
+                        </a>
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            <span>Barang di Teknisi</span>
+                        </a>
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+                            <span>Lacak Serial Number</span>
+                        </a>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- User Profile Card -->
+            <div class="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                <div class="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
+                    <div class="flex items-center gap-2.5 overflow-hidden">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                            SU
+                        </div>
+                        <div class="truncate">
+                            <p class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">Super Admin</p>
+                            <p class="text-[10px] text-slate-400 truncate">superadmin@whusnet.com</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Sidebar Overlay for Mobile -->
+        <div x-show="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-xs md:hidden" x-transition></div>
+
+        <!-- ================= MAIN CONTENT AREA ================= -->
+        <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+            <!-- Top Application Header Bar -->
+            <header class="glass-header sticky top-0 z-30 h-16 border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-3">
+                
+                <div class="flex items-center gap-3 min-w-0">
+                    <button @click="sidebarOpen = !sidebarOpen" class="md:hidden p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+
+                    <!-- Breadcrumbs -->
+                    <nav class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate">
+                        <a href="#" class="hover:text-slate-800 dark:hover:text-slate-200 transition-colors hidden sm:inline">Whusnet</a>
+                        <span class="hidden sm:inline text-slate-300 dark:text-slate-600">/</span>
+                        <a href="#" class="hover:text-slate-800 dark:hover:text-slate-200 transition-colors hidden sm:inline">Gudang</a>
+                        <span class="hidden sm:inline text-slate-300 dark:text-slate-600">/</span>
+                        <span class="font-bold text-sky-600 dark:text-sky-400 truncate">Pemakaian Material Lapangan</span>
+                    </nav>
+                </div>
+
+                <!-- Right Utility Actions -->
+                <div class="flex items-center gap-2 shrink-0">
+                    <!-- Global Search Box -->
+                    <div class="relative hidden sm:block w-44 md:w-60">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" x-model="searchKeyword" placeholder="Cari SN, Tiket, Teknisi..." class="w-full h-9 pl-9 pr-7 text-xs bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-full focus:outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-sky-500 transition-all">
+                        <button x-show="searchKeyword" @click="searchKeyword = ''" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Theme Switcher -->
+                    <button @click="toggleTheme()" class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors" title="Ganti Mode Tema">
+                        <svg x-show="darkMode" class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                        <svg x-show="!darkMode" class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                    </button>
+
+                    <!-- Scan Quick Action Icon -->
+                    <button @click="openScanModal()" class="p-2 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/50 rounded-xl transition-colors sm:hidden" title="Scan QR">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Content Container -->
+            <main class="flex-1 overflow-y-auto p-3.5 sm:p-5 lg:p-6 space-y-5 custom-scrollbar">
+
+                <!-- Page Banner Header & Actions -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3.5 pb-2 border-b border-slate-200/80 dark:border-slate-800">
+                    <div>
+                        <h1 class="text-lg sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                            Gudang & Inventori Logistik
+                        </h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Pusat kendali konsumsi material, rekonsiliasi perangkat terpasang, dan log pelacakan barang oleh teknisi.
+                        </p>
+                    </div>
+
+                    <!-- Action Bar -->
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button @click="openScanModal()" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl text-white bg-sky-600 hover:bg-sky-700 shadow-sm shadow-sky-600/20 transition-all active:scale-95">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            <span>Scan QR / Barcode</span>
+                        </button>
+                        
+                        <button @click="exportData()" class="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 shadow-xs transition-colors">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            <span class="hidden sm:inline">Download Excel</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sub Navigation Bar -->
+                <div class="overflow-x-auto no-scrollbar pb-1">
+                    <nav class="flex items-center gap-1.5 min-w-max text-xs font-medium">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">Gudang</span>
+                        <a href="#" class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Dashboard</a>
+                        <a href="#" class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Riwayat Mutasi</a>
+                        <a href="#" class="px-3 py-1.5 rounded-lg bg-sky-500 text-white font-bold shadow-xs shadow-sky-500/20">Pemakaian Material</a>
+                        <a href="#" class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Stok Barang</a>
+                        
+                        <div class="h-4 w-px bg-slate-200 dark:bg-slate-800 mx-1"></div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">Lapangan</span>
+                        <a href="#" class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Barang di Teknisi</a>
+                        <a href="#" class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Lacak SN / Roll</a>
+                    </nav>
+                </div>
+
+                <!-- Filter Section Box -->
+                <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-xs transition-all">
+                    
+                    <!-- Presets Header -->
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">Periode:</span>
+                            <button @click="setPreset('today')" :class="activePreset === 'today' ? 'bg-sky-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all">Hari Ini</button>
+                            <button @click="setPreset('yesterday')" :class="activePreset === 'yesterday' ? 'bg-sky-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all">Kemarin</button>
+                            <button @click="setPreset('last_7_days')" :class="activePreset === 'last_7_days' ? 'bg-sky-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all">7 Hari Terakhir</button>
+                            <button @click="setPreset('this_month')" :class="activePreset === 'this_month' ? 'bg-sky-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all">Bulan Ini</button>
+                        </div>
+
+                        <!-- Filter Drawer Toggle for Mobile -->
+                        <div class="flex items-center justify-between lg:justify-end gap-2">
+                            <button @click="filterOpen = !filterOpen" class="inline-flex items-center gap-1.5 text-xs text-sky-600 dark:text-sky-400 font-semibold hover:underline">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 12.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-8.586L2.293 6.707A1 1 0 012 6V4z"/></svg>
+                                <span x-text="filterOpen ? 'Sembunyikan Filter' : 'Filter Lanjutan'"></span>
+                            </button>
+
+                            <button @click="resetFilters()" x-show="selectedPop || selectedCategory || searchKeyword" class="text-xs text-rose-500 font-medium hover:underline">
+                                Reset Filter
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible Advanced Filters -->
+                    <div x-show="filterOpen" x-transition class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3.5">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Tanggal Mulai</label>
+                            <input type="date" x-model="startDate" class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Tanggal Akhir</label>
+                            <input type="date" x-model="endDate" class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Gudang POP / Cabang</label>
+                            <select x-model="selectedPop" class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                                <option value="">— Semua Cabang POP —</option>
+                                <option value="Jetis">Jetis (CABANG)</option>
+                                <option value="Sandya">Sandya (CABANG)</option>
+                                <option value="WHUSNET">WHUSNET (PUSAT)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Kategori Barang</label>
+                            <select x-model="selectedCategory" class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                                <option value="">— Semua Kategori —</option>
+                                <option value="Kabel Dropcore">Kabel Dropcore</option>
+                                <option value="Modem/ONT Pelanggan">Modem / ONT</option>
+                                <option value="Patch Cord">Patch Cord / Pasif</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-end gap-2">
+                            <div class="flex-1">
+                                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Kata Kunci Search</label>
+                                <input type="text" x-model="searchKeyword" placeholder="SN, Tiket, Teknisi..." class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                            </div>
+                            <button @click="applyFilters()" class="p-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary KPI Cards Grid -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    
+                    <!-- Card 1: Modem ONT -->
+                    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 sm:p-4 shadow-xs hover:border-sky-500/50 transition-all">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate">Modem ONT Terpasang</span>
+                            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-100 dark:border-sky-800/60 shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+                            </div>
+                        </div>
+                        <div class="mt-2.5 flex items-baseline gap-1.5">
+                            <span class="text-xl sm:text-2xl font-extrabold text-sky-600 dark:text-sky-400" x-text="calculatedTotals.modems">12</span>
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Unit</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1 truncate">PSB & Replacement Active</p>
+                    </div>
+
+                    <!-- Card 2: Cable Dropcore -->
+                    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 sm:p-4 shadow-xs hover:border-amber-500/50 transition-all">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate">Dropcore Terpakai</span>
+                            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-800/60 shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                        </div>
+                        <div class="mt-2.5 flex items-baseline gap-1.5">
+                            <span class="text-xl sm:text-2xl font-extrabold text-amber-600 dark:text-amber-400" x-text="calculatedTotals.cable.toLocaleString('id-ID')">2.775</span>
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Meter</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1 truncate">Potongan Roll Lapangan</p>
+                    </div>
+
+                    <!-- Card 3: Material Pasif -->
+                    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 sm:p-4 shadow-xs hover:border-indigo-500/50 transition-all">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate">Material Pasif</span>
+                            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-800/60 shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                            </div>
+                        </div>
+                        <div class="mt-2.5 flex items-baseline gap-1.5">
+                            <span class="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400" x-text="calculatedTotals.passive">9</span>
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Pcs</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1 truncate">Patchcord, Fast Conn, Protection</p>
+                    </div>
+
+                    <!-- Card 4: Tiket Tugas -->
+                    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 sm:p-4 shadow-xs hover:border-emerald-500/50 transition-all">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate">Tiket Lapangan</span>
+                            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-800/60 shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                        </div>
+                        <div class="mt-2.5 flex items-baseline gap-1.5">
+                            <span class="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400" x-text="calculatedTotals.tickets">11</span>
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Tugas</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1 truncate">Instalasi & Maintenance Selesai</p>
+                    </div>
+                </div>
+
+                <!-- Main Data View Tabs -->
+                <div class="space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 pb-2">
+                        
+                        <!-- Tab Controls -->
+                        <div class="flex items-center gap-1.5 bg-slate-200/70 dark:bg-slate-800/80 p-1 rounded-2xl w-fit">
+                            <button @click="currentTab = 'rekap'" :class="currentTab === 'rekap' ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 font-medium'" class="px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                <span>Rekap per Barang</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 font-mono" x-text="summaryItems.length">3</span>
+                            </button>
+
+                            <button @click="currentTab = 'log'" :class="currentTab === 'log' ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 font-medium'" class="px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                                <span>Log Rincian Lapangan</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono" x-text="filteredLogs.length">32</span>
+                            </button>
+                        </div>
+
+                        <span class="text-xs text-slate-400">
+                            Periode Aktif: <strong class="text-slate-700 dark:text-slate-200" x-text="getPeriodLabel()">September 2026</strong>
+                        </span>
+                    </div>
+
+                    <!-- ================= TAB 1: REKAPITULASI PER BARANG ================= -->
+                    <div x-show="currentTab === 'rekap'" x-transition>
+                        
+                        <!-- Desktop Table View -->
+                        <div class="hidden md:block bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-slate-50/90 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100 dark:border-slate-700/60">
+                                    <tr>
+                                        <th class="px-5 py-3.5">Nama Barang & SKU</th>
+                                        <th class="px-4 py-3.5">Kategori</th>
+                                        <th class="px-4 py-3.5 text-right">Total Terpakai</th>
+                                        <th class="px-4 py-3.5 text-center">Jumlah Tugas</th>
+                                        <th class="px-5 py-3.5">Identitas Roll ID / SN Terpakai</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-xs">
+                                    <template x-for="item in summaryItems" :key="item.sku">
+                                        <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
+                                            <td class="px-5 py-4">
+                                                <div class="font-bold text-slate-900 dark:text-slate-100" x-text="item.name"></div>
+                                                <span class="font-mono text-[11px] text-slate-400" x-text="item.sku"></span>
+                                            </td>
+                                            <td class="px-4 py-4">
+                                                <span class="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-600/60" x-text="item.category">
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-4 text-right font-mono">
+                                                <span class="text-sm font-extrabold text-slate-900 dark:text-slate-100" x-text="item.totalFormatted"></span>
+                                                <span class="text-xs text-slate-400" x-text="item.unit"></span>
+                                            </td>
+                                            <td class="px-4 py-4 text-center">
+                                                <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800" x-text="item.tasksCount + ' Tugas'">
+                                                </span>
+                                            </td>
+                                            <td class="px-5 py-4">
+                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                    <template x-for="sn in item.serials.slice(0, 3)" :key="sn">
+                                                        <span @click="openSnModal(sn, item.name)" class="font-mono text-[11px] px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 font-semibold cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors">
+                                                            <span x-text="sn"></span>
+                                                        </span>
+                                                    </template>
+                                                    <span x-show="item.serials.length > 3" @click="openAllSnModal(item)" class="text-[10px] font-bold text-sky-600 dark:text-sky-400 cursor-pointer hover:underline">
+                                                        +<span x-text="item.serials.length - 3"></span> SN Lainnya
+                                                    </span>
+                                                    <span x-show="item.serials.length === 0" class="text-slate-400 text-xs italic">
+                                                        Material Pasif Non-Serial
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Mobile Card View for Rekapitulasi -->
+                        <div class="md:hidden space-y-3">
+                            <template x-for="item in summaryItems" :key="'mob-' + item.sku">
+                                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 space-y-3 shadow-xs">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div>
+                                            <h3 class="font-bold text-sm text-slate-900 dark:text-slate-100" x-text="item.name"></h3>
+                                            <span class="font-mono text-xs text-slate-400" x-text="item.sku"></span>
+                                        </div>
+                                        <span class="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0" x-text="item.category"></span>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-2 py-2 border-y border-slate-100 dark:border-slate-700/60 text-xs">
+                                        <div>
+                                            <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Total Terpakai</span>
+                                            <span class="font-bold font-mono text-slate-900 dark:text-slate-100 text-sm">
+                                                <span x-text="item.totalFormatted"></span> <span x-text="item.unit"></span>
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Total Pekerjaan</span>
+                                            <span class="font-bold text-emerald-600 dark:text-emerald-400" x-text="item.tasksCount + ' Tugas'"></span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider mb-1">Identitas SN / Roll ID</span>
+                                        <div class="flex flex-wrap gap-1">
+                                            <template x-for="sn in item.serials" :key="'mob-sn-' + sn">
+                                                <span @click="openSnModal(sn, item.name)" class="font-mono text-[10px] px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 font-semibold cursor-pointer">
+                                                    <span x-text="sn"></span>
+                                                </span>
+                                            </template>
+                                            <span x-show="item.serials.length === 0" class="text-slate-400 text-xs italic">
+                                                Material Pasif Non-Serial
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- ================= TAB 2: RINCIAN LOG LAPANGAN ================= -->
+                    <div x-show="currentTab === 'log'" x-transition>
+                        
+                        <!-- Desktop Log Table View -->
+                        <div class="hidden md:block bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse min-w-[750px]">
+                                    <thead class="bg-slate-50/80 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100 dark:border-slate-700/60">
+                                        <tr>
+                                            <th class="px-4 py-3.5">Waktu & Gudang</th>
+                                            <th class="px-4 py-3.5">Barang</th>
+                                            <th class="px-4 py-3.5 text-right">Qty</th>
+                                            <th class="px-4 py-3.5">Identitas (SN / Roll)</th>
+                                            <th class="px-4 py-3.5">Teknisi Pelaksana</th>
+                                            <th class="px-4 py-3.5">Pelanggan & Tiket Tugas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-xs">
+                                        <template x-for="log in filteredLogs" :key="log.id">
+                                            <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
+                                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                                    <div class="font-bold text-slate-800 dark:text-slate-200" x-text="log.date"></div>
+                                                    <div class="text-[11px] text-slate-400 font-mono" x-text="log.time"></div>
+                                                    <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium" x-text="log.warehouse"></span>
+                                                </td>
+                                                <td class="px-4 py-3.5">
+                                                    <div class="font-bold text-slate-900 dark:text-slate-100" x-text="log.itemName"></div>
+                                                    <div class="text-[11px] text-slate-400 font-mono" x-text="log.sku"></div>
+                                                </td>
+                                                <td class="px-4 py-3.5 text-right font-mono font-extrabold text-slate-900 dark:text-slate-100">
+                                                    <span x-text="log.qty.toLocaleString('id-ID')"></span>
+                                                    <span class="text-xs font-normal text-slate-400" x-text="log.unit"></span>
+                                                </td>
+                                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                                    <span x-show="log.sn" @click="openSnModal(log.sn, log.itemName)" class="font-mono text-xs px-2 py-0.5 rounded-lg font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 cursor-pointer hover:underline" x-text="log.sn"></span>
+                                                    <span x-show="!log.sn" class="text-slate-400">—</span>
+                                                </td>
+                                                <td class="px-4 py-3.5 whitespace-nowrap">
+                                                    <div class="font-bold text-slate-800 dark:text-slate-200" x-text="log.tech"></div>
+                                                    <div class="text-[10px] text-slate-400">Teknisi Lapangan</div>
+                                                </td>
+                                                <td class="px-4 py-3.5">
+                                                    <div @click="openCustomerModal(log)" class="font-bold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer" x-text="log.customer"></div>
+                                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                                        <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800" x-text="log.taskType"></span>
+                                                        <span class="font-mono text-[11px] text-slate-400" x-text="log.ticket"></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="filteredLogs.length === 0">
+                                            <td colspan="6" class="px-4 py-8 text-center text-slate-400 text-xs">
+                                                Tidak ada log pemakaian material yang sesuai dengan filter.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Pagination -->
+                            <div class="px-5 py-3 border-t border-slate-100 dark:border-slate-700/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                                <span>Menampilkan 1 - <span x-text="filteredLogs.length"></span> dari 32 transaksi</span>
+                                <div class="flex items-center gap-1">
+                                    <button class="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">Sebelumnya</button>
+                                    <button class="px-3 py-1 rounded-lg bg-sky-600 text-white font-bold">1</button>
+                                    <button class="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">2</button>
+                                    <button class="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">Berikutnya</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mobile Card View for Log Lapangan -->
+                        <div class="md:hidden space-y-3">
+                            <template x-for="log in filteredLogs" :key="'mob-log-' + log.id">
+                                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 space-y-3 shadow-xs">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div>
+                                            <span class="text-[10px] font-bold text-slate-400 block" x-text="log.date + ' • ' + log.time"></span>
+                                            <h4 class="font-bold text-sm text-slate-900 dark:text-slate-100" x-text="log.itemName"></h4>
+                                            <span class="font-mono text-xs text-slate-400" x-text="log.sku"></span>
+                                        </div>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0" x-text="log.warehouse"></span>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-2 py-2 border-y border-slate-100 dark:border-slate-700/60 text-xs">
+                                        <div>
+                                            <span class="text-slate-400 block text-[10px] font-bold uppercase">JUMLAH TERPAKAI</span>
+                                            <span class="font-bold font-mono text-slate-900 dark:text-slate-100">
+                                                <span x-text="log.qty.toLocaleString('id-ID')"></span> <span x-text="log.unit"></span>
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span class="text-slate-400 block text-[10px] font-bold uppercase">IDENTITAS SN / ROLL</span>
+                                            <span x-show="log.sn" class="font-mono text-[11px] font-bold text-amber-700 dark:text-amber-300" x-text="log.sn"></span>
+                                            <span x-show="!log.sn" class="text-slate-400">—</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-between text-xs pt-1">
+                                        <div>
+                                            <span class="text-slate-400 block text-[10px]">PELANGGAN</span>
+                                            <span class="font-bold text-sky-600 dark:text-sky-400" x-text="log.customer"></span>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="text-slate-400 block text-[10px]">TEKNISI</span>
+                                            <span class="font-bold text-slate-800 dark:text-slate-200" x-text="log.tech"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- ================= MODALS & OVERLAYS ================= -->
+
+    <!-- Serial Number / Roll ID Modal -->
+    <div x-show="snModal.open" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs" x-transition>
+        <div @click.outside="snModal.open = false" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                <h3 class="font-bold text-sm text-slate-900 dark:text-slate-100">Detail Serial Number / Roll ID</h3>
+                <button @click="snModal.open = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            
+            <div class="space-y-3 text-xs">
+                <div>
+                    <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">NAMA BARANG</span>
+                    <span class="font-bold text-slate-800 dark:text-slate-200 text-xs" x-text="snModal.itemName"></span>
+                </div>
+
+                <div>
+                    <span class="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">SERIAL NUMBER / ROLL ID</span>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="font-mono text-sm font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/50 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800" x-text="snModal.sn"></span>
+                        <button @click="copyToClipboard(snModal.sn)" class="p-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200" title="Salin Serial Number">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                    <div>
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">STATUS</span>
+                        <span class="font-bold text-emerald-600 dark:text-emerald-400">Terpasang & Aktif</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px] font-bold uppercase">PELANGGAN</span>
+                        <span class="font-bold text-slate-800 dark:text-slate-200">TESTING 11 (#1968)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button @click="snModal.open = false" class="w-full py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 font-bold text-xs rounded-xl transition-colors">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Modal Simulator -->
+    <div x-show="scanModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs" x-transition>
+        <div @click.outside="scanModalOpen = false" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-sm w-full p-5 shadow-2xl text-center space-y-4">
+            <div class="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </div>
+            <div>
+                <h3 class="font-bold text-base text-slate-900 dark:text-slate-100">Scanner QR & Barcode</h3>
+                <p class="text-xs text-slate-500 mt-1">Arahkan kamera ke QR Code Roll Kabel / Modem ONT di lapangan</p>
+            </div>
+            <div class="border-2 border-dashed border-sky-400/60 rounded-xl p-6 bg-slate-50 dark:bg-slate-900/50 flex flex-col items-center justify-center">
+                <div class="w-16 h-16 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                <span class="text-[11px] font-medium text-slate-400 mt-3">Menghubungkan ke Kamera...</span>
+            </div>
+            <button @click="scanModalOpen = false" class="w-full py-2 bg-slate-100 dark:bg-slate-700 font-bold text-xs rounded-xl">Batalkan</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div x-show="toast.show" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-xs font-semibold" x-transition>
+        <svg class="w-4 h-4 text-emerald-400 dark:text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span x-text="toast.message"></span>
+    </div>
+
+    <!-- Alpine.js Application Logic -->
+    <script>
+        function materialUsageApp() {
+            return {
+                darkMode: true,
+                sidebarOpen: false,
+                filterOpen: true,
+                scanModalOpen: false,
+                currentTab: 'rekap', // 'rekap' or 'log'
+                activePreset: 'this_month',
+                startDate: '2026-09-01',
+                endDate: '2026-09-30',
+                selectedPop: '',
+                selectedCategory: '',
+                searchKeyword: '',
+                
+                snModal: {
+                    open: false,
+                    sn: '',
+                    itemName: ''
+                },
+                
+                toast: { show: false, message: '' },
+
+                summaryItems: [
+                    {
+                        name: 'Kabel Dropcore 1 Core',
+                        sku: 'DC-1C',
+                        category: 'Kabel Dropcore',
+                        totalFormatted: '2.775',
+                        unit: 'meter',
+                        tasksCount: 10,
+                        serials: ['DC-1C-20260924-000003', 'DC-1C-20260924-000002', 'DC-1C-20260924-000001']
+                    },
+                    {
+                        name: 'Modem ONT ZTE F609',
+                        sku: 'ONT-ZTE-F609',
+                        category: 'Modem/ONT Pelanggan',
+                        totalFormatted: '12',
+                        unit: 'pcs',
+                        tasksCount: 11,
+                        serials: ['ZTEHG0011', 'ZTEHG0010', 'ZTEHG0009', 'ZTEHG0008', 'ZTEHG0007', 'ZTEHG0006', 'ZTEHG0005', 'ZTEHG0004']
+                    },
+                    {
+                        name: 'Patch Cord SC/APC 1 Meter',
+                        sku: 'PC-SCAPC-1M',
+                        category: 'Patch Cord',
+                        totalFormatted: '9',
+                        unit: 'pcs',
+                        tasksCount: 8,
+                        serials: []
+                    }
+                ],
+
+                rawLogs: [
+                    { id: 1, date: '29 Sep 2026', time: '08:52 WIB', warehouse: 'Jetis', itemName: 'Patch Cord SC/APC 1 Meter', sku: 'PC-SCAPC-1M', category: 'Patch Cord', qty: 1, unit: 'pcs', sn: '', tech: 'Bella', customer: 'TESTING 11', taskType: 'Pemasangan Baru', ticket: '#TFOP-2026-0040' },
+                    { id: 2, date: '29 Sep 2026', time: '08:52 WIB', warehouse: 'Jetis', itemName: 'Kabel Dropcore 1 Core', sku: 'DC-1C', category: 'Kabel Dropcore', qty: 200, unit: 'meter', sn: 'DC-1C-20260924-000003', tech: 'Bella', customer: 'TESTING 11', taskType: 'Pemasangan Baru', ticket: '#TFOP-2026-0040' },
+                    { id: 3, date: '29 Sep 2026', time: '08:52 WIB', warehouse: 'Jetis', itemName: 'Modem ONT ZTE F609', sku: 'ONT-ZTE-F609', category: 'Modem/ONT Pelanggan', qty: 1, unit: 'pcs', sn: 'ZTEHG0011', tech: 'Bella', customer: 'TESTING 11', taskType: 'Pemasangan Baru', ticket: '#TFOP-2026-0040' },
+                    { id: 4, date: '28 Sep 2026', time: '15:03 WIB', warehouse: 'Jetis', itemName: 'Kabel Dropcore 1 Core', sku: 'DC-1C', category: 'Kabel Dropcore', qty: 150, unit: 'meter', sn: 'DC-1C-20260924-000003', tech: 'Bella', customer: 'Ifan Ilham Fajar', taskType: 'Customer Request', ticket: '#TFOP-2026-0030' },
+                    { id: 5, date: '28 Sep 2026', time: '15:03 WIB', warehouse: 'Jetis', itemName: 'Modem ONT ZTE F609', sku: 'ONT-ZTE-F609', category: 'Modem/ONT Pelanggan', qty: 1, unit: 'pcs', sn: 'ZTEHG0010', tech: 'Bella', customer: 'Ifan Ilham Fajar', taskType: 'Customer Request', ticket: '#TFOP-2026-0030' },
+                    { id: 6, date: '28 Sep 2026', time: '14:31 WIB', warehouse: 'Jetis', itemName: 'Kabel Dropcore 1 Core', sku: 'DC-1C', category: 'Kabel Dropcore', qty: 250, unit: 'meter', sn: 'DC-1C-20260924-000003', tech: 'Bella', customer: 'Muhammad Angfiudin', taskType: 'Maintenance', ticket: '#TFOP-2026-0029' },
+                    { id: 7, date: '24 Sep 2026', time: '16:18 WIB', warehouse: 'Jetis', itemName: 'Modem ONT ZTE F609', sku: 'ONT-ZTE-F609', category: 'Modem/ONT Pelanggan', qty: 1, unit: 'pcs', sn: 'ZTEHG0008', tech: 'Bella', customer: 'TESTING 6', taskType: 'Pemasangan Baru', ticket: '#TFOP-2026-0024' }
+                ],
+
+                get filteredLogs() {
+                    return this.rawLogs.filter(log => {
+                        const matchPop = !this.selectedPop || log.warehouse.toLowerCase().includes(this.selectedPop.toLowerCase());
+                        const matchCategory = !this.selectedCategory || log.category === this.selectedCategory;
+                        const matchKeyword = !this.searchKeyword || 
+                            log.itemName.toLowerCase().includes(this.searchKeyword.toLowerCase()) ||
+                            log.tech.toLowerCase().includes(this.searchKeyword.toLowerCase()) ||
+                            log.customer.toLowerCase().includes(this.searchKeyword.toLowerCase()) ||
+                            log.ticket.toLowerCase().includes(this.searchKeyword.toLowerCase()) ||
+                            log.sn.toLowerCase().includes(this.searchKeyword.toLowerCase());
+                        
+                        return matchPop && matchCategory && matchKeyword;
+                    });
+                },
+
+                get calculatedTotals() {
+                    let modems = 0;
+                    let cable = 0;
+                    let passive = 0;
+                    let ticketsSet = new Set();
+
+                    this.filteredLogs.forEach(l => {
+                        if (l.category === 'Modem/ONT Pelanggan') modems += l.qty;
+                        if (l.category === 'Kabel Dropcore') cable += l.qty;
+                        if (l.category === 'Patch Cord') passive += l.qty;
+                        if (l.ticket) ticketsSet.add(l.ticket);
+                    });
+
+                    return {
+                        modems: modems || 12,
+                        cable: cable || 2775,
+                        passive: passive || 9,
+                        tickets: ticketsSet.size || 11
+                    };
+                },
+
+                toggleTheme() {
+                    this.darkMode = !this.darkMode;
+                    if (this.darkMode) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                },
+
+                setPreset(preset) {
+                    this.activePreset = preset;
+                    if (preset === 'today') {
+                        this.startDate = '2026-09-30';
+                        this.endDate = '2026-09-30';
+                    } else if (preset === 'yesterday') {
+                        this.startDate = '2026-09-29';
+                        this.endDate = '2026-09-29';
+                    } else if (preset === 'last_7_days') {
+                        this.startDate = '2026-09-24';
+                        this.endDate = '2026-09-30';
+                    } else if (preset === 'this_month') {
+                        this.startDate = '2026-09-01';
+                        this.endDate = '2026-09-30';
+                    }
+                    this.showToast('Periode diperbarui: ' + preset);
+                },
+
+                getPeriodLabel() {
+                    if (this.activePreset === 'this_month') return 'September 2026';
+                    return this.startDate + ' s/d ' + this.endDate;
+                },
+
+                applyFilters() {
+                    this.showToast('Filter berhasil diterapkan');
+                },
+
+                resetFilters() {
+                    this.selectedPop = '';
+                    this.selectedCategory = '';
+                    this.searchKeyword = '';
+                    this.setPreset('this_month');
+                    this.showToast('Filter direset');
+                },
+
+                openSnModal(sn, itemName) {
+                    this.snModal.sn = sn;
+                    this.snModal.itemName = itemName || 'Perangkat Logistik';
+                    this.snModal.open = true;
+                },
+
+                openAllSnModal(item) {
+                    this.showToast('Menampilkan seluruh ' + item.serials.length + ' serial number');
+                },
+
+                openCustomerModal(log) {
+                    this.showToast('Detail Tiket: ' + log.ticket + ' (' + log.customer + ')');
+                },
+
+                openScanModal() {
+                    this.scanModalOpen = true;
+                },
+
+                exportData() {
+                    this.showToast('Mengekspor laporan Excel (.xlsx)...');
+                },
+
+                copyToClipboard(text) {
+                    const tempInput = document.createElement('input');
+                    tempInput.value = text;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+                    this.showToast('SN berhasil disalin!');
+                },
+
+                showToast(msg) {
+                    this.toast.message = msg;
+                    this.toast.show = true;
+                    setTimeout(() => { this.toast.show = false; }, 3000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

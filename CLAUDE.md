@@ -76,6 +76,7 @@ docker compose exec app php artisan package:discover --ansi
 | Service | Tanggung jawab |
 |---|---|
 | `TicketService` | Semua transisi status tiket: `create()` (snapshot pelanggan + lampiran, **tanpa** bikin FopTask) → `close()`/`cancel()`/`escalateToNoc()`/`onCheckNoc()`/`escalateToFop()`/`returnToHelpdesk()`. FopTask cuma kebentuk di `escalateToFop()` atau submit dari halaman Task FOP |
+| `NumberSequenceService` | Satu-satunya penghasil nomor TKT/TFOP/TASK/invoice/payment (counter `number_sequences`) |
 | `TaskService` | task teknisi: `create/update/start/complete/setPending/cancel/reassignTeam/detectConflicts` + sync balik ke FopTask |
 | `FopTaskTeamService` | `rebuildTeamsForDate()` — tim harian FOP, dipanggil tiap jadwal berubah |
 | `CustomerWorkflowService` | transisi status pelanggan (`WorkflowTransition`) |
@@ -105,7 +106,7 @@ docker compose exec app php artisan package:discover --ansi
 Bagian paling rawan di repo ini. Tiga entitas, tiga nomor, sinkron dua arah.
 
 ```
-Ticket (TKT-YYYY-NNNN)          FopTask TIDAK auto-dibuat saat submit!
+Ticket (TKT-YYYYMMDD-NNNNNN)         FopTask TIDAK auto-dibuat saat submit!
   handler=HELPDESK, status=OPEN
        │
        ├─ close()/cancel()  → selesai/batal TANPA pernah nyentuh FOP
@@ -115,10 +116,10 @@ Ticket (TKT-YYYY-NNNN)          FopTask TIDAK auto-dibuat saat submit!
        │                       = ['helpdesk','noc']). Gak ada langkah "terima".
        │
        └─ escalateToFop()   → SATU-SATUNYA titik FopTask kebentuk
-             └─ syncToFopTask() → FopTask (TFOP-YYYY-NNNN, status DRAFT)
+             └─ syncToFopTask() → FopTask (TFOP-YYYYMMDD-NNNNNN, status DRAFT)
                                     ├─ ticket.fop_task_id → FopTask
                                     ├─ ticket.handler = FOP  (TERMINAL)
-                                    └─ fop_task.task_id → Task (TASK-YYYY-NNNN)
+                                    └─ fop_task.task_id → Task (TASK-YYYYMMDD-NNNNNN)
                                           └─ TaskService::syncToFopTask()
                                                sync teknisi + task_date balik ke FopTask
                                                lalu FopTaskTeamService::rebuildTeamsForDate()
@@ -132,7 +133,7 @@ Aturan:
 3. **`Ticket::holderRoles()` = SATU-SATUNYA sumber "siapa yang boleh act"** — handler=HELPDESK ⇒ `['helpdesk']`; handler=NOC ⇒ `['helpdesk','noc']` (dipegang berdua); handler=FOP ⇒ `[]`. Dipakai bareng `TicketService::assertActorOwnsTicket()` (otorisasi asli) dan `Ticket::actionFlagsFor()` (gerbang tombol). Jangan duplikasi logic ini di tempat ketiga.
    → Window **"Pending NOC"** + aksi **Oncheck NOC** sudah **DIHAPUS** (ADHOC-06, 2026-07-29): assign ke NOC = langsung diproses. Kolom `noc_checked_at`, endpoint `tickets.oncheck-noc`, flag `can_oncheck_noc`, dan label `Pending NOC`/`OnCheck NOC` tidak ada lagi. Jangan dihidupkan sebagian — kalau perlu balik, balikkan utuh.
    → Dua tab di Worksheet NOC (**Tiket Masuk** = `handler=noc & open`, **Assign FOP** = `handler=fop` + jejak eskalasi lewat NOC; ADHOC-09) **bukan** tab Pending NOC yang itu: keduanya murni turunan data, satu permission (`noc_worksheet.view`), dan tetap tanpa langkah "terima tiket".
-4. **`TFOP-` digenerate di dua tempat** — `TicketService::generateFopTaskNumber()` dan `FopTaskController::generateTaskNumber()`. Format wajib identik, keduanya nulis ke deret yang sama.
+4. **`TFOP-` hanya digenerate lewat `NumberSequenceService::fopTaskNumber()`** — satu deret untuk semua jalur (Ticketing, form manual FOP, maintenance).
 5. **`fop_task.tugas` = `"{display_id}_{full_name}"`** (mis. `C1X4ARQ000631_Masudah Yuni Fitri`) — identitas pelanggan konsisten seluruh sistem, bukan label tipe tiket generik.
 6. **`fop_task.notes` cuma pointer pendek** (`"Ticket TKT-… — dikirim oleh …"`). Jangan salin `catatan_teknis` ke sini — itu bikin dua sumber kebenaran yang gampang menyimpang.
 7. **Riwayat pembatalan: satu aksi, dua riwayat, satu penulis per sisi.**
@@ -186,7 +187,7 @@ Permission & scope **di-cache**. Setelah mengubah role/permission/scope, panggil
 1. **Dilarang bikin role per cabang** (`NOC Ponorogo`, `Teknisi Siman`). Role global, batasi lewat scope.
 2. **Dilarang kasih permission langsung ke user** tanpa lewat matrix role.
 3. **Setiap query pelanggan/task/invoice/laporan wajib lewat POP scope.** Query tanpa scope = kebocoran data lintas cabang → berhenti dan tanya.
-4. Teknisi tak boleh catat pembayaran. `pop_admin` tak boleh lihat pelanggan luar scope. Helpdesk tak boleh ubah nominal tagihan terbit. Sales tak boleh akses laporan keuangan.
+4. Teknisi boleh catat pembayaran **terbatas**: hanya pelanggan dalam POP scope-nya (tanpa perlu di-assign), wajib menyetor saldo (peringatan "belum setor" lewat tutup hari 23:59), tanpa batas nominal harian, tanpa akses worklist kolektor. Lewat permission `kolektor.pay`/`kolektor.deposit` di Role Matrix role `teknisi` — bukan kode hardcode. Rancangan: `docs/plan/kolektor/rancangan-pembayaran-teknisi.md`. `pop_admin` tak boleh lihat pelanggan luar scope. Helpdesk tak boleh ubah nominal tagihan terbit. Sales tak boleh akses laporan keuangan.
 
 ## Business Rules
 
@@ -205,6 +206,8 @@ Tagihan turunan dari Pelanggan Aktif + Paket Aktif + Harga Layanan + Periode —
 ### Pembayaran
 Wajib terhubung invoice + pelanggan + POP. Penuh → `lunas`; kurang → `sebagian`; ditolak → tidak boleh jadi `lunas`. Semua perubahan masuk audit log.
 
+Batch (kolektor, teknisi, portal staf) **tidak menerima lebih bayar**: tunai + saldo per tagihan ≤ sisa tagihan. Lebih bayar hanya lewat form Tagihan admin. Penjaga: `CollectorPaymentService::validateRows()`. Detail: `docs/BUSINESS_RULES.md` §8.
+
 `PaymentObserver::creating()` menolak nominal ≤ 0 dari **semua** jalur masuk — data legacy punya baris "pembayaran" `BAYAR=0` yang sebenarnya placeholder log aktivasi. Jangan lemahkan guard ini.
 
 ### SLA — dua konsep, jangan dicampur
@@ -214,7 +217,9 @@ Wajib terhubung invoice + pelanggan + POP. Penuh → `lunas`; kurang → `sebagi
 `PackageSlaSetting` untuk SLA paket. **Bukan** untuk SLA pengerjaan teknisi.
 
 ### Penomoran & ID
-- `TKT-{tahun}-{4 digit}`, `TFOP-{tahun}-{4 digit}`, `TASK-{tahun}-{4 digit}`
+- `TKT-{YYYYMMDD}-{6 digit}`, `TFOP-{YYYYMMDD}-{6 digit}`, `TASK-{YYYYMMDD}-{6 digit}` (counter reset per hari)
+- Invoice `{PREFIX}-{YYYYMMDD}-{6 digit}`; payment `PAY-{invoice_number}` (lunas sekali bayar) atau `PAY-{invoice_number}-{NN}` (cicilan)
+- **Semua nomor dokumen lewat `NumberSequenceService`** (tabel `number_sequences`, counter atomik per key). Jangan pakai `count()+1` / `max()+1` di atas tabel dokumen — itu race dan bisa dipakai ulang setelah hard delete.
 - CID pelanggan digenerate per-POP: prefix di tabel `pops` + `PopSequence`. Lihat `docs/ID_NUMBERING_RULES.md` dan `docs/master/pop/business-logic.md`.
 - Data legacy multi-cabang (jetis_db, sand_db) punya risiko tabrakan ID (PE/RQ/IDBIAYA). **ID legacy wajib di-namespace per cabang.**
 

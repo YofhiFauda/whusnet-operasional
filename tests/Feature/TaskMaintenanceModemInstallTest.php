@@ -162,6 +162,48 @@ class TaskMaintenanceModemInstallTest extends TestCase
         $this->assertEquals($this->fopTask->id, $transaction->fop_task_id);
     }
 
+    /**
+     * MTN = GANTI (default `$returnExistingSerial=true`, ADHOC-108 koreksi
+     * 2026-10-08) — modem lama yang masih `INSTALLED` milik pelanggan ini
+     * WAJIB otomatis diretur begitu SN baru dipasang. Beda dari C-REQ
+     * `TAMBAH_MODEM` yang sengaja TIDAK meretur (lihat `TaskCreqBillingReportTest`).
+     */
+    #[Test]
+    public function pilih_sn_baru_otomatis_meretur_modem_lama_pelanggan(): void
+    {
+        $oldSerial = InventorySerial::create([
+            'item_id' => $this->modem->id,
+            'serial_number' => 'SN-MTN-OLD',
+            'status' => SerialStatus::INSTALLED->value,
+            'customer_id' => $this->customer->id,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+
+        $newSerial = InventorySerial::create([
+            'item_id' => $this->modem->id,
+            'serial_number' => 'SN-MTN-NEW',
+            'status' => SerialStatus::ISSUED->value,
+            'current_technician_id' => $this->technician->id,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+
+        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), [
+            'kendala_teknis' => 'Modem lama rusak, diganti unit baru.',
+            'opm_photo' => UploadedFile::fake()->image('opm.jpg'),
+            'speedtest_photo' => UploadedFile::fake()->image('speed.jpg'),
+            'selected_inventory_serial_id' => $newSerial->id,
+        ])->assertSessionHasNoErrors();
+
+        $oldSerial->refresh();
+        $this->assertEquals(SerialStatus::RETURNED, $oldSerial->status);
+        $this->assertNull($oldSerial->customer_id);
+
+        $newSerial->refresh();
+        $this->assertEquals(SerialStatus::INSTALLED, $newSerial->status);
+        $this->assertEquals($this->customer->id, $newSerial->customer_id);
+        $this->assertEquals('SN-MTN-NEW', $this->customer->refresh()->ont_sn);
+    }
+
     #[Test]
     public function sn_di_luar_custody_ditolak(): void
     {

@@ -30,6 +30,16 @@ class StockRequestService
             throw new InvalidArgumentException('Permintaan Stok wajib py minimal 1 baris barang.');
         }
 
+        // Kelompok H7, docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md:
+        // `pic_gudang` cuma boleh mengajukan permintaan stok ATAS NAMA cabang
+        // yang jadi penunjukannya — penting buat PIC scope `all_pop` (teknisi
+        // keliling) yang hak gudangnya tetap dibatasi ke cabang penunjukannya.
+        if ($actor->role?->code === 'pic_gudang' && ! $actor->isPicGudangOf($cabang)) {
+            throw new InvalidArgumentException(
+                "Cabang {$cabang->name} bukan gudang yang Anda kelola sebagai PIC Gudang."
+            );
+        }
+
         return DB::transaction(function () use ($cabang, $lines, $actor, $notes) {
             $request = StockRequest::create([
                 'reference_number' => $this->generateReferenceNumber(),

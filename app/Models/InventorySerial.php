@@ -8,6 +8,8 @@ use App\Enums\SerialStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Satu baris per unit fisik barang SERIALIZED (modem, ONT, router, OTDR).
@@ -86,6 +88,16 @@ class InventorySerial extends Model
     public function fopTask(): BelongsTo
     {
         return $this->belongsTo(FopTask::class);
+    }
+
+    public function retrievalLogs(): HasMany
+    {
+        return $this->hasMany(DeviceRetrievalLog::class, 'serial_id');
+    }
+
+    public function latestRetrievalLog(): HasOne
+    {
+        return $this->hasOne(DeviceRetrievalLog::class, 'serial_id')->latestOfMany('retrieved_at');
     }
 
     public function conditionCheckedBy(): BelongsTo

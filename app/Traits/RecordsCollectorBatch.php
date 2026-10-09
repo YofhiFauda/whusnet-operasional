@@ -2,11 +2,19 @@
 
 namespace App\Traits;
 
+use App\Enums\CollectorRole;
+use App\Models\Customer;
+use App\Models\Invoice;
+use App\Models\StaffPortalToken;
 use App\Models\User;
 use App\Services\CollectorPaymentService;
+use App\Services\CustomerQrTokenService;
+use App\Services\EffectiveAccessService;
 use App\Support\RupiahInput;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Bentuk request & response batch pembayaran kolektor, dipakai bersama oleh
@@ -38,7 +46,7 @@ trait RecordsCollectorBatch
 
         $request->merge([
             'rows' => array_map(
-                fn ($row) => is_array($row) ? RupiahInput::parseKeys($row, 'amount') : $row,
+                fn ($row) => is_array($row) ? RupiahInput::parseKeys($row, 'amount', 'use_balance_amount') : $row,
                 $rows
             ),
         ]);
@@ -53,8 +61,16 @@ trait RecordsCollectorBatch
             'idempotency_key' => 'required|string|max:191',
             'rows' => 'required|array|min:1',
             'rows.*.invoice_id' => 'required|integer',
-            'rows.*.amount' => 'required|numeric|min:1',
+            // min:0, bukan min:1: baris yang seluruhnya dibayar dari saldo
+            // pelanggan boleh tanpa uang tunai. Minimal Rp 1 (tunai + saldo)
+            // dijaga di CollectorPaymentService::validateRows().
+            'rows.*.amount' => 'required|numeric|min:0',
+            'rows.*.use_balance_amount' => 'nullable|numeric|min:0',
             'rows.*.payment_method' => 'required|in:cash,transfer,lainnya',
+            // Wajib untuk transfer — dicek di validateRows() bersama aturan
+            // lain supaya pesan gagalnya per baris, bukan validasi generik.
+            'rows.*.bank_account_id' => 'nullable|integer|exists:bank_accounts,id',
+            'rows.*.sender_name' => 'nullable|string|max:150',
             // Metode Lainnya wajib menjelaskan metode apa persisnya (mis.
             // "OVO") — dicek lagi di CollectorPaymentService::validateRows()
             // supaya konsisten dengan pesan gagal per baris yang sudah ada,
@@ -72,9 +88,141 @@ trait RecordsCollectorBatch
     }
 
     /**
+     * Jalur pembayaran dari Portal (token one-shot `StaffPortalToken`).
+     *
+     * Urutan dalam SATU transaksi, supaya token tidak bisa dipakai dua kali:
+     *   1. kunci baris token (`lockForUpdate`) + pastikan belum terkonsumsi;
+     *   2. izin `kolektor.qr.pay` & POP scope dicek ulang (bisa dicabut setelah scan);
+     *   3. setiap invoice harus milik pelanggan yang terikat ke token — tanpa ini
+     *      token pelanggan A bisa dipakai membayar tagihan pelanggan B;
+     *   4. hanya periode berjalan (tagihan mendatang belum boleh ditagih);
+     *   5. catat pembayaran (`recordBatch`, tanpa notifikasi) lalu konsumsi token.
+     *
+     * Notifikasi pop_admin dikirim SETELAH commit. Mengirim notifikasi di dalam
+     * transaksi berarti kegagalan dispatch bisa menahan atau membatalkan transaksi
+     * yang uangnya sudah diterima.
+     *
      * @param  array{idempotency_key: string, rows: array<int, array<string, mixed>>}  $validated
      */
-    protected function recordBatch(User $collector, User $actor, array $validated): JsonResponse
+    protected function recordStaffPortalBatch(StaffPortalToken $token, User $collector, array $validated, CollectorRole $source): JsonResponse
+    {
+        $outcome = DB::transaction(function () use ($token, $collector, $validated, $source) {
+            $locked = StaffPortalToken::query()->whereKey($token->id)->lockForUpdate()->first();
+
+            // expires_at ikut dicek DI BAWAH lock: middleware sudah mengecek sebelum
+            // transaksi, tapi token bisa lewat TTL saat request antre. Tanpa ini
+            // batch tetap diproses setelah token kedaluwarsa.
+            if (! $locked || $locked->consumed_at !== null || $locked->expires_at->isPast()) {
+                abort(401, 'Token staf tidak valid, sudah dipakai, atau sudah kedaluwarsa.');
+            }
+
+            $customer = Customer::findOrFail($locked->customer_id);
+            $this->assertStaffPortalAuthorized($collector, $customer);
+
+            $rowInvoiceIds = array_column($validated['rows'], 'invoice_id');
+
+            $foreignIds = Invoice::query()
+                ->whereIn('id', $rowInvoiceIds)
+                ->where('customer_id', '!=', $customer->id)
+                ->pluck('id')
+                ->all();
+
+            if ($foreignIds !== []) {
+                return ['response' => $this->staffPortalRejection(array_map(fn ($id) => [
+                    'invoice_id' => $id,
+                    'reason' => 'Tagihan ini bukan milik pelanggan pada QR yang discan.',
+                ], $foreignIds))];
+            }
+
+            $futureInvoices = Invoice::query()
+                ->whereIn('id', $rowInvoiceIds)
+                ->where('billing_period', '>', now()->format('Y-m'))
+                ->get(['id', 'invoice_number']);
+
+            if ($futureInvoices->isNotEmpty()) {
+                return ['response' => $this->staffPortalRejection($futureInvoices->map(fn (Invoice $invoice) => [
+                    'invoice_id' => $invoice->id,
+                    'reason' => "{$invoice->invoice_number}: periode tagihan belum berjalan.",
+                ])->values()->all())];
+            }
+
+            $response = $this->recordBatch($collector, $collector, $validated, $source, notify: false);
+            $payload = $response->getData(true);
+
+            $recorded = ($payload['success'] ?? false) === true && ($payload['already_processed'] ?? false) === false;
+            if ($recorded) {
+                $locked->consume();
+            }
+
+            return ['response' => $response, 'recorded' => $recorded, 'results' => $payload['results'] ?? []];
+        });
+
+        if ($outcome['recorded'] ?? false) {
+            app(CollectorPaymentService::class)->notifyPopAdmins($collector, $outcome['results']);
+        }
+
+        return $outcome['response'];
+    }
+
+    /**
+     * Resolve QR `$code` → `Customer`, DAN pastikan itu pelanggan yang SAMA dengan
+     * yang tertaut ke `$token`. Token diterbitkan untuk satu pelanggan; `$code` di
+     * URL hanya bukti halaman Portal masih benar, bukan sumber identitas. Mencegah
+     * staf menukar `code` di URL untuk memakai token pelanggan A ke pelanggan B.
+     */
+    protected function resolveStaffPortalCustomer(StaffPortalToken $token, string $code): Customer
+    {
+        [$rawToken, $signature] = array_pad(explode('.', $code, 2), 2, '');
+        $resolution = app(CustomerQrTokenService::class)->resolve($rawToken, $signature);
+
+        if ($resolution['status'] !== 'success' || (int) $resolution['qrToken']->customer_id !== $token->customer_id) {
+            abort(404);
+        }
+
+        return Customer::findOrFail($token->customer_id);
+    }
+
+    /**
+     * Izin `kolektor.pay` DAN `kolektor.qr.pay` + POP scope pelanggan. Dicek ulang
+     * di setiap request Portal, karena token berumur 15 menit dan izin bisa dicabut
+     * di antaranya.
+     *
+     * Dua permission sengaja dipasang bersama: `kolektor.qr.pay` memang terpisah
+     * dari `kolektor.pay` (lihat QrScanController), tapi jalur web teknisi digerbang
+     * `kolektor.pay`. Dengan syarat ganda, mencabut salah satunya langsung
+     * menutup jalur QR juga — dulu hanya `kolektor.qr.pay` yang dicek di sini.
+     */
+    protected function assertStaffPortalAuthorized(User $user, Customer $customer): void
+    {
+        abort_unless(
+            $user->hasPermission('kolektor.pay') && $user->hasPermission('kolektor.qr.pay'),
+            403,
+            'Izin pembayaran QR Anda sudah dicabut.'
+        );
+
+        $access = app(EffectiveAccessService::class);
+        $inScope = $access->hasAllPopAccess($user)
+            || in_array((int) $customer->pop_id, $access->getAllowedPopIds($user), true);
+
+        abort_unless($inScope, 403, 'Pelanggan ini di luar POP scope Anda.');
+    }
+
+    /**
+     * @param  array<int, array{invoice_id: mixed, reason: string}>  $failures
+     */
+    private function staffPortalRejection(array $failures): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Batch ditolak — ada baris tidak valid. Tidak ada payment yang tersimpan.',
+            'failures' => $failures,
+        ], 422);
+    }
+
+    /**
+     * @param  array{idempotency_key: string, rows: array<int, array<string, mixed>>}  $validated
+     */
+    protected function recordBatch(User $collector, User $actor, array $validated, CollectorRole $source = CollectorRole::KOLEKTOR, bool $notify = true): JsonResponse
     {
         $service = app(CollectorPaymentService::class);
 
@@ -91,7 +239,7 @@ trait RecordsCollectorBatch
             ]);
         }
 
-        $failures = $service->validateRows($collector, $validated['rows'], $actor);
+        $failures = $service->validateRows($collector, $validated['rows'], $actor, $source);
 
         if ($failures !== []) {
             return response()->json([
@@ -106,9 +254,35 @@ trait RecordsCollectorBatch
                 $collector,
                 $actor,
                 $validated['idempotency_key'],
-                $validated['rows']
+                $validated['rows'],
+                $source
             );
         } catch (\Throwable $e) {
+            // Dua submit paralel dengan idempotency_key sama: yang kalah kena unique
+            // violation, padahal batch pemenangnya sudah tercatat. Balas seperti
+            // replay, jangan "gagal" (kolektor bisa membayar ulang secara manual).
+            $winner = $service->findProcessedBatch($validated['idempotency_key']);
+            if ($winner) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Batch ini sudah pernah diproses sebelumnya — tidak diproses ulang.',
+                    'batch_id' => $winner->id,
+                    'already_processed' => true,
+                ]);
+            }
+
+            // Pesan SQL mentah jangan sampai ke klien. Hanya error domain (mis.
+            // "tagihan sudah lunas") yang pesannya ditampilkan.
+            if ($e instanceof QueryException) {
+                report($e);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Batch ditolak karena gangguan sistem. Silakan coba lagi.',
+                    'failures' => [['reason' => 'Gangguan sistem, belum ada pembayaran yang tersimpan.']],
+                ], 422);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Batch ditolak: '.$e->getMessage(),
@@ -130,7 +304,11 @@ trait RecordsCollectorBatch
         // yang boleh membuat response jadi "gagal". Kalau notifikasi ikut
         // dijaga try, satu exception dispatch dijawab 422 sementara uangnya
         // sudah tercatat — dan retry kolektor menyimpan payment kedua.
-        $service->notifyPopAdmins($collector, $outcome['results']);
+        // `$notify = false` dipakai jalur Portal (recordStaffPortalBatch): notifikasi
+        // dikirim SETELAH transaksi kunci-token commit, bukan di dalamnya.
+        if ($notify) {
+            $service->notifyPopAdmins($collector, $outcome['results']);
+        }
 
         return response()->json([
             'success' => true,

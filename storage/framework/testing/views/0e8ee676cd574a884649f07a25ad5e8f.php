@@ -297,14 +297,13 @@
                         
                         <div class="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-border/40 text-[10px]">
                             <template x-if="selected?.no_hp">
-                                <a :href="'https://wa.me/' + selected.no_hp" target="_blank" rel="noopener"
-                                   class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-mono font-bold hover:underline"
-                                   title="Buka WhatsApp">
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-mono font-bold"
+                                      title="Nomor WhatsApp">
                                     <svg class="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
                                     </svg>
                                     <span x-text="selected.no_hp"></span>
-                                </a>
+                                </span>
                             </template>
                             <span class="px-1.5 py-0.5 rounded bg-surface text-text-secondary border border-border font-medium truncate" x-text="selected?.paket || 'Tanpa Paket'"></span>
                             <span class="px-1.5 py-0.5 rounded bg-surface text-text-secondary border border-border font-medium truncate" x-text="(selected?.pop || '—') + ' / ' + (selected?.odp || '—')"></span>
@@ -589,7 +588,7 @@
                                         </svg>
                                         <span class="text-[11px] font-medium text-text-secondary"><span class="font-bold text-sky-600">Pilih file</span> (Maks. 5 file, @5MB)</span>
                                     </div>
-                                    <input type="file" x-ref="fileInput" @change="attachments = Array.from($event.target.files)" multiple accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden">
+                                    <input type="file" x-ref="fileInput" @change="attachments = Array.from($event.target.files)" multiple accept="image/*,application/pdf" class="hidden">
                                 </label>
                                 <p x-show="attachments.length > 0" x-cloak class="text-[10px] text-text-muted font-mono" x-text="attachments.length + ' file dipilih'"></p>
                             </div>
@@ -796,8 +795,11 @@
                                             <div class="mt-0.5 flex items-center gap-1.5 text-[11px] font-mono text-text-muted min-w-0">
                                                 <span class="font-bold text-text-secondary truncate" x-text="task.cid"></span>
                                                 <span class="shrink-0">•</span>
-                                                <a :href="'https://wa.me/' + task.customer_phone" target="_blank" rel="noopener"
-                                                   class="text-emerald-600 dark:text-emerald-400 hover:underline truncate" x-text="task.customer_phone"></a>
+                                                <span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold truncate"
+                                                      title="Nomor WhatsApp">
+                                                    <svg class="w-3 h-3 fill-current shrink-0" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+                                                    <span x-text="task.customer_phone"></span>
+                                                </span>
                                             </div>
                                         </template>
                                         <template x-if="task.is_batch">
@@ -912,14 +914,13 @@
                                                             
                                                             <div class="shrink-0 flex items-center gap-2">
                                                                 <template x-if="m.phone && m.phone !== '—'">
-                                                                    <a :href="'https://wa.me/' + m.phone" target="_blank" rel="noopener"
-                                                                       class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 transition-all text-xs font-mono font-bold shadow-2xs"
-                                                                       :title="'WhatsApp ' + m.phone">
+                                                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 text-xs font-mono font-bold shadow-2xs"
+                                                                          title="Nomor WhatsApp">
                                                                         <svg class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                                                                             <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
                                                                         </svg>
                                                                         <span x-text="m.phone"></span>
-                                                                    </a>
+                                                                    </span>
                                                                 </template>
                                                                 <template x-if="!m.phone || m.phone === '—'">
                                                                     <span class="text-text-muted italic text-[11px]">—</span>
@@ -1148,14 +1149,13 @@
                                         
                                         <div class="shrink-0 flex items-center gap-2">
                                             <template x-if="m.phone && m.phone !== '—'">
-                                                <a :href="'https://wa.me/' + m.phone" target="_blank" rel="noopener"
-                                                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 transition-all text-xs font-mono font-bold shadow-2xs"
-                                                   :title="'WhatsApp ' + m.phone">
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 text-xs font-mono font-bold shadow-2xs"
+                                                      title="Nomor WhatsApp">
                                                     <svg class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                                                         <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
                                                     </svg>
                                                     <span x-text="m.phone"></span>
-                                                </a>
+                                                </span>
                                             </template>
                                             <template x-if="!m.phone || m.phone === '—'">
                                                 <span class="text-text-muted italic text-[11px]">—</span>

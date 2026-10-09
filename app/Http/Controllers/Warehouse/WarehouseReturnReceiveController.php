@@ -8,11 +8,14 @@ use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
+use App\Models\DeviceRetrievalLog;
 use App\Models\InventorySerial;
 use App\Models\Item;
+use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
+use App\Support\LikeSearch;
 use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,18 +37,46 @@ class WarehouseReturnReceiveController extends Controller
 {
     use AuthorizesWarehousePop;
 
-    public function index(EffectiveAccessService $access): View
+    public function index(Request $request, EffectiveAccessService $access): View
     {
         $user = auth()->user();
+        $search = LikeSearch::sanitize((string) $request->input('q', ''));
+        $technicianId = $request->input('technician');
 
         $serials = InventorySerial::query()
             ->where('status', SerialStatus::RETURNED->value)
             ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('issued_from_pop_id', $access->getAllowedPopIds($user)))
-            ->with(['item', 'currentTechnician', 'customer', 'issuedFromPop'])
-            ->orderBy('updated_at')
-            ->paginate(25);
+            ->when($technicianId, fn ($q) => $q->where('current_technician_id', $technicianId))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($sub) use ($search) {
+                    $sub->where('serial_number', 'like', "%{$search}%")
+                        ->orWhereHas('item', fn ($i) => $i->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('customer', fn ($c) => $c->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('cid', 'like', "%{$search}%")
+                            ->orWhere('customer_code', 'like', "%{$search}%"));
+                });
+            })
+            ->with([
+                'item',
+                'currentTechnician',
+                'customer',
+                'issuedFromPop',
+                'latestRetrievalLog.task.deviceRetrieval',
+                'latestRetrievalLog.retrievedBy',
+            ])
+            ->orderByDesc('updated_at')
+            ->paginate(25)
+            ->withQueryString();
 
-        return view('warehouse.returns.index', compact('serials'));
+        $technicians = User::whereIn('id', function ($query) use ($access, $user) {
+            $query->select('current_technician_id')
+                ->from('inventory_serials')
+                ->where('status', SerialStatus::RETURNED->value)
+                ->whereNotNull('current_technician_id')
+                ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('issued_from_pop_id', $access->getAllowedPopIds($user)));
+        })->orderBy('name')->get();
+
+        return view('warehouse.returns.index', compact('serials', 'search', 'technicianId', 'technicians'));
     }
 
     public function create(InventorySerial $serial, EffectiveAccessService $access, LegacyDeviceHintService $hints): View|RedirectResponse
@@ -56,7 +87,24 @@ class WarehouseReturnReceiveController extends Controller
             return redirect()->route('warehouse.returns.index')->with('error', "SN {$serial->serial_number} tidak sedang menunggu diterima.");
         }
 
-        $serial->load(['item', 'currentTechnician', 'customer', 'issuedFromPop']);
+        $serial->load([
+            'item',
+            'currentTechnician',
+            'customer.customerTechnicalDetail',
+            'customer.customerAddress',
+            'issuedFromPop',
+            'latestRetrievalLog.task.deviceRetrieval',
+            'latestRetrievalLog.task.completedBy',
+            'latestRetrievalLog.retrievedBy',
+        ]);
+
+        $retrievalLog = $serial->latestRetrievalLog ?? DeviceRetrievalLog::query()
+            ->where('serial_id', $serial->id)
+            ->latest('retrieved_at')
+            ->with(['task.deviceRetrieval', 'task.completedBy', 'retrievedBy', 'customer'])
+            ->first();
+
+        $taskDeviceRetrieval = $retrievalLog?->task?->deviceRetrieval;
 
         $items = Item::active()
             ->where('tracking_type', TrackingType::SERIALIZED->value)
@@ -68,7 +116,7 @@ class WarehouseReturnReceiveController extends Controller
         // membantu staf mengoreksi model "Modem Pelanggan Lama" saat memegang fisiknya.
         $legacyHint = $serial->customer ? $hints->forCustomer($serial->customer) : null;
 
-        return view('warehouse.returns.receive', compact('serial', 'items', 'legacyHint'));
+        return view('warehouse.returns.receive', compact('serial', 'items', 'legacyHint', 'retrievalLog', 'taskDeviceRetrieval'));
     }
 
     public function store(Request $request, InventorySerial $serial, InventoryReassignService $service, EffectiveAccessService $access): RedirectResponse

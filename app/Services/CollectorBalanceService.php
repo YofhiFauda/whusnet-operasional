@@ -83,6 +83,96 @@ class CollectorBalanceService
     }
 
     /**
+     * Status setor seluruh teknisi yang masih memegang uang pembayaran.
+     *
+     * "Belum setor" (PERINGATAN, bukan blokir — keputusan user 2026-10-05):
+     * saldo > 0 dan (ada pembayaran yang `collected_date`-nya sebelum hari ini
+     * ATAU sudah lewat `billing.technician_close_time`). Dengan begitu uang
+     * yang dipegang semalam ikut tertandai walau jam tutup belum lewat.
+     *
+     * `$viewer` (opsional) membatasi hasil ke teknisi yang berbagi cabang dengan
+     * viewer. Tanpa ini, admin cabang A ikut melihat saldo teknisi cabang B —
+     * melanggar aturan POP scope. `null` = pemanggil sistem (mis. jadwal
+     * pengingat) yang memang tanpa batas cabang.
+     *
+     * @return Collection<int, array{user: User, balance: float, oldest_collected_date: ?string, overdue: bool}>
+     */
+    public function technicianSettlementStatus(?User $viewer = null): Collection
+    {
+        $closeTime = (string) config('billing.technician_close_time', '23:59');
+        $pastCloseTime = now()->format('H:i') >= $closeTime;
+        $today = now()->toDateString();
+
+        $technicians = User::query()->technicians()->with('role')->get();
+
+        if ($viewer !== null) {
+            $technicians = $this->techniciansInViewerScope($viewer, $technicians);
+        }
+
+        if ($technicians->isEmpty()) {
+            return collect();
+        }
+
+        // Satu query untuk semua teknisi (bukan satu query per teknisi).
+        $unsettled = Payment::query()
+            ->whereIn('collected_by', $technicians->pluck('id'))
+            ->where('payment_status', PaymentStatus::VALID->value)
+            ->whereNull('collector_deposit_id')
+            ->get(['id', 'collected_by', 'collected_date', 'amount', 'balance_used_amount', 'overpay_amount'])
+            ->groupBy('collected_by');
+
+        return $technicians
+            ->map(function (User $technician) use ($unsettled, $pastCloseTime, $today) {
+                $payments = $unsettled->get($technician->id, collect());
+                $balance = Money::sum($payments->map(fn (Payment $p) => $p->physicalAmount()));
+
+                if (Money::isZero($balance)) {
+                    return null;
+                }
+
+                $oldestDate = $payments->min('collected_date');
+                $oldestDate = $oldestDate ? (string) $oldestDate : null;
+                $overdue = $pastCloseTime || ($oldestDate !== null && $oldestDate < $today);
+
+                return [
+                    'user' => $technician,
+                    'balance' => $balance,
+                    'oldest_collected_date' => $oldestDate,
+                    'overdue' => $overdue,
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * Teknisi yang berbagi cabang dengan viewer. Viewer ber-akses semua cabang
+     * melihat semua. Teknisi ber-akses semua cabang selalu terlihat, karena dia
+     * bekerja di cabang viewer juga.
+     *
+     * @param  Collection<int, User>  $technicians
+     * @return Collection<int, User>
+     */
+    private function techniciansInViewerScope(User $viewer, Collection $technicians): Collection
+    {
+        $access = app(EffectiveAccessService::class);
+
+        if ($access->hasAllPopAccess($viewer)) {
+            return $technicians;
+        }
+
+        $viewerPops = $access->getAllowedPopIds($viewer);
+
+        return $technicians->filter(function (User $technician) use ($access, $viewerPops) {
+            if ($access->hasAllPopAccess($technician)) {
+                return true;
+            }
+
+            return array_intersect($access->getAllowedPopIds($technician), $viewerPops) !== [];
+        })->values();
+    }
+
+    /**
      * Total Kurang Setor yang belum ditutup.
      */
     public function outstandingShortfall(User $collector): float

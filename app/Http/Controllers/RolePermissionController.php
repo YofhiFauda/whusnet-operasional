@@ -6,6 +6,7 @@ use App\Models\Feature;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\EffectiveAccessService;
 use App\Services\RoleManagementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,6 +83,24 @@ class RolePermissionController extends Controller
             'permissions' => 'array',
             'permissions.*' => 'exists:permissions,id',
         ]);
+
+        // Guard 3: izin yang BARU ditambahkan ke role harus sudah dipegang actor sendiri.
+        // Guard 1 cuma membatasi role mana yang boleh dikelola — tanpa ini, NOC yang
+        // boleh mengelola role lain bisa memberi role itu izin yang NOC sendiri tidak punya.
+        // Izin yang sudah ada tidak dicek ulang: kalau dicabut, itu bukan eskalasi.
+        $oldPermissionIds = $role->permissions()->pluck('permissions.id')->all();
+        // Set yang DIPERIKSA = set yang akan TERSIMPAN (termasuk `.view` induk hasil
+        // auto-grant), bukan cuma input — `.view` itu juga izin yang diberikan.
+        $requestedPermissionIds = $roleManagementService->withAutoViewGrants($request->input('permissions', []));
+        // filter(): izin legacy tanpa `code` (skema lama) tidak punya kode yang bisa dicek.
+        $addedPermissionCodes = Permission::whereIn('id', array_diff($requestedPermissionIds, $oldPermissionIds))
+            ->pluck('code')
+            ->filter()
+            ->all();
+
+        if (! app(EffectiveAccessService::class)->canGrantPermissionCodes($currentUser, $addedPermissionCodes)) {
+            return back()->with('error', 'Matriks ini memuat izin yang belum Anda miliki sendiri — tidak bisa Anda berikan ke role lain.');
+        }
 
         $roleManagementService->syncPermissions($role, $request->input('permissions', []));
 

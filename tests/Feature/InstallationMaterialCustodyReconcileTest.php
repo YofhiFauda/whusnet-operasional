@@ -390,4 +390,40 @@ class InstallationMaterialCustodyReconcileTest extends TestCase
         $custody = TechnicianCustody::where('technician_id', $technician->id)->where('item_id', $kabel->id)->firstOrFail();
         $this->assertEquals(5, $custody->qty_remaining, 'custody TIDAK ikut kepotong sebagian — rollback bersih');
     }
+
+    /**
+     * Perangkat Pasif di Laporan Pemasangan: kategori & nama barang HANYA yang
+     * dibawa teknisi (custody). Barang master yang tidak dibawa tidak boleh
+     * muncul — kalau muncul, teknisi tidak bisa membedakan yang dibawa dan
+     * tidak. Test ini mengecek data yang dikirim ke combobox lewat render view.
+     */
+    #[Test]
+    public function laporan_pemasangan_pasif_hanya_menampilkan_barang_yang_dibawa_teknisi(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInProgressInstallation();
+
+        $catPasif = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabel = Item::create(['code' => 'KABEL-RC-VIS', 'name' => 'Dropcore Dibawa Visible', 'item_category_id' => $catPasif->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
+
+        $catLain = ItemCategory::where('equipment_class', 'pasif')->where('code', '!=', 'kabel_dropcore')->firstOrFail();
+        $tidakDibawa = Item::create(['code' => 'TIDAK-BAWA-VIS', 'name' => 'Barang Tidak Dibawa Hidden', 'item_category_id' => $catLain->id, 'unit' => 'pcs', 'tracking_type' => 'quantity']);
+
+        $admin = User::factory()->create();
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $kabel, 100, 5000, $admin);
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $tidakDibawa, 10, 5000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [
+            ['item_id' => $kabel->id, 'qty' => 100],
+            ['item_id' => $tidakDibawa->id, 'qty' => 10],
+        ], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$kabel->id => 100, $tidakDibawa->id => 10], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $kabel->id, 'qty' => 20]], $admin);
+
+        $response = $this->actingAs($technician)->get(route('customers.installation.report', $customer->id));
+
+        $response->assertOk();
+        $response->assertSee('Dropcore Dibawa Visible');
+        $response->assertDontSee('Barang Tidak Dibawa Hidden');
+        $response->assertDontSee($catLain->name);
+    }
 }

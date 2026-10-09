@@ -76,9 +76,18 @@ class TaskMaterialService
         $itemId = ! empty($row['item_id']) ? (int) $row['item_id'] : null;
         $item = $itemId ? Item::with('category')->find($itemId) : null;
 
-        // Nama & tipe di-snapshot dari master kalau item terdaftar; kalau tidak
-        // (kasus "lainnya"), pakai isian manual teknisi.
-        $name = trim((string) ($item?->name ?? $row['item_name'] ?? ''));
+        // Kategori barang terdaftar SELALU menang atas kiriman form — form
+        // mengunci kolomnya waktu item master dipilih, tapi POST yang dirakit
+        // tangan tidak. Baris "lainnya" (tanpa item_id) baru boleh menentukan
+        // kategorinya sendiri, dan itu pun harus code yang ada di master.
+        $category = $item?->category
+            ?? ItemCategory::where('code', (string) ($row['item_type'] ?? ''))->first()
+            ?? ItemCategory::where('code', ItemCategory::CODE_LAINNYA)->first();
+
+        // Nama & tipe di-snapshot dari master kalau item terdaftar. Estimasi
+        // survey (kategori saja) tidak punya nama model, jadi namanya diambil
+        // dari kategori; kalau tidak (kasus "lainnya"), pakai isian manual.
+        $name = trim((string) ($item?->name ?? $row['item_name'] ?? $category?->name ?? ''));
 
         if ($name === '') {
             return null;
@@ -89,14 +98,6 @@ class TaskMaterialService
         if ($qty <= 0) {
             return null;
         }
-
-        // Kategori barang terdaftar SELALU menang atas kiriman form — form
-        // mengunci kolomnya waktu item master dipilih, tapi POST yang dirakit
-        // tangan tidak. Baris "lainnya" (tanpa item_id) baru boleh menentukan
-        // kategorinya sendiri, dan itu pun harus code yang ada di master.
-        $category = $item?->category
-            ?? ItemCategory::where('code', (string) ($row['item_type'] ?? ''))->first()
-            ?? ItemCategory::where('code', ItemCategory::CODE_LAINNYA)->first();
 
         // Barang terdaftar: satuan diambil dari master, bukan dari form. Form
         // memang mengunci kolom ini waktu item master dipilih, tapi kalau yang
@@ -154,8 +155,8 @@ class TaskMaterialService
     /**
      * Perbandingan estimasi vs terpakai per barang, buat halaman verifikasi.
      *
-     * Dikelompokkan pakai item_id kalau ada; kalau null (barang "lainnya"),
-     * jatuh ke nama yang di-lowercase supaya "Tray" dan "tray" tetap ketemu.
+     * Dikelompokkan per kategori (item_type); kalau kosong, jatuh ke nama yang
+     * di-lowercase supaya "Tray" dan "tray" tetap ketemu.
      *
      * @return array<int, array{label: string, unit: string, estimasi: float, terpakai: float, selisih: float}>
      */
@@ -166,7 +167,10 @@ class TaskMaterialService
         $grouped = [];
 
         foreach ($rows as $row) {
-            $key = $row->item_id ? 'item:'.$row->item_id : 'name:'.mb_strtolower($row->item_name);
+            // Dibandingkan per KATEGORI: estimasi survey memang cuma kategori,
+            // dan realisasi (model apa pun dari kategori itu) harus bertemu di
+            // baris yang sama. Baris tanpa kategori jatuh ke nama.
+            $key = $row->item_type ? 'cat:'.$row->item_type : 'name:'.mb_strtolower($row->item_name);
 
             if (! isset($grouped[$key])) {
                 $grouped[$key] = [

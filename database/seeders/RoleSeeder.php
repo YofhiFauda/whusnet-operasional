@@ -107,6 +107,21 @@ class RoleSeeder extends Seeder
                 'is_package_restricted' => true,
             ],
             [
+                // Teknisi yang merangkap PIC gudang cabang. Role GLOBAL —
+                // cabang yang dia PIC-i ditentukan tabel `warehouse_pop_pics`
+                // (BUKAN scope POP — scope boleh `all_pop` buat teknisi
+                // keliling). Dilarang bikin 'pic_gudang_jetis'/'pic_gudang_siman'
+                // dsb (role per cabang, lihat CLAUDE.md RBAC). Dihitung sebagai
+                // teknisi lewat Role::TECHNICIAN_CODES. is_system = true
+                // supaya code-nya terkunci (dirujuk konstanta itu).
+                // docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md
+                'code' => 'pic_gudang',
+                'name' => 'Teknisi PIC Gudang',
+                'description' => 'Teknisi lapangan sekaligus PIC gudang cabang',
+                'is_system' => true,
+                'is_package_restricted' => true,
+            ],
+            [
                 'code' => 'sales',
                 'name' => 'Sales',
                 'description' => 'Pemasaran di lapangan',
@@ -130,6 +145,19 @@ class RoleSeeder extends Seeder
                 'code' => 'pop_admin',
                 'name' => 'POP Admin',
                 'description' => 'Administrator Cabang / POP',
+                'is_system' => true,
+            ],
+            [
+                // Dibuat lewat UI Role Matrix (2026-10-02), disalin ke seeder.
+                // Role GLOBAL pemegang operasional gudang Pusat (alur transfer
+                // kirim, approve/reject stock request, lihat harga transfer) —
+                // beda dari 'pic_gudang' (teknisi cabang) & 'pop_admin'
+                // (pemeriksa gudang cabangnya sendiri). is_system = true supaya
+                // code-nya terkunci: RolePermissionSeeder mencari role ini
+                // lewat code.
+                'code' => 'admin_gudang',
+                'name' => 'Admin Gudang',
+                'description' => 'Administrator Gudang Pusat',
                 'is_system' => true,
             ],
             [

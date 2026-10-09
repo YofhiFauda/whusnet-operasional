@@ -10,6 +10,7 @@ use App\Models\Ticket;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Support\IndonesianDate;
+use App\Support\LikeSearch;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -140,7 +141,7 @@ class TicketHistoryController extends Controller
             ])->orWhere('handler', TicketHandler::FOP->value);
         });
 
-        if ($search = trim((string) $request->query('q', ''))) {
+        if ($search = LikeSearch::sanitize((string) $request->query('q', ''))) {
             $query->where(function (Builder $q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
                     ->orWhere('detail_keluhan', 'like', "%{$search}%")

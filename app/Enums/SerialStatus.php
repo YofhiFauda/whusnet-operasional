@@ -45,4 +45,20 @@ enum SerialStatus: string
             self::QUARANTINE => 'Karantina',
         };
     }
+
+    /**
+     * Varian badge (.badge-* di app.css) — satu sumber warna status SN,
+     * dipakai `<x-warehouse.status-badge>` (analisa-ui-ux §U4/V6). Hijau =
+     * sehat & di gudang, biru = sedang mengalir/terpakai normal, kuning =
+     * transisi perlu perhatian, merah = bermasalah/akhir hayat.
+     */
+    public function badgeVariant(): string
+    {
+        return match ($this) {
+            self::AVAILABLE, self::INSTALLED => 'success',
+            self::RECEIVED, self::ISSUED, self::IN_USE => 'info',
+            self::RESERVED, self::TRANSFERRED, self::RETURNED => 'warning',
+            self::DAMAGED, self::LOST, self::SCRAPPED, self::QUARANTINE => 'error',
+        };
+    }
 }

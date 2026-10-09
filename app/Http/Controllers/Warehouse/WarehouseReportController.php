@@ -700,6 +700,7 @@ class WarehouseReportController extends Controller
 
         $itemIds = collect([$receiveByItem, $transferInByItem, $transferOutByItem, $issueByItem])
             ->flatMap(fn ($c) => $c->pluck('item_id'))
+            ->merge(collect($itemIdsEverTouchedByPop)->flatten())
             ->unique();
         $itemsById = Item::query()->whereIn('id', $itemIds)->get()->keyBy('id');
 
@@ -707,9 +708,16 @@ class WarehouseReportController extends Controller
             ->whereIn('id', $scopedPops)
             ->orderBy('type')->orderBy('name')
             ->get()
-            ->map(function (Pop $pop) use ($receive, $transferIn, $transferOut, $issue, $receiveByItem, $transferInByItem, $transferOutByItem, $issueByItem, $itemsById, $stockAsOf, $start, $nextPeriodStart) {
+            ->map(function (Pop $pop) use ($receive, $transferIn, $transferOut, $issue, $receiveByItem, $transferInByItem, $transferOutByItem, $issueByItem, $itemsById, $stockAsOf, $start, $nextPeriodStart, $itemIdsEverTouchedByPop) {
+                // Union pergerakan BULAN INI + item yang PERNAH disentuh di
+                // POP ini (idle stock, gak ada transaksi bulan ini tapi
+                // punya Stok Awal/Akhir) — tanpa union ini, barang yang
+                // nongkrong di rak tanpa pergerakan bulan ini gak akan
+                // pernah muncul sama sekali, Stok Awal-nya keliatan
+                // "selalu kosong" padahal cuma gak keplot.
                 $itemIdsForPop = collect([$receiveByItem, $transferInByItem, $transferOutByItem, $issueByItem])
                     ->flatMap(fn ($c) => $c->filter(fn ($r) => $r->pop_id === $pop->id)->pluck('item_id'))
+                    ->merge($itemIdsEverTouchedByPop[$pop->id] ?? [])
                     ->unique();
 
                 $items = $itemIdsForPop->map(function ($itemId) use ($pop, $receiveByItem, $transferInByItem, $transferOutByItem, $issueByItem, $itemsById, $stockAsOf, $start, $nextPeriodStart) {
@@ -752,6 +760,14 @@ class WarehouseReportController extends Controller
                         $stokAkhirQty = $stokAkhirQty / $meterPerRoll;
                     }
 
+                    // Barang idle (gak ada Stok Awal/Akhir/pergerakan sama
+                    // sekali bulan ini di POP ini) gak usah tampil — sama
+                    // prinsip "item tanpa data gak muncul" kayak export().
+                    $adaData = $stokAwalQty + $receiveQty + $transferInQty + $transferOutQty + $issueQty + $stokAkhirQty > 0;
+                    if (! $adaData) {
+                        return null;
+                    }
+
                     return [
                         'item_id' => $itemId,
                         'item_name' => $item->name,
@@ -776,7 +792,10 @@ class WarehouseReportController extends Controller
                     'items' => $items,
                 ];
             })
-            ->filter(fn ($row) => $row['items']->isNotEmpty() && ($row['receive'] + $row['transfer_in'] + $row['transfer_out'] + $row['issue'] > 0))
+            // Pop ditampilkan kalau ADA item dengan data (movement bulan ini
+            // ATAU idle stock) — bukan cuma movement, biar POP yang stoknya
+            // diam tapi ada Stok Awal/Akhir tetap kebaca.
+            ->filter(fn ($row) => $row['items']->isNotEmpty())
             ->values()
             ->all();
     }
@@ -851,6 +870,19 @@ class WarehouseReportController extends Controller
                 $unitCost = $unitCost !== null ? $unitCost * $meterPerRoll : null;
             }
 
+            // ADHOC-120 Kelompok H6: tandai baris yang di dalamnya ada
+            // laporan rusak/hilang/opname oleh pemegang custody-nya SENDIRI
+            // (`created_by` = `from_technician_id` ADJUSTMENT, lihat
+            // InventoryAdjustmentService::adjustCustody()/adjustSerialStatus()/
+            // adjustRollStatus()) — supaya Pusat memprioritaskan pemeriksaan
+            // (kontrol-anti-manipulasi.md §1, docs/plan/warehouse/
+            // rancangan-teknisi-pic-gudang-cabang.md §10). Granularitas baris
+            // ini agregat per reason+pop+item per periode — flag berarti
+            // "SETIDAKNYA satu transaksi di baris ini dilaporkan sendiri".
+            $hasSelfReportedEntry = $group->contains(
+                fn (InventoryTransaction $r) => $r->from_technician_id !== null && $r->from_technician_id === $r->created_by
+            );
+
             return [
                 'reason' => $category,
                 'reason_label' => $reasonLabels[$category] ?? $category,
@@ -863,6 +895,7 @@ class WarehouseReportController extends Controller
                 'total_qty' => $displayQty,
                 'unit_cost' => $unitCost,
                 'loss_value' => $lossValue,
+                'self_reported' => $hasSelfReportedEntry,
             ];
         })->sortBy('reason_label')->values()->all();
     }

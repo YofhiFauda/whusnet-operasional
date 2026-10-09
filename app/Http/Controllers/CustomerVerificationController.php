@@ -22,6 +22,7 @@ use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
 use App\Services\TeknisiWorkloadService;
 use App\Services\TelegramBotService;
+use App\Support\LikeSearch;
 use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,7 +65,7 @@ class CustomerVerificationController extends Controller
         // dijadwalkan buat dirinya — bukan seluruh antrean verifikasi/pemasangan.
         // NOC/FOP/Admin/Owner (hasFullAccess) tetap liat semua buat supervisi.
         // Lihat catatan sama di CustomerSurveyController::index().
-        if (! auth()->user()->hasFullAccess() && auth()->user()->hasRole('teknisi')) {
+        if (! auth()->user()->hasFullAccess() && auth()->user()->isTechnician()) {
             $query->whereHas('tasks', function ($q) {
                 $q->where('task_type', TaskType::PEMASANGAN->value)
                     ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', auth()->id()));
@@ -72,7 +73,7 @@ class CustomerVerificationController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = LikeSearch::sanitize((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
                     ->orWhere('id_number', 'like', "%{$search}%")
@@ -117,7 +118,7 @@ class CustomerVerificationController extends Controller
 
         $this->authorizeCustomerPopScope($user, $customer);
 
-        if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+        if (! $user->hasFullAccess() && $user->isTechnician()) {
             $isAssigned = Task::where('customer_id', $customer->id)
                 ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
                 ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id))
@@ -171,7 +172,7 @@ class CustomerVerificationController extends Controller
         // #1). Dicek ke task SURVEY *atau* PEMASANGAN karena halaman ini
         // dipakai buat pelanggan di berbagai tahap (waiting_acc s/d
         // verification_admin) — task yang relevan beda-beda tergantung tahap.
-        if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+        if (! $user->hasFullAccess() && $user->isTechnician()) {
             $isAssigned = Task::where('customer_id', $customer->id)
                 ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
                 ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id))

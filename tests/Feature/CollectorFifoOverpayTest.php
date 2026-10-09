@@ -8,7 +8,6 @@ use App\Models\CustomerAddress;
 use App\Models\CustomerService;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
-use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -152,14 +151,14 @@ class CollectorFifoOverpayTest extends TestCase
         $this->assertSame(0.0, app(CustomerBalanceService::class)->balance($this->customer));
     }
 
-    public function test_500k_across_two_invoices_settles_both_and_credits_remainder_as_balance(): void
+    public function test_500k_across_two_invoices_is_rejected_whole_because_overpay_is_not_allowed_in_batch(): void
     {
         $sept = $this->unpaidInvoice('INV-FIFO-SEP2', '2026-09');
         $okt = $this->unpaidInvoice('INV-FIFO-OKT2', '2026-10');
 
-        // Kolektor mengetik total 500k tersebar FIFO: Sept dapat pas 150k,
-        // sisanya (350k) dikirim di baris Okt — server yang memisah
-        // 150k penutup + 200k overpay, bukan klien.
+        // Kolektor mengetik total 500k tersebar FIFO. Baris Okt (350k) melebihi
+        // sisanya (150k): batch ditolak seluruhnya, tidak ada yang tersimpan,
+        // dan kelebihan hanya bisa dicatat lewat Tagihan admin.
         $response = $this->actingAs($this->kolektor)->postJson(route('collector-worklist.pay'), [
             'idempotency_key' => 'fifo-500k',
             'rows' => [
@@ -168,41 +167,34 @@ class CollectorFifoOverpayTest extends TestCase
             ],
         ]);
 
-        $response->assertOk();
-
-        $sept->refresh();
-        $okt->refresh();
-        $this->assertSame('lunas', $sept->invoice_status->value);
-        $this->assertSame('lunas', $okt->invoice_status->value);
-
-        $oktPayment = Payment::where('invoice_id', $okt->id)->firstOrFail();
-        $this->assertSame('150000.00', $oktPayment->amount);
-        $this->assertSame('200000.00', $oktPayment->overpay_amount);
-
-        $this->assertSame(200000.0, app(CustomerBalanceService::class)->balance($this->customer));
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertSame('belum_dibayar', $sept->fresh()->invoice_status->value);
+        $this->assertSame('belum_dibayar', $okt->fresh()->invoice_status->value);
+        $this->assertSame(0.0, app(CustomerBalanceService::class)->balance($this->customer));
     }
 
-    public function test_batch_stays_atomic_and_idempotent_with_overpay_row(): void
+    public function test_batch_stays_atomic_and_idempotent_with_exact_row(): void
     {
         $sept = $this->unpaidInvoice('INV-FIFO-SEP3', '2026-09');
 
         $payload = [
             'idempotency_key' => 'fifo-idem-1',
             'rows' => [
-                ['invoice_id' => $sept->id, 'amount' => 200000, 'payment_method' => 'cash', 'collected_date' => '2026-10-05'],
+                ['invoice_id' => $sept->id, 'amount' => 150000, 'payment_method' => 'cash', 'collected_date' => '2026-10-05'],
             ],
         ];
 
         $first = $this->actingAs($this->kolektor)->postJson(route('collector-worklist.pay'), $payload);
         $first->assertOk();
         $this->assertDatabaseCount('payments', 1);
-        $this->assertSame(50000.0, app(CustomerBalanceService::class)->balance($this->customer));
+        $this->assertSame(0.0, app(CustomerBalanceService::class)->balance($this->customer));
 
         // Submit ulang dengan idempotency_key sama — tidak dobel kredit saldo.
         $second = $this->actingAs($this->kolektor)->postJson(route('collector-worklist.pay'), $payload);
         $second->assertOk();
         $second->assertJson(['already_processed' => true]);
         $this->assertDatabaseCount('payments', 1);
-        $this->assertSame(50000.0, app(CustomerBalanceService::class)->balance($this->customer));
+        $this->assertSame(0.0, app(CustomerBalanceService::class)->balance($this->customer));
     }
 }

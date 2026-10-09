@@ -344,7 +344,7 @@ unset($__errorArgs, $__bag); ?>
             ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
             <?php echo $__env->make('verifications.partials.work-tools', [
-                'title' => 'Alat Kerja Dicatat Surveyor',
+                'title' => 'Alat Kerja Opsional · Survey',
                 'rows' => $surveyWorkTools,
             ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
@@ -692,7 +692,7 @@ unset($__errorArgs, $__bag); ?>
             <?php endif; ?>
 
             <?php echo $__env->make('verifications.partials.work-tools', [
-                'title' => 'Alat Kerja Dipakai Tim Pemasangan',
+                'title' => 'Alat Kerja Opsional · Pemasangan',
                 'rows' => $installationWorkTools,
             ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 

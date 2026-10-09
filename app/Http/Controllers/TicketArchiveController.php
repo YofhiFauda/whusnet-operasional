@@ -6,6 +6,7 @@ use App\Enums\TaskType;
 use App\Enums\TicketBucket;
 use App\Models\Pop;
 use App\Models\Ticket;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 
 /**
@@ -74,7 +75,7 @@ abstract class TicketArchiveController extends Controller
             ])
             ->withCount('attachments');
 
-        if ($search = $request->query('q')) {
+        if ($search = LikeSearch::sanitize((string) $request->query('q', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
                     ->orWhere('detail_keluhan', 'like', "%{$search}%")

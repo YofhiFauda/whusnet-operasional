@@ -220,9 +220,12 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->post(route('warehouse.returns.receive.store', $serial), ['condition' => 'used_good', 'estimated_value' => ''])
             ->assertSessionHasNoErrors();
 
+        // ADHOC-108: baris Tahap 1 (Cabang terima dari teknisi) TIDAK LAGI
+        // ber-`to_pop_id` — ambil baris RETURN TERAKHIR (bukan filter
+        // to_pop_id) buat cek nilai taksiran observasi awal Cabang.
         $received = InventoryTransaction::where('serial_id', $serial->id)
             ->where('type', InventoryTransactionType::RETURN->value)
-            ->whereNotNull('to_pop_id')
+            ->latest('id')
             ->firstOrFail();
 
         $this->assertNull($received->unit_price_snapshot);
@@ -238,10 +241,11 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->post(route('warehouse.returns.receive.store', $serial), ['condition' => 'used_good', 'estimated_value' => '1.250.000'])
             ->assertSessionHasNoErrors();
 
-        // Tipe RETURN saja — baris RECEIVE pengadaan awal SN juga ber-`to_pop_id`.
+        // Tipe RETURN saja, baris TERAKHIR (Tahap 1 Cabang) — ADHOC-108: gak
+        // ada lagi `to_pop_id` di baris ini (lihat catatan test di atas).
         $received = InventoryTransaction::where('serial_id', $serial->id)
             ->where('type', InventoryTransactionType::RETURN->value)
-            ->whereNotNull('to_pop_id')
+            ->latest('id')
             ->firstOrFail();
         $this->assertEquals(1250000.0, (float) $received->unit_price_snapshot);
     }
@@ -406,8 +410,13 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->assertDontSee('Siti Masih Aktif');
     }
 
+    /**
+     * ADHOC-108 (2026-10-08): walk-in juga wajib verifikasi Pusat sekarang —
+     * mendarat di state YANG SAMA dengan Tahap 1 DEAC (`RETURNED`, BUKAN
+     * `AVAILABLE`), menunggu Tahap 2/3 (`WarehouseReturnToPusatTest`).
+     */
     #[Test]
-    public function modem_diantar_pelanggan_langsung_masuk_stok_gudang_dengan_riwayat_dan_flag_alat(): void
+    public function modem_diantar_pelanggan_mendarat_transit_menunggu_pusat_dengan_riwayat_dan_flag_alat(): void
     {
         $serial = $this->makeInstalledSerial('WI-SN-001');
 
@@ -417,14 +426,16 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $serial->refresh();
-        $this->assertEquals(SerialStatus::AVAILABLE, $serial->status);
+        $this->assertEquals(SerialStatus::RETURNED, $serial->status);
         $this->assertEquals($this->cabang->id, $serial->current_pop_id);
+        $this->assertNull($serial->current_technician_id);
         $this->assertNull($serial->customer_id);
         $this->assertEquals(ItemCondition::USED_GOOD, $serial->condition);
-        $this->assertTrue($serial->isClearedForIssue());
+        $this->assertNull($serial->condition_checked_at);
+        $this->assertFalse($serial->isClearedForIssue());
 
         $ledger = InventoryTransaction::where('serial_id', $serial->id)->where('type', InventoryTransactionType::RETURN->value)->firstOrFail();
-        $this->assertEquals($this->cabang->id, $ledger->to_pop_id);
+        $this->assertNull($ledger->to_pop_id);
         $this->assertEquals(200000.0, (float) $ledger->unit_price_snapshot);
 
         $log = DeviceRetrievalLog::where('serial_id', $serial->id)->firstOrFail();
@@ -448,7 +459,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $serial = InventorySerial::where('serial_number', 'LEGACY-WI-9')->firstOrFail();
-        $this->assertEquals(SerialStatus::AVAILABLE, $serial->status);
+        $this->assertEquals(SerialStatus::RETURNED, $serial->status);
         $this->assertEquals($this->modemLegacy->id, $serial->item_id);
         $this->assertStringContainsString('SN pelanggan lama', (string) InventoryTransaction::where('serial_id', $serial->id)->value('notes'));
     }

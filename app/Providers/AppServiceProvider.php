@@ -12,6 +12,7 @@ use App\Models\FopTask;
 use App\Models\InventoryTransaction;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Pop;
 use App\Models\Task;
 use App\Observers\CustomerBalanceMutationObserver;
 use App\Observers\CustomerObserver;
@@ -22,6 +23,7 @@ use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TaskObserver;
 use App\Policies\TaskPolicy;
+use App\Services\EffectiveAccessService;
 use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -314,7 +316,7 @@ class AppServiceProvider extends ServiceProvider
                             $q->where('status', 'waiting_survey')->orWhere('status', 'survey_in_progress');
                         });
 
-                    if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+                    if (! $user->hasFullAccess() && $user->isTechnician()) {
                         $surveyQuery->whereHas('tasks', function ($q) use ($user) {
                             $q->where('task_type', TaskType::SURVEY->value)
                                 ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id));
@@ -338,7 +340,7 @@ class AppServiceProvider extends ServiceProvider
                     $verificationQuery = Customer::applyUserScope($user)
                         ->whereIn('status', $statuses);
 
-                    if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+                    if (! $user->hasFullAccess() && $user->isTechnician()) {
                         $verificationQuery->whereHas('tasks', function ($q) use ($user) {
                             $q->where('task_type', TaskType::PEMASANGAN->value)
                                 ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id));
@@ -353,6 +355,37 @@ class AppServiceProvider extends ServiceProvider
                 ->with('badge_verification_count', $verificationCount)
                 ->with('badge_registration_verification_count', $registrationVerificationCount)
                 ->with('badge_creq_billing_verification_count', $creqBillingVerificationCount);
+        });
+
+        // Konteks cabang global gudang (analisa-ui-ux-warehouse.md §S1) — chip
+        // switcher + badge "Menampilkan: Cabang X" di header SATU-SATUNYA
+        // (`x-warehouse.header`), dipasok lewat composer biar SEMUA halaman
+        // gudang (bukan cuma yang listing) otomatis dapat tanpa controller-nya
+        // masing-masing diubah. Pilihan aktif dibaca dari session yang ditulis
+        // `WarehouseSwitchPopController` — composer ini CUMA baca, gak nulis.
+        View::composer('components.warehouse.header', function ($view) {
+            $pops = collect();
+            $selectedPopId = null;
+
+            if (auth()->check()) {
+                $user = auth()->user();
+                $access = app(EffectiveAccessService::class);
+
+                $pops = Pop::query()
+                    ->warehouse()
+                    ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
+                    ->orderBy('type')->orderBy('name')
+                    ->get();
+
+                $sessionPopId = session('warehouse.pop_id');
+                if ($sessionPopId !== null
+                    && ($access->hasAllPopAccess($user) || in_array((int) $sessionPopId, $access->getAllowedPopIds($user), true))) {
+                    $selectedPopId = (int) $sessionPopId;
+                }
+            }
+
+            $view->with('warehousePops', $pops)
+                ->with('warehouseSelectedPopId', $selectedPopId);
         });
     }
 }

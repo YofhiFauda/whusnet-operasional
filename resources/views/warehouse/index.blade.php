@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Dasbor & Riwayat Gudang - Whusnet Operasional')
-@section('page_title', 'Dasbor Gudang')
+@section('title', 'Dashboard & Riwayat Gudang - Whusnet Operasional')
+@section('page_title', 'Dashboard Gudang')
 
 @section('content')
 
@@ -21,7 +21,7 @@
 <div class="space-y-6 pb-12">
 
     {{-- Header terpadu (Design System Naked Header) --}}
-    <x-warehouse.header active="dashboard" title="Dasbor & Riwayat Gudang" subtitle="Pusat kendali stok fisik, arus barang harian, custody teknisi, dan buku besar logistik ISP." />
+    <x-warehouse.header active="dashboard" title="Dashboard & Riwayat Gudang" subtitle="Pusat kendali stok fisik, arus barang harian, custody teknisi, dan buku besar logistik ISP." />
 
     {{-- Scope Selector POP (Naked context filter) --}}
     <form action="{{ route('warehouse.index') }}" method="GET" id="scopeForm" class="flex justify-end -mt-2">
@@ -47,6 +47,61 @@
             </div>
         </div>
     </form>
+
+    {{-- ═══════════════════════════════════════════════════════
+         ZONA 0 : PERLU TINDAKAN (analisa-ui-ux §B4/U7)
+         Hierarki dulu: apa yang HARUS dikerjakan sekarang, di atas,
+         dengan tautan langsung. Kalau semua nol → status "aman".
+    ═══════════════════════════════════════════════════════ --}}
+    @php
+        $actions = collect([
+            $stats['low_stock_count'] > 0 ? [
+                'label' => 'Stok Kritis', 'count' => $stats['low_stock_count'], 'unit' => 'item',
+                'desc' => 'Di bawah ambang minimum', 'url' => route('warehouse.stock.index', ['low_stock_only' => 1]),
+            ] : null,
+            ($canViewStockRequest && $stats['pending_stock_request_count'] > 0) ? [
+                'label' => 'Permintaan Stok Pending', 'count' => $stats['pending_stock_request_count'], 'unit' => 'tiket',
+                'desc' => 'Dari cabang, antre di pusat', 'url' => route('warehouse.stock-requests.index'),
+            ] : null,
+            $stats['transit_count'] > 0 ? [
+                'label' => 'Transfer Menunggu Konfirmasi', 'count' => $stats['transit_count'], 'unit' => 'transfer',
+                'desc' => 'Barang dalam perjalanan', 'url' => route('warehouse.transfers.pending'),
+            ] : null,
+            $stats['quarantine_count'] > 0 ? [
+                'label' => 'Karantina', 'count' => $stats['quarantine_count'], 'unit' => 'unit',
+                'desc' => 'Butuh keputusan scrap / kembali vendor', 'url' => route('warehouse.stock.index', ['view' => 'ringkasan']),
+            ] : null,
+        ])->filter()->values();
+    @endphp
+
+    <div class="bg-white dark:bg-slate-800 border {{ $actions->isNotEmpty() ? 'border-amber-200 dark:border-amber-900/60' : 'border-emerald-200 dark:border-emerald-900/60' }} rounded-lg p-4 sm:p-5 shadow-2xs">
+        <div class="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+            <span class="w-2 h-2 rounded-full {{ $actions->isNotEmpty() ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500' }} shrink-0"></span>
+            <h2 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Perlu Tindakan</h2>
+            <span class="ml-auto text-[11.5px] font-semibold {{ $actions->isNotEmpty() ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">
+                {{ $actions->isNotEmpty() ? $actions->count().' hal menunggu' : 'Semua aman' }}
+            </span>
+        </div>
+
+        @if($actions->isEmpty())
+        <p class="pt-3 text-xs text-slate-500 dark:text-slate-400">Tidak ada stok kritis, permintaan pending, transfer tertahan, atau unit karantina dalam cakupan Anda.</p>
+        @else
+        <div class="pt-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+            @foreach($actions as $a)
+            <a href="{{ $a['url'] }}" class="group flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors">
+                <div class="min-w-0">
+                    <div class="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate">{{ $a['label'] }}</div>
+                    <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ $a['desc'] }}</div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="text-xl font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400">{{ $a['count'] }}</span>
+                    <svg class="w-4 h-4 text-amber-500 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </div>
+            </a>
+            @endforeach
+        </div>
+        @endif
+    </div>
 
     {{-- ═══════════════════════════════════════════════════════
          ZONA 1 : 5 METRIC KPI CARDS (Design System Type C)

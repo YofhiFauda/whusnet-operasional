@@ -136,6 +136,25 @@
                                          Pengecekannya ada di collector-pay-script. --}}
                                     <input type="text" inputmode="decimal" data-rupiah data-max="{{ (float) $invoice->remaining_amount }}" value="{{ \App\Helpers\FormatHelper::rupiahInput($invoice->remaining_amount) }}" class="cb-amount w-full xl:w-32 2xl:w-36 font-mono text-xs pl-6 pr-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                                 </div>
+                                @php($balanceCustomer = (float) ($customerBalances[$invoice->customer_id] ?? 0))
+                                @if ($balanceCustomer > 0)
+                                    {{-- Pola sama dengan form Bayar admin: satu input nominal saja kecuali
+                                         kasir mencentang "Pakai saldo". Saat dicentang, saldo terisi
+                                         otomatis = min(saldo, sisa) dan nominal tunai menyesuaikan. --}}
+                                    <label class="flex items-start gap-1.5 text-[11px] leading-tight text-sky-700 dark:text-sky-400 font-medium cursor-pointer max-w-[11rem]" title="Saldo pelanggan tersedia: Rp {{ number_format($balanceCustomer, 0, ',', '.') }}">
+                                        <input type="checkbox" class="cb-use-saldo mt-px rounded border-sky-300 text-sky-600 focus:ring-sky-500 w-3.5 h-3.5 shrink-0">
+                                        <span>Pakai saldo <span class="font-mono font-semibold">{{ number_format($balanceCustomer, 0, ',', '.') }}</span></span>
+                                    </label>
+                                    <div class="cb-saldo-wrap hidden relative">
+                                        <span class="absolute left-2 top-2 text-xs font-semibold text-slate-400">Rp</span>
+                                        {{-- Diisi cbAutoFillSaldo(). data-balance = saldo utuh pelanggan (dibagi
+                                             antar baris satu pelanggan di JS), data-max = min(saldo, sisa). --}}
+                                        <input type="text" inputmode="decimal" data-rupiah data-balance="{{ $balanceCustomer }}" data-max="{{ min($balanceCustomer, (float) $invoice->remaining_amount) }}" value="0" class="cb-saldo w-full xl:w-32 2xl:w-36 font-mono text-xs pl-6 pr-1.5 py-1.5 border border-sky-200 dark:border-sky-500/30 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                    </div>
+                                @endif
+                                {{-- Pratinjau cicilan / lunas / lebih bayar — diisi cbRefreshHint(), sama
+                                     polanya dengan pratinjau di form Bayar admin. --}}
+                                <p class="cb-hint hidden inline-block text-[10px] leading-tight font-semibold px-1.5 py-0.5 rounded"></p>
                             </div>
                         </td>
 
@@ -151,6 +170,15 @@
                                 {{-- Wajib diisi kalau metode = Lainnya (dicek cbValidateRows()
                                      sebelum submit) — lihat PaymentMethod::requiresDescription(). --}}
                                 <input type="text" placeholder="Metode apa? (mis. OVO)" class="cb-note hidden w-full xl:w-26 2xl:w-28 mt-0.5 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                {{-- Transfer wajib rekening tujuan (Master Rekening Bank) — sama dengan
+                                     form Bayar admin. Nama pengirim opsional, untuk rekonsiliasi. --}}
+                                <select class="cb-bank hidden w-full xl:w-26 2xl:w-28 mt-0.5 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                    <option value="">Pilih rekening</option>
+                                    @foreach ($bankAccounts as $bankAccount)
+                                        <option value="{{ $bankAccount['id'] }}">{{ $bankAccount['name'] }}</option>
+                                    @endforeach
+                                </select>
+                                <input type="text" placeholder="Nama pengirim" maxlength="150" class="cb-sender hidden w-full xl:w-26 2xl:w-28 mt-0.5 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                             </div>
                         </td>
 
@@ -208,4 +236,21 @@
             </button>
         </div>
     </div>
+
+    {{-- Konfirmasi lebih bayar — sama dengan modal di form Bayar admin (ADHOC-84 §2.3).
+         Satu-satunya jeda sadar sebelum kelebihan uang masuk saldo pelanggan. --}}
+    <x-ui.modal name="cb-overpay-confirm" title="Konfirmasi Lebih Bayar" maxWidth="sm">
+        <p class="text-xs text-text-secondary" id="cb-overpay-message"></p>
+
+        <x-slot name="footer">
+            <button type="button" onclick="cbProceedOverpay()"
+                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer">
+                Lanjutkan
+            </button>
+            <button type="button" onclick="cbCancelOverpay()"
+                    class="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-surface-muted cursor-pointer">
+                Batal, Cek Lagi
+            </button>
+        </x-slot>
+    </x-ui.modal>
 @endif

@@ -57,7 +57,7 @@ Dua jalur terpisah, jangan tertukar:
 1. Dari halaman detail pelanggan, admin dengan permission `invoices.create` isi form: periode billing (`Y-m`), tanggal terbit & jatuh tempo, tipe tagihan (awal/bulanan/reaktivasi), biaya tambahan (prorate, kabel, instalasi, tiang — opsional).
 2. Sistem cek: pelanggan harus `active`/`suspended` atau `siap_billing`, punya `customerService` aktif.
 3. Cek dobel: tagihan tipe+periode yang sama utk pelanggan itu belum ada (AWAL & BULANAN boleh bareng di periode sama — kasus reaktivasi).
-4. Submit → nomor invoice sequential (`INV-YYYYMM-NNNN`) di-lock (`lockForUpdate`) biar gak tabrakan nomor pas concurrent.
+4. Submit → nomor invoice sequential (`{PREFIX}-{YYYYMMDD}-{NNNNNN}`, lihat ID_NUMBERING_RULES §16.1) di-lock (`lockForUpdate`) biar gak tabrakan nomor pas concurrent.
 
 ## 6. Tagihan AWAL otomatis (dari verifikasi instalasi)
 

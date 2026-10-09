@@ -101,4 +101,26 @@ class WarehouseHistoryGroupedByDocumentTest extends TestCase
             ->assertSee('Router Single Test')
             ->assertDontSee('Jenis Barang');
     }
+
+    #[Test]
+    public function summary_strip_dan_filter_tipe_berfungsi_dengan_baik(): void
+    {
+        $owner = $this->seedBase();
+
+        $pusat = Pop::create(['code' => 'HGS-PUSAT2', 'pop_code' => 'HGS2', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'Pusat Strip Test', 'type' => 'pusat', 'status' => 'active']);
+
+        $category = ItemCategory::where('code', 'media_converter')->firstOrFail();
+        $router = Item::create(['code' => 'HGS-ROUTER2', 'name' => 'Router Strip Test', 'item_category_id' => $category->id, 'unit' => 'unit', 'tracking_type' => 'quantity']);
+
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $router, 5, 100000, $owner);
+
+        $response = $this->actingAs($owner)->get(route('warehouse.history.index', ['type' => 'receive']));
+
+        $response->assertOk()
+            ->assertSee('Total Transaksi')
+            ->assertSee('Barang Masuk')
+            ->assertSee('Barang Keluar')
+            ->assertSee('Penyesuaian')
+            ->assertSee('Router Strip Test');
+    }
 }

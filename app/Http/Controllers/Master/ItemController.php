@@ -7,6 +7,8 @@ use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Services\MasterRecordRemovalService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,7 +25,7 @@ class ItemController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $type = $request->query('type');
         $status = $request->query('status');
 
@@ -94,6 +96,18 @@ class ItemController extends Controller
         return redirect()
             ->route('master.items.index')
             ->with('success', 'Barang "'.$item->name.'" berhasil diperbarui.');
+    }
+
+    public function destroy(Item $item, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        $deleted = $removal->remove($item, ['is_active' => false]);
+
+        return back()->with(
+            $deleted ? 'success' : 'warning',
+            $deleted
+                ? "Barang \"{$item->name}\" berhasil dihapus."
+                : "Barang \"{$item->name}\" sudah punya riwayat stok/transaksi, jadi hanya dinonaktifkan."
+        );
     }
 
     public function toggleStatus(Item $item): RedirectResponse

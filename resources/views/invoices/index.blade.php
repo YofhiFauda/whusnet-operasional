@@ -156,6 +156,7 @@
                         // Customer) — ambil dari koleksi payments yang sudah dimuat
                         // terurut payment_date ASC, jadi tinggal last().
                         $latestInvoicePayment = $invoice->payments->last();
+                        $lapanganPayment = $invoice->payments->whereNotNull('collected_by')->last();
                     @endphp
                     <tr class="hover:bg-slate-50/45 dark:hover:bg-slate-700/25 transition-colors" id="invoice-row-{{ $invoice->id }}">
                         <td class="px-6 py-3.5 text-center text-slate-400 dark:text-slate-500 data-text">{{ ($invoices->currentPage() - 1) * $invoices->perPage() + $loop->iteration }}</td>
@@ -209,6 +210,12 @@
                             @if($invoice->customer && $invoice->customer->collector_id)
                                 <span class="inline-flex items-center mt-1 px-1.5 py-0.5 text-[9px] font-bold rounded border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20">
                                     Kolektor: {{ $invoice->customer->collector?->name ?? '-' }}
+                                </span>
+                            @endif
+                            {{-- Siapa yang FAKTANYA menagih pembayaran lapangan terakhir (ADHOC-122). --}}
+                            @if($lapanganPayment)
+                                <span class="inline-flex items-center mt-1 px-1.5 py-0.5 text-[9px] font-bold rounded border {{ $lapanganPayment->collected_by_role === \App\Enums\CollectorRole::TEKNISI->value ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20' }}">
+                                    Dibayar {{ $lapanganPayment->collected_by_role === \App\Enums\CollectorRole::TEKNISI->value ? 'Teknisi' : 'Kolektor' }}: {{ $lapanganPayment->collector?->name ?? '-' }}
                                 </span>
                             @endif
                         </td>

@@ -28,15 +28,40 @@
      shortcut per barang (⋮ Aksi Cepat di tabel bawah) TETAP ada, itu
      kontekstual bukan navigasi umum. -->
 
+<!-- Pilihan tampilan: per lot (default) atau ringkasan per item (Fase 3, analisa §U1) -->
+@php
+    $viewToggle = fn (string $mode) => request()->fullUrlWithQuery(['view' => $mode === 'lot' ? null : $mode, 'sort' => null, 'dir' => null, 'page' => null]);
+@endphp
+<div class="flex items-center justify-between gap-3 mb-3">
+    <div class="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold" role="tablist" aria-label="Mode tampilan stok">
+        <a href="{{ $viewToggle('lot') }}" role="tab" aria-selected="{{ $viewMode === 'lot' ? 'true' : 'false' }}"
+           class="px-3.5 py-1.5 rounded-lg transition-all {{ $viewMode === 'lot' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100' }}">Per Lot</a>
+        <a href="{{ $viewToggle('ringkasan') }}" role="tab" aria-selected="{{ $viewMode === 'ringkasan' ? 'true' : 'false' }}"
+           class="px-3.5 py-1.5 rounded-lg transition-all {{ $viewMode === 'ringkasan' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100' }}">Ringkasan per Item</a>
+    </div>
+    @if($viewMode === 'ringkasan')
+    <p class="text-[11.5px] text-slate-500 dark:text-slate-400">Total = semua gudang dalam cakupan Anda. Lot dibuka per baris.</p>
+    @endif
+</div>
+
 <!-- Filter & Search Toolbar Card (Structured & Responsive) -->
 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 mb-5">
     <form method="GET" action="{{ route('warehouse.stock.index') }}" id="stockFilterForm" class="space-y-4">
+        {{-- Mode tampilan ikut terbawa saat filter diganti --}}
+        @if($viewMode === 'ringkasan')
+        <input type="hidden" name="view" value="ringkasan">
+        @endif
+        {{-- Urutan kolom ikut terbawa saat filter diganti (analisa §A5) --}}
+        @if($sort)
+        <input type="hidden" name="sort" value="{{ $sort }}">
+        <input type="hidden" name="dir" value="{{ $sortDirection }}">
+        @endif
         <!-- BARIS 1: Search Bar, Quick Status Pills, & Reset Button -->
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <!-- Cari Cepat (Live Search) -->
             <div class="relative flex-1">
                 <input type="text" name="search" id="search" value="{{ $search }}"
-                       placeholder="Cari Cepat (Nama Barang, Kode SKU, dll)..."
+                       placeholder="Cari nama, kode, SN, nomor roll, atau lot..."
                        class="w-full h-10 pl-10 pr-4 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs">
                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -77,11 +102,11 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <!-- Gudang POP Dropdown -->
             <div>
-                <label for="pop_id" class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                    <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                <label for="pop_id" class="block mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     <span>Gudang POP</span>
                 </label>
-                <select name="pop_id" id="pop_id" onchange="this.form.submit()" class="w-full h-9 px-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs">
+                <select name="pop_id" id="pop_id" onchange="this.form.submit()" class="w-full h-9 px-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs">
                     <option value="">— Semua Gudang Terjangkau —</option>
                     @foreach($pops as $pop)
                     <option value="{{ $pop->id }}" {{ (string) $popFilter === (string) $pop->id ? 'selected' : '' }}>
@@ -93,11 +118,11 @@
 
             <!-- Kategori Dropdown -->
             <div>
-                <label for="category_id" class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                    <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                <label for="category_id" class="block mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
                     <span>Kategori Barang</span>
                 </label>
-                <select name="category_id" id="category_id" onchange="handleStockCategoryChange(this)" class="w-full h-9 px-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs">
+                <select name="category_id" id="category_id" onchange="handleStockCategoryChange(this)" class="w-full h-9 px-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs">
                     <option value="">— Semua Kategori —</option>
                     @foreach($categories as $cat)
                     <option value="{{ $cat->id }}" {{ (string) $categoryFilter === (string) $cat->id ? 'selected' : '' }}>
@@ -109,27 +134,37 @@
 
             <!-- Nama Barang Dropdown -->
             <div>
-                <label for="item_id" class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                    <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <label for="item_id" class="block mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                     <span>Nama Barang</span>
                 </label>
-                <select name="item_id" id="item_id" onchange="this.form.submit()" class="w-full h-9 px-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs">
-                    <option value="">— Semua Barang —</option>
-                    @foreach($items as $item)
-                    <option value="{{ $item->id }}" data-category="{{ $item->item_category_id }}" {{ (string) $itemFilter === (string) $item->id ? 'selected' : '' }}>
-                        {{ $item->name }} ({{ $item->code }})
-                    </option>
-                    @endforeach
-                </select>
+                {{-- Combobox bisa diketik (analisa-ui-ux §A6) — <select> biasa
+                     berat dicari saat master barang ratusan. Opsi sudah di-filter
+                     server menurut kategori; memilih langsung submit form. --}}
+                @php
+                    $itemOptions = collect([['value' => '', 'label' => '— Semua Barang —', 'search' => '']])
+                        ->concat($items->map(fn ($item) => [
+                            'value' => (string) $item->id,
+                            'label' => $item->name.' ('.$item->code.')',
+                            'search' => $item->name.' '.$item->code,
+                        ]))->values();
+                @endphp
+                <x-combobox
+                    id="item_id"
+                    name="item_id"
+                    :options-expr="json_encode($itemOptions)"
+                    :value-expr="json_encode((string) ($itemFilter ?? ''))"
+                    on-select-expr="document.getElementById('stockFilterForm').submit()"
+                    placeholder="Ketik / pilih nama barang..." />
             </div>
 
             <!-- Jenis Tracking Dropdown -->
             <div>
-                <label for="tracking_type" class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                    <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <label for="tracking_type" class="block mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     <span>Jenis Tracking</span>
                 </label>
-                <select name="tracking_type" id="tracking_type" onchange="this.form.submit()" class="w-full h-9 px-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs">
+                <select name="tracking_type" id="tracking_type" onchange="this.form.submit()" class="w-full h-9 px-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-2xs">
                     <option value="">— Semua Jenis —</option>
                     @foreach(\App\Enums\TrackingType::cases() as $type)
                     <option value="{{ $type->value }}" {{ $trackingFilter === $type->value ? 'selected' : '' }}>{{ $type->label() }}</option>
@@ -140,9 +175,45 @@
     </form>
 </div>
 
+@php
+    // Chip filter aktif (analisa §A4) — tiap filter tampil sebagai chip yang
+    // bisa dihapus sendiri, supaya user tahu data sedang terfilter.
+    // Hapus chip = link ke URL yang sama tanpa parameter itu (page ikut
+    // di-reset supaya tidak nyasar ke halaman kosong).
+    $activeChips = collect([
+        $search !== '' ? ['key' => 'search', 'label' => 'Cari: "'.$search.'"'] : null,
+        $popFilter ? ['key' => 'pop_id', 'label' => 'Gudang: '.optional($pops->firstWhere('id', $popFilter))->name] : null,
+        $categoryFilter ? ['key' => 'category_id', 'label' => 'Kategori: '.optional($categories->firstWhere('id', $categoryFilter))->name] : null,
+        $itemFilter ? ['key' => 'item_id', 'label' => 'Barang: '.optional($items->firstWhere('id', $itemFilter))->name] : null,
+        $trackingFilter ? ['key' => 'tracking_type', 'label' => 'Jenis: '.\App\Enums\TrackingType::from($trackingFilter)->label()] : null,
+        $lowStockOnly ? ['key' => 'low_stock_only', 'label' => 'Stok Menipis'] : null,
+    ])->filter()->values();
+@endphp
+
+@if($activeChips->isNotEmpty())
+<div class="flex flex-wrap items-center gap-2 -mt-2 mb-4" aria-label="Filter aktif">
+    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Filter aktif</span>
+    @foreach($activeChips as $chip)
+    <a href="{{ request()->fullUrlWithQuery([$chip['key'] => null, 'page' => null]) }}"
+       class="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors"
+       title="Hapus filter ini">
+        <span>{{ $chip['label'] }}</span>
+        <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-200/70 dark:bg-sky-800 text-sky-800 dark:text-sky-200" aria-hidden="true">
+            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </span>
+        <span class="sr-only">Hapus filter {{ $chip['label'] }}</span>
+    </a>
+    @endforeach
+    <a href="{{ route('warehouse.stock.index') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 underline underline-offset-2 ml-1">Hapus semua</a>
+</div>
+@endif
+
 <!-- Kontainer Utama List Stok Barang -->
 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden" x-data="{}">
-    @if($balances->isEmpty())
+    @if($viewMode === 'ringkasan')
+        {{-- Posisi Stok per item (Fase 3) — rincian lot ada di <details> per baris --}}
+        @include('warehouse.stock.ringkasan')
+    @elseif($balances->isEmpty())
     <div class="p-12 sm:p-16 text-center">
         <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
             <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -159,33 +230,77 @@
     </div>
     @else
 
+    @php
+        // Satu sumber hitung dipakai 2 kali (tabel desktop & card mobile) — analisa §B6.
+        // Sebelumnya tiap blok render punya @php sendiri yang menghitung ulang nilai
+        // yang sama persis dari $balance; kalau rumus diubah di satu blok dan lupa di
+        // blok lain, status "Aman"/"Kritis" bisa beda antara tampilan desktop & mobile
+        // padahal datanya sama. Dihitung sekali di sini, dipakai ulang oleh kedua blok.
+        $rowMeta = $balances->mapWithKeys(function ($balance) use ($lastOpnameByKey, $lastPriceByKey, $multiLotPopItemKeys, $heldByPopItem, $lastActorByKey) {
+            $qty = (float) $balance->qty;
+            $min = (float) ($balance->minimum_stock ?? 0);
+            $opnameKey = $balance->pop_id.'-'.$balance->item_id.'-'.($balance->lot_no ?: '');
+            $priceKey = $balance->item_id.'-'.($balance->lot_no ?: '');
+            $piKey = $balance->pop_id.'-'.$balance->item_id;
+
+            return [$opnameKey => [
+                'isLow' => $balance->isLowStock(),
+                'qty' => $qty,
+                'min' => $min,
+                'trackingType' => $balance->item->tracking_type->value ?? 'quantity',
+                'ratio' => $min > 0 ? min(100, round(($qty / $min) * 100)) : 100,
+                'lastOpnameAt' => isset($lastOpnameByKey[$opnameKey]) ? \Illuminate\Support\Carbon::parse($lastOpnameByKey[$opnameKey]) : null,
+                'lotPrice' => $lastPriceByKey[$priceKey] ?? null,
+                'isMultiLot' => isset($multiLotPopItemKeys[$piKey]),
+                'held' => $heldByPopItem[$piKey] ?? null,
+                'actor' => $lastActorByKey[$piKey] ?? null,
+            ]];
+        });
+    @endphp
+
     <!-- TAMPILAN DESKTOP & LAPTOP: Table View (hidden lg:block) -->
     <div class="hidden lg:block overflow-x-auto scroll-smooth min-h-[300px]">
         <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
             <thead class="bg-slate-50/80 dark:bg-slate-800/60">
                 <tr>
-                    <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gudang POP</th>
-                    <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Detail Barang</th>
-                    <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Jenis &amp; Lot</th>
-                    <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Kesehatan Stok</th>
-                    <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Jumlah Tersedia</th>
+                    @php
+                        // Helper sort header (analisa §A5): klik kolom aktif →
+                        // balik arah; klik kolom lain → mulai naik. Parameter
+                        // filter lain & page ikut terbawa lewat fullUrlWithQuery.
+                        $sortLink = fn (string $key) => request()->fullUrlWithQuery([
+                            'sort' => $key,
+                            'dir' => ($sort === $key && $sortDirection === 'asc') ? 'desc' : 'asc',
+                            'page' => null,
+                        ]);
+                        $ariaSort = fn (string $key) => $sort !== $key ? 'none' : ($sortDirection === 'desc' ? 'descending' : 'ascending');
+                        $sortIcon = fn (string $key) => $sort !== $key ? '↕' : ($sortDirection === 'desc' ? '↓' : '↑');
+                    @endphp
+                    <th scope="col" aria-sort="{{ $ariaSort('pop') }}" class="px-6 py-3.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                        <a href="{{ $sortLink('pop') }}" class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-white">Gudang POP <span class="font-mono {{ $sort === 'pop' ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" aria-hidden="true">{{ $sortIcon('pop') }}</span></a>
+                    </th>
+                    <th scope="col" aria-sort="{{ $ariaSort('item') }}" class="px-6 py-3.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                        <a href="{{ $sortLink('item') }}" class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-white">Detail Barang <span class="font-mono {{ $sort === 'item' ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" aria-hidden="true">{{ $sortIcon('item') }}</span></a>
+                    </th>
+                    <th scope="col" aria-sort="{{ $ariaSort('jenis') }}" class="px-6 py-3.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                        <a href="{{ $sortLink('jenis') }}" class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-white">Jenis &amp; Lot <span class="font-mono {{ $sort === 'jenis' ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" aria-hidden="true">{{ $sortIcon('jenis') }}</span></a>
+                    </th>
+                    <th scope="col" aria-sort="{{ $ariaSort('kesehatan') }}" class="px-6 py-3.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                        <a href="{{ $sortLink('kesehatan') }}" class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-white">Kesehatan Stok <span class="font-mono {{ $sort === 'kesehatan' ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" aria-hidden="true">{{ $sortIcon('kesehatan') }}</span></a>
+                    </th>
+                    <th scope="col" aria-sort="{{ $ariaSort('qty') }}" class="px-6 py-3.5 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                        <a href="{{ $sortLink('qty') }}" class="inline-flex items-center gap-1 justify-end w-full hover:text-slate-900 dark:hover:text-white">Jumlah Tersedia <span class="font-mono {{ $sort === 'qty' ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" aria-hidden="true">{{ $sortIcon('qty') }}</span></a>
+                    </th>
+                    <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Pemegang &amp; Penginput</th>
                     @if($showActionColumn)
-                    <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Aksi</th>
+                    <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Aksi</th>
                     @endif
                 </tr>
             </thead>
             <tbody class="bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
                 @foreach($balances as $balance)
                 @php
-                    $isLow = $balance->isLowStock();
-                    $qty = (float) $balance->qty;
-                    $min = (float) ($balance->minimum_stock ?? 0);
-                    $trackingType = $balance->item->tracking_type->value ?? 'quantity';
-                    $ratio = $min > 0 ? min(100, round(($qty / $min) * 100)) : 100;
-
-                    // Opname terakhir per item per gudang
-                    $opnameKey = $balance->pop_id.'-'.$balance->item_id.'-'.($balance->lot_no ?: '');
-                    $lastOpnameAt = isset($lastOpnameByKey[$opnameKey]) ? \Illuminate\Support\Carbon::parse($lastOpnameByKey[$opnameKey]) : null;
+                    $m = $rowMeta[$balance->pop_id.'-'.$balance->item_id.'-'.($balance->lot_no ?: '')];
+                    ['isLow' => $isLow, 'qty' => $qty, 'min' => $min, 'trackingType' => $trackingType, 'ratio' => $ratio, 'lastOpnameAt' => $lastOpnameAt] = $m;
                 @endphp
                 <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors {{ $isLow ? 'bg-rose-50/25 dark:bg-rose-950/10' : '' }}">
                     <!-- Gudang POP -->
@@ -217,38 +332,37 @@
                         <button type="button"
                             @click="$dispatch('open-serial-modal', { popId: {{ $balance->pop_id }}, itemId: {{ $balance->item_id }}, itemName: @js($balance->item->name), popName: @js($balance->pop->name) })"
                             title="Lihat daftar Serial Number yang tersedia di gudang ini"
-                            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/40 dark:hover:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 cursor-pointer transition-colors">
-                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
-                            <span>SERIAL NUMBER</span>
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/40 dark:hover:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 cursor-pointer transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
+                            <span>Serial Number</span>
                         </button>
-                        <div class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-mono">{{ $qty !== null ? rtrim(rtrim(number_format($qty, 0, ',', '.'), '0'), ',') : 0 }} SN siap</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">{{ $qty !== null ? rtrim(rtrim(number_format($qty, 0, ',', '.'), '0'), ',') : 0 }} SN siap</div>
                         @elseif($trackingType === 'roll')
                         <button type="button"
                             @click="$dispatch('open-roll-modal', { popId: {{ $balance->pop_id }}, itemId: {{ $balance->item_id }}, itemName: @js($balance->item->name), popName: @js($balance->pop->name) })"
                             title="Lihat daftar roll yang tersedia di gudang ini"
-                            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 cursor-pointer transition-colors">
-                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a1 1 0 001-1v-4a1 1 0 00-1-1H9a1 1 0 00-1 1v4a1 1 0 001 1zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                            <span>ROLL KABEL</span>
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 cursor-pointer transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a1 1 0 001-1v-4a1 1 0 00-1-1H9a1 1 0 00-1 1v4a1 1 0 001 1zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                            <span>Roll Kabel</span>
                         </button>
-                        <div class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-mono">Sisa total meter</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">Sisa total meter</div>
                         @else
                         @php
-                            $priceKey = $balance->item_id.'-'.($balance->lot_no ?: '');
-                            $lotPrice = $lastPriceByKey[$priceKey] ?? null;
-                            $isMultiLot = isset($multiLotPopItemKeys[$balance->pop_id.'-'.$balance->item_id]);
+                            $lotPrice = $m['lotPrice'];
+                            $isMultiLot = $m['isMultiLot'];
                         @endphp
-                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                            <span>QUANTITY</span>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <span>Quantity</span>
                         </span>
                         @if($isMultiLot)
-                        <div class="text-[10px] {{ $balance->lot_no ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-slate-400' }} mt-1 font-mono">
+                        <div class="text-xs {{ $balance->lot_no ? 'text-purple-700 dark:text-purple-400 font-semibold' : 'text-slate-500' }} mt-1 font-mono">
                             {{ $balance->lot_no ? 'Harga Baru' : 'Harga Lama' }}
                         </div>
                         @elseif($lotPrice === null)
-                        <div class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Non-serial</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">Non-serial</div>
                         @endif
                         @if($lotPrice !== null)
-                        <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">Rp {{ number_format($lotPrice, 0, ',', '.') }}/{{ $balance->item->unit }}</div>
+                        <div class="text-xs text-slate-600 dark:text-slate-400 mt-0.5 font-mono">Rp {{ number_format($lotPrice, 0, ',', '.') }}/{{ $balance->item->unit }}</div>
                         @endif
                         @endif
                     </td>
@@ -257,23 +371,23 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         @if($isLow)
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
                                 <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
                                 Kritis / Menipis
                             </span>
                         </div>
                         @else
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                 Stok Aman
                             </span>
                         </div>
                         @endif
                         @if($min > 0)
-                        <div class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-mono">Min: {{ rtrim(rtrim(number_format($min, 2, ',', '.'), '0'), ',') }} {{ $trackingType === 'roll' ? 'meter' : $balance->item->unit }}</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">Min: {{ rtrim(rtrim(number_format($min, 2, ',', '.'), '0'), ',') }} {{ $trackingType === 'roll' ? 'meter' : $balance->item->unit }}</div>
                         @endif
-                        <div class="text-[10px] {{ $lastOpnameAt ? 'text-slate-400 dark:text-slate-500' : 'text-amber-500 dark:text-amber-400 font-semibold' }} mt-0.5">
+                        <div class="text-xs {{ $lastOpnameAt ? 'text-slate-500 dark:text-slate-400' : 'text-amber-700 dark:text-amber-400 font-medium' }} mt-0.5">
                             Opname: {{ $lastOpnameAt ? $lastOpnameAt->diffForHumans() : 'Belum pernah' }}
                         </div>
                     </td>
@@ -284,6 +398,22 @@
                             {{ rtrim(rtrim(number_format($qty, 2, ',', '.'), '0'), ',') }}
                         </span>
                         <span class="text-xs font-semibold text-slate-400 ml-0.5">{{ $trackingType === 'roll' ? 'meter' : $balance->item->unit }}</span>
+                    </td>
+
+                    <!-- Pemegang & Penginput (analisa-ui-ux §U3/V4) -->
+                    @php
+                        $held = $m['held'];
+                        $actor = $m['actor'];
+                    @endphp
+                    <td class="px-6 py-4 text-xs text-slate-600 dark:text-slate-400 align-top">
+                        @if($held && $held['qty'] > 0)
+                        <div class="text-[11px]"><span class="font-semibold text-sky-700 dark:text-sky-300">Di teknisi:</span> <span class="font-mono tabular-nums">{{ rtrim(rtrim(number_format($held['qty'], 2, ',', '.'), '0'), ',') }}</span> ({{ $held['techs'] }} teknisi)</div>
+                        @else
+                        <div class="text-[11px] text-slate-400">Semua di gudang</div>
+                        @endif
+                        @if($actor)
+                        <div class="text-[10px] text-slate-400 mt-0.5" title="{{ $actor->created_at?->translatedFormat('d M Y H:i') }}">Diinput {{ $actor->createdBy->name ?? 'Sistem' }} · {{ $actor->created_at?->diffForHumans() }}</div>
+                        @endif
                     </td>
 
                     <!-- Aksi -->
@@ -371,15 +501,8 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             @foreach($balances as $balance)
             @php
-                $isLow = $balance->isLowStock();
-                $qty = (float) $balance->qty;
-                $min = (float) ($balance->minimum_stock ?? 0);
-                $trackingType = $balance->item->tracking_type->value ?? 'quantity';
-                $opnameKey = $balance->pop_id.'-'.$balance->item_id.'-'.($balance->lot_no ?: '');
-                $lastOpnameAt = isset($lastOpnameByKey[$opnameKey]) ? \Illuminate\Support\Carbon::parse($lastOpnameByKey[$opnameKey]) : null;
-                $priceKey = $balance->item_id.'-'.($balance->lot_no ?: '');
-                $lotPrice = $lastPriceByKey[$priceKey] ?? null;
-                $isMultiLot = isset($multiLotPopItemKeys[$balance->pop_id.'-'.$balance->item_id]);
+                $m = $rowMeta[$balance->pop_id.'-'.$balance->item_id.'-'.($balance->lot_no ?: '')];
+                ['isLow' => $isLow, 'qty' => $qty, 'min' => $min, 'trackingType' => $trackingType, 'lastOpnameAt' => $lastOpnameAt, 'lotPrice' => $lotPrice, 'isMultiLot' => $isMultiLot] = $m;
             @endphp
             <div class="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/90 shadow-xs hover:border-sky-300 dark:hover:border-sky-700 transition-all flex flex-col justify-between space-y-3 {{ $isLow ? 'bg-rose-50/20 dark:bg-rose-950/15 border-rose-200 dark:border-rose-900/60' : '' }}">
                 <!-- Header Card: POP + Status Stok + Action Dropdown -->
@@ -458,8 +581,11 @@
                             <span>Lihat Roll</span>
                         </button>
                         @else
+                        {{-- "REGULER" selaras badge tracking_type di form Receive/Transfer/Issue
+                             (analisa-ui-ux §C2) — sebelumnya "QUANTITY", istilah Inggris sendirian
+                             di antara badge lain yang sudah Indonesia. --}}
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                            <span>QUANTITY</span>
+                            <span>REGULER</span>
                         </span>
                         @if($isMultiLot)
                         <span class="text-[10px] {{ $balance->lot_no ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-slate-400' }} font-mono">
@@ -553,12 +679,14 @@
                                     <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
                                         <td class="px-3.5 py-2.5 font-mono font-bold text-slate-700 dark:text-slate-300" x-text="serial.serial_number"></td>
                                         <td class="px-3.5 py-2.5">
-                                            <span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold border"
+                                            {{-- Satu sumber warna: design token .badge-* (analisa-ui-ux §U4/V6),
+                                                 varian & label SAMA dengan <x-warehouse.condition-badge> --}}
+                                            <span class="badge"
                                                 :class="{
-                                                    'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800': serial.condition === 'new',
-                                                    'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800': serial.condition === 'used_damaged',
-                                                    'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800': serial.condition === 'used_good' && serial.condition_checked,
-                                                    'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800': serial.condition === 'used_good' && !serial.condition_checked,
+                                                    'badge-success': serial.condition === 'new',
+                                                    'badge-error': serial.condition === 'used_damaged',
+                                                    'badge-info': serial.condition === 'used_good' && serial.condition_checked,
+                                                    'badge-warning': serial.condition === 'used_good' && !serial.condition_checked,
                                                 }"
                                                 x-text="serial.condition === 'new' ? 'Baru' : (serial.condition === 'used_damaged' ? 'Bekas — Rusak' : (serial.condition_checked ? 'Bekas — Sudah Dicek' : 'Bekas — Belum Dicek'))"></span>
                                         </td>

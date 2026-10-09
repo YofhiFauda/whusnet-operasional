@@ -54,4 +54,36 @@ trait AuthorizesWarehousePop
 
         $this->assertPopInScope(Pop::findOrFail($popId), $user, $access);
     }
+
+    /**
+     * Kelompok H5, docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md
+     * §7.2: begitu cabang sudah punya PIC Gudang aktif, konfirmasi terima
+     * kiriman Pusat→Cabang jadi tugas PIC — `pop_admin` TIDAK LAGI boleh
+     * konfirmasi sendiri (beda dari issue, yang pop_admin tetap boleh asal
+     * ditujukan ke PIC — lihat InventoryIssueService::assertIssueAllowed()).
+     *
+     * @throws HttpException 403
+     */
+    protected function assertPopAdminNotBlockedByActivePicGudang(Pop $pop, User $user): void
+    {
+        if ($user->role?->code === 'pop_admin' && $pop->hasActivePicGudang()) {
+            abort(403, "Gudang {$pop->name} sudah punya PIC Gudang — konfirmasi terima kiriman dilakukan oleh PIC Gudang cabang ini, bukan POP Admin.");
+        }
+    }
+
+    /**
+     * Kelompok H5/H2c: `pic_gudang` cuma boleh bertindak di cabang yang jadi
+     * penunjukannya (`warehouse_pop_pics`) — PENTING buat PIC yang scope-nya
+     * `all_pop` (teknisi keliling), scope mengizinkan dia MELIHAT semua
+     * cabang tapi hak TULIS gudang tetap dibatasi ke cabang penunjukannya
+     * (§5.3.6).
+     *
+     * @throws HttpException 403
+     */
+    protected function assertPicGudangCanActOnPop(Pop $pop, User $user): void
+    {
+        if ($user->role?->code === 'pic_gudang' && ! $user->isPicGudangOf($pop)) {
+            abort(403, "Cabang {$pop->name} bukan gudang yang Anda kelola sebagai PIC Gudang.");
+        }
+    }
 }

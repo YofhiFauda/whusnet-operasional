@@ -13,6 +13,19 @@
         default => 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60',
     };
     $totalMoneyReceived = (float) $payment->amount + (float) $payment->overpay_amount;
+
+    // Label alokasi dana harus ikut JENIS tagihan yang sebenarnya dibayar —
+    // dulu di-hardcode "Pelunasan Tagihan Internet" walau invoice-nya MTN/
+    // OTH/REL (bukan langganan internet sama sekali). Urutan sama dengan
+    // badge jenis tagihan di invoices/show.blade.php: sub-nama manual >
+    // kategori manual > jenis tagihan.
+    $invoiceLabel = $payment->invoice?->manual_subtype_name
+        ?? $payment->invoice?->manual_category?->label()
+        ?? $payment->invoice?->invoice_type?->label()
+        ?? 'Tagihan';
+    $invoiceSubtitle = $payment->invoice?->description
+        ?? $payment->invoice?->internetPackage?->name
+        ?? 'Layanan ISP';
 @endphp
 
 <style>
@@ -336,7 +349,7 @@
                 </div>
                 <div class="mt-1">
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                        {{ $payment->collector ? 'Kolektor Lapangan' : 'Tanpa Kolektor Lapangan' }}
+                        {{ $payment->collector ? ($payment->collected_by_role === \App\Enums\CollectorRole::TEKNISI->value ? 'Teknisi Lapangan' : 'Kolektor Lapangan') : 'Tanpa Kolektor Lapangan' }}
                     </span>
                 </div>
             </div>
@@ -389,8 +402,8 @@
                                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium">
                                         <tr>
                                             <td class="p-3.5">
-                                                <span class="font-bold text-slate-900 dark:text-white block">Pelunasan Tagihan Internet</span>
-                                                <span class="text-[10px] text-slate-400">{{ $payment->invoice->internetPackage->name ?? 'Layanan ISP' }}</span>
+                                                <span class="font-bold text-slate-900 dark:text-white block">Pelunasan {{ $invoiceLabel }}</span>
+                                                <span class="text-[10px] text-slate-400">{{ $invoiceSubtitle }}</span>
                                             </td>
                                             <td class="p-3.5 font-mono text-slate-600 dark:text-slate-400">
                                                 {{ $payment->invoice->invoice_number ?? '-' }}

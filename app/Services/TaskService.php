@@ -44,7 +44,7 @@ class TaskService
                 : TaskStatus::PENDING->value;
 
             $task = Task::create([
-                'task_number' => $this->generateTaskNumber(),
+                'task_number' => app(NumberSequenceService::class)->taskNumber(),
                 'customer_id' => $data['customer_id'] ?? null,
                 'pop_id' => $data['pop_id'],
                 'task_type' => $taskType->value,
@@ -248,8 +248,14 @@ class TaskService
 
     /**
      * Teknisi mulai mengerjakan task.
+     *
+     * `$attendance` diisi cuma oleh jalur absen QR (QrAttendanceService) —
+     * jejak lokasi ditulis di transisi yang SAMA, bukan update terpisah, supaya
+     * task tidak pernah tercatat "in_progress" tanpa jejak asal-mulainya.
+     *
+     * @param  array{started_via?: string, started_latitude?: float|null, started_longitude?: float|null, started_accuracy_meters?: int|null, started_distance_meters?: int|null}  $attendance
      */
-    public function start(Task $task, User $actor): Task
+    public function start(Task $task, User $actor, array $attendance = []): Task
     {
         abort_unless(
             $task->status === TaskStatus::TERJADWAL,
@@ -289,6 +295,7 @@ class TaskService
             // — waktu selesai sesi lama gak boleh kebawa jadi acuan SLA.
             'work_finished_at' => null,
             'updated_by' => $actor->id,
+            ...$attendance,
         ]);
 
         // "Mulai Task" dikasih NAMA, sejajar completed/cancelled/reassigned.
@@ -796,17 +803,6 @@ class TaskService
     }
 
     // ─── Helper ──────────────────────────────────────────────────
-
-    private function generateTaskNumber(): string
-    {
-        $year = date('Y');
-        $count = Task::whereBetween('created_at', [
-            Carbon::createFromDate($year)->startOfYear(),
-            Carbon::createFromDate($year)->endOfYear(),
-        ])->count() + 1;
-
-        return sprintf('TASK-%s-%04d', $year, $count);
-    }
 
     private function notifyTeam(Task $task, string $message, string $eventType = 'created'): void
     {

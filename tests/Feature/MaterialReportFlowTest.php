@@ -122,7 +122,11 @@ class MaterialReportFlowTest extends TestCase
         $rows = TaskMaterial::where('customer_id', $this->customer->id)->estimasi()->get();
 
         $this->assertCount(2, $rows);
-        $this->assertSame('Kabel Dropcore 1 Core', $rows->first()->item_name);
+        // Estimasi itu per kategori: item_id dibuang walau dikirim, nama diambil
+        // dari kategori (bukan nama model master).
+        $this->assertNull($rows->first()->item_id);
+        $this->assertSame('kabel_dropcore', $rows->first()->item_type);
+        $this->assertSame(ItemCategory::where('code', 'kabel_dropcore')->value('name'), $rows->first()->item_name);
         $this->assertSame('meter', $rows->first()->unit);
     }
 

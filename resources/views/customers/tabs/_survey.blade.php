@@ -225,17 +225,17 @@
                         @endif
                     </div>
 
-                    {{-- 2. TABEL ESTIMASI ALAT KERJA (TOOLS SURVEY) --}}
+                    {{-- 2. TABEL ALAT KERJA OPSIONAL (TOOLS SURVEY) --}}
                     <div>
                         <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                            <i class="fa-solid fa-screwdriver-wrench text-indigo-600 mr-1"></i> 2. TABEL ESTIMASI ALAT KERJA YANG PERLU DIBAWA (TOOLS SURVEY)
+                            <i class="fa-solid fa-screwdriver-wrench text-indigo-600 mr-1"></i> 2. TABEL ALAT KERJA OPSIONAL (TOOLS SURVEY)
                         </span>
                         @if($alatSurvey->isNotEmpty())
                             <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
                                 <table class="w-full text-left border-collapse text-xs">
                                     <thead>
                                         <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
-                                            <th class="px-4 py-2">Nama Alat Kerja (Tools)</th>
+                                            <th class="px-4 py-2">Nama Alat Kerja Opsional</th>
                                             <th class="px-4 py-2">Keterangan / Fungsi Utama</th>
                                         </tr>
                                     </thead>
@@ -251,7 +251,7 @@
                             </div>
                         @else
                             <div class="py-5 text-center text-[11px] text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                                Belum ada checklist alat kerja pada FOP Task Survey pelanggan ini.
+                                Belum ada alat kerja opsional yang dicatat pada FOP Task Survey pelanggan ini.
                             </div>
                         @endif
                         {{-- Tabel di atas tidak punya kolom Qty/Satuan: task_work_tools memang

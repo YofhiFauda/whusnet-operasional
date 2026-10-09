@@ -1,99 +1,123 @@
-# WHUSNET Operasional
+<div align="center">
 
-WHUSNET Operasional adalah aplikasi web berbasis Laravel untuk membantu proses administrasi dan monitoring operasional ISP. Project ini berfokus pada pengelolaan data pelanggan, master data layanan, master wilayah, status langganan, dashboard operasional, dan proses import pelanggan.
+# 🌐 WHUSNET Operasional
+### *Platform Manajemen Billing ISP & Operasional Terpadu Berbasis Master Data Pelanggan*
 
-Dokumentasi detail setiap fitur tersedia di folder [docs](docs/README.md).
+[![Laravel](https://img.shields.io/badge/Laravel-13.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com)
+[![PHP](https://img.shields.io/badge/PHP-8.4-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.x-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![WebSockets](https://img.shields.io/badge/Laravel_Reverb-Realtime-4F46E5?style=for-the-badge&logo=socketdotio&logoColor=white)](https://laravel.com/docs/reverb)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
+[![License](https://img.shields.io/badge/License-Proprietary-blue.svg?style=for-the-badge)](LICENSE)
 
-## Gambaran Umum
+<p align="center">
+  <b>WHUSNET Operasional</b> adalah sistem operasional ISP (Internet Service Provider) enterprise internal yang dirancang untuk mengintegrasikan seluruh siklus hidup pelanggan (<i>Customer Lifecycle</i>), verifikasi lapangan, penugasan teknisi FOP, pengelolaan tiket gangguan NOC/Helpdesk, inventaris gudang bertingkat, hingga alur penagihan (<i>billing</i>) dan setoran kas bertingkat.
+</p>
 
-Aplikasi ini dibuat sebagai fondasi sistem operasional ISP dengan modul utama:
+[Fitur Utama](#-fitur-utama-sistem) •
+[Aturan CID & REQ ID](#-aturan-cid--req-id-pelanggan) •
+[Alur Bisnis](#-alur-proses-bisnis-utama) •
+[Peta Modul & Dokumentasi](#-peta-navigasi-modul--tautan-dokumentasi) •
+[Direktori Dokumen](#-direktori-lengkap-dokumentasi-fitur) •
+[Instalasi](#-panduan-instalasi) •
+[Teknologi](#-stack-teknologi)
 
-1. Dashboard operasional untuk melihat ringkasan pelanggan.
-2. Data Pelanggan untuk registrasi, daftar, edit, detail, dan import pelanggan.
-3. Master Wilayah untuk referensi kota, kecamatan, dan desa.
-4. Master Paket Layanan untuk referensi paket internet WHUSNET.
-5. Master Status Langganan untuk workflow status pelanggan.
-6. API penunjang untuk dependent dropdown wilayah dan validasi import pelanggan.
+---
 
-## Teknologi
+</div>
 
-| Komponen | Teknologi |
-| --- | --- |
-| Backend | Laravel 13, PHP 8.3 |
-| Frontend | Blade, Vite, Tailwind CSS |
-| Database | MySQL atau database Laravel yang dikonfigurasi di `.env` |
-| Testing | PHPUnit |
-| Container | Docker, Nginx, PHP-FPM, MySQL, phpMyAdmin |
+## 📌 Filosofi & Prinsip Sistem
 
-## Menu Aplikasi
-
-| Menu | Route | Fungsi | Dokumentasi |
-| --- | --- | --- | --- |
-| Dashboard | `/` | Ringkasan total pelanggan, pelanggan aktif, pending, suspend, distribusi status, kategori paket, dan tren registrasi. | [Dashboard](docs/dashboard/README.md) |
-| Data Pelanggan | `/customers` | Daftar pelanggan dengan search, filter status, filter kecamatan, filter paket, indikator kelengkapan data, dan progress workflow. | [Data Pelanggan](docs/data-pelanggan/README.md) |
-| Tambah Pelanggan | `/customers/create` | Form registrasi pelanggan baru beserta data diri, wilayah, layanan, referral, teknis, dan dokumen. | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
-| Import Pelanggan | `/customers/import` | Import batch pelanggan melalui validasi row, warning, error, dan simpan massal. | [Import Pelanggan](docs/penunjang/import-pelanggan.md) |
-| Detail Pelanggan | `/customers/{customer}` | Detail pelanggan dengan timeline, survey, FOP, pemasangan, aktivasi, teknis, uji layanan, invoice awal, referral, dan timelog. | [Flowchart Data Pelanggan](docs/data-pelanggan/flowchart.md) |
-| Edit Pelanggan | `/customers/{customer}/edit` | Perubahan data pelanggan dan pengelolaan dokumen upload. | [Schema Data Pelanggan](docs/data-pelanggan/database-schema.md) |
-| Master Wilayah | `/master/wilayah` | Referensi kota, kecamatan, desa, dan pencarian wilayah. | [Master Wilayah](docs/master/wilayah.md) |
-| Master Internet Package | `/master/paket` | Daftar paket internet aktif yang dikelompokkan berdasarkan kategori. | [Master Internet Package](docs/master/internet-package.md) |
-| Master Status Langganan | `/master/status-langganan` | Daftar status workflow pelanggan beserta jumlah pelanggan per status. | [Master Status Langganan](docs/master/status-langganan.md) |
-| Master Timeline SLA | `/master/sla-timeline` | Matrix batas waktu wajib mulai ditangani per jenis tiket, beda-beda per paket internet. | [Master Timeline SLA](docs/master/sla-timeline/README.md) |
-| API Kecamatan | `/api/cities/{city}/districts` | Mengambil daftar kecamatan berdasarkan kota. | [API Wilayah](docs/penunjang/api-wilayah.md) |
-| API Desa | `/api/districts/{district}/villages` | Mengambil daftar desa berdasarkan kecamatan. | [API Wilayah](docs/penunjang/api-wilayah.md) |
-
-## Alur Sistem Singkat
+Sistem WHUSNET Operasional menempatkan **Master Data Pelanggan** sebagai pusat dari semua transaksi bisnis operasional ISP:
 
 ```mermaid
-flowchart TD
-    A[Dashboard] --> B[Data Pelanggan]
-    A --> C[Master]
-    B --> D[Registrasi Pelanggan]
-    B --> E[Import Pelanggan]
-    B --> F[Detail Pelanggan]
-    F --> G[Edit Pelanggan]
-    C --> H[Master Wilayah]
-    C --> I[Master Paket Layanan]
-    C --> J[Master Status Langganan]
-    H --> B
-    I --> B
-    J --> B
+flowchart LR
+    CP[Pelanggan Lengkap] --> IP[Paket Layanan]
+    IP --> LA[Layanan Aktif / Siap Billing]
+    LA --> TG[Tagihan / Invoice]
+    TG --> PB[Pembayaran / Kolektor]
+    PB --> SK[Setoran Kas Bertingkat]
+    SK --> LP[Laporan Keuangan & Audit]
 ```
 
-Dokumentasi flowchart lengkap tersedia di [Flowchart System](docs/flowchart-system.md).
+> [!IMPORTANT]
+> **Prinsip Utama:** Billing dan penagihan tidak dapat berdiri sendiri tanpa validitas data pelanggan, riwayat verifikasi instalasi, dan penugasan POP yang sah.
 
-## Struktur Dokumentasi
+---
 
-| File / Folder | Isi |
-| --- | --- |
-| [docs/README.md](docs/README.md) | Indeks dokumentasi project. |
-| [docs/database-schema.md](docs/database-schema.md) | Database schema utama berdasarkan migration aktual. |
-| [docs/flowchart-system.md](docs/flowchart-system.md) | Flowchart sistem secara umum. |
-| [docs/data-pelanggan](docs/data-pelanggan/README.md) | Dokumentasi fitur pelanggan. |
-| [docs/master](docs/master/README.md) | Dokumentasi fitur master. |
-| [docs/dashboard](docs/dashboard/README.md) | Dokumentasi dashboard. |
-| [docs/penunjang](docs/penunjang/README.md) | Dokumentasi fitur penunjang. |
+## 🚀 Fitur Utama Sistem
 
-## Struktur Project Penting
+### 1. 🔐 Hierarchical Dynamic RBAC (Role & Permission Management)
+* **Pemisahan Role & Data Scope:** Role menentukan *kapabilitas fitur*, sedangkan Scope menentukan *wilayah data* (`all_pop`, `selected_pop`, `pop_tree`, `assigned_only`, `own_created`).
+* **Matrix Role Interaktif:** Konfigurasi izin granular berbasis string format lowercase (misal: `customers.view`, `invoices.create`, `cash_deposit.verify`).
+* **Audit Trail Komprehensif:** Setiap tindakan mutasi data penting dicatat lengkap dengan actor ID, IP, snapshot sebelum & sesudah perubahan.
 
-| Path | Keterangan |
-| --- | --- |
-| `routes/web.php` | Definisi route halaman dan API sederhana. |
-| `app/Http/Controllers` | Controller utama aplikasi. |
-| `app/Http/Controllers/Master` | Controller untuk menu master. |
-| `app/Models` | Model Eloquent. |
-| `database/migrations` | Struktur tabel database. |
-| `database/seeders` | Seeder master wilayah, paket layanan, status langganan, dan pelanggan dummy. |
-| `resources/views` | Blade view aplikasi. |
-| `resources/views/customers` | View fitur pelanggan. |
-| `resources/views/master` | View fitur master. |
-| `docs` | Dokumentasi project. |
+### 2. 👥 Master Data Pelanggan & Customer Lifecycle (360° View)
+* **Multi-Stage Onboarding Workflow:**
+  * *Draft / Registrasi* ➔ *Verifikasi CS/Admin* ➔ *Verifikasi Tim Bisnis (BD)* ➔ *Survey Lapangan* ➔ *Pemasangan & Speedtest* ➔ *Validasi Final & Penugasan Jaringan OLT/ODP* ➔ *Aktivasi Siap Billing*.
+* **Sistem QR Code & PIN Pelanggan:** Penerbitan token QR fisik unik untuk verifikasi cepat teknisi lapangan dan portal pelanggan.
+* **Manajemen Perubahan & Terminasi:**
+  * Putus Langganan (Terminasi dengan penarikan modem/DEAC).
+  * Cuti Berlangganan & Pembebasan Tagihan Periode (*Billing Waiver*).
+  * Pelanggan Gagal & Alasan Terminasi terarsip terpisah.
+* **Import Pelanggan Batch:** Upload Excel/CSV massal dengan validasi baris real-time, deteksi anomali/warning, dan riwayat batch.
 
-## Aturan CID & REQ ID Pelanggan
+### 3. 💳 Billing, Invoice & Pembayaran Terintegrasi
+* **Penerbitan Invoice Otomatis & Manual:** Perhitungan pro-rata, tanggal jatuh tempo dinamis, dan status tagihan (*Unpaid*, *Partial*, *Paid*, *Write-Off / Tak Tertagih*).
+* **Alur Hapus Buku (Write-off) & Reversal:** Pengelolaan piutang macet dengan otorisasi bertingkat.
+* **Kwitansi & Struk Pembayaran:** Cetak struk pembayaran resmi satuan maupun cetak massal.
+* **Manajemen Lebih-Bayar (Overpay):** Pencatatan saldo lebih-bayar pelanggan secara akurat.
 
-Identitas pelanggan (`customers.customer_code` / `customers.cid`) mengikuti format berjenjang, tergantung status pelanggan. Detail lengkap (termasuk celah desain yang perlu disiplin operasional) ada di [Business Logic Master POP](docs/master/pop/business-logic.md).
+### 4. 🛵 Modul Kolektor & Alur Setoran Kas Bertingkat
+* **Admin Collector Worksheet:** Pengaturan pembagian penugasan tagihan ke kolektor per wilayah/POP, monitoring progres penagihan, dan rekonsiliasi kwitansi.
+* **Mobile Collector Worklist:** Antarmuka khusus kolektor lapangan untuk mencatat pembayaran langsung di tempat, input riwayat kunjungan tanpa hasil (janji bayar), dan rekap kas harian.
+* **Setoran Bertingkat (Cash Deposit Engine):**
+  $$\text{Pelanggan} \xrightarrow{\text{Bayar Tunai}} \text{Kolektor} \xrightarrow{\text{Setor \& Verifikasi}} \text{Admin POP} \xrightarrow{\text{Setoran Kas Admin}} \text{Owner / Bank}$$
+* **Verifikasi & Validasi Selisih:** Pemeriksaan fisik uang setoran dengan proteksi *maker-checker* (penyetor tidak boleh memverifikasi setorannya sendiri).
 
-**Struktur CID lengkap** (`Pop::generateComplexCid()`):
+### 5. 🎫 Helpdesk, NOC & Trouble Ticketing
+* **Multi-Bucket Ticketing:** Kategori tiket Maintenance (MTN), Customer Request (C-REQ), dan Gangguan Internal.
+* **Worksheet NOC & Helpdesk:** Drawer interaktif untuk eskalasi tiket instan antar divisi, pengembalian tiket, dan penutupan dengan bukti penanganan.
+* **Batch / Mass Ticket:** Satu tiket gangguan backbone/ODC dapat dikaitkan ke puluhan pelanggan terdampak secara serentak.
+* **SLA Monitoring:** Penghitungan batas waktu penanganan (SLA timeline) per paket internet dengan visualisasi indikator overdue.
+
+### 6. 🛠️ FOP (Field Operation) & Task Scheduling
+* **Kanban & Calendar Scheduler:** Manajemen antrean tugas teknisi berbasis drag-and-drop dengan deteksi konflik jadwal teknisi.
+* **Live Technician Worksheet (`/tasks-saya`):** Dashboard teknisi lapangan dengan pembaruan real-time via WebSocket (Laravel Reverb & Echo).
+* **Laporan Lapangan Khusus:**
+  * Laporan Survey & Kelayakan Redaman (dBm).
+  * Laporan Pemasangan & Uji Kecepatan (Speedtest).
+  * Laporan Perbaikan Maintenance.
+  * Laporan Penarikan Modem (DEAC Task).
+* **Verifikasi Biaya C-REQ:** Validasi material tambahan dan biaya teknisi oleh CS/Helpdesk sebelum ditagihkan ke invoice pelanggan.
+
+### 7. 📦 Gudang & Manajemen Inventaris (Warehouse Management)
+* **Struktur Multi-Gudang (Pusat & Cabang/POP):** Penunjukan PIC Gudang resmi per cabang.
+* **Dukungan 3 Tipe Barang:**
+  1. *Barang Serialized:* Pelacakan per Unit Serial Number (Modem ONT, Router, OLT SFP).
+  2. *Barang Non-Serial:* Manajemen stok kuantitas (Konektor SC/UPC, Dropcore clamp, Patchcord).
+  3. *Barang Roll (Meteran):* Pelacakan sisa panjang kabel roll drum.
+* **Siklus Mutasi Lengkap:**
+  * Penerimaan Barang Masuk (Receive) + Cetak Barcode/QR SN & Roll.
+  * Transfer Antar-Gudang (Surat Jalan & Invoice Transfer).
+  * Pengeluaran Barang ke Teknisi (*Custody Tracking*).
+  * Pengembalian & Retur Barang Bekas Pelanggan dengan inspeksi status kelayakan.
+  * Penyesuaian Stok (Adjustment Rusak/Hilang & Stock Opname Fisik).
+  * Permintaan Stok Cabang (*Stock Request Approval & Fulfillment*).
+* **Traceability 360°:** Pelacakan jejak riwayat satu unit modem dari pabrik, rak gudang pusat, kurir transfer, tangan teknisi, hingga rumah pelanggan.
+* **Scan-First Lookup:** Pencarian cepat status barang via barcode/QR scanner kamera atau barcode reader.
+
+### 8. 📊 Laporan & Analytics Eksekutif
+* **Laporan Keuangan & Kas:** Rekap tagihan bulanan, pembayaran harian, buku kas admin, dan mutasi deposit.
+* **Laporan Kinerja Kolektor:** Matriks performa penagihan kolektor dan persentase keberhasilan.
+* **Dashboard Omset Sales & Business Development:** Monitoring pertumbuhan pelanggan baru, referral agent mitra, dan pendapatan bulanan.
+* **Laporan Konsumsi Material:** Rekap pemakaian material harian oleh teknisi di lapangan.
+
+---
+
+## 🆔 Aturan CID & REQ ID Pelanggan
+
+Identitas pelanggan (`customers.customer_code` / `customers.cid`) mengikuti format berjenjang sesuai status pelanggan:
 
 ```
 D    2      X6C          RQ001296
@@ -103,200 +127,286 @@ D    2      X6C          RQ001296
 └─ Kode Cabang POP (Pop.cid_prefix, input manual admin)
 ```
 
-**Format ID per status pelanggan** (`Pop::resolveDisplayId()`):
+**Format ID per status pelanggan:**
 
-| Status | Format tampil | Contoh |
-| --- | --- | --- |
-| Baru daftar / survey / pemasangan (belum ada distribusi) | REQ ID murni | `RQ001296` |
-| Active / Suspended + **sudah** ada distribusi | CID lengkap | `D2X6CRQ001296_MANGKUJAYAN_DYAHGALUH` |
-| Active / Suspended + **belum** ada distribusi | Default cabang | `C00RQ001296` |
-| Terminated / Failed / Rejected / Putus / Gagal | Balik ke REQ ID murni | `RQ001296` |
+| Status | Format Tampil | Contoh | Keterangan |
+|---|---|---|---|
+| Baru daftar / Survey / Pemasangan | REQ ID murni | `RQ001296` | Belum ada distribusi jaringan |
+| Active / Suspended + ada distribusi | CID lengkap | `D2X6CRQ001296_MANGKUJAYAN_DYAHGALUH` | Layanan aktif normal |
+| Active / Suspended + belum ada distribusi | Default cabang | `C00RQ001296` | Fallback cabang induk |
+| Terminated / Failed / Gagal / Putus | Balik ke REQ ID murni | `RQ001296` | Distribusi dilepas |
 
-REQ ID **permanen** — dibuat sekali saat registrasi, gak pernah berubah/hilang seumur hidup pelanggan. CID cuma "dibungkus" beda tergantung status; saat terminate, sistem gak generate ID baru, cuma nampilin lagi REQ ID murni yang dari awal udah ada (`extractBareRegistrationId()`).
-
-## Database Utama
-
-Tabel utama yang digunakan:
-
-| Tabel | Fungsi |
-| --- | --- |
-| `customers` | Data utama pelanggan. |
-| `cities` | Master kota/kabupaten. |
-| `districts` | Master kecamatan. |
-| `villages` | Master desa/kelurahan. |
-| `internet_packages` | Master paket layanan internet. |
-| `subscription_statuses` | Master status workflow langganan. |
-
-Detail schema tersedia di [Database Schema](docs/database-schema.md).
-
-## Instalasi Lokal
-
-Salin file environment:
-
-```bash
-cp .env.example .env
-```
-
-Install dependency backend dan frontend:
-
-```bash
-composer install
-npm install
-```
-
-Generate key dan jalankan migration:
-
-```bash
-php artisan key:generate
-php artisan migrate --seed
-```
-
-Jalankan aplikasi:
-
-```bash
-composer run dev
-```
-
-Atau jalankan frontend dan backend terpisah:
-
-```bash
-php artisan serve
-npm run dev
-```
-
-## Menjalankan dengan Docker
-
-Jalankan container:
-
-```bash
-docker compose up -d --build
-```
-
-Akses aplikasi:
-
-| Service | URL |
-| --- | --- |
-| Aplikasi | `http://localhost:8000` |
-| phpMyAdmin | `http://localhost:8080` |
-
-## Testing
-
-Jalankan test:
-
-```bash
-php artisan test
-```
-
-Atau melalui Composer:
-
-```bash
-composer test
-```
-
-## Sprint 8 — FOP Task Management & Design System
-
-Sprint 8 menambahkan modul task scheduling dan management untuk FOP:
-
-| Fitur | Route | Dokumentasi |
-|-------|-------|-------------|
-| FOP Dashboard | `/fop` | [Dashboard](docs/sprint-8/fop-dashboard.md) |
-| Kanban Task Scheduler | `/fop/kanban` | [Kanban](docs/sprint-8/kanban-task-scheduler.md) |
-| Calendar Scheduler | `/fop/calendar` | [Calendar](docs/sprint-8/calendar-scheduler.md) |
-| Task Workflow | — | [Workflow](docs/sprint-8/task-workflow.md) |
-| Design System UI | — | [Design System](docs/sprint-8/design-system-ui.md) |
-| Overdue Indicator | `/fop` (stat card) | [Overdue](docs/sprint-8/overdue-indicator.md) |
-
-**Overview lengkap:** [Sprint 8 Documentation](docs/sprint-8/README.md)
-
-## Ticketing — Tiket Internal Perusahaan
-
-Modul Ticketing menangani tiket MTN (Maintenance) dan C-REQ (Customer Request) yang diajukan helpdesk/NOC/sales/admin, otomatis membuat Task FOP terkait:
-
-| Fitur | Route | Dokumentasi |
-|-------|-------|-------------|
-| Daftar Tiket (4 bucket) | `/tickets/{bucket}` | [README](docs/ticketing/README.md) |
-| Tiket Baru | `/tickets/new` | [User Flow](docs/ticketing/user-flow.md) |
-| Detail Tiket | `/tickets/{id}` | [Business Logic](docs/ticketing/business-logic.md) |
-
-**Overview lengkap:** [Ticketing Documentation](docs/ticketing/README.md)
+> [!NOTE]
+> **REQ ID bersifat permanen** — dibuat sekali saat registrasi dan tidak pernah berubah. Detail lengkap dapat dibaca pada [Business Logic Master POP](docs/master/pop/business-logic.md).
 
 ---
 
-## Catatan Implementasi
+## 🔄 Alur Proses Bisnis Utama
 
-Project ini sudah menyediakan fondasi fitur operasional ISP, termasuk modul Onboarding Workflow (Survey, Verifikasi Lapangan, Pemasangan, Aktivasi) yang diatur menggunakan *State Machine* (`CustomerWorkflowService`) serta tabel riwayat transaksi pendukung (`customer_surveys`, `customer_installations`, `customer_technical_details`). 
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Calon Pelanggan / Sales
+    actor CS as Admin / CS / Helpdesk
+    actor FOP as Tim FOP & Teknisi
+    actor NOC as Tim NOC
+    actor K as Kolektor / Kasir
+    actor G as Logistik / Gudang
 
-Sprint 8 menambahkan Task Management untuk FOP dengan:
-- **Kanban & Calendar views** untuk task scheduling
-- **Real-time updates** via Reverb WebSocket
-- **Design System konsistensi** UI (CSS vars)
-- **Workflow approval gates** — FOP approve trigger customer transition (no auto-update)
-- **Overdue indicator** untuk SLA waiting phase
+    Note over C,CS: 1. Pendaftaran & Verifikasi
+    C->>CS: Pendaftaran Baru (Input Data Diri & Paket)
+    CS->>CS: Verifikasi Registrasi & Lokasi POP
 
-Data tagihan awal dan uji layanan secara bertahap akan diintegrasikan dengan modul Billing.
-## Menu Dokumentasi Fitur
+    Note over CS,FOP: 2. Survey & Pemasangan
+    CS->>FOP: Terbitkan Task Survey & Pemasangan
+    G->>FOP: Pengeluaran Perangkat (Modem & Kabel)
+    FOP->>FOP: Instalasi Lapangan, Input Redaman & Speedtest
+    FOP->>CS: Kirim Laporan Selesai Pemasangan
 
-Bagian ini dibuat sebagai pintu masuk cepat untuk programmer baru. Pilih menu sesuai fitur yang ingin dipelajari, lalu buka dokumentasi detailnya.
+    Note over CS,NOC: 3. Penugasan Jaringan & Aktivasi
+    CS->>NOC: Verifikasi Data Teknis (Port OLT & Distribusi)
+    NOC-->>CS: Konfirmasi Siap Aktif
+    CS->>CS: Aktivasi Layanan (Status: ACTIVE / Siap Billing)
 
-### Dashboard
+    Note over CS,K: 4. Billing & Pembayaran
+    CS->>K: Terbitkan Invoice Bulanan
+    K->>C: Penagihan Lapangan (Kolektor) / Loket Pembayaran
+    C->>K: Pembayaran Tagihan
+    K->>CS: Setoran Kas & Rekonsiliasi Kwitansi
+```
 
-| Kebutuhan | Dokumentasi |
-| --- | --- |
-| Memahami fungsi dashboard | [Overview Dashboard](docs/dashboard/README.md) |
-| Melihat alur data dashboard | [Flow Dashboard](docs/dashboard/flow.md) |
-| Melihat flowchart dashboard | [Flowchart Dashboard](docs/dashboard/flowchart.md) |
-| Melihat tabel sumber dashboard | [Schema Dashboard](docs/dashboard/database-schema.md) |
+---
 
-### Data Pelanggan
+## 🗺️ Peta Navigasi Modul & Tautan Dokumentasi
 
-| Kebutuhan | Dokumentasi |
-| --- | --- |
-| Memahami fitur Data Pelanggan secara umum | [Overview Data Pelanggan](docs/data-pelanggan/README.md) |
-| Melihat alur daftar pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
-| Melihat alur registrasi pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
-| Melihat alur edit pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
-| Melihat alur detail pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
-| Melihat alur import pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
-| Melihat flowchart registrasi, detail, dan import | [Flowchart Data Pelanggan](docs/data-pelanggan/flowchart.md) |
-| Melihat tabel dan field pelanggan | [Schema Data Pelanggan](docs/data-pelanggan/database-schema.md) |
+| Menu / Modul | Route URL | Fungsi & Kegunaan | Tautan Dokumentasi |
+|---|---|---|---|
+| **Dashboard** | `/` | KPI operasional utama, ringkasan pelanggan, status jaringan, dan grafik tren. | [Overview](docs/dashboard/README.md) • [Flow](docs/dashboard/flow.md) • [Schema](docs/dashboard/database-schema.md) |
+| **Data Pelanggan** | `/customers` | Database pelanggan lengkap, filter multi-dimensi, detail timeline 360°, dan edit data. | [Overview](docs/data-pelanggan/README.md) • [Flow](docs/data-pelanggan/flow.md) • [Schema](docs/data-pelanggan/database-schema.md) |
+| **Pendaftaran & Verifikasi** | `/customer-registration-verifications` | Form registrasi & antrean approval pendaftaran sebelum jadwal survey. | [Pendaftaran](docs/pendaftaran-pelanggan/README.md) • [User Flow](docs/pendaftaran-pelanggan/user-flow.md) • [Schema](docs/pendaftaran-pelanggan/database-schema.md) |
+| **Pelanggan Putus / Gagal** | `/customers/terminated` | Arsip pelanggan terminasi/putus langganan dan pendaftaran gagal. | [Skema Putus](docs/plan/billing/skema-putus-langganan.md) • [Analisa Deaktivasi](docs/plan/billing/analisa-rancangan-request-deaktivasi-bebas-tagihan-periode.md) |
+| **Import Data Pelanggan** | `/customers/import` | Upload batch data pelanggan lama beserta validasi, riwayat, dan log error. | [Import Spec](docs/IMPORT_SPEC.md) • [Panduan Import](docs/penunjang/import-pelanggan.md) |
+| **Tagihan (Invoices)** | `/invoices` | Manajemen tagihan aktif, status lunas, belum lunas, invoice manual, dan write-off. | [Business Rules](docs/BUSINESS_RULES.md) • [Tagihan Manual](docs/plan/billing/analisa-rancangan-tagihan-manual.md) |
+| **Pembayaran & Kwitansi** | `/payments` | Pencatatan transaksi pembayaran, penanganan overpay, dan cetak kuitansi. | [Rancangan Kwitansi](docs/plan/billing/kwitansi.md) • [Edit Bayar](docs/plan/billing/rancangan-edit-pembayaran-penuh.md) |
+| **Worksheet Kolektor** | `/collector-worksheet` | Penugasan rute tagihan kolektor, monitoring setoran, dan cetak kwitansi massal. | [Overview](docs/kolektor/README.md) • [Logic](docs/kolektor/business-logic.md) • [User Flow](docs/kolektor/user-flow.md) |
+| **Worklist Kolektor Mobile** | `/collector-worklist` | Portal mobile kolektor untuk input penagihan langsung dan setor kas. | [Alur 2.0](docs/plan/kolektor/analisa-alur-kolektor-2.0.md) • [Schema](docs/kolektor/database-schema.md) |
+| **Setoran Kas Admin** | `/cash-deposits` | Rekonsiliasi dan verifikasi uang kas fisik admin cabang sebelum disetor ke bank. | [Analisa Setoran Kas](docs/plan/kolektor/analisa-setoran-kas-admin.md) |
+| **Ticketing Gangguan** | `/tickets/new` | Pembuatan tiket keluhan, tracking SLA, eskalasi, dan histori gangguan. | [Overview](docs/ticketing/README.md) • [Logic](docs/ticketing/business-logic.md) • [Flowchart](docs/ticketing/flowchart.md) |
+| **Worksheet NOC** | `/noc/worksheet` | Ruang kerja teknis NOC untuk diagnosa gangguan backbone/distribusi. | [Worksheet NOC](docs/ticketing/Redesign-Worksheet-NOC.md) • [NOC Dashboard](docs/plan/noc-dashboard-analysis.md) |
+| **FOP Task Management** | `/fop` & `/fop-tasks` | Kanban task scheduling, kalender penugasan, dan manajemen beban kerja. | [FOP Dashboard](docs/fop-task/fop-dashboard.md) • [Flowchart](docs/fop-task/flowchart.md) • [Schema](docs/fop-task/database-schema.md) |
+| **Task Saya (Teknisi)** | `/tasks-saya` | Dashboard kerja mobile teknisi untuk pelaporan status kerja real-time. | [Overview](docs/task-teknisi/README.md) • [Logic](docs/task-teknisi/business-logic.md) • [User Flow](docs/task-teknisi/user-flow.md) |
+| **Verifikasi C-REQ** | `/tasks-creq-billing` | Approval penagihan biaya pekerjaan teknisi / permintaan khusus oleh CS. | [Rancangan C-REQ](docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md) |
+| **Gudang (Warehouse)** | `/warehouse` & `/warehouse/stock`| Monitoring stok barang serial/roll/non-serial, mutasi, dan surat jalan. | [Overview](docs/warehouse/README.md) • [Logic](docs/warehouse/business-logic.md) • [User Flow](docs/warehouse/user-flow.md) |
+| **Lacak Barang (Traceability)**| `/warehouse/traceability` | Riwayat perjalanan lengkap serial number perangkat (ONT/Router). | [Traceability Advanced](docs/plan/warehouse/warehouse_inventory_asset_traceability_analysis_advanced.md) |
+| **Business Development** | `/business-development/agents` | Manajemen mitra agent referral, restriksi paket, dan dashboard omset. | [Tabel Bisnis](docs/plan/bussiness-development/tabel_paket_bisnis.md) |
+| **Master Wilayah** | `/master/wilayah` | Referensi Kota, Kecamatan, Desa/Kelurahan, dan API search. | [Overview](docs/master/wilayah/README.md) • [User Flow](docs/master/wilayah/user-flow.md) • [Schema](docs/master/wilayah/database-schema.md) |
+| **Master POP / Cabang** | `/master/pop` | Pengelolaan Cabang POP & Mini POP hierarkis. | [Overview](docs/master/pop/README.md) • [Business Logic](docs/master/pop/business-logic.md) • [Flowchart](docs/master/pop/flowchart.md) |
+| **Master Distribusi** | `/master/distribusi` | Referensi titik distribusi ODP / ODC jaringan. | [Overview](docs/master/distribution/README.md) • [Business Logic](docs/master/distribution/business-logic.md) |
+| **Master Paket Internet** | `/master/paket` | Katalog paket layanan internet Home, Bisnis, & Dedicated. | [Overview](docs/master/internet-package/README.md) • [Schema](docs/master/internet-package/database-schema.md) |
+| **Master Timeline SLA** | `/master/sla-timeline` | Matriks batas waktu penanganan tiket per paket internet. | [Overview](docs/master/sla-timeline/README.md) • [Business Logic](docs/master/sla-timeline/business-logic.md) |
+| **Master Status Pelanggan**| `/master/status-langganan`| State machine status alur hidup langganan. | [Overview](docs/master/status-pelanggan/README.md) • [User Flow](docs/master/status-pelanggan/user-flow.md) |
+| **Manajemen Akses (RBAC)** | `/roles` & `/users` | Pengaturan Role, Hak Akses Granular, User Scope, dan Log Audit. | [Overview](docs/rbac/README.md) • [RBAC Matrix](docs/RBAC_MATRIX.md) • [User Flow](docs/rbac/user-flow.md) |
 
-### Master
+---
 
-| Kebutuhan | Dokumentasi |
-| --- | --- |
-| Memahami modul Master secara umum | [Overview Master](docs/master/README.md) |
-| Melihat master wilayah | [Master Wilayah](docs/master/wilayah/README.md) |
-| Melihat master internet package | [Master Internet Package](docs/master/internet-package/README.md) |
-| Melihat master status pelanggan | [Master Status Pelanggan](docs/master/status-pelanggan/README.md) |
-| Melihat master POP (Cabang) | [Master POP](docs/master/pop/README.md) |
-| Memahami aturan generate CID & REQ ID pelanggan | [Business Logic Master POP](docs/master/pop/business-logic.md) |
-| Melihat master Distribusi jaringan | [Master Distribusi](docs/master/distribution/README.md) |
-| Melihat Master Timeline SLA (batas waktu tiket per paket) | [Master Timeline SLA](docs/master/sla-timeline/README.md) |
+## 📖 Direktori Lengkap Dokumentasi Fitur
 
-### Ticketing
+Gunakan tautan di bawah untuk mempelajari arsitektur, user flow, dan skema teknis setiap modul:
 
-| Kebutuhan | Dokumentasi |
-| --- | --- |
-| Memahami fitur Ticketing secara umum | [Overview Ticketing](docs/ticketing/README.md) |
-| Melihat alur submit/assign/cancel tiket | [User Flow Ticketing](docs/ticketing/user-flow.md) |
-| Melihat aturan bisnis (RBAC, snapshot, dual-history, bug fixes) | [Business Logic Ticketing](docs/ticketing/business-logic.md) |
-| Melihat flowchart auto-sync & pembatalan | [Flowchart Ticketing](docs/ticketing/flowchart.md) |
-| Melihat tabel dan kolom Ticketing | [Schema Ticketing](docs/ticketing/database-schema.md) |
+### 1. Dashboard
+* 📄 [Overview Dashboard](docs/dashboard/README.md)
+* 🔀 [Alur Kerja (Flow) Dashboard](docs/dashboard/flow.md)
+* 📊 [Flowchart Diagram Dashboard](docs/dashboard/flowchart.md)
+* 🗄️ [Database Schema Dashboard](docs/dashboard/database-schema.md)
 
-### Penunjang
+### 2. Data Pelanggan & Pendaftaran
+* 📄 [Overview Data Pelanggan](docs/data-pelanggan/README.md)
+* 🔀 [Alur Kerja Data Pelanggan](docs/data-pelanggan/flow.md)
+* 📊 [Flowchart Siklus Pelanggan](docs/data-pelanggan/flowchart.md)
+* 🗄️ [Database Schema Pelanggan](docs/data-pelanggan/database-schema.md)
+* 📄 [Spesifikasi Pendaftaran Pelanggan](docs/pendaftaran-pelanggan/README.md)
+* 🔀 [User Flow Pendaftaran](docs/pendaftaran-pelanggan/user-flow.md)
+* 📑 [Spesifikasi Import Pelanggan](docs/IMPORT_SPEC.md)
+* 📱 [Rancangan QR Code & Token Pelanggan](docs/plan/qr-code/rancangan-qr-pelanggan-final.md)
 
-| Kebutuhan | Dokumentasi |
-| --- | --- |
-| Memahami fitur penunjang secara umum | [Overview Penunjang](docs/penunjang/README.md) |
-| Melihat alur import pelanggan batch | [Import Pelanggan](docs/penunjang/import-pelanggan.md) |
-| Melihat API dependent dropdown wilayah | [API Wilayah](docs/penunjang/api-wilayah.md) |
-| Melihat flowchart fitur penunjang | [Flowchart Penunjang](docs/penunjang/flowchart.md) |
-| Melihat schema fitur penunjang | [Schema Penunjang](docs/penunjang/database-schema.md) |
+### 3. Master Data
+* 📄 [Overview Modul Master](docs/master/README.md)
+* 📍 **Master Wilayah:** [Dokumentasi](docs/master/wilayah/README.md) • [User Flow](docs/master/wilayah/user-flow.md) • [Schema](docs/master/wilayah/database-schema.md)
+* 🏢 **Master POP (Cabang & Mini POP):** [Dokumentasi](docs/master/pop/README.md) • [Business Logic](docs/master/pop/business-logic.md) • [Flowchart](docs/master/pop/flowchart.md)
+* 🔌 **Master Distribusi Jaringan:** [Dokumentasi](docs/master/distribution/README.md) • [Business Logic](docs/master/distribution/business-logic.md)
+* 🌐 **Master Paket Internet:** [Dokumentasi](docs/master/internet-package/README.md) • [User Flow](docs/master/internet-package/user-flow.md)
+* ⏱️ **Master Timeline SLA:** [Dokumentasi](docs/master/sla-timeline/README.md) • [Business Logic](docs/master/sla-timeline/business-logic.md)
+* 🔄 **Master Status Pelanggan:** [Dokumentasi](docs/master/status-pelanggan/README.md) • [Flowchart](docs/master/status-pelanggan/flowchart.md)
 
-### Sistem dan Database
+### 4. Billing, Tagihan & Pembayaran
+* 📑 [Aturan Bisnis Baku (Business Rules)](docs/BUSINESS_RULES.md)
+* 💳 [Rancangan Tagihan Manual](docs/plan/billing/analisa-rancangan-tagihan-manual.md)
+* 🧾 [Standar Format Kwitansi Pembayaran](docs/plan/billing/kwitansi.md)
+* ⚠️ [Skema Putus Langganan & Piutang Tak Tertagih](docs/plan/billing/skema-putus-langganan.md)
+* ⏸️ [Rancangan Deaktivasi & Bebas Tagihan Periode (Cuti)](docs/plan/billing/analisa-rancangan-request-deaktivasi-bebas-tagihan-periode.md)
+* 🏦 [Master Rekening Bank Transfer](docs/plan/billing/analisa-rancangan-master-rekening-transfer.md)
 
-| Kebutuhan | Dokumentasi |
-| --- | --- |
-| Melihat indeks semua dokumentasi | [Indeks Dokumentasi](docs/README.md) |
-| Melihat flowchart sistem keseluruhan | [Flowchart System](docs/flowchart-system.md) |
-| Melihat database schema utama | [Database Schema](docs/database-schema.md) |
+### 5. Modul Kolektor & Setoran Kas
+* 📄 [Overview Modul Kolektor](docs/kolektor/README.md)
+* 💼 [Business Logic Kolektor](docs/kolektor/business-logic.md)
+* 🔀 [User Flow Kolektor](docs/kolektor/user-flow.md)
+* 📊 [Flowchart Sistem Kolektor](docs/kolektor/flowchart.md)
+* 🗄️ [Database Schema Kolektor](docs/kolektor/database-schema.md)
+* 💰 [Analisa & Validasi Setoran Kas Admin](docs/plan/kolektor/analisa-setoran-kas-admin.md)
+
+### 6. Ticketing & Trouble Handling
+* 📄 [Overview Ticketing](docs/ticketing/README.md)
+* 💼 [Business Logic Ticketing & SLA](docs/ticketing/business-logic.md)
+* 🔀 [User Flow Penanganan Tiket](docs/ticketing/user-flow.md)
+* 📊 [Flowchart Auto-Sync & Pembatalan](docs/ticketing/flowchart.md)
+* 🗄️ [Database Schema Ticketing](docs/ticketing/database-schema.md)
+* 🖥️ [Redesign Worksheet NOC & Helpdesk](docs/ticketing/Redesign-Worksheet-NOC.md)
+
+### 7. FOP (Field Operation) & Task Teknisi
+* 📊 [FOP Dashboard & Pipeline](docs/fop-task/fop-dashboard.md)
+* 🔀 [User Flow Penugasan FOP](docs/fop-task/user-flow.md)
+* 📊 [Flowchart Task FOP](docs/fop-task/flowchart.md)
+* 🗄️ [Database Schema Task FOP](docs/fop-task/database-schema.md)
+* 📱 [Dashboard & Worksheet Teknisi Lapangan](docs/task-teknisi/README.md)
+* 💼 [Business Logic Task Teknisi](docs/task-teknisi/business-logic.md)
+* 💵 [Verifikasi Biaya C-REQ oleh CS](docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)
+
+### 8. Gudang & Manajemen Inventaris (Warehouse)
+* 📄 [Overview Modul Gudang](docs/warehouse/README.md)
+* 💼 [Business Logic Inventaris & Mutasi](docs/warehouse/business-logic.md)
+* 🔀 [User Flow Gudang & Logistik](docs/warehouse/user-flow.md)
+* 📊 [Flowchart Alur Barang Gudang](docs/warehouse/flowchart.md)
+* 🗄️ [Database Schema Gudang](docs/warehouse/database-schema.md)
+* 🔍 [Analisa Traceability & Pelacakan Serial Number](docs/plan/warehouse/warehouse_inventory_asset_traceability_analysis_advanced.md)
+* 🚚 [Rancangan Surat Jalan & Invoice Transfer](docs/plan/warehouse/rancangan-invoice-surat-jalan-transfer.md)
+* 🔄 [Alur Retur & Penerimaan Modem Bekas Pelanggan](docs/plan/warehouse/analisa-riwayat-dan-terima-modem-dari-pelanggan.md)
+
+### 9. Hierarchical Dynamic RBAC & Keamanan
+* 📄 [Overview RBAC System](docs/rbac/README.md)
+* 🛡️ [RBAC Matrix Lengkap (Role & Permission)](docs/RBAC_MATRIX.md)
+* 💼 [Business Logic Hak Akses & Scope](docs/rbac/business-logic.md)
+* 🔀 [User Flow Manajemen User & Role](docs/rbac/user-flow.md)
+* 🗄️ [Database Schema RBAC](docs/rbac/database-schema.md)
+* 🔒 [Pemisahan Role & User Scope POP](docs/docs/analisa-rbac-dinamis-whusnett.md)
+
+### 10. Sistem & Database Utama
+* 📑 [Indeks Dokumentasi Pusat](docs/README.md)
+* 🏗️ [Konsep Basis Data Utama](docs/DATABASE_CONCEPT.md)
+* 🗄️ [Database Schema Aktual](docs/database-schema.md)
+* 📊 [Flowchart Sistem Menyeluruh](docs/flowchart-system.md)
+* 🚀 [Project Context & Roadmap](docs/PROJECT_CONTEXT.md)
+
+---
+
+## 💻 Stack Teknologi
+
+| Komponen | Teknologi | Keterangan |
+|---|---|---|
+| **Backend Framework** | [Laravel 13.x](https://laravel.com) | Arsitektur modern dengan Service Layer, Action classes, & Policy Guards |
+| **Bahasa Pemrograman**| [PHP 8.4](https://php.net) | Tipe data kuat (*strict types*), constructor property promotion |
+| **Frontend & UI** | [Blade](https://laravel.com/docs/blade) + [Tailwind CSS v4](https://tailwindcss.com) + [Alpine.js](https://alpinejs.dev) | UI responsif modern, dark/light harmonious color palette |
+| **Asset Bundler** | [Vite](https://vitejs.dev) | Hot Module Replacement (HMR) & build frontend super cepat |
+| **Realtime WebSockets**| [Laravel Reverb](https://laravel.com/docs/reverb) + Laravel Echo | Push event instan untuk task teknisi & status update tanpa reload |
+| **Database** | [MySQL 8.0+](https://mysql.com) / MariaDB | Relasi data transaksional terindeks dengan foreign key integrity |
+| **Asynchronous Queue** | [Laravel Horizon](https://laravel.com/docs/horizon) + Redis | Pemrosesan background job (import batch, mutasi, notifikasi) |
+| **Containerization** | [Docker](https://docker.com) & Docker Compose | Setup lingkungan terisolasi (Nginx, PHP-FPM, MySQL, phpMyAdmin) |
+| **Testing Suite** | [PHPUnit](https://phpunit.de) | Unit & Feature tests dengan automated seeders |
+| **Code Formatter** | [Laravel Pint](https://laravel.com/docs/pint) | Standarisasi PSR-12 code style |
+
+---
+
+## 🛠️ Panduan Instalasi
+
+### 1. Kebutuhan Sistem
+* PHP $\ge$ 8.3 (Disarankan PHP 8.4)
+* Composer $\ge$ 2.6
+* Node.js $\ge$ 18.x & NPM
+* MySQL $\ge$ 8.0 atau MariaDB $\ge$ 10.5
+* Redis (Opsional untuk background queue & caching)
+
+---
+
+### 2. Instalasi Lokal (Native)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/YofhiFauda/whusnet-operasional.git
+cd whusnet-operasional
+
+# 2. Salin konfigurasi environment
+cp .env.example .env
+
+# 3. Install dependency PHP & Node.js
+composer install
+npm install
+
+# 4. Generate application key
+php artisan key:generate
+
+# 5. Konfigurasikan database pada file .env, kemudian jalankan migrasi & seeder
+php artisan migrate --seed
+
+# 6. Buat symbolic link untuk storage upload dokumen
+php artisan storage:link
+
+# 7. Jalankan server aplikasi & asset compiler
+composer run dev
+```
+
+> [!TIP]
+> Perintah `composer run dev` akan otomatis menjalankan `php artisan serve`, `npm run dev`, dan worker secara simultan.
+
+---
+
+### 3. Instalasi Menggunakan Docker
+
+Tersedia konfigurasi Docker Compose siap pakai untuk kemudahan deployment lingkungan pengembangan:
+
+```bash
+# 1. Salin environment
+cp .env.example .env
+
+# 2. Build dan jalankan container di background
+docker compose up -d --build
+
+# 3. Jalankan migrasi dan seeder di dalam container
+docker compose exec app php artisan migrate --seed
+docker compose exec app php artisan storage:link
+```
+
+**Akses Endpoint Docker:**
+* 🌐 **Aplikasi Utama:** `http://localhost:8000`
+* 🗄️ **phpMyAdmin:** `http://localhost:8080`
+
+---
+
+## 🧪 Menjalankan Pengujian (Testing)
+
+Aplikasi dilengkapi dengan test suite otomatis menggunakan PHPUnit:
+
+```bash
+# Jalankan seluruh automated tests
+php artisan test --compact
+
+# Jalankan pengujian pada file tertentu
+php artisan test tests/Feature/CustomerTest.php
+
+# Jalankan linter dan code formatter
+vendor/bin/pint --dirty --format agent
+```
+
+---
+
+## 🔒 Standar Keamanan & Keandalan
+
+* **Anti-Bypass Guard:** Seluruh mutasi kas, status tiket, dan aktivasi dilindungi oleh *Policy & Authorization Service* terpusat.
+* **Idempoten & Concurrency Safe:** Transaksi kas dan perpindahan status menggunakan database locking untuk mencegah *double payment* atau *race conditions*.
+* **Defense-in-Depth:** Rute sensitif diamankan berlapis melalui Middleware Permission, Route Constraints, dan Policy Check di tingkat controller.
+
+---
+
+<div align="center">
+
+**WHUSNET Operasional** • Dikembangkan dengan ❤️ untuk Keunggulan Operasional ISP Nusantara.
+
+</div>

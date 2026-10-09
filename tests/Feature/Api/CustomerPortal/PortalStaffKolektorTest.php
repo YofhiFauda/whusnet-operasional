@@ -208,6 +208,36 @@ class PortalStaffKolektorTest extends TestCase
         $this->assertNotNull(StaffPortalToken::where('token_hash', hash('sha256', $plaintext))->first()->consumed_at);
     }
 
+    /**
+     * Token dikunci ke pelanggan A. Tagihan pelanggan B (sama-sama di worklist
+     * kolektor) TIDAK boleh dibayar lewat token A.
+     */
+    #[Test]
+    public function payments_token_pelanggan_a_tidak_bisa_bayar_tagihan_pelanggan_b(): void
+    {
+        $kolektor = $this->createKolektor();
+        $customerA = $this->createCustomerWithUnpaidInvoice('RQ910A', $kolektor->id);
+        $customerB = $this->createCustomerWithUnpaidInvoice('RQ910B', $kolektor->id);
+        $invoiceB = Invoice::where('customer_id', $customerB->id)->firstOrFail();
+        $plaintext = $this->issueStaffToken($kolektor, $customerA);
+
+        $this->withHeaders($this->authHeaders($plaintext))
+            ->postJson('/api/customer-portal/kolektor/payments', [
+                'idempotency_key' => 'staff-portal-lintas-pelanggan',
+                'rows' => [[
+                    'invoice_id' => $invoiceB->id,
+                    'amount' => 150000,
+                    'payment_method' => 'cash',
+                    'collected_date' => now()->toDateString(),
+                ]],
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        $this->assertDatabaseMissing('payments', ['invoice_id' => $invoiceB->id]);
+        $this->assertNull(StaffPortalToken::where('token_hash', hash('sha256', $plaintext))->first()->consumed_at);
+    }
+
     #[Test]
     public function payments_invoice_di_luar_worklist_ditolak_422_token_tidak_terkonsumsi(): void
     {

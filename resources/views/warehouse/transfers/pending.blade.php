@@ -9,8 +9,16 @@
 
 <div class="space-y-6">
 
+    {{-- Pintas ke daftar semua transfer (Fase 8 §S3) — pending hanya in-transit --}}
+    <div class="flex justify-end -mb-2">
+        <a href="{{ route('warehouse.transfers.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline">
+            Lihat semua transfer &amp; surat jalan
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+    </div>
+
     {{-- Perlu dikonfirmasi di sisi user ini (scope-nya masuk to_pop) --}}
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg shadow-xs overflow-hidden">
+    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-xs overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700/80 flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-800/60 shrink-0">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -66,7 +74,7 @@
     </div>
 
     {{-- Dikirim dari sini, masih menunggu cabang tujuan konfirmasi --}}
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg shadow-xs overflow-hidden">
+    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-xs overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700/80 flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-100 dark:border-sky-800/60 shrink-0">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

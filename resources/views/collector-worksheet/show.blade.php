@@ -823,7 +823,7 @@
                                      @drop.prevent="isDragging = false; handleDrop($event)"
                                      :class="{ 'border-sky-500 bg-sky-50/50 dark:bg-sky-500/10': isDragging }">
 
-                                    <input type="file" name="files[]" id="receipt_files" multiple required accept=".jpg,.jpeg,.png,.webp,.pdf"
+                                    <input type="file" name="files[]" id="receipt_files" multiple required accept="image/*,application/pdf"
                                            @change="pilih($event)"
                                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
 

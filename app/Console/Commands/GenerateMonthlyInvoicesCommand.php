@@ -141,7 +141,7 @@ class GenerateMonthlyInvoicesCommand extends Command
                     // menulis ke deret yang sama. Tetap dipanggil DI DALAM
                     // transaksi supaya lockForUpdate()-nya bermakna.
                     $invoice = Invoice::create([
-                        'invoice_number' => app(InvoiceNumberGenerator::class)->nextFor($billingPeriod),
+                        'invoice_number' => app(InvoiceNumberGenerator::class)->nextFor(InvoiceType::BULANAN, null, $periodStart),
                         'invoice_type' => InvoiceType::BULANAN->value,
                         'customer_id' => $customer->id,
                         'pop_id' => $customer->pop_id,

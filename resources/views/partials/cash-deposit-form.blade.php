@@ -69,7 +69,7 @@
 
         <div>
             <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Bukti (opsional, JPG/PNG/PDF)</label>
-            <input type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf"
+            <input type="file" name="proof" accept="image/*,application/pdf"
                    class="w-full text-xs text-slate-600 dark:text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200">
         </div>
 

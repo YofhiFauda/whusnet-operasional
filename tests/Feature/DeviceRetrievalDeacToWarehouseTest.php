@@ -160,8 +160,14 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         return $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $task ?? $this->task), $payload);
     }
 
+    /**
+     * ADHOC-108 (2026-10-08): Tahap 1 "Terima dari Teknisi" di Cabang
+     * BUKAN LAGI titik final — SN tetap `RETURNED`, gate kondisi tetap
+     * tertutup, `to_pop_id` ledger tetap kosong (gak keitung stok Cabang).
+     * Kelanjutan ke Pusat (Tahap 2/3) dicakup `WarehouseReturnToPusatTest`.
+     */
     #[Test]
-    public function sn_terdaftar_masuk_transit_lalu_diterima_gudang_cabang(): void
+    public function sn_terdaftar_masuk_transit_lalu_diterima_cabang_dari_teknisi(): void
     {
         $serial = $this->makeInstalledSerial('DR-SN-001');
 
@@ -180,28 +186,30 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         $this->assertEquals(DeviceRetrievalOutcome::DIAMBIL, $this->task->deviceRetrieval->outcome);
         $this->assertEquals(['adaptor'], $this->task->deviceRetrieval->accessories);
 
-        // Gudang cabang menerima.
+        // Gudang Cabang terima DARI TEKNISI — masih transit, BUKAN stok
+        // Cabang. Kondisi final & stok nambah nanti di Pusat (Tahap 3).
         $this->actingAs($this->owner)
             ->post(route('warehouse.returns.receive.store', $serial), ['condition' => 'used_good'])
             ->assertRedirect(route('warehouse.returns.index'))
             ->assertSessionHas('success');
 
         $serial->refresh();
-        $this->assertEquals(SerialStatus::AVAILABLE, $serial->status);
+        $this->assertEquals(SerialStatus::RETURNED, $serial->status);
         $this->assertEquals($this->cabang->id, $serial->current_pop_id);
         $this->assertNull($serial->current_technician_id);
         $this->assertNull($serial->customer_id);
         $this->assertEquals(ItemCondition::USED_GOOD, $serial->condition);
-        $this->assertNotNull($serial->condition_checked_at);
-        $this->assertTrue($serial->isClearedForIssue());
+        $this->assertNull($serial->condition_checked_at);
+        $this->assertFalse($serial->isClearedForIssue());
 
-        // Dua baris RETURN: pelanggan→teknisi (tanpa to_pop_id, jadi tidak
-        // ikut dihitung stok) lalu teknisi→gudang (to_pop_id = cabang).
+        // Dua baris RETURN, KEDUANYA tanpa to_pop_id — belum ada yang
+        // keitung stok di mana pun: pelanggan→teknisi, lalu teknisi→Cabang
+        // (cuma penanda lokasi fisik, bukan stok).
         $ledger = InventoryTransaction::where('serial_id', $serial->id)->where('type', InventoryTransactionType::RETURN->value)->orderBy('id')->get();
         $this->assertCount(2, $ledger);
         $this->assertNull($ledger[0]->to_pop_id);
         $this->assertEquals($this->teknisi->id, $ledger[0]->to_technician_id);
-        $this->assertEquals($this->cabang->id, $ledger[1]->to_pop_id);
+        $this->assertNull($ledger[1]->to_pop_id);
     }
 
     #[Test]
@@ -221,7 +229,8 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         $this->assertStringContainsString('SN pelanggan lama', InventoryTransaction::where('serial_id', $serial->id)->value('notes'));
         $this->assertNotNull($this->customer->customerDevice->refresh()->device_retrieved_at);
 
-        // Staf gudang mengoreksi model saat menerima.
+        // Staf gudang Cabang mengoreksi model saat menerima dari teknisi
+        // (observasi awal, masih bisa ditimpa lagi Pusat di Tahap 3).
         $this->actingAs($this->owner)
             ->post(route('warehouse.returns.receive.store', $serial), ['condition' => 'used_damaged', 'item_id' => $this->modem->id])
             ->assertSessionHas('success');
@@ -229,7 +238,7 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         $serial->refresh();
         $this->assertEquals($this->modem->id, $serial->item_id);
         $this->assertEquals(ItemCondition::USED_DAMAGED, $serial->condition);
-        $this->assertEquals(SerialStatus::AVAILABLE, $serial->status);
+        $this->assertEquals(SerialStatus::RETURNED, $serial->status);
     }
 
     #[Test]
@@ -442,6 +451,30 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         $this->actingAs($this->owner)
             ->get(route('warehouse.returns.receive.create', $serial))
             ->assertOk()
+            ->assertSee('Terima ke Gudang');
+    }
+
+    #[Test]
+    public function halaman_terima_retur_menampilkan_laporan_pengembalian_teknisi_secara_lengkap(): void
+    {
+        $serial = $this->makeInstalledSerial('DR-SN-FULL-REPORT');
+        $this->submitReport([
+            'serials' => [['serial_number' => 'DR-SN-FULL-REPORT', 'item_id' => '']],
+            'accessories' => ['adaptor', 'patchcord'],
+            'notes' => 'Modem ditarik kondisi utuh dari ruang tamu.',
+            'condition_photo' => UploadedFile::fake()->image('modem.jpg'),
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($this->owner)
+            ->get(route('warehouse.returns.receive.create', $serial))
+            ->assertOk()
+            ->assertSee('Laporan Pengembalian dari Lapangan')
+            ->assertSee('DR-SN-FULL-REPORT')
+            ->assertSee($this->customer->full_name)
+            ->assertSee('Adaptor')
+            ->assertSee('Patchcord')
+            ->assertSee('Modem ditarik kondisi utuh dari ruang tamu.')
+            ->assertSee('Foto Bukti Fisik Lapangan')
             ->assertSee('Terima ke Gudang');
     }
 }

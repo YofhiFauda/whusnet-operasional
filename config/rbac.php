@@ -415,17 +415,6 @@ return [
             ActionCode::VIEW->value,
         ],
 
-        // Dua permission tab lama DIPENSIUNKAN (ADHOC-06) — sengaja tetap
-        // digenerate biar role yang terlanjur punya gak error waktu resolusi
-        // permission, tapi sudah tidak menggerbangi route mana pun.
-        'noc_worksheet.masuk' => [
-            ActionCode::VIEW->value,
-        ],
-
-        'noc_worksheet.diproses' => [
-            ActionCode::VIEW->value,
-        ],
-
         'noc_dashboard' => [
             ActionCode::VIEW->value,
         ],
@@ -757,6 +746,12 @@ return [
     'view_autogrant_exempt' => [
         'cash_deposit',
         'customers',
+        // Bug 2026-10: mencentang kolektor.pay / kolektor.deposit / kolektor.visit
+        // dulu diam-diam mencentang kolektor.view (Worklist). Akibatnya, admin
+        // yang sengaja mencabut "Buka Worklist" untuk teknisi melihatnya kembali
+        // tercentang setelah disimpan. Worklist = halaman berbasis assignment,
+        // bukan hak yang otomatis ikut hak bayar.
+        'kolektor',
     ],
 
     /*
@@ -857,8 +852,6 @@ return [
         'tickets.history.view' => 'Lihat Halaman History Ticketing (semua tiket)',
         'tickets.history.export' => 'Ekspor History Ticketing ke Excel',
         'noc_worksheet.view' => 'Akses Modul Worksheet NOC',
-        'noc_worksheet.masuk.view' => '[Nonaktif] Tab Ticket Masuk — dilebur ke Worksheet NOC',
-        'noc_worksheet.diproses.view' => '[Nonaktif] Tab Ticket Diproses — dilebur ke Worksheet NOC',
         'noc_dashboard.view' => 'Lihat Halaman Dashboard NOC',
         'noc_dashboard.performance.view' => 'Lihat Leaderboard Performa Individu (Helpdesk/NOC)',
 

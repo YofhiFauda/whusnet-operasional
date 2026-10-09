@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DepositStatus;
+use App\Models\BankAccount;
 use App\Models\CollectorDeposit;
 use App\Models\CollectorVisit;
 use App\Services\CollectorBalanceService;
 use App\Services\CollectorWorklistService;
+use App\Services\CustomerBalanceService;
+use App\Support\LikeSearch;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -35,9 +39,17 @@ class CollectorWorklistController extends Controller
         private readonly CollectorBalanceService $balance,
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         $collector = $request->user();
+
+        // Teknisi (termasuk PIC gudang) TIDAK punya worklist kolektor. Pelanggan
+        // teknisi tidak di-assign admin, jadi worklist ini (yang berbasis
+        // assignment) tidak pernah relevan buat mereka. Teknisi dikirim ke
+        // halaman Catat Pembayaran yang mencari pelanggan dalam POP scope-nya.
+        if ($collector->isTechnician()) {
+            return redirect()->route('technician-payments.index');
+        }
 
         // Dua tab: `tagihan` (default, siapa yang perlu didatangi) dan
         // `bayar` (siapa yang SUDAH bayar dan uangnya sedang menunggu
@@ -46,7 +58,7 @@ class CollectorWorklistController extends Controller
         // ikut ke setoran itu, bukan cuma total saldonya.
         $tab = $request->query('tab') === 'bayar' ? 'bayar' : 'tagihan';
 
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
 
         $query = $this->worklist->dueInvoices($collector, $collector);
 
@@ -114,10 +126,15 @@ class CollectorWorklistController extends Controller
                 ->withQueryString()
             : null;
 
+        $bankAccounts = BankAccount::activeOptions();
+        $customerBalances = app(CustomerBalanceService::class)->balancesForCustomers(
+            collect($invoices->items())->pluck('customer_id')->all()
+        );
+
         return view('collector-worklist.index', compact(
             'tab', 'invoices', 'canPay', 'canDeposit', 'canLogVisit',
             'balance', 'unsettledCount', 'outstandingShortfall', 'pendingDeposits',
-            'unsettledPayments', 'visitCandidates', 'todayVisits', 'search',
+            'unsettledPayments', 'visitCandidates', 'todayVisits', 'search', 'bankAccounts', 'customerBalances',
         ));
     }
 }

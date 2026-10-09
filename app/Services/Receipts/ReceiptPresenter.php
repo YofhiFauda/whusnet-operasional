@@ -3,7 +3,10 @@
 namespace App\Services\Receipts;
 
 use App\Enums\BalanceMutationSource;
+use App\Enums\CollectorRole;
 use App\Enums\CustomerBalanceMutationType;
+use App\Enums\InvoiceType;
+use App\Enums\ManualInvoiceCategory;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Invoice;
@@ -125,8 +128,11 @@ class ReceiptPresenter
             'titip_saldo' => $this->titipSaldo($payment),
 
             'penerima' => $payment->receiver->name ?? '-',
+            // Pembayaran lapangan teknisi diberi penanda "Teknisi" supaya kwitansi
+            // tidak mengira orang itu kolektor (ADHOC-122, snapshot collected_by_role).
             'penagih' => $payment->collector?->name
-                ?: 'Kasir POP '.($payment->pop->name ?? '-'),
+                ? ($payment->collected_by_role === CollectorRole::TEKNISI->value ? 'Teknisi '.$payment->collector->name : $payment->collector->name)
+                : 'Kasir POP '.($payment->pop->name ?? '-'),
 
             // Catatan kosong tetap null. Versi A4 dulu mengarang kalimat
             // "Tagihan Bulanan…" saat catatan kosong, sehingga kwitansi
@@ -153,19 +159,22 @@ class ReceiptPresenter
     }
 
     /**
-     * "Pembayaran Layanan Internet Bulan {NamaBulan}" — bulan diambil dari
-     * `billing_period` invoice ('Y-m') kalau ada, fallback ke bulan
-     * `payment_date`. Suffix cicilan/pelunasan ditempel supaya info itu tidak
-     * hilang dari satu-satunya baris item kwitansi (ADHOC-94, tabel item
-     * tidak lagi punya baris "Keterangan" terpisah seperti struk lama).
+     * Keterangan item kwitansi dinamis per Jenis Tagihan:
+     * - BULANAN (atau default): "Pembayaran Layanan Internet Bulan {NamaBulan}"
+     * - AWAL: "Pembayaran Biaya Aktivasi Layanan"
+     * - MANUAL:
+     *     - Perbaikan: "Pembayaran Tagihan Perbaikan" (+ " ({description})" jika ada)
+     *     - Pindah Lokasi: "Pembayaran Tagihan Pindah Lokasi" (+ " ({description})" jika ada)
+     *     - Lainnya: "Pembayaran Tagihan {manual_subtype_name ?: description ?: 'Lainnya'}"
+     *     - Umum: "Pembayaran Tagihan Manual"
+     * - Tanpa invoice: "Pembayaran Saldo / Titip Bayar"
+     *
+     * Suffix cicilan/pelunasan ditempel supaya info itu tidak hilang dari satu-satunya
+     * baris item kwitansi (ADHOC-94).
      */
     private function keteranganItem(Payment $payment, ?Invoice $invoice): string
     {
-        $bulan = $invoice?->billing_period
-            ? Carbon::createFromFormat('Y-m', $invoice->billing_period)->locale('id')->translatedFormat('F')
-            : $payment->payment_date?->locale('id')->translatedFormat('F');
-
-        $keterangan = 'Pembayaran Layanan Internet Bulan '.($bulan ?: '-');
+        $keterangan = $this->resolveBaseKeterangan($payment, $invoice);
 
         $context = $payment->installmentContext();
 
@@ -174,6 +183,49 @@ class ReceiptPresenter
         }
 
         return $keterangan;
+    }
+
+    private function resolveBaseKeterangan(Payment $payment, ?Invoice $invoice): string
+    {
+        if (! $invoice) {
+            return 'Pembayaran Saldo / Titip Bayar';
+        }
+
+        $type = $invoice->invoice_type;
+
+        if ($type === InvoiceType::AWAL) {
+            return 'Pembayaran Biaya Aktivasi Layanan';
+        }
+
+        if ($type === InvoiceType::MANUAL) {
+            if ($invoice->manual_category === ManualInvoiceCategory::PERBAIKAN) {
+                return $invoice->description
+                    ? 'Pembayaran Tagihan Perbaikan ('.$invoice->description.')'
+                    : 'Pembayaran Tagihan Perbaikan';
+            }
+
+            if ($invoice->manual_category === ManualInvoiceCategory::PINDAH_LOKASI) {
+                return $invoice->description
+                    ? 'Pembayaran Tagihan Pindah Lokasi ('.$invoice->description.')'
+                    : 'Pembayaran Tagihan Pindah Lokasi';
+            }
+
+            if ($invoice->manual_category === ManualInvoiceCategory::LAINNYA) {
+                $sub = $invoice->manual_subtype_name ?: ($invoice->description ?: 'Lainnya');
+
+                return 'Pembayaran Tagihan '.$sub;
+            }
+
+            return $invoice->description
+                ? 'Pembayaran Tagihan Manual ('.$invoice->description.')'
+                : 'Pembayaran Tagihan Manual';
+        }
+
+        $bulan = $invoice->billing_period
+            ? Carbon::createFromFormat('Y-m', $invoice->billing_period)->locale('id')->translatedFormat('F')
+            : $payment->payment_date?->locale('id')->translatedFormat('F');
+
+        return 'Pembayaran Layanan Internet Bulan '.($bulan ?: '-');
     }
 
     /**

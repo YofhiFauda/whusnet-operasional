@@ -37,3 +37,7 @@ Schedule::command('webhook-outbox:prune')->dailyAt('01:15');
 // fop:reset-cancelled-tasks di atas, dihapus 2026-08-13) — arah command ini
 // SEBALIKNYA: melepas task yang belum final, bukan menghidupkan yang sudah.
 Schedule::command('tasks:auto-pending-overdue')->dailyAt('00:05');
+
+// Peringatan belum setor teknisi (ADHOC-122). Jam sama dengan config
+// `billing.technician_close_time` (default 23:59). Hanya notifikasi.
+Schedule::command('technicians:notify-unsettled')->dailyAt((string) config('billing.technician_close_time', '23:59'));

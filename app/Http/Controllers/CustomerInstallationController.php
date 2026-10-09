@@ -14,8 +14,10 @@ use App\Enums\WorkflowTransition;
 use App\Events\InstallationActivated;
 use App\Events\InstallationCompleted;
 use App\Events\InstallationStarted;
+use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\InternetPackage;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
@@ -24,6 +26,7 @@ use App\Models\Task;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
+use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
@@ -33,11 +36,13 @@ use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
 use App\Support\SafeUrl;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class CustomerInstallationController extends Controller
@@ -375,9 +380,26 @@ class CustomerInstallationController extends Controller
             ? $installFopTask->materials()->terpakai()->orderBy('id')->get()
             : collect();
 
-        $sourceRows = $existingUsage->isNotEmpty()
-            ? $existingUsage
-            : $materialService->estimatesForCustomer($customer);
+        // Estimasi survey sekarang per KATEGORI (bukan model), jadi patokannya
+        // dibaca dari equipment_class kategori. Estimasi TIDAK lagi di-prefill
+        // jadi baris realisasi: realisasi harus berasal dari custody (SN/roll/
+        // barang pasif yang benar-benar dibawa), jadi estimasi hanya tampil
+        // sebagai patokan di seksi yang sesuai.
+        //   - kategori AKTIF               → patokan seksi SN Perangkat Aktif
+        //   - kategori PASIF, satuan meter → patokan seksi Roll Kabel
+        //   - kategori PASIF, sisanya      → patokan seksi Perangkat Pasif
+        $estimasiAll = $materialService->estimatesForCustomer($customer);
+        $equipmentClassByCode = ItemCategory::whereIn('code', $estimasiAll->pluck('item_type')->filter()->unique())
+            ->get()
+            ->mapWithKeys(fn ($category) => [$category->code => $category->equipment_class?->value]);
+        $isAktif = fn ($row) => ($equipmentClassByCode[$row->item_type] ?? null) === EquipmentClass::AKTIF->value;
+
+        $estimasiPerangkatAktif = $estimasiAll->filter($isAktif)->values();
+        $estimasiPasifSemua = $estimasiAll->reject($isAktif)->values();
+        $estimasiRoll = $estimasiPasifSemua->filter(fn ($row) => $row->unit === 'meter')->values();
+        $estimasiPasif = $estimasiPasifSemua->reject(fn ($row) => $row->unit === 'meter')->values();
+
+        $sourceRows = $existingUsage;
 
         // Baris freeform ("Lainnya" — item_id null) TIDAK BISA di-prefill lagi
         // ke sini (koreksi lanjutan ADHOC-54, 2026-09-12) — dropdown Material
@@ -424,7 +446,12 @@ class CustomerInstallationController extends Controller
             && $installFopTask
             && $installFopTask->materials()->terpakai()->exists();
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames'));
+        // Dropdown untuk form koreksi Step 1 (kota) & Step 3 (paket internet).
+        $cities = City::orderBy('name')->get(['id', 'name']);
+        $internetPackages = InternetPackage::orderBy('name')->get();
+        $surveyFields = $customer->latestSurvey?->difficultyAndNote() ?? ['difficulty_level' => null, 'survey_note' => null];
+
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -781,6 +808,168 @@ class CustomerInstallationController extends Controller
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Koreksi Step 1 (Data Diri) dari Laporan Pemasangan. Guard sama dengan
+     * report(): status pemasangan harus berjalan dan teknisi wajib anggota tim
+     * Task pemasangan. Kota/kecamatan/desa & koordinat ikut dikirim dari form —
+     * updateIdentity() menulis ulang customer_addresses, jadi yang tidak ikut
+     * terkirim akan ter-null-kan.
+     */
+    public function updateIdentity(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->abortUnlessInstallationReportEditable($customer);
+
+        $validated = $request->validate([
+            'full_name' => 'required|string|max:150',
+            'identity_number' => 'nullable|string|size:16|regex:/^[0-9]+$/',
+            'primary_phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'alternative_phone' => ['nullable', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'email' => 'nullable|email|max:100',
+            'address' => 'required|string',
+            'city_id' => 'nullable|exists:cities,id',
+            'district_id' => 'nullable|exists:districts,id',
+            'village_id' => 'nullable|exists:villages,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateIdentity($customer, $validated, $request->user());
+
+        return $this->redirectBackToInstallationReport($request, $customer, 'Data diri pelanggan diperbarui.');
+    }
+
+    /**
+     * Koreksi Step 3 (Paket Internet) dari Laporan Pemasangan — dipakai saat
+     * pemasangan menemukan paket yang dipilih saat registrasi tidak sesuai.
+     */
+    public function updatePackage(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->abortUnlessInstallationReportEditable($customer);
+
+        $validated = $request->validate([
+            'internet_package_id' => 'required|exists:internet_packages,id',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+
+        return $this->redirectBackToInstallationReport($request, $customer, 'Paket internet pelanggan diperbarui.');
+    }
+
+    /**
+     * Koreksi Step 4 (Laporan Survey Lapangan) dari Laporan Pemasangan. Survey
+     * yang dikoreksi di sini adalah laporan survey terakhir — sama dengan yang
+     * dibaca halaman ini.
+     */
+    public function updateSurveyData(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->abortUnlessInstallationReportEditable($customer);
+
+        $survey = $customer->latestSurvey()->first();
+        abort_unless($survey !== null, 422, 'Pelanggan ini belum punya data survey untuk dikoreksi.');
+
+        $validated = $request->validate([
+            'nearest_odp' => 'nullable|string|max:255',
+            'cable_estimation_meter' => 'nullable|integer|min:0',
+            'requested_installation_date' => 'nullable|date',
+            'difficulty_level' => 'nullable|in:MUDAH,SEDANG,SULIT',
+            'survey_note' => 'nullable|string',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateSurveyData($survey, $validated, $request->user());
+
+        return $this->redirectBackToInstallationReport($request, $customer, 'Laporan survey diperbarui.');
+    }
+
+    /**
+     * Ganti foto Step 2 (Foto Rumah & Foto ODP) dari Laporan Pemasangan. Foto
+     * yang diganti dihapus dari disk, sama seperti penggantian di survey.
+     * Field yang tidak diisi dibiarkan apa adanya.
+     */
+    public function updatePhotos(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->abortUnlessInstallationReportEditable($customer);
+
+        $survey = $customer->latestSurvey()->first();
+        abort_unless($survey !== null, 422, 'Pelanggan ini belum punya data survey untuk diganti fotonya.');
+
+        $validated = $request->validate([
+            'house_photo' => 'nullable|image|max:2048',
+            'survey_photo' => 'nullable|image|max:2048',
+        ]);
+
+        // Urutan aman: unggah foto baru → simpan DB → baru hapus foto lama. Dulu
+        // foto lama dihapus dulu; kalau unggah/simpan gagal, record masih menunjuk
+        // file yang sudah hilang dan tidak bisa dipulihkan.
+        $changes = [];
+        $oldPaths = [];
+        foreach (['house_photo' => 'house', 'survey_photo' => 'odp'] as $field => $photoType) {
+            if (! $request->hasFile($field)) {
+                continue;
+            }
+
+            $changes[$field] = FileUploadService::uploadSurveyPhoto($request->file($field), $customer, $photoType);
+
+            if ($survey->{$field}) {
+                $oldPaths[] = $survey->{$field};
+            }
+        }
+
+        if ($changes !== []) {
+            try {
+                DB::transaction(fn () => $survey->update($changes));
+            } catch (\Throwable $e) {
+                // Foto baru yatim kalau DB gagal: bersihkan, foto lama dibiarkan.
+                foreach ($changes as $newPath) {
+                    Storage::disk('public')->delete($newPath);
+                }
+
+                throw $e;
+            }
+
+            foreach ($oldPaths as $oldPath) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+
+        return $this->redirectBackToInstallationReport($request, $customer, $changes === [] ? 'Tidak ada foto yang diganti.' : 'Foto survey diperbarui.');
+    }
+
+    /**
+     * Guard edit Step 1–4 Laporan Pemasangan — sama dengan report(): permission,
+     * status, dan keanggotaan tim Task pemasangan (no exemption untuk NOC).
+     */
+    private function abortUnlessInstallationReportEditable(Customer $customer): void
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
+
+        abort_unless(
+            in_array($customer->status, ['installation_in_progress', 'revision_installation'], true),
+            403,
+            'Data pelanggan hanya bisa diubah selama tahap pemasangan berjalan.'
+        );
+
+        $task = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->whereIn('status', TaskStatus::reportableValues())
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($task && $task->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
+        );
+    }
+
+    private function redirectBackToInstallationReport(Request $request, Customer $customer, string $message): RedirectResponse
+    {
+        $returnTo = SafeUrl::resolveReturnTo($request->input('return_to'), 'verifications.queue');
+
+        return redirect()->route('customers.installation.report', ['customer' => $customer, 'return_to' => $returnTo])
+            ->with('success', $message);
     }
 
     /**

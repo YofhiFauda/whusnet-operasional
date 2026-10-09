@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\InvoiceType;
+use App\Enums\ManualInvoiceCategory;
 use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\CustomerService;
@@ -98,6 +101,60 @@ class PaymentReceiptPrintTest extends TestCase
         $response = $this->actingAs($user)->get(route('payments.receipt', $payment->id));
 
         $response->assertForbidden();
+    }
+
+    public function test_receipt_shows_dynamic_item_description_for_different_invoice_types(): void
+    {
+        $this->loginAsAdmin();
+        $pop = $this->createPop('POP-DYN-1', 'DYN1', 'POP Dynamic Test');
+
+        // 1. Bulanan
+        $pBulanan = $this->createPayment($pop, 'INV-202606-B001', 'PAY-202606-B001');
+        $resBulanan = $this->get(route('payments.receipt', $pBulanan->id));
+        $resBulanan->assertSee('Pembayaran Layanan Internet Bulan Juni (Cicilan Ke-1)');
+
+        // 2. Awal (Aktivasi)
+        $pAwal = $this->createPayment($pop, 'INV-202606-A001', 'PAY-202606-A001');
+        $invAwal = $pAwal->invoice;
+        $invAwal->invoice_type = InvoiceType::AWAL;
+        $invAwal->paid_amount = 150000;
+        $invAwal->remaining_amount = 0;
+        $invAwal->invoice_status = InvoiceStatus::LUNAS;
+        $invAwal->save();
+        $pAwal->amount = 150000;
+        $pAwal->save();
+        $resAwal = $this->get(route('payments.receipt', $pAwal->id));
+        $resAwal->assertSee('Pembayaran Biaya Aktivasi Layanan (Pelunasan)');
+
+        // 3. Manual - Perbaikan
+        $pPerbaikan = $this->createPayment($pop, 'INV-202606-M001', 'PAY-202606-M001');
+        $invPerbaikan = $pPerbaikan->invoice;
+        $invPerbaikan->invoice_type = InvoiceType::MANUAL;
+        $invPerbaikan->manual_category = ManualInvoiceCategory::PERBAIKAN;
+        $invPerbaikan->description = 'Ganti Adaptor';
+        $invPerbaikan->paid_amount = 150000;
+        $invPerbaikan->remaining_amount = 0;
+        $invPerbaikan->invoice_status = InvoiceStatus::LUNAS;
+        $invPerbaikan->save();
+        $pPerbaikan->amount = 150000;
+        $pPerbaikan->save();
+        $resPerbaikan = $this->get(route('payments.receipt', $pPerbaikan->id));
+        $resPerbaikan->assertSee('Pembayaran Tagihan Perbaikan (Ganti Adaptor) (Pelunasan)');
+
+        // 4. Manual - Lainnya (Denda Putus Langganan / Over Kabel)
+        $pLainnya = $this->createPayment($pop, 'INV-202606-M002', 'PAY-202606-M002');
+        $invLainnya = $pLainnya->invoice;
+        $invLainnya->invoice_type = InvoiceType::MANUAL;
+        $invLainnya->manual_category = ManualInvoiceCategory::LAINNYA;
+        $invLainnya->manual_subtype_name = 'Denda Putus Langganan';
+        $invLainnya->paid_amount = 150000;
+        $invLainnya->remaining_amount = 0;
+        $invLainnya->invoice_status = InvoiceStatus::LUNAS;
+        $invLainnya->save();
+        $pLainnya->amount = 150000;
+        $pLainnya->save();
+        $resLainnya = $this->get(route('payments.receipt', $pLainnya->id));
+        $resLainnya->assertSee('Pembayaran Tagihan Denda Putus Langganan (Pelunasan)');
     }
 
     protected function createPop(string $code, string $popCode, string $name): Pop

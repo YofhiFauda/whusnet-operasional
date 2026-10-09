@@ -661,6 +661,14 @@ QR statis **bisa difoto** — teknisi bisa menyimpan foto QR semua pelanggannya 
 - Tidak menduplikasi logika start di controller. `TaskService::start()` tetap satu-satunya penulis transisi.
 - Tidak menghapus tombol "Mulai Task" manual.
 
+**Status implementasi (2026-10-05):** dibangun. Penyimpangan dari rancangan di atas, disengaja:
+- `tasks.started_via` NULL = mulai manual (tidak diisi `'manual'` supaya jalur lama tidak disentuh). `'qr_scan'` = via absen.
+- Task hari ini lebih dari satu → ditolak dengan pesan, bukan halaman pilihan. Teknisi mulai manual dari halaman Task.
+- GPS ditolak/timeout → tetap dikirim tanpa koordinat (`tanpa_koordinat`), tidak diblokir.
+- Radius di `config/qr.php` (`attendance_radius_meters` 150, `attendance_hard_limit_meters` 500), bisa diatur lewat env.
+- Dispatch: cabang absen ada di paling depan, hanya untuk user yang benar-benar anggota tim task hari ini (owner tanpa penugasan tidak terkena).
+- Kode: `QrAttendanceService`, `QrAttendanceController`, route `qr.attendance.show|store`, view `qr/attendance.blade.php`, test `tests/Feature/QrCode/QrAttendanceTest.php` (13 test hijau).
+
 **Analisa kelayakan tanpa peta (2026-10-05):**
 
 Absen QR **bisa diimplementasi tanpa fitur map**. Map hanya untuk tampilan; guard radius cuma butuh angka koordinat.

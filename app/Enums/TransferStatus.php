@@ -29,4 +29,18 @@ enum TransferStatus: string
             self::RECEIVED_PARTIAL => 'Diterima Sebagian',
         };
     }
+
+    /**
+     * Varian badge (.badge-* di app.css) — dipakai daftar Transfer (analisa-ui-ux
+     * §S3). Kuning = masih dalam perjalanan (perlu konfirmasi), hijau = beres,
+     * merah = ada selisih yang perlu ditindaklanjuti.
+     */
+    public function badgeVariant(): string
+    {
+        return match ($this) {
+            self::IN_TRANSIT => 'warning',
+            self::RECEIVED => 'success',
+            self::RECEIVED_PARTIAL => 'error',
+        };
+    }
 }

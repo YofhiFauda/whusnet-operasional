@@ -142,6 +142,46 @@
         </div>
     </div>
 
+    {{-- Teknisi pemegang uang pembayaran lapangan (ADHOC-122). Peringatan saja. --}}
+    <div class="rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-white dark:bg-slate-800 p-4 space-y-3">
+        <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Teknisi — Saldo Belum Disetor</div>
+            <span class="text-[11px] text-slate-500">Peringatan tutup hari: {{ config('billing.technician_close_time') }}</span>
+        </div>
+        @if($technicianStatus->isEmpty())
+            <p class="text-xs text-slate-500">Tidak ada teknisi yang memegang saldo.</p>
+        @else
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="text-[11px] uppercase text-slate-500">
+                        <tr>
+                            <th class="px-3 py-2 text-left">Teknisi</th>
+                            <th class="px-3 py-2 text-right">Saldo</th>
+                            <th class="px-3 py-2 text-left">Tertua dari</th>
+                            <th class="px-3 py-2 text-left">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @foreach($technicianStatus as $row)
+                            <tr>
+                                <td class="px-3 py-2 font-semibold">{{ $row['user']->name }}</td>
+                                <td class="px-3 py-2 text-right font-mono">Rp {{ number_format($row['balance'], 0, ',', '.') }}</td>
+                                <td class="px-3 py-2">{{ $row['oldest_collected_date'] ? \Carbon\Carbon::parse($row['oldest_collected_date'])->translatedFormat('d M Y') : '-' }}</td>
+                                <td class="px-3 py-2">
+                                    @if($row['overdue'])
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Belum setor</span>
+                                    @else
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Berjalan</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
     {{-- Main Worksheet Layout (Mobile Tabs + Desktop 2 Columns) --}}
     <div x-data="{ activeMobileTab: 'collectors', searchFilter: '' }" class="space-y-4">
         {{-- Mobile Switcher Buttons (Hidden on LG screens) --}}

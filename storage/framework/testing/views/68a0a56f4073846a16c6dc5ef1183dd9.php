@@ -716,24 +716,29 @@
                 // Sejak kolomnya jadi teks bermasking, cek itu harus di sini —
                 // kalau tidak, nominal 0 baru ketahuan salah setelah bolak-balik
                 // ke server.
-                const nominal = qpNominal();
-                if (isNaN(nominal) || nominal < 1) {
-                    errorBox.textContent = 'Nominal wajib diisi minimal Rp 1.';
+                const nominal = isNaN(qpNominal()) ? 0 : qpNominal();
+                const useBalance = qpUseBalanceAmount();
+                const totalPayment = nominal + useBalance;
+
+                if (totalPayment < 1) {
+                    errorBox.textContent = 'Nominal pembayaran wajib diisi minimal Rp 1 atau menggunakan Saldo Pelanggan.';
                     errorBox.classList.remove('hidden');
                     document.getElementById('qp-amount').focus();
                     return;
                 }
 
                 const method = document.getElementById('qp-payment-method').value;
-                if (method === 'transfer' && !document.getElementById('qp-bank-account').value) {
-                    errorBox.textContent = 'Pilih rekening tujuan untuk metode Transfer.';
-                    errorBox.classList.remove('hidden');
-                    return;
-                }
-                if (method === 'kolektor' && !document.getElementById('qp-collector').value) {
-                    errorBox.textContent = 'Pilih kolektor untuk metode Kolektor.';
-                    errorBox.classList.remove('hidden');
-                    return;
+                if (nominal > 0) {
+                    if (method === 'transfer' && !document.getElementById('qp-bank-account').value) {
+                        errorBox.textContent = 'Pilih rekening tujuan untuk metode Transfer.';
+                        errorBox.classList.remove('hidden');
+                        return;
+                    }
+                    if (method === 'kolektor' && !document.getElementById('qp-collector').value) {
+                        errorBox.textContent = 'Pilih kolektor untuk metode Kolektor.';
+                        errorBox.classList.remove('hidden');
+                        return;
+                    }
                 }
                 // 'note' yang dikirim ke server SELALU terisi (diawali label
                 // Alokasi, lihat konstruksi payload di bawah), jadi
@@ -784,7 +789,6 @@
                     payload.append('collected_by', document.getElementById('qp-collector').value);
                 }
 
-                const useBalance = qpUseBalanceAmount();
                 if (useBalance > 0) {
                     payload.append('use_balance_amount', useBalance);
                 }

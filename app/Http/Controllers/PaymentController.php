@@ -17,6 +17,7 @@ use App\Services\CustomerBalanceService;
 use App\Services\FileUploadService;
 use App\Services\PaymentService;
 use App\Services\Receipts\ReceiptPresenter;
+use App\Support\LikeSearch;
 use App\Support\Money;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
@@ -37,7 +38,7 @@ class PaymentController extends Controller
      */
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $popId = $request->query('pop_id', '');
         $dateFrom = trim((string) $request->query('date_from', ''));
         $dateTo = trim((string) $request->query('date_to', ''));
@@ -142,7 +143,7 @@ class PaymentController extends Controller
      */
     public function overpay(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $popId = $request->query('pop_id', '');
 
         $query = Payment::query()
@@ -324,6 +325,13 @@ class PaymentController extends Controller
         // Tanpa normalisasi ini titiknya dibaca sebagai desimal Inggris dan
         // pembayaran tercatat 1.000 kali lebih kecil TANPA satu pun error.
         $request->merge(['amount' => RupiahInput::parse($request->input('amount'))]);
+        if ($request->filled('use_balance_amount')) {
+            $request->merge(['use_balance_amount' => RupiahInput::parse($request->input('use_balance_amount'))]);
+        }
+
+        if ((float) $request->input('amount') === 0.0 && (float) $request->input('use_balance_amount') > 0) {
+            $request->merge(['payment_method' => PaymentMethod::CASH->value]);
+        }
 
         // Aturan bersama dengan update() (Edit Pembayaran, ADHOC-108) — lihat
         // paymentRules(). `amount` = TOTAL uang tunai/transfer/kolektor yang
@@ -332,7 +340,7 @@ class PaymentController extends Controller
         // jadi overpay_amount di transaction PaymentService — admin tak
         // perlu hitung sendiri "sisa tagihan dikurangi total" (2026-08-04,
         // lihat docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §D-5).
-        $validated = $request->validate($this->paymentRules(forUpdate: false));
+        $validated = $request->validate($this->paymentRules(forUpdate: false, request: $request));
 
         $proofPath = null;
         if ($request->hasFile('proof_file')) {
@@ -635,7 +643,7 @@ class PaymentController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function paymentRules(bool $forUpdate): array
+    private function paymentRules(bool $forUpdate, ?Request $request = null): array
     {
         $rules = [
             'payment_date' => 'required|date|before_or_equal:today',
@@ -659,7 +667,19 @@ class PaymentController extends Controller
                 },
             ],
             'use_balance_amount' => 'nullable|numeric|min:0',
-            'amount' => 'required|numeric|min:1|max:99999999.99',
+            'amount' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:99999999.99',
+                function ($attribute, $value, $fail) use ($request) {
+                    $amount = (float) $value;
+                    $useBalance = (float) ($request?->input('use_balance_amount') ?? 0);
+                    if (($amount + $useBalance) < 1) {
+                        $fail('Nominal pembayaran wajib diisi minimal Rp 1 atau menggunakan Saldo Pelanggan.');
+                    }
+                },
+            ],
             'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
             'note' => 'required_if:payment_method,lainnya|nullable|string|max:1000',
         ];
@@ -711,7 +731,11 @@ class PaymentController extends Controller
             $request->merge(['use_balance_amount' => RupiahInput::parse($request->input('use_balance_amount'))]);
         }
 
-        $validated = $request->validate($this->paymentRules(forUpdate: true));
+        if ((float) $request->input('amount') === 0.0 && (float) $request->input('use_balance_amount') > 0) {
+            $request->merge(['payment_method' => PaymentMethod::CASH->value]);
+        }
+
+        $validated = $request->validate($this->paymentRules(forUpdate: true, request: $request));
 
         $proofPath = null;
         if ($request->hasFile('proof_file')) {

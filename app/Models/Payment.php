@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentPeriodType;
 use App\Enums\PaymentStatus;
+use App\Services\NumberSequenceService;
 use App\Support\BookPeriod;
 use App\Support\Money;
 use App\Traits\HasPopScope;
@@ -12,7 +13,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Facades\DB;
 
 class Payment extends Model
 {
@@ -45,6 +45,7 @@ class Payment extends Model
         'overpay_amount',
         'received_by',
         'collected_by',
+        'collected_by_role',
         'proof_file',
         'payment_status',
         'reject_reason',
@@ -460,57 +461,52 @@ class Payment extends Model
     }
 
     /**
-     * Generate `payment_number` berikutnya untuk periode (Ym) tanggal bayar
-     * yang diberikan. Format: `PAY-{Ym}-{nomor berjalan}`.
+     * Generate `payment_number` untuk payment baru pada `$invoice`. Format:
+     * `PAY-{invoice_number}` untuk lunas sekali bayar, atau
+     * `PAY-{invoice_number}-{NN}` untuk cicilan (keputusan user 2026-10-02,
+     * revisi BUG 13/2026-10-01 — versi lama nempelin `-01` bahkan ke
+     * pembayaran lunas sekali bayar, bikin laporan susah bedain
+     * lunas-langsung vs cicilan dari nomornya saja).
+     * `invoice_number`-nya ditempel APA ADANYA (bukan dipetakan ulang ke
+     * prefix) — Payment dan Invoice yang sama langsung kelihatan berpasangan
+     * dari bentuk nomornya.
      *
-     * Pengganti MAX+1 (`orderBy(...)->lockForUpdate()->first()`) yang lama —
-     * pola itu tak mengunci apa pun kalau belum ada payment di periode itu
-     * (phantom read: dua request pertama bulan itu bisa dapat nomor sama).
-     * Di sini yang dikunci adalah baris `payment_number_sequences`, yang
-     * SELALU ada setelah dibuat sekali — pola sama `Pop::generateRegistrationNumber()`.
+     * `{NN}` CUMA muncul kalau pembayaran ini bagian dari cicilan — yaitu
+     * bukan pembayaran pertama pada invoice ini ($ordinal > 1), ATAU
+     * pembayaran pertama itu sendiri tidak langsung melunasi sisa tagihan
+     * ($appliedAmount < remaining_amount saat itu). Begitu sebuah invoice
+     * "ketahuan" cicilan (ordinal > 1), SEMUA baris di invoice itu termasuk
+     * yang nanti melunasi sisanya tetap kebagian `-NN` — nomor pertama yang
+     * sudah dicetak tanpa suffix TIDAK diubah lagi (beku begitu dicetak).
      *
-     * Sinkronisasi dengan MAX existing tetap dilakukan (jaga-jaga data lama/
-     * import yang penomorannya di luar sequence ini), sama seperti pola POP.
+     * `{NN}` = urutan pembayaran ke berapa pada invoice ini (2 digit), dari
+     * counter NumberSequenceService — SEMUA pembayaran dihitung apa pun
+     * statusnya (termasuk yang nanti ditolak atau di-hard delete), angka
+     * TIDAK PERNAH dipakai ulang. Ini SENGAJA beda basis dari badge "Cicilan Ke-N" di UI
+     * (`installmentContext()`, cuma menghitung yang VALID): nomor di sini
+     * identitas HISTORIS yang beku begitu dicetak, badge UI itu status
+     * TERKINI yang boleh bergeser kalau ada payment lama yang ditolak
+     * belakangan. Dua hal berbeda, jangan disamakan paksa.
      *
-     * Lebar digit menyesuaikan otomatis begitu nomor berjalan lewat 9999
-     * (dari %04d ke %05d, dst) — bukan dipatok statis, supaya nomor lama
-     * (4 digit) tetap valid dan generator tak jebol di skala tinggi
-     * (docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §A-7 #5).
+     * `$appliedAmount` wajib bagian yang menutup tagihan SAJA (bukan
+     * `overpay_amount`) — pemanggil sudah memisahkannya lewat
+     * `splitAmount()`/`Money::min()` sebelum ke sini.
+     *
+     * WAJIB dipanggil di dalam transaksi yang sama dengan `Payment::create()`
+     * (semua pemanggil sudah begitu) supaya kenaikan counter ikut rollback.
      */
-    public static function generatePaymentNumber(string $paymentDate): string
+    public static function generatePaymentNumber(Invoice $invoice, mixed $appliedAmount): string
     {
-        $periodCode = date('Ym', strtotime($paymentDate));
+        $ordinal = app(NumberSequenceService::class)->paymentOrdinal($invoice);
 
-        return DB::transaction(function () use ($periodCode): string {
-            $sequence = PaymentNumberSequence::query()
-                ->where('period_code', $periodCode)
-                ->lockForUpdate()
-                ->first();
+        $lunasSekaliBayar = $ordinal === 1
+            && Money::compare($appliedAmount, $invoice->remaining_amount) >= 0;
 
-            if (! $sequence) {
-                $sequence = PaymentNumberSequence::create([
-                    'period_code' => $periodCode,
-                    'current_number' => 0,
-                ]);
-            }
+        if ($lunasSekaliBayar) {
+            return "PAY-{$invoice->invoice_number}";
+        }
 
-            $numberStartsAt = strlen('PAY-'.$periodCode.'-') + 1;
-
-            $maxExisting = static::where('payment_number', 'like', "PAY-{$periodCode}-%")
-                ->selectRaw("MAX(CAST(SUBSTRING(payment_number, {$numberStartsAt}) AS UNSIGNED)) as max_num")
-                ->value('max_num') ?? 0;
-
-            if ($maxExisting >= $sequence->current_number) {
-                $sequence->current_number = $maxExisting;
-            }
-
-            $sequence->current_number++;
-            $sequence->save();
-
-            $width = max(4, strlen((string) $sequence->current_number));
-
-            return sprintf("PAY-%s-%0{$width}d", $periodCode, $sequence->current_number);
-        });
+        return sprintf('PAY-%s-%02d', $invoice->invoice_number, $ordinal);
     }
 
     /**

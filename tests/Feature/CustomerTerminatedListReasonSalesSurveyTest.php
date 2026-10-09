@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
-use App\Models\CustomerSurvey;
 use App\Models\CustomerTerminationReason;
 use App\Models\Pop;
 use App\Models\Role;
@@ -41,53 +40,60 @@ class CustomerTerminatedListReasonSalesSurveyTest extends TestCase
     }
 
     #[Test]
-    public function menampilkan_alasan_sales_dan_teknisi_survei_dari_relasi(): void
+    public function menampilkan_alasan_dan_pelaku_input_dari_creator_atau_registered_by_name(): void
     {
         $this->loginAsAdmin();
 
         $reason = CustomerTerminationReason::create(['name' => 'Kompetitor']);
-        $salesRole = Role::where('code', 'sales')->first();
-        $sales = User::factory()->create(['role_id' => $salesRole->id, 'name' => 'Budi Sales', 'status' => 'active']);
-        $teknisiRole = Role::where('code', 'teknisi')->first();
-        $teknisi = User::factory()->create(['role_id' => $teknisiRole->id, 'name' => 'Andi Teknisi', 'status' => 'active']);
+        $adminRole = Role::where('code', 'admin')->first();
+        $inputter = User::factory()->create(['role_id' => $adminRole->id, 'name' => 'Siti Admin Input', 'status' => 'active']);
 
-        $customer = Customer::create([
+        $customer1 = Customer::create([
             'customer_code' => 'C-LST-000001',
-            'full_name' => 'Pelanggan List',
+            'full_name' => 'Pelanggan List Creator',
             'primary_phone' => '081200000010',
             'registration_date' => now(),
             'pop_id' => $this->pop->id,
             'status' => 'terminated',
             'terminated_at' => now(),
             'termination_reason_id' => $reason->id,
-            'sales_user_id' => $sales->id,
+            'created_by' => $inputter->id,
         ]);
 
-        CustomerSurvey::create([
-            'customer_id' => $customer->id,
-            'technician_id' => $teknisi->id,
-            'survey_status' => 'completed',
+        $customer2 = Customer::create([
+            'customer_code' => 'C-LST-000002',
+            'full_name' => 'Pelanggan List Legacy',
+            'primary_phone' => '081200000011',
+            'registration_date' => now(),
+            'pop_id' => $this->pop->id,
+            'status' => 'terminated',
+            'terminated_at' => now(),
+            'termination_reason_id' => $reason->id,
+            'registered_by_name' => 'Rina CS Legacy',
         ]);
 
         $response = $this->get(route('customers.terminated'));
 
         $response->assertOk();
+        $response->assertSee('Input Oleh');
         $response->assertSee('Kompetitor');
-        $response->assertSee('Budi Sales');
-        $response->assertSee('Andi Teknisi');
+        $response->assertSee('Siti Admin Input');
+        $response->assertSee('Rina CS Legacy');
+        $response->assertDontSee('<th scope="col" class="py-3.5 px-4">Sales</th>', false);
+        $response->assertDontSee('<th scope="col" class="py-3.5 px-4">Teknisi Survei</th>', false);
     }
 
     #[Test]
-    public function pelanggan_tanpa_sales_atau_survei_tampil_strip(): void
+    public function pelanggan_tanpa_pelaku_input_tampil_strip(): void
     {
         $this->loginAsAdmin();
 
         $reason = CustomerTerminationReason::create(['name' => 'Alasan Sepi']);
 
         Customer::create([
-            'customer_code' => 'C-LST-000002',
+            'customer_code' => 'C-LST-000003',
             'full_name' => 'Pelanggan Tanpa Relasi',
-            'primary_phone' => '081200000011',
+            'primary_phone' => '081200000014',
             'registration_date' => now(),
             'pop_id' => $this->pop->id,
             'status' => 'terminated',

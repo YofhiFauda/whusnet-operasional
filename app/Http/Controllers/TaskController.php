@@ -660,7 +660,7 @@ class TaskController extends Controller
         $accessService = app(EffectiveAccessService::class);
 
         $query = User::with('role')
-            ->whereHas('role', fn ($q) => $q->where('code', 'teknisi'))
+            ->technicians()
             ->orderBy('name');
 
         // Pakai hasAllPopAccess(), bukan `! empty($allowedPopIds)`: getAllowedPopIds()

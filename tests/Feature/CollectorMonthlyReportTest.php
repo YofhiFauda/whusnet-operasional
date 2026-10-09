@@ -80,7 +80,7 @@ class CollectorMonthlyReportTest extends TestCase
         $aktivasi = $this->makeInvoice($this->branchA, '2026-08', 50000, 'awal');
         $this->makePayment($aktivasi, 50000, '2026-08-15');
 
-        $lain = $this->makeInvoice($this->branchA, '2026-08', 25000, 'insidental');
+        $lain = $this->makeInvoice($this->branchA, '2026-08', 25000, 'manual');
         $this->makePayment($lain, 25000, '2026-08-20', overpay: 5000);
     }
 

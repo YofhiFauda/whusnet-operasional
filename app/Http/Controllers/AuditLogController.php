@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Payment;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
@@ -14,7 +15,7 @@ class AuditLogController extends Controller
     {
         $module = trim((string) $request->query('module', ''));
         $action = trim((string) $request->query('action', ''));
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
 
         $query = AuditLog::query()
             ->with('user')

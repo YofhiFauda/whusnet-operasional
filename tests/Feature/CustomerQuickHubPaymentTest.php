@@ -9,6 +9,7 @@ use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerBalanceMutation;
+use App\Models\CustomerDevice;
 use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
@@ -305,5 +306,56 @@ class CustomerQuickHubPaymentTest extends TestCase
             'type' => CustomerBalanceMutationType::DEBIT->value,
             'amount' => 50000,
         ]);
+    }
+
+    public function test_payment_info_returns_complete_technical_profile(): void
+    {
+        $customer = $this->createCustomer();
+
+        CustomerDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'ont',
+            'brand' => 'ZTE',
+            'model' => 'F609',
+            'serial_number' => 'ZTEGC12345678',
+            'mac_address' => 'AA:BB:CC:DD:EE:FF',
+            'pppoe_username' => 'TEST_PPPOE_USER',
+            'vlan_id' => 120,
+            'odp' => 'ODP-SIMAN-01',
+            'odp_port' => 'Port 3',
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('customers.payment-info', $customer->id));
+
+        $response->assertOk()
+            ->assertJsonPath('technical.pppoe_username', 'TEST_PPPOE_USER')
+            ->assertJsonPath('technical.vlan', '120')
+            ->assertJsonPath('technical.onu_sn', 'ZTEGC12345678')
+            ->assertJsonPath('technical.brand_model', 'ZTE F609')
+            ->assertJsonPath('technical.distribution', 'ODP-SIMAN-01');
+    }
+
+    public function test_payment_info_returns_attenuation_falls_back_to_initial(): void
+    {
+        $customer = $this->createCustomer();
+
+        $customer->customerTechnicalDetail()->create([
+            'initial_attenuation' => -18.5,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('customers.payment-info', $customer->id));
+
+        $response->assertOk()
+            ->assertJsonPath('technical.attenuation', '-18.5 dBm');
+
+        $customer->customerTechnicalDetail->update(['actual_attenuation' => -21.2]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('customers.payment-info', $customer->id));
+
+        $response->assertOk()
+            ->assertJsonPath('technical.attenuation', '-21.2 dBm');
     }
 }

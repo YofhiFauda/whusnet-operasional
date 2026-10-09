@@ -173,8 +173,8 @@ class AuditLogGeneralTest extends TestCase
 
     public function test_owner_and_admin_pusat_can_view_audit_log_page(): void
     {
-        $adminPusat = User::factory()->create([
-            'role_id' => Role::where('name', 'Admin')->firstOrFail()->id,
+        $atasan = User::factory()->create([
+            'role_id' => Role::where('name', 'Atasan')->firstOrFail()->id,
             'status' => 'active',
         ]);
 
@@ -196,7 +196,7 @@ class AuditLogGeneralTest extends TestCase
             ->assertSee('Data Pelanggan')
             ->assertSee('Nama Baru');
 
-        $this->actingAs($adminPusat)
+        $this->actingAs($atasan)
             ->get(route('audit-logs.index'))
             ->assertOk()
             ->assertSee('Riwayat Perubahan Penting');
@@ -204,12 +204,12 @@ class AuditLogGeneralTest extends TestCase
 
     public function test_non_owner_admin_pusat_cannot_view_audit_log_page(): void
     {
-        $finance = User::factory()->create([
-            'role_id' => Role::where('name', 'Helpdesk')->firstOrFail()->id,
+        $admin = User::factory()->create([
+            'role_id' => Role::where('name', 'Admin')->firstOrFail()->id,
             'status' => 'active',
         ]);
 
-        $this->actingAs($finance)
+        $this->actingAs($admin)
             ->get(route('audit-logs.index'))
             ->assertForbidden();
     }

@@ -57,6 +57,7 @@ Role yang di-assign buat `customers.detail.devices.retrieve`: `admin`, `noc`, `f
 |---|---|---|---|
 | Tombol Ambil Alat (membuat task DEAC) | `customers.retrieve-device` | `customers.detail.devices.retrieve` | tidak berubah |
 | Teknisi mengisi Laporan Ambil Alat | `tasks.device-retrieval.{report,store}` | policy `TaskPolicy::statusComplete` (anggota tim task) | sama seperti laporan Maintenance |
+| Teknisi catat pembayaran pelanggan di lapangan (ADHOC-122) | `technician-payments.search`, `technician-payments.store` | `kolektor.pay` (matrix role `teknisi`) + gerbang `isTechnician()` di controller | dalam POP scope, tanpa assign; tidak masuk worklist kolektor; setor saldo lewat `kolektor.deposit`. Rancangan: `docs/plan/kolektor/rancangan-pembayaran-teknisi.md` |
 | Terima Retur (konfirmasi gudang) | `warehouse.returns.*` | `warehouse_reassign.create` | satu payung dengan "Sudah Dicek" & Reassign (keputusan user 2026-09-19); scope POP lewat gudang tujuan |
 | Terima modem dari pelanggan (tanpa task) | `warehouse.returns.from-customer.*` | `warehouse_reassign.create` | hanya pelanggan `terminated` dalam scope POP |
 | Riwayat Pengambilan Alat | `warehouse.retrievals.index` | `warehouse.view` | view-only, scope POP gudang tujuan |

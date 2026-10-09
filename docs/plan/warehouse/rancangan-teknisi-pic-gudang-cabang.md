@@ -1,7 +1,7 @@
 # Rancangan: Teknisi Merangkap PIC Gudang Cabang
 
 > **Status:** RANCANGAN — belum ada kode yang diubah.
-> **Dibuat:** 2026-09-29 · **Revisi:** 2026-09-30 (tambah pembagian tugas PIC Gudang vs POP Admin — §7; PIC boleh lapor rusak/hilang/opname)
+> **Dibuat:** 2026-09-29 · **Revisi:** 2026-09-30a (tambah pembagian tugas PIC Gudang vs POP Admin — §7; PIC boleh lapor rusak/hilang/opname) · **Revisi:** 2026-09-30b (pisahkan penunjukan PIC dari scope POP — §5.3, tabel `warehouse_pop_pics` — untuk kasus teknisi scope global yang PIC di 1 cabang saja)
 > **Modul tersentuh saat implementasi:** RBAC, Gudang (Warehouse), FOP Task, Task Teknisi, Customer (antrean Survey/Verifikasi).
 > **Dokumen terkait:** `docs/rbac/business-logic.md`, `docs/warehouse/business-logic.md`, `docs/plan/warehouse/kontrol-anti-manipulasi.md`, `docs/plan/analisa-celah-scope-pop.md`.
 
@@ -34,14 +34,15 @@ Di lapangan, **tiap cabang punya satu teknisi yang sekaligus menjadi PIC (penang
 - tetap bisa **diberi task** oleh FOP seperti teknisi biasa, dan
 - bisa **mengurus gudang cabangnya** (terima kiriman Pusat, keluarkan barang ke teknisi, ajukan permintaan stok, lapor rusak/hilang/opname).
 
-Sistem sekarang **belum mendukung** kombinasi ini. Solusinya bertumpu pada empat hal:
+Sistem sekarang **belum mendukung** kombinasi ini — termasuk kasus teknisi yang **scope-nya lintas cabang** (`all_pop`, misalnya teknisi senior/keliling) tapi cuma jadi PIC di **satu** cabang tertentu. Solusinya bertumpu pada lima hal:
 
 | # | Pilar | Isi singkat |
 |---|---|---|
 | 1 | **Satu definisi "siapa teknisi"** | Konstanta `Role::TECHNICIAN_CODES = ['teknisi', 'pic_gudang']`. Semua kode yang mencari teknisi memakai daftar ini, bukan string `'teknisi'`. |
 | 2 | **Satu role global `pic_gudang`** | Hak akses = hak Teknisi + hak gudang cabang. Berlaku untuk semua cabang. |
-| 3 | **Cabang lewat scope POP** | PIC Jetis = role `pic_gudang` + scope `selected_pop` → Jetis. PIC Siman = role yang sama + scope → Siman. |
+| 3 | **Penunjukan PIC TERPISAH dari scope POP** | Scope (`user_role_scopes`) menjawab "data mana yang boleh dia lihat". Tabel baru `warehouse_pop_pics` menjawab "gudang cabang mana dia jadi penanggung jawab" — dua pertanyaan berbeda, dua sumber berbeda. Detail §5.3. |
 | 4 | **PIC pelaksana, POP Admin pemeriksa** | PIC menjalankan gudang sehari-hari. POP Admin menangani hal yang tidak boleh PIC lakukan untuk dirinya sendiri (issue barang **ke** PIC). Pusat memantau laporan rusak/hilang. Detail §7. |
+| 5 | **Aksi tulis gudang dibatasi ke cabang penunjukan, bukan ke seluruh scope** | PIC dengan scope `all_pop` tetap bisa lihat & kerjakan task di semua cabang, tapi issue/terima/adjustment/request stok cuma jalan di cabang yang dia ditunjuk. Detail §8 Kelompok H. |
 
 Role `pic_gudang_jetis` yang sempat dibuat lewat UI **tidak dipakai** dan dihapus (lihat §11).
 
@@ -156,17 +157,90 @@ Catatan: `Role::isTechnicianRole()` sekarang membandingkan **name** (`'Teknisi'`
 | `is_system` | `true` — code terkunci di UI, karena dirujuk `TECHNICIAN_CODES` |
 | `is_package_restricted` | `true` — sama seperti Teknisi. Whitelist `restricted_packages` bersifat global (tanpa `role_id`), jadi **tidak perlu konfigurasi tambahan** di Business Development. |
 
-### 5.3 Pilar 3 — Cabang lewat scope POP
+### 5.3 Pilar 3 — Penunjukan PIC terpisah dari scope POP
 
-| User | Role | Scope | Target |
+#### 5.3.1 Kenapa scope saja tidak cukup
+
+Rancangan awal (2026-09-29) menyimpulkan "cabang PIC" langsung dari scope-nya: `selected_pop → Jetis` berarti "PIC Jetis". Ini gagal begitu ada **teknisi yang scope-nya lintas cabang** (`all_pop`, misalnya teknisi senior yang membantu task di cabang mana pun) tapi cuma ditunjuk jadi PIC di **satu** cabang. Scope-nya "semua", tapi "PIC di mana" gak bisa dijawab dari situ.
+
+Jadi scope dan penunjukan PIC adalah **dua pertanyaan berbeda**, dan harus punya **dua sumber data berbeda**:
+
+| Pertanyaan | Dijawab oleh |
+|---|---|
+| Data pelanggan/task mana yang boleh dia lihat & kerjakan | Scope (`user_role_scopes`) — bisa `all_pop`, `selected_pop`, `pop_tree` |
+| Gudang cabang mana dia jadi penanggung jawab (boleh issue/terima/adjustment/request stok) | Tabel baru **`warehouse_pop_pics`** — independen dari scope |
+
+#### 5.3.2 Struktur data baru
+
+Tabel pivot kecil, bukan kolom tunggal di `pops` — supaya mendukung baik "1 cabang banyak PIC" maupun "1 orang PIC di beberapa cabang kecil" (§15, keputusan disetujui 2026-09-30):
+
+```
+warehouse_pop_pics
+  id          bigint, PK
+  pop_id      bigint, FK -> pops.id
+  user_id     bigint, FK -> users.id
+  created_at, updated_at
+
+  UNIQUE (pop_id, user_id)   -- gak boleh baris duplikat
+```
+
+Model tipis `app/Models/WarehousePopPic.php` + relasi:
+
+```php
+// app/Models/Pop.php
+public function gudangPics(): BelongsToMany
+{
+    return $this->belongsToMany(User::class, 'warehouse_pop_pics')->where('status', 'active');
+}
+
+// app/Models/User.php
+public function picGudangPops(): BelongsToMany
+{
+    return $this->belongsToMany(Pop::class, 'warehouse_pop_pics');
+}
+
+public function isPicGudangOf(Pop $pop): bool
+{
+    return $this->picGudangPops()->whereKey($pop->id)->exists();
+}
+```
+
+#### 5.3.3 Validasi — dua arah, biar penunjukannya gak jadi mati
+
+Halaman Gudang sudah difilter oleh scope (`applyUserScope()`) **sebelum** sampai ke pengecekan "apakah dia PIC cabang ini". Kalau scope user cuma `selected_pop → Jetis` tapi ditunjuk PIC di Siman, dia gak akan pernah bisa membuka gudang Siman sama sekali — penunjukannya tersimpan tapi gak pernah bisa dipakai, dan itu membingungkan saat troubleshooting. Karena itu **wajib divalidasi dari dua arah**:
+
+| Arah | Aturan |
+|---|---|
+| **Menunjuk PIC baru** | Kalau scope user `selected_pop`/`pop_tree` → cabang yang ditunjuk **wajib** ada di dalam scope-nya (cek lewat `EffectiveAccessService::getAllowedPopIds()`). Kalau scope `all_pop` → bebas ditunjuk ke cabang mana pun. |
+| **Mengubah scope user yang sudah jadi PIC** | Kalau perubahan scope membuat cabang PIC-nya jadi di luar scope baru → **ditolak** (bukan dihapus otomatis). Admin harus lepas/pindah dulu penunjukan PIC-nya, baru boleh ubah scope. Alasan: status PIC adalah keputusan operasional, gak boleh hilang diam-diam gara-gara form lain diedit. |
+
+#### 5.3.4 Contoh skenario
+
+| # | Role | Scope | Ditunjuk PIC di (`warehouse_pop_pics`) | Hasil |
+|---|---|---|---|---|
+| 1 | `pic_gudang` | `selected_pop` (Jetis) | Jetis | Kasus dasar — scope & penunjukan nyambung |
+| 2 | `pic_gudang` | **`all_pop`** (keliling) | **Jetis saja** | **Kasus yang melatarbelakangi revisi ini.** Lihat & kerja task semua cabang; hak TULIS gudang (issue/terima/adjustment/request stok) cuma jalan di Jetis |
+| 3 | `pic_gudang` | `all_pop` | Jetis **+ Siman** | 1 orang jadi PIC 2 cabang kecil sekaligus |
+| 4 | `pic_gudang` | `selected_pop` (Jetis) | Siman | **Ditolak validasi** — PIC di tempat yang gak bisa dia lihat sendiri |
+| 5 | `teknisi` biasa | `all_pop` (keliling, tanpa tugas PIC) | — | Kerja task di mana saja, **tanpa** hak gudang sama sekali (role `teknisi` gak dapat permission `warehouse_*`) |
+
+| User | Role | Scope | Ditunjuk PIC di |
 |---|---|---|---|
-| Budi (PIC Jetis) | `pic_gudang` | `selected_pop` | Jetis |
-| Sari (POP Admin Jetis) | `pop_admin` | `selected_pop` | Jetis |
-| Andi (PIC Siman, nanti) | `pic_gudang` | `selected_pop` | Siman |
+| Budi (PIC Jetis, scope sempit) | `pic_gudang` | `selected_pop` → Jetis | Jetis |
+| Sari (POP Admin Jetis) | `pop_admin` | `selected_pop` → Jetis | — |
+| Andi (PIC keliling) | `pic_gudang` | `all_pop` | Jetis |
 
-Semua query gudang, pelanggan, dan task sudah discope lewat `EffectiveAccessService` (`getAllowedPopIds()` / `hasAllPopAccess()`), jadi Budi & Sari otomatis hanya melihat data Jetis.
+Semua query pelanggan/task tetap discope lewat `EffectiveAccessService` seperti biasa — yang berubah cuma **sumber jawaban** "gudang mana yang dia urus".
 
-Aturan scope role ini: **wajib `selected_pop`** (sama seperti `teknisi` & `pop_admin`). `all_pop` ditolak — PIC gudang lintas cabang tidak masuk akal.
+#### 5.3.5 Aturan scope role `pic_gudang` (direvisi)
+
+Sebelumnya (2026-09-29): wajib `selected_pop`. **Direvisi** (2026-09-30): role `pic_gudang` boleh scope apa saja (`selected_pop`, `pop_tree`, `all_pop`) — scope tidak lagi dipakai untuk menyimpulkan cabang PIC-nya, jadi tidak ada alasan membatasinya. Yang tetap dibatasi hanya **cabang mana yang boleh diisi di `warehouse_pop_pics`**, lewat validasi §5.3.3.
+
+#### 5.3.6 Konsekuensi UX (perlu diputuskan, §15)
+
+PIC dengan scope `all_pop` yang membuka halaman Gudang akan **melihat** semua cabang (karena scope), tapi tombol Issue/Terima/Request Stok cuma aktif di cabang yang dia ditunjuk. Perlu:
+- Default filter cabang saat buka halaman Gudang → cabang PIC-nya (`picGudangPops()`), bukan cabang pertama di daftar.
+- Label jelas di cabang lain ("Bukan gudang yang Anda kelola") supaya gak dikira bug saat tombolnya nonaktif.
 
 ### 5.4 Pilar 4 — PIC pelaksana, POP Admin pemeriksa
 
@@ -251,7 +325,7 @@ Tidak semua cabang langsung punya PIC. Supaya cabang tanpa PIC tidak macet, pemb
 
 Karena itu **permission `pop_admin` TIDAK dicabut** (`warehouse_transfer.receive` & `warehouse_issue.create` tetap ada). Pembatasan dilakukan di kode berdasarkan "apakah cabang ini punya PIC aktif". Begitu PIC ditunjuk lewat Manajemen User, aturan B berlaku sendiri tanpa mengubah Role Matrix.
 
-**Definisi "PIC aktif cabang X":** user dengan role `pic_gudang`, `status = active`, dan `user_role_scopes` bertipe `selected_pop` yang target-nya memuat POP X. Dihitung di **satu tempat** (helper, §8 Kelompok H) — jangan ditulis ulang di tiap controller.
+**Definisi "PIC aktif cabang X":** user dengan role `pic_gudang`, `status = active`, dan punya baris di **`warehouse_pop_pics`** untuk POP X (§5.3.2) — **bukan** dari scope-nya. Ini sengaja dipisah dari scope: PIC bisa saja scope-nya `all_pop`, tapi tetap cuma "PIC aktif" untuk cabang yang dia ditunjuk secara eksplisit. Dihitung di **satu tempat** (`Pop::hasActivePicGudang()` / `Pop::gudangPics()`, §8 Kelompok H) — jangan ditulis ulang di tiap controller.
 
 ### 7.3 Aturan "tidak ke diri sendiri"
 
@@ -324,12 +398,12 @@ Teknisi hanya melihat pelanggan Survey/Pemasangan yang **ia ikut kerjakan**. Kal
 | D3 | `app/Models/User.php` | — | tambah `scopeTechnicians()` |
 | D4 | `app/Models/Role.php` | — | tambah `TECHNICIAN_CODES` |
 
-### Kelompok E — Aturan scope user (WAJIB)
+### Kelompok E — Aturan scope user (WAJIB, direvisi 2026-09-30b)
 
 | # | Lokasi | Perubahan |
 |---|---|---|
-| E1 | `resources/views/users/_form.blade.php:342` (`validScopes` JS) | Tambah `'pic_gudang': ['selected_pop']` |
-| E2 | `app/Http/Controllers/UserController.php:150` & `:239` (validasi server create/update) | Tambah aturan: `pic_gudang` wajib `selected_pop` (pola sama `pop_admin`). **Server wajib ikut** — JS saja bisa dilewati. |
+| E1 | `resources/views/users/_form.blade.php:342` (`validScopes` JS) | Tambah `'pic_gudang': ['all_pop', 'selected_pop', 'pop_tree']` — **bukan** dibatasi ke `selected_pop` saja (lihat §5.3.5: cabang PIC ditentukan `warehouse_pop_pics`, bukan scope). |
+| E2 | `app/Http/Controllers/UserController.php:150` & `:239` (validasi server create/update) | **Tidak perlu** aturan wajib-scope-tertentu untuk `pic_gudang` (beda dari `pop_admin`). Yang divalidasi bukan scope-nya, tapi §5.3.3 di bawah (Kelompok I). |
 
 ### Kelompok F — Butuh keputusan (lihat §15)
 
@@ -355,14 +429,26 @@ Teknisi hanya melihat pelanggan Survey/Pemasangan yang **ia ikut kerjakan**. Kal
 
 | # | Lokasi | Perubahan |
 |---|---|---|
-| H1 | Helper baru — disarankan `app/Models/Pop.php` (`activePicGudangIds(): array` / `hasActivePicGudang(): bool`) | Satu-satunya definisi "PIC aktif cabang X" (§7.2). Query: user role `pic_gudang`, `status = active`, scope `selected_pop` dengan target POP ini. |
-| H2 | `app/Services/InventoryIssueService.php` | (a) Tolak kalau pengeluar = penerima (§7.3). (b) Kalau pelaku `pop_admin` **dan** cabang punya PIC aktif → penerima wajib salah satu PIC cabang itu. |
-| H3 | `app/Http/Controllers/Warehouse/WarehouseIssueController.php` `create()` (±baris 42–65) | Dropdown penerima: sembunyikan diri sendiri; untuk `pop_admin` di cabang ber-PIC tampilkan PIC saja. Tampilan saja — penegakan tetap di H2. |
-| H4 | `app/Services/InventoryReassignService.php` + `WarehouseReassignController` `store*` | Tolak kalau pelaku = penerima custody baru (§7.3); sembunyikan diri sendiri di dropdown. |
-| H5 | `app/Http/Controllers/Warehouse/WarehouseReceiveController.php` (konfirmasi terima kiriman) | Kalau pelaku `pop_admin` **dan** cabang tujuan punya PIC aktif → tolak dengan pesan "Terima kiriman dilakukan PIC Gudang cabang ini". Tombol ikut disembunyikan. |
+| H1 | Helper baru — `app/Models/Pop.php` (`gudangPics(): BelongsToMany`, `hasActivePicGudang(): bool`) | Satu-satunya definisi "PIC aktif cabang X" (§7.2). Sumber: tabel `warehouse_pop_pics` (§5.3.2) + `status = active` — **bukan** scope. |
+| H2 | `app/Services/InventoryIssueService.php` | (a) Tolak kalau pengeluar = penerima (§7.3). (b) Kalau pelaku `pop_admin` **dan** cabang punya PIC aktif → penerima wajib salah satu PIC cabang itu. (c) Kalau pelaku `pic_gudang` → POP gudang asal barang wajib salah satu cabang di `picGudangPops()`-nya (§5.3.6/§8.5 Kelompok I — PIC scope `all_pop` gak boleh issue dari gudang di luar cabang penunjukannya). |
+| H3 | `app/Http/Controllers/Warehouse/WarehouseIssueController.php` `create()` (±baris 42–65) | Dropdown penerima: sembunyikan diri sendiri; untuk `pop_admin` di cabang ber-PIC tampilkan PIC saja. Selektor cabang gudang: untuk `pic_gudang`, default & batasi ke `picGudangPops()`-nya. Tampilan saja — penegakan tetap di H2. |
+| H4 | `app/Services/InventoryReassignService.php` + `WarehouseReassignController` `store*` | Tolak kalau pelaku = penerima custody baru (§7.3); sembunyikan diri sendiri di dropdown. Untuk `pic_gudang`: POP asal custody wajib salah satu cabang penunjukannya (sama pola H2c). |
+| H5 | `app/Http/Controllers/Warehouse/WarehouseReceiveController.php` (konfirmasi terima kiriman) | Kalau pelaku `pop_admin` **dan** cabang tujuan punya PIC aktif → tolak dengan pesan "Terima kiriman dilakukan PIC Gudang cabang ini". Kalau pelaku `pic_gudang` → cabang tujuan kiriman wajib salah satu cabang penunjukannya (H2c). Tombol ikut disembunyikan/dibatasi sesuai kondisi. |
 | H6 | `app/Http/Controllers/Warehouse/WarehouseReportController.php` (baris kerugian/adjustment) | Tandai baris di mana pelapor (`created_by`) = pemegang custody barang itu → label *"dilaporkan oleh pemegang sendiri"*, supaya Pusat memprioritaskan pemeriksaan (§10). |
+| H7 | `app/Http/Controllers/Warehouse/WarehouseStockRequestController.php` `store()` | Kalau pelaku `pic_gudang` → POP asal permintaan wajib salah satu cabang penunjukannya (H2c). |
+| H8 | `app/Http/Controllers/Warehouse/WarehouseAdjustmentController.php` `storeBalance()`/`storeOpname()` (adjustment level **saldo POP**, opname) | Kalau pelaku `pic_gudang` → POP wajib salah satu cabang penunjukannya (H2c). **Tidak berlaku** untuk `storeCustody()`/`storeSerial()`/`storeRoll()` (adjustment atas barang di custody-nya sendiri) — itu gak terikat cabang mana pun, barangnya memang di tangan dia. |
 
-> Pesan penolakan H2/H4/H5 dalam bahasa Indonesia dan menyebut siapa yang seharusnya melakukan (mis. "Barang untuk PIC dikeluarkan oleh POP Admin").
+> Pesan penolakan H2/H4/H5/H7/H8 dalam bahasa Indonesia dan menyebut siapa/apa yang seharusnya (mis. "Barang untuk PIC dikeluarkan oleh POP Admin", "Cabang ini bukan gudang yang Anda kelola").
+
+### Kelompok I — Penunjukan & validasi PIC (WAJIB, baru — §5.3)
+
+| # | Lokasi | Perubahan |
+|---|---|---|
+| I1 | Migration baru | Tabel `warehouse_pop_pics` (§5.3.2). |
+| I2 | Model baru `app/Models/WarehousePopPic.php` + relasi `Pop::gudangPics()` / `User::picGudangPops()` / `User::isPicGudangOf()` | §5.3.2. |
+| I3 | UI penunjukan PIC — disarankan panel baru di halaman Edit User (muncul kalau role dipilih `pic_gudang`): multi-select cabang, **terpisah** dari selektor scope POP. | Nama field beda dari `pop_ids` (punya scope) supaya gak ketuker — mis. `pic_gudang_pop_ids`. |
+| I4 | Validasi server saat simpan I3 | Kalau scope user `selected_pop`/`pop_tree` → tiap cabang di `pic_gudang_pop_ids` wajib ∈ `EffectiveAccessService::getAllowedPopIds()`. Scope `all_pop` → bebas (§5.3.3 arah 1). |
+| I5 | Validasi server saat user **mengubah scope**-nya sendiri (`UserController::update`) | Kalau user itu terdaftar di `warehouse_pop_pics` untuk cabang X, dan scope baru gak lagi mencakup X → tolak, pesan sebut cabang mana & suruh lepas/pindah PIC dulu (§5.3.3 arah 2). |
 
 ### Aturan untuk kode BARU setelah refactor
 
@@ -436,6 +522,10 @@ Sengaja tidak dicabut (`warehouse_transfer.receive`, `warehouse_issue.create` te
 
 ### 9.4 Contoh user PIC (opsional, pola `TechnicianSeeder`) — data demo, bukan wajib
 
+Dua varian, sesuai §5.3.4 skenario 1 dan 2.
+
+**Varian A — PIC scope sempit (skenario 1, kasus dasar):**
+
 ```php
 $role = Role::where('code', 'pic_gudang')->firstOrFail();
 $jetis = Pop::where('name', 'Jetis')->firstOrFail(); // cari lewat nama — id beda tiap server
@@ -451,7 +541,7 @@ $user = User::updateOrCreate(
     ]
 );
 
-// Cabang ditentukan DI SINI, bukan di role.
+// Scope — data pelanggan/task yang boleh dia lihat.
 $scope = UserRoleScope::updateOrCreate(
     ['user_id' => $user->id, 'role_id' => $role->id],
     ['scope_type' => ScopeType::SELECTED_POP->value]
@@ -461,6 +551,39 @@ UserRoleScopeTarget::firstOrCreate([
     'user_role_scope_id' => $scope->id,
     'pop_id' => $jetis->id,
 ]);
+
+// Penunjukan PIC — gudang mana yang dia urus. TERPISAH dari scope di atas
+// (§5.3), walau di varian ini kebetulan sama-sama Jetis.
+WarehousePopPic::firstOrCreate(['user_id' => $user->id, 'pop_id' => $jetis->id]);
+
+app(EffectiveAccessService::class)->clearCache($user);
+```
+
+**Varian B — PIC scope global, tapi PIC cuma 1 cabang (skenario 2, §5.3.4):**
+
+```php
+$role = Role::where('code', 'pic_gudang')->firstOrFail();
+$jetis = Pop::where('name', 'Jetis')->firstOrFail();
+
+$user = User::updateOrCreate(
+    ['email' => 'pic.gudang.keliling@whusnet.net'],
+    [
+        'name' => 'Andi (Teknisi Keliling, PIC Jetis)',
+        'phone' => '081200000001',
+        'password' => bcrypt('password'),
+        'status' => 'active',
+        'role_id' => $role->id,
+    ]
+);
+
+// Scope LUAS — boleh lihat & kerja task di semua cabang.
+UserRoleScope::updateOrCreate(
+    ['user_id' => $user->id, 'role_id' => $role->id],
+    ['scope_type' => ScopeType::ALL_POP->value]
+);
+
+// Tapi penunjukan PIC-nya SEMPIT — cuma Jetis.
+WarehousePopPic::firstOrCreate(['user_id' => $user->id, 'pop_id' => $jetis->id]);
 
 app(EffectiveAccessService::class)->clearCache($user);
 ```
@@ -494,14 +617,16 @@ Semua transaksi tetap tercatat di ledger append-only — HQ bisa menelusuri siap
 
 | Langkah | Detail |
 |---|---|
-| 1 | Jalankan `RoleSeeder` → role `pic_gudang` terbentuk. |
-| 2 | Jalankan `RolePermissionSeeder` → permission `pic_gudang` ter-sync. |
-| 3 | Tunjuk PIC per cabang lewat UI Manajemen User: role `pic_gudang`, scope `selected_pop` → cabangnya. Begitu disimpan, aturan §7 aktif untuk cabang itu. |
-| 4 | Barang yang **sudah** di custody calon PIC (dari masa ia masih role `teknisi`) tetap tercatat atas namanya — tidak perlu dipindah. |
-| 5 | Hapus role `pic_gudang_jetis` lewat UI. Kondisi 2026-09-29: **0 user, 0 permission** → aman dihapus. Cek ulang jumlah user sebelum menghapus. |
-| 6 | `EffectiveAccessService::clearCache()` untuk user yang dipindah (`RolePermissionSeeder` sudah `Cache::flush()`). |
+| 1 | Jalankan migration `warehouse_pop_pics` (Kelompok I1, §5.3.2). |
+| 2 | Jalankan `RoleSeeder` → role `pic_gudang` terbentuk. |
+| 3 | Jalankan `RolePermissionSeeder` → permission `pic_gudang` ter-sync. |
+| 4 | Beri user role `pic_gudang` + scope sesuai kebutuhannya (sempit ke 1 cabang, atau `all_pop` kalau memang teknisi keliling — §5.3.5). |
+| 5 | **Terpisah dari langkah 4:** tunjuk PIC-nya lewat UI baru (Kelompok I3) → isi `warehouse_pop_pics` untuk cabang yang jadi tanggung jawabnya. Begitu disimpan, aturan §7 aktif untuk cabang itu. |
+| 6 | Barang yang **sudah** di custody calon PIC (dari masa ia masih role `teknisi`) tetap tercatat atas namanya — tidak perlu dipindah. |
+| 7 | Hapus role `pic_gudang_jetis` lewat UI. Kondisi 2026-09-29: **0 user, 0 permission** → aman dihapus. Cek ulang jumlah user sebelum menghapus. |
+| 8 | `EffectiveAccessService::clearCache()` untuk user yang dipindah (`RolePermissionSeeder` sudah `Cache::flush()`). |
 
-Tidak ada migration skema — tidak ada tabel/kolom baru.
+Ada 1 migration skema baru: tabel `warehouse_pop_pics` (§5.3.2, I1). Tidak ada perubahan kolom di tabel yang sudah ada.
 
 ---
 
@@ -521,16 +646,24 @@ Nama test mengikuti gejala (konvensi repo). File utama: `tests/Feature/TeknisiPi
 | 8 | PIC issue barang ke teknisi Jetis | Berhasil |
 | 9 | Hak bagian teknisi `pic_gudang` ⊇ hak role `teknisi` (hasil seeder) | Lolos — penjaga §6.1 |
 | 10 | Tidak ada `where('code', 'teknisi')` / `hasRole('teknisi')` baru di `app/` (pola `PostTargetRenderedServerSideTest`) | Lolos — penjaga §8 |
-| 11 | Simpan user `pic_gudang` dengan scope `all_pop` (E2) | Ditolak validasi |
-| 12 | PIC issue barang ke dirinya sendiri (H2) | Ditolak |
+| 11 | Simpan user `pic_gudang` dengan scope `all_pop` (E2, direvisi 2026-09-30b) | **Diterima** — scope `pic_gudang` gak lagi dibatasi ke `selected_pop` (§5.3.5) |
+| 12 | PIC issue barang ke dirinya sendiri (H2a) | Ditolak |
 | 13 | PIC reassign custody ke dirinya sendiri (H4) | Ditolak |
 | 14 | POP Admin issue barang ke PIC di cabang ber-PIC | Berhasil |
-| 15 | POP Admin issue barang ke teknisi non-PIC di cabang ber-PIC (H2) | Ditolak |
+| 15 | POP Admin issue barang ke teknisi non-PIC di cabang ber-PIC (H2b) | Ditolak |
 | 16 | POP Admin terima kiriman di cabang ber-PIC (H5) | Ditolak |
 | 17 | POP Admin terima kiriman & issue ke teknisi mana pun di cabang **tanpa** PIC (§7.2) | Berhasil — perilaku lama tetap |
 | 18 | PIC dinonaktifkan (`status` ≠ active) → cabang dianggap tanpa PIC | POP Admin kembali bisa terima kiriman |
 | 19 | PIC lapor rusak barang di custody-nya sendiri | Berhasil; baris laporan gudang bertanda "dilaporkan oleh pemegang sendiri" (H6) |
 | 20 | PIC cabang Siman tidak dihitung sebagai PIC Jetis (H1) | POP Admin Jetis tetap boleh terima kiriman kalau Jetis tanpa PIC |
+| 21 | PIC scope `all_pop`, ditunjuk PIC Jetis saja — buka gudang Jetis, issue dari Jetis (§5.3.4 skenario 2) | Berhasil |
+| 22 | PIC scope `all_pop` yang sama di atas — coba issue dari gudang Siman (bukan cabang penunjukannya) (H2c) | Ditolak, walau scope-nya mengizinkan dia **melihat** Siman |
+| 23 | PIC scope `all_pop` mengerjakan task Survey di cabang Siman (bukan cabang penunjukan gudangnya) | Berhasil — hak task gak dibatasi penunjukan PIC, cuma hak gudang (§5.3.6) |
+| 24 | Tunjuk PIC baru untuk cabang yang **di luar** scope-nya (`selected_pop` sempit) (I4) | Ditolak validasi |
+| 25 | Tunjuk PIC baru untuk cabang yang di dalam scope `all_pop`-nya (I4) | Diterima |
+| 26 | User yang sudah jadi PIC cabang X mencoba ubah scope-nya jadi tidak lagi mencakup X (I5) | Ditolak validasi, pesan sebut cabang X |
+| 27 | 1 user ditunjuk PIC di 2 cabang (Jetis + Siman) (§5.3.4 skenario 3) | Berhasil, kedua cabang tercatat di `warehouse_pop_pics` |
+| 28 | 2 user berbeda sama-sama ditunjuk PIC di 1 cabang | Berhasil (§15, keputusan "boleh >1 PIC per cabang") |
 
 Test lama yang wajib tetap hijau: `tests/Feature/Seeders/RolePermissionSeederTest.php`, `tests/Feature/RolePermissionTest.php`, test Warehouse*, FopTask*, Task*, CustomerVerification*. Jalankan per file (aturan repo: **bukan** full suite).
 
@@ -543,14 +676,15 @@ Setiap langkah bisa di-commit terpisah.
 1. **Fondasi** — `Role::TECHNICIAN_CODES`, `Role::isTechnicianRole()`, `User::isTechnician()`, `User::scopeTechnicians()` (Kelompok D). Belum ada perilaku berubah karena `pic_gudang` belum ada.
 2. **Refactor pencarian teknisi** — Kelompok A, B, C. Perilaku tetap sama untuk role `teknisi`. Jalankan test FopTask*, Task*, Warehouse*, CustomerVerification*.
 3. **Test penjaga §12 no. 10** — mencegah string `'teknisi'` baru.
-4. **Role & permission** — `RoleSeeder`, `RolePermissionSeeder` (§9.1–9.2), aturan scope (Kelompok E).
-5. **Aturan "tidak ke diri sendiri"** — H2(a), H4. Berlaku untuk semua user, aman dikerjakan terpisah.
-6. **Pembagian PIC vs POP Admin** — H1, H2(b), H3, H5.
-7. **Penanda laporan untuk Pusat** — H6.
-8. **Kelompok F** — sesuai keputusan §15.
-9. **Test skenario** §12.
-10. **Migrasi data** §11 (manual lewat UI, di server).
-11. **Dokumentasi** — update `docs/rbac/business-logic.md` (daftar role + aturan `TECHNICIAN_CODES`), `docs/warehouse/business-logic.md` (pembagian PIC vs POP Admin), `docs/plan/warehouse/kontrol-anti-manipulasi.md` (tambahan §7.3 & H6), `docs/TASKS.md`.
+4. **Role & permission** — `RoleSeeder`, `RolePermissionSeeder` (§9.1–9.2), aturan scope (Kelompok E, sudah direvisi ke "bebas").
+5. **Penunjukan PIC** — migration `warehouse_pop_pics`, model, relasi, UI, validasi 2 arah (Kelompok I).
+6. **Aturan "tidak ke diri sendiri"** — H2(a), H4. Berlaku untuk semua user, aman dikerjakan terpisah.
+7. **Pembagian PIC vs POP Admin** — H1, H2(b), H3, H5, H7, H8 (semuanya baca dari Kelompok I, bukan scope).
+8. **Penanda laporan untuk Pusat** — H6.
+9. **Kelompok F** — sesuai keputusan §15.
+10. **Test skenario** §12.
+11. **Migrasi data** §11 (manual lewat UI, di server).
+12. **Dokumentasi** — update `docs/rbac/business-logic.md` (daftar role + aturan `TECHNICIAN_CODES`), `docs/warehouse/business-logic.md` (pembagian PIC vs POP Admin, tabel `warehouse_pop_pics`), `docs/plan/warehouse/kontrol-anti-manipulasi.md` (tambahan §7.3 & H6), `docs/database-schema.md` (tabel baru), `docs/TASKS.md`.
 
 ---
 
@@ -560,7 +694,8 @@ Setiap langkah bisa di-commit terpisah.
 - Role `teknisi` tetap seperti sekarang.
 - **Permission** `pop_admin` tetap seperti sekarang; yang berubah hanya perilakunya di cabang yang sudah punya PIC aktif (§7.2).
 - Cabang tanpa PIC berjalan persis seperti sekarang.
-- Tidak ada tabel/kolom baru.
+- **Scope (`user_role_scopes`) tidak berubah strukturnya** — tetap 3 `ScopeType`, tetap mekanisme yang sama. Yang baru cuma dipakainya di sisi lain (`warehouse_pop_pics`) untuk urusan penunjukan PIC.
+- Tidak ada perubahan kolom di tabel yang sudah ada — hanya **1 tabel baru** (`warehouse_pop_pics`, §5.3.2).
 - Alur Ticket ↔ FopTask ↔ Task tidak tersentuh — hanya daftar siapa yang boleh jadi anggota tim.
 - Persetujuan permintaan stok & pengiriman antar gudang tetap di Pusat.
 
@@ -576,6 +711,9 @@ Setiap langkah bisa di-commit terpisah.
 | 2 | Tiap cabang punya PIC Gudang **dan** POP Admin → pembagian **Opsi B**: PIC pelaksana, POP Admin pemeriksa (§7) | 2026-09-30 |
 | 3 | PIC **boleh** lapor rusak/hilang/opname (`warehouse_adjustment.create`), **dipantau Pusat** | 2026-09-30 |
 | 4 | PIC **tidak boleh** issue/reassign barang ke dirinya sendiri — barang untuk PIC dikeluarkan POP Admin | 2026-09-30 (bagian dari Opsi B) |
+| 5 | Penunjukan PIC **dipisah dari scope POP** lewat tabel baru `warehouse_pop_pics` — menjawab kasus teknisi scope global yang PIC cuma di 1 cabang (§5.3) | 2026-09-30 |
+| 6 | Validasi penunjukan PIC berlaku **2 arah**: cabang PIC wajib dalam scope saat ditunjuk, dan scope gak boleh diubah sampai keluar dari cabang yang sudah dia PIC-i (§5.3.3) | 2026-09-30 |
+| 7 | Satu cabang boleh punya **lebih dari satu** PIC, dan satu PIC boleh pegang **lebih dari satu** cabang — makanya dipilih tabel pivot, bukan kolom tunggal di `pops` (§5.3.2) | 2026-09-30 |
 
 ### 15.2 Masih terbuka — wajib dijawab sebelum implementasi
 
@@ -586,5 +724,5 @@ Setiap langkah bisa di-commit terpisah.
 | 3 | Penanda "dilaporkan oleh pemegang sendiri" di laporan gudang (H6) | Pakai / tidak | **Pakai** — ini yang membuat pemantauan Pusat bermakna |
 | 4 | Statistik dashboard "didaftarkan teknisi" (F1) | PIC ikut dihitung / tidak | **Ikut** |
 | 5 | Admin boleh mengelola role `pic_gudang` di Role Matrix (F2) | Ya / Tidak (Owner saja) | **Tidak** |
-| 6 | Satu cabang boleh punya lebih dari satu PIC? | Ya / Tidak | **Ya** — POP Admin boleh issue ke PIC mana pun di cabangnya; tidak perlu validasi "tepat satu" |
+| 6 | Lokasi UI penunjukan PIC (I3) | Panel tambahan di halaman Edit User / halaman terpisah "Kelola PIC Gudang per Cabang" (mis. di bawah menu Gudang) | **Halaman terpisah** — penunjukan PIC itu keputusan gudang, bukan atribut user biasa; lebih gampang dilihat "cabang X PIC-nya siapa saja" dalam satu layar |
 | 7 | Dikerjakan di sprint mana | — | Menyentuh modul di luar sprint aktif — tentukan di `docs/TASKS.md` |

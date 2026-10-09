@@ -18,7 +18,7 @@
 <div class="space-y-6">
 
         <!-- Search Hero Panel -->
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-6 shadow-xs">
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs">
             <div class="max-w-3xl">
                 <div class="flex items-start gap-3">
                     <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-800/60 mt-0.5">
@@ -93,8 +93,82 @@
                         </button>
                     </div>
                 </form>
+
+                {{-- Pencarian lintas-cabang (analisa-ui-ux §M2): cari SN/roll
+                     lewat nama pelanggan, teknisi pemegang, nomor transfer,
+                     atau nama/kode barang. Hasil berupa daftar kandidat untuk
+                     dibuka. Filter POP (§M1) membatasi hasil ke satu cabang. --}}
+                <form action="{{ route('warehouse.traceability.index') }}" method="GET" class="mt-3">
+                    <div class="flex flex-col sm:flex-row gap-2.5">
+                        <div class="relative flex-1">
+                            <input type="text"
+                                   name="q"
+                                   value="{{ $query }}"
+                                   placeholder="Cari via pelanggan, teknisi, nomor transfer, atau nama barang..."
+                                   class="w-full pl-4 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all min-h-[44px]">
+                        </div>
+                        @if($pops->count() > 1)
+                        <select name="pop_id" class="sm:w-52 px-3 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[44px]">
+                            <option value="">— Semua Cabang Terjangkau —</option>
+                            @foreach($pops as $pop)
+                            <option value="{{ $pop->id }}" {{ (string) $popFilter === (string) $pop->id ? 'selected' : '' }}>{{ $pop->name }} ({{ strtoupper($pop->type) }})</option>
+                            @endforeach
+                        </select>
+                        @endif
+                        <button type="submit"
+                                class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-xs sm:text-sm font-semibold shadow-xs transition-all min-h-[44px] cursor-pointer">
+                            <span>Cari</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
+
+        {{-- Daftar hasil pencarian (§M2) — muncul hanya saat mode cari `q` --}}
+        @if($query !== '')
+        <div class="mt-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xs overflow-hidden">
+            <div class="px-4 sm:px-5 py-3 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
+                <h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">Hasil Pencarian "{{ $query }}"</h3>
+                <span class="text-xs text-slate-400">{{ $results->count() }} ditemukan</span>
+            </div>
+            @if($results->isEmpty())
+            <div class="p-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                Tidak ada SN atau roll dalam cakupan Anda yang cocok. Coba kata kunci lain atau ubah filter cabang.
+            </div>
+            @else
+            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                @foreach($results as $r)
+                @php
+                    $isSerial = $r['type'] === 'serial';
+                    $obj = $isSerial ? $r['serial'] : $r['roll'];
+                    $linkParam = $isSerial ? ['sn' => $obj->serial_number] : ['roll' => $obj->roll_code];
+                    $code = $isSerial ? $obj->serial_number : $obj->roll_code;
+                    $tech = $obj->currentTechnician?->name;
+                    $cust = $isSerial ? $obj->customer?->full_name : null;
+                    $loc = $obj->currentPop?->name ?? ($tech ? 'Di teknisi' : '—');
+                @endphp
+                <li>
+                    <a href="{{ route('warehouse.traceability.index', $linkParam) }}" class="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-xs sm:text-sm font-bold {{ $isSerial ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-300' }}">{{ $code }}</span>
+                                <x-warehouse.status-badge :status="$obj->status" />
+                            </div>
+                            <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                                {{ $obj->item->name ?? '—' }}
+                                @if($cust) · Pelanggan: {{ $cust }} @endif
+                                @if($tech) · Teknisi: {{ $tech }} @endif
+                                · {{ $loc }}
+                            </div>
+                        </div>
+                        <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                </li>
+                @endforeach
+            </ul>
+            @endif
+        </div>
+        @endif
 
         <!-- State Not Found -->
         @if($notFound)
@@ -156,7 +230,7 @@
         @endphp
 
         <!-- Current Location & Device Status Card -->
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-6 shadow-xs space-y-4"
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4"
              x-data="{ copied: false }">
 
             <!-- Device Summary Banner -->
@@ -192,19 +266,12 @@
                             </span>
 
                             {{-- Badge Kondisi Fisik (analisa-gap-kondisi-barang.md
-                                 poin 8) — axis independen dari status di atas. --}}
-                            @php
-                                $conditionVal = $serial->condition?->value ?? 'new';
-                                $conditionBadge = match(true) {
-                                    $conditionVal === 'new' => ['label' => 'Baru', 'class' => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'],
-                                    $conditionVal === 'used_damaged' => ['label' => 'Bekas — Rusak', 'class' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'],
-                                    $serial->condition_checked_at !== null => ['label' => 'Bekas — Sudah Dicek', 'class' => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'],
-                                    default => ['label' => 'Bekas — Belum Dicek', 'class' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'],
-                                };
-                            @endphp
-                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $conditionBadge['class'] }}">
-                                {{ $conditionBadge['label'] }}
-                            </span>
+                                 poin 8) — axis independen dari status di atas.
+                                 Komponen tunggal: warna/label dari satu sumber
+                                 (analisa-ui-ux §U4/V6). --}}
+                            <x-warehouse.condition-badge
+                                :condition="$serial->condition ?? \App\Enums\ItemCondition::NEW"
+                                :checked="$serial->condition_checked_at !== null" />
                         </div>
 
                         {{-- Aksi "Sudah Dicek" — cuma muncul buat SN bekas yang
@@ -300,7 +367,7 @@
         </div>
 
         <!-- Interactive Connected Timeline (Audit Trail) -->
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
             <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                     <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-100 dark:border-sky-800/60 shrink-0">
@@ -396,7 +463,7 @@
                             @endif
 
                             <div class="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/40 flex items-center justify-between text-[11px] text-slate-400">
-                                <span>Diverifikasi oleh: <strong class="text-slate-600 dark:text-slate-300">{{ $event->createdBy->name ?? 'Sistem' }}</strong></span>
+                                <span>Operator: <strong class="text-slate-600 dark:text-slate-300">{{ $event->createdBy->name ?? 'Sistem' }}</strong></span>
                             </div>
                         </div>
                     </div>
@@ -421,7 +488,7 @@
             };
         @endphp
 
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-6 shadow-xs space-y-4">
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-700/60">
                 <div class="flex items-start gap-3.5">
                     <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-lg {{ $rollStatusConfig['icon_bg'] }} text-white flex items-center justify-center shadow-md shadow-slate-900/10 shrink-0">
@@ -499,7 +566,7 @@
             </div>
         </div>
 
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
             <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60">
                 <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Riwayat Ledger Roll (RECEIVE/TRANSFER/ISSUE/RETURN/ADJUSTMENT)</h4>
                 <p class="text-[11px] text-slate-400 mt-0.5">Pemakaian harian (potong meter) TIDAK masuk ledger ini — cukup tercatat di Laporan Task teknisi.</p>
@@ -537,7 +604,7 @@
                             <div class="mt-2 text-xs font-mono text-slate-500 dark:text-slate-400">Qty: {{ rtrim(rtrim(number_format((float) $event->qty, 2, ',', '.'), '0'), ',') }} meter</div>
 
                             <div class="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/40 text-[11px] text-slate-400">
-                                Diverifikasi oleh: <strong class="text-slate-600 dark:text-slate-300">{{ $event->createdBy->name ?? 'Sistem' }}</strong>
+                                Operator: <strong class="text-slate-600 dark:text-slate-300">{{ $event->createdBy->name ?? 'Sistem' }}</strong>
                             </div>
                         </div>
                     </div>

@@ -234,14 +234,14 @@
                     
                     <div>
                         <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                            <i class="fa-solid fa-screwdriver-wrench text-indigo-600 mr-1"></i> 2. TABEL ALAT KERJA YANG DIBAWA &amp; DIGUNAKAN (TOOLS PEMASANGAN)
+                            <i class="fa-solid fa-screwdriver-wrench text-indigo-600 mr-1"></i> 2. TABEL ALAT KERJA OPSIONAL (TOOLS PEMASANGAN)
                         </span>
                         <?php if($alatPemasangan->isNotEmpty()): ?>
                             <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
                                 <table class="w-full text-left border-collapse text-xs">
                                     <thead>
                                         <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
-                                            <th class="px-4 py-2">Nama Alat Kerja (Tools Lapangan)</th>
+                                            <th class="px-4 py-2">Nama Alat Kerja Opsional</th>
                                             <th class="px-4 py-2">Keterangan / Penggunaan Field</th>
                                         </tr>
                                     </thead>
@@ -257,7 +257,7 @@
                             </div>
                         <?php else: ?>
                             <div class="py-5 text-center text-[11px] text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                                Belum ada checklist alat kerja pada FOP Task Pemasangan pelanggan ini.
+                                Belum ada alat kerja opsional yang dicatat pada FOP Task Pemasangan pelanggan ini.
                             </div>
                         <?php endif; ?>
                     </div>
@@ -576,7 +576,7 @@
 
                 <div class="md:col-span-2">
                     <label for="installation_photo" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Foto Pemasangan</label>
-                    <input type="file" name="installation_photo" id="installation_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp"
+                    <input type="file" name="installation_photo" id="installation_photo" accept="image/*"
                            class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200">
                     <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
                 </div>
@@ -673,7 +673,7 @@
 
                 <div class="md:col-span-2">
                     <label for="speedtest_photo" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Foto Hasil Speedtest</label>
-                    <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/jpeg,image/png,image/webp,image/jpg,.jpg,.jpeg,.png,.webp"
+                    <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*"
                            class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200">
                     <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
                 </div>

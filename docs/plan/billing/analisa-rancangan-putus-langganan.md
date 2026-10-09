@@ -187,3 +187,10 @@ Menu sidebar: masuk grup Master (sejajar `Master Alat Kerja`, `Kategori Material
 - `InvoiceObserver::creating()` — dua guard harus lolos untuk invoice putus langganan: (a) `rejectSecondSubscriptionInvoice()` (menolak invoice langganan kedua per pelanggan+periode) dan (b) guard dedup 5 menit `customer+type+billing_period+total_amount`. Tipe invoice sudah dipilih (Tagihan Manual, di luar `SUBSCRIPTION_TYPES`, §2.1), jadi (a) tidak berlaku; yang tinggal (b) dedup 5 menit — dua denda dengan nominal sama untuk pelanggan+periode yang sama dalam 5 menit akan ditolak. Wajib diverifikasi test, termasuk denda terbit di periode yang sama dengan invoice Bulanan pelanggan itu.
 - `CustomerWorkflowService`/`WorkflowTransition` — pastikan transisi ke `terminated` tetap konsisten dengan state machine yang ada, invoice generation ini nambah langkah baru di jalur yang sama, bukan jalur baru terpisah. **Update 2026-09-19 (ADHOC-85):** `CustomerTerminationController` sekarang sudah lewat `transition()` + pre-check status; audit `customers`/`terminate` masih ditulis karena dibaca list & import legacy. Service baru di rancangan ini harus mewarisi pre-check itu dan baru boleh menghentikan audit `terminate` setelah `RendersCustomerList` membaca `termination_reason_id`. Lihat [`rancangan-terminate-reactivate-state-machine.md`](rancangan-terminate-reactivate-state-machine.md) §7.
 - `docs/billing-pembayaran/` & dokumentasi modul pelanggan — begitu diimplementasi, update README/business-logic sesuai `docs/DEFINITION_OF_DONE.md`.
+
+---
+
+## 6. Studi Kasus Operasional (4 Skenario Nyata)
+
+Rincian lengkap 4 studi kasus (Pindah Domisili, Berhenti Sebelum Kontrak, Bebas Tagihan Bulan Mati, dan Hapus Buku/Tak Tertagih) dicatat secara resmi di **`docs/BUSINESS_RULES.md` §11**.
+

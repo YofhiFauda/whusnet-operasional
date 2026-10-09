@@ -160,6 +160,8 @@ Alur:
 
 ## 12a. Ambil Modem (DEAC) → Terima Retur (ADHOC-86)
 
+> **Sejak ADHOC-108 (2026-10-08): "Terima Retur" di bawah ini CUMA TAHAP 1 dari 3.** SN hasil Tahap 1 TIDAK LAGI `AVAILABLE` — tetap `RETURNED`, gate kondisi tetap tertutup, `to_pop_id` ledger tetap kosong. Kelanjutannya (Tahap 2: Cabang kirim ke Pusat; Tahap 3: Pusat konfirmasi final) ada di §12b. Deskripsi di bawah ini dipertahankan APA ADANYA (riwayat keputusan ADHOC-86) kecuali poin 4 yang sudah tidak akurat — baca §12b untuk perilaku SEKARANG.
+
 Menggantikan perilaku lama "task DEAC selesai → semua SN `INSTALLED` milik pelanggan otomatis `AVAILABLE` di cabang". Rancangan lengkap + daftar gap: `docs/plan/warehouse/analisa-ambil-modem-deac-ke-gudang.md`.
 
 Alur:
@@ -189,6 +191,54 @@ Penanda asal DEAC di ledger: baris `RETURN` dengan `fop_task_id` terisi.
 - **Petunjuk merek data lama** (`LegacyDeviceHintService`): hanya tebakan awal, dipetakan ke master barang kalau label ≥5 karakter dan tepat satu barang cocok.
 - **Langganan Lagi** mengosongkan `device_retrieved_at`; riwayat tetap utuh di log.
 - **Tab "Return dari Pelanggan"** di Barang di Tangan Teknisi (`/warehouse/custody`): modem `RETURNED` (transit) yang masih dipegang teknisi, per teknisi, dengan tombol Terima → Terima Retur. Hilang dari tab begitu diterima gudang. Berlawanan arah dengan tab Perangkat Serial Number (`ISSUED`, barang yang dibawa ke lapangan).
+
+## 12b. SEMUA retur wajib verifikasi Pusat — 3 tahap (ADHOC-108, 2026-10-08)
+
+Keputusan user: modem hasil retur APA PUN asalnya (DEAC, Ganti Modem/Migrasi C-REQ, walk-in) jadi **stok Gudang Pusat**, bukan stok Cabang — Cabang cuma titik transit fisik. Mengubah total makna "Terima Retur" (§12a) jadi TAHAP 1 dari 3. Rancangan: `docs/plan/warehouse/rancangan-retur-ke-pusat-dan-modem-rusak.md`.
+
+```
+TAHAP 0 — Teknisi lapor (TIDAK BERUBAH)
+  DEAC: pickupSerialFromCustomer() — SN RETURNED, current_technician_id=teknisi.
+  Ganti Modem/Migrasi (C1 fix): InventoryService::installSerial() — modem lama
+    yang digantikan JUGA RETURNED + current_technician_id=teknisi (dulu BUG:
+    langsung ke_pop_id, keitung stok seketika padahal fisik masih di teknisi).
+    DeviceRetrievalLog ditulis juga (source=CREQ_SWAP) — jejak sama DEAC.
+
+TAHAP 1 — Cabang terima dari teknisi (confirmReturnedSerial()/
+  receiveSerialFromCustomerAtWarehouse() — DIUBAH MAKNANYA, bukan method baru)
+  SN TETAP RETURNED (BUKAN AVAILABLE lagi). current_technician_id→null,
+  current_pop_id=Cabang (penanda lokasi fisik, BUKAN klaim stok — ledger
+  TANPA to_pop_id). condition_checked_at TETAP NULL — observasi Cabang
+  (condition yang diisi di sini) non-final, bisa ditimpa Pusat.
+  Walk-in (diantar pelanggan) MENDARAT DI STATE YANG SAMA — tidak lagi
+  AVAILABLE langsung.
+
+TAHAP 2 — Cabang kirim ke Pusat (BARU — InventoryReturnTransferService::
+  dispatchToPusat(), halaman /warehouse/returns/dispatch)
+  SN status=RETURNED + current_technician_id=null + current_pop_id=Cabang
+  → pilih SN + Pusat tujuan → TRANSFERRED, current_pop_id=null. Ledger
+  TRANSFER (from_pop_id=Cabang, TANPA to_pop_id), inventory_transfer_id
+  nunjuk InventoryTransfer header BARU (reuse tabel yang sama dengan
+  Transfer Pusat→Cabang — arahnya TIDAK AMBIGU karena Cabang CUMA PERNAH
+  kirim transfer ke Pusat lewat jalur ini, gak pernah sebaliknya).
+
+TAHAP 3 — Pusat konfirmasi (BARU — InventoryReturnTransferService::
+  confirmAtPusat(), halaman /warehouse/returns/pusat)
+  Per-SN (bukan batch) — staf Pusat nilai kondisi FINAL (boleh menimpa
+  observasi Cabang), boleh koreksi model. SN → AVAILABLE, current_pop_id=
+  Pusat, condition_checked_at/by TERISI DI SINI (gate isClearedForIssue()
+  lepas di sini, bukan Tahap 1). Ledger TRANSFER kedua (to_pop_id=Pusat) —
+  INI baris yang bikin stok Pusat bertambah. Header InventoryTransfer
+  ditutup RECEIVED begitu semua baris dispatch-nya sudah dikonfirmasi.
+```
+
+**Label asal modem retur** (Migrasi/Ganti Modem/Deaktivasi/Diantar Pelanggan) — `DeviceRetrievalLog::originLabel()`, derivasi dari `source` (`DeviceRetrievalSource::DEAC`/`WALK_IN`/`CREQ_SWAP`) + `task->creqDetail->category` kalau `CREQ_SWAP` (bedain Ganti Modem vs Migrasi). Ditampilkan lewat `<x-warehouse.origin-badge>` di Terima Retur, Kirim ke Pusat, Terima di Pusat, dan Modem Rusak.
+
+**Halaman Modem Rusak** (`/warehouse/damaged`, `WarehouseDamagedStockController`, permission `warehouse.view`, read-only) — listing SN `DAMAGED`/`QUARANTINE`/`SCRAPPED` atau `condition=used_damaged`, gabungan hasil retur rusak (Tahap 3) dan Lapor Rusak barang biasa (`InventoryAdjustmentService::adjustSerialStatus()`).
+
+**Data retur LAMA** (sudah `AVAILABLE` di Cabang sebelum ADHOC-108) **dibiarkan** — tidak ada migrasi data massal, aturan baru cuma untuk retur baru. Test: `WarehouseReturnToPusatTest`, `WarehouseDamagedStockPageTest`; Tahap 1 diupdate di `DeviceRetrievalDeacToWarehouseTest`/`DeviceRetrievalHistoryAndWalkInTest`.
+
+**Belum dikerjakan** (dicatat, bukan lupa): badge asal belum ditempel di Kelola Stok (modal quick-look) dan Scan Barang — cuma di 4 halaman yang disebut di atas. `<x-warehouse.header>` (nav global) belum punya tab eksplisit untuk Kirim ke Pusat/Terima di Pusat/Modem Rusak — baru ada di `<x-warehouse.returns-nav>` (sub-nav halaman Retur).
 - **Riwayat Task FOP** (`/fop-tasks/history/{id}`) untuk kategori Ambil Modem menampilkan laporan yang sama, termasuk foto kondisi alat yang terlampir (sebelumnya jatuh ke "tidak punya laporan lapangan terstruktur").
 - **Detail Laporan task DEAC** di halaman Task memakai format laporan pengambilan alat (hasil, modem per SN dengan status transit/diterima, kelengkapan, foto kondisi, catatan/alasan), bukan format Maintenance.
 
@@ -203,3 +253,46 @@ Rancangan & data lama: `docs/plan/warehouse/analisa-riwayat-dan-terima-modem-dar
 - **Evidence foto wajib** untuk klaim kerugian (lost/damaged/scrapped), ditegakkan di Service.
 - **Row locking (`lockForUpdate()`)** di semua titik rawan race: dispatch/receive transfer, issue serial, receive transfer, reassign serial — plus urutan lock item_id yang konsisten (`usort` sebelum lock) untuk mencegah deadlock antar transaction yang menyebut item sama dengan urutan input berbeda.
 - **Tanpa approval gate berjenjang** — trade-off eksplisit, lihat §7.
+
+## 14. Laporan Gudang — Rumus Stok Awal/Akhir (`WarehouseStockAsOfService`)
+
+Stok Awal/Akhir **tidak disimpan** di kolom manapun — dihitung ulang tiap request lewat replay ledger `inventory_transactions` (append-only, lihat §13). Stok Awal bulan ini = Stok Akhir bulan lalu secara otomatis, karena sama-sama hasil replay dengan cutoff yang cuma geser maju tiap bulan.
+
+**Rumus dasar**: Stok Awal POP X per tanggal cutoff = SUM semua transaksi POP X yang `created_at < cutoff`, dengan:
+- `to_pop_id = X` → **tambah** qty (barang masuk/arrival ke POP X)
+- `from_pop_id = X` → **kurang** qty (barang keluar dari POP X)
+
+Beda cara hitung per `tracking_type`:
+
+1. **QUANTITY** (meter kabel, dll) — `quantityAsOf()`:
+   ```
+   ambil semua baris: WHERE (to_pop_id=X OR from_pop_id=X) AND created_at < cutoff
+   kelompokkan per lot_no
+   tiap baris to_pop_id=X  → balance[lot] += qty
+   tiap baris from_pop_id=X → balance[lot] -= qty
+   sisa balance > 0 = Stok Awal lot itu
+   ```
+   Lot diurut berdasar ID transaksi pertama kali muncul → 2 slot: **Lama** (lot pertama) & **Baru** (lot kedua, kalau ganti harga).
+
+2. **SERIALIZED/ROLL** (modem, dll, per-unit) — `unitsAsOf()`:
+   ```
+   tiap unit (serial_id/roll_id) dicari transaksi TERAKHIRNYA sebelum cutoff
+   kalau baris terakhir itu to_pop_id = X → unit itu dihitung "ada" di POP X
+   ```
+   Bukan SUM qty, tapi "posisi terakhir tiap unit sebelum cutoff ada di mana".
+
+**Contoh** — item Modem (serialized) transfer ke POP Jetis (id=2) jam `2026-10-01 10:16`, cutoff Stok Awal periode Oktober = `2026-10-01 00:00:00`:
+```
+query: item=Modem, to_pop_id=2 OR from_pop_id=2, created_at < 2026-10-01 00:00:00
+→ 0 baris (transfer confirm jam 10:16 tgl 1, >= cutoff, gak keikut)
+→ Stok Awal Oktober = 0 (BENAR — transfer ini masuk kolom "Barang Masuk" Oktober, bukan Stok Awal)
+```
+Kalau besok (2 Oktober) transfer lagi 10 unit ke Jetis, lalu lihat laporan November (cutoff `2026-11-01 00:00:00`):
+```
+→ ketemu baris transfer confirm 35 unit (1 Okt) + 10 unit (2 Okt) = 45 baris to_pop_id=2
+→ Stok Awal November = 45
+```
+
+**Kesalahan paham yang sering muncul**: Stok Awal kosong bulan ini untuk barang yang BARU ditransfer bulan ini **bukan bug** — itu barang baru lahir ledgernya di periode ini, nongol di "Barang Masuk", belum di "Stok Awal". Baru jadi Stok Awal bulan berikutnya.
+
+Item yang punya saldo dari bulan lalu tapi **gak ada pergerakan sama sekali** bulan ini tetap wajib ditampilkan (idle stock) — kalau hilang dari tampilan, itu baru bug (lihat riwayat fix di `WarehouseReportController::buildMovementSummary()`, union `$itemIdsEverTouchedByPop`).

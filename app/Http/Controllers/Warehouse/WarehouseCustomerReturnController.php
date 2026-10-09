@@ -20,6 +20,7 @@ use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
+use App\Support\LikeSearch;
 use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -49,7 +50,7 @@ class WarehouseCustomerReturnController extends Controller
     public function create(Request $request, EffectiveAccessService $access, LegacyDeviceHintService $hints): View|RedirectResponse
     {
         $user = auth()->user();
-        $search = trim((string) $request->query('q'));
+        $search = LikeSearch::sanitize((string) $request->query('q'));
         $customer = null;
         $matches = collect();
         $blockedReason = null;

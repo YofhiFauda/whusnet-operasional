@@ -29,22 +29,26 @@
 ?>
 
 <!-- LAYER 1: NAKED PAGE HEADER (Strict Design System Rule: No card wrapper) -->
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-    <div>
-        <div class="flex items-center gap-3 flex-wrap">
-            <h1 class="text-xl font-bold text-slate-900 dark:text-slate-50 tracking-tight"><?php echo e($customer->full_name); ?></h1>
+<div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-5 sm:mb-6">
+    <div class="space-y-2 flex-1 min-w-0">
+        <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+            <h1 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-50 tracking-tight leading-tight">
+                <?php echo e($customer->full_name); ?>
+
+            </h1>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold <?php echo e($customer->subscriptionStatus?->badgeClasses() ?? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'); ?>">
                 ● Status: <?php echo e($customer->subscriptionStatus->name ?? Str::headline($customer->status)); ?>
 
             </span>
-            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
+            <div class="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-700/80 px-2 py-0.5 rounded text-xs font-mono font-medium text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-600/60">
                 <span><?php echo e($displayIdLabel ?? 'CID'); ?>: <?php echo e($displayId); ?></span>
-                <button type="button" onclick="copyText('<?php echo e($displayId); ?>', 'CID')" class="text-slate-400 hover:text-sky-600 ml-1 cursor-pointer" title="Salin CID">
+                <button type="button" onclick="copyText('<?php echo e($displayId); ?>', 'CID')" class="text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 ml-1 cursor-pointer transition-colors" title="Salin CID">
                     <i class="fa-regular fa-copy"></i>
                 </button>
             </div>
             <?php if($customer->collector): ?>
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20" title="Kolektor yang rutin menagih pelanggan ini">
+                    <i class="fa-solid fa-user-tag mr-1 text-[10px] opacity-70"></i>
                     Kolektor: <?php echo e($customer->collector->name); ?>
 
                 </span>
@@ -58,18 +62,33 @@
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customer_balance.view')): ?>
                 <?php if($customerBalance > 0): ?>
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20" title="Saldo aktif pelanggan ini — otomatis dipakai untuk tagihan Bulanan berikutnya begitu terbit (FIFO periode terlama dulu). Lihat riwayat di tab Billing.">
+                        <i class="fa-solid fa-wallet mr-1 text-[10px] opacity-70"></i>
                         Saldo: Rp <?php echo e(number_format($customerBalance, 0, ',', '.')); ?>
 
                     </span>
                 <?php endif; ?>
             <?php endif; ?>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Paket: <strong><?php echo e($customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket'); ?></strong> (Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>/bln) — <?php echo e($customer->pop->name ?? 'POP Belum Set'); ?> (<?php echo e($customer->miniPop->name ?? 'Mini POP Belum Set'); ?>) — Terdaftar sejak <?php echo e($regDate); ?>
-
-        </p>
+        <div class="flex items-center gap-x-3 gap-y-1.5 flex-wrap text-xs text-slate-500 dark:text-slate-400">
+            <span class="inline-flex items-center gap-1.5">
+                <i class="fa-solid fa-wifi text-sky-500 text-[11px]"></i>
+                <span>Paket: <strong class="text-slate-800 dark:text-slate-200 font-semibold"><?php echo e($customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket'); ?></strong></span>
+                <span class="text-slate-500 dark:text-slate-400 font-mono">(Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>/bln)</span>
+            </span>
+            <span class="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
+            <span class="inline-flex items-center gap-1.5">
+                <i class="fa-solid fa-network-wired text-indigo-500 text-[11px]"></i>
+                <span><?php echo e($customer->pop->name ?? 'POP Belum Set'); ?></span>
+                <span class="text-slate-400">(<?php echo e($customer->miniPop->name ?? 'Mini POP Belum Set'); ?>)</span>
+            </span>
+            <span class="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
+            <span class="inline-flex items-center gap-1.5 text-slate-400">
+                <i class="fa-regular fa-calendar-check text-[11px]"></i>
+                <span>Terdaftar sejak <?php echo e($regDate); ?></span>
+            </span>
+        </div>
     </div>
-    <div class="flex items-center gap-2 shrink-0 flex-wrap">
+    <div class="flex items-center gap-2 shrink-0 flex-wrap w-full xl:w-auto pt-1 xl:pt-0">
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.installation.activate')): ?>
             <?php
                 $hasWorkflowTask = isset($customerTasks) && $customerTasks->whereIn('task_type', [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])->isNotEmpty();
@@ -79,46 +98,47 @@
                 <form action="<?php echo e(route('customers.activate', $customer->id)); ?>" method="POST" class="inline" onsubmit="event.preventDefault(); window.confirmAction('Pelanggan ini belum aktif lewat proses verifikasi normal. Aktifkan manual sekarang? CID akan dibuat dan tagihan pertama akan diterbitkan.', this);">
                     <?php echo csrf_field(); ?>
                     <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer"
+                            class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs cursor-pointer"
                             title="Khusus pelanggan migrasi lama."
                             <?php if(!$completeness['is_ready_billing']): ?> disabled title="Data profil belum lengkap untuk diaktifkan" <?php endif; ?>>
                         <i class="fa-solid fa-circle-check"></i>
-                        Aktivasi Manual
+                        <span>Aktivasi Manual</span>
                     </button>
                 </form>
             <?php endif; ?>
         <?php endif; ?>
 
-        <a href="<?php echo e(route('customers.edit', $customer->id)); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+        <a href="<?php echo e(route('customers.edit', $customer->id)); ?>" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs">
             <i class="fa-solid fa-pen-to-square"></i>
-            Edit Profil
+            <span>Edit Profil</span>
         </a>
 
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.qr.view')): ?>
-            <a href="<?php echo e(route('customers.qr.show', $customer->id)); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm">
-                <i class="fa-solid fa-qrcode"></i>
-                QR Pelanggan
+            <a href="<?php echo e(route('customers.qr.show', $customer->id)); ?>" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-2xs">
+                <i class="fa-solid fa-qrcode text-slate-500 dark:text-slate-400"></i>
+                <span>QR Pelanggan</span>
             </a>
         <?php endif; ?>
 
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
             <?php if($isActive && $customer->customerService): ?>
-                <a href="<?php echo e(route('invoices.create', ['customer_id' => $customer->id])); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                <a href="<?php echo e(route('invoices.create', ['customer_id' => $customer->id])); ?>" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs">
                     <i class="fa-solid fa-plus"></i>
-                    Buat Tagihan
+                    <span>Buat Tagihan</span>
                 </a>
             <?php endif; ?>
         <?php endif; ?>
 
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.installation.validate')): ?>
-            <button type="button" x-data @click="$dispatch('open-modal', 'network-assignment')" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
+            <button type="button" x-data @click="$dispatch('open-modal', 'network-assignment')" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs cursor-pointer">
                 <i class="fa-solid fa-diagram-project"></i>
-                Atur Mini POP
+                <span>Atur Mini POP</span>
             </button>
         <?php endif; ?>
 
-        <a href="<?php echo e(route('customers.index')); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm">
-            Kembali
+        <a href="<?php echo e(route('customers.index')); ?>" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-2xs">
+            <i class="fa-solid fa-arrow-left text-slate-400"></i>
+            <span>Kembali</span>
         </a>
     </div>
 </div>
@@ -126,41 +146,49 @@
 <!-- LAYER 3: SINGLE UNIFIED DETAIL PANEL (Card Budget = 1) -->
 <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm overflow-hidden">
 
-    <!-- SECTION A: QUICK METRIC STRIP (Flat summary bar with dividers) -->
-    <div class="grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-slate-200 dark:divide-slate-700 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
-        <div class="p-4 flex flex-col justify-center">
+    <!-- SECTION A: QUICK METRIC STRIP (Responsive hairline grid for Mobile, Tablet, & Desktop) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-px bg-slate-200 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-700">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">LANGGANAN & BIAYA</span>
-            <span class="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1 truncate"><?php echo e($customer->internetPackage->name ?? 'Belum Ada Paket'); ?></span>
+            <span class="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1 truncate" title="<?php echo e($customer->internetPackage->name ?? 'Belum Ada Paket'); ?>">
+                <?php echo e($customer->internetPackage->name ?? 'Belum Ada Paket'); ?>
+
+            </span>
             <span class="text-xs font-mono font-semibold text-sky-600 dark:text-sky-400">Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>/bln (Nett)</span>
         </div>
-        <div class="p-4 flex flex-col justify-center">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PPPOE</span>
             <?php
                 $pppoeShown = $customer->customerDevice?->pppoe_username ?: ($customer->customerTechnicalDetail?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?? '-')));
                 $pppoeWarning = \App\Services\CustomerCidService::pppoeMismatchWarning($customer, $pppoeShown);
             ?>
-            <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
-                <span><?php echo e($pppoeShown); ?></span>
+            <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100 truncate" title="<?php echo e($pppoeShown); ?>">
+                <span class="truncate"><?php echo e($pppoeShown); ?></span>
             </div>
             <?php if($pppoeWarning): ?>
                 <span class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug"><?php echo e($pppoeWarning); ?></span>
             <?php endif; ?>
         </div>
-        <div class="p-4 flex flex-col justify-center">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
-            <span class="text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 truncate"><?php echo e($customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang')); ?></span>
+            <span class="text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 truncate" title="<?php echo e($customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang')); ?>">
+                <?php echo e($customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang')); ?>
+
+            </span>
             <span class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">Redaman: <?php echo e($customer->customerTechnicalDetail->fiber_signal ?? ($customer->customerDevice->signal_power ?? '-')); ?></span>
         </div>
-        <div class="p-4 flex flex-col justify-center">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>
             <?php if($latestInvoice): ?>
-                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 truncate"><?php echo e($latestInvoice->invoice_number); ?> (<?php echo e($latestInvoice->invoice_status->label()); ?>)</span>
+                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 truncate" title="<?php echo e($latestInvoice->invoice_number); ?> (<?php echo e($latestInvoice->invoice_status->label()); ?>)">
+                    <?php echo e($latestInvoice->invoice_number); ?> (<?php echo e($latestInvoice->invoice_status->label()); ?>)
+                </span>
             <?php else: ?>
                 <span class="text-xs font-bold text-slate-400 mt-1">Belum Ada Tagihan</span>
             <?php endif; ?>
             <span class="text-[11px] text-slate-500">Jatuh Tempo: <?php echo e($customer->customerService?->due_date ? 'Tgl ' . \Carbon\Carbon::parse($customer->customerService->due_date)->day . ' Per Bulan' : '-'); ?></span>
         </div>
-        <div class="p-4 flex flex-col justify-center col-span-2 md:col-span-1">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0 sm:col-span-2 lg:col-span-1">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
             <div class="flex items-center justify-between mt-1">
                 <span class="text-xs font-bold <?php echo e(count($completeness['missing_required']) > 0 ? 'text-rose-600' : (count($completeness['missing_optional']) > 0 ? 'text-amber-600' : 'text-emerald-600')); ?>"><?php echo e($completeness['percentage']); ?>% Lengkap</span>
@@ -174,9 +202,9 @@
 
     <!-- SECTION C: SEARCH & EXACT 15-TAB NAV BAR -->
     <div class="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-        <!-- Omni-Search Bar & Mode Toggle -->
-        <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            <div class="relative flex-1">
+        <!-- Omni-Search Bar & Mode Toggle (Fully Responsive for Mobile/Tablet/Desktop) -->
+        <div class="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div class="relative flex-1 min-w-0">
                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 <input type="text" id="omni-search" onkeyup="filterContent()" placeholder="⚡ Cari apapun di seluruh tab (contoh: IP, ZTE, PPPoE, Speedtest, NIK, Prorate, Tiang, Kontrak)..."
                        class="w-full pl-9 pr-10 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
@@ -184,50 +212,54 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs shrink-0">
-                <button type="button" onclick="setViewMode('tabs')" id="view-mode-tabs" class="px-3 py-1.5 rounded-md font-semibold bg-white dark:bg-slate-800 text-sky-600 shadow-sm transition-all cursor-pointer">📑 Mode Tab (15 Tab)</button>
-                <button type="button" onclick="setViewMode('all')" id="view-mode-all" class="px-3 py-1.5 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all cursor-pointer">⚡ All-In-One (Scroll Semua)</button>
+            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs shrink-0 self-start sm:self-auto">
+                <button type="button" onclick="setViewMode('tabs')" id="view-mode-tabs" class="px-2.5 sm:px-3 py-1.5 rounded-md font-semibold bg-white dark:bg-slate-800 text-sky-600 shadow-xs transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs">
+                    📑 <span class="hidden sm:inline">Mode </span>Tab (15)
+                </button>
+                <button type="button" onclick="setViewMode('all')" id="view-mode-all" class="px-2.5 sm:px-3 py-1.5 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs">
+                    ⚡ All-In-One<span class="hidden md:inline"> (Scroll)</span>
+                </button>
             </div>
         </div>
 
-        <!-- 15 Tab Buttons Nav -->
-        <div id="tab-nav-wrapper" class="overflow-x-auto flex border-b border-slate-200 dark:border-slate-700 scrollbar-none px-2 bg-slate-50/50 dark:bg-slate-900/30">
-            <button type="button" onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap cursor-pointer">Ringkasan (Overview)</button>
+        <!-- 15 Tab Buttons Nav with Smooth Scroll & Touch Support -->
+        <div id="tab-nav-wrapper" class="overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth flex border-b border-slate-200 dark:border-slate-700 px-2 bg-slate-50/50 dark:bg-slate-900/30 touch-pan-x">
+            <button type="button" onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap cursor-pointer transition-colors">Ringkasan (Overview)</button>
             <?php if(auth()->user()->hasPermission('customers.detail.identity.view')): ?>
-            <button type="button" onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Identitas</button>
+            <button type="button" onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Identitas</button>
             <?php endif; ?>
             <?php if(auth()->user()->hasPermission('customers.detail.address.view')): ?>
-            <button type="button" onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Alamat</button>
+            <button type="button" onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Alamat</button>
             <?php endif; ?>
-            <button type="button" onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">POP/Cabang</button>
+            <button type="button" onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">POP/Cabang</button>
             <?php if(auth()->user()->hasPermission('customers.detail.survey.view')): ?>
-            <button type="button" onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Survey</button>
+            <button type="button" onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Survey</button>
             <?php endif; ?>
             <?php if(auth()->user()->hasPermission('customers.detail.installation.view')): ?>
-            <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Pemasangan</button>
+            <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Pemasangan</button>
             <?php endif; ?>
             <?php if(auth()->user()->hasPermission('customers.detail.devices.view')): ?>
-            <button type="button" onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Perangkat</button>
+            <button type="button" onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Perangkat</button>
             <?php endif; ?>
             <?php if(auth()->user()->hasPermission('customers.detail.packages.view')): ?>
-            <button type="button" onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Paket & Layanan</button>
+            <button type="button" onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Paket & Layanan</button>
             <?php endif; ?>
-            <button type="button" onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Billing</button>
-            <button type="button" onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Tagihan</button>
-            <button type="button" onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Pembayaran</button>
+            <button type="button" onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Billing</button>
+            <button type="button" onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Tagihan</button>
+            <button type="button" onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Pembayaran</button>
             <?php if(auth()->user()->hasPermission('customers.detail.documents.view')): ?>
-            <button type="button" onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Dokumen & Berkas</button>
+            <button type="button" onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Dokumen & Berkas</button>
             <?php endif; ?>
-            <button type="button" onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Riwayat Ticketing</button>
-            <button type="button" onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Riwayat Perubahan</button>
+            <button type="button" onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Riwayat Ticketing</button>
+            <button type="button" onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Riwayat Perubahan</button>
             <?php if($customer->customerTechnicalDetail): ?>
-            <button type="button" onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Detail Teknis Lama</button>
+            <button type="button" onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Detail Teknis Lama</button>
             <?php endif; ?>
         </div>
     </div>
 
     <!-- SECTION D: UNIFIED DETAILS BODY (All Data Tabs) -->
-    <div class="p-0 text-xs" id="details-container">
+    <div class="p-2 md:p-6 text-xs" id="details-container">
 
         <!-- TAB 1: RINGKASAN (OVERVIEW) -->
         <div id="tab-content-ringkasan" class="tab-content space-y-6 searchable-section">
@@ -1508,7 +1540,7 @@ unset($__errorArgs, $__bag); ?>
                 </div>
                 <div>
                     <label for="document_file" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">File Gambar / PDF</label>
-                    <input type="file" name="document_file" id="document_file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" required>
+                    <input type="file" name="document_file" id="document_file" accept="image/*,application/pdf" class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" required>
                 </div>
                 <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                     <button type="button" onclick="closeModal('document-upload-modal')" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>

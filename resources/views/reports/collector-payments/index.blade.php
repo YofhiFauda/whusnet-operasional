@@ -55,10 +55,19 @@
                     @endforeach
                 </select>
             </div>
+            <div>
+                <label for="source" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Sumber</label>
+                <select id="source" name="source" class="w-full rounded-md border-slate-300 dark:border-slate-600 text-sm">
+                    <option value="">Semua Sumber</option>
+                    @foreach($sources as $s)
+                        <option value="{{ $s->value }}" @selected($source === $s->value)>{{ $s->label() }}</option>
+                    @endforeach
+                </select>
+            </div>
             <div class="flex gap-2">
                 <button type="submit" class="px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 hover:bg-sky-700 text-white transition-colors">Tampilkan</button>
                 @if($canExport)
-                    <a href="{{ route('reports.collector-payments.export', array_filter(['collector_id' => $collectorId, 'start_date' => $start_date, 'end_date' => $end_date, 'method' => $method])) }}" class="px-4 py-2 text-sm font-semibold rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Export</a>
+                    <a href="{{ route('reports.collector-payments.export', array_filter(['collector_id' => $collectorId, 'start_date' => $start_date, 'end_date' => $end_date, 'method' => $method, 'source' => $source])) }}" class="px-4 py-2 text-sm font-semibold rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Export</a>
                 @endif
             </div>
         </form>
@@ -83,7 +92,7 @@
                 <thead>
                     <tr class="bg-amber-100/70 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800/40 text-slate-700 dark:text-slate-200 font-semibold uppercase text-xs tracking-wider">
                         <th class="py-3 px-4">Tanggal</th>
-                        <th class="py-3 px-4">Kolektor</th>
+                        <th class="py-3 px-4">Pencatat</th>
                         <th class="py-3 px-4">Akun</th>
                         <th class="py-3 px-4">Nama Pelanggan</th>
                         <th class="py-3 px-4">Alamat</th>
@@ -103,7 +112,12 @@
                             @endphp
                             <tr class="{{ $isLast ? 'bg-yellow-50/60 dark:bg-yellow-900/10' : '' }}" x-show="q === '' || @js($haystack).includes(q.toLowerCase())">
                                 <td class="py-2.5 px-4 whitespace-nowrap text-slate-500">{{ $i === 0 ? $group['date']->format('d-m-y') : '' }}</td>
-                                <td class="py-2.5 px-4 whitespace-nowrap">{{ $payment->collector?->name ?? '-' }}</td>
+                                <td class="py-2.5 px-4 whitespace-nowrap">
+                                    @if($payment->collected_by_role === \App\Enums\CollectorRole::TEKNISI->value)
+                                        <span class="inline-flex px-1.5 py-0.5 mr-1 text-[10px] font-bold rounded border bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20">Teknisi</span>
+                                    @endif
+                                    {{ $payment->collector?->name ?? '-' }}
+                                </td>
                                 <td class="py-2.5 px-4 font-mono text-xs">{{ $customer?->cid ?? $customer?->customer_code ?? '-' }}</td>
                                 <td class="py-2.5 px-4 font-medium text-slate-900 dark:text-slate-100">{{ $customer?->full_name ?? '-' }}</td>
                                 <td class="py-2.5 px-4 text-slate-500">{{ \Illuminate\Support\Str::limit($customer?->address ?? '-', 40) }}</td>

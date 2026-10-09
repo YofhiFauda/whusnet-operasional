@@ -62,7 +62,7 @@ Lima halaman, **permission masing-masing** — dulu semuanya numpang `tickets.vi
 | **Ticket Selesai** | `/tickets/selesai` | `tickets.selesai.view` | semua pemegang `tickets.*` + atasan |
 | **Ticket Dibatalkan** | `/tickets/dibatalkan` | `tickets.dibatalkan.view` | semua pemegang `tickets.*` + atasan |
 
-`/noc/worksheet` digerbangi **satu** permission (`noc_worksheet.view`) untuk seluruh halaman, termasuk kedua tabnya (**Tiket Masuk** / **Assign FOP**, ADHOC-09) — tab dipilih lewat query `?tab=`, bukan route sendiri. Dua permission tab lama (`noc_worksheet.masuk.view`, `noc_worksheet.diproses.view`) sudah pensiun (feature dinonaktifkan di `TicketFeatureSeeder`, barisnya sengaja gak dihapus dari DB); tab baru **tidak** menghidupkannya lagi. URL lama `/noc/worksheet/masuk` & `/noc/worksheet/diproses` tetap di-redirect ke `/noc/worksheet`.
+`/noc/worksheet` digerbangi **satu** permission (`noc_worksheet.view`) untuk seluruh halaman, termasuk kedua tabnya (**Tiket Masuk** / **Assign FOP**, ADHOC-09) — tab dipilih lewat query `?tab=`, bukan route sendiri. Dua permission tab lama (`noc_worksheet.masuk.view`, `noc_worksheet.diproses.view`) sudah **dihapus total** dari sistem (migration `2026_10_02_084341_remove_retired_noc_worksheet_tab_features`); tab baru **tidak** menghidupkannya lagi. URL lama `/noc/worksheet/masuk` & `/noc/worksheet/diproses` tetap di-redirect ke `/noc/worksheet`.
 
 ### Permission aksi
 

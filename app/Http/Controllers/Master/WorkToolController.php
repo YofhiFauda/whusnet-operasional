@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\WorkTool;
+use App\Services\MasterRecordRemovalService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,7 +23,7 @@ class WorkToolController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $status = $request->query('status');
 
         $tools = WorkTool::query()
@@ -70,6 +72,18 @@ class WorkToolController extends Controller
         return redirect()
             ->route('master.work-tools.index')
             ->with('success', 'Alat kerja "'.$workTool->name.'" berhasil diperbarui.');
+    }
+
+    public function destroy(WorkTool $workTool, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        $deleted = $removal->remove($workTool, ['is_active' => false]);
+
+        return back()->with(
+            $deleted ? 'success' : 'warning',
+            $deleted
+                ? "Alat kerja \"{$workTool->name}\" berhasil dihapus."
+                : "Alat kerja \"{$workTool->name}\" pernah dipinjam teknisi, jadi hanya dinonaktifkan."
+        );
     }
 
     public function toggleStatus(WorkTool $workTool): RedirectResponse

@@ -53,8 +53,7 @@
                             Alasan Putus {{ $sort === 'alasan' ? '▲' : '' }}
                         </a>
                     </th>
-                    <th scope="col" class="py-3.5 px-4">Sales</th>
-                    <th scope="col" class="py-3.5 px-4">Teknisi Survei</th>
+                    <th scope="col" class="py-3.5 px-4">Input Oleh</th>
                     <th scope="col" class="py-3.5 px-4">Tgl Pemutusan</th>
                     <th scope="col" class="py-3.5 px-4 text-center">Status Alat</th>
                     <th scope="col" class="py-3.5 px-4 text-center">Tagihan</th>
@@ -99,10 +98,7 @@
                         {{ $customer->termination_reason ?? '-' }}
                     </td>
                     <td class="px-4 py-3.5 text-slate-600 dark:text-slate-400">
-                        {{ $customer->salesUser->name ?? '-' }}
-                    </td>
-                    <td class="px-4 py-3.5 text-slate-600 dark:text-slate-400">
-                        {{ $customer->latestSurvey->technician->name ?? '-' }}
+                        {{ $customer->registered_by_name ?? $customer->creator?->name ?? '-' }}
                     </td>
                     <td class="px-4 py-3.5 font-mono text-slate-500 whitespace-nowrap">
                         {{ $customer->terminated_at ? \App\Support\IndonesianDate::date($customer->terminated_at) : '-' }}
@@ -145,7 +141,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="11" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
+                    <td colspan="10" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -201,13 +197,9 @@
                             {{ $customer->termination_reason ?? '-' }}
                         </dd>
                     </div>
-                    <div class="min-w-0">
-                        <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Sales</dt>
-                        <dd class="text-slate-700 dark:text-slate-300 font-semibold mt-0.5">{{ $customer->salesUser->name ?? '-' }}</dd>
-                    </div>
-                    <div class="min-w-0">
-                        <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Teknisi Survei</dt>
-                        <dd class="text-slate-700 dark:text-slate-300 font-semibold mt-0.5">{{ $customer->latestSurvey->technician->name ?? '-' }}</dd>
+                    <div class="col-span-2 min-w-0">
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Input Oleh</dt>
+                        <dd class="text-slate-700 dark:text-slate-300 font-semibold mt-0.5">{{ $customer->registered_by_name ?? $customer->creator?->name ?? '-' }}</dd>
                     </div>
                     <div class="col-span-2 min-w-0">
                         <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tagihan</dt>

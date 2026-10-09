@@ -10,6 +10,7 @@ use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\TaskMaterial;
 use App\Services\EffectiveAccessService;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -192,6 +193,17 @@ class WarehouseUsageController extends Controller
         $now = Carbon::now();
 
         switch ($preset) {
+            case 'all':
+                // Tanpa batas tanggal — laporan ini defaultnya date-scoped
+                // ('today'), beda sama Task FOP/Riwayat Mutasi yang nampilin
+                // histori penuh tanpa filter waktu. User ngira itu bug "cuma
+                // alat terakhir" padahal cuma gara-gara filter default sempit
+                // (laporan 2026-10-01). Start dipatok ke tanggal paling awal
+                // data biar whereBetween tetap kebatas rentang valid.
+                $start = Carbon::createFromDate(2000, 1, 1)->startOfDay();
+                $end = $now->copy()->endOfDay();
+                $periodLabel = 'Semua Waktu';
+                break;
             case 'yesterday':
                 $start = $now->copy()->subDay()->startOfDay();
                 $end = $now->copy()->subDay()->endOfDay();
@@ -227,7 +239,7 @@ class WarehouseUsageController extends Controller
         }
 
         $categoryFilter = $request->integer('category_id') ?: null;
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
 
         return [
             'preset' => $preset,

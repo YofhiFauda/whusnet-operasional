@@ -9,7 +9,7 @@
 --}}
 @php
     $creq = $task->creqDetail;
-    $creq?->loadMissing(['verifier', 'invoice']);
+    $creq?->loadMissing(['verifier', 'invoice', 'targetPop']);
     $creqStatus = $creq?->verification_status;
     $creqStatusTone = match ($creqStatus) {
         \App\Enums\CReqVerificationStatus::VERIFIED => 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60',
@@ -43,6 +43,12 @@
         <div class="bg-surface-muted border border-border p-3.5 rounded-xl shadow-xs">
             <span class="block text-[9px] text-text-muted font-bold uppercase font-ui select-none">Nama Kategori</span>
             <span class="font-bold text-text-main text-xs mt-1 block font-ui">{{ $creq->category_custom_name }}</span>
+        </div>
+        @endif
+        @if($creq->targetPop)
+        <div class="bg-surface-muted border border-border p-3.5 rounded-xl shadow-xs">
+            <span class="block text-[9px] text-text-muted font-bold uppercase font-ui select-none">POP Tujuan</span>
+            <span class="font-bold text-text-main text-xs mt-1 block font-ui">{{ $creq->targetPop->name }}</span>
         </div>
         @endif
     </div>

@@ -8,8 +8,7 @@
 <div class="mb-6">
     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/></svg>
-        {{ $title }}
-    </h4>
+        {{ $title }}    </h4>
     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-5">
         @if(! empty($rows))
         <div class="flex flex-wrap gap-2">
@@ -21,7 +20,7 @@
             @endforeach
         </div>
         @else
-        <p class="text-sm text-text-muted">Tidak ada alat kerja yang dicatat pada laporan ini.</p>
+        <p class="text-sm text-text-muted">Tidak ada alat kerja opsional yang dicatat pada laporan ini.</p>
         @endif
     </div>
 </div>

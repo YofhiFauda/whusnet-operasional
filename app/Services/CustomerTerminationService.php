@@ -121,10 +121,11 @@ class CustomerTerminationService
 
             if ($eligibleForPenalty && $penaltyAmount > 0 && $service) {
                 $billingPeriod = now()->format('Y-m');
+                $issueDate = now()->toDateString();
 
                 try {
                     $invoice = Invoice::create([
-                        'invoice_number' => $this->numbers->nextFor($billingPeriod),
+                        'invoice_number' => $this->numbers->nextFor(InvoiceType::MANUAL, ManualInvoiceCategory::LAINNYA, $issueDate),
                         'invoice_type' => InvoiceType::MANUAL->value,
                         'manual_category' => ManualInvoiceCategory::LAINNYA->value,
                         'manual_subtype_name' => self::PENALTY_SUBTYPE_NAME,
@@ -134,8 +135,8 @@ class CustomerTerminationService
                         'customer_service_id' => $service->id,
                         'internet_package_id' => $service->internet_package_id,
                         'billing_period' => $billingPeriod,
-                        'issue_date' => now()->toDateString(),
-                        'due_date' => now()->toDateString(),
+                        'issue_date' => $issueDate,
+                        'due_date' => $issueDate,
                         'subtotal' => $penaltyAmount,
                         'discount' => 0,
                         'ppn' => 0,

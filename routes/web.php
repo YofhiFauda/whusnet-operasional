@@ -48,6 +48,7 @@ use App\Http\Controllers\Master\ItemController;
 use App\Http\Controllers\Master\PackageCategoryController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\Master\RegionController;
+use App\Http\Controllers\Master\RegionMasterController;
 use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
@@ -60,6 +61,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QrAttendanceController;
 use App\Http\Controllers\QrInAppScanController;
 use App\Http\Controllers\QrScanController;
 use App\Http\Controllers\QrTicketController;
@@ -71,6 +73,7 @@ use App\Http\Controllers\TaskDeviceRetrievalController;
 use App\Http\Controllers\TaskMaintenanceController;
 use App\Http\Controllers\TaskStatusController;
 use App\Http\Controllers\TaskTeamController;
+use App\Http\Controllers\TechnicianPaymentController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketDibatalkanController;
 use App\Http\Controllers\TicketHistoryController;
@@ -80,18 +83,24 @@ use App\Http\Controllers\Warehouse\WarehouseAdjustmentController;
 use App\Http\Controllers\Warehouse\WarehouseController;
 use App\Http\Controllers\Warehouse\WarehouseCustodyController;
 use App\Http\Controllers\Warehouse\WarehouseCustomerReturnController;
+use App\Http\Controllers\Warehouse\WarehouseDamagedStockController;
 use App\Http\Controllers\Warehouse\WarehouseHistoryController;
 use App\Http\Controllers\Warehouse\WarehouseIssueController;
+use App\Http\Controllers\Warehouse\WarehousePicGudangController;
 use App\Http\Controllers\Warehouse\WarehouseReassignController;
 use App\Http\Controllers\Warehouse\WarehouseReceiveController;
 use App\Http\Controllers\Warehouse\WarehouseReportController;
 use App\Http\Controllers\Warehouse\WarehouseRetrievalHistoryController;
+use App\Http\Controllers\Warehouse\WarehouseReturnDispatchController;
+use App\Http\Controllers\Warehouse\WarehouseReturnPusatController;
 use App\Http\Controllers\Warehouse\WarehouseReturnReceiveController;
 use App\Http\Controllers\Warehouse\WarehouseRollController;
 use App\Http\Controllers\Warehouse\WarehouseScanController;
+use App\Http\Controllers\Warehouse\WarehouseSearchController;
 use App\Http\Controllers\Warehouse\WarehouseSerialController;
 use App\Http\Controllers\Warehouse\WarehouseStockController;
 use App\Http\Controllers\Warehouse\WarehouseStockRequestController;
+use App\Http\Controllers\Warehouse\WarehouseSwitchPopController;
 use App\Http\Controllers\Warehouse\WarehouseTraceabilityController;
 use App\Http\Controllers\Warehouse\WarehouseTransferController;
 use App\Http\Controllers\Warehouse\WarehouseUsageController;
@@ -146,6 +155,18 @@ Route::middleware('auth')->group(function () {
     Route::post('/scan-qr/choose/{code}', [QrScanController::class, 'chooseConfirm'])
         ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
         ->name('qr.scan.choose.confirm');
+
+    // Absen teknisi via QR (Fase 3, rancangan §6.3). Permission dicek di
+    // route DAN di controller/policy — dua lapis, bukan satu.
+    Route::middleware('permission:tasks.qr_attendance.create')->group(function () {
+        Route::get('/q1/{code}/absen', [QrAttendanceController::class, 'show'])
+            ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+            ->name('qr.attendance.show');
+
+        Route::post('/q1/{code}/absen', [QrAttendanceController::class, 'store'])
+            ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+            ->name('qr.attendance.store');
+    });
 });
 
 // Authenticated Admin Routes
@@ -431,6 +452,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/collector-worklist/pay', [CollectorPaymentController::class, 'store'])->name('collector-worklist.pay');
     });
 
+    // Teknisi mencatat pembayaran pelanggan di lapangan (rancangan-pembayaran-
+    // teknisi §5). Permission-nya `kolektor.pay` lewat Role Matrix role teknisi;
+    // gerbang "benar-benar teknisi" ada di controller. Pelanggan dicari dulu
+    // (GET), bukan dari worklist — TANPA parameter id teknisi di URL.
+    Route::middleware('permission:kolektor.pay')->group(function () {
+        Route::get('/technician-payments', [TechnicianPaymentController::class, 'index'])->name('technician-payments.index');
+        Route::get('/technician-payments/search', [TechnicianPaymentController::class, 'search'])->name('technician-payments.search');
+        Route::post('/technician-payments', [TechnicianPaymentController::class, 'store'])->name('technician-payments.store');
+    });
+
     // Kolektor menyetorkan SELURUH saldonya ke admin. Sama seperti rute bayar:
     // tanpa parameter, kolektor dari auth()->user().
     Route::middleware('permission:kolektor.deposit')->group(function () {
@@ -555,6 +586,21 @@ Route::middleware('auth')->group(function () {
     // Master Data
     Route::middleware('permission:master_wilayah.view')->group(function () {
         Route::get('/master/wilayah', [RegionController::class, 'index'])->name('master.wilayah.index');
+        Route::get('/master/wilayah/kelola', [RegionMasterController::class, 'kelola'])->name('master.wilayah.kelola');
+    });
+
+    Route::middleware('permission:master_wilayah.create')->group(function () {
+        Route::get('/master/wilayah/create', [RegionMasterController::class, 'create'])->name('master.wilayah.create');
+        Route::post('/master/wilayah', [RegionMasterController::class, 'store'])->name('master.wilayah.store');
+    });
+
+    Route::middleware('permission:master_wilayah.update')->group(function () {
+        Route::get('/master/wilayah/{level}/{id}/edit', [RegionMasterController::class, 'edit'])->name('master.wilayah.edit');
+        Route::put('/master/wilayah/{level}/{id}', [RegionMasterController::class, 'update'])->name('master.wilayah.update');
+    });
+
+    Route::middleware('permission:master_wilayah.delete')->group(function () {
+        Route::delete('/master/wilayah/{level}/{id}', [RegionMasterController::class, 'destroy'])->name('master.wilayah.destroy');
     });
 
     // POP Management - Static Routes First
@@ -576,6 +622,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/master/pop/{pop}/edit', [PopController::class, 'edit'])->name('master.pop.edit');
         Route::put('/master/pop/{pop}', [PopController::class, 'update'])->name('master.pop.update');
         Route::post('/master/pop/{pop}/toggle', [PopController::class, 'toggleStatus'])->name('master.pop.toggle');
+    });
+
+    Route::middleware('permission:pops.delete')->group(function () {
+        Route::delete('/master/pop/{pop}', [PopController::class, 'destroy'])->name('master.pop.destroy');
     });
 
     // Distribusi
@@ -615,6 +665,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/master/issue-categories/{category}/toggle', [TicketIssueCategoryController::class, 'toggleStatus'])->name('master.ticket-issue-categories.toggle');
     });
 
+    Route::middleware('permission:ticket_issue_categories.delete')->group(function () {
+        Route::delete('/master/issue-categories/{category}', [TicketIssueCategoryController::class, 'destroy'])->name('master.ticket-issue-categories.destroy');
+    });
+
     // Master Barang/Material - Static Routes First
     Route::middleware('permission:items.create|items.update')->group(function () {
         Route::get('/master/items/create', [ItemController::class, 'create'])->name('master.items.create');
@@ -630,6 +684,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/master/items/{item}/edit', [ItemController::class, 'edit'])->name('master.items.edit');
         Route::put('/master/items/{item}', [ItemController::class, 'update'])->name('master.items.update');
         Route::post('/master/items/{item}/toggle', [ItemController::class, 'toggleStatus'])->name('master.items.toggle');
+    });
+
+    Route::middleware('permission:items.delete')->group(function () {
+        Route::delete('/master/items/{item}', [ItemController::class, 'destroy'])->name('master.items.destroy');
     });
 
     // Master Kategori Barang - Static Routes First
@@ -649,6 +707,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/master/item-categories/{itemCategory}/toggle', [ItemCategoryController::class, 'toggleStatus'])->name('master.item-categories.toggle');
     });
 
+    Route::middleware('permission:item_categories.delete')->group(function () {
+        Route::delete('/master/item-categories/{itemCategory}', [ItemCategoryController::class, 'destroy'])->name('master.item-categories.destroy');
+    });
+
     // Master Alat Kerja - Static Routes First
     Route::middleware('permission:work_tools.create|work_tools.update')->group(function () {
         Route::get('/master/work-tools/create', [WorkToolController::class, 'create'])->name('master.work-tools.create');
@@ -664,6 +726,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/master/work-tools/{workTool}/edit', [WorkToolController::class, 'edit'])->name('master.work-tools.edit');
         Route::put('/master/work-tools/{workTool}', [WorkToolController::class, 'update'])->name('master.work-tools.update');
         Route::post('/master/work-tools/{workTool}/toggle', [WorkToolController::class, 'toggleStatus'])->name('master.work-tools.toggle');
+    });
+
+    Route::middleware('permission:work_tools.delete')->group(function () {
+        Route::delete('/master/work-tools/{workTool}', [WorkToolController::class, 'destroy'])->name('master.work-tools.destroy');
     });
 
     // Master Rekening Bank (ADHOC-95) - Static Routes First
@@ -705,9 +771,28 @@ Route::middleware('auth')->group(function () {
         Route::delete('/master/termination-reasons/{reason}', [CustomerTerminationReasonController::class, 'destroy'])->name('master.termination-reasons.destroy');
     });
 
+    // Kelola PIC Gudang per Cabang (ADHOC-120) — halaman TERPISAH dari
+    // Manajemen User (keputusan §15.2 no. 6 docs/plan/warehouse/
+    // rancangan-teknisi-pic-gudang-cabang.md). Permission REUSE `users.update`
+    // — lihat docblock WarehousePicGudangController soal kenapa.
+    Route::middleware('permission:users.update')->group(function () {
+        Route::get('/warehouse/pic-gudang', [WarehousePicGudangController::class, 'index'])->name('warehouse.pic-gudang.index');
+        Route::post('/warehouse/pic-gudang', [WarehousePicGudangController::class, 'store'])->name('warehouse.pic-gudang.store');
+        Route::delete('/warehouse/pic-gudang/{picGudang}', [WarehousePicGudangController::class, 'destroy'])->name('warehouse.pic-gudang.destroy');
+    });
+
+    // Konteks cabang global (analisa-ui-ux-warehouse.md §S1) — tanpa permission
+    // khusus (gerbangnya scope pop di dalam controller sendiri), bukan bagian
+    // halaman mana pun jadi ditaruh sebelum semua halaman gudang.
+    Route::post('/warehouse/switch-pop', [WarehouseSwitchPopController::class, 'store'])->name('warehouse.switch-pop');
+
     // Gudang/Inventory (ADHOC-54) - Static Routes First
     Route::middleware('permission:warehouse.view')->group(function () {
         Route::get('/warehouse', [WarehouseController::class, 'index'])->name('warehouse.index');
+        // Pencarian universal (analisa-ui-ux-warehouse.md §S2) — satu kotak di
+        // header, cari SN/roll/transfer/surat jalan sekaligus. Reuse
+        // warehouse.view, gerbang yang sama dengan Dashboard/Stok/Scan.
+        Route::get('/warehouse/search', [WarehouseSearchController::class, 'index'])->name('warehouse.search');
         // Management Stock (koreksi IA, 2026-09-03) — hub stok + titik masuk
         // Receive/Transfer/Issue/Adjustment, reuse permission warehouse.view
         // (cuma VIEW, sama kayak Dashboard) — lihat docblock WarehouseStockController.
@@ -728,6 +813,9 @@ Route::middleware('auth')->group(function () {
         // pas create/konfirmasi; begitu ditinggal, dokumennya "hilang" gak
         // ke-reach lagi (laporan user: list/detail tersembunyi).
         Route::get('/warehouse/history', [WarehouseHistoryController::class, 'index'])->name('warehouse.history.index');
+        // Modem Rusak (ADHOC-108) — listing SN DAMAGED/QUARANTINE/SCRAPPED
+        // atau condition=used_damaged, read-only, reuse warehouse.view.
+        Route::get('/warehouse/damaged', [WarehouseDamagedStockController::class, 'index'])->name('warehouse.damaged.index');
 
         // Rekap Pemakaian Material Lapangan (Daily Material Consumption Report)
         Route::get('/warehouse/usage', [WarehouseUsageController::class, 'index'])->name('warehouse.usage.index');
@@ -765,6 +853,7 @@ Route::middleware('auth')->group(function () {
 
     // Gudang/Inventory - Dynamic Routes Last
     Route::middleware('permission:warehouse_transfer.view')->group(function () {
+        Route::get('/warehouse/transfers', [WarehouseTransferController::class, 'index'])->name('warehouse.transfers.index');
         Route::get('/warehouse/transfers/pending', [WarehouseTransferController::class, 'pending'])->name('warehouse.transfers.pending');
         Route::get('/warehouse/receive/{reference}', [WarehouseReceiveController::class, 'show'])->name('warehouse.receive.show');
         Route::get('/warehouse/receive/{reference}/rolls/print', [WarehouseRollController::class, 'printBatch'])->name('warehouse.receive.rolls.print');
@@ -824,6 +913,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/warehouse/returns/from-customer', [WarehouseCustomerReturnController::class, 'store'])->name('warehouse.returns.from-customer.store');
         Route::get('/warehouse/returns/{serial}/receive', [WarehouseReturnReceiveController::class, 'create'])->name('warehouse.returns.receive.create');
         Route::post('/warehouse/returns/{serial}/receive', [WarehouseReturnReceiveController::class, 'store'])->name('warehouse.returns.receive.store');
+
+        // Tahap 2 (ADHOC-108) — Cabang kirim retur ke Pusat. Static sebelum {serial}.
+        Route::get('/warehouse/returns/dispatch', [WarehouseReturnDispatchController::class, 'index'])->name('warehouse.returns.dispatch.index');
+        Route::post('/warehouse/returns/dispatch', [WarehouseReturnDispatchController::class, 'store'])->name('warehouse.returns.dispatch.store');
+
+        // Tahap 3 (ADHOC-108) — Pusat konfirmasi retur dari Cabang.
+        Route::get('/warehouse/returns/pusat', [WarehouseReturnPusatController::class, 'index'])->name('warehouse.returns.pusat.index');
+        Route::get('/warehouse/returns/pusat/{serial}', [WarehouseReturnPusatController::class, 'create'])->name('warehouse.returns.pusat.create');
+        Route::post('/warehouse/returns/pusat/{serial}', [WarehouseReturnPusatController::class, 'store'])->name('warehouse.returns.pusat.store');
 
         Route::get('/warehouse/reassign/custody/{custody}/create', [WarehouseReassignController::class, 'createCustody'])->name('warehouse.reassign.custody.create');
         Route::post('/warehouse/reassign/custody/{custody}', [WarehouseReassignController::class, 'storeCustody'])->name('warehouse.reassign.custody.store');
@@ -907,6 +1005,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/master/paket/{paket}/toggle', [InternetPackageController::class, 'toggleStatus'])->name('master.paket.toggle');
     });
 
+    Route::middleware('permission:packages.delete')->group(function () {
+        Route::delete('/master/paket/{paket}', [InternetPackageController::class, 'destroy'])->name('master.paket.destroy');
+    });
+
     Route::middleware('permission:sla_timeline.view')->group(function () {
         Route::get('/master/sla-timeline', [SlaTimelineController::class, 'index'])->name('master.sla-timeline.index');
     });
@@ -920,6 +1022,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/{customer}/survey/report', [CustomerSurveyController::class, 'report'])->name('customers.survey.report');
         Route::post('/customers/{customer}/survey/start', [CustomerSurveyController::class, 'start'])->name('customers.survey.start');
         Route::post('/customers/{customer}/survey', [CustomerSurveyController::class, 'store'])->name('customers.survey.store');
+        Route::put('/customers/{customer}/survey/identity', [CustomerSurveyController::class, 'updateIdentity'])->name('customers.survey.update-identity');
     });
 
     Route::middleware('permission:customers.detail.survey.reject')->group(function () {
@@ -938,6 +1041,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/{customer}/installation', [CustomerInstallationController::class, 'store'])->name('customers.installation.store');
         Route::post('/customers/{customer}/installation/pemasangan', [CustomerInstallationController::class, 'storePemasangan'])->name('customers.installation.pemasangan');
         Route::post('/customers/{customer}/installation/speedtest', [CustomerInstallationController::class, 'storeSpeedtest'])->name('customers.installation.speedtest');
+        Route::put('/customers/{customer}/installation/identity', [CustomerInstallationController::class, 'updateIdentity'])->name('customers.installation.update-identity');
+        Route::put('/customers/{customer}/installation/package', [CustomerInstallationController::class, 'updatePackage'])->name('customers.installation.update-package');
+        Route::put('/customers/{customer}/installation/survey', [CustomerInstallationController::class, 'updateSurveyData'])->name('customers.installation.update-survey');
+        Route::put('/customers/{customer}/installation/photos', [CustomerInstallationController::class, 'updatePhotos'])->name('customers.installation.update-photos');
         Route::post('/customers/{customer}/test-report', [CustomerTestReportController::class, 'store'])->name('customers.test-report.store');
     });
 
@@ -989,6 +1096,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:reports.view')->group(function () {
         Route::get('/reports/customers', [CustomerReportController::class, 'index'])->name('reports.customers.index');
         Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');
+        Route::get('/reports/customers/export-xlsx', [CustomerReportController::class, 'exportXlsx'])->name('reports.customers.export-xlsx');
         Route::get('/reports/invoices', [InvoiceReportController::class, 'index'])->name('reports.invoices.index');
         Route::get('/reports/invoices/export', [InvoiceReportController::class, 'export'])->name('reports.invoices.export');
         Route::get('/reports/invoices/export-xlsx', [InvoiceReportController::class, 'exportXlsx'])->name('reports.invoices.export-xlsx');

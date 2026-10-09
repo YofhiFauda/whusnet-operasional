@@ -142,7 +142,18 @@ class ReceiptNumberExtractor
             return null;
         }
 
-        if (preg_match('/PAY-\d{6}-\d+/i', $raw, $matches) !== 1) {
+        // Pola dilonggarkan jadi "PAY-" + rentetan alnum/dash (BUG 13,
+        // 2026-10-01): sejak payment_number menempelkan invoice_number APA
+        // ADANYA (`PAY-{invoice_number}-{NN}`, lihat Payment::generatePaymentNumber()),
+        // bentuk badan nomornya ikut bervariasi sesuai jenis & umur
+        // invoice-nya (format baru ACT/TAG/MTN/OTH/REL vs invoice lama yang
+        // belum di-backfill) — menghardcode satu bentuk pasti kurang lengkap
+        // begitu ada variasi baru. Gerbang SESUNGGUHNYA tetap pencarian ke
+        // DB (lihat docblock kelas), jadi pola di sini sengaja permisif;
+        // nomor yang lolos tapi tak ketemu baris `payments`-nya cuma
+        // berakhir MISMATCH, bukan tercocokkan asal. Pola yang SAMA dengan
+        // PdfTextNumberReader::read().
+        if (preg_match('/PAY-[A-Z0-9-]{5,40}/i', $raw, $matches) !== 1) {
             return null;
         }
 

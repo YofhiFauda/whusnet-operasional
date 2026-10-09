@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Master;
 use App\Http\Controllers\Controller;
 use App\Models\InternetPackage;
 use App\Models\PackageCategory;
+use App\Services\MasterRecordRemovalService;
+use App\Support\LikeSearch;
 use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +17,7 @@ class InternetPackageController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $category = $request->query('category');
         $status = $request->query('status');
 
@@ -96,6 +98,18 @@ class InternetPackageController extends Controller
         return redirect()
             ->route('master.paket.index')
             ->with('success', 'Paket internet "'.$paket->package_code.'" berhasil diperbarui.');
+    }
+
+    public function destroy(InternetPackage $paket, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        $deleted = $removal->remove($paket, ['is_active' => false]);
+
+        return back()->with(
+            $deleted ? 'success' : 'warning',
+            $deleted
+                ? "Paket \"{$paket->package_code}\" berhasil dihapus."
+                : "Paket \"{$paket->package_code}\" sudah pernah ditagih/dipakai pelanggan, jadi hanya dinonaktifkan."
+        );
     }
 
     public function toggleStatus(InternetPackage $paket): RedirectResponse

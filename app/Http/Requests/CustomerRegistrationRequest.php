@@ -124,7 +124,10 @@ class CustomerRegistrationRequest extends FormRequest
             'status' => 'nullable|string|max:50',
 
             // Documents
-            'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            // Foto Rumah cuma ada di blok Skip Survey (wajib di sana). Di jalur
+            // normal field ini dihapus, jadi upload yang nyasar ditolak, bukan
+            // diam-diam tersimpan.
+            'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'prohibited_unless:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf|max:2048',
             // FAB (Formulir Akan Berlangganan Bisnis) — wajib kalau kategori
             // paket yang dipilih adalah kategori Bisnis (mis. "Paket Bisnis

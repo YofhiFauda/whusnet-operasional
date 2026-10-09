@@ -166,7 +166,7 @@ class PaymentReceiptTest extends TestCase
         ]);
 
         $payment = Payment::create([
-            'payment_number' => Payment::generatePaymentNumber(now()->format('Y-m-d')),
+            'payment_number' => Payment::generatePaymentNumber($invoice, $amount),
             'invoice_id' => $invoice->id,
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,

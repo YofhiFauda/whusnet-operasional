@@ -62,7 +62,7 @@ class WarehouseMaterialUsageReportTest extends TestCase
         $ownerRole = Role::where('code', 'owner')->firstOrFail();
         $this->owner = User::factory()->create(['role_id' => $ownerRole->id]);
 
-        $adminRole = Role::where('code', 'admin')->firstOrFail();
+        $adminRole = Role::where('code', 'pop_admin')->firstOrFail();
         $this->popAdmin = User::factory()->create(['role_id' => $adminRole->id]);
 
         $teknisiRole = Role::where('code', 'teknisi')->firstOrFail();
@@ -269,6 +269,46 @@ class WarehouseMaterialUsageReportTest extends TestCase
         $response->assertSee('DC-1C-20260924-000002');
         $response->assertSee('1.000');
         $response->assertDontSee('DC-1C-20260925-000001');
+    }
+
+    #[Test]
+    public function filter_all_shows_material_across_all_dates(): void
+    {
+        $customer = Customer::factory()->create(['pop_id' => $this->popSiman->id, 'full_name' => 'Pelanggan Lama']);
+        $fopTask = FopTask::create([
+            'task_number' => 'TSK-LAMA-001',
+            'tugas' => 'Pemasangan Lama',
+            'category' => TaskType::PEMASANGAN->value,
+            'pop_id' => $this->popSiman->id,
+            'customer_id' => $customer->id,
+            'status' => 'selesai',
+        ]);
+
+        $materialLama = TaskMaterial::create([
+            'fop_task_id' => $fopTask->id,
+            'customer_id' => $customer->id,
+            'kind' => MaterialKind::TERPAKAI->value,
+            'item_id' => $this->kabelItem->id,
+            'item_type' => 'kabel_dropcore',
+            'item_name' => $this->kabelItem->name,
+            'lot_no' => 'DC-1C-LAMA-000001',
+            'qty' => 300,
+            'unit' => 'meter',
+            'recorded_by' => $this->teknisi->id,
+        ]);
+        $materialLama->created_at = now()->subYear();
+        $materialLama->saveQuietly();
+
+        // Preset 'today' TIDAK melihat data setahun lalu, 'all' harus melihat.
+        $this->actingAs($this->owner)
+            ->get(route('warehouse.usage.index', ['preset' => 'today']))
+            ->assertOk()
+            ->assertDontSee('DC-1C-LAMA-000001');
+
+        $this->actingAs($this->owner)
+            ->get(route('warehouse.usage.index', ['preset' => 'all']))
+            ->assertOk()
+            ->assertSee('DC-1C-LAMA-000001');
     }
 
     #[Test]

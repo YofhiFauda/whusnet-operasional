@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\City;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 
 class RegionController extends Controller
@@ -15,7 +16,7 @@ class RegionController extends Controller
      */
     public function index(Request $request)
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
 
         $cities = City::query()
             ->with(['districts' => function ($districtQuery) use ($search): void {

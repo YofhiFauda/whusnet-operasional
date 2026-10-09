@@ -17,6 +17,7 @@ use App\Models\Invoice;
 use App\Models\PackageCategory;
 use App\Models\Payment;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\Task;
 use App\Models\Ticket;
 use App\Services\EffectiveAccessService;
@@ -306,7 +307,10 @@ class DashboardController extends Controller
         $teknisiCustomers = $activeCustomers->filter(function ($c) {
             $roleCode = strtolower($c->salesUser?->role?->code ?? '');
 
-            return $roleCode === 'teknisi';
+            // Kelompok F1, docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md
+            // — pelanggan yang didaftarkan PIC Gudang (role 'pic_gudang') ikut
+            // dihitung sebagai didaftarkan teknisi (keputusan user: "Ikut").
+            return in_array($roleCode, Role::TECHNICIAN_CODES, true);
         });
 
         $bisnisCategoryNames = PackageCategory::query()

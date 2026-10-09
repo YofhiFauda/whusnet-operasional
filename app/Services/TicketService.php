@@ -115,7 +115,7 @@ class TicketService
             $type = TaskType::from($data['type']);
 
             $ticket = new Ticket;
-            $ticket->ticket_number = $this->generateTicketNumber();
+            $ticket->ticket_number = app(NumberSequenceService::class)->ticketNumber();
             $ticket->type = $type;
             $ticket->customer_id = $customer->id;
             $ticket->pop_id = $customer->pop_id;
@@ -224,7 +224,7 @@ class TicketService
         $type = TaskType::from($data['type']);
 
         $ticket = new Ticket;
-        $ticket->ticket_number = $this->generateTicketNumber();
+        $ticket->ticket_number = app(NumberSequenceService::class)->ticketNumber();
         $ticket->type = $type;
         $ticket->customer_id = null;
         $ticket->pop_id = $data['pop_id'];
@@ -623,17 +623,16 @@ class TicketService
      * lihat TaskType::ticketValues()), tapi tetap dibikin Draft-unassigned
      * kayak syncToFopTask() supaya alur eksekusinya (assign teknisi → Task →
      * report → review) SAMA PERSIS dengan MTN/C-REQ, bukan lagi
-     * langsung tandai device_retrieved_at sekali klik. Nomor TFOP- tetap
-     * lewat generateFopTaskNumber() yang sama biar gak nyimpang dari deret
-     * yang dipakai FopTaskController::generateTaskNumber() (lihat CLAUDE.md
-     * § Sinkronisasi Ticket ↔ FopTask ↔ Task). device_retrieved_at sendiri
+     * langsung tandai device_retrieved_at sekali klik. Nomor TFOP- diambil
+     * dari NumberSequenceService, deret yang sama dengan jalur FOP lainnya
+     * (lihat CLAUDE.md § Sinkronisasi Ticket ↔ FopTask ↔ Task). device_retrieved_at sendiri
      * baru keisi otomatis saat Task-nya selesai (lihat TaskService::complete()).
      */
     public function createDeviceRetrievalTask(Customer $customer, User $actor): FopTask
     {
         return DB::transaction(function () use ($customer, $actor) {
             $fopTask = new FopTask;
-            $fopTask->task_number = $this->generateFopTaskNumber();
+            $fopTask->task_number = app(NumberSequenceService::class)->fopTaskNumber();
             $fopTask->task_date = now();
             $fopTask->category = TaskType::AMBIL_MODEM;
             $fopTask->tugas = $customer->display_id.'_'.$customer->full_name;
@@ -774,7 +773,7 @@ class TicketService
     private function syncToFopTask(Ticket $ticket, ?Customer $customer, User $actor, ?string $taskDate = null): FopTask
     {
         $fopTask = new FopTask;
-        $fopTask->task_number = $this->generateFopTaskNumber();
+        $fopTask->task_number = app(NumberSequenceService::class)->fopTaskNumber();
         $fopTask->task_date = $taskDate ?? now();
         $fopTask->category = $ticket->type;
         // Format "{CID}_{Nama}" (mis. "C1X4ARQ000631_Masudah Yuni Fitri") —
@@ -873,32 +872,6 @@ class TicketService
             })
             ->latest('id')
             ->first();
-    }
-
-    private function generateTicketNumber(): string
-    {
-        $year = date('Y');
-        $lastNum = Ticket::where('ticket_number', 'like', "TKT-{$year}-%")
-            ->pluck('ticket_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('TKT-%s-%04d', $year, $lastNum + 1);
-    }
-
-    /**
-     * Format nomor harus identik sama FopTaskController::generateTaskNumber()
-     * — dua-duanya nulis ke deret yang sama (TFOP-{tahun}-{urut}).
-     */
-    private function generateFopTaskNumber(): string
-    {
-        $year = date('Y');
-        $lastNum = FopTask::where('task_number', 'like', "TFOP-{$year}-%")
-            ->pluck('task_number')
-            ->map(fn ($taskNumber) => (int) substr($taskNumber, strrpos($taskNumber, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('TFOP-%s-%04d', $year, $lastNum + 1);
     }
 
     /**

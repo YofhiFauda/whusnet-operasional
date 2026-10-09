@@ -4,14 +4,19 @@ namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\ItemCondition;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Warehouse\Concerns\ChecksAssetScope;
+use App\Http\Controllers\Warehouse\Concerns\ResolvesSelectedPop;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
+use App\Models\Pop;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryReassignService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use InvalidArgumentException;
@@ -30,6 +35,9 @@ use InvalidArgumentException;
  */
 class WarehouseTraceabilityController extends Controller
 {
+    use ChecksAssetScope;
+    use ResolvesSelectedPop;
+
     public function index(Request $request, EffectiveAccessService $access): View
     {
         $serialNumber = trim((string) $request->query('sn', ''));
@@ -38,6 +46,27 @@ class WarehouseTraceabilityController extends Controller
         $roll = null;
         $ledger = collect();
         $notFound = false;
+
+        $user = auth()->user();
+
+        // Filter POP (analisa-ui-ux §M1) — Traceability sebelumnya satu-satunya
+        // halaman gudang TANPA filter cabang. Dropdown dibatasi ke POP dalam
+        // scope aktor; filter ini menyempitkan pencarian daftar `q`, bukan
+        // lookup langsung sn/roll (lookup langsung tetap dicek scope per item).
+        $pops = Pop::query()
+            ->warehouse()
+            ->when(! $access->hasAllPopAccess($user), fn ($qq) => $qq->whereIn('id', $access->getAllowedPopIds($user)))
+            ->orderBy('type')->orderBy('name')
+            ->get();
+        // Konteks cabang global (analisa-ui-ux-warehouse.md §S1).
+        $popFilter = $this->resolveSelectedPopId($request, $access, $user);
+
+        // Pencarian daftar (analisa-ui-ux §M2) — trace tidak lagi cuma lewat
+        // SN/roll yang diketik persis: cari juga by nama pelanggan, nama
+        // teknisi pemegang, nomor transfer/dokumen, nama/kode barang. Hasil
+        // berupa kandidat yang di-scope POP, user klik buat buka detail.
+        $query = LikeSearch::sanitize((string) $request->query('q', ''));
+        $results = collect();
 
         if ($serialNumber !== '') {
             $found = InventorySerial::query()
@@ -90,7 +119,77 @@ class WarehouseTraceabilityController extends Controller
             }
         }
 
-        return view('warehouse.traceability.index', compact('serialNumber', 'rollCode', 'serial', 'roll', 'ledger', 'notFound'));
+        // Jalankan pencarian daftar hanya kalau tidak sedang lookup langsung.
+        if ($serialNumber === '' && $rollCode === '' && $query !== '') {
+            $results = $this->searchCandidates($query, $popFilter, $access, $user);
+        }
+
+        return view('warehouse.traceability.index', compact(
+            'serialNumber', 'rollCode', 'serial', 'roll', 'ledger', 'notFound',
+            'query', 'results', 'pops', 'popFilter'
+        ));
+    }
+
+    /**
+     * Cari kandidat SN & roll (analisa-ui-ux §M2). Match: SN/roll code, nama
+     * pelanggan, nama teknisi pemegang, nama/kode barang, dan nomor dokumen
+     * transaksi (TRF/ISS/surat jalan via ledger). Scope POP diterapkan DI
+     * QUERY (`scopeSerialQuery`/`scopeRollQuery` dari `ChecksAssetScope`,
+     * 2026-10-08 — sebelumnya ambil 100 baris mentah lalu difilter scope di
+     * PHP baru dipotong N; sekarang `limit(50)` beneran ambil 50 baris yang
+     * SUDAH valid scope-nya). Jalur otorisasi yang SAMA dengan lookup
+     * langsung (`isSerialInScope`/`isRollInScope`), bukan aturan kedua.
+     *
+     * @return Collection<int, array{type: string, serial: ?InventorySerial, roll: ?InventoryRoll}>
+     */
+    private function searchCandidates(string $query, ?int $popFilter, EffectiveAccessService $access, User $user): Collection
+    {
+        $like = '%'.$query.'%';
+
+        // ID SN/roll yang dokumen transaksinya cocok (nomor transfer / surat jalan).
+        $serialIdsByRef = InventoryTransaction::query()
+            ->where('reference_number', 'like', $like)
+            ->whereNotNull('serial_id')
+            ->distinct()->pluck('serial_id');
+        $rollIdsByRef = InventoryTransaction::query()
+            ->where('reference_number', 'like', $like)
+            ->whereNotNull('roll_id')
+            ->distinct()->pluck('roll_id');
+
+        $serials = $this->scopeSerialQuery(
+            InventorySerial::query()
+                ->where(function ($w) use ($like, $serialIdsByRef) {
+                    $w->where('serial_number', 'like', $like)
+                        ->orWhereHas('customer', fn ($c) => $c->where('full_name', 'like', $like))
+                        ->orWhereHas('currentTechnician', fn ($t) => $t->where('name', 'like', $like))
+                        ->orWhereHas('item', fn ($i) => $i->where('name', 'like', $like)->orWhere('code', 'like', $like))
+                        ->orWhereIn('id', $serialIdsByRef);
+                })
+                ->when($popFilter, fn ($qq) => $qq->where(fn ($w) => $w->where('current_pop_id', $popFilter)->orWhere('issued_from_pop_id', $popFilter))),
+            $access, $user
+        )
+            ->with(['item', 'currentPop', 'currentTechnician', 'customer.pop', 'issuedFromPop'])
+            ->orderBy('serial_number')
+            ->limit(50)->get();
+
+        $rolls = $this->scopeRollQuery(
+            InventoryRoll::query()
+                ->where(function ($w) use ($like, $rollIdsByRef) {
+                    $w->where('roll_code', 'like', $like)
+                        ->orWhereHas('currentTechnician', fn ($t) => $t->where('name', 'like', $like))
+                        ->orWhereHas('item', fn ($i) => $i->where('name', 'like', $like)->orWhere('code', 'like', $like))
+                        ->orWhereIn('id', $rollIdsByRef);
+                })
+                ->when($popFilter, fn ($qq) => $qq->where(fn ($w) => $w->where('current_pop_id', $popFilter)->orWhere('issued_from_pop_id', $popFilter))),
+            $access, $user
+        )
+            ->with(['item', 'currentPop', 'currentTechnician', 'issuedFromPop'])
+            ->orderBy('roll_code')
+            ->limit(50)->get();
+
+        return $serials->map(fn ($s) => ['type' => 'serial', 'serial' => $s, 'roll' => null])
+            ->concat($rolls->map(fn ($r) => ['type' => 'roll', 'serial' => null, 'roll' => $r]))
+            ->values();
     }
 
     /**
@@ -120,45 +219,7 @@ class WarehouseTraceabilityController extends Controller
             ->with('success', "SN {$serial->serial_number} ditandai sudah dicek fisik.");
     }
 
-    private function isSerialInScope(InventorySerial $serial, EffectiveAccessService $access, User $user): bool
-    {
-        if ($access->hasAllPopAccess($user)) {
-            return true;
-        }
-
-        $allowed = $access->getAllowedPopIds($user);
-
-        if ($serial->current_pop_id && in_array($serial->current_pop_id, $allowed, true)) {
-            return true;
-        }
-
-        if ($serial->issued_from_pop_id && in_array($serial->issued_from_pop_id, $allowed, true)) {
-            return true;
-        }
-
-        if ($serial->customer && in_array($serial->customer->pop_id, $allowed, true)) {
-            return true;
-        }
-
-        return false;
-    }
-
-    private function isRollInScope(InventoryRoll $roll, EffectiveAccessService $access, User $user): bool
-    {
-        if ($access->hasAllPopAccess($user)) {
-            return true;
-        }
-
-        $allowed = $access->getAllowedPopIds($user);
-
-        if ($roll->current_pop_id && in_array($roll->current_pop_id, $allowed, true)) {
-            return true;
-        }
-
-        if ($roll->issued_from_pop_id && in_array($roll->issued_from_pop_id, $allowed, true)) {
-            return true;
-        }
-
-        return false;
-    }
+    // isSerialInScope()/isRollInScope() dipindah ke trait ChecksAssetScope
+    // (2026-10-07) — dipakai bareng WarehouseSearchController (§S2), SATU
+    // aturan scope, bukan disalin dua tempat.
 }

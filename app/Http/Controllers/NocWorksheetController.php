@@ -11,6 +11,7 @@ use App\Models\Pop;
 use App\Models\Ticket;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
+use App\Support\LikeSearch;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -35,8 +36,9 @@ use Illuminate\Support\Collection;
  *
  * Gerbangnya `noc_worksheet.view` (feature root) — TETAP satu permission untuk
  * seluruh halaman. Dua permission tab lama (`noc_worksheet.masuk.view`/
- * `noc_worksheet.diproses.view`) tetap pensiun di TicketFeatureSeeder; tab baru
- * di sini SENGAJA gak menghidupkannya (tab ini bukan tab yang itu).
+ * `noc_worksheet.diproses.view`) sudah dihapus total dari sistem (2026-10-02,
+ * lihat migration `remove_retired_noc_worksheet_tab_features`) — tab di sini
+ * BUKAN kebangkitan tab yang itu, cuma kebetulan nama serupa.
  *
  * Cuma nampilin daftar; aksi (Selesai/Ke FOP/Kembalikan/Batalkan) tetap lewat
  * endpoint TicketController yang sudah ada — controller ini gak duplikasi logic
@@ -133,7 +135,7 @@ class NocWorksheetController extends Controller
      */
     private function applyFilters(Builder $query, Request $request): void
     {
-        if ($search = trim((string) $request->query('q', ''))) {
+        if ($search = LikeSearch::sanitize((string) $request->query('q', ''))) {
             $query->where(function (Builder $q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
                     ->orWhere('detail_keluhan', 'like', "%{$search}%")

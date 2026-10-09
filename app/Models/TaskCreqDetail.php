@@ -13,6 +13,7 @@ class TaskCreqDetail extends Model
         'task_id',
         'category',
         'category_custom_name',
+        'target_pop_id',
         'tikor_lama_lat',
         'tikor_lama_lng',
         'tikor_baru_lat',
@@ -48,6 +49,12 @@ class TaskCreqDetail extends Model
     public function verifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    /** POP tujuan — cuma terisi untuk kategori `MIGRASI`. */
+    public function targetPop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class);
     }
 
     /**

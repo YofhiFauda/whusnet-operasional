@@ -8,6 +8,7 @@ use App\Models\CustomerAcquisition;
 use App\Models\CustomerService;
 use App\Models\InternetPackage;
 use App\Models\PackageCategory;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\ActionSeeder;
@@ -15,6 +16,7 @@ use Database\Seeders\CustomerAcquisitionFeatureSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
@@ -134,9 +136,32 @@ class InstallationFeeDynamicApprovalTest extends TestCase
         $this->assertNotNull($record->installation_fee_invoice_id);
 
         $invoice = $record->installationFeeInvoice;
-        $this->assertSame(InvoiceType::INSIDENTAL, $invoice->invoice_type);
+        $this->assertSame(InvoiceType::MANUAL, $invoice->invoice_type);
+        $this->assertSame('Biaya Instalasi', $invoice->manual_subtype_name);
         $this->assertEquals(2000000, $invoice->total_amount);
         $this->assertSame($record->customer_id, $invoice->customer_id);
+    }
+
+    /**
+     * Regresi: tagihan Biaya Instalasi dulu tanpa baris rincian, jadi invoices/show
+     * jatuh ke fallback "Langganan Internet" — seolah biaya instalasi itu paket bulanan.
+     */
+    public function test_installation_fee_invoice_has_its_own_line_item(): void
+    {
+        $bdRole = Role::where('code', 'business_development')->firstOrFail();
+        $user = User::factory()->create(['status' => 'active', 'role_id' => $bdRole->id]);
+        $this->giveAllPopScope($user);
+        $this->actingAs($user);
+
+        $record = $this->makeAcquisition('Paket Bisnis Broadband');
+        $this->put(route('customer-acquisitions.installation-fee.update', $record), [
+            'installation_fee' => 2000000,
+        ]);
+
+        $items = $record->refresh()->installationFeeInvoice->items;
+        $this->assertCount(1, $items);
+        $this->assertSame('Biaya Instalasi', $items->first()->subcategory_name_snapshot);
+        $this->assertEquals(2000000, $items->first()->amount);
     }
 
     /**
@@ -214,6 +239,11 @@ class InstallationFeeDynamicApprovalTest extends TestCase
     public function test_reassigning_category_role_changes_who_can_approve_without_code_change(): void
     {
         $bdRole = Role::where('code', 'business_development')->firstOrFail();
+        $perm = Permission::where('code', 'customer_acquisitions.installation_fee.update')->first();
+        if ($perm) {
+            $bdRole->permissions()->detach($perm->id);
+            Cache::flush();
+        }
         $bdUser = User::factory()->create(['status' => 'active', 'role_id' => $bdRole->id]);
         $this->giveAllPopScope($bdUser);
 
@@ -222,8 +252,14 @@ class InstallationFeeDynamicApprovalTest extends TestCase
         // Admin mengalihkan kategori ini ke role lain (sales) yang BD bukan
         // anggotanya, dan BD tidak punya permission override.
         $salesRole = Role::where('code', 'sales')->firstOrFail();
+        $viewPerm = Permission::where('code', 'customer_acquisitions.view')->first();
+        if ($viewPerm) {
+            $salesRole->permissions()->syncWithoutDetaching([$viewPerm->id]);
+            Cache::flush();
+        }
         PackageCategory::where('name', 'Paket Bisnis Dedicated')
             ->update(['installation_fee_approval_role_id' => $salesRole->id]);
+        CustomerAcquisition::flushPackageCategoryCache();
 
         $this->actingAs($bdUser);
         $response = $this->put(route('customer-acquisitions.installation-fee.update', $record), [

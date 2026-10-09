@@ -43,6 +43,22 @@ class WarehouseScanLookupTest extends TestCase
 
     private Item $modem;
 
+    /**
+     * Analisa UI/UX Fase 5 (§U4/V6) — badge kondisi di halaman Scan (Alpine)
+     * memakai design token `.badge-*`, selaras `<x-warehouse.condition-badge>`.
+     */
+    #[Test]
+    public function halaman_scan_badge_kondisi_pakai_design_token(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('warehouse.scan.index'));
+
+        $response->assertOk()
+            ->assertSee('badge-success', false)
+            ->assertSee('badge-error', false)
+            ->assertSee('badge-info', false)
+            ->assertSee('badge-warning', false);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

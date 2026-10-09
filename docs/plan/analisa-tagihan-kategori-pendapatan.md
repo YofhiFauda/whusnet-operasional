@@ -93,6 +93,8 @@ pernah kepakai.
 `default_amount` opsional — tarif standar yang mengisi otomatis kolom nominal di form, tetap
 bisa ditimpa. "Tambah Kabel" 20 meter dan 200 meter jelas beda harga.
 
+> **Catatan 2026-10-05:** untuk master `item_categories`, `items`, dll. sekarang ada aksi hapus kondisional (hapus permanen kalau belum dipakai, nonaktif kalau sudah dipakai) — lihat `docs/plan/analisa-permission-matrix-belum-implementasi.md` Keputusan 1. Paragraf di bawah berlaku untuk konteks kategori pendapatan (`revenue_categories`), yang masih tanpa delete.
+
 **Master tidak pernah dihapus, hanya dinonaktifkan.** `restrictOnDelete` menegakkannya di
 lapis DB; controller memang tidak punya aksi hapus, constraint itu jaring untuk jalur lain
 (tinker, SQL langsung). Sub kategori yang dihapus akan membuat tagihan lama kehilangan

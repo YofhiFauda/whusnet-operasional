@@ -210,6 +210,61 @@ class TaskCreqBillingReportTest extends TestCase
         $this->assertSame('tambah_modem', $task->creqDetail->category->value);
     }
 
+    /**
+     * Koreksi 2026-10-08: "Tambah Modem" = pelanggan beneran NAMBAH (lebih
+     * dari satu modem aktif bersamaan), BUKAN ganti. Modem lama yang masih
+     * `INSTALLED` HARUS TETAP INSTALLED — beda dari MTN/kategori C-REQ lain
+     * yang defaultnya ganti/swap (lihat `TaskMaintenanceModemInstallTest`).
+     */
+    #[Test]
+    public function tambah_modem_tidak_meretur_modem_lama_pelanggan(): void
+    {
+        $task = $this->makeCreqTask();
+
+        $category = ItemCategory::create(['code' => 'modem_ont', 'name' => 'Modem/ONT Pelanggan', 'default_unit' => 'pcs']);
+        $modem = Item::create([
+            'code' => 'ONT-CREQ-TAMBAH', 'name' => 'Modem ONT Tambahan', 'unit' => 'pcs',
+            'item_category_id' => $category->id, 'tracking_type' => 'serialized', 'ownership_mode' => 'installable',
+        ]);
+
+        $oldSerial = InventorySerial::create([
+            'item_id' => $modem->id,
+            'serial_number' => 'SN-CREQ-OLD',
+            'status' => SerialStatus::INSTALLED->value,
+            'customer_id' => $this->customer->id,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+
+        $newSerial = InventorySerial::create([
+            'item_id' => $modem->id,
+            'serial_number' => 'SN-CREQ-NEW',
+            'status' => SerialStatus::ISSUED->value,
+            'current_technician_id' => $this->technician->id,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+
+        $response = $this->actingAs($this->technician)
+            ->post(route('tasks.maintenance.store', $task), $this->basePayload() + [
+                'creq_category' => 'tambah_modem',
+                'selected_inventory_serial_id' => $newSerial->id,
+            ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $oldSerial->refresh();
+        $this->assertEquals(SerialStatus::INSTALLED, $oldSerial->status, 'Modem lama TIDAK BOLEH ketarik otomatis — Tambah Modem bukan ganti.');
+        $this->assertEquals($this->customer->id, $oldSerial->customer_id);
+
+        $newSerial->refresh();
+        $this->assertEquals(SerialStatus::INSTALLED, $newSerial->status);
+        $this->assertEquals($this->customer->id, $newSerial->customer_id);
+
+        // customer_devices cuma 1 baris per pelanggan (hasOne) — `ont_sn`
+        // TIDAK boleh ketimpa SN modem tambahan (sebelumnya kosong, TETAP
+        // kosong — tanpa fix ini bakal keisi 'SN-CREQ-NEW').
+        $this->assertNull($this->customer->refresh()->ont_sn);
+    }
+
     #[Test]
     public function task_berbayar_wajib_catatan_biaya_dan_masuk_antrean_verifikasi(): void
     {

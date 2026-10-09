@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full overflow-hidden dark" x-data="warehouseHistoryApp()" :class="{ 'dark': darkMode }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Riwayat Mutasi - WHUSNET Operasional</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Menlo', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Custom Scrollbars */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Glassmorphism Header */
+        .glass-header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+        }
+        .dark .glass-header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+        }
+
+        /* Sidebar Transition */
+        .sidebar-transition {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Badge pulse animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .pulse-live {
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-full overflow-hidden text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-900 antialiased font-sans selection:bg-sky-500 selection:text-white">
+
+<div class="flex h-dvh overflow-hidden bg-slate-50 dark:bg-slate-900">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" 
+           class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between sidebar-transition md:static md:translate-x-0"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'">
+
+        <!-- Brand Header -->
+        <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 dark:border-slate-800/60 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-base shadow-md shadow-sky-500/20 shrink-0">
+                    W
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-extrabold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight">WHUSNET</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800">OPS</span>
+                </div>
+            </div>
+            <button @click="sidebarOpen = false" class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 overflow-y-auto pl-3.5 pr-2 py-4 space-y-6 custom-scrollbar text-xs">
+            
+            <!-- Group: Gudang & Inventory -->
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Gudang & Inventory</p>
+                <div class="space-y-1">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                        <span>Dashboard Gudang</span>
+                    </a>
+                    
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        <span>Kelola Stok</span>
+                    </a>
+
+                    <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-lg font-bold bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border border-sky-100 dark:border-sky-800/50">
+                        <div class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span>Riwayat Mutasi</span>
+                        </div>
+                        <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+                    </a>
+
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        <span>Barang di Teknisi</span>
+                    </a>
+
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"></path></svg>
+                        <span>Terima Retur</span>
+                    </a>
+
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <span>Lacak Barang / SN</span>
+                    </a>
+
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M18.7 8l-5.1 5.1-2.8-2.8L7 14"></path></svg>
+                        <span>Laporan Gudang</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Group: Operasional & Pelanggan -->
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Operasional</p>
+                <div class="space-y-1">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+                        <span>Pelanggan</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"></path><path d="M13 6h8"></path><path d="M13 12h8"></path><path d="M13 18h8"></path></svg>
+                        <span>Penjadwalan Teknis</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11h3a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M21 11h-3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3 11a9 9 0 1 1 18 0"></path></svg>
+                        <span>Ticketing / Helpdesk</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- User Profile Footer -->
+        <div class="p-3 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/60 dark:bg-slate-900/60 shrink-0">
+            <div class="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/70 shadow-xs">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                    <div class="relative shrink-0">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center">
+                            SU
+                        </div>
+                        <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-slate-800"></span>
+                    </div>
+                    <div class="truncate">
+                        <p class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">Super Admin</p>
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500 truncate">Gudang Utama (Pusat)</p>
+                    </div>
+                </div>
+                <button class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors" title="Keluar">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m16 17 5-5-5-5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M21 12H9"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Mobile Backdrop -->
+    <div x-show="sidebarOpen" 
+         @click="sidebarOpen = false" 
+         x-transition.opacity
+         class="fixed inset-0 z-30 bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-xs md:hidden"></div>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        <!-- HEADER TOPBAR -->
+        <header class="glass-header sticky top-0 z-30 border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+            
+            <!-- Left: Sidebar Toggle & Breadcrumb -->
+            <div class="flex items-center gap-3 min-w-0">
+                <button @click="sidebarOpen = !sidebarOpen" class="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M4 6h16M4 18h16"></path>
+                    </svg>
+                </button>
+
+                <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 truncate">
+                    <a href="#" class="hover:text-slate-800 dark:hover:text-slate-200 transition-colors hidden sm:inline">Gudang</a>
+                    <svg class="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 shrink-0 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"></path>
+                    </svg>
+                    <span class="font-bold text-sky-600 dark:text-sky-400 truncate">Riwayat Mutasi Barang</span>
+                </nav>
+            </div>
+
+            <!-- Center: Search Input (Tablet & Desktop) -->
+            <div class="hidden md:block flex-1 max-w-md">
+                <div class="relative">
+                    <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"></path>
+                    </svg>
+                    <input type="search" 
+                           x-model="searchQuery" 
+                           placeholder="Cari Ref, SN, Barang, Teknisi, atau Tiket..." 
+                           class="w-full h-9 pl-10 pr-16 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all">
+                    <kbd class="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-slate-100 dark:bg-slate-900">/</kbd>
+                </div>
+            </div>
+
+            <!-- Right: Quick Actions & Theme Switcher -->
+            <div class="flex items-center gap-2">
+                <!-- Live Realtime Status -->
+                <div class="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-live"></span>
+                    <span>Live Ledger</span>
+                </div>
+
+                <!-- Theme Toggle Button -->
+                <button @click="darkMode = !darkMode" 
+                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors"
+                        title="Ganti Tema Mode (Dark/Light)">
+                    <svg x-show="darkMode" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+                    <svg x-show="!darkMode" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"></path></svg>
+                </button>
+
+                <!-- New Transaction Quick Dropdown -->
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open" 
+                            @click.outside="open = false" 
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg text-white bg-sky-600 hover:bg-sky-700 shadow-xs shadow-sky-600/30 transition-all cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                        <span class="hidden sm:inline">Tambah Mutasi</span>
+                        <svg class="w-3 h-3 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path></svg>
+                    </button>
+
+                    <div x-show="open" 
+                         x-transition:enter="transition ease-out duration-150"
+                         x-transition:enter-start="opacity-0 scale-95 translate-y-1"
+                         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                         class="absolute right-0 mt-2 w-56 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-2 z-50 text-xs divide-y divide-slate-100 dark:divide-slate-700/60"
+                         style="display: none;">
+                        <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Buat Transaksi Baru</div>
+                        <a href="#" class="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span class="font-semibold">Inbound (Barang Masuk)</span>
+                        </a>
+                        <a href="#" class="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-600">
+                            <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+                            <span class="font-semibold">Transfer Antar Cabang</span>
+                        </a>
+                        <a href="#" class="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600">
+                            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                            <span class="font-semibold">Serah Terima Teknisi</span>
+                        </a>
+                        <a href="#" class="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600">
+                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <span class="font-semibold">Penyesuaian / Opname</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- SUB NAV MODULE TABS -->
+        <div class="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 py-2 overflow-x-auto no-scrollbar">
+            <div class="flex items-center gap-1.5 min-w-max text-xs">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">Menu Gudang:</span>
+                
+                <a href="#" class="px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">Dashboard</a>
+                
+                <a href="#" class="px-3 py-1.5 rounded-lg font-bold bg-sky-500 text-white shadow-xs shadow-sky-500/30">
+                    Riwayat Mutasi
+                </a>
+                
+                <a href="#" class="px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">Pemakaian Material</a>
+                <a href="#" class="px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">Laporan Agregat</a>
+                
+                <div class="h-3.5 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                
+                <a href="#" class="px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">Kelola Stok</a>
+                <a href="#" class="px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">Transfer Cabang</a>
+                <a href="#" class="px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">Barang di Teknisi</a>
+            </div>
+        </div>
+
+        <!-- MAIN SCROLLABLE CONTENT -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-6 overflow-y-auto custom-scrollbar space-y-6">
+
+            <!-- PAGE HEADING & SUBTITLE -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-1">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-50 tracking-tight">
+                        Riwayat Mutasi & Ledger Material
+                    </h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Jejak digital seluruh pergerakan barang, transfer antar cabang, pengeluaran teknisi, retur, hingga koreksi stok terverifikasi.
+                    </p>
+                </div>
+
+                <!-- Export & Print Action Buttons -->
+                <div class="flex items-center gap-2 shrink-0">
+                    <button @click="resetFilters()" 
+                            class="px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <span>Reset Filter</span>
+                    </button>
+
+                    <button class="px-3.5 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span>Export Excel</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- KPI METRIC CARDS -->
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                
+                <!-- Card 1: Total Mutasi -->
+                <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-xs relative overflow-hidden">
+                    <div class="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">Total Transaksi</span>
+                        <div class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700/50">
+                            <svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl font-black text-slate-900 dark:text-slate-50" x-text="filteredMutations.length"></span>
+                        <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">transaksi</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Sesuai filter aktif</p>
+                </div>
+
+                <!-- Card 2: Barang Masuk (Inbound) -->
+                <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-xs">
+                    <div class="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Inbound (Masuk)</span>
+                        <div class="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-1.5">
+                        <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400" x-text="getMetricCount('inbound')"></span>
+                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">trx</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Pengadaan & Suplier</p>
+                </div>
+
+                <!-- Card 3: Transfer Cabang -->
+                <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-xs">
+                    <div class="flex items-center justify-between text-sky-600 dark:text-sky-400 mb-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Transfer Cabang</span>
+                        <div class="p-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/50">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-1.5">
+                        <span class="text-2xl font-black text-sky-600 dark:text-sky-400" x-text="getMetricCount('transfer')"></span>
+                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">trx</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Inter-POP / Gudang</p>
+                </div>
+
+                <!-- Card 4: Serah Teknisi -->
+                <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-xs">
+                    <div class="flex items-center justify-between text-indigo-600 dark:text-indigo-400 mb-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Serah Teknisi</span>
+                        <div class="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-1.5">
+                        <span class="text-2xl font-black text-indigo-600 dark:text-indigo-400" x-text="getMetricCount('outbound_tech')"></span>
+                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">trx</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Custody Lapangan</p>
+                </div>
+
+                <!-- Card 5: Penyesuaian & Retur -->
+                <div class="col-span-2 lg:col-span-1 bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-xs">
+                    <div class="flex items-center justify-between text-amber-600 dark:text-amber-400 mb-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Penyesuaian/Retur</span>
+                        <div class="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-1.5">
+                        <span class="text-2xl font-black text-amber-600 dark:text-amber-400" x-text="getMetricCount('adjust_return')"></span>
+                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">trx</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Opname & Damage</p>
+                </div>
+
+            </div>
+
+            <!-- COMPREHENSIVE FILTER BAR PANEL -->
+            <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 shadow-xs space-y-4">
+                
+                <!-- Filter Header & Quick Range Chips -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">Filter Data Ledger</span>
+                    </div>
+
+                    <!-- Quick Preset Chips -->
+                    <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                        <button @click="setPeriodPreset('today')" 
+                                :class="selectedPeriod === 'today' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+                                class="px-2.5 py-1 rounded-lg text-[11px] transition-all cursor-pointer">
+                            Hari Ini
+                        </button>
+                        <button @click="setPeriodPreset('this_week')" 
+                                :class="selectedPeriod === 'this_week' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+                                class="px-2.5 py-1 rounded-lg text-[11px] transition-all cursor-pointer">
+                            Minggu Ini
+                        </button>
+                        <button @click="setPeriodPreset('this_month')" 
+                                :class="selectedPeriod === 'this_month' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+                                class="px-2.5 py-1 rounded-lg text-[11px] transition-all cursor-pointer">
+                            Bulan Ini (Sep 2026)
+                        </button>
+                        <button @click="selectedPeriod = 'custom'" 
+                                :class="selectedPeriod === 'custom' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+                                class="px-2.5 py-1 rounded-lg text-[11px] transition-all cursor-pointer">
+                            Kustom Tanggal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input Controls Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    
+                    <!-- 1. Search Query (Mobile/Secondary) -->
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Pencarian Teks</label>
+                        <div class="relative">
+                            <input type="text" 
+                                   x-model="searchQuery" 
+                                   placeholder="Ref, SN, Barang, PJP..." 
+                                   class="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none">
+                            <button x-show="searchQuery" @click="searchQuery = ''" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Jenis Mutasi Filter -->
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Jenis Mutasi</label>
+                        <select x-model="selectedType" class="w-full px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none">
+                            <option value="all">— Semua Jenis Mutasi —</option>
+                            <option value="inbound">📥 Barang Masuk (Inbound Pengadaan)</option>
+                            <option value="transfer">🔄 Transfer Antar Cabang</option>
+                            <option value="outbound_tech">👨‍🔧 Serah Terima Teknisi</option>
+                            <option value="return_tech">🔁 Retur dari Teknisi</option>
+                            <option value="return_cust">🏠 Retur dari Pelanggan</option>
+                            <option value="adjustment">⚠️️ Penyesuaian Saldo / Opname</option>
+                        </select>
+                    </div>
+
+                    <!-- 3. Gudang / POP Selector -->
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Lokasi Gudang / POP</label>
+                        <select x-model="selectedWarehouse" class="w-full px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none">
+                            <option value="all">— Semua Gudang Terjangkau —</option>
+                            <option value="WHUSNET (PUSAT)">WHUSNET (Gudang Pusat)</option>
+                            <option value="Jetis (CABANG)">Jetis (Gudang Cabang)</option>
+                            <option value="Sandya (CABANG)">Sandya (Gudang Cabang)</option>
+                        </select>
+                    </div>
+
+                    <!-- 4. Date Range Inputs (Visible when Custom is Selected) -->
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                            Rentang Tanggal <span x-show="selectedPeriod === 'custom'" class="text-sky-500 font-bold">(Kustom)</span>
+                        </label>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <input type="date" 
+                                   x-model="startDate" 
+                                   :disabled="selectedPeriod !== 'custom'"
+                                   class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 disabled:opacity-50">
+                            <input type="date" 
+                                   x-model="endDate" 
+                                   :disabled="selectedPeriod !== 'custom'"
+                                   class="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 disabled:opacity-50">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- MUTATION DATA DISPLAY CONTAINER -->
+            <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl overflow-hidden shadow-xs">
+                
+                <!-- Table Action / Active Filter Info Bar -->
+                <div class="px-4 py-3 bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span>Menampilkan <strong class="text-slate-800 dark:text-slate-200" x-text="paginatedMutations.length"></strong> dari <strong class="text-slate-800 dark:text-slate-200" x-text="filteredMutations.length"></strong> catatan ledger</span>
+                        <span x-show="searchQuery || selectedType !== 'all' || selectedWarehouse !== 'all'" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-bold">
+                            Filtered
+                        </span>
+                    </div>
+
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="text-slate-400 hidden sm:inline">Tampilkan:</span>
+                        <select x-model.number="itemsPerPage" class="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- DESKTOP / LAPTOP HIGH DENSITY TABLE (Hidden on Mobile < md) -->
+                <div class="hidden md:block overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100/70 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                <th class="py-3 px-4">Waktu & Ref TRX</th>
+                                <th class="py-3 px-4">Jenis Mutasi</th>
+                                <th class="py-3 px-4">Rute (Asal → Tujuan)</th>
+                                <th class="py-3 px-4">Barang & Volume</th>
+                                <th class="py-3 px-4">Nomor Seri (SN)</th>
+                                <th class="py-3 px-4">Operator / PJP</th>
+                                <th class="py-3 px-4 text-center">Status</th>
+                                <th class="py-3 px-4 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-xs">
+                            
+                            <!-- Repeat Loop for Mutations -->
+                            <template x-for="item in paginatedMutations" :key="item.id">
+                                <tr class="hover:bg-sky-50/40 dark:hover:bg-slate-700/40 transition-colors group cursor-pointer" @click="openDetail(item)">
+                                    
+                                    <!-- Waktu & Ref TRX -->
+                                    <td class="py-3.5 px-4">
+                                        <div class="flex flex-col">
+                                            <span class="font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+                                                <span x-text="item.ref_code"></span>
+                                                <svg class="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                            </span>
+                                            <span class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5" x-text="item.timestamp"></span>
+                                            <span class="text-[10px] text-slate-400 font-mono" x-text="item.relative_time"></span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Jenis Mutasi Badge -->
+                                    <td class="py-3.5 px-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold" :class="getTypeBadgeClass(item.type)">
+                                            <span x-html="getTypeIcon(item.type)"></span>
+                                            <span x-text="getTypeLabel(item.type)"></span>
+                                        </span>
+                                    </td>
+
+                                    <!-- Rute Asal -> Tujuan -->
+                                    <td class="py-3.5 px-4">
+                                        <div class="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
+                                            <span class="truncate max-w-[110px]" x-text="item.origin" :title="item.origin"></span>
+                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"></path></svg>
+                                            <span class="truncate max-w-[110px] font-semibold text-sky-600 dark:text-sky-400" x-text="item.destination" :title="item.destination"></span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Barang & Quantity -->
+                                    <td class="py-3.5 px-4">
+                                        <div>
+                                            <p class="font-bold text-slate-800 dark:text-slate-100" x-text="item.item_name"></p>
+                                            <div class="flex items-center gap-2 mt-0.5">
+                                                <span class="font-mono font-extrabold text-sky-700 dark:text-sky-300 bg-sky-100 dark:bg-sky-950/80 px-1.5 py-0.5 rounded text-[11px]" x-text="`${item.qty} ${item.unit}`"></span>
+                                                <span class="text-[10px] text-slate-400" x-text="item.category"></span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- SN Pill List Preview -->
+                                    <td class="py-3.5 px-4">
+                                        <div x-if="item.sn_list && item.sn_list.length > 0">
+                                            <div class="flex items-center gap-1 flex-wrap max-w-[160px]">
+                                                <span class="font-mono text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600" x-text="item.sn_list[0]"></span>
+                                                <span x-show="item.sn_list.length > 1" 
+                                                      class="font-mono text-[10px] bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-bold" 
+                                                      x-text="`+${item.sn_list.length - 1} SN`"></span>
+                                            </div>
+                                        </div>
+                                        <div x-show="!item.sn_list || item.sn_list.length === 0">
+                                            <span class="text-[11px] text-slate-400 italic">Non-SN / Curah</span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Operator / PJP -->
+                                    <td class="py-3.5 px-4">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-[10px] flex items-center justify-center shrink-0" x-text="getInitials(item.operator)">
+                                            </div>
+                                            <div class="truncate max-w-[110px]">
+                                                <p class="font-semibold text-slate-800 dark:text-slate-200 truncate" x-text="item.operator"></p>
+                                                <p class="text-[10px] text-slate-400 truncate" x-text="item.role"></p>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- Status -->
+                                    <td class="py-3.5 px-4 text-center whitespace-nowrap">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold" :class="getStatusBadgeClass(item.status)">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                            <span x-text="item.status"></span>
+                                        </span>
+                                    </td>
+
+                                    <!-- Actions Button -->
+                                    <td class="py-3.5 px-4 text-right whitespace-nowrap" @click.stop>
+                                        <button @click="openDetail(item)" class="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-slate-700 transition-colors" title="Lihat Detail Mutasi">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                        </button>
+                                    </td>
+
+                                </tr>
+                            </template>
+
+                            <!-- Empty State -->
+                            <tr x-show="filteredMutations.length === 0">
+                                <td colspan="8" class="py-12 text-center">
+                                    <div class="flex flex-col items-center justify-center space-y-2">
+                                        <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                                        </div>
+                                        <p class="font-bold text-slate-700 dark:text-slate-300 text-sm">Tidak ada mutasi yang cocok dengan filter</p>
+                                        <p class="text-xs text-slate-400">Coba ubah kata kunci pencarian atau tanggal periode Anda.</p>
+                                        <button @click="resetFilters()" class="mt-2 text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline">Reset Semua Filter</button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- MOBILE & TABLET CARD STACK VIEW (< md Screens) -->
+                <div class="md:hidden divide-y divide-slate-100 dark:divide-slate-700/60">
+                    <template x-for="item in paginatedMutations" :key="item.id">
+                        <div class="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors space-y-3" @click="openDetail(item)">
+                            
+                            <!-- Card Header: Type, Status, Ref Code -->
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold" :class="getTypeBadgeClass(item.type)">
+                                        <span x-html="getTypeIcon(item.type)"></span>
+                                        <span x-text="getTypeLabel(item.type)"></span>
+                                    </span>
+                                    <p class="font-mono font-bold text-sky-600 dark:text-sky-400 text-xs mt-1" x-text="item.ref_code"></p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold" :class="getStatusBadgeClass(item.status)" x-text="item.status"></span>
+                                    <p class="text-[10px] text-slate-400 mt-1" x-text="item.timestamp"></p>
+                                </div>
+                            </div>
+
+                            <!-- Item Info & Quantity -->
+                            <div class="bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                <div>
+                                    <p class="font-bold text-xs text-slate-800 dark:text-slate-100" x-text="item.item_name"></p>
+                                    <p class="text-[10px] text-slate-400" x-text="item.category"></p>
+                                </div>
+                                <span class="font-mono font-extrabold text-sky-700 dark:text-sky-300 bg-sky-100 dark:bg-sky-950 px-2 py-1 rounded text-xs" x-text="`${item.qty} ${item.unit}`"></span>
+                            </div>
+
+                            <!-- Route & Operator -->
+                            <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 pt-1">
+                                <div class="flex items-center gap-1">
+                                    <span class="font-medium" x-text="item.origin"></span>
+                                    <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                    <span class="font-bold text-sky-600 dark:text-sky-400" x-text="item.destination"></span>
+                                </div>
+                                <span class="text-[11px] text-slate-400" x-text="item.operator"></span>
+                            </div>
+
+                            <!-- SN Preview if available -->
+                            <div x-show="item.sn_list && item.sn_list.length > 0" class="flex items-center gap-1 pt-1">
+                                <span class="text-[10px] text-slate-400">SN:</span>
+                                <span class="font-mono text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded" x-text="item.sn_list[0]"></span>
+                                <span x-show="item.sn_list.length > 1" class="font-mono text-[10px] text-sky-600 dark:text-sky-400 font-bold" x-text="`+${item.sn_list.length - 1} lainnya`"></span>
+                            </div>
+
+                        </div>
+                    </template>
+                </div>
+
+                <!-- PAGINATION CONTROLS FOOTER -->
+                <div class="px-4 py-3 bg-slate-50/80 dark:bg-slate-900/60 border-t border-slate-100 dark:border-slate-700/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                    <span class="text-slate-500 dark:text-slate-400">
+                        Halaman <strong class="text-slate-800 dark:text-slate-200" x-text="currentPage"></strong> dari <strong class="text-slate-800 dark:text-slate-200" x-text="totalPages"></strong>
+                    </span>
+
+                    <div class="flex items-center gap-1">
+                        <button @click="currentPage = Math.max(1, currentPage - 1)" 
+                                :disabled="currentPage === 1"
+                                class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold cursor-pointer">
+                            &laquo; Prev
+                        </button>
+                        
+                        <template x-for="p in totalPages" :key="p">
+                            <button @click="currentPage = p" 
+                                    :class="currentPage === p ? 'bg-sky-500 text-white font-bold' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'"
+                                    class="w-8 h-8 rounded-lg text-xs flex items-center justify-center cursor-pointer" 
+                                    x-text="p">
+                            </button>
+                        </template>
+
+                        <button @click="currentPage = Math.min(totalPages, currentPage + 1)" 
+                                :disabled="currentPage === totalPages"
+                                class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold cursor-pointer">
+                            Next &raquo;
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- MUTATION DETAIL SLIDE-OVER DRAWER -->
+    <div x-show="detailDrawerOpen" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-xs flex justify-end"
+         style="display: none;">
+        
+        <div @click.outside="detailDrawerOpen = false" 
+             x-transition:enter="transition ease-out duration-300 transform"
+             x-transition:enter-start="translate-x-full"
+             x-transition:enter-end="translate-x-0"
+             x-transition:leave="transition ease-in duration-200 transform"
+             x-transition:leave-start="translate-x-0"
+             x-transition:leave-end="translate-x-full"
+             class="w-full max-w-xl bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col justify-between overflow-hidden">
+            
+            <!-- Drawer Header -->
+            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Detail Mutasi Material</h3>
+                        <p class="font-mono text-xs text-sky-600 dark:text-sky-400 font-bold" x-text="activeDetail?.ref_code"></p>
+                    </div>
+                </div>
+
+                <button @click="detailDrawerOpen = false" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Drawer Body Scrollable Content -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar text-xs">
+                
+                <!-- Status & Type Header Info -->
+                <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Jenis Transaksi</span>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold" :class="getTypeBadgeClass(activeDetail?.type)">
+                            <span x-html="getTypeIcon(activeDetail?.type)"></span>
+                            <span x-text="getTypeLabel(activeDetail?.type)"></span>
+                        </span>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Status Ledger</span>
+                        <span class="px-2.5 py-0.5 rounded text-xs font-bold" :class="getStatusBadgeClass(activeDetail?.status)" x-text="activeDetail?.status"></span>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Waktu Eksekusi</span>
+                        <span class="font-semibold text-slate-800 dark:text-slate-200" x-text="activeDetail?.timestamp"></span>
+                    </div>
+                </div>
+
+                <!-- Route Flow Graph (Origin -> Destination) -->
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Alur Perpindahan Stok</h4>
+                    <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 grid grid-cols-2 gap-4 text-center relative">
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Gudang Asal</span>
+                            <p class="font-extrabold text-sm text-slate-800 dark:text-slate-100" x-text="activeDetail?.origin"></p>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-bold text-sky-500 uppercase">Gudang Tujuan</span>
+                            <p class="font-extrabold text-sm text-sky-600 dark:text-sky-400" x-text="activeDetail?.destination"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item & Volume Summary -->
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Rincian Barang</h4>
+                    <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 space-y-2">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <p class="font-black text-sm text-slate-900 dark:text-slate-50" x-text="activeDetail?.item_name"></p>
+                                <p class="text-xs text-slate-400" x-text="activeDetail?.category"></p>
+                            </div>
+                            <span class="font-mono text-base font-black text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950 px-3 py-1 rounded-lg border border-sky-200 dark:border-sky-800" x-text="`${activeDetail?.qty} ${activeDetail?.unit}`"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Serial Numbers (SN) Breakdown List -->
+                <div x-show="activeDetail?.sn_list && activeDetail?.sn_list.length > 0">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Daftar Serial Number (SN) Terdaftar</h4>
+                        <span class="text-[10px] font-bold text-sky-600 dark:text-sky-400" x-text="`${activeDetail?.sn_list.length} unit SN`"></span>
+                    </div>
+
+                    <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 max-h-40 overflow-y-auto custom-scrollbar">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-[11px]">
+                            <template x-for="(sn, idx) in activeDetail?.sn_list" :key="idx">
+                                <div class="px-2.5 py-1.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                    <span class="font-bold text-slate-800 dark:text-slate-200" x-text="sn"></span>
+                                    <span class="text-[9px] text-emerald-600 font-bold">OK</span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Responsible Person & Source Reference -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                        <span class="text-[10px] font-bold uppercase text-slate-400">Operator / PJP</span>
+                        <p class="font-bold text-slate-800 dark:text-slate-100 text-xs mt-1" x-text="activeDetail?.operator"></p>
+                        <p class="text-[10px] text-slate-400" x-text="activeDetail?.role"></p>
+                    </div>
+
+                    <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                        <span class="text-[10px] font-bold uppercase text-slate-400">Referensi Tiket/Doc</span>
+                        <p class="font-mono font-bold text-sky-600 dark:text-sky-400 text-xs mt-1" x-text="activeDetail?.source_doc || 'N/A'"></p>
+                        <p class="text-[10px] text-slate-400">Dokumen Acuan</p>
+                    </div>
+                </div>
+
+                <!-- Notes / Catatan -->
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Catatan Keterangan</h4>
+                    <p class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 italic text-xs leading-relaxed" x-text="activeDetail?.notes || 'Tidak ada catatan tambahan.'"></p>
+                </div>
+
+            </div>
+
+            <!-- Drawer Footer Action -->
+            <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-3 shrink-0">
+                <button @click="detailDrawerOpen = false" class="px-4 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    Tutup
+                </button>
+
+                <button class="px-4 py-2 text-xs font-bold rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    <span>Cetak Bukti Mutasi</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- ALPINE JS APPLICATION LOGIC -->
+<script>
+function warehouseHistoryApp() {
+    return {
+        darkMode: true,
+        sidebarOpen: false,
+        detailDrawerOpen: false,
+        activeDetail: null,
+        
+        // Filter States
+        searchQuery: '',
+        selectedType: 'all',
+        selectedWarehouse: 'all',
+        selectedPeriod: 'this_month',
+        startDate: '2026-09-01',
+        endDate: '2026-09-30',
+        
+        // Pagination
+        currentPage: 1,
+        itemsPerPage: 10,
+
+        // Mock Mutations Dataset based on WHUSNET operational system
+        mutations: [
+            {
+                id: 1,
+                ref_code: 'TRX-IN-20260930-0089',
+                timestamp: '30 Sep 2026, 14:25 WIB',
+                relative_time: '25 menit lalu',
+                type: 'inbound',
+                origin: 'PT Fiber Supply',
+                destination: 'WHUSNET (PUSAT)',
+                item_name: 'Modem ONT ZTE F609',
+                category: 'CPE & Modem',
+                qty: 50,
+                unit: 'pcs',
+                sn_list: ['ZTEG88A12901', 'ZTEG88A12902', 'ZTEG88A12903', 'ZTEG88A12904', 'ZTEG88A12905'],
+                operator: 'Budi Santoso',
+                role: 'Head Warehouse',
+                status: 'Selesai',
+                source_doc: 'PO-2026-0912',
+                notes: 'Penerimaan batch ke-3 modem ZTE dari suplier utama.'
+            },
+            {
+                id: 2,
+                ref_code: 'TRX-TRF-20260930-0042',
+                timestamp: '30 Sep 2026, 11:10 WIB',
+                relative_time: '3 jam lalu',
+                type: 'transfer',
+                origin: 'WHUSNET (PUSAT)',
+                destination: 'Jetis (CABANG)',
+                item_name: 'Kabel Dropcore 1 Core',
+                category: 'Kabel & FO',
+                qty: 15,
+                unit: 'roll',
+                sn_list: [],
+                operator: 'Agus Setiawan',
+                role: 'Staff Logistik',
+                status: 'Selesai',
+                source_doc: 'REQ-WH-2026-088',
+                notes: 'Transfer stok dropcore untuk kebutuhan pemasangan Jetis.'
+            },
+            {
+                id: 3,
+                ref_code: 'TRX-OUT-20260929-0112',
+                timestamp: '29 Sep 2026, 16:45 WIB',
+                relative_time: 'Kemarin',
+                type: 'outbound_tech',
+                origin: 'Jetis (CABANG)',
+                destination: 'Rudi Teknisi',
+                item_name: 'Modem ONT ZTE F609',
+                category: 'CPE & Modem',
+                qty: 3,
+                unit: 'pcs',
+                sn_list: ['ZTEG77918201', 'ZTEG77918202', 'ZTEG77918203'],
+                operator: 'Dewi Rahma',
+                role: 'Admin Gudang Jetis',
+                status: 'Selesai',
+                source_doc: 'TSK-FOP-20260929-003',
+                notes: 'Pengambilan modem untuk WO pemasangan baru di sektor Jetis Barat.'
+            },
+            {
+                id: 4,
+                ref_code: 'TRX-RET-20260929-0021',
+                timestamp: '29 Sep 2026, 13:15 WIB',
+                relative_time: 'Kemarin',
+                type: 'return_cust',
+                origin: 'Pelanggan ID-8821',
+                destination: 'WHUSNET (PUSAT)',
+                item_name: 'Modem ONT Huawei HG8245H',
+                category: 'CPE & Modem',
+                qty: 1,
+                unit: 'pcs',
+                sn_list: ['HW1029384756'],
+                operator: 'Budi Santoso',
+                role: 'Head Warehouse',
+                status: 'Karantina',
+                source_doc: 'TERM-20260929-12',
+                notes: 'Modem retur bekas pelanggan putus langganan, dalam tes QC fungsi.'
+            },
+            {
+                id: 5,
+                ref_code: 'TRX-ADJ-20260928-0005',
+                timestamp: '28 Sep 2026, 09:00 WIB',
+                relative_time: '2 hari lalu',
+                type: 'adjustment',
+                origin: 'Jetis (CABANG)',
+                destination: 'Jetis (CABANG)',
+                item_name: 'Patch Cord SC/APC 1M',
+                category: 'Aksesoris FO',
+                qty: -5,
+                unit: 'pcs',
+                sn_list: [],
+                operator: 'Dewi Rahma',
+                role: 'Admin Gudang Jetis',
+                status: 'Disetujui',
+                source_doc: 'OPN-2026-09A',
+                notes: 'Penyesuaian kabel patch cord rusak saat pembongkaran rak.'
+            },
+            {
+                id: 6,
+                ref_code: 'TRX-TRF-20260927-0033',
+                timestamp: '27 Sep 2026, 15:20 WIB',
+                relative_time: '3 hari lalu',
+                type: 'transfer',
+                origin: 'WHUSNET (PUSAT)',
+                destination: 'Sandya (CABANG)',
+                item_name: 'OLT Module GPON 8 Port',
+                category: 'Perangkat Aktif',
+                qty: 2,
+                unit: 'pcs',
+                sn_list: ['GPON-MOD-991', 'GPON-MOD-992'],
+                operator: 'Agus Setiawan',
+                role: 'Staff Logistik',
+                status: 'Selesai',
+                source_doc: 'REQ-SANDYA-04',
+                notes: 'Penambahan modul GPON cabang Sandya.'
+            },
+            {
+                id: 7,
+                ref_code: 'TRX-OUT-20260926-0081',
+                timestamp: '26 Sep 2026, 10:05 WIB',
+                relative_time: '4 hari lalu',
+                type: 'outbound_tech',
+                origin: 'Sandya (CABANG)',
+                destination: 'Doni Teknisi',
+                item_name: 'Kabel Dropcore 1 Core',
+                category: 'Kabel & FO',
+                qty: 2,
+                unit: 'roll',
+                sn_list: [],
+                operator: 'Eko Prasetyo',
+                role: 'Admin Gudang Sandya',
+                status: 'Selesai',
+                source_doc: 'TSK-FOP-20260926-08',
+                notes: 'Pengeluaran kabel perbaikan jaringan terputus Sandya Indah.'
+            }
+        ],
+
+        // Computed Filtered List
+        get filteredMutations() {
+            return this.mutations.filter(m => {
+                // Search Query matching
+                const query = this.searchQuery.toLowerCase().trim();
+                const matchesSearch = !query || 
+                    m.ref_code.toLowerCase().includes(query) ||
+                    m.item_name.toLowerCase().includes(query) ||
+                    m.origin.toLowerCase().includes(query) ||
+                    m.destination.toLowerCase().includes(query) ||
+                    m.operator.toLowerCase().includes(query) ||
+                    m.sn_list.some(sn => sn.toLowerCase().includes(query));
+
+                // Type Filter
+                const matchesType = this.selectedType === 'all' || m.type === this.selectedType;
+
+                // Warehouse Filter
+                const matchesWarehouse = this.selectedWarehouse === 'all' || 
+                    m.origin === this.selectedWarehouse || 
+                    m.destination === this.selectedWarehouse;
+
+                return matchesSearch && matchesType && matchesWarehouse;
+            });
+        },
+
+        // Paginated subset
+        get paginatedMutations() {
+            const start = (this.currentPage - 1) * this.itemsPerPage;
+            return this.filteredMutations.slice(start, start + this.itemsPerPage);
+        },
+
+        get totalPages() {
+            return Math.ceil(this.filteredMutations.length / this.itemsPerPage) || 1;
+        },
+
+        // Metric Card Helpers
+        getMetricCount(category) {
+            if (category === 'inbound') return this.mutations.filter(m => m.type === 'inbound').length;
+            if (category === 'transfer') return this.mutations.filter(m => m.type === 'transfer').length;
+            if (category === 'outbound_tech') return this.mutations.filter(m => m.type === 'outbound_tech').length;
+            if (category === 'adjust_return') return this.mutations.filter(m => m.type === 'adjustment' || m.type === 'return_cust').length;
+            return 0;
+        },
+
+        // Preset Period Setters
+        setPeriodPreset(preset) {
+            this.selectedPeriod = preset;
+            if (preset === 'today') {
+                this.startDate = '2026-09-30';
+                this.endDate = '2026-09-30';
+            } else if (preset === 'this_week') {
+                this.startDate = '2026-09-24';
+                this.endDate = '2026-09-30';
+            } else if (preset === 'this_month') {
+                this.startDate = '2026-09-01';
+                this.endDate = '2026-09-30';
+            }
+        },
+
+        // Reset Filters
+        resetFilters() {
+            this.searchQuery = '';
+            this.selectedType = 'all';
+            this.selectedWarehouse = 'all';
+            this.selectedPeriod = 'this_month';
+            this.currentPage = 1;
+        },
+
+        // Modal Drawer trigger
+        openDetail(item) {
+            this.activeDetail = item;
+            this.detailDrawerOpen = true;
+        },
+
+        // Helper UI Formatting Methods
+        getTypeLabel(type) {
+            const labels = {
+                'inbound': 'Barang Masuk',
+                'transfer': 'Transfer Cabang',
+                'outbound_tech': 'Serah Teknisi',
+                'return_tech': 'Retur Teknisi',
+                'return_cust': 'Retur Pelanggan',
+                'adjustment': 'Penyesuaian Saldo'
+            };
+            return labels[type] || type;
+        },
+
+        getTypeBadgeClass(type) {
+            const classes = {
+                'inbound': 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
+                'transfer': 'bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800',
+                'outbound_tech': 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800',
+                'return_cust': 'bg-teal-100 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800',
+                'adjustment': 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+            };
+            return classes[type] || 'bg-slate-100 text-slate-700';
+        },
+
+        getTypeIcon(type) {
+            if (type === 'inbound') return `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>`;
+            if (type === 'transfer') return `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>`;
+            if (type === 'outbound_tech') return `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>`;
+            return `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
+        },
+
+        getStatusBadgeClass(status) {
+            if (status === 'Selesai' || status === 'Disetujui') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300';
+            if (status === 'Karantina' || status === 'Pending') return 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
+            return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+        },
+
+        getInitials(name) {
+            if (!name) return 'U';
+            return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        }
+    }
+}
+</script>
+
+</body>
+</html>

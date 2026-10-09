@@ -10,7 +10,9 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\CollectorBalanceService;
+use App\Services\EffectiveAccessService;
 use App\Services\UserScopeManagementService;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -21,7 +23,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $roleId = $request->query('role_id', '');
         $status = trim((string) $request->query('status', ''));
         $popId = $request->query('pop_id', '');
@@ -156,6 +158,13 @@ class UserController extends Controller
                     }
                 }
             }
+
+            if ($request->role_id) {
+                $targetRole = Role::find($request->role_id);
+                if ($targetRole && ! app(EffectiveAccessService::class)->canGrantRole($request->user(), $targetRole)) {
+                    $validator->errors()->add('role_id', 'Role ini punya izin yang belum Anda miliki — Anda tidak bisa menetapkannya.');
+                }
+            }
         });
 
         $validated = $validator->validate();
@@ -243,6 +252,39 @@ class UserController extends Controller
                     if ($scopeType === 'selected_pop' && empty($request->pop_ids)) {
                         $validator->errors()->add('pop_ids', 'Minimal 1 POP target wajib dipilih untuk scope ini.');
                     }
+                }
+            }
+
+            // Eskalasi role (lihat EffectiveAccessService::canGrantRole): role LAMA user
+            // juga dicek — kalau tidak, actor berizin terbatas bisa mengedit Owner
+            // dan menurunkannya ke role yang dia pegang sendiri.
+            $actor = $request->user();
+            if ($request->role_id) {
+                $targetRole = Role::find($request->role_id);
+                if ($targetRole && ! app(EffectiveAccessService::class)->canGrantRole($actor, $targetRole)) {
+                    $validator->errors()->add('role_id', 'Role ini punya izin yang belum Anda miliki — Anda tidak bisa menetapkannya.');
+                }
+            }
+            if ($user->role && ! app(EffectiveAccessService::class)->canGrantRole($actor, $user->role)) {
+                $validator->errors()->add('role_id', 'User ini punya role dengan izin yang melebihi milik Anda — tidak bisa Anda ubah.');
+            }
+
+            // Kelompok I5, docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md
+            // §5.3.3 arah 2: scope gak boleh diubah sampai keluar dari cabang
+            // yang sudah dia PIC-i (warehouse_pop_pics) — penunjukan PIC
+            // adalah keputusan operasional, gak boleh hilang diam-diam gara-
+            // gara form scope diedit. all_pop selalu aman (mencakup semua).
+            if ($request->scope_type === 'selected_pop') {
+                $picPopIds = $user->picGudangPops()->pluck('pops.id');
+                $requestedPopIds = collect($request->pop_ids ?? [])->map(fn ($id) => (int) $id);
+                $missingPopIds = $picPopIds->diff($requestedPopIds);
+
+                if ($missingPopIds->isNotEmpty()) {
+                    $missingNames = Pop::whereIn('id', $missingPopIds)->pluck('name')->implode(', ');
+                    $validator->errors()->add(
+                        'scope_type',
+                        "User ini masih jadi PIC Gudang cabang {$missingNames} — lepas/pindahkan dulu penunjukan PIC-nya lewat halaman Kelola PIC Gudang sebelum mengubah scope ini."
+                    );
                 }
             }
 

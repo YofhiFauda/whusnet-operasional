@@ -42,7 +42,7 @@
 
     function cbSignature(rows) {
         return rows
-            .map(r => [r.invoice_id, r.amount, r.payment_method, r.collected_date].join(':'))
+            .map(r => [r.invoice_id, r.amount, r.use_balance_amount ?? 0, r.payment_method, r.bank_account_id ?? '', r.collected_date].join(':'))
             .sort()
             .join('|');
     }
@@ -97,6 +97,13 @@
         if (e.target.classList.contains('cb-row-checkbox')) {
             cbUpdateCount();
         }
+
+        // "Pakai saldo" dicentang/dilepas → hitung ulang pelanggan itu saja.
+        if (e.target.classList.contains('cb-use-saldo')) {
+            const tr = e.target.closest('tr');
+            cbAutoFillSaldo(tr ? tr.dataset.customerId : null);
+            cbRefreshAllHints();
+        }
     });
 
     // Pakai komponen Toast global (resources/views/components/toast.blade.php),
@@ -127,6 +134,9 @@
 
     function cbRowToPayload(tr) {
         const noteInput = tr.querySelector('.cb-note');
+        const bankInput = tr.querySelector('.cb-bank');
+        const senderInput = tr.querySelector('.cb-sender');
+        const method = tr.querySelector('.cb-method').value;
 
         return {
             invoice_id: parseInt(tr.querySelector('.cb-row-checkbox').value, 10),
@@ -134,7 +144,11 @@
             // atas "150.000" menghasilkan 150 — pembayaran 1.000× lebih kecil,
             // tanpa error. Server tetap menormalkan ulang (RupiahInput).
             amount: window.Rupiah.angka(tr.querySelector('.cb-amount').value),
-            payment_method: tr.querySelector('.cb-method').value,
+            use_balance_amount: cbSaldoOf(tr),
+            payment_method: method,
+            // Hanya dikirim untuk Transfer — rekening tujuan dari master.
+            bank_account_id: method === 'transfer' && bankInput && bankInput.value ? parseInt(bankInput.value, 10) : null,
+            sender_name: method === 'transfer' && senderInput ? senderInput.value.trim() : '',
             collected_date: tr.querySelector('.cb-collected-date').value,
             // Wajib untuk metode Lainnya — dicek cbBarisValid() sebelum
             // submit, dan lagi di CollectorPaymentService (server otoritatif).
@@ -142,16 +156,175 @@
         };
     }
 
+    // Saldo yang dipakai baris ini (0 kalau kolom saldo tidak tampil).
+    function cbSaldoOf(tr) {
+        const saldoInput = tr.querySelector('.cb-saldo');
+        const checkbox = tr.querySelector('.cb-use-saldo');
+        if (!saldoInput || (checkbox && !checkbox.checked)) return 0;
+
+        return window.Rupiah.angka(saldoInput.value) || 0;
+    }
+
+    // Tunai + saldo = total yang menutup tagihan baris ini.
+    function cbTotalOf(tr) {
+        const amount = window.Rupiah.angka(tr.querySelector('.cb-amount').value) || 0;
+        return amount + cbSaldoOf(tr);
+    }
+
+    // Sisa tagihan baris ini, dari data-max yang disegarkan cbApplyResults().
+    function cbRemainingOf(tr) {
+        return parseFloat(tr.querySelector('.cb-amount').dataset.max);
+    }
+
+    // Lebih bayar = total di atas sisa tagihan. Dibulatkan ke sen supaya
+    // "bayar pas" tak menghasilkan Rp0,000001 hantu (sama seperti server).
+    function cbOverpayOf(tr) {
+        const over = cbTotalOf(tr) - cbRemainingOf(tr);
+        return over > 0 ? Math.round(over * 100) / 100 : 0;
+    }
+
+    // Pratinjau di bawah input, sama maknanya dengan form Bayar admin:
+    // lunas / cicilan (sisa) / lebih bayar. Tanpa nomor cicilan — jalur batch
+    // tidak punya urutan cicilan seperti form admin.
+    function cbRefreshHint(tr) {
+        if (!tr) return;
+        const hint = tr.querySelector('.cb-hint');
+        if (!hint) return;
+
+        const total = cbTotalOf(tr);
+        const remaining = cbRemainingOf(tr);
+        const fmt = (n) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+
+        // Satu baris pendek (chip) supaya tabel tidak melebar; penjelasan
+        // lengkap ada di tooltip (title).
+        hint.className = 'cb-hint hidden inline-block text-[10px] leading-tight font-semibold px-1.5 py-0.5 rounded';
+        if (!(total > 0) || isNaN(remaining)) return;
+
+        if (total > remaining) {
+            hint.textContent = 'Melebihi sisa ' + fmt(total - remaining);
+            hint.title = 'Tidak bisa diproses di sini. Kelebihan hanya bisa dicatat lewat Tagihan admin.';
+            hint.classList.add('text-rose-700', 'bg-rose-50');
+        } else if (total < remaining) {
+            hint.textContent = 'Cicilan · sisa ' + fmt(remaining - total);
+            hint.title = 'Tagihan jadi Sebagian, sisa setelah ini ' + fmt(remaining - total) + '.';
+            hint.classList.add('text-amber-800', 'bg-amber-50');
+        } else {
+            hint.textContent = 'Lunas';
+            hint.title = 'Pembayaran ini melunasi tagihan.';
+            hint.classList.add('text-emerald-700', 'bg-emerald-50');
+        }
+        hint.classList.remove('hidden');
+    }
+
+    function cbRefreshAllHints() {
+        document.querySelectorAll('tr[data-invoice-row]').forEach(cbRefreshHint);
+    }
+
+    // Saldo terisi otomatis seperti form Bayar admin: saldo = min(sisa saldo,
+    // sisa tagihan), nominal tunai = sisa tagihan dikurangi saldo. Saldo satu
+    // pelanggan dibagi antar tagihannya (satu saldo, banyak baris), jadi
+    // baris berikutnya hanya mendapat sisa saldo yang belum dipakai baris sebelumnya.
+    // Format ribuan seperti input lain (150.000), bukan angka mentah (150000).
+    function cbSetRupiah(input, value) {
+        input.value = window.Rupiah.format(String(Math.max(0, Math.round(value))));
+    }
+
+    // Hanya baris yang saldonya dicentang ("Pakai saldo") yang dihitung. Baris
+    // lain: saldo 0, nominal = sisa tagihan. `onlyCustomerId` membatasi hitung
+    // ulang ke satu pelanggan (dipakai saat checkbox-nya diklik), supaya nominal
+    // hasil ketikan kasir di baris lain tidak tertimpa.
+    function cbAutoFillSaldo(onlyCustomerId = null) {
+        const assigned = {};
+
+        document.querySelectorAll('tr[data-invoice-row]').forEach(tr => {
+            const saldoInput = tr.querySelector('.cb-saldo');
+            if (!saldoInput) return;
+
+            const customerId = tr.dataset.customerId;
+            if (onlyCustomerId !== null && customerId !== String(onlyCustomerId)) return;
+
+            const checkbox = tr.querySelector('.cb-use-saldo');
+            const remaining = cbRemainingOf(tr);
+            const balance = parseFloat(saldoInput.dataset.balance) || 0;
+            const available = Math.max(0, balance - (assigned[customerId] || 0));
+            const useSaldo = checkbox && checkbox.checked;
+            const saldo = useSaldo ? Math.max(0, Math.min(available, remaining)) : 0;
+
+            if (useSaldo) assigned[customerId] = (assigned[customerId] || 0) + saldo;
+            saldoInput.closest('.cb-saldo-wrap')?.classList.toggle('hidden', !useSaldo);
+            cbSetRupiah(saldoInput, saldo);
+            cbSetRupiah(tr.querySelector('.cb-amount'), remaining - saldo);
+        });
+    }
+
+    // Saldo diubah kasir → nominal tunai ikut menyesuaikan sisa tagihan.
+    function cbOnSaldoChange(saldoInput) {
+        const tr = saldoInput.closest('tr');
+        if (!tr) return;
+
+        const max = parseFloat(saldoInput.dataset.max) || 0;
+        const saldo = Math.min(cbSaldoOf(tr), max);
+        cbSetRupiah(tr.querySelector('.cb-amount'), cbRemainingOf(tr) - saldo);
+    }
+
+    // Konfirmasi lebih bayar sebelum kiriman dikirim — modal yang sama
+    // maksudnya dengan form Bayar admin. `submit` baru jalan kalau kasir
+    // menekan Lanjutkan; Batal membiarkan baris tetap bisa diubah.
+    let cbPendingSubmit = null;
+
+    function cbConfirmOverpay(trs, submit) {
+        const overpay = trs.reduce((sum, tr) => sum + cbOverpayOf(tr), 0);
+
+        if (overpay <= 0) {
+            submit();
+            return;
+        }
+
+        document.getElementById('cb-overpay-message').textContent =
+            'Lebih bayar Rp ' + Math.round(overpay).toLocaleString('id-ID') + ' akan masuk saldo pelanggan. Lanjutkan?';
+        cbPendingSubmit = submit;
+        window.dispatchEvent(new CustomEvent('open-modal', { detail: 'cb-overpay-confirm' }));
+    }
+
+    function cbProceedOverpay() {
+        const submit = cbPendingSubmit;
+        cbPendingSubmit = null;
+        window.dispatchEvent(new CustomEvent('close-modal', { detail: 'cb-overpay-confirm' }));
+        if (submit) submit();
+    }
+
+    function cbCancelOverpay() {
+        cbPendingSubmit = null;
+        window.dispatchEvent(new CustomEvent('close-modal', { detail: 'cb-overpay-confirm' }));
+    }
+
     // Metode Lainnya menampilkan input keterangan di baris yang sama
-    // (PaymentMethod::requiresDescription()) — sembunyi untuk metode lain.
+    // (PaymentMethod::requiresDescription()); Transfer menampilkan pilihan
+    // rekening & nama pengirim (PaymentMethod::requiresBankDetails()). Yang
+    // tidak relevan disembunyikan & dikosongkan supaya tak ikut terkirim.
     function cbToggleNote(select) {
         const tr = select.closest('tr');
-        const noteInput = tr ? tr.querySelector('.cb-note') : null;
-        if (!noteInput) return;
+        if (!tr) return;
+
+        const noteInput = tr.querySelector('.cb-note');
+        const bankInput = tr.querySelector('.cb-bank');
+        const senderInput = tr.querySelector('.cb-sender');
 
         const isLainnya = select.value === 'lainnya';
-        noteInput.classList.toggle('hidden', !isLainnya);
-        if (!isLainnya) noteInput.value = '';
+        const isTransfer = select.value === 'transfer';
+
+        if (noteInput) {
+            noteInput.classList.toggle('hidden', !isLainnya);
+            if (!isLainnya) noteInput.value = '';
+        }
+        if (bankInput) {
+            bankInput.classList.toggle('hidden', !isTransfer);
+            if (!isTransfer) bankInput.value = '';
+        }
+        if (senderInput) {
+            senderInput.classList.toggle('hidden', !isTransfer);
+            if (!isTransfer) senderInput.value = '';
+        }
     }
 
     function cbPost(rows, submittingBtn, restoreLabel) {
@@ -184,6 +357,14 @@
                 // baris pakai data.results (per-invoice, dari
                 // Invoice::recalculateFromPayments()) daripada reload.
                 cbApplyResults(data.results || []);
+
+                // Saldo yang terpakai tidak bisa dipatch di sisi klien (saldo
+                // tersisa tak ikut dikirim server per baris), jadi halaman
+                // disegarkan supaya "maks saldo" & pratinjau tak basi. Toast
+                // sempat tampil dulu.
+                if (rows.some(r => r.use_balance_amount > 0)) {
+                    setTimeout(() => window.location.reload(), 1500);
+                }
             })
             .catch((err) => {
                 cbShowAlert(err.message, true);
@@ -234,6 +415,8 @@
         });
 
         cbUpdateCount();
+        cbAutoFillSaldo();
+        cbRefreshAllHints();
 
         const batchBtn = document.getElementById('cb-submit');
         if (batchBtn) {
@@ -259,13 +442,49 @@
      * @return {boolean} true kalau semua baris valid.
      */
     function cbBarisValid(trs) {
+        // Saldo satu pelanggan dibagi antar tagihannya — total yang dipakai
+        // tidak boleh melebihi saldo yang ada (server mengecek ulang juga).
+        const saldoPerCustomer = {};
+        for (const tr of trs) {
+            const saldoInput = tr.querySelector('.cb-saldo');
+            if (!saldoInput) continue;
+            const customerId = tr.dataset.customerId;
+            saldoPerCustomer[customerId] = (saldoPerCustomer[customerId] || 0) + cbSaldoOf(tr);
+            if (saldoPerCustomer[customerId] > (parseFloat(saldoInput.dataset.balance) || 0)) {
+                cbShowAlert('Total saldo yang dipakai untuk pelanggan ini melebihi saldonya.', true);
+                saldoInput.focus();
+                return false;
+            }
+        }
+
         for (const tr of trs) {
             const input = tr.querySelector('.cb-amount');
             const nilai = window.Rupiah.angka(input.value);
 
-            if (isNaN(nilai) || nilai < 1) {
-                cbShowAlert('Nominal wajib diisi minimal Rp 1.', true);
+            if (isNaN(nilai) || nilai < 0) {
+                cbShowAlert('Nominal tidak valid.', true);
                 input.focus();
+                return false;
+            }
+
+            // Batch tidak menerima lebih bayar: tunai + saldo tak boleh melebihi sisa.
+            if (cbTotalOf(tr) > cbRemainingOf(tr) + 0.001) {
+                cbShowAlert('Nominal tunai ditambah saldo melebihi sisa tagihan. Kelebihan hanya bisa dicatat lewat Tagihan admin.', true);
+                input.focus();
+                return false;
+            }
+
+            // Tunai boleh 0 kalau saldo menutup — yang wajib minimal Rp 1 total.
+            if (cbTotalOf(tr) < 1) {
+                cbShowAlert('Nominal wajib diisi minimal Rp 1, atau pakai Saldo Pelanggan.', true);
+                input.focus();
+                return false;
+            }
+
+            const saldoInput = tr.querySelector('.cb-saldo');
+            if (saldoInput && cbSaldoOf(tr) > parseFloat(saldoInput.dataset.max)) {
+                cbShowAlert('Saldo yang dipakai melebihi saldo tersedia.', true);
+                saldoInput.focus();
                 return false;
             }
 
@@ -274,6 +493,13 @@
             if (method === 'lainnya' && (!noteInput || !noteInput.value.trim())) {
                 cbShowAlert('Metode Lainnya wajib diisi keterangannya (mis. OVO, Dana, GoPay).', true);
                 if (noteInput) noteInput.focus();
+                return false;
+            }
+
+            const bankInput = tr.querySelector('.cb-bank');
+            if (method === 'transfer' && (!bankInput || !bankInput.value)) {
+                cbShowAlert('Pilih rekening tujuan untuk metode Transfer.', true);
+                if (bankInput) bankInput.focus();
                 return false;
             }
         }
@@ -289,10 +515,13 @@
         if (!cbBarisValid([tr])) return;
 
         const btn = tr.querySelector('button');
-        btn.disabled = true;
-        btn.textContent = 'Memproses...';
 
-        cbPost([cbRowToPayload(tr)], btn, 'Bayar');
+        cbConfirmOverpay([tr], () => {
+            btn.disabled = true;
+            btn.textContent = 'Memproses...';
+
+            cbPost([cbRowToPayload(tr)], btn, 'Bayar');
+        });
     }
 
     // Bayar massal — semua baris yang dicentang.
@@ -303,81 +532,29 @@
         if (trs.length === 0) return;
         if (!cbBarisValid(trs)) return;
 
-        const rows = trs.map(cbRowToPayload);
-
         const btn = document.getElementById('cb-submit');
-        btn.disabled = true;
-        btn.textContent = 'Memproses...';
 
-        cbPost(rows, btn, 'Bayar Massal (Baris Terpilih)');
+        cbConfirmOverpay(trs, () => {
+            const rows = trs.map(cbRowToPayload);
+
+            btn.disabled = true;
+            btn.textContent = 'Memproses...';
+
+            cbPost(rows, btn, 'Bayar Massal (Baris Terpilih)');
+        });
     }
 
-    // ---------------------------------------------------------------
-    // FIFO isian awal (ADHOC-84 §2.5/§4.4) — cuma kemudahan mengisi, BUKAN
-    // aturan server. Uang total pelanggan disebar ke baris tagihannya
-    // (sudah berdempet per pelanggan, urutan periode tertua dulu — lihat
-    // komentar di collector-pay-table.blade.php) dari yang TERTUA: tiap
-    // baris selain yang TERAKHIR dibatasi `data-max`-nya sendiri (sisa
-    // tagihan baris itu, jadi cicilan wajar kalau uang habis di tengah);
-    // baris TERAKHIR menyerap SISANYA APA ADANYA, termasuk kalau itu
-    // melebihi sisa tagihannya sendiri — kelebihan itu yang nanti
-    // otomatis jadi kredit saldo di server. Nilainya tetap bisa diedit
-    // manual sesudahnya, cuma isian awal.
-    function cbApplyFifo(customerId, totalInput) {
-        const total = window.Rupiah ? window.Rupiah.angka(totalInput.value) : parseFloat(totalInput.value);
-        if (isNaN(total) || total <= 0) {
-            cbShowAlert('Isi total uang yang diterima dari pelanggan ini dulu.', true);
-            return;
+    // Ketik nominal/saldo → pratinjau baris itu ikut berubah.
+    document.addEventListener('input', function (e) {
+        if (e.target.classList.contains('cb-saldo')) {
+            cbOnSaldoChange(e.target);
         }
-
-        const rows = Array.from(document.querySelectorAll('tr[data-customer-id="' + customerId + '"]'));
-        let sisaUang = total;
-
-        rows.forEach((tr, idx) => {
-            const input = tr.querySelector('.cb-amount');
-            if (!input) return;
-
-            const batas = parseFloat(input.dataset.max);
-            const isLast = idx === rows.length - 1;
-            const terapkan = isLast ? sisaUang : Math.min(sisaUang, isNaN(batas) ? sisaUang : batas);
-
-            input.value = window.Rupiah ? window.Rupiah.formatDariServer(String(Math.max(0, terapkan))) : String(Math.max(0, terapkan));
-            sisaUang = Math.max(0, sisaUang - terapkan);
-        });
-    }
-
-    // Baris toolbar "Total Diterima" disisipkan sekali per pelanggan yang
-    // punya 2+ tagihan tertunggak di halaman ini — pelanggan dengan 1
-    // tagihan tak butuh FIFO (tak ada yang disebar), isi manual saja.
-    document.addEventListener('DOMContentLoaded', function () {
-        const groups = new Map();
-        document.querySelectorAll('tr[data-customer-id]').forEach((tr) => {
-            const id = tr.dataset.customerId;
-            if (!groups.has(id)) groups.set(id, []);
-            groups.get(id).push(tr);
-        });
-
-        groups.forEach((rows, customerId) => {
-            if (rows.length < 2) return;
-
-            const firstRow = rows[0];
-            const toolbar = document.createElement('tr');
-            toolbar.className = 'block xl:table-row bg-sky-50/60 dark:bg-sky-500/10';
-            toolbar.innerHTML = `
-                <td class="block xl:table-cell px-3 py-2" colspan="${CB_COLSPAN}">
-                    <div class="flex flex-wrap items-center gap-2 text-xs">
-                        <span class="font-semibold text-sky-800 dark:text-sky-300">Isian awal FIFO — total uang diterima dari pelanggan ini:</span>
-                        <input type="text" inputmode="decimal" data-rupiah class="fifo-total w-32 font-mono text-xs px-2 py-1 border border-sky-200 dark:border-sky-500/30 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-                        <button type="button" class="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-semibold cursor-pointer">Terapkan</button>
-                        <span class="text-sky-700 dark:text-sky-400">Lebih dari total sisa tagihan otomatis jadi saldo pelanggan — tetap bisa diedit per baris.</span>
-                    </div>
-                </td>
-            `;
-            toolbar.querySelector('button').addEventListener('click', function () {
-                cbApplyFifo(customerId, toolbar.querySelector('.fifo-total'));
-            });
-
-            firstRow.parentNode.insertBefore(toolbar, firstRow);
-        });
+        if (e.target.classList.contains('cb-amount') || e.target.classList.contains('cb-saldo')) {
+            cbRefreshHint(e.target.closest('tr'));
+        }
     });
+
+    cbAutoFillSaldo();
+    cbRefreshAllHints();
+
 </script>

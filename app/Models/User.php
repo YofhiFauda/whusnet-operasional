@@ -9,6 +9,7 @@ use App\Services\EffectiveAccessService;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -107,11 +108,39 @@ class User extends Authenticatable
     }
 
     /**
-     * Check whether the user is a technician role.
+     * Check whether the user is a technician role (termasuk `pic_gudang` —
+     * lihat Role::TECHNICIAN_CODES).
      */
     public function isTechnician(): bool
     {
-        return $this->hasRole('teknisi');
+        return $this->hasRole(Role::TECHNICIAN_CODES);
+    }
+
+    /**
+     * Query scope: user yang role-nya teknisi lapangan (Role::TECHNICIAN_CODES).
+     * Pengganti `where('code', 'teknisi')` yang ditulis manual — pakai ini
+     * supaya `pic_gudang` otomatis ikut di semua titik yang mencari teknisi.
+     */
+    public function scopeTechnicians(Builder $query): Builder
+    {
+        return $query->whereHas('role', fn ($q) => $q->whereIn('code', Role::TECHNICIAN_CODES));
+    }
+
+    /**
+     * Cabang gudang yang jadi tanggung jawab user ini sebagai PIC (tabel
+     * `warehouse_pop_pics`) — TERPISAH dari scope POP-nya (`roleScopes()`).
+     * Lihat docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md §5.3.
+     *
+     * @return BelongsToMany<Pop, $this>
+     */
+    public function picGudangPops(): BelongsToMany
+    {
+        return $this->belongsToMany(Pop::class, 'warehouse_pop_pics');
+    }
+
+    public function isPicGudangOf(Pop $pop): bool
+    {
+        return $this->picGudangPops()->whereKey($pop->id)->exists();
     }
 
     /**

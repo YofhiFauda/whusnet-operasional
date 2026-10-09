@@ -59,6 +59,7 @@ use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
 use App\Services\NetworkAssignmentService;
+use App\Services\NumberSequenceService;
 use App\Services\TelegramBotService;
 use App\Services\TicketService;
 use App\Support\IndonesianDate;
@@ -629,14 +630,14 @@ class CustomerController extends Controller
                     $surveyPhotoPath = FileUploadService::uploadSurveyPhoto($surveyPhoto, $customer, 'odp');
                 }
 
-                $note = $difficultyLevel ? ('Tingkat Kesulitan: '.$difficultyLevel) : '';
-                $note .= ($note ? "\n" : '').'Catatan: Diinput oleh Sales saat Registrasi (Skip Survey).';
+                $note = 'Diinput oleh Sales saat Registrasi (Skip Survey).';
 
                 CustomerSurvey::create([
                     'customer_id' => $customer->id,
                     'survey_status' => 'completed',
                     'nearest_odp' => $nearestOdp,
                     'cable_estimation_meter' => $cableEstimationMeter,
+                    'difficulty_level' => $difficultyLevel,
                     // uploadSurveyPhoto('house') di atas nulis ke folder yang sama
                     // persis dipakai Laporan Survey teknisi — path-nya reuse, bukan
                     // upload dobel.
@@ -653,10 +654,8 @@ class CustomerController extends Controller
                 // pernah kepanggil di jalur ini. Bikin manual di sini, samain
                 // dengan blok non-skip di bawah biar antrean Pemasangan tetap
                 // konsisten kebentuk otomatis.
-                $year = date('Y');
-                $count = Task::whereYear('created_at', $year)->count() + 1;
                 Task::create([
-                    'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                    'task_number' => app(NumberSequenceService::class)->taskNumber(),
                     'task_type' => TaskType::PEMASANGAN->value,
                     'title' => 'Pemasangan Baru: '.$customer->full_name,
                     'description' => null,
@@ -1816,6 +1815,8 @@ class CustomerController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $deviceProfile = CustomerDeviceProfileService::resolve($customer);
+
         return response()->json([
             'invoice_id' => $latestInvoice ? $latestInvoice->id : null,
             // Target POST form "Catat Pembayaran" di Quick Hub. Dikirim SERVER-SIDE,
@@ -1836,18 +1837,28 @@ class CustomerController extends Controller
             // Dropdown rekening tujuan metode Transfer (ADHOC-95).
             'available_bank_accounts' => BankAccount::activeOptions(),
             'technical' => [
-                'pppoe_username' => $device?->pppoe_username ?: ($service?->pppoe_username ?: '-'),
+                'pppoe_username' => $deviceProfile['device']?->pppoe_username ?: ($service?->pppoe_username ?: ($customer->pppoe_username ?? '-')),
                 // K2 (ADHOC-107): PPPoE tidak diubah otomatis saat CID berubah,
                 // cukup diberi peringatan supaya NOC menyesuaikan di Mikrotik.
-                'pppoe_warning' => CustomerCidService::pppoeMismatchWarning($customer, $device?->pppoe_username ?: $service?->pppoe_username),
-                'onu_sn' => $device?->onu_sn ?? $device?->mac_address ?? '-',
-                'router_sn' => $device?->router_sn ?? '-',
-                'device_brand' => $device?->device_brand ?? '-',
+                'pppoe_warning' => CustomerCidService::pppoeMismatchWarning($customer, $deviceProfile['device']?->pppoe_username ?: ($service?->pppoe_username ?: $customer->pppoe_username)),
+                'vlan' => (string) ($deviceProfile['vlanId'] ?? '-'),
+                'bandwidth' => $customer->internetPackage?->speed_mbps ? $customer->internetPackage->speed_mbps.' Mbps' : ($service?->download_speed_snapshot ? $service->download_speed_snapshot.' Mbps' : '-'),
+                'onu_sn' => $deviceProfile['serialNumber'] ?: ($deviceProfile['macAddress'] ?: '-'),
+                'router_sn' => $deviceProfile['brandModel'] ?: ($deviceProfile['macAddress'] ?: '-'),
+                'brand_model' => $deviceProfile['brandModel'] ?: '-',
+                'mac_address' => $deviceProfile['macAddress'] ?: '-',
                 'contract_type' => match ($service?->contract_type) {
                     'sewa' => 'Sewa', 'beli' => 'Beli', default => '-'
                 },
-                'distribution' => $customer->distribution?->name ?? '-',
+                'distribution' => $deviceProfile['odpCode'] ?: ($customer->distribution?->name ?? '-'),
                 'pop_name' => $customer->pop?->name ?? '-',
+                // Redaman — ambil Aktual dulu (hasil pemasangan/maintenance
+                // terakhir), fallback ke Awal kalau belum ada ukuran ulang.
+                'attenuation' => $customer->customerTechnicalDetail?->actual_attenuation !== null
+                    ? $customer->customerTechnicalDetail->actual_attenuation.' dBm'
+                    : ($customer->customerTechnicalDetail?->initial_attenuation !== null
+                        ? $customer->customerTechnicalDetail->initial_attenuation.' dBm'
+                        : '-'),
             ],
             'location' => [
                 'latitude' => $lat ?? '',

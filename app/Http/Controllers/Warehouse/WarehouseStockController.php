@@ -8,6 +8,7 @@ use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
+use App\Http\Controllers\Warehouse\Concerns\ResolvesSelectedPop;
 use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
@@ -15,11 +16,15 @@ use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
+use App\Models\TechnicianCustody;
 use App\Services\EffectiveAccessService;
+use App\Services\WarehouseStockPositionService;
+use App\Support\LikeSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
@@ -43,6 +48,7 @@ use Illuminate\View\View;
 class WarehouseStockController extends Controller
 {
     use AuthorizesWarehousePop;
+    use ResolvesSelectedPop;
 
     public function index(Request $request, EffectiveAccessService $access): View
     {
@@ -71,13 +77,77 @@ class WarehouseStockController extends Controller
             default => $pops->count().' Gudang Terjangkau',
         };
 
-        $popFilter = $request->integer('pop_id') ?: null;
+        // Konteks cabang global (analisa-ui-ux-warehouse.md §S1) — pop_id
+        // eksplisit di query tetap menang; absen → pakai switcher header (session).
+        $popFilter = $this->resolveSelectedPopId($request, $access, $user);
         $categoryFilter = $request->integer('category_id') ?: null;
         $itemFilter = $request->integer('item_id') ?: null;
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $lowStockOnly = $request->boolean('low_stock_only');
         $trackingFilter = $request->query('tracking_type');
         $trackingFilter = in_array($trackingFilter, array_column(TrackingType::cases(), 'value'), true) ? $trackingFilter : null;
+
+        // Mode tampilan (Fase 3, analisa §U1): "lot" = daftar per lot (default,
+        // perilaku lama), "ringkasan" = satu baris per item dari
+        // WarehouseStockPositionService. Ambang stok menipis ada di level lot,
+        // jadi di mode ringkasan filter itu dimatikan (chip-nya ikut hilang)
+        // daripada menampilkan hasil yang kelihatan ter-filter padahal tidak.
+        $viewMode = $request->query('view') === 'ringkasan' ? 'ringkasan' : 'lot';
+        if ($viewMode === 'ringkasan') {
+            $lowStockOnly = false;
+            $summaryRows = app(WarehouseStockPositionService::class)->summarize(
+                $popIds, $popFilter, $itemFilter, $categoryFilter, $search, $trackingFilter
+            );
+
+            // Sort mode ringkasan (analisa-ui-ux §A5, sisa Fase 3). Whitelist;
+            // default = nama barang asc (urutan dari service). 'item' pakai
+            // string, sisanya numerik.
+            $summarySort = in_array($request->query('sort'), ['item', 'total', 'held', 'in_transit', 'problem'], true) ? $request->query('sort') : null;
+            $summaryDir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
+            if ($summarySort !== null) {
+                $summaryRows = $summaryRows->sortBy(
+                    fn ($row) => $summarySort === 'item' ? ($row['item']->name ?? '') : (float) $row[$summarySort],
+                    $summarySort === 'item' ? SORT_NATURAL | SORT_FLAG_CASE : SORT_REGULAR,
+                    $summaryDir === 'desc'
+                )->values();
+            }
+
+            $perPage = 25;
+            $page = LengthAwarePaginator::resolveCurrentPage();
+            $summary = new LengthAwarePaginator(
+                $summaryRows->forPage($page, $perPage)->values(),
+                $summaryRows->count(),
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+
+            return view('warehouse.stock.index', [
+                'pops' => $pops,
+                'categories' => ItemCategory::active()->ordered()->get(),
+                'items' => $this->dropdownItems($popIds, $itemFilter, $categoryFilter, $search),
+                'balances' => new LengthAwarePaginator(collect(), 0, $perPage, $page),
+                'summary' => $summary,
+                'summarySort' => $summarySort,
+                'summaryDir' => $summaryDir,
+                'viewMode' => $viewMode,
+                'popFilter' => $popFilter,
+                'categoryFilter' => $categoryFilter,
+                'itemFilter' => $itemFilter,
+                'search' => $search,
+                'lowStockOnly' => $lowStockOnly,
+                'trackingFilter' => $trackingFilter,
+                'lastOpnameByKey' => [],
+                'lastPriceByKey' => [],
+                'multiLotPopItemKeys' => [],
+                'sort' => null,
+                'sortDirection' => 'asc',
+                'canActAsPusat' => $canActAsPusat,
+                'canActAsCabang' => $canActAsCabang,
+                'lockedSinglePop' => $lockedSinglePop,
+                'modeLabel' => $modeLabel,
+            ]);
+        }
 
         // Barang QUANTITY/BATCH — saldo asli dari `inventory_balances`
         // (ditulis InventoryReceiveService::receiveQuantity() dkk).
@@ -89,10 +159,13 @@ class WarehouseStockController extends Controller
             ->when($categoryFilter, function ($q) use ($categoryFilter) {
                 $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
             })
+            // Cari juga by nomor lot (ADHOC-… analisa-ui-ux-warehouse §A2) —
+            // lot = identitas baris QUANTITY, sama pentingnya dengan nama barang.
             ->when($search !== '', function ($q) use ($search) {
-                $q->whereHas('item', function ($itemQuery) use ($search) {
-                    $itemQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%");
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('lot_no', 'like', "%{$search}%")
+                        ->orWhereHas('item', fn ($itemQuery) => $itemQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%"));
                 });
             })
             ->when($lowStockOnly, fn ($q) => $q->lowStock())
@@ -124,10 +197,13 @@ class WarehouseStockController extends Controller
                 ->when($categoryFilter, function ($q) use ($categoryFilter) {
                     $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
                 })
+                // SN dicari langsung: hasil agregat ikut menyempit ke unit
+                // yang cocok, jadi user lihat "1 SN ini ada di gudang mana".
                 ->when($search !== '', function ($q) use ($search) {
-                    $q->whereHas('item', function ($itemQuery) use ($search) {
-                        $itemQuery->where('name', 'like', "%{$search}%")
-                            ->orWhere('code', 'like', "%{$search}%");
+                    $q->where(function ($qq) use ($search) {
+                        $qq->where('serial_number', 'like', "%{$search}%")
+                            ->orWhereHas('item', fn ($itemQuery) => $itemQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%"));
                     });
                 })
                 ->selectRaw('current_pop_id as pop_id, item_id, COUNT(*) as qty')
@@ -195,9 +271,10 @@ class WarehouseStockController extends Controller
                     $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
                 })
                 ->when($search !== '', function ($q) use ($search) {
-                    $q->whereHas('item', function ($itemQuery) use ($search) {
-                        $itemQuery->where('name', 'like', "%{$search}%")
-                            ->orWhere('code', 'like', "%{$search}%");
+                    $q->where(function ($qq) use ($search) {
+                        $qq->where('roll_code', 'like', "%{$search}%")
+                            ->orWhereHas('item', fn ($itemQuery) => $itemQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%"));
                     });
                 })
                 ->selectRaw('current_pop_id as pop_id, item_id, SUM(length_remaining) as qty')
@@ -248,6 +325,26 @@ class WarehouseStockController extends Controller
             ->sortBy([['pop_id', 'asc'], ['item_id', 'asc']])
             ->values();
 
+        // Sort kolom (analisa §A5). Whitelist — parameter lain diabaikan
+        // diam-diam, bukan error, supaya link lama/rusak tetap bisa dibuka.
+        // Default = urutan lama (pop lalu item) biar halaman tanpa sort
+        // tidak berubah perilakunya.
+        $sort = in_array($request->query('sort'), ['pop', 'item', 'qty', 'jenis', 'kesehatan'], true) ? $request->query('sort') : null;
+        $sortDirection = $request->query('dir') === 'desc' ? 'desc' : 'asc';
+        if ($sort !== null) {
+            $sortValue = match ($sort) {
+                'pop' => fn ($b) => $b->pop?->name ?? '',
+                'item' => fn ($b) => $b->item?->name ?? '',
+                'qty' => fn ($b) => (float) $b->qty,
+                // Jenis = tracking type barang; Kesehatan = low-stock dulu
+                // (yang kritis naik ke atas saat desc).
+                'jenis' => fn ($b) => $b->item?->tracking_type?->value ?? '',
+                'kesehatan' => fn ($b) => $b->isLowStock() ? 1 : 0,
+            };
+            $numericSort = in_array($sort, ['qty', 'kesehatan'], true);
+            $merged = $merged->sortBy($sortValue, $numericSort ? SORT_REGULAR : SORT_NATURAL | SORT_FLAG_CASE, $sortDirection === 'desc')->values();
+        }
+
         $perPage = 25;
         $page = LengthAwarePaginator::resolveCurrentPage();
         $balances = new LengthAwarePaginator(
@@ -280,6 +377,54 @@ class WarehouseStockController extends Controller
             foreach ($opnameRows as $row) {
                 $key = $row->to_pop_id.'-'.$row->item_id.'-'.($row->lot_no ?? '');
                 $lastOpnameByKey[$key] = $row->last_opname_at;
+            }
+        }
+
+        // Pemegang & penginput per (pop, item) untuk mode per-lot (analisa §U3/V4).
+        // Held tidak lot-scoped (barang di tangan teknisi = per item+gudang asal),
+        // jadi dikunci pop_id-item_id — sama di tiap baris lot item itu, murni
+        // informasi. Dibatasi ke pasangan yang tampil di halaman ini.
+        $heldByPopItem = [];
+        $lastActorByKey = [];
+        if ($balances->isNotEmpty()) {
+            $popIdsOnPage = $balances->getCollection()->pluck('pop_id')->unique()->values();
+            $itemIdsOnPage = $balances->getCollection()->pluck('item_id')->unique()->values();
+
+            // Qty + jumlah teknisi per (pop,item) dari custody/SN/roll yang
+            // diissue DARI pop itu (issued_from_pop_id).
+            $custodyHeld = TechnicianCustody::query()->active()
+                ->whereIn('issued_from_pop_id', $popIdsOnPage)->whereIn('item_id', $itemIdsOnPage)
+                ->selectRaw('issued_from_pop_id as pop_id, item_id, SUM(qty_remaining) as qty, COUNT(DISTINCT technician_id) as techs')
+                ->groupBy('issued_from_pop_id', 'item_id')->get();
+            $serialHeld = InventorySerial::query()
+                ->whereIn('issued_from_pop_id', $popIdsOnPage)->whereIn('item_id', $itemIdsOnPage)
+                ->whereIn('status', [SerialStatus::ISSUED->value, SerialStatus::IN_USE->value])
+                ->selectRaw('issued_from_pop_id as pop_id, item_id, COUNT(*) as qty, COUNT(DISTINCT current_technician_id) as techs')
+                ->groupBy('issued_from_pop_id', 'item_id')->get();
+            $rollHeld = InventoryRoll::query()
+                ->whereIn('issued_from_pop_id', $popIdsOnPage)->whereIn('item_id', $itemIdsOnPage)
+                ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+                ->selectRaw('issued_from_pop_id as pop_id, item_id, SUM(length_remaining) as qty, COUNT(DISTINCT current_technician_id) as techs')
+                ->groupBy('issued_from_pop_id', 'item_id')->get();
+
+            foreach ($custodyHeld->concat($serialHeld)->concat($rollHeld) as $row) {
+                $key = $row->pop_id.'-'.$row->item_id;
+                $heldByPopItem[$key]['qty'] = ($heldByPopItem[$key]['qty'] ?? 0) + (float) $row->qty;
+                $heldByPopItem[$key]['techs'] = ($heldByPopItem[$key]['techs'] ?? 0) + (int) $row->techs;
+            }
+
+            // Transaksi terakhir yang menyentuh (pop,item) + siapa penginputnya.
+            $lastActorRows = InventoryTransaction::query()
+                ->whereIn('item_id', $itemIdsOnPage)
+                ->where(fn ($q) => $q->whereIn('from_pop_id', $popIdsOnPage)->orWhereIn('to_pop_id', $popIdsOnPage))
+                ->with('createdBy:id,name')
+                ->orderBy('id')
+                ->get(['id', 'item_id', 'from_pop_id', 'to_pop_id', 'created_by', 'created_at']);
+            foreach ($lastActorRows as $row) {
+                foreach (array_unique(array_filter([$row->from_pop_id, $row->to_pop_id])) as $popId) {
+                    // diurut asc lalu ditimpa → yang terakhir (id tertinggi) menang
+                    $lastActorByKey[$popId.'-'.$row->item_id] = $row;
+                }
             }
         }
 
@@ -324,7 +469,22 @@ class WarehouseStockController extends Controller
         }
 
         $categories = ItemCategory::active()->ordered()->get();
-        $items = Item::query()
+        $items = $this->dropdownItems($popIds, $itemFilter, $categoryFilter, $search);
+
+        return view('warehouse.stock.index', compact(
+            'pops', 'categories', 'items', 'balances', 'popFilter', 'categoryFilter', 'itemFilter', 'search', 'lowStockOnly', 'trackingFilter', 'lastOpnameByKey', 'lastPriceByKey', 'multiLotPopItemKeys',
+            'canActAsPusat', 'canActAsCabang', 'lockedSinglePop', 'modeLabel', 'sort', 'sortDirection', 'viewMode', 'heldByPopItem', 'lastActorByKey'
+        ));
+    }
+
+    /**
+     * Isi dropdown "Nama Barang" — hanya barang yang punya stok di scope (atau
+     * barang yang sedang dipilih, supaya filter aktif tetap terlihat). Dipakai
+     * bareng oleh mode per lot dan ringkasan.
+     */
+    private function dropdownItems(Collection $popIds, ?int $itemFilter, ?int $categoryFilter, string $search): Collection
+    {
+        return Item::query()
             ->where(function ($q) use ($popIds, $itemFilter) {
                 $q->whereHas('inventoryBalances', fn ($b) => $b->whereIn('pop_id', $popIds)->where('qty', '>', 0))
                     ->orWhereHas('inventorySerials', fn ($s) => $s->whereIn('current_pop_id', $popIds)->where('status', SerialStatus::AVAILABLE->value))
@@ -344,11 +504,6 @@ class WarehouseStockController extends Controller
             ->with('category')
             ->orderBy('name')
             ->get();
-
-        return view('warehouse.stock.index', compact(
-            'pops', 'categories', 'items', 'balances', 'popFilter', 'categoryFilter', 'itemFilter', 'search', 'lowStockOnly', 'trackingFilter', 'lastOpnameByKey', 'lastPriceByKey', 'multiLotPopItemKeys',
-            'canActAsPusat', 'canActAsCabang', 'lockedSinglePop', 'modeLabel'
-        ));
     }
 
     /**

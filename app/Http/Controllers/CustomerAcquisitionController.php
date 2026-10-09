@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\CustomerAcquisition;
+use App\Models\Invoice;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\InstallationFeeInvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -142,10 +144,12 @@ class CustomerAcquisitionController extends Controller
         abort_unless($customerAcquisition->needsInstallationFeeValidation(), 404, 'Kategori paket pelanggan ini tidak butuh validasi Biaya Instalasi.');
         abort_unless($customerAcquisition->canBeValidatedBy($request->user()), 403, 'Anda tidak punya izin memvalidasi Biaya Instalasi kategori paket ini.');
 
+        $sudahDiterbitkan = 'Biaya Instalasi pelanggan ini sudah diterbitkan jadi tagihan — tidak bisa diubah dari sini. Koreksi lewat menu Tagihan (batalkan, lalu terbitkan ulang) kalau nominalnya salah.';
+
         if ($customerAcquisition->installation_fee_invoice_id) {
             return redirect()
                 ->route('customer-acquisitions.index', ['periode' => $customerAcquisition->periode])
-                ->with('error', 'Biaya Instalasi pelanggan ini sudah diterbitkan jadi tagihan — tidak bisa diubah dari sini. Koreksi lewat menu Tagihan (batalkan, lalu terbitkan ulang) kalau nominalnya salah.');
+                ->with('error', $sudahDiterbitkan);
         }
 
         $access = app(EffectiveAccessService::class);
@@ -158,12 +162,32 @@ class CustomerAcquisitionController extends Controller
             'installation_fee' => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $invoice = $installationFeeInvoiceService->issue($customerAcquisition->customer, (float) $validated['installation_fee']);
+        // Klik ganda / dua admin bersamaan: cek `installation_fee_invoice_id` di atas
+        // dibaca tanpa kunci, jadi dua request bisa lolos bersamaan dan menerbitkan
+        // dua tagihan. Kunci baris akuisisi lalu cek ulang di dalam transaksi; invoice
+        // dan penautannya harus commit atau gagal bersama (tak ada invoice yatim).
+        $invoice = DB::transaction(function () use ($customerAcquisition, $validated, $installationFeeInvoiceService): ?Invoice {
+            $locked = CustomerAcquisition::query()->whereKey($customerAcquisition->id)->lockForUpdate()->firstOrFail();
 
-        $customerAcquisition->update([
-            'installation_fee' => $validated['installation_fee'],
-            'installation_fee_invoice_id' => $invoice->id,
-        ]);
+            if ($locked->installation_fee_invoice_id) {
+                return null;
+            }
+
+            $invoice = $installationFeeInvoiceService->issue($locked->customer, (float) $validated['installation_fee']);
+
+            $locked->update([
+                'installation_fee' => $validated['installation_fee'],
+                'installation_fee_invoice_id' => $invoice->id,
+            ]);
+
+            return $invoice;
+        });
+
+        if ($invoice === null) {
+            return redirect()
+                ->route('customer-acquisitions.index', ['periode' => $customerAcquisition->periode])
+                ->with('error', $sudahDiterbitkan);
+        }
 
         return redirect()
             ->route('customer-acquisitions.index', ['periode' => $customerAcquisition->periode])

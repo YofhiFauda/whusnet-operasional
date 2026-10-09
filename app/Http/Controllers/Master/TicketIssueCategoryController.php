@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Master;
 use App\Enums\FopTaskPriority;
 use App\Http\Controllers\Controller;
 use App\Models\TicketIssueCategory;
+use App\Services\MasterRecordRemovalService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,7 +17,7 @@ class TicketIssueCategoryController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $status = $request->query('status');
 
         $categories = TicketIssueCategory::query()
@@ -74,6 +76,18 @@ class TicketIssueCategoryController extends Controller
         $statusText = $category->is_active ? 'diaktifkan' : 'dinonaktifkan';
 
         return back()->with('success', "Kategori issue \"{$category->name}\" berhasil {$statusText}.");
+    }
+
+    public function destroy(TicketIssueCategory $category, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        $deleted = $removal->remove($category, ['is_active' => false]);
+
+        return back()->with(
+            $deleted ? 'success' : 'warning',
+            $deleted
+                ? "Kategori issue \"{$category->name}\" berhasil dihapus."
+                : "Kategori issue \"{$category->name}\" masih dipakai tiket, jadi hanya dinonaktifkan."
+        );
     }
 
     /**

@@ -18,14 +18,15 @@ use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TaskCreqDetail;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\FileUploadService;
-use App\Services\FopTaskProvisioningService;
 use App\Services\InventoryService;
+use App\Services\NumberSequenceService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
@@ -179,7 +180,13 @@ class TaskMaintenanceController extends Controller
         // task_type = CREQ, tapi selalu dioper biar view gak perlu query lagi.
         $creqCategories = CReqCategory::options();
 
-        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories'));
+        // Dropdown POP tujuan — kategori Migrasi (ADHOC-108). Semua Cabang
+        // aktif, TANPA batas scope POP teknisi — keputusan pindah POP
+        // datang dari CS/NOC, teknisi cuma eksekusi fisiknya.
+        $cabangPops = Pop::query()->where('type', 'cabang')->where('status', 'active')
+            ->orderBy('name')->get(['id', 'name']);
+
+        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
@@ -207,6 +214,9 @@ class TaskMaintenanceController extends Controller
         // yang benar-benar dikirim, bukan ditebak setelah validasi lolos.
         $isCreq = $task->task_type === TaskType::CREQ;
         $creqCategory = $isCreq ? CReqCategory::tryFrom((string) $request->input('creq_category')) : null;
+
+        $task->loadMissing('customer');
+        $currentPopId = $task->customer?->pop_id;
 
         $rules = [
             'kendala_teknis' => 'required|string',
@@ -273,6 +283,21 @@ class TaskMaintenanceController extends Controller
             $rules['creq_is_billable'] = ['nullable', 'boolean'];
             $rules['creq_billing_note'] = ['nullable', 'string', 'max:1000', Rule::requiredIf($request->boolean('creq_is_billable'))];
 
+            // Migrasi: POP tujuan wajib, harus Cabang aktif, dan beda dari
+            // POP pelanggan sekarang — pindah ke POP yang sama bukan migrasi.
+            if ($creqCategory?->requiresTargetPop()) {
+                $rules['creq_target_pop_id'] = [
+                    'required',
+                    'integer',
+                    Rule::exists('pops', 'id')->where('type', 'cabang')->where('status', 'active'),
+                    function ($attribute, $value, $fail) use ($currentPopId) {
+                        if ((int) $value === (int) $currentPopId) {
+                            $fail('POP tujuan harus berbeda dari POP pelanggan saat ini.');
+                        }
+                    },
+                ];
+            }
+
             // Tambah Modem: perketat field SN yang di form ini defaultnya
             // opsional (Maintenance biasa boleh gak ganti modem) — kategori
             // ini WAJIB pilih dari custody tim, gak ada "Tidak ganti modem".
@@ -287,6 +312,8 @@ class TaskMaintenanceController extends Controller
             $messages['creq_tikor_baru_lng.required'] = 'Titik koordinat baru wajib diisi untuk kategori ini.';
             $messages['creq_billing_note.required'] = 'Catatan biaya wajib diisi kalau task ini ditandai berbayar.';
             $messages['selected_inventory_serial_id.required'] = 'Kategori Tambah Modem wajib memilih SN modem dari custody tim.';
+            $messages['creq_target_pop_id.required'] = 'Kategori Migrasi wajib memilih POP tujuan.';
+            $messages['creq_target_pop_id.exists'] = 'POP tujuan tidak valid.';
         }
 
         $validated = $request->validate($rules, $messages);
@@ -358,6 +385,7 @@ class TaskMaintenanceController extends Controller
                 TaskCreqDetail::updateOrCreate(['task_id' => $task->id], [
                     'category' => $validated['creq_category'],
                     'category_custom_name' => $validated['creq_category_custom_name'] ?? null,
+                    'target_pop_id' => $validated['creq_target_pop_id'] ?? null,
                     'tikor_lama_lat' => $validated['creq_tikor_lama_lat'] ?? null,
                     'tikor_lama_lng' => $validated['creq_tikor_lama_lng'] ?? null,
                     'tikor_baru_lat' => $validated['creq_tikor_baru_lat'] ?? null,
@@ -369,6 +397,19 @@ class TaskMaintenanceController extends Controller
                     'verified_at' => null,
                     'rejection_reason' => null,
                 ]);
+            }
+
+            // Eksekusi pindah POP untuk kategori Migrasi (ADHOC-108). Cuma
+            // `$customer->update(['pop_id' => ...])` biasa — SEMUA invariant
+            // (guard piutang, lepas kolektor, hitung ulang CID, pindah
+            // tagihan bulan berjalan) sudah ditegakkan `CustomerObserver`
+            // (lihat CLAUDE.md § Pindah Cabang), satu sumber yang sama
+            // dengan Edit Pelanggan. Guard piutang lempar
+            // `CustomerRelocationBlockedException` yang ditangkap catch
+            // umum di bawah dan tampil sebagai pesan error laporan — task
+            // TIDAK selesai, teknisi harus minta CS lunaskan piutang dulu.
+            if ($isCreq && $creqCategory?->requiresTargetPop() && $task->customer) {
+                $task->customer->update(['pop_id' => (int) $validated['creq_target_pop_id']]);
             }
 
             // Material & alat menempel di FopTask, bukan di maintenance_reports.
@@ -385,7 +426,7 @@ class TaskMaintenanceController extends Controller
 
             if (! $fopTask && $task->customer) {
                 $fopTask = FopTask::create([
-                    'task_number' => app(FopTaskProvisioningService::class)->generateTaskNumber(),
+                    'task_number' => app(NumberSequenceService::class)->fopTaskNumber(),
                     'task_id' => $task->id,
                     'task_date' => $task->scheduled_at ?? now(),
                     'category' => $task->task_type,
@@ -433,9 +474,16 @@ class TaskMaintenanceController extends Controller
                     // `customer_installations.selected_inventory_serial_id`
                     // — Maintenance one-shot (sync()+complete() satu request,
                     // gak bisa resubmit), jadi aman langsung INSTALL di sini.
+                    //
+                    // Kategori C-REQ TAMBAH_MODEM = pelanggan beneran NAMBAH
+                    // (>1 modem aktif bersamaan), BUKAN ganti — modem lama
+                    // TIDAK BOLEH ketarik otomatis (koreksi 2026-10-08, beda
+                    // dari semua task_type/kategori lain yang defaultnya
+                    // ganti/swap).
                     if (! empty($validated['selected_inventory_serial_id'])) {
                         $serial = InventorySerial::findOrFail($validated['selected_inventory_serial_id']);
-                        app(InventoryService::class)->installSerial($serial, $task->customer, $fopTask, $teamTechnicians, auth()->user());
+                        $returnExistingSerial = ! ($isCreq && $creqCategory?->addsModemWithoutReturningExisting());
+                        app(InventoryService::class)->installSerial($serial, $task->customer, $fopTask, $teamTechnicians, auth()->user(), $returnExistingSerial);
                     }
 
                     // Roll kabel — OPSIONAL sama pola SN di atas, one-shot

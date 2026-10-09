@@ -201,11 +201,11 @@
                         <span class="block text-sm font-bold text-text-main">{{ $survey->technician->name ?? '-' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Surveyor 2</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Teknisi Kedua</span>
                         <span class="block text-sm text-text-main">{{ $survey->surveyor2->name ?? '-' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Surveyor 3</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Teknisi Ketiga</span>
                         <span class="block text-sm text-text-main">{{ $survey->surveyor3->name ?? '-' }}</span>
                     </div>
                 </div>
@@ -317,7 +317,7 @@
             ])
 
             @include('verifications.partials.work-tools', [
-                'title' => 'Alat Kerja Dicatat Surveyor',
+                'title' => 'Alat Kerja Opsional · Survey',
                 'rows' => $surveyWorkTools,
             ])
 
@@ -648,7 +648,7 @@
             @endif
 
             @include('verifications.partials.work-tools', [
-                'title' => 'Alat Kerja Dipakai Tim Pemasangan',
+                'title' => 'Alat Kerja Opsional · Pemasangan',
                 'rows' => $installationWorkTools,
             ])
 

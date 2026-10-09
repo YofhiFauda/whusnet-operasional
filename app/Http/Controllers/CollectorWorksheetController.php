@@ -7,6 +7,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\NotificationType;
 use App\Enums\PaymentStatus;
 use App\Events\CollectorActivityUpdated;
+use App\Models\BankAccount;
 use App\Models\CashDeposit;
 use App\Models\CollectorDeposit;
 use App\Models\Customer;
@@ -22,7 +23,9 @@ use App\Services\AdminCashBalanceService;
 use App\Services\CollectorBalanceService;
 use App\Services\CollectorVisitService;
 use App\Services\CollectorWorklistService;
+use App\Services\CustomerBalanceService;
 use App\Services\EffectiveAccessService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -131,7 +134,7 @@ class CollectorWorksheetController extends Controller
         $miniPopIds = array_values(array_filter((array) $request->query('mini_pop_id', [])));
         $districtIds = array_values(array_filter((array) $request->query('district_id', [])));
         $villageIds = array_values(array_filter((array) $request->query('village_id', [])));
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
 
         $unassignedCustomers = Customer::query()
             ->applyUserScope()
@@ -207,7 +210,13 @@ class CollectorWorksheetController extends Controller
             ->paginate(5, ['*'], 'kas_page')
             ->withQueryString();
 
+        // Saldo & status setor TEKNISI (ADHOC-122) — peringatan saja, tidak
+        // memblokir apa pun. Dipisah dari daftar kolektor supaya admin melihat
+        // dua jalur uang lapangan dengan rincian masing-masing.
+        $technicianStatus = $this->balance->technicianSettlementStatus($request->user());
+
         return view('collector-worksheet.index', compact(
+            'technicianStatus',
             'activityChannels',
             'kasTunai',
             'kasNonTunai',
@@ -375,7 +384,7 @@ class CollectorWorksheetController extends Controller
             ->paginate(50, ['*'], 'assigned_page')
             ->withQueryString();
 
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $searchResults = null;
         if ($tab === 'assign' && $search !== '') {
             $searchResults = Customer::query()
@@ -397,10 +406,15 @@ class CollectorWorksheetController extends Controller
 
         $activityChannels = $this->activityChannels($viewer);
 
+        $bankAccounts = BankAccount::activeOptions();
+        $customerBalances = app(CustomerBalanceService::class)->balancesForCustomers(
+            collect($invoices->items())->pluck('customer_id')->all()
+        );
+
         return view('collector-worksheet.show', compact(
             'collector', 'tab', 'invoices', 'invoiceSearch', 'unsettledPayments', 'unsettledCount', 'assignedCustomers', 'search', 'searchResults',
             'deposits', 'balance', 'outstandingShortfall', 'openShortfallDeposits',
-            'aging', 'visitHistory', 'receipts', 'receiptCandidates', 'activityChannels',
+            'aging', 'visitHistory', 'receipts', 'receiptCandidates', 'activityChannels', 'bankAccounts', 'customerBalances',
         ));
     }
 

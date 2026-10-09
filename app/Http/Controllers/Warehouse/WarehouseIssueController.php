@@ -16,6 +16,7 @@ use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
 use App\Models\Item;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryIssueService;
@@ -53,8 +54,11 @@ class WarehouseIssueController extends Controller
         // barang lapangan. Belum discope per-cabang (butuh data penempatan staf
         // yang gak ada strukturnya sekarang) — SEMUA teknisi/fop lintas cabang
         // muncul, admin gudang yang menilai kewajaran pas milih.
+        // Role::TECHNICIAN_CODES (bukan 'teknisi' doang) — PIC gudang (role
+        // 'pic_gudang') juga teknisi, wajib ikut muncul (lihat docs/plan/
+        // warehouse/rancangan-teknisi-pic-gudang-cabang.md Kelompok B).
         $technicians = User::query()
-            ->whereHas('role', fn ($q) => $q->whereIn('code', ['teknisi', 'fop']))
+            ->whereHas('role', fn ($q) => $q->whereIn('code', [...Role::TECHNICIAN_CODES, 'fop']))
             ->with('role')
             ->orderBy('name')
             ->get();

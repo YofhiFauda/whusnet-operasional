@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\InventoryTransactionType;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Warehouse\Concerns\ResolvesSelectedPop;
 use App\Models\InventoryTransaction;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -54,6 +56,8 @@ use Illuminate\View\View;
  */
 class WarehouseHistoryController extends Controller
 {
+    use ResolvesSelectedPop;
+
     public function index(Request $request, EffectiveAccessService $access): View
     {
         $user = auth()->user();
@@ -68,8 +72,9 @@ class WarehouseHistoryController extends Controller
         $popIds = $pops->pluck('id');
 
         $typeFilter = $request->query('type');
-        $popFilter = $request->integer('pop_id') ?: null;
-        $search = trim((string) $request->query('search', ''));
+        // Konteks cabang global (analisa-ui-ux-warehouse.md §S1).
+        $popFilter = $this->resolveSelectedPopId($request, $access, $user);
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
         $conditionFilter = $request->query('condition');
@@ -154,11 +159,21 @@ class WarehouseHistoryController extends Controller
             // fopTask.customer & serial.customer — kolom tujuan baris INSTALL
             // menampilkan pelanggannya (lihat view); tanpa eager load ini
             // preventLazyLoading meledak di non-production.
-            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial.customer', 'roll', 'createdBy', 'transfer.toPop', 'fopTask.customer'])
+            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial.customer', 'roll', 'createdBy.role', 'transfer.toPop', 'fopTask.customer'])
             ->latest('id')
             ->get();
 
         $groups = $this->groupByDocument($ledger);
+
+        // Sort kolom (analisa-ui-ux §A5). Default date desc = perilaku lama.
+        // Whitelist; parameter asing diabaikan diam-diam.
+        $sort = in_array($request->query('sort'), ['date', 'type'], true) ? $request->query('sort') : 'date';
+        $sortDirection = $request->query('dir') === 'asc' ? 'asc' : 'desc';
+        $groups = $groups->sortBy(
+            fn ($g) => $sort === 'type' ? $g->typeLabel : ($g->createdAt?->timestamp ?? 0),
+            $sort === 'type' ? SORT_NATURAL | SORT_FLAG_CASE : SORT_REGULAR,
+            $sortDirection === 'desc'
+        )->values();
 
         $perPage = 30;
         $page = LengthAwarePaginator::resolveCurrentPage();
@@ -172,7 +187,18 @@ class WarehouseHistoryController extends Controller
 
         $types = InventoryTransactionType::cases();
 
-        return view('warehouse.history.index', compact('ledger', 'pops', 'types', 'typeFilter', 'popFilter', 'search', 'dateFrom', 'dateTo', 'conditionFilter', 'adjustmentReasonFilter'));
+        $summary = [
+            'total' => $groups->count(),
+            'inbound' => $groups->filter(fn ($g) => in_array($g->type->value ?? '', ['receive']))->count(),
+            'transfer' => $groups->filter(fn ($g) => in_array($g->type->value ?? '', ['transfer']))->count(),
+            'outbound_tech' => $groups->filter(fn ($g) => in_array($g->type->value ?? '', ['issue', 'install']))->count(),
+            'adjust_return' => $groups->filter(fn ($g) => in_array($g->type->value ?? '', ['return', 'adjustment', 'stock_opname', 'transfer_custody']))->count(),
+            // Backward-compatible keys for tests
+            'outbound' => $groups->filter(fn ($g) => in_array($g->type->value ?? '', ['issue', 'transfer', 'install']))->count(),
+            'adjustment' => $groups->filter(fn ($g) => in_array($g->type->value ?? '', ['return', 'adjustment', 'stock_opname', 'transfer_custody']))->count(),
+        ];
+
+        return view('warehouse.history.index', compact('ledger', 'pops', 'types', 'typeFilter', 'popFilter', 'search', 'dateFrom', 'dateTo', 'conditionFilter', 'adjustmentReasonFilter', 'summary', 'sort', 'sortDirection'));
     }
 
     /**

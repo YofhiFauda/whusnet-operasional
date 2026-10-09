@@ -8,11 +8,13 @@ use App\Enums\PaymentStatus;
 use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\User;
 use App\Services\CustomerBalanceService;
 use App\Services\InvoiceWriteOffService;
 use App\Services\ManualCategoryInvoiceService;
+use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +28,7 @@ class InvoiceController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $popId = $request->query('pop_id', '');
         $billingPeriod = trim((string) $request->query('billing_period', ''));
         $status = trim((string) $request->query('status', ''));
@@ -170,7 +172,7 @@ class InvoiceController extends Controller
             }
         }
 
-        $search = trim((string) $request->query('q', ''));
+        $search = LikeSearch::sanitize((string) $request->query('q', ''));
         $searchResults = collect();
 
         if (! $customer && $search !== '') {
@@ -280,6 +282,12 @@ class InvoiceController extends Controller
                     ->with(['receiver', 'collector'])->latest('payment_date')->latest('id');
             },
         ]);
+
+        // Payment::installmentContext() (dipakai view ini untuk "Cicilan
+        // Ke-N") membaca $this->invoice->total_amount — eager-load di atas
+        // cuma mengisi arah Invoice->payments, bukan sebaliknya, jadi tanpa
+        // ini setiap panggilan lazy-load ulang (ditolak strict mode).
+        $invoice->payments->each(fn (Payment $payment) => $payment->setRelation('invoice', $invoice));
 
         if (request()->wantsJson() || request()->expectsJson()) {
             if ($invoice->customer) {

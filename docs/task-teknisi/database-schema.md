@@ -72,9 +72,10 @@ Migrasi: `2026_09_26_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe `CR
 |-------|------|------------|
 | `id` | bigint PK | |
 | `task_id` | FK → `tasks.id`, cascade delete | |
-| `category` | string | Enum `App\Enums\CReqCategory`: `pindah_lokasi`/`pindah_kabel`/`tambah_modem`/`lainnya` |
+| `category` | string | Enum `App\Enums\CReqCategory`: `pindah_lokasi`/`pindah_kabel`/`tambah_modem`/`migrasi`/`lainnya` |
 | `category_custom_name` | string nullable | Wajib kalau `category=lainnya` |
-| `tikor_lama_lat`, `tikor_lama_lng`, `tikor_baru_lat`, `tikor_baru_lng` | decimal(10,7) nullable | Wajib kalau `category` = `pindah_lokasi`/`pindah_kabel` |
+| `target_pop_id` | FK → `pops.id`, null on delete, nullable | Migrasi `2026_10_08_100000_add_target_pop_id` (ADHOC-108). Wajib kalau `category=migrasi` — POP tujuan pindah, dieksekusi via `$customer->update(['pop_id' => ...])` biasa di `TaskMaintenanceController::store()` |
+| `tikor_lama_lat`, `tikor_lama_lng`, `tikor_baru_lat`, `tikor_baru_lng` | decimal(10,7) nullable | Wajib kalau `category` = `pindah_lokasi`/`pindah_kabel`/`migrasi` |
 | `is_billable` | boolean, default false | Checkbox "Task ini berbayar" di form |
 | `billing_note` | text nullable | Wajib kalau `is_billable=true` |
 | `verification_status` | string, default `pending` | Enum `App\Enums\CReqVerificationStatus`: `pending`/`verified`/`rejected` — hanya bermakna kalau `is_billable=true` |

@@ -16,6 +16,7 @@ use App\Models\Pop;
 use App\Models\SubscriptionStatus;
 use App\Models\User;
 use App\Models\Village;
+use App\Support\LikeSearch;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -42,7 +43,7 @@ trait RendersCustomerList
         ?string $forcedStatusGroup = null,
         string $view = 'customers.index'
     ): View {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $statusGroup = $forcedStatusGroup ?? trim((string) $request->query('status_group', ''));
         // Default to empty string '' (Semua active & suspend) if not specified
         $status = $request->query('status', '');
@@ -93,18 +94,17 @@ trait RendersCustomerList
                 'pop_id', 'distribution_id', 'mini_pop_id', 'collector_id',
                 'city_id', 'district_id', 'village_id', 'internet_package_id',
                 'sales_user_id', 'termination_reason_id', 'termination_note',
+                'registered_by_name', 'created_by',
                 'created_at', 'updated_at',
             ])
             ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice', 'latestPayment', 'collector:id,name']);
 
-        // List Putus (ADHOC-69) butuh 3 relasi tambahan yang TIDAK dipakai di
-        // List Data Pelanggan biasa — dipisah supaya query List Data Pelanggan
-        // (jauh lebih sering diakses) tidak ikut menanggung 3 join/eager-load
-        // yang percuma untuk statusGroup lain.
+        // List Putus (ADHOC-69 & Bug 5) butuh relasi creator (petugas input)
+        // dan terminationReason untuk List Putus — dipisah supaya query List
+        // Data Pelanggan biasa tidak ikut menanggung eager-load yang percuma.
         if ($statusGroup === 'terminated') {
             $query->with([
-                'salesUser:id,name',
-                'latestSurvey.technician:id,name',
+                'creator:id,name',
                 'terminationReason:id,name',
             ]);
         }
@@ -112,7 +112,11 @@ trait RendersCustomerList
         // Search filter — Fase 5.3. Diarahkan per BENTUK input, bukan LIKE '%x%'
         // di 8 kolom sekaligus (yang memaksa full scan tiap ketik):
         //  - ada '@'  → email (identifier, prefix)
-        //  - ada digit → kode/HP/NIK/CID → PREFIX 'x%' (sargable, pakai index)
+        //  - ada digit → customer_code/old_customer_id/old_request_id → PREFIX
+        //    'x%' (sargable, pakai index)
+        //  - CID/HP/NIK substring '%x%' — sering dicari dari potongan tengah
+        //    atau buntut (mis. "0004" dari CID "C1X4ARQ000004", 4 digit
+        //    terakhir HP/NIK), bukan dari awal string
         //  - selainnya → nama → substring '%x%' (nama memang butuh potongan tengah,
         //                cuma 1 kolom, jauh lebih murah dari 8-kolom OR)
         // Konsekuensi UX yang disengaja: query nama tidak lagi mencocokkan kode,
@@ -123,11 +127,11 @@ trait RendersCustomerList
                     $q->where('email', 'like', "{$search}%");
                 } elseif (preg_match('/\d/', $search)) {
                     $q->where('customer_code', 'like', "{$search}%")
-                        ->orWhere('cid', 'like', "{$search}%")
+                        ->orWhere('cid', 'like', "%{$search}%")
                         ->orWhere('old_customer_id', 'like', "{$search}%")
                         ->orWhere('old_request_id', 'like', "{$search}%")
-                        ->orWhere('primary_phone', 'like', "{$search}%")
-                        ->orWhere('identity_number', 'like', "{$search}%");
+                        ->orWhere('primary_phone', 'like', "%{$search}%")
+                        ->orWhere('identity_number', 'like', "%{$search}%");
                 } else {
                     $q->where('full_name', 'like', "%{$search}%");
                 }

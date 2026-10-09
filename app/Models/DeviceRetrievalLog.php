@@ -100,4 +100,30 @@ class DeviceRetrievalLog extends Model
     {
         return $this->condition_photo ?? $this->task?->deviceRetrieval?->condition_photo;
     }
+
+    /**
+     * Label asal modem buat staf gudang (badge "bekas apa") — satu sumber
+     * supaya tidak ditulis ulang beda-beda per halaman. `CREQ_SWAP` generik
+     * di enum (satu jalur kode `installSerial()` buat semua kategori C-REQ
+     * yang ganti modem), sub-jenisnya (Ganti Modem/Migrasi) ditelusuri dari
+     * `task->creqDetail->category` di sini.
+     */
+    public function originLabel(): string
+    {
+        if ($this->source === DeviceRetrievalSource::CREQ_SWAP) {
+            $category = $this->task?->creqDetail?->category;
+
+            return match ($category) {
+                \App\Enums\CReqCategory::MIGRASI => 'Bekas Migrasi',
+                \App\Enums\CReqCategory::TAMBAH_MODEM => 'Bekas Ganti Modem',
+                default => 'Bekas Ganti Modem (C-REQ)',
+            };
+        }
+
+        return match ($this->source) {
+            DeviceRetrievalSource::DEAC => 'Bekas Deaktivasi',
+            DeviceRetrievalSource::WALK_IN => 'Bekas Diantar Pelanggan',
+            default => $this->source->label(),
+        };
+    }
 }

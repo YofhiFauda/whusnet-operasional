@@ -33,7 +33,7 @@ class CustomerBalanceMutationResource extends ApiResource
         return [
             'date' => $this->created_at?->toIso8601String(),
             'type' => $this->type,
-            'type_label' => $this->type === CustomerBalanceMutationType::CREDIT->value ? 'Masuk' : 'Keluar',
+            'type_label' => $this->type === CustomerBalanceMutationType::CREDIT ? 'Masuk' : 'Keluar',
             // Kolom `amount` di DB SELALU positif — arah ditentukan `type`,
             // bukan tanda minus (database-schema.md, migrasi
             // customer_balance_mutations). Dipertahankan positif di sini

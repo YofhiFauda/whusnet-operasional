@@ -7,6 +7,7 @@ use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
@@ -40,7 +41,8 @@ class WarehouseReassignController extends Controller
         $cabangPops = Pop::where('type', 'cabang')
             ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
             ->orderBy('name')->get();
-        $technicians = User::whereHas('role', fn ($q) => $q->whereIn('code', ['teknisi', 'fop']))
+        // Role::TECHNICIAN_CODES — PIC gudang (role 'pic_gudang') ikut muncul.
+        $technicians = User::whereHas('role', fn ($q) => $q->whereIn('code', [...Role::TECHNICIAN_CODES, 'fop']))
             ->where('id', '!=', $custody->technician_id)
             ->orderBy('name')
             ->get();
@@ -86,7 +88,8 @@ class WarehouseReassignController extends Controller
         $cabangPops = Pop::where('type', 'cabang')
             ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
             ->orderBy('name')->get();
-        $technicians = User::whereHas('role', fn ($q) => $q->whereIn('code', ['teknisi', 'fop']))
+        // Role::TECHNICIAN_CODES — PIC gudang (role 'pic_gudang') ikut muncul.
+        $technicians = User::whereHas('role', fn ($q) => $q->whereIn('code', [...Role::TECHNICIAN_CODES, 'fop']))
             ->where('id', '!=', $serial->current_technician_id)
             ->orderBy('name')
             ->get();
@@ -137,7 +140,8 @@ class WarehouseReassignController extends Controller
         $cabangPops = Pop::where('type', 'cabang')
             ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
             ->orderBy('name')->get();
-        $technicians = User::whereHas('role', fn ($q) => $q->whereIn('code', ['teknisi', 'fop']))
+        // Role::TECHNICIAN_CODES — PIC gudang (role 'pic_gudang') ikut muncul.
+        $technicians = User::whereHas('role', fn ($q) => $q->whereIn('code', [...Role::TECHNICIAN_CODES, 'fop']))
             ->where('id', '!=', $roll->current_technician_id)
             ->orderBy('name')
             ->get();
