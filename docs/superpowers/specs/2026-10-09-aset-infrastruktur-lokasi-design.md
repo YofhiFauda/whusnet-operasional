@@ -116,20 +116,60 @@ di Pusat/Cabang/Mini POP — kolom ini sekarang punya 2 makna tergantung `status
   masih stok" (makna lama, tidak berubah).
 - `status = DEPLOYED` → "terpasang netap di lokasi ini" (makna baru).
 
-Konsisten dengan prinsip yang sudah ada di dokumen Gudang §12 ("axis independen,
+**Ini AMAN dilakukan** — `inventory_serials.current_pop_id` **tidak pernah**
+dibatasi `Pop::WAREHOUSE_TYPES` di level model/DB (beda dari `inventory_balances`,
+lihat §3.5 di bawah). Pembatasan `WAREHOUSE_TYPES=['pusat','cabang']` cuma
+ditegakkan Service-level untuk alur stok (`InventoryReceiveService`/
+`InventoryTransferService`/`InventoryIssueService`), bukan untuk kolom ini
+secara umum. Konsisten dengan prinsip Gudang §12 ("axis independen,
 `current_pop_id`/`current_technician_id` sengaja dibiarkan sebagai jejak
-forensik") — satu kolom, makna ditentukan `status` yang mendampinginya, bukan
-constraint DB. Hanya `pusat`/`cabang`/`mini_pop` yang valid untuk kombinasi ini
-(Service yang menegakkan, sama pola `AuthorizesWarehousePop`).
+forensik") — satu kolom, makna ditentukan `status` yang mendampinginya.
 
-### 3.5 `inventory_balances` — kolom lokasi baru (barang QUANTITY)
+### 3.5 **KOREKSI** — barang QUANTITY butuh tabel baru, BUKAN kolom di `inventory_balances`
+
+**Revisi dari draf awal** (ditemukan saat perencanaan detail, 2026-10-09):
+rancangan awal mau menambah `odp_id` + izinkan `mini_pop` di `inventory_balances`.
+Ini **menabrak invariant yang sudah ada dan sengaja**: `Pop::WAREHOUSE_TYPES =
+['pusat','cabang']` (`app/Models/Pop.php:67`) — **Mini POP sengaja TIDAK
+PERNAH dianggap gudang** (ADHOC-54: "titik distribusi fisik, bukan kantor
+cabang berstaf"), dan `inventory_balances.pop_id` punya dokumentasi tegas
+"TIDAK PERNAH mini_pop" yang ditegakkan di titik tulis Service. Menambah jalur
+yang bikin `inventory_balances` punya baris ber-makna "mini_pop"/"odp"
+mencampur konsep "stok gudang yang bisa di-Transfer/Issue" dengan "aset netap
+infrastruktur" — dua lifecycle yang beda.
+
+**Keputusan baru:** tabel proyeksi terpisah, `infrastructure_balances`
+— pola sama `inventory_balances` (proyeksi, diturunkan dari ledger, bukan
+sumber kebenaran) tapi khusus barang QUANTITY yang **terpasang netap**
+(bukan stok yang masih bisa dipindah-pindah):
 
 | Kolom | Tipe | Keterangan |
 |---|---|---|
-| `odp_id` | FK `odps` nullable, null-on-delete | Mirror `pop_id` — proyeksi saldo QUANTITY yang netap di ODP (contoh: 40 meter slack dropcore tersisa di ODP B) |
+| `id` | PK | |
+| `item_id` | FK `items`, restrict | |
+| `lot_no` | `string(50)` default `''` | Sentinel kosong, sama pola `inventory_balances` |
+| `pop_id` | FK `pops` nullable, restrict | Lokasi = Pusat/Cabang/**Mini POP** (3 level diperbolehkan di sini — beda dari `inventory_balances` yang cuma 2) |
+| `odp_id` | FK `odps` nullable, restrict | Lokasi = ODP |
+| `qty` | `decimal(12,2)` default 0 | |
 
-Unique index diperluas: `(pop_id, odp_id, item_id, lot_no)` — salah satu dari
-`pop_id`/`odp_id` terisi, yang lain `null` (exclusive, ditegakkan Service).
+Unique: `(pop_id, odp_id, item_id, lot_no)`. Constraint aplikasi (Service):
+tepat satu dari `pop_id`/`odp_id` terisi, yang lain `null`.
+
+**Kenapa tabel baru, bukan kolom di tabel lama:** konsisten dengan alasan
+`task_materials` dulu dibuat baru alih-alih numpang kolom existing (lihat
+`docs/fop-task/rancangan-request-pemasangan-dan-material-task.md` §2.2) —
+"tabel baru kalau kolom tidak cukup" berlaku juga di sini karena makna
+"gudang" dan "terpasang netap" sudah punya invariant yang saling bertentangan
+secara sengaja, bukan cuma beda nama kolom.
+
+### 3.5a `WarehouseStockAsOfService` — TIDAK disentuh
+
+Karena `infrastructure_balances` adalah tabel proyeksi sendiri (bukan baris
+baru di `inventory_balances`), replay logic `WarehouseStockAsOfService` yang
+sudah ada **tidak perlu diubah**. Laporan Gudang (stok Pusat/Cabang) dan
+laporan Aset Infrastruktur (Mini POP/ODP) tetap 2 sumber proyeksi yang jelas
+terpisah — menghindari laporan stok gudang tiba-tiba kemasukan baris "stok"
+Mini POP yang sebenarnya bukan stok.
 
 ### 3.6 `inventory_transactions` — kolom & tipe baru
 
@@ -146,10 +186,17 @@ Unique index diperluas: `(pop_id, odp_id, item_id, lot_no)` — salah satu dari
 | `retrieve_infra` | (`from_pop_id` **atau** `from_odp_id`), `to_technician_id` | Aset dicabut balik dari lokasi ke custody teknisi (mis. OLT lama dicabut sebelum diganti, mau dibawa balik ke gudang/dibuang) |
 
 Kedua tipe baru ini **mengikuti pola yang sama persis** dengan
-`issue`/`return`/`install` yang sudah ada — tidak ada mekanisme ledger baru,
-cuma kombinasi kolom baru untuk `type` baru. Ledger append-only, row locking,
-dan `WarehouseStockAsOfService` replay logic tetap berlaku tanpa modifikasi
-struktural (cuma tambah cabang `to_odp_id`/`from_odp_id` di query SUM).
+`issue`/`return`/`install` yang sudah ada — ledger append-only, row locking,
+reference number per pola `generateReferenceNumber()`. Satu ledger, dua
+pembaca proyeksi tergantung `tracking_type` item:
+- **SERIALIZED** → proyeksi dibaca dari `inventory_serials.status/current_pop_id/current_odp_id`
+  (SATU baris = SATU unit, gak butuh tabel saldo — sama seperti `install` sekarang).
+- **QUANTITY** → proyeksi ditulis ke `infrastructure_balances` (§3.5), **bukan**
+  `inventory_balances` — `to_pop_id`/`to_odp_id` baris `deploy` dan
+  `from_pop_id`/`from_odp_id` baris `retrieve_infra` dibaca Service yang
+  meng-update `infrastructure_balances`, mirror cara `inventory_balances`
+  diupdate di `issue`/`transfer` sekarang (increment/decrement langsung di
+  Service yang sama dengan penulisan ledger, satu transaction).
 
 ## 4. Alur Pasang/Ganti Aset lewat O-REQ/INFR-REQ
 
@@ -170,9 +217,10 @@ Mengikuti pola **integrasi Task Teknisi ↔ Gudang** yang sudah ada
    - SERIALIZED: SN → status=DEPLOYED, current_pop_id ATAU current_odp_id diisi
      (exclusive), current_technician_id dikosongkan. Ledger `deploy`.
    - QUANTITY: consumeFromCustody() (SUDAH ADA, tidak diubah) kurangi custody,
-     lalu baris `deploy` ke to_pop_id/to_odp_id menambah inventory_balances
-     di lokasi tujuan. Guard OwnershipMode::INFRASTRUCTURE_ASSET ditegakkan
-     di titik ini — satu-satunya pintu transisi, sama prinsip installSerial().
+     lalu baris `deploy` ke to_pop_id/to_odp_id menambah **`infrastructure_balances`**
+     (§3.5 — BUKAN `inventory_balances`) di lokasi tujuan. Guard
+     OwnershipMode::INFRASTRUCTURE_ASSET ditegakkan di titik ini —
+     satu-satunya pintu transisi, sama prinsip installSerial().
 
 4. Mutasi/ganti aset existing (OLT lama diganti baru):
    - Laporan INFR-REQ dengan 2 bagian: SN lama "dicabut" (retrieve_infra,
@@ -207,9 +255,10 @@ dari Dashboard Gudang biasa).
   **plus** rollup semua ODP di bawahnya (buat audit cepat "Mini POP C1 lengkap
   infrastrukturnya apa, termasuk semua ODP-nya"). Pilih sampai ODP spesifik =
   cuma aset di ODP itu.
-- **Isi tabel**: SN (SERIALIZED, status=DEPLOYED) + nama item + tanggal
-  dipasang (`deployed_at`, dari ledger `created_at` baris `deploy` terakhir) +
-  saldo QUANTITY (splitter banyak, kabel sisa) kalau ada di node itu.
+- **Isi tabel**: SN (SERIALIZED, status=DEPLOYED, dari `inventory_serials`) +
+  nama item + tanggal dipasang (`deployed_at`, dari ledger `created_at` baris
+  `deploy` terakhir) + saldo QUANTITY (splitter banyak, kabel sisa, dari
+  **`infrastructure_balances`** §3.5) kalau ada di node itu.
 - **Breadcrumb** di atas tabel: `Cabang Jetis → Mini POP C1 → ODP B` — jawab
   langsung pertanyaan "ODP B terpasang di Mini POP mana" tanpa klik tambahan.
 - **Link "Riwayat"** per baris SN → lempar ke Lacak Barang (`warehouse.traceability.show`)
@@ -241,32 +290,30 @@ menjawab "isinya apa", bukan "dia anak siapa".
 
 ## 7. Open Items (belum diputuskan, perlu digali lagi sebelum implementasi)
 
-1. **`OwnershipMode` per-Item vs per-transaksi** (§3.2) — kalau satu Item
-   (misal splitter 1x8) bisa jadi `INSTALLABLE` (ke pelanggan) DAN
-   `INFRASTRUCTURE_ASSET` (ke ODP) tergantung konteks pemakaian, axis ini
-   gak bisa lagi murni property `Item` statis seperti sekarang. Butuh
-   keputusan: pisah jadi 2 Item master (`SPLITTER-1X8-PELANGGAN` vs
-   `SPLITTER-1X8-ODP`) walau fisiknya identik, atau `OwnershipMode` jadi
-   kolom di `inventory_transactions`/laporan (dipilih saat deploy), bukan
-   di `Item`.
-2. **Jalur admin assign langsung tanpa laporan teknisi** (§4.1) — perlu
-   atau tidak, dan kalau perlu, permission apa yang menggerakkannya.
-3. **Kapasitas ODP** (`capacity_port`) — cuma informasional, atau nanti ada
-   guard "ODP penuh, gak bisa deploy splitter baru"? Keputusan Distribution
-   (§3 `docs/master/distribution/business-logic.md`) eksplisit menolak
-   tracking kapasitas — perlu dikonfirmasi apakah ODP baru ini mau beda
-   prinsip atau ikut yang sama (murni informasional).
-4. **Field survey existing `nearest_odp`** (teks bebas) — apakah nanti
-   diganti jadi dropdown pilih `Odp` master yang sebenarnya, atau dibiarkan
-   teks bebas terpisah dari master ODP baru ini (dua sumber kebenaran ODP
-   kalau tidak disatukan).
-5. **Laporan Rusak/Hilang** — adjustment existing (`InventoryAdjustmentService`)
-   untuk SN `status=DEPLOYED` di lokasi: perlu dicek apakah
-   `adjustSerialStatus()` yang sudah ada otomatis cukup (kemungkinan iya,
-   karena method itu generic per-SN tidak peduli status asal) atau perlu
-   penyesuaian kecil untuk mengosongkan `current_odp_id` juga (seperti pola
-   mengosongkan `customer_id` di §12 Gudang business-logic saat SN
-   `INSTALLED` diadjust).
+Status per 2026-10-09 (sesi lanjutan sebelum writing-plans) — 5 item di atas
+**sudah diputuskan**, dipertahankan di sini sebagai jejak keputusan:
+
+1. **RESOLVED — `OwnershipMode` tetap property `Item` statis.** Keputusan
+   user: kalau fisik barang sama (splitter 1x8) tapi dipakai di 2 konteks
+   (ke pelanggan vs ke ODP), admin bikin **2 kode Item master beda**
+   (misal `SPLITTER-1X8-PEL` = `INSTALLABLE`, `SPLITTER-1X8-ODP` =
+   `INFRASTRUCTURE_ASSET`) — bukan ubah axis jadi property transaksi. Tidak
+   ada perubahan struktur `Item`/enum di luar penambahan case §3.2.
+2. **DEFERRED — jalur admin assign langsung tanpa laporan teknisi.** Di luar
+   scope plan ini. Semua `deploy`/`retrieve_infra` lewat laporan O-REQ/INFR-REQ
+   teknisi (§4). Kalau nanti dibutuhkan, itu rancangan/plan terpisah.
+3. **DECIDED — `capacity_port` murni informasional.** Ikut prinsip
+   Distribution (`docs/master/distribution/business-logic.md` §3): dicatat,
+   tidak ada guard "ODP penuh". Kolom tetap ada (nullable) buat catatan
+   admin, tidak ditegakkan Service.
+4. **DEFERRED — field survey `nearest_odp` (teks bebas) tidak disentuh.**
+   Tetap teks bebas, terpisah dari master `odps` baru. Penyatuan (migrasi
+   ke dropdown `Odp`) di luar scope plan ini.
+5. **IN SCOPE — penyesuaian `adjustSerialStatus()`.** Masuk sebagai task
+   di plan: SN `status=DEPLOYED` yang diadjust ke `LOST`/`DAMAGED`/`SCRAPPED`/
+   `QUARANTINE` wajib mengosongkan `current_pop_id`/`current_odp_id` juga
+   (pola sama pengosongan `customer_id` saat SN `INSTALLED` diadjust, Gudang
+   business-logic §7/§12).
 
 ## 8. Dokumen Terkait
 
