@@ -114,18 +114,52 @@ generik `"Login ID atau PIN salah."` walau `login_id`+PIN yang dikirim BENAR
 Ini rangkaian, bukan command tunggal. Jalankan berurutan, satu cabang selesai
 dulu sebelum cabang berikutnya.
 
-### Langkah 1 — Impor utama
+### Langkah 0 — Pastikan Pop `type=pusat` sudah ada
 
+Command **wajib** diberi `--pusat-code` (pop_code dari Pop `type=pusat` yang
+sudah ada) — Cabang baru yang dibuat command ini jadi anak (`parent_id`) Pusat
+itu. Tanpa Pusat yang sudah ada, command berhenti dengan error, bukan diam-diam
+bikin Cabang orphan. Kalau belum ada, buat dulu lewat Master POP (`type=pusat`)
+sekali di awal — satu Pusat cukup dipakai berulang untuk semua Cabang.
+
+### Langkah 1 — Impor utama
+    /**
+     * JIKA INGIN MIGRASI TANPA BILING LAMA
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --pusat-code=WHUSNET --without-billing
+     *
+     * JIKA INGIN MIGRASI DENGAN BILING LAMA
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --pusat-code=WHUSNET
+     *
+     *
+     * JIKA POP DAN MINI POP SUDAH DISI MAKA LAKUKAN COMMAND INI AGAR POP DAN MINI POP TIDAK TEMBAK DEFAULT
+     * docker compose exec app php artisan app:import-legacy-sql sand_db_sandya.sql --pusat-code=WHUSNET --no-interaction
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --pusat-code=WHUSNET --no-interaction
+     *
+     * JIKA NOMOR kategori_perangkat_jaringan LEGACY BEDA DENGAN NOMOR MINI POP
+     * SUNGGUHAN DI CABANG TUJUAN (mis. dump ini semuanya kategori=1 tapi
+     * secara fisik harus jadi Mini POP D6, bukan D1 — karena D1..D5 sudah
+     * dipakai OLT lain di Cabang D yang sama):
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --pusat-code=WHUSNET --mini-pop-map=1:6
+     *  */
+    protected $signature = 'app:import-legacy-sql
+                        {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql}
+                        {--branch-code= : Tentukan Kode Cabang POP target (contoh: C, D)}
+                        {--branch-name= : Tentukan Nama Cabang POP target (contoh: Jetis, Siman)}
+                        {--pusat-code= : WAJIB. pop_code dari Pop type=pusat yang sudah ada (dibuat manual di Master POP) — Cabang baru dari command ini jadi anak Pusat tsb}
+                        {--without-billing : Impor pelanggan/layanan/data teknis saja, tanpa tagihan & pembayaran legacy}
+                        {--mini-pop-map= : Peta ulang nomor kategori_perangkat_jaringan LEGACY (khusus per-dump) ke segmen Mini POP SUNGGUHAN di Master POP, format "1:6,2:7". Wajib dipakai kalau dump berasal dari instalasi/cabang lama yang penomoran OLT-nya sendiri (mis. selalu mulai dari 1) tidak sama dengan penomoran Mini POP nyata di bawah Cabang tujuan (mis. dump ini semuanya harus jadi Mini POP D6, bukan D1). Kategori yang tidak disebut di peta ini tetap dipakai apa adanya.}';
 ```bash
-php artisan app:import-legacy-sql jetis_db_aplikasi_jetis.sql --branch-code=C --branch-name=Jetis
-php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman
+php artisan app:import-legacy-sql jetis_db_aplikasi_jetis.sql --branch-code=C --branch-name=Jetis --pusat-code=WHUSNET
+php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --pusat-code=WHUSNET
 ```
 
 Mengimpor pelanggan, layanan, data teknis, tagihan, dan pembayaran. `--branch-code`
 wajib diisi berbeda per cabang — ID legacy (`PE`/`RQ`/`IDBIAYA`) dimulai dari 1 di
-tiap sistem lama, jadi tanpa pemisahan cabang keduanya bertabrakan.
+tiap sistem lama, jadi tanpa pemisahan cabang keduanya bertabrakan. `--pusat-code`
+wajib sama untuk semua Cabang di bawah satu Pusat yang sama.
 
-Tanpa opsi `--branch-*`, command akan bertanya interaktif.
+Tanpa opsi `--branch-*`, command akan bertanya interaktif — `--pusat-code` tetap
+wajib walau interaktif.
 
 Ada opsi `--without-billing` untuk mengimpor pelanggan/layanan/data teknis **tanpa**
 tagihan & pembayaran legacy. Dipakai hanya pada skenario go-live "pelanggan saja" —
@@ -144,7 +178,7 @@ D1–D5 di Cabang D/Siman sudah dipakai OLT lain, bukan D1) — pemetaan default
 akan salah bikin/menempel ke `D1`. Petakan dulu nomor legacy → segmen asli:
 
 ```bash
-php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --mini-pop-map=1:6
+php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --pusat-code=WHUSNET --mini-pop-map=1:6
 ```
 
 Format `legacy:asli`, boleh banyak pasangan sekaligus kalau satu dump punya
@@ -296,8 +330,8 @@ php artisan rbac:generate-permissions
 **3. Impor pelanggan saja**
 
 ```bash
-php artisan app:import-legacy-sql jetis_db_aplikasi_jetis.sql --branch-code=C --branch-name=Jetis --without-billing
-php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --without-billing
+php artisan app:import-legacy-sql jetis_db_aplikasi_jetis.sql --branch-code=C --branch-name=Jetis --pusat-code=WHUSNET --without-billing
+php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --pusat-code=WHUSNET --without-billing
 ```
 
 `--without-billing` mengosongkan sheet `invoices` & `payments`, tapi **tetap**
@@ -316,6 +350,30 @@ php artisan app:backfill-device-retrieved
 
 `app:fix-legacy-billing-batch2` **dilewati** — tugasnya merapikan label `LEGACY`
 pada tagihan/pembayaran, yang di skenario ini tidak ada.
+
+**4b. Tambal `due_date` layanan kosong**
+
+Bug lama di importer: sheet `services` dulu mengirim `due_date` string kosong,
+jadi kolom ini NULL untuk **semua** pelanggan migrasi (bukan cuma yang
+`--without-billing`). Karena jatuh tempo termasuk field wajib
+`CustomerValidationService`, pelanggan tertahan di status `perlu_dilengkapi`
+walau sebenarnya aktif dan ditagih tiap bulan.
+
+```bash
+php artisan billing:backfill-legacy-service-fields              # mode daftar saja
+php artisan billing:backfill-legacy-service-fields --force      # eksekusi
+
+# kalau monthly_price ikut 0 (paket legacy 'default'/'undefined'),
+# tambahkan sumber harga dari dump asli:
+php artisan billing:backfill-legacy-service-fields --dump=sand_db_sandya.sql --force
+```
+
+Mengisi `due_date` = `activation_date` + 1 bulan, dan `monthly_price` kalau ≤ 0
+(urutan sumber: `biaya_tagihan.BIAYABULANAN` dari dump → invoice BULANAN
+terakhir → harga paket → kalau semua kosong, dilaporkan REVIEW MANUAL, tidak
+ditebak). Tiap tulis masuk audit log (`action = backfill_legacy_service_fields`)
+dan memicu `Customer::recalculateCompleteness()`. Hanya menyentuh baris legacy
+(`old_request_id` terisi) — baris pendaftaran normal tidak tersentuh.
 
 **5. Verifikasi**
 
@@ -397,6 +455,31 @@ Baris hasil migrasi legacy dilewati — tanggalnya sudah benar dari sistem lama.
 
 Setiap perubahan masuk audit log (`action = backfill_activation_date`) lengkap
 dengan nilai lama, nilai baru, dan sumbernya.
+
+### `billing:apply-balance` — auto-pakai Saldo Pelanggan (ADHOC-92)
+
+```bash
+php artisan billing:apply-balance --dry-run                # WAJIB dijalankan dulu, lihat yang AKAN terjadi
+php artisan billing:apply-balance                           # eksekusi
+php artisan billing:apply-balance --customer=123             # batasi ke satu pelanggan
+php artisan billing:apply-balance --period=2026-09 --dry-run # ringkasan dry-run per periode (tidak membatasi eksekusi)
+```
+
+Auto-pay utama sudah otomatis lewat `billing:generate-monthly-invoices` (dalam
+transaksi yang sama dengan penerbitan tagihan BULANAN). Command ini untuk:
+
+1. **Kasus pinggiran** — saldo yang masuk SETELAH tagihan bulan itu sudah
+   terbit (mis. pelanggan titip saldo di tengah bulan padahal tagihan bulan
+   itu belum lunas).
+2. **Audit sebelum go-live/deploy** — `--dry-run` WAJIB dijalankan dulu
+   sebelum tanggal 1 pertama setelah fitur ini di-deploy. Credit lama (dari
+   ADHOC-38 atau `payments:backfill-customer-balance`) akan langsung terpakai
+   di generator tanggal 1 berikutnya — tinjau daftar pelanggan terdampak
+   dulu supaya tidak ada yang kaget tagihannya lunas tanpa uang masuk.
+
+FIFO periode terlama dulu, hanya invoice `bulanan` terbuka (`belum_dibayar`/
+`sebagian`). `--period` cuma membatasi RINGKASAN `--dry-run`, tidak membatasi
+invoice yang disentuh saat eksekusi nyata — FIFO tetap jalan lintas periode.
 
 ---
 
@@ -501,7 +584,7 @@ php artisan rbac:generate-permissions
 ### Impor data cabang baru dari sistem lama
 
 ```bash
-php artisan app:import-legacy-sql <file>.sql --branch-code=X --branch-name=Nama
+php artisan app:import-legacy-sql <file>.sql --branch-code=X --branch-name=Nama --pusat-code=WHUSNET
 php artisan app:backfill-legacy-device-payment <file>.sql
 php artisan app:backfill-device-retrieved --dry-run
 php artisan app:backfill-device-retrieved
@@ -520,10 +603,12 @@ docker compose ps scheduler                         # pastikan penjadwal hidup
 docker exec whusnet-db mysqldump -uroot -proot whusnet_operasional > backup-sebelum-reset-$(date +%F).sql
 php artisan migrate:fresh --seed
 php artisan rbac:generate-permissions
-php artisan app:import-legacy-sql <file>.sql --branch-code=X --branch-name=Nama --without-billing
+php artisan app:import-legacy-sql <file>.sql --branch-code=X --branch-name=Nama --pusat-code=WHUSNET --without-billing
 php artisan app:backfill-legacy-device-payment <file>.sql
 php artisan app:backfill-device-retrieved --dry-run
 php artisan app:backfill-device-retrieved
+php artisan billing:backfill-legacy-service-fields              # cek due_date/monthly_price kosong
+php artisan billing:backfill-legacy-service-fields --force
 # TIDAK ada generate untuk bulan lampau — scheduler yang terbitkan tanggal 1
 ```
 
@@ -558,6 +643,37 @@ php artisan billing:generate-monthly-invoices
 
 Menghidupkan scheduler saja **tidak** menambal bulan yang sudah lewat — jadwalnya
 `monthlyOn(1)`, tanggal 1 yang terlewat tidak akan diulang.
+
+### Memasang fitur Ambil Modem (DEAC) → Gudang (ADHOC-86/88)
+
+Butuh 2 tabel baru (`task_device_retrievals`, `device_retrieval_logs`), 1 item
+master baru (`MODEM-PELANGGAN-LAMA`), dan asset frontend baru. Jalankan di container `app`
+(bukan `exec app npm run build` — lihat catatan kepemilikan file di CLAUDE.md):
+
+```bash
+docker compose exec app php artisan migrate
+docker compose exec app php artisan db:seed --class=ItemSeeder   # item "Modem Pelanggan Lama" (idempotent)
+docker compose exec app php artisan storage:link                 # sekali saja; foto kondisi alat di disk public
+docker compose run --rm assets                                   # npm run build (class Tailwind & view baru)
+```
+
+Tanpa `migrate` form teknisi dan Terima Retur akan error (tabel tidak ada). Tanpa
+`ItemSeeder` pilihan "Modem Pelanggan Lama" tidak muncul (model lain tetap bisa dipilih).
+Tanpa `storage:link` foto kondisi tersimpan tapi thumbnail di Detail Task/Riwayat
+Task FOP tidak tampil.
+
+Periksa hasilnya (read-only):
+
+```bash
+docker compose exec app php artisan tinker --execute 'echo \App\Models\Item::where("code","MODEM-PELANGGAN-LAMA")->count();'   # harus 1
+docker compose exec app php artisan tinker --execute 'echo \Schema::hasTable("device_retrieval_logs") ? "ok" : "BELUM";'
+```
+
+**Tidak ada backfill massal SN legacy — sengaja.** Data lama punya SN kosong (273
+dari 1.957 detail teknis di data dev), SN dobel lintas pelanggan (93), dan tanpa
+nama barang; SN didaftarkan satu per satu **saat modemnya benar-benar ditarik**
+(SN di stiker fisik yang menjadi kebenaran). Jangan menyalin
+`customer_technical_details.router_or_ont_serial` ke `inventory_serials` secara massal.
 
 ---
 

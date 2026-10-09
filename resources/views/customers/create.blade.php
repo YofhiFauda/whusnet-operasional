@@ -183,7 +183,7 @@
 
                             <div>
                                 <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Registrasi <span class="text-rose-500">*</span></label>
-                                <input type="date" name="registration_date" id="registration_date" value="{{ old('registration_date', now()->format('Y-m-d')) }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('registration_date') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <input type="date" name="registration_date" id="registration_date" value="{{ old('registration_date', today()->format('Y-m-d')) }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('registration_date') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
                                 @error('registration_date')
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
                                 @enderror
@@ -319,7 +319,8 @@
                                 @enderror
                             </div>
 
-                            <!-- Foto Rumah -->
+                            <!-- Foto Rumah — cuma ada & wajib di Skip Survey (tidak ada di jalur
+                                 registrasi biasa). Validasi: CustomerRegistrationRequest::rules(). -->
                             <div class="border-2 border-dashed @error('foto_rumah') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm">
                                 <div id="default-placeholder-foto_rumah" class="py-4 space-y-2">
                                     <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
@@ -338,7 +339,7 @@
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_rumah')">
+                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" class="hidden" onchange="onFileChange('foto_rumah')">
                                     <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Foto Rumah
                                     </label>
@@ -368,7 +369,7 @@
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')">
+                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" class="hidden" onchange="onFileChange('survey_photo')">
                                     <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Foto ODP
                                     </label>
@@ -392,7 +393,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div class="md:col-span-2">
                                 <label for="internet_package_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Paket Internet <span class="text-rose-500">*</span></label>
-                                <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown()" class="w-full text-xs font-sans px-3 py-2.5 border @error('internet_package_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown(); toggleFabRequirement();" class="w-full text-xs font-sans px-3 py-2.5 border @error('internet_package_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
                                     <option value="" disabled {{ old('internet_package_id') ? '' : 'selected' }}>Pilih Paket Internet</option>
                                     @foreach($packages as $package)
                                         <option value="{{ $package->id }}" data-price="{{ $package->monthly_price }}" {{ old('internet_package_id') == $package->id ? 'selected' : '' }}>
@@ -402,6 +403,39 @@
                                 </select>
                                 @error('internet_package_id')
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <!-- FAB (Formulir Akan Berlangganan Bisnis) — cuma muncul kalau
+                                 kategori paket yang dipilih adalah kategori Bisnis. Toggle
+                                 murni bantuan UX; validasi wajib sebenarnya di server
+                                 (CustomerRegistrationRequest::rules() -> fab_document). -->
+                            <div id="fab-document-wrapper" class="md:col-span-2 border-2 border-dashed @error('fab_document') border-rose-400 bg-rose-50/20 @else border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-900/10 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm" style="display: none;">
+                                <div id="default-placeholder-fab_document" class="py-4 space-y-2">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg border border-amber-200 dark:border-amber-800">
+                                        <x-ui.icon name="file-text" class="w-4 h-4" />
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FAB — FORMULIR AKAN BERLANGGANAN BISNIS <span class="text-rose-500">*</span></span>
+                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib untuk paket yang divalidasi Business Development (JPG, PNG, PDF)</span>
+                                </div>
+                                <div id="preview-container-fab_document" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                    <div class="relative inline-block w-full">
+                                        <img id="preview-img-fab_document" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview FAB">
+                                        <button type="button" onclick="clearFile('fab_document')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                            <x-ui.icon name="x" class="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ FAB Terpilih</span>
+                                </div>
+                                <div class="mt-2">
+                                    <input type="file" name="fab_document" id="fab_document" accept="image/*,application/pdf" class="hidden" onchange="onFileChange('fab_document')">
+                                    <label for="fab_document" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                        Pilih Berkas FAB
+                                    </label>
+                                    <span id="file-label-fab_document" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                </div>
+                                @error('fab_document')
+                                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
                                 @enderror
                             </div>
 
@@ -461,6 +495,73 @@
                             </div>
                         </div>
 
+                        <!-- Skema 3 (2026-09-12) — ID Sales/Agent/Referral wajib
+                             terisi SAAT REGISTRASI (dulu cuma ada di halaman edit,
+                             jadi sering kelewat & data komisi hilang). -->
+                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3 pt-2">
+                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">3. INFORMASI REFERRAL &amp; AKUISISI</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Menentukan komisi Sales/Agent — isi sesuai siapa yang mendaftarkan pelanggan ini</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div>
+                                <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Sales</label>
+                                {{-- Berbasis is_package_restricted (2026-09-12, koreksi user) — bukan hardcode role 'sales', lihat CustomerController::create() --}}
+                                @if(auth()->user()->role?->is_package_restricted)
+                                    <input type="text" value="{{ auth()->user()->name }} (Anda)" disabled
+                                           class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                    <input type="hidden" name="sales_user_id" value="{{ auth()->id() }}">
+                                @else
+                                    {{-- Actor DI LUAR role yang ditandai "Batasi pilihan paket
+                                         internet" (Skema 1) — ID Sales gak auto-terisi buat dia,
+                                         pilih manual (2026-09-14, permintaan user). --}}
+                                    <p class="text-[10px] text-amber-600 dark:text-amber-400 mb-1.5">
+                                        Auto-deteksi ID Sales cuma berlaku untuk role
+                                        <span class="font-semibold">{{ $restrictedRoleNames->implode(', ') ?: '(belum ada role diatur)' }}</span>.
+                                        Role Anda ({{ auth()->user()->role?->name ?? '—' }}) di luar itu — pilih manual di bawah.
+                                    </p>
+                                    <select name="sales_user_id" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                        <option value="">— Tidak ada —</option>
+                                        @foreach($salesUsers as $salesUser)
+                                            <option value="{{ $salesUser->id }}" {{ old('sales_user_id') == $salesUser->id ? 'selected' : '' }}>{{ $salesUser->name }}</option>
+                                        @endforeach
+                                    </select>
+                                @endif
+                                @error('sales_user_id')<p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
+                            </div>
+
+                            @if($agents->isNotEmpty())
+                            <div>
+                                <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Agent</label>
+                                <select name="agent_id" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="">— Tidak ada —</option>
+                                    @foreach($agents as $agent)
+                                        <option value="{{ $agent->id }}" {{ old('agent_id') == $agent->id ? 'selected' : '' }}>{{ $agent->code }} — {{ $agent->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('agent_id')<p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            @endif
+
+                            {{-- Disembunyikan sementara (permintaan user). Field tidak dikirim,
+                                 jadi referral_customer_id tersimpan null. Aktifkan lagi dengan
+                                 menghapus pembungkus Blade comment ini. --}}
+                            {{--
+                            <div class="relative" x-data="referralSearch()">
+                                <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Referral Pelanggan</label>
+                                <input type="text" x-model="query" @input.debounce.400ms="search()" placeholder="Cari nama/CID pelanggan existing..."
+                                       class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <input type="hidden" name="referral_customer_id" :value="selectedId">
+                                <ul x-show="results.length > 0" x-cloak class="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto text-xs">
+                                    <template x-for="r in results" :key="r.id">
+                                        <li @click="pick(r)" class="px-3 py-2 hover:bg-sky-50 dark:hover:bg-sky-900/30 cursor-pointer" x-text="r.customer_code + ' — ' + r.full_name"></li>
+                                    </template>
+                                </ul>
+                                @error('referral_customer_id')<p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            --}}
+                        </div>
+
                     </div>
 
                 </div>
@@ -496,6 +597,30 @@
 
 @section('scripts')
 <script>
+    /* Skema 3 (2026-09-12) — autocomplete ID Referral Pelanggan, cari
+       pelanggan existing lewat CID/nama. Nol dependency baru (vanilla fetch
+       + Alpine yang sudah dibundel), pola sama komponen Alpine lain di app. */
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('referralSearch', () => ({
+            query: '',
+            results: [],
+            selectedId: '{{ old('referral_customer_id') }}',
+            async search() {
+                if (this.query.length < 2) {
+                    this.results = [];
+                    return;
+                }
+                const res = await fetch(`{{ route('customers.search-referral') }}?q=${encodeURIComponent(this.query)}`);
+                this.results = res.ok ? await res.json() : [];
+            },
+            pick(r) {
+                this.selectedId = r.id;
+                this.query = r.customer_code + ' — ' + r.full_name;
+                this.results = [];
+            },
+        }));
+    });
+
     /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;
     const totalStepsCount = 2;
@@ -510,6 +635,29 @@
             optional: []
         }
     };
+
+    // Paket yang butuh FAB (Formulir Akan Berlangganan Bisnis) — paket
+    // berkategori Bisnis (dikirim server lewat CustomerController::create()).
+    // Cuma dipakai buat toggle tampilan; guard sebenarnya tetap di server.
+    const fabRequiredPackageIds = @json($fabRequiredPackageIds->map(fn ($id) => (string) $id)->values());
+
+    function toggleFabRequirement() {
+        const select = document.getElementById('internet_package_id');
+        const wrapper = document.getElementById('fab-document-wrapper');
+        if (! select || ! wrapper) {
+            return;
+        }
+
+        const needsFab = fabRequiredPackageIds.length > 0 && fabRequiredPackageIds.includes(select.value);
+        setElementVisible(wrapper, needsFab);
+
+        formFields['layanan'].required = formFields['layanan'].required.filter(f => f !== 'fab_document');
+        if (needsFab) {
+            formFields['layanan'].required.push('fab_document');
+        }
+
+        runLiveProgressUpdates();
+    }
 
     const stepKeys = {
         1: 'data-diri',
@@ -568,6 +716,7 @@
         updateWizardButtons();
         runLiveProgressUpdates();
         updateLayananBreakdown();
+        toggleFabRequirement();
     });
 
     /* File Change & Preview Helper — dipakai Foto Rumah & Foto ODP (Skip Survey) */
@@ -813,7 +962,8 @@
             cable_estimation_meter: 'Estimasi Kabel',
             difficulty_level: 'Tingkat Kesulitan',
             foto_rumah: 'Foto Rumah',
-            survey_photo: 'Foto ODP'
+            survey_photo: 'Foto ODP',
+            fab_document: 'FAB (Formulir Akan Berlangganan Bisnis)'
         };
         return labels[field] || field;
     }

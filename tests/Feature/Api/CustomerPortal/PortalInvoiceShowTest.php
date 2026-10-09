@@ -82,4 +82,22 @@ class PortalInvoiceShowTest extends TestCase
         $response->assertJsonPath('data.paid_amount', '50000.00');
         $response->assertJsonPath('data.remaining_amount', '100000.00');
     }
+
+    /**
+     * ADHOC-87 §4.6 — `index()` menyaring `batal` dari "Semua Status", tapi
+     * `show()` (detail per nomor) SENGAJA tidak disaring sama sekali.
+     */
+    public function test_invoice_batal_tetap_bisa_dibuka_detailnya(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $this->seedInvoice($seed['customer'], ['invoice_number' => 'INV-BATAL-DETAIL', 'invoice_status' => 'batal']);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->withHeaders($this->authenticatedHeaders($tokens['access_token']))
+            ->getJson('/api/customer-portal/me/invoices/INV-BATAL-DETAIL');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.invoice_number', 'INV-BATAL-DETAIL');
+        $response->assertJsonPath('data.invoice_status.value', 'batal');
+    }
 }

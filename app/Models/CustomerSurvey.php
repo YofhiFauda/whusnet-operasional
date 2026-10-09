@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'required_tools',
     'cable_estimation_meter',
     'nearest_odp',
+    'difficulty_level',
     'requested_installation_date',
     'survey_photo',
     'house_photo',
@@ -41,6 +42,26 @@ class CustomerSurvey extends Model
         'survey_photo',
         'house_photo',
     ];
+
+    /**
+     * Tingkat kesulitan & catatan murni untuk form/laporan. Kolom `difficulty_level`
+     * diutamakan; baris lama (sebelum kolom ada) dipecah dari survey_note format
+     * "Tingkat Kesulitan: X\nCatatan: Y" — itu format yang ditulis store() dulu.
+     *
+     * @return array{difficulty_level: ?string, survey_note: ?string}
+     */
+    public function difficultyAndNote(): array
+    {
+        $difficulty = $this->difficulty_level;
+        $note = $this->survey_note;
+
+        if ($difficulty === null && $note && preg_match('/^Tingkat Kesulitan: (MUDAH|SEDANG|SULIT)$/m', $note, $match)) {
+            $difficulty = $match[1];
+            $note = preg_match('/^Catatan: (.*)\z/ms', $note, $noteMatch) ? $noteMatch[1] : null;
+        }
+
+        return ['difficulty_level' => $difficulty, 'survey_note' => $note];
+    }
 
     protected function casts(): array
     {

@@ -1,14 +1,46 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-slate-50 dark:bg-slate-900">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full overflow-hidden bg-slate-50 dark:bg-slate-900">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {{--
+        interactive-widget=resizes-content — sejak Chrome 108, default
+        Android jadi `overlays-content`: keyboard virtual OVERLAY konten,
+        cuma nge-pan visual viewport, layout viewport gak ikut resize.
+        Itu akar bug "background modal ikut kescroll pas keyboard muncul" —
+        `position:fixed` (body lock, window.Dialog) ngikutin LAYOUT
+        viewport, bukan visual viewport, jadi begitu keduanya kepisah gara2
+        overlay-mode itu, overlay dialog ninggalin celah yang nembus ke
+        konten di belakang. `resizes-content` balikin perilaku lama: browser
+        BENERAN resize viewport pas keyboard buka, jadi CSS fixed/dvh biasa
+        otomatis ngikut tanpa perlu JS visualViewport (lihat
+        components/dialog.blade.php — itu tetap dipertahankan sebagai
+        fallback buat browser yang belum dukung directive ini, mis. iOS
+        Safari versi lama).
+    --}}
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>@yield('title', 'Whusnet Operasional')</title>
 
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+    </style>
+
     {{-- Tema dipasang SEBELUM body dirender supaya tidak ada kedipan putih saat dark mode --}}
     <script>
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+        window.scrollTo(0, 0);
+        window.addEventListener('focus', function() {
+            if (window.scrollY !== 0 || window.scrollX !== 0) {
+                window.scrollTo(0, 0);
+            }
+        });
         (function () {
             const saved = localStorage.getItem('whusnet-theme');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -25,9 +57,19 @@
     <!-- Styles / Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+<body class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
-<div class="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+{{--
+    h-dvh, bukan h-screen (=100vh): di real device, address bar mobile
+    muncul-hilang bikin 100vh statis lebih tinggi dari area kelihatan.
+    Shell ini jadi lebih tinggi dari viewport asli → browser nampilin
+    scrollbar body beneran, dan halaman "app-shell" kayak Worksheet
+    Ticketing (yang ngandelin h-full/overflow-hidden internal, BUKAN
+    scroll body) jadi ikut kescroll dari luar. Kontainernya sendiri gak
+    salah (overflow-hidden + flex tetap bener), yang salah unit tinggi
+    acuannya. dvh reaktif ke toolbar browser, jadi shell selalu pas.
+--}}
+<div class="flex h-dvh overflow-hidden bg-slate-50 dark:bg-slate-900">
 
     {{-- ═══════════════════════════════════════════════════════
          SIDEBAR — Light mode (putih), sesuai Design.md §3.2
@@ -83,25 +125,25 @@
                         <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')"
                                 title="Pelanggan"
                                 class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*')
+                                       {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*')
                                            ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold'
                                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87"/><path stroke-linecap="round" stroke-linejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"/>
                                 </svg>
                                 <span class="sidebar-text">Pelanggan</span>
                             </div>
                             <svg id="chevron-pelanggan"
                                  class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300
-                                        {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                        {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
 
                         <div id="submenu-pelanggan"
-                             class="submenu-container {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'is-open' : '' }}">
+                             class="submenu-container {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*') ? 'is-open' : '' }}">
                             <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
 
                                 @if(auth()->user()->hasPermission('customers.create'))
@@ -112,6 +154,26 @@
                                 </a>
                                 @endif
 
+                                @if(auth()->user()->hasPermission('customer_registration_verification.view'))
+                                <a href="{{ route('customer-registration-verifications.index') }}"
+                                   class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors
+                                          {{ Request::is('customer-registration-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    <span>Verifikasi Registrasi</span>
+                                    @if(isset($badge_registration_verification_count) && $badge_registration_verification_count > 0)
+                                        <span class="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_registration_verification_count }}</span>
+                                    @endif
+                                </a>
+                                @endif
+                                @if(auth()->user()->hasPermission('creq_billing_verification.view'))
+                                <a href="{{ route('tasks.creq-billing.index') }}"
+                                   class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors
+                                          {{ Request::is('tasks-creq-billing*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    <span>Verifikasi Biaya C-REQ</span>
+                                    @if(isset($badge_creq_billing_verification_count) && $badge_creq_billing_verification_count > 0)
+                                        <span class="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_creq_billing_verification_count }}</span>
+                                    @endif
+                                </a>
+                                @endif
                                 @if(auth()->user()->hasPermission('customers.detail.survey.view'))
                                 <a href="{{ route('surveys.queue') }}"
                                    class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors
@@ -168,84 +230,40 @@
                     @endif
 
                     @if(auth()->user()->hasPermission('invoices.view'))
-                    <div class="space-y-1">
-                        <button onclick="toggleSubmenu('submenu-tagihan', 'chevron-tagihan')"
-                                title="Tagihan"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       {{ Request::is('invoices*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
-                            <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 {{ Request::is('invoices*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>
-                                </svg>
-                                <span class="sidebar-text">Tagihan</span>
-                            </div>
-                            <svg id="chevron-tagihan"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ Request::is('invoices*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
-                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                    <a href="{{ route('invoices.belum-lunas') }}" title="Tagihan"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::is('invoices*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::is('invoices*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>
                             </svg>
-                        </button>
-                        {{-- "Tagihan" = kewajiban yang MASIH ADA (2026-08-18, ulang
-                             dari percakapan sebelumnya): namanya "tagihan", jadi
-                             cuma yang belum/lagi ditagih. "Tagihan Lunas" DICABUT
-                             dari sini — begitu lunas, itu bukan tagihan lagi, itu
-                             riwayat pembayaran (lihat submenu Pembayaran).
-                             `invoices.lunas` route/controller/view TETAP ADA
-                             (tidak dihapus, biar tidak ada broken link), cuma tidak
-                             ditautkan dari nav. --}}
-                        <div id="submenu-tagihan"
-                             class="submenu-container {{ Request::is('invoices*') ? 'is-open' : '' }}">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
-                                <a href="{{ route('invoices.belum-lunas') }}"
-                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::routeIs('invoices.belum-lunas') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
-                                    Tagihan Belum Lunas
-                                </a>
-                                <a href="{{ route('invoices.index') }}"
-                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::routeIs('invoices.index') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
-                                    Semua Tagihan
-                                </a>
-                            </div>
+                            <span class="sidebar-text">Tagihan</span>
                         </div>
-                    </div>
+                    </a>
                     @endif
 
                     @if(auth()->user()->hasPermission('payments.view'))
-                    <div class="space-y-1">
-                        <button onclick="toggleSubmenu('submenu-pembayaran', 'chevron-pembayaran')"
-                                title="Pembayaran"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       {{ Request::is('payments*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
-                            <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 {{ Request::is('payments*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
-                                </svg>
-                                <span class="sidebar-text">Pembayaran</span>
-                            </div>
-                            <svg id="chevron-pembayaran"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ Request::is('payments*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
-                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                    <a href="{{ route('payments.index') }}" title="Pembayaran"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::routeIs('payments.index') || (Request::is('payments*') && !Request::routeIs('payments.overpay')) ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::routeIs('payments.index') || (Request::is('payments*') && !Request::routeIs('payments.overpay')) ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
                             </svg>
-                        </button>
-                        {{-- "Pembayaran" = histori uang yang SUDAH masuk. Ganti total
-                             halaman "Pembayaran" berdiri sendiri (dulu) DAN "Tagihan
-                             Lunas" (yang dicabut dari submenu Tagihan di atas) — kedua
-                             kebutuhan itu sekarang dipenuhi Riwayat Transaksi (per
-                             cicilan/transaksi, bukan per invoice) + Lebih Bayar. --}}
-                        <div id="submenu-pembayaran"
-                             class="submenu-container {{ Request::is('payments*') ? 'is-open' : '' }}">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
-                                <a href="{{ route('payments.index') }}"
-                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::routeIs('payments.index') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
-                                    Riwayat Transaksi Pembayaran
-                                </a>
-                                <a href="{{ route('payments.overpay') }}"
-                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::routeIs('payments.overpay') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
-                                    Pembayaran Lebih (Overpay)
-                                </a>
-                            </div>
+                            <span class="sidebar-text">Pembayaran</span>
                         </div>
-                    </div>
+                    </a>
+
+                    <a href="{{ route('payments.overpay') }}" title="Overpay"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::routeIs('payments.overpay') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::routeIs('payments.overpay') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="sidebar-text">Overpay</span>
+                        </div>
+                    </a>
                     @endif
 
                     @if(auth()->user()->hasPermission('collector_worksheet.view'))
@@ -274,7 +292,15 @@
                     </a>
                     @endif
 
-                    @if(auth()->user()->hasPermission('kolektor.view'))
+                    @if(auth()->user()->isTechnician() && auth()->user()->hasPermission('kolektor.pay'))
+                    <a href="{{ route('technician-payments.index') }}" title="Catat Pembayaran"
+                       class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200
+                              {{ Request::is('technician-payments*') ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <span class="sidebar-text">Catat Pembayaran</span>
+                    </a>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('kolektor.view') && ! auth()->user()->isTechnician())
                     <a href="{{ route('collector-worklist.index') }}" title="Worklist Kolektor"
                        class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
                               {{ Request::is('collector-worklist*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
@@ -285,6 +311,63 @@
                             <span class="sidebar-text">Worklist Kolektor</span>
                         </div>
                     </a>
+                    @endif
+
+                    {{-- Group "Business Development" (2026-09-12, permintaan user)
+                         — sebelumnya 4 link lepas (Busdev/Omset Sales/Master Agent/
+                         Restriksi Paket), sekarang satu submenu collapsible, pola
+                         sama toggleSubmenu() yang dipakai submenu lain di sidebar
+                         ini. "Busdev" diganti "Pelanggan Aktif < 30 Hari" — biar
+                         gak redundan dengan judul group. --}}
+                    @if(auth()->user()->hasPermission('customer_acquisitions.view') || auth()->user()->hasPermission('sales_omset_dashboard.view') || auth()->user()->hasPermission('agents.view') || auth()->user()->hasPermission('package_restrictions.view') || auth()->user()->hasPermission('business_development_verification.view') || auth()->user()->hasPermission('business_customers.view'))
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-busdev', 'chevron-busdev')"
+                                title="Business Development"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3 sidebar-item-content">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="7" width="18" height="13" rx="2"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                                <span class="sidebar-text">Business Development</span>
+                            </div>
+                            <svg id="chevron-busdev"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div id="submenu-busdev"
+                             class="submenu-container {{ Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*') ? 'is-open' : '' }}">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                                @if(auth()->user()->hasPermission('customer_acquisitions.view'))
+                                <a href="{{ route('customer-acquisitions.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('customer-acquisitions*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Pelanggan Aktif &lt; 30 Hari</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('business_development_verification.view'))
+                                <a href="{{ route('business-development-verifications.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Menunggu Verifikasi BD</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('business_customers.view'))
+                                <a href="{{ route('business-development.business-customers.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development/business-customers*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">List Pelanggan Bisnis</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('sales_omset_dashboard.view'))
+                                <a href="{{ route('business-development.sales-omset.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development/sales-omset*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Omset Sales</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('agents.view'))
+                                <a href="{{ route('business-development.agents.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development/agents*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Agent</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('package_restrictions.view'))
+                                <a href="{{ route('business-development.package-restrictions.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development/package-restrictions*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Restriksi Paket</a>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                     @endif
                 </div>
             </div>
@@ -298,8 +381,8 @@
                 </div>
                 <div class="space-y-1">
 
-                    @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own'))
-                    @if(auth()->user()->hasPermission('task.view.all'))
+                    @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('fop_analytics.view'))
+                    @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('fop_analytics.view'))
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-tasks', 'chevron-tasks')"
                                 title="Penjadwalan Teknis"
@@ -320,10 +403,18 @@
                         <div id="submenu-tasks"
                              class="submenu-container {{ Request::is('tasks*') || Request::is('fop*') ? 'is-open' : '' }}">
                             <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                                @if(auth()->user()->hasPermission('task.view.all'))
                                 <a href="{{ route('fop.dashboard') }}"
                                    class="block py-1.5 px-3 rounded-md transition-colors {{ Request::routeIs('fop.dashboard') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                     FOP Dashboard
                                 </a>
+                                @endif
+                                @if(auth()->user()->hasPermission('fop_analytics.view'))
+                                <a href="{{ route('fop.analytics') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::routeIs('fop.analytics') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    Dashboard Analitik FOP
+                                </a>
+                                @endif
                                 @if(auth()->user()->hasPermission('fop_tasks.view'))
                                 <a href="{{ route('fop-tasks.index') }}"
                                    class="block py-1.5 px-3 rounded-md transition-colors {{ Request::routeIs('fop-tasks.index') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
@@ -438,14 +529,14 @@
                     @if(auth()->user()->hasPermission('reports.view'))
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-laporan', 'chevron-laporan')"
-                                title="Laporan Keuangan"
+                                title="Laporan"
                                 class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
                                        {{ Request::is('reports*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
                             <div class="flex items-center gap-3 sidebar-item-content">
                                 <svg class="h-5 w-5 shrink-0 {{ Request::is('reports*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v16a2 2 0 0 0 2 2h16"/><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-5 5-4-4-3 3"/>
                                 </svg>
-                                <span class="sidebar-text">Laporan Keuangan</span>
+                                <span class="sidebar-text">Laporan</span>
                             </div>
                             <svg id="chevron-laporan"
                                  class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ Request::is('reports*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
@@ -468,6 +559,18 @@
                                    class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('reports/payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                     Laporan Pembayaran
                                 </a>
+                                @if(auth()->user()->hasPermission('collector_report.view'))
+                                <a href="{{ route('reports.collector-monthly.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('reports/collector-monthly*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    Laporan Bulanan Admin
+                                </a>
+                                @endif
+                                @if(auth()->user()->hasPermission('collector_payment_report.view'))
+                                <a href="{{ route('reports.collector-payments.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('reports/collector-payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    Laporan Bayar Kolektor
+                                </a>
+                                @endif
                                 <a href="{{ route('reports.imports.index') }}"
                                    class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('reports/imports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                     Laporan Import Data
@@ -494,7 +597,7 @@
             @endif
 
             {{-- ── Group: MASTER & PENGATURAN ── --}}
-            @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view'))
+            @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view'))
             <div>
                 <div class="sidebar-group-header">
                     <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Master &amp; Pengaturan</p>
@@ -502,7 +605,7 @@
                 </div>
                 <div class="space-y-1">
 
-                    @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view'))
+                    @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view'))
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-master', 'chevron-master')"
                                 title="Master Data"
@@ -534,6 +637,7 @@
                                 @endif
                                 @if(auth()->user()->hasPermission('packages.view'))
                                 <a href="/master/paket" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('master/paket*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Paket Internet</a>
+                                <a href="{{ route('master.package-categories.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('master/package-categories*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Kategori Paket</a>
                                 @endif
                                 @if(auth()->user()->hasPermission('master_status_pelanggan.view'))
                                 <a href="/master/status-langganan" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('master/status-langganan') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Status Pelanggan</a>
@@ -552,6 +656,12 @@
                                 @endif
                                 @if(auth()->user()->hasPermission('work_tools.view'))
                                 <a href="/master/work-tools" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('master/work-tools*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Alat Kerja</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('master_rekening.view'))
+                                <a href="{{ route('master.rekening.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('master/rekening*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Rekening Bank</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('termination_reasons.view'))
+                                <a href="{{ route('master.termination-reasons.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('master/termination-reasons*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Alasan Putus Langganan</a>
                                 @endif
                             </div>
                         </div>
@@ -593,6 +703,80 @@
             </div>
             @endif
 
+            {{-- ── Group: GUDANG & INVENTORY (ADHOC-54) ── --}}
+            @if(auth()->user()->hasPermission('warehouse.view') || auth()->user()->hasPermission('warehouse_transfer.view') || auth()->user()->hasPermission('warehouse_issue.view') || auth()->user()->hasPermission('warehouse_custody.view') || auth()->user()->hasPermission('warehouse_traceability.view') || auth()->user()->hasPermission('warehouse_adjustment.create') || auth()->user()->hasPermission('warehouse_reassign.create') || auth()->user()->hasPermission('warehouse_report.view') || auth()->user()->hasPermission('warehouse_stock_request.view'))
+            <div>
+                <div class="sidebar-group-header">
+                    <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Gudang &amp; Inventory</p>
+                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2.5 mx-2"></div>
+                </div>
+                <div class="space-y-1">
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-warehouse', 'chevron-warehouse')"
+                                title="Gudang"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ Request::is('warehouse*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3 sidebar-item-content">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('warehouse*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4"/>
+                                </svg>
+                                <span class="sidebar-text">Gudang</span>
+                            </div>
+                            <svg id="chevron-warehouse"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ Request::is('warehouse*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div id="submenu-warehouse"
+                             class="submenu-container {{ Request::is('warehouse*') ? 'is-open' : '' }}">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                                {{-- Koreksi IA Gudang (2026-09-03) — Barang Masuk/Buat Transfer/Issue/
+                                     Adjustment DIHAPUS dari nav flat, tetap reachable lewat tombol di
+                                     Dashboard/Kelola Stok (bukan hilang, cuma gak lagi entri nav
+                                     terpisah). Jangan tambah balik sebagai link nav — itu persis
+                                     kebiasaan yang bikin submenu ini kepenuhan.
+                                     Istilah bahasa Inggris (Management Stock/Custody/Asset
+                                     Traceability/Reassign) di-Indonesiakan biar staf gudang non-teknis
+                                     gak ngira itu error/typo — cuma teks tampilan, nama
+                                     route/permission di belakang gak berubah. --}}
+                                @if(auth()->user()->hasPermission('warehouse.view'))
+                                <a href="{{ route('warehouse.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Dashboard Gudang</a>
+                                <a href="{{ route('warehouse.stock.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/stock*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Kelola Stok</a>
+                                {{-- Riwayat Mutasi (2026-09-07) — sebelumnya cuma reachable dari tab
+                                     x-warehouse.header, gak ada di sidebar utama sama sekali. --}}
+                                <a href="{{ route('warehouse.history.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/history*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Riwayat Mutasi</a>
+                                {{-- Riwayat Pengambilan Alat (ADHOC-88) — log siapa teknisi yang menarik modem --}}
+                                <a href="{{ route('warehouse.retrievals.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/retrievals*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Riwayat Ambil Alat</a>
+                                {{-- Pemakaian Material Lapangan (Daily Material Usage Report) --}}
+                                <a href="{{ route('warehouse.usage.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/usage*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Pemakaian Material</a>
+                                {{-- Scan Barang (2026-09-07, mode scan-first) --}}
+                                <a href="{{ route('warehouse.scan.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/scan*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Scan Barang</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('warehouse_custody.view'))
+                                <a href="{{ route('warehouse.custody.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Barang di Tangan Teknisi</a>
+                                @endif
+                                {{-- Terima Retur & Terima dari Pelanggan --}}
+                                @if(auth()->user()->hasPermission('warehouse_reassign.create'))
+                                <a href="{{ route('warehouse.returns.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ (Request::is('warehouse/returns') || (Request::is('warehouse/returns/*') && ! Request::is('warehouse/returns/from-customer*'))) ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Terima Retur Modem</a>
+                                <a href="{{ route('warehouse.returns.from-customer.create') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/returns/from-customer*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Terima dari Pelanggan</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('warehouse_traceability.view'))
+                                <a href="{{ route('warehouse.traceability.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/traceability*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Lacak Barang / SN</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('warehouse_report.view'))
+                                <a href="{{ route('warehouse.reports.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/reports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Laporan Gudang</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('warehouse_stock_request.view'))
+                                <a href="{{ route('warehouse.stock-requests.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Permintaan Stok</a>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
         </nav>
 
         {{-- Sidebar Footer — User Profile --}}
@@ -611,7 +795,7 @@
                     </div>
                 </div>
                 <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">@csrf</form>
-                <button onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                <button onclick="event.preventDefault(); window.Confirm('Konfirmasi Keluar', 'Yakin ingin keluar dari sistem?', 'warning', () => document.getElementById('logout-form').submit());"
                         class="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors sidebar-footer-info"
                         title="Keluar">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -697,9 +881,9 @@
 
             {{-- Right: Actions --}}
             <div class="flex items-center gap-1 sm:gap-2">
-                {{-- Theme Toggle --}}
+                {{-- Theme Toggle (Desktop only) --}}
                 <button onclick="toggleTheme(event)" id="themeToggle" aria-label="Ganti tema" title="Ganti Tema (Ctrl+D / Alt+T)"
-                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
+                        class="hidden sm:flex items-center justify-center p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
                                hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all duration-200 active:scale-90 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
                     <svg id="themeIconMoon" class="h-5 w-5 theme-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/>
@@ -709,19 +893,19 @@
                     </svg>
                 </button>
 
-                {{-- Bantuan & Pintasan Keyboard --}}
+                {{-- Bantuan & Pintasan Keyboard (Desktop only) --}}
                 <button onclick="openHelp()" aria-label="Bantuan dan pintasan keyboard" title="Bantuan (?)"
-                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
+                        class="hidden sm:flex items-center justify-center p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
                                hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
                     </svg>
                 </button>
 
-                {{-- Notifications --}}
+                {{-- Notifications (Tetap di Navbar Mobile & Desktop) --}}
                 <x-notification-dropdown />
 
-                <div class="h-5 w-px bg-slate-200 dark:bg-slate-700"></div>
+                <div class="hidden sm:block h-5 w-px bg-slate-200 dark:bg-slate-700"></div>
 
                 {{-- User Menu --}}
                 <div class="relative" x-data="{ open: false }">
@@ -766,8 +950,36 @@
                                 Scan QR
                             </a>
                         @endcan
+
+                        {{-- Switch Theme & Bantuan khusus di Mobile (di bawah Scan QR) --}}
+                        <div class="sm:hidden my-1 border-t border-slate-100 dark:border-slate-700/60"></div>
+                        <button type="button" onclick="toggleTheme(event)"
+                                class="sm:hidden w-full px-3 py-2 flex items-center justify-between text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                            <div class="flex items-center gap-2.5">
+                                <svg class="h-4 w-4 text-slate-400 dark:text-slate-500 dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/>
+                                </svg>
+                                <svg class="h-4 w-4 text-amber-400 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                                </svg>
+                                <span>Ganti Tema</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                <span class="dark:hidden">Light</span>
+                                <span class="hidden dark:inline">Dark</span>
+                            </span>
+                        </button>
+
+                        <button type="button" onclick="openHelp(); open = false;"
+                                class="sm:hidden w-full px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
+                            </svg>
+                            <span>Bantuan &amp; Pintasan</span>
+                        </button>
+
                         <div class="my-1 border-t border-slate-100 dark:border-slate-700/60"></div>
-                        <button onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                        <button onclick="event.preventDefault(); window.Confirm('Konfirmasi Keluar', 'Yakin ingin keluar dari sistem?', 'warning', () => document.getElementById('logout-form').submit());"
                                 class="w-full px-3 py-2 flex items-center gap-2.5 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m16 17 5-5-5-5"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12H9"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
                             Keluar
@@ -778,7 +990,7 @@
         </header>
 
         {{-- Main Dynamic Page Content --}}
-        <main class="flex-1 p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto">
+        <main class="flex-1 p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto scroll-smooth">
             @yield('content')
         </main>
     </div>
@@ -1172,6 +1384,21 @@
             {{-- TAB: PINTASAN --}}
             <div id="helppane-keys" role="tabpanel" aria-labelledby="helptab-keys" class="space-y-5">
                 <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Worksheet Ticketing (Helpdesk &amp; NOC)</p>
+                    <dl class="space-y-1.5">
+                        <div class="flex justify-between gap-4"><dt>Buka / toggle form tiket baru</dt><dd><kbd class="kbd">N</kbd> / <kbd class="kbd">Alt</kbd>+<kbd class="kbd">N</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Tutup panel form / batalkan aksi</dt><dd><kbd class="kbd">Esc</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Simpan &amp; buat tiket baru</dt><dd><kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">Enter</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Pilih pelanggan teratas di pencarian</dt><dd><kbd class="kbd">Enter</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Pindah baris tiket aktif</dt><dd><kbd class="kbd">&uarr;</kbd> <kbd class="kbd">&darr;</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Pindah tab antrean (Ticket / NOC / FOP)</dt><dd><kbd class="kbd">&larr;</kbd> <kbd class="kbd">&rarr;</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Buka detail drawer tiket</dt><dd><kbd class="kbd">Enter</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span> Quick: Selesaikan tiket</dt><dd><kbd class="kbd">C</kbd> &rarr; <kbd class="kbd">Enter</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span> Quick: Eskalasi ke NOC</dt><dd><kbd class="kbd">V</kbd> &rarr; <kbd class="kbd">Enter</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span> Quick: Teruskan ke FOP</dt><dd><kbd class="kbd">B</kbd> &rarr; <kbd class="kbd">Enter</kbd></dd></div>
+                    </dl>
+                </div>
+                <div>
                     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Tabel (List Pelanggan)</p>
                     <dl class="space-y-1.5">
                         <div class="flex justify-between gap-4"><dt>Pindah baris</dt><dd><kbd class="kbd">&uarr;</kbd> <kbd class="kbd">&darr;</kbd></dd></div>
@@ -1190,8 +1417,8 @@
                     </dl>
                 </div>
                 <p class="text-[11px] text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700/60 pt-3">
-                    Pintasan tabel tidak aktif saat kursor berada di kolom isian atau saat modal terbuka &mdash;
-                    kecuali <kbd class="kbd">Alt</kbd>+<kbd class="kbd">N</kbd> yang berlaku di mana saja.
+                    Pintasan tabel &amp; worksheet tidak aktif saat kursor berada di kolom isian &mdash;
+                    kecuali <kbd class="kbd">Alt</kbd>+<kbd class="kbd">N</kbd> (toggle form) dan <kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">Enter</kbd> (submit tiket) yang berlaku di mana saja.
                 </p>
             </div>
 
@@ -1229,6 +1456,26 @@
                             <svg class="h-4 w-4 text-rose-600 dark:text-rose-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                             <div><dt class="font-semibold text-rose-700 dark:text-rose-300">Terminasi &mdash; permanen</dt>
                                  <dd>Putus langganan dan keluarkan dari billing aktif. Butuh konfirmasi dan <strong>tidak bisa dibatalkan</strong> dari halaman ini.</dd></div>
+                        </div>
+                    </dl>
+                </div>
+                <div class="border-t border-slate-100 dark:border-slate-700/60 pt-4">
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Aksi Cepat Ticketing (Quick Dispatch)</p>
+                    <dl class="space-y-2.5">
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                            <div><dt class="font-semibold text-slate-800 dark:text-slate-100">Selesaikan Tiket (<kbd class="kbd">C</kbd>)</dt>
+                                 <dd>Menutup tiket yang selesai ditangani Helpdesk/NOC secara tuntas dengan catatan penyelesaian.</dd></div>
+                        </div>
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8-8 8-4-4-6 6"/></svg>
+                            <div><dt class="font-semibold text-slate-800 dark:text-slate-100">Eskalasi ke NOC (<kbd class="kbd">V</kbd>)</dt>
+                                 <dd>Memindahkan penanganan tiket ke tim NOC untuk investigasi jaringan atau konfigurasi teknis.</dd></div>
+                        </div>
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.199l-4-4m0 0l-4 4m4-4V3"/></svg>
+                            <div><dt class="font-semibold text-slate-800 dark:text-slate-100">Teruskan ke FOP (<kbd class="kbd">B</kbd>)</dt>
+                                 <dd>Menerbitkan tugas kunjungan lapangan ke tim teknisi FOP untuk pengecekan fisik/kabel di lokasi.</dd></div>
                         </div>
                     </dl>
                 </div>

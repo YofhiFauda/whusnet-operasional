@@ -149,6 +149,41 @@ class TicketIssueCategoryCRUDTest extends TestCase
         ]);
     }
 
+    /**
+     * `is_batch` (revisi Worksheet Helpdesk — tiket batch Parent/Child) cuma
+     * bisa diaktifkan lewat form ini. Checkbox HTML gak ngirim apa pun kalau
+     * gak dicentang — pastikan uncheck beneran nge-reset ke false, bukan
+     * dibiarkan (lihat TicketIssueCategoryController::validateCategory()).
+     */
+    public function test_is_batch_checkbox_can_be_toggled_on_and_off(): void
+    {
+        $this->loginAsAdmin();
+
+        $response = $this->post('/master/issue-categories', [
+            'name' => 'ODP LOS',
+            'default_priority' => 'High',
+            'sla_source' => 'prioritas',
+            'is_active' => '1',
+            'is_batch' => '1',
+        ]);
+        $response->assertRedirect('/master/issue-categories');
+
+        $category = TicketIssueCategory::where('name', 'ODP LOS')->firstOrFail();
+        $this->assertTrue($category->is_batch);
+
+        // Uncheck (field gak dikirim sama sekali, kayak submit form browser
+        // beneran) — is_batch WAJIB balik false, bukan tetap true.
+        $response = $this->put("/master/issue-categories/{$category->id}", [
+            'name' => 'ODP LOS',
+            'default_priority' => 'High',
+            'sla_source' => 'prioritas',
+            'is_active' => '1',
+        ]);
+        $response->assertRedirect('/master/issue-categories');
+
+        $this->assertFalse($category->fresh()->is_batch);
+    }
+
     public function test_name_uniqueness_validation(): void
     {
         $this->loginAsAdmin();

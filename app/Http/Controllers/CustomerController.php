@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\BillingWaiverSource;
 use App\Enums\DocumentType;
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
@@ -10,19 +11,25 @@ use App\Enums\PaymentStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
+use App\Exceptions\CustomerRelocationBlockedException;
 use App\Http\Controllers\Concerns\RedirectsToCustomer;
 use App\Http\Controllers\Concerns\RendersCustomerList;
 use App\Http\Requests\CustomerRegistrationRequest;
+use App\Models\Agent;
 use App\Models\AuditLog;
+use App\Models\BankAccount;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
+use App\Models\CustomerBalanceMutation;
 use App\Models\CustomerDevice;
+use App\Models\CustomerDocument;
 use App\Models\CustomerInstallation;
 use App\Models\CustomerService;
 use App\Models\CustomerStatusLog;
 use App\Models\CustomerSurvey;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\CustomerTerminationReason;
 use App\Models\Distribution;
 use App\Models\District;
 use App\Models\FopTask;
@@ -34,21 +41,32 @@ use App\Models\Payment;
 use App\Models\Person;
 use App\Models\Pop;
 use App\Models\PopSequence;
+use App\Models\RestrictedPackage;
+use App\Models\Role;
 use App\Models\SubscriptionStatus;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Services\BillingPeriodWaiverService;
+use App\Services\CustomerBalanceService;
+use App\Services\CustomerCidService;
+use App\Services\CustomerDeviceProfileService;
+use App\Services\CustomerRelocationService;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
+use App\Services\NetworkAssignmentService;
+use App\Services\NumberSequenceService;
 use App\Services\TelegramBotService;
 use App\Services\TicketService;
 use App\Support\IndonesianDate;
 use App\Support\RupiahInput;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -157,10 +175,15 @@ class CustomerController extends Controller
             return redirect()->back()->with('error', 'Pelanggan ini tidak dalam status putus langganan.');
         }
 
-        $device = $customer->customerDevice;
-        if (! $device) {
-            return redirect()->back()->with('error', 'Data alat pelanggan tidak ditemukan.');
-        }
+        // Pelanggan legacy yang masih aktif saat migrasi TIDAK punya baris
+        // `customer_devices` — baris itu hanya dibuat untuk yang sudah putus
+        // (BackfillDeviceRetrievedStatusCommand) atau lewat alur instalasi
+        // sistem baru. Di data dev: 1.957 pelanggan, cuma 229 punya baris, jadi
+        // ~1.700 pelanggan akan mentok di sini begitu diputus. Baris ini tempat
+        // `device_retrieved_at` disimpan, jadi dibuatkan placeholder yang sama
+        // dengan import/backfill legacy — bukan menolak tombol Ambil Alat.
+        $device = $customer->customerDevice
+            ?? $customer->customerDevice()->create(['device_type' => CustomerDevice::LEGACY_DEVICE_TYPE]);
 
         if ($device->device_retrieved_at) {
             return redirect()->back()->with('error', 'Alat pelanggan ini sudah ditandai diambil.');
@@ -185,8 +208,15 @@ class CustomerController extends Controller
     }
 
     /**
-     * Aktifkan kembali pelanggan yang putus langganan ("Langganan Lagi"),
-     * langsung ke status active tanpa lewat survey/verifikasi ulang.
+     * Aktifkan kembali pelanggan yang putus langganan ("Langganan Lagi").
+     *
+     * Cabang ditentukan status pengambilan alat (`customer_devices.
+     * device_retrieved_at`), BUKAN pilihan manual admin — modem lama yang
+     * masih terpasang di lokasi berarti tidak ada yang perlu disurvey ulang:
+     * - Belum diambil → langsung `active` (perilaku asli sebelum branch ini).
+     * - Sudah diambil → `waiting_survey` (Antrean Survey), pelanggan diproses
+     *   ulang seperti pemasangan baru karena butuh modem baru + survey lokasi.
+     *   Rancangan & alasan bisnis: rancangan-terminate-reactivate-state-machine.md §13.
      */
     public function reactivate(Customer $customer)
     {
@@ -196,28 +226,137 @@ class CustomerController extends Controller
             return redirect()->back()->with('error', 'Pelanggan ini tidak dalam status putus langganan.');
         }
 
-        DB::transaction(function () use ($customer) {
-            $customer->update(['status' => 'active']);
+        // Gate utang (ADHOC-105): pelanggan wajib lunas dulu sebelum Langganan
+        // Lagi, di KEDUA cabang (langsung active maupun lewat waiting_survey).
+        // `tak_tertagih` ikut dicek walau sudah keluar dari tab Tagihan —
+        // statusnya cuma label pembukuan, utangnya masih ada. Adminnya harus
+        // menekan Kembalikan di List Putus Langganan dulu, lalu melunasi.
+        // Sengaja tanpa filter POP scope: ini penjaga per pelanggan, bukan
+        // daftar — invoice di POP lain milik pelanggan yang sama tetap utang.
+        $hasOutstandingInvoice = Invoice::query()
+            ->where('customer_id', $customer->id)
+            ->whereIn('invoice_status', [...Invoice::OUTSTANDING_STATUSES, InvoiceStatus::TAK_TERTAGIH->value])
+            ->exists();
+
+        if ($hasOutstandingInvoice) {
+            return redirect()->back()->with('error', 'Pelanggan ini masih punya tagihan/piutang yang belum lunas. Lunasi dulu (tagihan tak tertagih dikembalikan ke Tagihan lewat kolom Tagihan di halaman ini) sebelum Langganan Lagi.');
+        }
+
+        // Dibaca SEBELUM transaksi karena flag ini dicabut di dalamnya (lihat
+        // catatan ADHOC-88 di bawah) — begitu dicabut, informasi "sudah
+        // diambil atau belum" hilang buat pengecekan berikutnya.
+        $deviceAlreadyRetrieved = (bool) $customer->customerDevice?->device_retrieved_at;
+
+        DB::transaction(function () use ($customer, $deviceAlreadyRetrieved) {
+            if ($deviceAlreadyRetrieved) {
+                // Modem lama sudah ditarik dari lokasi — tidak bisa langsung
+                // aktif tanpa alat. Masuk WAITING_SURVEY: auto-create Task
+                // Survey + FopTask lewat CustomerWorkflowService::transition()
+                // (sama seperti pendaftaran baru), lanjut proses instalasi
+                // ulang penuh sampai VERIFICATION_ADMIN → ACTIVE lagi.
+                app(CustomerWorkflowService::class)->transition($customer, WorkflowTransition::WAITING_SURVEY, 'Langganan Lagi - Alat Sudah Diambil, Masuk Antrean Survey');
+            } else {
+                // Modem lama masih terpasang — lewat state machine (TERMINATED
+                // → ACTIVE diizinkan enum sejak ADHOC-85) — jejaknya masuk
+                // customer_status_logs + audit 'Customer Workflow' dengan note
+                // 'Langganan Lagi'. Audit khusus action 'reactivate' dihapus:
+                // tidak ada pembacanya di kode, dan baris lamanya di
+                // audit_logs tetap utuh. terminated_at SENGAJA tidak
+                // dikosongkan — dipakai DashboardController::growthStats
+                // untuk churn per periode; dikosongkan = churn bulan lalu ikut
+                // terhapus. Akun portal & QR dipulihkan CustomerObserver.
+                app(CustomerWorkflowService::class)->transition($customer, WorkflowTransition::ACTIVE, 'Langganan Lagi');
+
+                if ($customer->customerService) {
+                    $customer->customerService->update(['service_status' => 'aktif']);
+                }
+            }
+
+            // Pelanggan yang Langganan Lagi akan dipasangi modem baru (baik
+            // langsung aktif maupun lewat survey ulang), jadi flag "alat sudah
+            // diambil" dari masa langganan lama dicabut di kedua cabang —
+            // kalau tidak, badge menyesatkan dan tombol Ambil Alat menolak
+            // pemutusan berikutnya ("sudah diambil"). Riwayat pengambilan yang
+            // sudah terjadi TIDAK hilang: ia tersimpan di `device_retrieval_logs`
+            // (tampil di tab Perangkat), bukan di flag ini (ADHOC-88).
+            $customer->customerDevice?->update(['device_retrieved_at' => null]);
+        });
+
+        $message = $deviceAlreadyRetrieved
+            ? 'Pelanggan masuk Antrean Survey untuk pemasangan ulang (alat sebelumnya sudah diambil).'
+            : 'Pelanggan berhasil diaktifkan kembali.';
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * Toggle status layanan pelanggan antara active (aktif) dan suspended (isolir).
+     */
+    public function toggleSuspend(Request $request, Customer $customer): JsonResponse|RedirectResponse
+    {
+        abort_unless(auth()->user()->hasPermission('customers.update'), 403);
+        $this->authorizeCustomerPopScope($customer);
+
+        if (! in_array($customer->status, ['active', 'suspended'], true)) {
+            $msg = 'Layanan hanya dapat diisolir atau diaktifkan untuk pelanggan yang sudah aktif atau terisolir.';
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+
+            return redirect()->back()->with('error', $msg);
+        }
+
+        $isCurrentlyActive = $customer->status === 'active';
+        $newStatus = $isCurrentlyActive ? 'suspended' : 'active';
+        $serviceStatus = $isCurrentlyActive ? 'isolir' : 'aktif';
+        $actionName = $isCurrentlyActive ? 'isolir' : 'aktivasi_kembali';
+        $note = $request->input('note', $isCurrentlyActive ? 'Isolir Layanan' : 'Aktivasi Kembali Layanan');
+
+        DB::transaction(function () use ($customer, $newStatus, $serviceStatus, $actionName, $note) {
+            $oldStatus = $customer->status;
+            $customer->update(['status' => $newStatus]);
 
             if ($customer->customerService) {
-                $customer->customerService->update(['service_status' => 'aktif']);
+                $customer->customerService->update(['service_status' => $serviceStatus]);
             }
 
             AuditLog::create([
                 'user_id' => auth()->id(),
                 'module' => 'customers',
-                'action' => 'reactivate',
+                'action' => $actionName,
                 'auditable_type' => Customer::class,
                 'auditable_id' => $customer->id,
-                'old_values' => ['status' => 'terminated'],
-                'new_values' => ['status' => 'active', 'note' => 'Langganan Lagi'],
+                'old_values' => ['status' => $oldStatus],
+                'new_values' => ['status' => $newStatus, 'note' => $note],
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
                 'created_at' => now(),
             ]);
+
+            CustomerStatusLog::create([
+                'customer_id' => $customer->id,
+                'from_status' => $oldStatus,
+                'to_status' => $newStatus,
+                'changed_by' => auth()->id(),
+                'note' => $note,
+            ]);
         });
 
-        return redirect()->back()->with('success', 'Pelanggan berhasil diaktifkan kembali.');
+        $message = $isCurrentlyActive
+            ? "Layanan pelanggan {$customer->full_name} berhasil diisolir."
+            : "Layanan pelanggan {$customer->full_name} berhasil diaktifkan kembali.";
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'status' => $newStatus,
+                'raw_status' => $newStatus,
+                'status_label' => strtoupper($newStatus === 'suspended' ? 'ISOLIR' : 'ACTIVE'),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 
     /**
@@ -230,11 +369,34 @@ class CustomerController extends Controller
         // jadi memuat SELURUH district di sini sia-sia (dead weight yang meledak
         // saat wilayah bertambah). $cities dipertahankan — top-level, kecil,
         // memang dirender.
-        $packages = InternetPackage::orderBy('name')->get();
+        $user = request()->user();
+        // Restriksi Paket per Role (Skema 1) — lihat InternetPackage::scopeAvailableFor().
+        $packages = InternetPackage::availableFor($user)->orderBy('name')->get();
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
 
-        return view('customers.create', compact('packages', 'cities', 'pops'));
+        // Skema 3 (2026-09-12) — dropdown ID Sales/Agent di form registrasi.
+        // Diganti dari hardcode role code 'sales' (2026-09-12, koreksi user)
+        // jadi berbasis flag `roles.is_package_restricted` — SATU sumber
+        // kebenaran dipakai dua kali: role yang paketnya dibatasi (Skema 1)
+        // otomatis JUGA jadi "role penjual" yang muncul di dropdown ID Sales
+        // & ke-agregasi Dashboard Omset (Skema 2). Kalau nanti Teknisi diberi
+        // akses registrasi pelanggan, dia otomatis ikut tanpa ubah kode ini.
+        $salesUsers = User::whereHas('role', fn ($q) => $q->where('is_package_restricted', true))->orderBy('name')->get();
+        $agents = $user->hasPermission('agents.view') ? Agent::active()->orderBy('name')->get() : collect();
+        // Nama-nama role yang diatur (2026-09-14, permintaan user) — dipakai
+        // blade buat kasih pesan ke actor DI LUAR role itu, jelasin kenapa
+        // ID Sales gak auto-terisi buat dia.
+        $restrictedRoleNames = Role::where('is_package_restricted', true)->pluck('name');
+
+        // Paket yang butuh FAB (Formulir Akan Berlangganan Bisnis) saat
+        // Registrasi — paket berkategori Bisnis (lihat komentar
+        // CustomerRegistrationRequest::rules() kenapa BUKAN restricted_packages).
+        // Dikirim ke JS supaya blok upload FAB cuma muncul begitu paket yang
+        // relevan dipilih; validasi sebenarnya tetap di server.
+        $fabRequiredPackageIds = $packages->filter(fn ($package) => stripos((string) $package->category, 'bisnis') !== false)->pluck('id');
+
+        return view('customers.create', compact('packages', 'cities', 'pops', 'salesUsers', 'agents', 'restrictedRoleNames', 'fabRequiredPackageIds'));
     }
 
     /**
@@ -255,8 +417,31 @@ class CustomerController extends Controller
         // Skip Survey lompat langsung ke antrean Pemasangan — pelanggan gak
         // pernah masuk antrean Survey teknisi maupun ACC Admin sama sekali
         // (lihat blok 5 di bawah yang di-skip kalau $skipSurvey).
-        $validated['status'] = $skipSurvey ? 'waiting_installation' : 'waiting_survey';
+        //
+        // Non-Skip-Survey TIDAK LAGI langsung `waiting_survey` (ADHOC-73,
+        // Verifikasi Registrasi) — berhenti dulu di `registered` sampai
+        // Admin/CS approve di CustomerRegistrationVerificationController,
+        // yang baru memindahkan ke `waiting_survey` + bikin Task/FopTask
+        // Survey. Lihat docs/plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md.
+        $validated['status'] = $skipSurvey ? 'waiting_installation' : 'registered';
         $validated['updated_by'] = auth()->id();
+
+        // Skema 3 (2026-09-12) — ID Sales/Agent/Referral. Actor ber-role
+        // "restricted paket" (lihat komentar di create(), 2026-09-12 —
+        // BUKAN lagi hardcode role code 'sales') TIDAK BOLEH mendaftarkan
+        // pelanggan atas nama orang lain (paksa `sales_user_id` = dirinya
+        // sendiri, abaikan apa pun yang disubmit klien — cegah spoofing
+        // komisi). Role lain (Busdev/admin/owner) pakai nilai dari dropdown
+        // form. `agent_id` cuma berlaku dari actor yang punya akses Master
+        // Agent (Busdev/admin/owner) — Agent gak pernah login, jadi kalau
+        // field ini nyelip dari role lain, abaikan.
+        $user = $request->user();
+        $validated['sales_user_id'] = $user->role?->is_package_restricted
+            ? $user->id
+            : ($validated['sales_user_id'] ?? null);
+        if (! $user->hasPermission('agents.view')) {
+            $validated['agent_id'] = null;
+        }
 
         $statusMapping = [
             'active' => 'aktif',
@@ -280,6 +465,8 @@ class CustomerController extends Controller
         unset($validated['foto_rumah']);
         $fotoKontrak = $request->file('foto_kontrak');
         unset($validated['foto_kontrak']);
+        $fabDocument = $request->file('fab_document');
+        unset($validated['fab_document']);
 
         // Data survey (Skip Survey) — bukan kolom customers, ditangani
         // terpisah di blok 5 lewat CustomerSurvey::create().
@@ -290,12 +477,19 @@ class CustomerController extends Controller
         $requestedInstallationDate = $validated['requested_installation_date'] ?? null;
         unset($validated['survey_photo'], $validated['nearest_odp'], $validated['cable_estimation_meter'], $validated['difficulty_level'], $validated['requested_installation_date']);
 
+        // jenis_kontrak bukan kolom customers — punya customer_services
+        // (contract_type). Cabut dari $validated sebelum Customer::create()
+        // supaya gak diam-diam ke-drop lewat filter Fillable (aman, tapi
+        // membingungkan kalau dibiarkan nebeng).
+        $jenisKontrak = $validated['jenis_kontrak'] ?? null;
+        unset($validated['jenis_kontrak']);
+
         // Generate customer_code via POP sequence generator
         $pop = Pop::findOrFail($validated['pop_id']);
         $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate) {
+        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak, $fabDocument, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate, $jenisKontrak) {
             // Pendaftaran baru lewat UI = orang baru → person baru berdiri sendiri
             // (tanpa legacy_key). Pencarian "mungkin orang yang sama?" saat
             // registrasi adalah pekerjaan gel.2; di sini cukup jaga invarian
@@ -314,6 +508,23 @@ class CustomerController extends Controller
             }
             if (! empty($updates)) {
                 $customer->update($updates);
+            }
+
+            // FAB (Formulir Akan Berlangganan Bisnis) — wajib untuk paket
+            // berkategori Bisnis (lihat CustomerRegistrationRequest::rules()).
+            // Beda dari foto_rumah/foto_kontrak (kolom langsung di customers),
+            // FAB disimpan lewat CustomerDocument (DocumentType::FAB) supaya
+            // konsisten dengan jalur upload dokumen lain di Detail Pelanggan &
+            // gampang ditambah tanpa migrasi kolom baru tiap ada dokumen baru.
+            if ($fabDocument instanceof UploadedFile) {
+                $fabPath = FileUploadService::uploadCustomerRegistrationDoc($fabDocument, $customer, 'fab');
+
+                CustomerDocument::create([
+                    'customer_id' => $customer->id,
+                    'document_type' => DocumentType::FAB->value,
+                    'file_path' => $fabPath,
+                    'uploaded_by' => auth()->id(),
+                ]);
             }
 
             // 2. Create customer address
@@ -354,9 +565,20 @@ class CustomerController extends Controller
                 $ppn = (float) ($validated['tax_percent'] ?? 0.00);
                 $otherFee = (float) ($validated['other_fee'] ?? 0.00);
 
-                // Calculate total bill
+                // Calculate total bill — SENGAJA TIDAK ikutkan $otherFee (2026-09-14).
+                // customer_services.total_monthly_bill wajib murni tagihan bulanan
+                // berulang: GenerateMonthlyInvoicesCommand men-generate Tagihan
+                // Bulanan sungguhan cuma dari monthly_price+discount+ppn, TIDAK
+                // PERNAH baca other_fee sama sekali (lihat komentarnya). other_fee
+                // (materai dkk) cuma sekali di Tagihan Awal/Registrasi —
+                // InitialInvoiceService::calculate() docblock eksplisit: "TIDAK
+                // PERNAH ikut tagihan bulanan". Dulu di sini malah di-fold ke
+                // total_monthly_bill, bikin field itu berbohong soal nominal
+                // tagihan bulanan asli (temuan nyata: CID C1X4ARQ000004). Kolom
+                // other_fee TETAP disimpan (baris di bawah), cuma tidak lagi
+                // menambah total_monthly_bill.
                 $discountedPrice = max(0, $monthlyPrice - $discount);
-                $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
+                $totalBill = $discountedPrice * (1 + $ppn / 100);
 
                 $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
                 $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
@@ -382,6 +604,7 @@ class CustomerController extends Controller
                     'billing_cycle' => 'monthly',
                     'service_status' => $serviceStatus,
                     'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
+                    'contract_type' => $jenisKontrak,
                 ]);
             }
 
@@ -407,14 +630,14 @@ class CustomerController extends Controller
                     $surveyPhotoPath = FileUploadService::uploadSurveyPhoto($surveyPhoto, $customer, 'odp');
                 }
 
-                $note = $difficultyLevel ? ('Tingkat Kesulitan: '.$difficultyLevel) : '';
-                $note .= ($note ? "\n" : '').'Catatan: Diinput oleh Sales saat Registrasi (Skip Survey).';
+                $note = 'Diinput oleh Sales saat Registrasi (Skip Survey).';
 
                 CustomerSurvey::create([
                     'customer_id' => $customer->id,
                     'survey_status' => 'completed',
                     'nearest_odp' => $nearestOdp,
                     'cable_estimation_meter' => $cableEstimationMeter,
+                    'difficulty_level' => $difficultyLevel,
                     // uploadSurveyPhoto('house') di atas nulis ke folder yang sama
                     // persis dipakai Laporan Survey teknisi — path-nya reuse, bukan
                     // upload dobel.
@@ -431,10 +654,8 @@ class CustomerController extends Controller
                 // pernah kepanggil di jalur ini. Bikin manual di sini, samain
                 // dengan blok non-skip di bawah biar antrean Pemasangan tetap
                 // konsisten kebentuk otomatis.
-                $year = date('Y');
-                $count = Task::whereYear('created_at', $year)->count() + 1;
                 Task::create([
-                    'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                    'task_number' => app(NumberSequenceService::class)->taskNumber(),
                     'task_type' => TaskType::PEMASANGAN->value,
                     'title' => 'Pemasangan Baru: '.$customer->full_name,
                     'description' => null,
@@ -446,28 +667,15 @@ class CustomerController extends Controller
                 ]);
 
                 app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::PEMASANGAN);
-            } else {
-                // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey) + FopTask
-                //    anchor-nya. FopTask dibuat di sini, bukan menunggu papan
-                //    /fop-tasks dibuka: dia anchor wajib task_materials &
-                //    task_work_tools, dan tanpa itu isian estimasi material serta
-                //    checklist alat di laporan survey hilang tanpa pesan error.
-                $year = date('Y');
-                $count = Task::whereYear('created_at', $year)->count() + 1;
-                Task::create([
-                    'task_number' => sprintf('TASK-%s-%04d', $year, $count),
-                    'task_type' => TaskType::SURVEY->value,
-                    'title' => 'Survey Calon Pelanggan: '.$customer->full_name,
-                    'description' => null,
-                    'pop_id' => $customer->pop_id,
-                    'customer_id' => $customer->id,
-                    'status' => TaskStatus::PENDING->value,
-                    'created_by' => auth()->id() ?? 1,
-                    'updated_by' => auth()->id() ?? 1,
-                ]);
-
-                app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::SURVEY);
             }
+            // ELSE (non-Skip-Survey): TIDAK bikin Task/FopTask Survey di sini lagi
+            // (ADHOC-73, Verifikasi Registrasi). Pelanggan berhenti dulu di status
+            // `registered` — Task (SURVEY) + FopTask-nya baru kebentuk begitu
+            // Admin/CS approve di CustomerRegistrationVerificationController::
+            // approve(), supaya Task FOP gak kebanjiran entri yang belum
+            // ditinjau siapa pun. Skip Survey TETAP tidak tersentuh (dikonfirmasi
+            // user) — cabang if di atas tetap langsung bikin Task PEMASANGAN.
+            // Lihat docs/plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md.
 
             return $customer;
         });
@@ -529,12 +737,67 @@ class CustomerController extends Controller
         $this->authorizeCustomerPopScope($customer);
 
         // Fase 5.4 — $districts dead weight (form edit pakai cascade async). Buang.
-        $packages = InternetPackage::orderBy('name')->get();
+        $user = request()->user();
+        // Restriksi Paket per Role (Skema 1) — kalau paket pelanggan saat ini
+        // sudah di luar daftar restriksi (data lama), tetap disertakan biar
+        // select tidak diam-diam "mencopot" paket yang sedang dipakai.
+        $packages = InternetPackage::availableFor($user)->orderBy('name')->get();
+        if ($customer->internet_package_id && ! $packages->contains('id', $customer->internet_package_id)) {
+            $current = InternetPackage::find($customer->internet_package_id);
+            if ($current) {
+                $packages->push($current);
+            }
+        }
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
-        $distributions = Distribution::orderBy('code')->get();
+        // Dropdown berantai POP → Mini POP → Distribusi. Dulu Distribusi
+        // memuat SEMUA baris lintas cabang (bocor ke pop_admin cabang lain,
+        // dan tetap pre-select distribusi lama saat pindah POP). Sekarang cuma
+        // Mini POP di bawah Cabang dalam scope user, dan Distribusi di bawah
+        // Mini POP itu — penyaringan per pilihan dilakukan di klien lewat
+        // data-* option, validasi aslinya tetap di update().
+        $miniPops = Pop::where('type', 'mini_pop')
+            ->whereIn('parent_id', $pops->pluck('id'))
+            ->orderBy('name')
+            ->get(['id', 'parent_id', 'name', 'pop_code']);
+        $distributions = Distribution::whereIn('pop_id', $miniPops->pluck('id'))->orderBy('code')->get();
+        // Dropdown Mini POP & Distribusi dikunci kalau pra-pemasangan atau
+        // user tanpa izin atur jaringan — rumus yang sama dengan update().
+        $networkLockReason = $this->networkLockReason($customer, $user);
+        $networkLockMessage = $networkLockReason !== null
+            ? 'Mini POP & Distribusi '.self::NETWORK_LOCK_MESSAGES[$networkLockReason]
+            : null;
 
-        return view('customers.edit', compact('customer', 'packages', 'cities', 'pops', 'distributions'));
+        // Keterangan pindah Cabang di form (ADHOC-107 R4): berapa piutang yang
+        // wajib lunas dulu, dan tagihan bulan berjalan mana yang akan ikut
+        // pindah — supaya admin tahu SEBELUM submit, bukan dari pesan error.
+        $relocationBlocking = CustomerRelocationService::blockingSummary($customer);
+        $relocationMovable = CustomerRelocationService::movableSummary($customer);
+
+        // Skema 3 (2026-09-12) — dropdown ID Sales/Agent di form Detail
+        // Pelanggan. Berbasis `is_package_restricted`, bukan hardcode role
+        // 'sales' — lihat komentar di create().
+        $salesUsers = User::whereHas('role', fn ($q) => $q->where('is_package_restricted', true))->orderBy('name')->get();
+        $agents = $user->hasPermission('agents.view') ? Agent::active()->orderBy('name')->get() : collect();
+        $restrictedRoleNames = Role::where('is_package_restricted', true)->pluck('name');
+
+        // Step 7 (Parameter Teknis) Edit Pelanggan sekarang juga menampilkan &
+        // mengedit detail perangkat/jaringan terstruktur (device_type, SN, WiFi,
+        // ODP/OLT, dst) yang aslinya cuma diisi teknisi lewat Laporan Pemasangan
+        // — lihat CustomerInstallationController::storePemasangan(). Wajib
+        // eager-load: Model::preventLazyLoading() aktif di luar production
+        // (AppServiceProvider), akses $customer->customerDevice tanpa ini
+        // meledak di test & lokal.
+        $customer->load(['customerDevice', 'customerTechnicalDetail']);
+
+        // Nilai awal step 7 = nilai yang tampil di Detail Pelanggan (urutan
+        // cadangan Gudang → customer_devices → detail teknis → kolom lama),
+        // bukan cuma customer_devices — dulu SN pelanggan migrasi (mis. Siti
+        // Juariyah) tampil di Detail tapi kosong di sini. Nilai lama yang
+        // tidak lolos validasi Edit dikembalikan sebagai `hints`, bukan diisi.
+        $devicePrefill = CustomerDeviceProfileService::editPrefill($customer);
+
+        return view('customers.edit', compact('customer', 'packages', 'cities', 'pops', 'miniPops', 'distributions', 'networkLockReason', 'networkLockMessage', 'relocationBlocking', 'relocationMovable', 'devicePrefill', 'salesUsers', 'agents', 'restrictedRoleNames'));
     }
 
     /**
@@ -558,44 +821,224 @@ class CustomerController extends Controller
             'other_fee',
         ));
 
+        // Mini POP & Distribusi terkunci di Edit kalau pelanggan masih
+        // pra-pemasangan ATAU user tidak punya izin atur jaringan — lihat
+        // networkLockReason(). Pakai status di DB, bukan input `status`
+        // (hidden field yang bisa dikirim apa saja).
+        $networkLockReason = $this->networkLockReason($customer, $request->user());
+
+        // Mini POP & Distribusi cuma boleh berubah lewat Edit kalau Cabang
+        // (pop_id) ikut dipindah — keputusan user 2026-09-28. Edit data lain
+        // (nomor HP, alamat, paket, ...) TIDAK menyentuh keduanya: rule
+        // `exclude` membuang field itu dari $validated, jadi
+        // $customer->update($validated) gak pernah menulisnya. Dulu form
+        // selalu mengirim nilai dropdown berantai — pelanggan legacy yang
+        // distribusinya belum di bawah Mini POP kehilangan distribution_id
+        // dan CID-nya dibuat ulang hanya karena admin ganti nomor HP.
+        // Atur Mini POP/Distribusi tanpa pindah Cabang tetap lewat modal
+        // "Atur Mini POP & Distribusi" (CustomerNetworkAssignmentController).
+        $popChanging = (int) $request->input('pop_id') !== (int) $customer->pop_id;
+
+        // Layanan yang sudah pernah ditagih TIDAK boleh dilepas dari Edit —
+        // paket kosong dulu berarti customer_services dihapus, dan FK
+        // invoices ikut menyapu seluruh tagihan + pembayaran pelanggan
+        // (keputusan user 2026-09-28). Sekarang paket jadi wajib; melepas
+        // layanan cuma boleh untuk calon pelanggan yang belum pernah ditagih.
+        $serviceHasInvoices = $customer->customerService
+            && Invoice::where('customer_service_id', $customer->customerService->id)->exists();
+
         $validated = $request->validate([
             'full_name' => 'required|string|max:150',
             'identity_number' => 'nullable|string|max:50',
             'gender' => 'nullable|string|max:20',
             'primary_phone' => 'required|string|max:20',
             'alternative_phone' => 'nullable|string|max:20',
+            'npwp' => 'nullable|string|max:30',
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
-            'pop_id' => 'required|exists:pops,id',
-            'distribution_id' => 'nullable|exists:distributions,id',
+            'pop_id' => [
+                'required',
+                'exists:pops,id',
+                // Pindah POP cuma ke Cabang dalam scope user — dropdown sudah
+                // difilter Pop::forUser(), tapi PUT langsung ke endpoint bisa
+                // mengirim pop_id cabang mana pun (larangan RBAC #3).
+                function ($attribute, $value, $fail) use ($customer) {
+                    if ((int) $value === (int) $customer->pop_id) {
+                        return;
+                    }
+
+                    if (! Pop::forUser()->where('type', 'cabang')->whereKey($value)->exists()) {
+                        $fail('POP tujuan berada di luar akses Anda.');
+
+                        return;
+                    }
+
+                    // REQ ID (customer_code) permanen saat pindah POP, dan
+                    // unik per (pop_id, customer_code) — tanpa cek ini
+                    // tabrakan di POP tujuan meledak jadi QueryException 500.
+                    $bentrok = Customer::where('pop_id', $value)
+                        ->where('customer_code', $customer->customer_code)
+                        ->whereKeyNot($customer->id)
+                        ->exists();
+                    if ($bentrok) {
+                        $fail("REQ ID {$customer->customer_code} sudah dipakai pelanggan lain di POP tujuan.");
+
+                        return;
+                    }
+
+                    // Pindah Cabang wajib lunas PIUTANG dulu (keputusan user
+                    // 2026-09-28, K6/K8): tunggakan bulan-bulan sebelumnya
+                    // dan tagihan yang sudah dicicil sebagian. Tagihan bulan
+                    // berjalan yang belum dibayar sama sekali ikut pindah
+                    // (CustomerObserver::updated()). Aturan lengkap &
+                    // satu-satunya definisi: CustomerRelocationService.
+                    // CustomerObserver::updating() menegakkan aturan yang sama
+                    // sebagai lapis kedua untuk jalur di luar form ini.
+                    $summary = CustomerRelocationService::blockingSummary($customer);
+                    if ($summary['count'] > 0) {
+                        $fail(CustomerRelocationService::blockingMessage($summary));
+                    }
+                },
+            ],
+            // Mini POP & Distribusi — aturan hierarki satu sumber
+            // (NetworkAssignmentService::miniPopBelongsToPop()/
+            // distributionBelongsToMiniPop()), sama dengan modal staf, API, dan
+            // CustomerObserver::updating(). Pilihan yang tidak cocok DITOLAK,
+            // bukan dikosongkan diam-diam, supaya admin tahu harus memilih
+            // ulang. Kalau terkunci (pra-pemasangan / tanpa izin atur
+            // jaringan), cuma boleh dikosongkan: Mini POP & Distribusi cabang
+            // lama dilepas observer, yang baru diatur lewat modal oleh
+            // pemegang izin.
+            'mini_pop_id' => ! $popChanging ? ['exclude'] : [
+                'nullable',
+                'exists:pops,id',
+                function ($attribute, $value, $fail) use ($request, $networkLockReason) {
+                    if ($networkLockReason !== null) {
+                        $fail('Mini POP '.self::NETWORK_LOCK_MESSAGES[$networkLockReason]);
+
+                        return;
+                    }
+                    if (! NetworkAssignmentService::miniPopBelongsToPop($value, $request->input('pop_id'))) {
+                        $fail('Mini POP yang dipilih bukan milik POP Cabang ini.');
+                    }
+                },
+            ],
+            'distribution_id' => ! $popChanging ? ['exclude'] : [
+                'nullable',
+                'exists:distributions,id',
+                function ($attribute, $value, $fail) use ($request, $networkLockReason) {
+                    if ($networkLockReason !== null) {
+                        $fail('Distribusi '.self::NETWORK_LOCK_MESSAGES[$networkLockReason]);
+
+                        return;
+                    }
+                    $miniPopId = $request->input('mini_pop_id');
+                    if (! $miniPopId) {
+                        $fail('Pilih Mini POP dulu sebelum memilih Distribusi.');
+
+                        return;
+                    }
+                    if (! NetworkAssignmentService::distributionBelongsToMiniPop($value, $miniPopId)) {
+                        $fail('Distribusi yang dipilih bukan milik Mini POP ini.');
+                    }
+                },
+            ],
             'address' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'city_id' => 'nullable|exists:cities,id',
             'district_id' => 'nullable|exists:districts,id',
             'village_id' => 'nullable|exists:villages,id',
-            'internet_package_id' => 'nullable|exists:internet_packages,id',
+            'internet_package_id' => [
+                $serviceHasInvoices ? 'required' : 'nullable',
+                'exists:internet_packages,id',
+                // Restriksi Paket per Role (Skema 1) — sama seperti
+                // CustomerRegistrationRequest, lihat komentar di sana.
+                function ($attribute, $value, $fail) use ($request) {
+                    // Fail-open selama restricted_packages masih kosong sama
+                    // sekali — lihat InternetPackage::scopeAvailableFor().
+                    if ($value && $request->user()?->role?->is_package_restricted
+                        && RestrictedPackage::query()->exists()
+                        && ! RestrictedPackage::where('package_id', $value)->exists()) {
+                        $fail('Paket yang dipilih tidak termasuk daftar paket yang diizinkan untuk role Anda.');
+                    }
+                },
+            ],
             'contract_period_months' => 'nullable|integer|min:1',
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
             'other_fee' => 'nullable|numeric|min:0',
+            // jenis_kontrak — sama seperti Registrasi, gak pernah divalidasi
+            // sebelum ini (2026-09-12) meski inputnya sudah ada di form
+            // Registrasi. Simpan ke customer_services.contract_type.
+            'jenis_kontrak' => 'nullable|string|in:sewa,beli',
 
-            // Referrals
+            // Referrals — kolom lama (varchar) dipertahankan (data lama),
+            // FK baru (Skema 3) di bawah.
             'sales_code' => 'nullable|string|max:30',
             'agent_code' => 'nullable|string|max:30',
             'referral_customer_code' => 'nullable|string|max:30',
+            'sales_user_id' => 'nullable|exists:users,id',
+            'agent_id' => 'nullable|exists:agents,id',
+            'referral_customer_id' => ['nullable', 'exists:customers,id', Rule::notIn([$customer->id])],
 
-            // Technical specs
-            'ont_sn' => 'nullable|string|max:100',
-            'odp_code' => 'nullable|string|max:50',
-            'olt_code' => 'nullable|string|max:50',
-            'vlan_id' => 'nullable|string|max:20',
+            // ont_sn/odp_code/olt_code/vlan_id (kolom ringan legacy di tabel
+            // customers) SENGAJA DICABUT dari validasi (2026-09-12, atas
+            // permintaan user) — Edit Pelanggan sudah punya penggantinya yang
+            // lebih lengkap: Informasi Perangkat Aktif + Distribusi Jaringan
+            // Detail di bawah (customer_devices/customer_technical_details).
+            // Kalau rule-nya dibiarkan 'nullable' di sini padahal formnya
+            // sudah gak kirim field itu sama sekali, Laravel tetap masukin
+            // key-nya ke $validated sebagai null (rule ada = key ikut
+            // divalidasi walau absen) — $customer->update($validated) lalu
+            // diam-diam nge-null-in kolom lama itu tiap kali Edit disimpan.
+            // Kolom customers-nya SENDIRI tidak dihapus (data lama/import
+            // tetap ada), cuma jalur tulis dari Edit yang dicabut.
+
+            // Detail perangkat & distribusi jaringan TERSTRUKTUR (2026-09-12) —
+            // field yang sama persis dengan Laporan Pemasangan
+            // (CustomerInstallationController::storePemasangan()), ditulis ke
+            // customer_devices & customer_technical_details. SEMUA nullable:
+            // beda dari alur teknisi (wifi_ssid/odp_number dkk wajib di sana
+            // karena syarat gerbang Aktivasi), di sini cuma koreksi data admin
+            // — gak ada gerbang workflow yang perlu ditegakkan.
+            'device_type' => 'nullable|string|in:modem,ont,onu,router,other',
+            'brand' => 'nullable|string|max:100',
+            'model' => 'nullable|string|max:100',
+            'serial_number' => 'nullable|string|max:100',
+            'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
+            'connection_mode' => 'nullable|string|in:bridge,router,pppoe,static,dhcp,other',
+            'pppoe_username' => 'nullable|string|max:150',
+            'pppoe_password' => 'nullable|string|max:150',
+            'wifi_ssid' => 'nullable|string|max:150',
+            'wifi_password' => 'nullable|string|max:150',
+            'odp_number' => 'nullable|string|max:100',
+            'odp_port' => 'nullable|string|max:50',
+            'olt_number' => 'nullable|string|max:50',
+            'olt_slot' => 'nullable|string|max:20',
+            'olt_port' => 'nullable|string|max:50',
+            'vlan' => 'nullable|string|max:20',
+            'router_number' => 'nullable|string|max:50',
+            'initial_attenuation' => 'nullable|numeric',
 
             // Status
             'status' => 'required|string|max:50',
         ]);
 
         $validated['updated_by'] = auth()->id();
+
+        // Skema 3 (2026-09-12) — sama seperti store(): actor ber-role
+        // restricted paket gak boleh pindahkan sales_user_id pelanggan ke
+        // orang lain (berbasis `is_package_restricted`, bukan hardcode
+        // 'sales' — lihat komentar create()), dan agent_id cuma berlaku
+        // dari actor ber-akses Master Agent.
+        $actor = $request->user();
+        if ($actor->role?->is_package_restricted) {
+            $validated['sales_user_id'] = $actor->id;
+        }
+        if (! $actor->hasPermission('agents.view')) {
+            unset($validated['agent_id']);
+        }
 
         $statusMapping = [
             'active' => 'aktif',
@@ -639,121 +1082,178 @@ class CustomerController extends Controller
             $validated['foto_kontrak'] = FileUploadService::uploadInstallationPhoto($request->file('foto_kontrak'), $customer, 'kontrak');
         }
 
-        DB::transaction(function () use ($customer, $validated, $serviceStatus) {
-            // 1. Update customer record
-            $customer->update($validated);
+        try {
+            DB::transaction(function () use ($customer, $validated, $serviceStatus) {
+                // 1. Update customer record. CID ikut dibuat ulang di sini oleh
+                // CustomerObserver::updating() kalau POP/Mini POP/Distribusi
+                // berubah atau CID masih kosong (ADHOC-107 R3) — controller tidak
+                // menghitung CID sendiri lagi.
+                $customer->update($validated);
 
-            // 1b. Auto-generate / update CID berdasarkan status pelanggan
-            // Sesuai spesifikasi-pop-distribusi-cid.md:
-            // - Status active/suspended: generate CID lengkap jika ada distribusi,
-            //   atau set ke format C00RQ###### jika belum ada distribusi
-            // - Status terminated: hapus cid (kembali tampilkan REQ ID murni)
-            $newStatus = strtolower((string) ($validated['status'] ?? ''));
-            $pop = $customer->pop;
-
-            if ($pop && in_array($newStatus, ['active', 'suspended'], true)) {
-                $distribution = $customer->distribution;
-                if ($distribution) {
-                    // Ada distribusi → generate CID lengkap
-                    $customer->load(['village', 'customerTechnicalDetail']);
-                    $newCid = $pop->generateComplexCid($customer, $distribution);
-                } else {
-                    // Belum ada distribusi → format default C00RQ######
-                    $reqId = $pop->extractBareRegistrationId($customer->customer_code);
-                    $newCid = sprintf('%s00%s', $pop->cid_prefix, $reqId);
+                // 1a. Update device & detail teknis terstruktur (2026-09-12) — field
+                // ini SEBELUMNYA cuma bisa ditulis teknisi lewat Laporan Pemasangan
+                // (CustomerInstallationController::storePemasangan()); sekarang Edit
+                // Pelanggan juga jadi penulis kedua ke customer_devices &
+                // customer_technical_details. SADAR risikonya: dua controller nulis
+                // ke tabel yang sama — kalau nanti field ini perlu ditarik lagi jadi
+                // read-only di sini, baca balik diskusi di riwayat task ini dulu.
+                // Field yang TIDAK dikirim sama sekali tidak disentuh — dulu
+                // `$validated[...] ?? null` menyamakan "tidak dikirim" dengan
+                // "dikosongkan", jadi request yang tidak lengkap menghapus SN,
+                // PPPoE, nomor OLT (bahan CID), dst. Field yang dikirim kosong
+                // tetap mengosongkan (ConvertEmptyStringsToNull → null tapi
+                // key-nya ada), jadi admin masih bisa sengaja mengosongkan.
+                $deviceFields = [
+                    'device_type' => $validated['device_type'] ?? null,
+                    'brand' => $validated['brand'] ?? null,
+                    'model' => $validated['model'] ?? null,
+                    'serial_number' => $validated['serial_number'] ?? null,
+                    'mac_address' => $validated['mac_address'] ?? null,
+                    'wifi_ssid' => $validated['wifi_ssid'] ?? null,
+                    'wifi_password' => $validated['wifi_password'] ?? null,
+                    'connection_mode' => $validated['connection_mode'] ?? null,
+                    'pppoe_username' => $validated['pppoe_username'] ?? null,
+                    'pppoe_password' => $validated['pppoe_password'] ?? null,
+                ];
+                // updateOrCreate cuma nulis kolom yang disebutkan — kolom lain milik
+                // baris ini (ip_address, technical_note, dst) tidak tersentuh. Baris
+                // baru cuma dibuat kalau ADA isian ATAU barisnya sudah ada (biar admin
+                // tetap bisa mengosongkan field yang sudah pernah diisi teknisi).
+                $deviceFields = array_intersect_key($deviceFields, $validated);
+                $deviceExists = CustomerDevice::where('customer_id', $customer->id)->exists();
+                // `customer_devices.device_type` NOT NULL tanpa default — jenis
+                // kosong TIDAK PERNAH ditulis. Perangkat yang sudah ada: jenis
+                // lama dipertahankan (dulu memilih "Belum diisi" = error 500).
+                // Perangkat baru dari data lain (SN/MAC/PPPoE diisi tanpa
+                // jenis): jadi "other" (Lainnya), bukan tebakan ONT/Router.
+                if ($deviceExists && array_key_exists('device_type', $deviceFields) && blank($deviceFields['device_type'])) {
+                    unset($deviceFields['device_type']);
+                } elseif (! $deviceExists && array_filter($deviceFields) && blank($deviceFields['device_type'] ?? null)) {
+                    $deviceFields['device_type'] = 'other';
+                }
+                if ($deviceFields !== [] && (array_filter($deviceFields) || $deviceExists)) {
+                    $customer->customerDevice()->updateOrCreate(['customer_id' => $customer->id], $deviceFields);
                 }
 
-                if ($customer->cid !== $newCid) {
-                    $customer->updateQuietly(['cid' => $newCid]);
-                }
-            } elseif ($newStatus === 'terminated') {
-                // Terminate: cid tidak lagi aktif, tapi simpan sebagai histori (jangan hapus)
-                // Display akan dikembalikan ke REQ ID murni via display_id accessor
-                // Tidak perlu update kolom cid
-            }
-
-            // 2. Update address record
-            $cityName = null;
-            if (! empty($validated['city_id'])) {
-                $cityName = City::where('id', $validated['city_id'])->value('name');
-            }
-            $districtName = null;
-            if (! empty($validated['district_id'])) {
-                $districtName = District::where('id', $validated['district_id'])->value('name');
-            }
-            $villageName = null;
-            if (! empty($validated['village_id'])) {
-                $villageName = Village::where('id', $validated['village_id'])->value('name');
-            }
-
-            $customer->customerAddress()->updateOrCreate([], [
-                'full_address' => $validated['address'] ?? null,
-                'province' => 'Jawa Timur',
-                'city' => $cityName,
-                'district' => $districtName,
-                'village' => $villageName,
-                'city_id' => $validated['city_id'] ?? null,
-                'district_id' => $validated['district_id'] ?? null,
-                'village_id' => $validated['village_id'] ?? null,
-                'latitude' => $validated['latitude'] ?? null,
-                'longitude' => $validated['longitude'] ?? null,
-                'house_photo' => $validated['foto_rumah'] ?? null,
-                'contract_photo' => $validated['foto_kontrak'] ?? null,
-            ]);
-
-            // 3. Update customer service
-            if (! empty($validated['internet_package_id'])) {
-                $package = InternetPackage::findOrFail($validated['internet_package_id']);
-
-                $monthlyPrice = (float) $package->monthly_price;
-                $discount = (float) ($validated['discount_amount'] ?? 0.00);
-                $ppn = (float) ($validated['tax_percent'] ?? 0.00);
-                $otherFee = (float) ($validated['other_fee'] ?? 0.00);
-
-                // Calculate total bill
-                $discountedPrice = max(0, $monthlyPrice - $discount);
-                $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
-
-                $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
-                $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
-
-                $activationDate = $validated['registration_date'] ?? null;
-                $dueDate = null;
-                if ($activationDate) {
-                    $dueDate = Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
+                $technicalFields = [
+                    'odp_number' => $validated['odp_number'] ?? null,
+                    'odp_port' => $validated['odp_port'] ?? null,
+                    'olt_number' => $validated['olt_number'] ?? null,
+                    'olt_slot' => $validated['olt_slot'] ?? null,
+                    'olt_port' => $validated['olt_port'] ?? null,
+                    'vlan' => $validated['vlan'] ?? null,
+                    'router_number' => $validated['router_number'] ?? null,
+                    'initial_attenuation' => $validated['initial_attenuation'] ?? null,
+                ];
+                $technicalFields = array_intersect_key($technicalFields, $validated);
+                if ($technicalFields !== [] && (array_filter($technicalFields) || CustomerTechnicalDetail::where('customer_id', $customer->id)->exists())) {
+                    $customer->customerTechnicalDetail()->updateOrCreate(['customer_id' => $customer->id], $technicalFields);
                 }
 
-                $customer->customerService()->updateOrCreate([], [
-                    'internet_package_id' => $package->id,
-                    'package_name_snapshot' => $package->name,
-                    'download_speed_snapshot' => $downLabel,
-                    'upload_speed_snapshot' => $upLabel,
-                    'monthly_price' => $monthlyPrice,
-                    'discount' => $discount,
-                    'ppn' => $ppn,
-                    'other_fee' => $otherFee,
-                    'total_monthly_bill' => $totalBill,
-                    'activation_date' => $activationDate,
-                    'due_date' => $dueDate,
-                    'billing_cycle' => 'monthly',
-                    'service_status' => $serviceStatus,
-                    'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
+                // 2. Update address record
+                $cityName = null;
+                if (! empty($validated['city_id'])) {
+                    $cityName = City::where('id', $validated['city_id'])->value('name');
+                }
+                $districtName = null;
+                if (! empty($validated['district_id'])) {
+                    $districtName = District::where('id', $validated['district_id'])->value('name');
+                }
+                $villageName = null;
+                if (! empty($validated['village_id'])) {
+                    $villageName = Village::where('id', $validated['village_id'])->value('name');
+                }
+
+                $customer->customerAddress()->updateOrCreate([], [
+                    'full_address' => $validated['address'] ?? null,
+                    'province' => 'Jawa Timur',
+                    'city' => $cityName,
+                    'district' => $districtName,
+                    'village' => $villageName,
+                    'city_id' => $validated['city_id'] ?? null,
+                    'district_id' => $validated['district_id'] ?? null,
+                    'village_id' => $validated['village_id'] ?? null,
+                    'latitude' => $validated['latitude'] ?? null,
+                    'longitude' => $validated['longitude'] ?? null,
+                    'house_photo' => $validated['foto_rumah'] ?? null,
+                    'contract_photo' => $validated['foto_kontrak'] ?? null,
                 ]);
-            } else {
-                $customer->customerService()->delete();
-            }
 
-            // 4. Evaluate data completeness via service and flash warning to user
-            $customer->load('customerService');
-            /** @var CustomerValidationService $validationService */
-            $validationService = app(CustomerValidationService::class);
-            $completenessResult = $validationService->validate($customer);
+                // 3. Update customer service
+                if (! empty($validated['internet_package_id'])) {
+                    $package = InternetPackage::findOrFail($validated['internet_package_id']);
 
-            if (! empty($completenessResult['missing_required'])) {
-                $missingLabels = array_values($completenessResult['missing_required']);
-                session()->flash('warning', 'Data pelanggan berhasil diperbarui dengan status "'.ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])).'", tetapi masih memerlukan data berikut agar Lengkap: '.implode(', ', $missingLabels));
-            }
-        });
+                    $monthlyPrice = (float) $package->monthly_price;
+                    $discount = (float) ($validated['discount_amount'] ?? 0.00);
+                    $ppn = (float) ($validated['tax_percent'] ?? 0.00);
+                    $otherFee = (float) ($validated['other_fee'] ?? 0.00);
+
+                    // Calculate total bill — SENGAJA TIDAK ikutkan $otherFee (2026-09-14).
+                    // customer_services.total_monthly_bill wajib murni tagihan bulanan
+                    // berulang: GenerateMonthlyInvoicesCommand men-generate Tagihan
+                    // Bulanan sungguhan cuma dari monthly_price+discount+ppn, TIDAK
+                    // PERNAH baca other_fee sama sekali (lihat komentarnya). other_fee
+                    // (materai dkk) cuma sekali di Tagihan Awal/Registrasi —
+                    // InitialInvoiceService::calculate() docblock eksplisit: "TIDAK
+                    // PERNAH ikut tagihan bulanan". Dulu di sini malah di-fold ke
+                    // total_monthly_bill, bikin field itu berbohong soal nominal
+                    // tagihan bulanan asli (temuan nyata: CID C1X4ARQ000004). Kolom
+                    // other_fee TETAP disimpan (baris di bawah), cuma tidak lagi
+                    // menambah total_monthly_bill.
+                    $discountedPrice = max(0, $monthlyPrice - $discount);
+                    $totalBill = $discountedPrice * (1 + $ppn / 100);
+
+                    $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
+                    $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
+
+                    $activationDate = $validated['registration_date'] ?? null;
+                    $dueDate = null;
+                    if ($activationDate) {
+                        $dueDate = Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
+                    }
+
+                    $customer->customerService()->updateOrCreate([], [
+                        'internet_package_id' => $package->id,
+                        'package_name_snapshot' => $package->name,
+                        'download_speed_snapshot' => $downLabel,
+                        'upload_speed_snapshot' => $upLabel,
+                        'monthly_price' => $monthlyPrice,
+                        'discount' => $discount,
+                        'ppn' => $ppn,
+                        'other_fee' => $otherFee,
+                        'total_monthly_bill' => $totalBill,
+                        'activation_date' => $activationDate,
+                        'due_date' => $dueDate,
+                        'billing_cycle' => 'monthly',
+                        'service_status' => $serviceStatus,
+                        'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
+                        'contract_type' => $validated['jenis_kontrak'] ?? null,
+                    ]);
+                } elseif (! $customer->customerService || ! Invoice::where('customer_service_id', $customer->customerService->id)->exists()) {
+                    // Jaring kedua di bawah rule `required` di atas — layanan yang
+                    // punya tagihan tidak pernah dihapus dari sini (FK invoices
+                    // juga restrictOnDelete sejak 2026-09-28).
+                    $customer->customerService()->delete();
+                }
+
+                // 4. Evaluate data completeness via service and flash warning to user
+                $customer->load('customerService');
+                /** @var CustomerValidationService $validationService */
+                $validationService = app(CustomerValidationService::class);
+                $completenessResult = $validationService->validate($customer);
+
+                if (! empty($completenessResult['missing_required'])) {
+                    $missingLabels = array_values($completenessResult['missing_required']);
+                    session()->flash('warning', 'Data pelanggan berhasil diperbarui dengan status "'.ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])).'", tetapi masih memerlukan data berikut agar Lengkap: '.implode(', ', $missingLabels));
+                }
+            });
+        } catch (CustomerRelocationBlockedException $e) {
+            // Lapis kedua guard pindah Cabang (CustomerObserver::updating())
+            // menolak — mis. tagihan terbit di antara validasi dan simpan.
+            // Transaksi sudah di-rollback; tampilkan sebagai error validasi,
+            // bukan halaman 500.
+            return back()->withErrors(['pop_id' => $e->getMessage()])->withInput();
+        }
 
         foreach ($originalFiles as $field => $path) {
             if ($path && $path !== ($validated[$field] ?? null)) {
@@ -771,12 +1271,53 @@ class CustomerController extends Controller
     }
 
     /**
+     * Akhiran pesan kunci Mini POP/Distribusi di Edit, per alasan kunci.
+     */
+    private const NETWORK_LOCK_MESSAGES = [
+        'status' => 'baru bisa diatur setelah pemasangan dimulai. Sebelum itu cuma POP Cabang yang boleh dipilih.',
+        'permission' => 'cuma bisa diatur oleh pengguna yang berhak mengatur jaringan pelanggan. Pindah Cabang tetap bisa; Mini POP & Distribusi cabang baru diatur lewat "Atur Mini POP & Distribusi" di Detail Pelanggan.',
+    ];
+
+    /**
+     * Kenapa Mini POP/Distribusi di Edit terkunci — null kalau tidak terkunci.
+     * Satu rumus untuk edit() (tampilan) dan update() (validasi).
+     *
+     * - 'status': pelanggan pra-pemasangan (NetworkAssignmentService::
+     *   BLOCKED_STATUSES) — belum ada dasar teknis menentukan OLT/Distribusi
+     *   (keputusan user 2026-09-26).
+     * - 'permission': user tidak punya `customers.detail.installation.validate`,
+     *   permission yang sama dengan modal "Atur Mini POP & Distribusi". Tanpa
+     *   ini, Edit (cukup `customers.update`) jadi pintu belakang untuk
+     *   mengubah OLT/ODP & CID pelanggan (ADHOC-107 T2/R2).
+     */
+    private function networkLockReason(Customer $customer, ?User $user): ?string
+    {
+        if (in_array($customer->status, NetworkAssignmentService::BLOCKED_STATUSES, true)) {
+            return 'status';
+        }
+
+        if (! $user?->hasPermission('customers.detail.installation.validate')) {
+            return 'permission';
+        }
+
+        return null;
+    }
+
+    /**
      * Remove the specified customer from storage.
      */
     public function destroy(Customer $customer)
     {
         abort_unless(auth()->user()->hasPermission('customers.delete'), 403);
         $this->authorizeCustomerPopScope($customer);
+
+        // Pelanggan yang punya riwayat tagihan/pembayaran tidak boleh dihapus
+        // (hard delete) — FK-nya restrictOnDelete sejak 2026-09-28, dicek di
+        // sini supaya admin dapat pesan jelas, bukan error 500. Pelanggan
+        // seperti ini diputus langganan (terminated), bukan dihapus.
+        if (Invoice::where('customer_id', $customer->id)->exists() || Payment::where('customer_id', $customer->id)->exists()) {
+            return redirect()->back()->with('error', 'Pelanggan ini punya riwayat tagihan/pembayaran sehingga tidak bisa dihapus. Gunakan Putus Langganan.');
+        }
 
         DB::transaction(function () use ($customer) {
             $customer->delete();
@@ -785,7 +1326,7 @@ class CustomerController extends Controller
         return redirect()->back()->with('success', 'Data pelanggan berhasil dihapus!');
     }
 
-    public function show(Customer $customer)
+    public function show(Customer $customer, BillingPeriodWaiverService $waiverService)
     {
         if (! $customer->exists) {
             $customer = Customer::findOrFail(request()->route('customer'));
@@ -883,9 +1424,26 @@ class CustomerController extends Controller
         $latestInstallation = $customer->installations()->latest('id')->first();
         $service = $customer->customerService;
 
-        $surveyDate = $latestSurvey?->end_date ?? $latestSurvey?->survey_date;
-        $installationDate = $latestInstallation?->finished_date ?? $latestInstallation?->scheduled_date;
+        $latestSurveyTask = $customer->tasks()
+            ->where('task_type', TaskType::SURVEY->value)
+            ->with(['updater', 'teamMembers.user'])
+            ->latest('id')
+            ->first();
+
+        $latestInstallTask = $customer->tasks()
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->with(['teamMembers.user', 'fop'])
+            ->latest('id')
+            ->first();
+
+        $surveyDate = $latestSurvey?->end_date ?? $latestSurvey?->survey_date ?? ($latestSurveyTask?->scheduled_at ? Carbon::parse($latestSurveyTask->scheduled_at)->toDateString() : null);
+        $installationDate = $latestInstallation?->finished_date ?? $latestInstallation?->scheduled_date ?? ($latestInstallTask?->scheduled_at ? Carbon::parse($latestInstallTask->scheduled_at)->toDateString() : null);
         $activationDate = $service?->activation_date;
+
+        $adminFilterDate = $service?->admin_filter_at
+            ?? ($latestSurveyTask?->fop_review_status === 'approved' ? $latestSurveyTask->updated_at : null);
+        $adminFilterPic = $service?->admin_filter_by_name
+            ?? ($latestSurveyTask?->fop_review_status === 'approved' ? $latestSurveyTask->updater?->name : null);
 
         $timeline = [
             [
@@ -908,8 +1466,19 @@ class CustomerController extends Controller
                     : ($statusRank == 2 || $latestSurvey ? 'current' : 'pending'),
             ],
             [
+                'step' => 'Review Admin',
+                'title' => 'Verifikasi Hasil Survey (ACC)',
+                'date' => $adminFilterDate ? IndonesianDate::date($adminFilterDate) : '-',
+                'notes' => $adminFilterPic
+                    ? 'Disetujui oleh '.$adminFilterPic
+                    : ($status === 'waiting_acc' ? 'Menunggu ACC / verifikasi Admin' : ($statusRank >= 4 ? 'Survey disetujui (ACC)' : 'Menunggu hasil survey')),
+                'status' => $statusRank >= 4 || $adminFilterDate
+                    ? 'completed'
+                    : ($status === 'waiting_acc' || ($latestSurvey && $latestSurvey->survey_status === 'completed') ? 'current' : 'pending'),
+            ],
+            [
                 'step' => 'Pemasangan',
-                'title' => 'Penarikan Kabel & Pemasangan ONT',
+                'title' => 'Penarikan Kabel & ONT',
                 'date' => $installationDate ? IndonesianDate::date($installationDate) : '-',
                 'notes' => $latestInstallation
                     ? 'SN ONT: '.($customer->ont_sn ?: '-')
@@ -917,7 +1486,7 @@ class CustomerController extends Controller
                     : ($statusRank == 4 ? 'Teknisi sedang melakukan penarikan kabel dropcore.' : 'Belum ada laporan pemasangan.'),
                 'status' => $latestInstallation && $latestInstallation->installation_status === 'completed'
                     ? 'completed'
-                    : ($latestInstallation ? 'current' : 'pending'),
+                    : ($latestInstallation || $statusRank == 4 ? 'current' : 'pending'),
             ],
             [
                 'step' => 'Aktivasi Billing',
@@ -941,12 +1510,6 @@ class CustomerController extends Controller
                 'no' => 1,
                 'title' => 'Registrasi & Input Pelanggan',
                 'subtitle' => 'Pendaftaran Awal Data Pelanggan',
-                // Pelanggan hasil migrasi legacy: $customer->created_at &
-                // creator selalu mencatat SAAT IMPORT dijalankan (wall clock +
-                // admin yang jalanin command), bukan kapan/siapa yang beneran
-                // mendaftarkan pelanggan itu di sistem lama. registration_date
-                // & registered_by_name (diisi khusus dari jalur migrasi) yang
-                // jadi sumber kebenaran kalau ada.
                 'at' => $customer->registered_by_name ? $regDate : $customer->created_at,
                 'date_fallback' => IndonesianDate::date($regDate),
                 'pic' => $customer->registered_by_name ?? $customer->creator?->name,
@@ -955,11 +1518,11 @@ class CustomerController extends Controller
             ],
             [
                 'no' => 2,
-                'title' => 'Survey Lokasi & Jalur Optik',
+                'title' => 'Survey Lokasi',
                 'subtitle' => 'Pemeriksaan Jalur & ODP',
-                'at' => $latestSurvey?->assigned_at,
+                'at' => $latestSurvey?->assigned_at ?? ($latestSurveyTask?->scheduled_at ? Carbon::parse($latestSurveyTask->scheduled_at) : null),
                 'date_fallback' => $surveyDate ? IndonesianDate::date($surveyDate) : null,
-                'pic' => $latestSurvey?->technician?->name ?? $latestSurvey?->surveyors,
+                'pic' => $latestSurvey?->technician?->name ?? ($latestSurvey?->surveyors ?? ($latestSurveyTask?->teamMembers?->first()?->user?->name ?? null)),
                 'pic_role' => $latestSurvey?->technician?->role?->name ?? 'Surveyor FOP',
                 'accent' => 'indigo',
             ],
@@ -967,19 +1530,19 @@ class CustomerController extends Controller
                 'no' => 3,
                 'title' => 'Review & Filter Admin',
                 'subtitle' => 'Verifikasi Hasil Survey (ACC)',
-                'at' => $service?->admin_filter_at,
+                'at' => $adminFilterDate,
                 'date_fallback' => null,
-                'pic' => $service?->admin_filter_by_name,
+                'pic' => $adminFilterPic,
                 'pic_role' => 'Admin POP',
                 'accent' => 'amber',
             ],
             [
                 'no' => 4,
-                'title' => 'Proses Pemasangan Perangkat & FO',
-                'subtitle' => 'Penarikan Dropcore & ONT',
-                'at' => $latestInstallation?->assigned_at,
+                'title' => 'Proses Pemasangan Perangkat',
+                'subtitle' => 'Penarikan Dropcore & Pemasangan ONT',
+                'at' => $latestInstallation?->assigned_at ?? ($latestInstallTask?->scheduled_at ? Carbon::parse($latestInstallTask->scheduled_at) : null),
                 'date_fallback' => $installationDate ? IndonesianDate::date($installationDate) : null,
-                'pic' => $latestInstallation?->technician?->name ?? $latestInstallation?->technicians,
+                'pic' => $latestInstallation?->technician?->name ?? ($latestInstallation?->technicians ?? ($latestInstallTask?->teamMembers?->first()?->user?->name ?? null)),
                 'pic_role' => $latestInstallation?->technician?->role?->name ?? 'Teknisi FOP',
                 'accent' => 'purple',
             ],
@@ -1079,6 +1642,40 @@ class CustomerController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // Dropdown "Ganti Paket" di tab Paket & Layanan (CustomerPackageController).
+        $availablePackages = InternetPackage::orderBy('name')->get(['id', 'name', 'monthly_price', 'download_speed_mbps', 'upload_speed_mbps']);
+
+        // Dropdown alasan Putus Langganan (ADHOC-69) + eligibilitas denda
+        // (masa langganan <=1 tahun, dihitung server, sama dengan
+        // CustomerTerminationService — form cuma menampilkan field denda
+        // kalau eligible, guard sebenarnya tetap di Service).
+        $terminationReasons = CustomerTerminationReason::active()->orderBy('name')->get();
+        $terminationPenaltyEligible = $activationDate === null
+            || now()->lessThanOrEqualTo(Carbon::parse($activationDate)->addYear());
+
+        // ADHOC-87 (disederhanakan 2026-09-24) — dropdown periode tagihan
+        // buat aksi "Cuti Berlangganan / Bebaskan Tagihan", SATU-SATUNYA
+        // pintu ke BillingPeriodWaiverService sekarang (form Request Putus
+        // Langganan tidak lagi bawa periode). Dihitung juga untuk pelanggan
+        // `terminated` — aksi ini sengaja tetap dibuka setelah putus (G6),
+        // buat bersihin tagihan yang kelupaan dibebaskan sebelum putus resmi.
+        $leaveWaiverPeriods = collect();
+        if ($customer->customerService && in_array($customer->status, ['active', 'suspended', 'terminated'], true)) {
+            $leaveWaiverPeriods = $waiverService->eligiblePeriods($customer, BillingWaiverSource::LEAVE);
+        }
+        $activeBillingWaivers = $customer->billingWaivers()->with(['invoice', 'creator'])->latest()->get();
+
+        // Saldo Pelanggan (ADHOC-92) — kartu ringkasan + riwayat ledger di tab
+        // Billing. `customer_balance.view` permission SENGAJA tidak menggerbang
+        // variabel ini (dihitung selalu) — gerbangnya di Blade (`@can`), sama
+        // pola field sensitif lain di halaman ini.
+        $customerBalance = app(CustomerBalanceService::class)->balance($customer);
+        $customerBalanceMutations = CustomerBalanceMutation::where('customer_id', $customer->id)
+            ->with(['payment.invoice', 'creator'])
+            ->latest()
+            ->limit(15)
+            ->get();
+
         return view('customers.show', compact(
             'customer',
             'displayId',
@@ -1094,7 +1691,14 @@ class CustomerController extends Controller
             'customerTickets',
             'customerFopTasks',
             'availableMiniPops',
-            'availableDistributions'
+            'availableDistributions',
+            'availablePackages',
+            'terminationReasons',
+            'terminationPenaltyEligible',
+            'leaveWaiverPeriods',
+            'activeBillingWaivers',
+            'customerBalance',
+            'customerBalanceMutations'
         ));
     }
 
@@ -1144,9 +1748,11 @@ class CustomerController extends Controller
             ->latest('issue_date')
             ->first();
 
-        // Hitung total piutang (sum dari remaining_amount semua invoice yang belum lunas)
+        // Total piutang = sisa tagihan belum lunas dari periode SEBELUM bulan
+        // berjalan. Tagihan bulan ini yang belum dibayar bukan piutang (due_date
+        // tanggal 10 cuma label UI) — lihat Invoice::scopePiutang().
         $totalPiutang = $customer->invoices()
-            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
+            ->piutang()
             ->sum('remaining_amount');
 
         // Recent payments (3 pembayaran terakhir)
@@ -1202,6 +1808,15 @@ class CustomerController extends Controller
                 ]];
             });
 
+        $customerBalance = app(CustomerBalanceService::class)->balance($customer);
+        $availableCollectors = User::query()
+            ->whereHas('role', fn ($q) => $q->where('name', 'kolektor')->orWhere('code', 'kolektor'))
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $deviceProfile = CustomerDeviceProfileService::resolve($customer);
+
         return response()->json([
             'invoice_id' => $latestInvoice ? $latestInvoice->id : null,
             // Target POST form "Catat Pembayaran" di Quick Hub. Dikirim SERVER-SIDE,
@@ -1217,16 +1832,33 @@ class CustomerController extends Controller
             'total_piutang' => (float) $totalPiutang,
             'billing_period' => $latestInvoice ? $latestInvoice->billing_period : null,
             'due_date' => $latestInvoice && $latestInvoice->due_date ? $latestInvoice->due_date->format('d/m/Y') : null,
+            'customer_balance' => (float) $customerBalance,
+            'available_collectors' => $availableCollectors,
+            // Dropdown rekening tujuan metode Transfer (ADHOC-95).
+            'available_bank_accounts' => BankAccount::activeOptions(),
             'technical' => [
-                'pppoe_username' => $service?->pppoe_username ?? '-',
-                'onu_sn' => $device?->onu_sn ?? $device?->mac_address ?? '-',
-                'router_sn' => $device?->router_sn ?? '-',
-                'device_brand' => $device?->device_brand ?? '-',
+                'pppoe_username' => $deviceProfile['device']?->pppoe_username ?: ($service?->pppoe_username ?: ($customer->pppoe_username ?? '-')),
+                // K2 (ADHOC-107): PPPoE tidak diubah otomatis saat CID berubah,
+                // cukup diberi peringatan supaya NOC menyesuaikan di Mikrotik.
+                'pppoe_warning' => CustomerCidService::pppoeMismatchWarning($customer, $deviceProfile['device']?->pppoe_username ?: ($service?->pppoe_username ?: $customer->pppoe_username)),
+                'vlan' => (string) ($deviceProfile['vlanId'] ?? '-'),
+                'bandwidth' => $customer->internetPackage?->speed_mbps ? $customer->internetPackage->speed_mbps.' Mbps' : ($service?->download_speed_snapshot ? $service->download_speed_snapshot.' Mbps' : '-'),
+                'onu_sn' => $deviceProfile['serialNumber'] ?: ($deviceProfile['macAddress'] ?: '-'),
+                'router_sn' => $deviceProfile['brandModel'] ?: ($deviceProfile['macAddress'] ?: '-'),
+                'brand_model' => $deviceProfile['brandModel'] ?: '-',
+                'mac_address' => $deviceProfile['macAddress'] ?: '-',
                 'contract_type' => match ($service?->contract_type) {
                     'sewa' => 'Sewa', 'beli' => 'Beli', default => '-'
                 },
-                'distribution' => $customer->distribution?->name ?? '-',
+                'distribution' => $deviceProfile['odpCode'] ?: ($customer->distribution?->name ?? '-'),
                 'pop_name' => $customer->pop?->name ?? '-',
+                // Redaman — ambil Aktual dulu (hasil pemasangan/maintenance
+                // terakhir), fallback ke Awal kalau belum ada ukuran ulang.
+                'attenuation' => $customer->customerTechnicalDetail?->actual_attenuation !== null
+                    ? $customer->customerTechnicalDetail->actual_attenuation.' dBm'
+                    : ($customer->customerTechnicalDetail?->initial_attenuation !== null
+                        ? $customer->customerTechnicalDetail->initial_attenuation.' dBm'
+                        : '-'),
             ],
             'location' => [
                 'latitude' => $lat ?? '',
@@ -2442,11 +3074,13 @@ class CustomerController extends Controller
                     ];
 
                     // Generate CID if active or suspended
-                    if (in_array($serviceStatus, ['active', 'suspended'], true)) {
-                        $pop = $customer->pop;
-                        $distribution = $customer->distribution;
-                        if ($pop) {
-                            $updateData['cid'] = $pop->generateComplexCid($customer, $distribution);
+                    // Rumus satu pintu (CustomerCidService, ADHOC-107 R3).
+                    // updateQuietly() di bawah melewati CustomerObserver,
+                    // jadi CID wajib dihitung eksplisit di sini.
+                    if (in_array($serviceStatus, CustomerCidService::CID_STATUSES, true)) {
+                        $cid = CustomerCidService::resolve($customer);
+                        if ($cid !== null) {
+                            $updateData['cid'] = $cid;
                         }
                     }
 
@@ -3193,7 +3827,8 @@ class CustomerController extends Controller
             'cash' => 'cash',
             'transfer' => 'transfer',
             'bank_transfer' => 'transfer',
-            'qris' => 'qris',
+            // 'qris' DIHAPUS dari PaymentMethod (2026-09-22) — legacy 'qris'
+            // sekarang jatuh ke fallback 'lainnya' di bawah.
         ][$normalized] ?? 'lainnya';
     }
 
@@ -3323,11 +3958,11 @@ class CustomerController extends Controller
 
         // Load relasi teknis dan distribusi untuk generate CID kompleks
         $customer->loadMissing(['customerTechnicalDetail', 'distribution', 'village']);
-        DB::transaction(function () use ($customer, $service, $pop) {
-            // Generate CID kompleks: {pop.cid_prefix}{olt_number}{dist_code}{customer_code}_{village}_{name}
-            // Contoh: D2X6CRQ001296_MANGKUJAYAN_DYAHGALUH
-            $distribution = $customer->distribution;
-            $cid = $pop->generateComplexCid($customer, $distribution);
+        DB::transaction(function () use ($customer, $service) {
+            // CID lewat rumus satu pintu (CustomerCidService, ADHOC-107 R3):
+            // {cid_prefix}{segmen Mini POP}{kode Distribusi}{REQ ID}.
+            // cid_prefix sudah dipastikan terisi di atas, jadi resolve() tidak null.
+            $cid = CustomerCidService::resolve($customer) ?? $customer->cid;
 
             $oldValues = [
                 'cid' => $customer->cid,
@@ -3394,156 +4029,29 @@ class CustomerController extends Controller
     }
 
     /**
-     * S5-T003 — Buat Tagihan Manual
-     * Handle POST request to create a manual invoice for a customer.
+     * Skema 3 (2026-09-12) — autocomplete "ID Referral Pelanggan" di form
+     * registrasi/edit. Cari pelanggan existing by CID/nama/customer_code,
+     * dipakai buat isi `referral_customer_id`. Gerbang permission sama
+     * dengan form yang memuatnya (customers.create|customers.update).
      */
-    public function storeManualInvoice(Request $request, Customer $customer)
+    public function searchReferral(Request $request): JsonResponse
     {
-        if (! $customer->exists) {
-            $customer = Customer::findOrFail($request->route('customer'));
+        $q = trim((string) $request->query('q', ''));
+
+        if ($q === '') {
+            return response()->json([]);
         }
 
-        // 1. Authorization checks
-        if (! auth()->user()->hasPermission('invoices.create')) {
-            abort(403, 'Anda tidak memiliki akses untuk membuat tagihan.');
-        }
+        $customers = Customer::query()
+            ->where(function ($query) use ($q) {
+                $query->where('full_name', 'like', "%{$q}%")
+                    ->orWhere('cid', 'like', "%{$q}%")
+                    ->orWhere('customer_code', 'like', "%{$q}%");
+            })
+            ->orderBy('full_name')
+            ->limit(15)
+            ->get(['id', 'customer_code', 'full_name']);
 
-        // Scope check for user's assigned POPs
-        if (! Customer::query()->applyUserScope()->where('id', $customer->id)->exists()) {
-            abort(403, 'Anda tidak memiliki akses ke data pelanggan di POP ini.');
-        }
-
-        // 2. Validate request
-        // Nominal prorata & biaya tambahan diketik berformat ribuan.
-        $request->merge(RupiahInput::parseKeys(
-            $request->only(['prorate_amount', 'extra_cable_fee', 'extra_installation_fee', 'extra_pole_fee']),
-            'prorate_amount',
-            'extra_cable_fee',
-            'extra_installation_fee',
-            'extra_pole_fee',
-        ));
-
-        $validated = $request->validate([
-            'billing_period' => 'required|date_format:Y-m',
-            'issue_date' => 'required|date',
-            'due_date' => 'required|date|after_or_equal:issue_date',
-            'invoice_type' => ['required', Rule::enum(InvoiceType::class)],
-            'prorate_amount' => 'nullable|numeric|min:0',
-            'extra_cable_fee' => 'nullable|numeric|min:0',
-            'extra_installation_fee' => 'nullable|numeric|min:0',
-            'extra_pole_fee' => 'nullable|numeric|min:0',
-        ]);
-
-        $billingPeriod = $validated['billing_period'];
-        $issueDate = $validated['issue_date'];
-        $dueDate = $validated['due_date'];
-        $invoiceType = InvoiceType::from($validated['invoice_type']);
-        $prorateAmount = (float) ($validated['prorate_amount'] ?? 0);
-        $extraCableFee = (float) ($validated['extra_cable_fee'] ?? 0);
-        $extraInstallationFee = (float) ($validated['extra_installation_fee'] ?? 0);
-        $extraPoleFee = (float) ($validated['extra_pole_fee'] ?? 0);
-
-        // 3. Business logic checks
-        // Cek pelanggan aktif/siap billing
-        if (! in_array($customer->status, ['active', 'suspended']) && $customer->data_completeness_status !== 'siap_billing') {
-            return redirect()->back()->withErrors(['error' => 'Tagihan hanya bisa dibuat untuk pelanggan dengan status aktif atau siap billing.']);
-        }
-
-        $service = $customer->customerService;
-        if (! $service) {
-            return redirect()->back()->withErrors(['error' => 'Pelanggan tidak memiliki layanan aktif.']);
-        }
-
-        // Cek invoice dobel untuk periode + jenis tagihan yang sama (bukan
-        // seluruh periode, karena AWAL dan BULANAN sah muncul bersamaan di
-        // periode yang sama — misal saat reaktivasi).
-        $exists = Invoice::where('customer_id', $customer->id)
-            ->where('billing_period', $billingPeriod)
-            ->where('invoice_type', $invoiceType->value)
-            ->exists();
-
-        if ($exists) {
-            return redirect()->back()->withErrors(['billing_period' => "Tagihan {$invoiceType->label()} untuk periode {$billingPeriod} sudah pernah dibuat untuk pelanggan ini."]);
-        }
-
-        // 4. Generate invoice number sequentially (e.g., format INV-YYYYMM-[counter] where counter increment is locked for update)
-        $periodCode = str_replace('-', '', $billingPeriod);
-
-        $invoice = DB::transaction(function () use (
-            $customer, $service, $billingPeriod, $issueDate, $dueDate, $periodCode, $invoiceType,
-            $prorateAmount, $extraCableFee, $extraInstallationFee, $extraPoleFee
-        ) {
-            $lastInvoice = Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
-                ->orderBy('invoice_number', 'desc')
-                ->lockForUpdate()
-                ->first();
-
-            $nextSeq = 1;
-            if ($lastInvoice) {
-                $parts = explode('-', $lastInvoice->invoice_number);
-                if (count($parts) === 3) {
-                    $nextSeq = ((int) $parts[2]) + 1;
-                }
-            }
-            $invoiceNumber = sprintf('INV-%s-%04d', $periodCode, $nextSeq);
-
-            // Rincian biaya dari service snapshot
-            $subtotal = (float) $service->monthly_price;
-            $discount = (float) ($service->discount ?? 0.00);
-            $ppnPercent = (float) ($service->ppn ?? 0.00);
-
-            // Hitung PPN dari (subtotal - discount) × rate
-            $afterDiscount = max(0, $subtotal - $discount);
-            $ppnAmount = round($afterDiscount * ($ppnPercent / 100), 2);
-            $nettMonthly = $afterDiscount + $ppnAmount;
-
-            // Total = tagihan bulanan nett + semua biaya tambahan
-            $totalAmount = $nettMonthly + $prorateAmount + $extraCableFee + $extraInstallationFee + $extraPoleFee;
-            $paidAmount = 0.00;
-            $remainingAmount = $totalAmount;
-
-            $newInvoice = Invoice::create([
-                'invoice_number' => $invoiceNumber,
-                'invoice_type' => $invoiceType->value,
-                'customer_id' => $customer->id,
-                'pop_id' => $customer->pop_id,
-                'customer_service_id' => $service->id,
-                'internet_package_id' => $service->internet_package_id,
-                'billing_period' => $billingPeriod,
-                'issue_date' => $issueDate,
-                'due_date' => $dueDate,
-                'subtotal' => $subtotal,
-                'discount' => $discount,
-                'ppn' => $ppnPercent,
-                'prorate_amount' => $prorateAmount > 0 ? $prorateAmount : null,
-                'extra_cable_fee' => $extraCableFee > 0 ? $extraCableFee : null,
-                'extra_installation_fee' => $extraInstallationFee > 0 ? $extraInstallationFee : null,
-                'extra_pole_fee' => $extraPoleFee > 0 ? $extraPoleFee : null,
-                'total_amount' => $totalAmount,
-                'paid_amount' => $paidAmount,
-                'remaining_amount' => $remainingAmount,
-                'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
-                'created_by' => auth()->id(),
-            ]);
-
-            // Save changes to audit log (Sprint 8: audit_logs)
-            AuditLog::create([
-                'user_id' => auth()->id(),
-                'module' => 'Tagihan',
-                'action' => 'create',
-                'auditable_type' => get_class($newInvoice),
-                'auditable_id' => $newInvoice->id,
-                'old_values' => null,
-                'new_values' => $newInvoice->toArray(),
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-                'created_at' => now(),
-            ]);
-
-            return $newInvoice;
-        });
-
-        return $this->redirectToCustomer($customer)
-            ->with('success', "Tagihan manual dengan nomor {$invoice->invoice_number} berhasil dibuat!");
+        return response()->json($customers);
     }
 }

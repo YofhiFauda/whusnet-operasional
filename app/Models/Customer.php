@@ -38,6 +38,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'status',
     'rejected_at',
     'terminated_at',
+    'termination_reason_id',
+    'termination_note',
     'address',
     'latitude',
     'longitude',
@@ -51,6 +53,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'sales_code',
     'agent_code',
     'referral_customer_code',
+    'sales_user_id',
+    'agent_id',
+    'referral_customer_id',
     'ont_sn',
     'odp_code',
     'olt_code',
@@ -59,6 +64,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'foto_kontrak',
     'created_by',
     'updated_by',
+    'pending_initial_invoice',
 ])]
 class Customer extends Model
 {
@@ -81,6 +87,10 @@ class Customer extends Model
             'rejected_at' => 'datetime',
             'terminated_at' => 'datetime',
             'gender' => Gender::class,
+            // Snapshot Invoice AWAL yang belum terbit (kategori Bisnis,
+            // nunggu BD) — lihat migration
+            // add_pending_initial_invoice_to_customers_table.
+            'pending_initial_invoice' => 'array',
         ];
     }
 
@@ -114,6 +124,61 @@ class Customer extends Model
     public function internetPackage(): BelongsTo
     {
         return $this->belongsTo(InternetPackage::class, 'internet_package_id');
+    }
+
+    /**
+     * Sales (User berrole sales) yang mendaftarkan pelanggan ini — FK asli
+     * sejak Skema 3 (2026-09-12), dipakai untuk agregasi omset Busdev.
+     * `sales_code` (varchar) tetap ada sebagai fallback tampilan data lama.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function salesUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_user_id');
+    }
+
+    /**
+     * Agent (master data, bukan akun login) yang mendaftarkan pelanggan ini
+     * atas bantuan Business Development.
+     *
+     * @return BelongsTo<Agent, $this>
+     */
+    public function agent(): BelongsTo
+    {
+        return $this->belongsTo(Agent::class);
+    }
+
+    /**
+     * Alasan Putus Langganan (ADHOC-69) — klasifikasi master, sumber utama
+     * kolom Alasan di List Putus (menggantikan baca AuditLog.new_values).
+     *
+     * @return BelongsTo<CustomerTerminationReason, $this>
+     */
+    public function terminationReason(): BelongsTo
+    {
+        return $this->belongsTo(CustomerTerminationReason::class, 'termination_reason_id');
+    }
+
+    /**
+     * Riwayat pembebasan tagihan periode (ADHOC-87) — Request Putus
+     * Langganan / Cuti Berlangganan.
+     *
+     * @return HasMany<CustomerBillingWaiver, $this>
+     */
+    public function billingWaivers(): HasMany
+    {
+        return $this->hasMany(CustomerBillingWaiver::class);
+    }
+
+    /**
+     * Pelanggan existing sumber referral — self-referential.
+     *
+     * @return BelongsTo<Customer, $this>
+     */
+    public function referralCustomer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'referral_customer_id');
     }
 
     /**
@@ -212,6 +277,65 @@ class Customer extends Model
     }
 
     /**
+     * Baris modul Customer Acquisition (dipakai tim Busdev) — cuma ada
+     * kalau pelanggan ini pernah diverifikasi admin (WorkflowTransition
+     * ACTIVE). Dibuat sekali oleh CustomerObserver.
+     */
+    public function customerAcquisition(): HasOne
+    {
+        return $this->hasOne(CustomerAcquisition::class);
+    }
+
+    /**
+     * Kategori paket pelanggan ini — dipakai di dua tempat yang perlu tau
+     * "kategori paket ini butuh validasi Business Development (BD) atau
+     * tidak" SEBELUM baris `CustomerAcquisition` sempat ada:
+     * `CustomerVerificationController::finalVerify()` (nentuin ACTIVE
+     * langsung atau nyangkut di WAITING_BUSINESS_DEVELOPMENT_VERIFICATION
+     * dulu) dan `BusinessDevelopmentVerificationController` (antrean BD).
+     * Butuh `customerService.internetPackage` sudah di-eager-load — pola
+     * sama `CustomerAcquisition::packageCategory()`.
+     */
+    public function packageCategory(): ?PackageCategory
+    {
+        $categoryName = $this->customerService?->internetPackage?->category;
+
+        if (! $categoryName) {
+            return null;
+        }
+
+        static $cache = [];
+
+        return $cache[$categoryName] ??= PackageCategory::with('installationFeeApprovalRole')->where('name', $categoryName)->first();
+    }
+
+    public function needsBusdevInstallationFeeVerification(): bool
+    {
+        return (bool) $this->packageCategory()?->needsInstallationFeeValidation();
+    }
+
+    /**
+     * Gerbang aksi "Verifikasi & Aktifkan" di
+     * `/business-development-verifications` — pola identik
+     * `CustomerAcquisition::canBeValidatedBy()` (dua jalur: override
+     * permission via Role Matrix, atau role user cocok dengan yang dipilih
+     * admin di Master Kategori Paket). Duplikasi kecil disengaja: dua model
+     * beda siklus hidup (sebelum vs sesudah baris CustomerAcquisition ada),
+     * memaksakan satu sumber lewat relasi/trait di titik ini menambah
+     * coupling yang tidak sepadan buat ~10 baris logic.
+     */
+    public function canInstallationFeeBeValidatedBy(User $user): bool
+    {
+        if ($user->hasPermission('customer_acquisitions.installation_fee.update')) {
+            return true;
+        }
+
+        $requiredRole = $this->packageCategory()?->installationFeeApprovalRole;
+
+        return $requiredRole !== null && $user->role_id === $requiredRole->id;
+    }
+
+    /**
      * @return HasMany<Invoice, $this>
      */
     public function invoices(): HasMany
@@ -246,6 +370,18 @@ class Customer extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Ledger Saldo Pelanggan (ADHOC-92) — dipakai `billing:apply-balance`
+     * buat menyaring pelanggan yang PERNAH punya mutasi, sebelum menghitung
+     * saldo berjalannya lewat CustomerBalanceService::balance().
+     *
+     * @return HasMany<CustomerBalanceMutation, $this>
+     */
+    public function customerBalanceMutations(): HasMany
+    {
+        return $this->hasMany(CustomerBalanceMutation::class);
     }
 
     /**
@@ -303,6 +439,17 @@ class Customer extends Model
     public function qrTokens(): HasMany
     {
         return $this->hasMany(CustomerQrToken::class);
+    }
+
+    /**
+     * Unit SERIALIZED yang terpasang di pelanggan ini (ADHOC-54) — cuma
+     * traceability, BUKAN sumber kebenaran device terpasang. Sumber kebenaran
+     * tetap `customerTechnicalDetail` (SN modem, ODP, dst) — lihat §29.3
+     * warehouse_inventory_asset_traceability_analysis.md.
+     */
+    public function inventorySerials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class);
     }
 
     /**
@@ -373,6 +520,17 @@ class Customer extends Model
     }
 
     /**
+     * Riwayat pengambilan modem dari pelanggan ini (ADHOC-88). Tetap utuh
+     * walau `customer_devices.device_retrieved_at` direset saat Langganan Lagi.
+     *
+     * @return HasMany<DeviceRetrievalLog, $this>
+     */
+    public function deviceRetrievalLogs(): HasMany
+    {
+        return $this->hasMany(DeviceRetrievalLog::class)->orderByDesc('retrieved_at');
+    }
+
+    /**
      * @return HasOne<CustomerTechnicalDetail, $this>
      */
     public function customerTechnicalDetail(): HasOne
@@ -409,9 +567,22 @@ class Customer extends Model
         $this->unsetRelation('customerService');
         $this->unsetRelation('customerAddress');
 
+        // validate() me-loadMissing relasi (customerDevice, detail teknis, ...)
+        // ke instance INI. Kalau dibiarkan, relasi yang saat itu belum ada
+        // tercache `null` — kode yang membuat device sesudah save lalu membaca
+        // $customer->customerDevice dapat null basi (ketahuan 2026-09-28 lewat
+        // 8 test DEAC yang gagal). Relasi yang di-load di sini dilepas lagi,
+        // yang sudah ter-load sebelumnya dibiarkan.
+        $loadedBefore = array_keys($this->getRelations());
+
         /** @var CustomerValidationService $service */
         $service = app(CustomerValidationService::class);
         $result = $service->validate($this);
+
+        foreach (array_diff(array_keys($this->getRelations()), $loadedBefore) as $relation) {
+            $this->unsetRelation($relation);
+        }
+
         $newStatus = $result['completeness_status'];
 
         if ($this->data_completeness_status !== $newStatus) {

@@ -446,4 +446,49 @@ class FopTasksTest extends TestCase
         $this->assertStringNotContainsString($taskC->task_number, $tableSection, 'Task C seharusnya gak nongol di baris tabel karena kefilter team_id.');
         $response->assertSee('"task_number":"'.$taskC->task_number.'"', false);
     }
+
+    public function test_technicians_availability_returns_correct_workload_and_teams(): void
+    {
+        $targetDate = now()->addDays(2)->format('Y-m-d');
+
+        // Create task for technician1 on targetDate
+        $task = FopTask::create([
+            'task_number' => 'TFOP-2026-9999',
+            'task_date' => $targetDate.' 10:00:00',
+            'category' => 'MTN',
+            'tugas' => 'Perbaikan ODP',
+            'village_id' => $this->village->id,
+            'pop_id' => $this->pop->id,
+            'issue' => 'Redaman tinggi',
+            'status' => 'terjadwal',
+            'priority' => 'Medium',
+        ]);
+        $task->technicians()->sync([$this->technician1->id]);
+
+        $response = $this->actingAs($this->fopUser)->getJson(route('fop-tasks.technicians-availability', [
+            'date' => $targetDate,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'date',
+            'technicians' => [
+                '*' => ['id', 'name', 'task_count', 'status_label', 'status_level', 'tasks'],
+            ],
+            'teams',
+            'summary' => ['total', 'free', 'medium', 'busy'],
+        ]);
+
+        $data = $response->json();
+        $this->assertEquals($targetDate, $data['date']);
+
+        $tech1 = collect($data['technicians'])->firstWhere('id', $this->technician1->id);
+        $tech2 = collect($data['technicians'])->firstWhere('id', $this->technician2->id);
+
+        $this->assertNotNull($tech1);
+        $this->assertNotNull($tech2);
+        $this->assertEquals(1, $tech1['task_count']);
+        $this->assertEquals(0, $tech2['task_count']);
+        $this->assertEquals('free', $tech2['status_level']);
+    }
 }

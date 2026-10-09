@@ -123,7 +123,7 @@ Arsip kwitansi. **Dokumen, bukan uang** — tak satu pun kolom di sini memengaru
 | `original_filename`, `path`, `mime_type`, `size_bytes` | | `path` di disk **`local`** (privat) — menunjuk LEMBAR yang diunggah. Satu lembar bisa memuat 8 kwitansi, jadi berkas ini arsip kertasnya, bukan "kwitansi pelanggan X". Kwitansi satuan dirender ulang dari data, tidak disimpan |
 | `checksum` | string(64) | SHA-256 isi berkas yang diunggah. Dipakai `store()` mengenali unggahan ulang. **Unique-nya komposit `(checksum, payment_id)`**, bukan `checksum` sendirian — lihat di bawah |
 | `status` | string, **indexed** | `ReceiptStatus` |
-| `match_method` | string, nullable | `ReceiptMatchMethod` — `teks` / `qr` / `ocr` / `manual` |
+| `match_method` | string, nullable | `ReceiptMatchMethod` — `teks` / `qr` / `manual` |
 | `detected_number` | string, nullable | nomor yang terbaca, disimpan juga saat `MISMATCH` untuk penelusuran |
 | `attempts` | tinyint | percobaan baca otomatis; batasnya `PaymentReceiptService::MAX_ATTEMPTS`, dan `MatchPaymentReceipt::$tries` mengambil angka dari konstanta yang sama |
 | `last_error` | text, nullable | alasan gagal — dibedakan antara "tak terbaca" dan kegagalan teknis |
@@ -217,8 +217,6 @@ Model `CollectorDeposit` dan `CollectorVisit` dua-duanya `use HasPopScope` — q
 | Kunci | Default | Berkas |
 |---|---|---|
 | `billing.collector_due_window_days` | `7` (env `COLLECTOR_DUE_WINDOW_DAYS`) | `config/billing.php` |
-| `services.gemini.key` | **kosong** (env `GEMINI_API_KEY`) | `config/services.php` — OCR cadangan; kosong = mati, dan itu normal |
-| `services.gemini.model` | `gemini-2.0-flash` | idem |
 
 ### Dependency yang ditambahkan Fase 4
 

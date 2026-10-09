@@ -332,7 +332,7 @@ unset($__errorArgs, $__bag); ?>
 
                             <div>
                                 <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Registrasi <span class="text-rose-500">*</span></label>
-                                <input type="date" name="registration_date" id="registration_date" value="<?php echo e(old('registration_date', now()->format('Y-m-d'))); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['registration_date'];
+                                <input type="date" name="registration_date" id="registration_date" value="<?php echo e(old('registration_date', today()->format('Y-m-d'))); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['registration_date'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -631,7 +631,8 @@ endif;
 unset($__errorArgs, $__bag); ?>
                             </div>
 
-                            <!-- Foto Rumah -->
+                            <!-- Foto Rumah — cuma ada & wajib di Skip Survey (tidak ada di jalur
+                                 registrasi biasa). Validasi: CustomerRegistrationRequest::rules(). -->
                             <div class="border-2 border-dashed <?php $__errorArgs = ['foto_rumah'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -695,7 +696,7 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_rumah')">
+                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" class="hidden" onchange="onFileChange('foto_rumah')">
                                     <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Foto Rumah
                                     </label>
@@ -777,7 +778,7 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP Terpilih</span>
                                 </div>
                                 <div class="mt-2">
-                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')">
+                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" class="hidden" onchange="onFileChange('survey_photo')">
                                     <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
                                         Pilih Foto ODP
                                     </label>
@@ -808,7 +809,7 @@ unset($__errorArgs, $__bag); ?>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div class="md:col-span-2">
                                 <label for="internet_package_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Paket Internet <span class="text-rose-500">*</span></label>
-                                <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown()" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['internet_package_id'];
+                                <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown(); toggleFabRequirement();" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['internet_package_id'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -829,6 +830,91 @@ if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
 $message = $__bag->first($__errorArgs[0]); ?>
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <!-- FAB (Formulir Akan Berlangganan Bisnis) — cuma muncul kalau
+                                 kategori paket yang dipilih adalah kategori Bisnis. Toggle
+                                 murni bantuan UX; validasi wajib sebenarnya di server
+                                 (CustomerRegistrationRequest::rules() -> fab_document). -->
+                            <div id="fab-document-wrapper" class="md:col-span-2 border-2 border-dashed <?php $__errorArgs = ['fab_document'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 bg-rose-50/20 <?php else: ?> border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-900/10 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm" style="display: none;">
+                                <div id="default-placeholder-fab_document" class="py-4 space-y-2">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg border border-amber-200 dark:border-amber-800">
+                                        <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'file-text','class' => 'w-4 h-4']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'file-text','class' => 'w-4 h-4']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
+<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
+<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
+<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
+<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
+<?php endif; ?>
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FAB — FORMULIR AKAN BERLANGGANAN BISNIS <span class="text-rose-500">*</span></span>
+                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib untuk paket yang divalidasi Business Development (JPG, PNG, PDF)</span>
+                                </div>
+                                <div id="preview-container-fab_document" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                    <div class="relative inline-block w-full">
+                                        <img id="preview-img-fab_document" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview FAB">
+                                        <button type="button" onclick="clearFile('fab_document')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                            <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'x','class' => 'w-3 h-3']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'x','class' => 'w-3 h-3']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
+<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
+<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
+<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
+<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
+<?php endif; ?>
+                                        </button>
+                                    </div>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ FAB Terpilih</span>
+                                </div>
+                                <div class="mt-2">
+                                    <input type="file" name="fab_document" id="fab_document" accept="image/*,application/pdf" class="hidden" onchange="onFileChange('fab_document')">
+                                    <label for="fab_document" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                        Pilih Berkas FAB
+                                    </label>
+                                    <span id="file-label-fab_document" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                </div>
+                                <?php $__errorArgs = ['fab_document'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2"><?php echo e($message); ?></p>
                                 <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
@@ -951,6 +1037,70 @@ unset($__errorArgs, $__bag); ?>
                             </div>
                         </div>
 
+                        <!-- Skema 3 (2026-09-12) — ID Sales/Agent/Referral wajib
+                             terisi SAAT REGISTRASI (dulu cuma ada di halaman edit,
+                             jadi sering kelewat & data komisi hilang). -->
+                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3 pt-2">
+                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">3. INFORMASI REFERRAL &amp; AKUISISI</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Menentukan komisi Sales/Agent — isi sesuai siapa yang mendaftarkan pelanggan ini</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div>
+                                <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Sales</label>
+                                
+                                <?php if(auth()->user()->role?->is_package_restricted): ?>
+                                    <input type="text" value="<?php echo e(auth()->user()->name); ?> (Anda)" disabled
+                                           class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                    <input type="hidden" name="sales_user_id" value="<?php echo e(auth()->id()); ?>">
+                                <?php else: ?>
+                                    
+                                    <p class="text-[10px] text-amber-600 dark:text-amber-400 mb-1.5">
+                                        Auto-deteksi ID Sales cuma berlaku untuk role
+                                        <span class="font-semibold"><?php echo e($restrictedRoleNames->implode(', ') ?: '(belum ada role diatur)'); ?></span>.
+                                        Role Anda (<?php echo e(auth()->user()->role?->name ?? '—'); ?>) di luar itu — pilih manual di bawah.
+                                    </p>
+                                    <select name="sales_user_id" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                        <option value="">— Tidak ada —</option>
+                                        <?php $__currentLoopData = $salesUsers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $salesUser): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <option value="<?php echo e($salesUser->id); ?>" <?php echo e(old('sales_user_id') == $salesUser->id ? 'selected' : ''); ?>><?php echo e($salesUser->name); ?></option>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </select>
+                                <?php endif; ?>
+                                <?php $__errorArgs = ['sales_user_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p><?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <?php if($agents->isNotEmpty()): ?>
+                            <div>
+                                <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ID Agent</label>
+                                <select name="agent_id" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="">— Tidak ada —</option>
+                                    <?php $__currentLoopData = $agents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $agent): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($agent->id); ?>" <?php echo e(old('agent_id') == $agent->id ? 'selected' : ''); ?>><?php echo e($agent->code); ?> — <?php echo e($agent->name); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                                <?php $__errorArgs = ['agent_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?><p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p><?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+                            <?php endif; ?>
+
+                            
+                            
+                        </div>
+
                     </div>
 
                 </div>
@@ -1043,6 +1193,30 @@ unset($__errorArgs, $__bag); ?>
 
 <?php $__env->startSection('scripts'); ?>
 <script>
+    /* Skema 3 (2026-09-12) — autocomplete ID Referral Pelanggan, cari
+       pelanggan existing lewat CID/nama. Nol dependency baru (vanilla fetch
+       + Alpine yang sudah dibundel), pola sama komponen Alpine lain di app. */
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('referralSearch', () => ({
+            query: '',
+            results: [],
+            selectedId: '<?php echo e(old('referral_customer_id')); ?>',
+            async search() {
+                if (this.query.length < 2) {
+                    this.results = [];
+                    return;
+                }
+                const res = await fetch(`<?php echo e(route('customers.search-referral')); ?>?q=${encodeURIComponent(this.query)}`);
+                this.results = res.ok ? await res.json() : [];
+            },
+            pick(r) {
+                this.selectedId = r.id;
+                this.query = r.customer_code + ' — ' + r.full_name;
+                this.results = [];
+            },
+        }));
+    });
+
     /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;
     const totalStepsCount = 2;
@@ -1057,6 +1231,29 @@ unset($__errorArgs, $__bag); ?>
             optional: []
         }
     };
+
+    // Paket yang butuh FAB (Formulir Akan Berlangganan Bisnis) — paket
+    // berkategori Bisnis (dikirim server lewat CustomerController::create()).
+    // Cuma dipakai buat toggle tampilan; guard sebenarnya tetap di server.
+    const fabRequiredPackageIds = <?php echo json_encode($fabRequiredPackageIds->map(fn ($id) => (string) $id)->values(), 15, 512) ?>;
+
+    function toggleFabRequirement() {
+        const select = document.getElementById('internet_package_id');
+        const wrapper = document.getElementById('fab-document-wrapper');
+        if (! select || ! wrapper) {
+            return;
+        }
+
+        const needsFab = fabRequiredPackageIds.length > 0 && fabRequiredPackageIds.includes(select.value);
+        setElementVisible(wrapper, needsFab);
+
+        formFields['layanan'].required = formFields['layanan'].required.filter(f => f !== 'fab_document');
+        if (needsFab) {
+            formFields['layanan'].required.push('fab_document');
+        }
+
+        runLiveProgressUpdates();
+    }
 
     const stepKeys = {
         1: 'data-diri',
@@ -1115,6 +1312,7 @@ unset($__errorArgs, $__bag); ?>
         updateWizardButtons();
         runLiveProgressUpdates();
         updateLayananBreakdown();
+        toggleFabRequirement();
     });
 
     /* File Change & Preview Helper — dipakai Foto Rumah & Foto ODP (Skip Survey) */
@@ -1417,7 +1615,8 @@ unset($__errorArgs, $__bag); ?>
             cable_estimation_meter: 'Estimasi Kabel',
             difficulty_level: 'Tingkat Kesulitan',
             foto_rumah: 'Foto Rumah',
-            survey_photo: 'Foto ODP'
+            survey_photo: 'Foto ODP',
+            fab_document: 'FAB (Formulir Akan Berlangganan Bisnis)'
         };
         return labels[field] || field;
     }

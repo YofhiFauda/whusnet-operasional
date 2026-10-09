@@ -4,7 +4,7 @@ Semua logika uang ada di service, bukan controller. Controller tipis: validasi r
 
 | Service | Tanggung jawab |
 |---|---|
-| `CollectorWorklistService` | Satu-satunya sumber "tagihan mana yang boleh ditagih" — `dueInvoices()` (kolektor, ber-jendela) & `outstandingInvoices()` (admin, tanpa jendela) |
+| `CollectorWorklistService` | Satu-satunya sumber "tagihan mana yang boleh ditagih" — `dueInvoices()` (kolektor, periode sudah berjalan) & `outstandingInvoices()` (admin, tanpa filter periode) |
 | `CollectorPaymentService` | Pencatatan batch pembayaran: validasi baris, transaksi all-or-nothing, idempotency, notifikasi pop_admin |
 | `CollectorBalanceService` | Dua angka uang (saldo & kurang setor) + jejak POP kolektor untuk gerbang visibilitas |
 | `CollectorDepositService` | Siklus hidup setoran: setor → cross check → terverifikasi / kurang setor / lebih setor → lunas / hapus buku |
@@ -13,18 +13,18 @@ Semua logika uang ada di service, bukan controller. Controller tipis: validasi r
 
 ---
 
-## 1. Jendela Tagih — "sudah waktunya ditagih"
+## 1. Kapan Boleh Ditagih — berbasis periode (2026-09-23)
 
-`config('billing.collector_due_window_days')`, default **7**. Disimpan di config karena tiap POP bisa beda ritme keliling dan penyetelannya tak boleh butuh deploy.
+Tagihan boleh ditagih kolektor begitu **periodenya berjalan**: `billing_period <= bulan ini`. Tagihan bulanan terbit tanggal 1 → hari itu juga muncul di Worklist; batas bayar riil akhir bulan; mulai tanggal 1 bulan berikutnya jadi piutang (`Invoice::isPiutang()`). `due_date` cuma label UI dan **tidak** dibaca Worklist.
 
-Dua aturan yang gampang tertukar, keduanya disengaja:
+> Dulu (s.d. 2026-09-22) pakai jendela `config('billing.collector_due_window_days')` = `due_date <= hari ini + 7`. Dihapus karena membandingkan tanggal yang sudah tak bermakna, dan menyimpang dari aturan piutang yang berbasis periode. Jangan dihidupkan lagi.
 
-1. **Seleksi per PELANGGAN, tampilan per INVOICE.** Pelanggan masuk daftar kalau punya **minimal satu** tagihan `due_date <= hari ini + N`. Begitu masuk, **seluruh** tagihan tertunggaknya ikut tampil — termasuk yang belum jatuh tempo. Kalau tidak begitu, tunggakan lama dan tagihan berjalan pecah ke dua kunjungan, padahal kolektor cuma lewat sebulan sekali.
-2. **Jendela, bukan `due_date <= hari ini`.** Jatuh tempo tanggal 20, kolektor lewat tanggal 18 — pelanggan siap bayar tapi tak muncul di layar. Itu kegagalan yang mahal.
+Aturan yang tetap berlaku:
 
-**Jendela ini BUKAN pencegah "nagih 2× ke pelanggan sama".** Dobel tagih sudah tertutup struktural: bayar → `remaining_amount` turun → lunas → invoice keluar dari daftar; ditambah penolakan di `CollectorPaymentService::validateRows()` untuk invoice `lunas`/`batal` dan nominal melebihi sisa. Yang dicegah jendela adalah **nagih terlalu awal**.
+1. **Seleksi per PELANGGAN, tampilan per INVOICE.** Pelanggan masuk daftar kalau punya **minimal satu** tagihan belum lunas dengan periode sudah berjalan. Begitu masuk, **seluruh** tagihan tertunggaknya ikut tampil. Kalau tidak begitu, tunggakan lama dan tagihan berjalan pecah ke dua kunjungan, padahal kolektor cuma lewat sebulan sekali.
+2. **Filter ini BUKAN pencegah "nagih 2× ke pelanggan sama".** Dobel tagih sudah tertutup struktural: bayar → `remaining_amount` turun → lunas → invoice keluar dari daftar; ditambah penolakan di `CollectorPaymentService::validateRows()` untuk invoice `lunas`/`batal` dan nominal melebihi sisa. Yang dicegah filter adalah **nagih tagihan yang periodenya belum dimulai**.
 
-**Worksheet Admin sengaja TANPA jendela** — admin bukan pengetuk pintu, dia butuh gambaran penuh untuk cross check.
+**Worksheet Admin sengaja TANPA filter periode** — admin bukan pengetuk pintu, dia butuh gambaran penuh untuk cross check.
 
 ---
 
@@ -52,7 +52,8 @@ Satu endpoint logika, dua jalur masuk:
 
 | Aturan | Alasan |
 |---|---|
-| `amount` ≤ sisa tagihan | Kelebihan bayar dikembalikan fisik, tidak jadi kredit (§B-8 no. 6 dokumen lama, masih berlaku) |
+| `amount` + saldo yang dipakai ≤ sisa tagihan | **Diubah 2026-10-05** (keputusan user, opsi 2). Batch kolektor, teknisi, dan portal staf **tidak menerima lebih bayar**. Sebelumnya (ADHOC-84, 2026-09-23) kelebihan otomatis masuk saldo; sekarang kelebihan hanya bisa dicatat lewat form Tagihan admin (`quick-payment-modal`), yang tetap membolehkan lebih bayar dengan konfirmasi. Penjaga: `CollectorPaymentService::validateRows()` (per baris, pesan "Kelebihan hanya bisa dicatat lewat Tagihan admin") dan validasi klien di `collector-pay-script`/`StaffKolektorPaymentForm` |
+| `use_balance_amount` ≤ sisa tagihan | Saldo dipakai per tagihan hanya sampai sisanya. Saldo satu pelanggan dijumlahkan **per pelanggan** di seluruh baris batch (`validateRows()` menyimpan `$balanceUsedByCustomer`), jadi dua tagihan tidak bisa sama-sama memakai saldo penuh |
 | `amount` > 0 | `PaymentObserver::creating()` menolak ≤ 0 dari semua jalur |
 | `collected_date` ≤ hari ini | Tanggal masa depan merusak pemotongan pendapatan per periode dan melahirkan kunjungan bertanggal besok |
 
@@ -61,6 +62,33 @@ Satu endpoint logika, dua jalur masuk:
 ### Cicilan
 
 Nominal boleh di bawah sisa. Invoice jadi `sebagian`, sisanya tetap muncul di worklist sampai lunas, dan saldo kolektor bertambah **sebesar uang yang diterima** — bukan sebesar nilai tagihan.
+
+### Pakai saldo pelanggan (2026-10-05)
+
+Pola sama dengan form Bayar admin, tampil sebagai checkbox **"Pakai saldo"** per tagihan (default tidak dicentang):
+
+- Dicentang → saldo terisi otomatis `min(saldo tersisa, sisa tagihan)`, dan uang tunai = sisa tagihan − saldo.
+- Dilepas → saldo 0, tunai kembali ke sisa tagihan penuh.
+- Saldo tetap bisa diubah manual, tapi selalu dibatasi `min(saldo tersedia, sisa tagihan)`.
+- Saldo satu pelanggan dibagi berurutan antar tagihannya dalam satu batch.
+- Bayar penuh dari saldo (tunai 0) tercatat sebagai metode `saldo`, sama seperti admin.
+- Saldo **bukan** uang fisik: total yang masuk setoran kolektor hanya `amount` (tunai).
+
+Tabel bayar kolektor dan worksheet admin memakai markup yang sama (`partials/collector-pay-table.blade.php`). Di portal staf, saldo tampil sebagai kartu per tagihan (`StaffKolektorPaymentForm.tsx`) dengan rincian "Sisa tagihan / Dari saldo / Uang tunai".
+
+### Transfer dan Lainnya
+
+- **Transfer** wajib memilih rekening aktif dari master (`bank_accounts`); `bank_name` dan `account_number` di payment diambil sebagai snapshot dari master, bukan dari input. Nama pengirim opsional.
+- **Lainnya** wajib mengisi keterangan metode (mis. OVO, Dana).
+- Metode batch: `cash`, `transfer`, `lainnya`, plus `saldo` otomatis. `qris` sudah dihapus dari sistem.
+
+### Jalur masuk selain kolektor
+
+| Jalur | Endpoint | Aturan |
+|---|---|---|
+| Teknisi | `POST /technician-payments` | Sama dengan kolektor, tanpa cek `collector_id`. Batas POP scope tetap. Tidak menulis buku kunjungan. |
+| Portal staf (QR) | `POST /customer-portal/kolektor/payments`, `…/teknisi/payments` | Token one-shot, aturan batch yang sama. Worklist mengirim `customer.balance` dan `bank_accounts` untuk form. |
+| Worksheet admin | `POST /payment-batches/{collector}` | Memakai tabel bayar yang sama, jadi juga tidak menerima lebih bayar. Untuk kelebihan, pakai Tagihan admin. |
 
 ---
 
@@ -234,6 +262,14 @@ Guard yang berlaku di kedua jalur: target wajib ber-role `kolektor`, dan **POP t
 
 > Menyalin guard ke method kedua dilarang. Dua jalur tulis dengan dua salinan guard adalah cara tercepat salah satunya ketinggalan.
 
+### Pelanggan pindah POP — kolektor selalu dilepas (ADHOC-107, final 2026-09-29)
+
+Kalau `customers.pop_id` berganti, `CustomerObserver::updating()` men-NULL-kan `collector_id` **tanpa syarat** — termasuk kolektor ber-`all_pop` atau yang scope-nya mencakup POP baru (keputusan user 2026-09-28: "pelanggan A di JETIS dengan kolektor Wahyu pindah ke SANDYA → lepas dari Wahyu"). Pelanggan tidak terikat kolektor siapa pun sampai admin cabang baru meng-assign lewat Worksheet Kolektor (daftar pelanggan tanpa kolektor). Dulu (ADHOC-104) kolektor cuma dilepas kalau tidak punya akses POP baru.
+
+Aman terhadap uang: piutang wajib lunas dulu sebelum pindah, dan tagihan bulan berjalan yang belum dibayar ikut pindah ke cabang baru (lihat `docs/billing-pembayaran/README.md` §Pelanggan Pindah POP) — kolektor lama tidak meninggalkan tagihan yang belum tertagih di cabangnya. Konsekuensi: tagihan bulan pertama di cabang baru tidak masuk worklist siapa pun sampai kolektor baru di-assign.
+
+Ini bukan salinan guard assign: arahnya **melepas**, bukan memberi, dan jalan dari semua jalur pindah POP. Perubahan `collector_id` tercatat di `audit_logs` (save yang sama). **Belum ada:** notifikasi ke kolektor yang dilepas (`kabariPerubahanRute()` tidak dipanggil dari observer).
+
 ---
 
 ## 9. Notifikasi
@@ -296,7 +332,7 @@ Dispatch-nya menumpang `safelyNotify()` yang sama dengan notifikasi — kegagala
 | Entitas | Format |
 |---|---|
 | Setoran | `SETOR-{tahun}-{4 digit}` |
-| Payment | `PAY-{YYYYMM}-{4 digit}` (mekanisme lama, tak berubah) |
+| Payment | `PAY-{invoice_number}-{NN}` (BUG 13, ID_NUMBERING_RULES §16.2) |
 
 `deposit_number` dijaga unique index; generator memakai `max + 1` per tahun.
 
@@ -373,17 +409,16 @@ Diperbarui 2026-08-11. Urutannya ditentukan di **satu tempat**: `ReceiptNumberEx
 ```
 1. TEKS   lapisan teks PDF        pasti, gratis, seluruh halaman sekaligus
 2. QR     raster halaman + decode untuk berkas yang isinya cuma piksel
-3. OCR    Gemini                  cuma kalau QR rusak; mati tanpa GEMINI_API_KEY
-4. MANUAL admin memilih sendiri   selalu tersedia, tak boleh disandera mesin
+3. MANUAL admin memilih sendiri   selalu tersedia, tak boleh disandera mesin
 ```
 
 **Kenapa TEKS di depan.** Kwitansi mencetak nomornya **dua kali** — sebagai QR *dan* sebagai teks di sampingnya. Dokumen hasil "Print → Save as PDF" membawa teks itu apa adanya, jadi nomornya bisa diambil tanpa render, tanpa DPI, tanpa blur.
 
 **Kenapa QR tetap ada.** Untuk berkas yang memang tidak punya lapisan teks: foto/scan kertas. Di situ nomor tercetak hanyalah gambar tinta, dan QR unggul dibanding mengenali teks — error correction High (~30% modul boleh rusak), tahan miring, dan punya checksum internal sehingga **rusak = gagal baca, bukan salah baca**. Untuk urusan uang, gagal jujur lebih murah daripada benar-tapi-salah.
 
-**Kenapa QR TIDAK pernah diserahkan ke OCR.** Model bahasa buruk membaca matriks QR dan akan mengarang nomor yang formatnya benar — kegagalan paling berbahaya karena lolos gerbang pola. Pembagiannya tetap: QR → decoder khusus, teks tercetak → OCR.
+**Kenapa tidak ada OCR.** OCR Gemini pernah ada sebagai jalur cadangan, tapi **dihapus 2026-09-26 (ADHOC-99)** tanpa pernah diaktifkan: probabilistik dan berbiaya, bisa salah baca satu digit lalu menempelkan kwitansi diam-diam ke pelanggan lain dengan status "Cocok" ([analisa](../plan/kolektor/analisa-risiko-ocr-kwitansi.md)), dan mengirim data pelanggan ke pihak ketiga. QR sobek/buram jatuh ke pencocokan manual.
 
-`ReceiptMatchMethod` punya empat nilai (`teks`, `qr`, `ocr`, `manual`) justru supaya kolom itu jujur waktu ada kwitansi salah tempel: metode menentukan seberapa jauh harus ditelusuri.
+`ReceiptMatchMethod` punya tiga nilai (`teks`, `qr`, `manual`) justru supaya kolom itu jujur waktu ada kwitansi salah tempel: metode menentukan seberapa jauh harus ditelusuri.
 
 ### Satu LEMBAR memuat banyak kwitansi — tapi satu kwitansi tetap satu halaman
 
@@ -391,7 +426,7 @@ Diperbarui 2026-08-14: tata letak diganti dari grid 2 kolom (8 kwitansi/lembar, 
 satu kolom bergaya struk — field lengkap (alamat, invoice, total/sisa tagihan, catatan), **satu
 pembayaran = satu halaman A4** (`page-break-after` per kartu). QR + `payment_number` sebagai teks
 tetap dicetak di tiap halaman — dua penanda itu tidak boleh hilang, itulah yang dibaca ulang jalur
-TEKS/QR/OCR di atas. Konsekuensi paling nyata: mencetak 50 pembayaran sekarang menghasilkan 50
+TEKS/QR di atas. Konsekuensi paling nyata: mencetak 50 pembayaran sekarang menghasilkan 50
 halaman, bukan ~7 lembar gunting — trade-off sadar demi keterbacaan dan format kwitansi yang
 konsisten dengan struk (`payments/receipt.blade.php`) dan lembar A4 (`payments/show.blade.php`),
 bukan lagi bentuk keempat yang menyimpang sendiri.
@@ -447,7 +482,7 @@ Yang dicetak di kertas ada **dua**, dan keduanya perlu:
 | Penanda | Dibaca oleh | Saat |
 |---|---|---|
 | QR (SVG, error correction **High**) | mesin | jalur utama |
-| `payment_number` sebagai teks polos | OCR, lalu manusia | saat QR sobek/buram/fotokopi |
+| `payment_number` sebagai teks polos | lapisan teks PDF, lalu manusia | berkas PDF; manusia saat QR sobek/buram/fotokopi |
 
 Error correction High dipilih sadar: kertas kwitansi terlipat, kena air, difotokopi. Level H menoleransi ~30% modul rusak — itu selisih antara pencocokan otomatis dan kerja manual admin.
 
@@ -455,9 +490,9 @@ Isi QR **bukan URL**: kertas yang sudah dicetak tak boleh terikat domain yang bi
 
 ### Satu pembaca gagal tidak menghentikan rantai
 
-Tiap pembaca dibungkus `try/catch`; yang meledak dicatat lalu **dilewati**, bukan menghentikan yang berikutnya. `Zxing\QrReader` melempar untuk gambar yang GD-nya tak bisa buka (mis. WEBP di build tanpa dukungan WEBP) — dan `getimagesize()` tetap mengenali berkas itu, jadi penjaga "ini gambar?" pun lolos. Waktu exception-nya merambat keluar, **OCR yang justru ada untuk kasus "QR tak terbaca" tak pernah dicoba sama sekali**.
+Tiap pembaca dibungkus `try/catch`; yang meledak dicatat lalu **dilewati**, bukan menghentikan yang berikutnya. `Zxing\QrReader` melempar untuk gambar yang GD-nya tak bisa buka (mis. WEBP di build tanpa dukungan WEBP) — dan `getimagesize()` tetap mengenali berkas itu, jadi penjaga "ini gambar?" pun lolos. Exception-nya dikumpulkan jadi `ReceiptReadFailure` (lihat di bawah), bukan merambat mentah ke pemanggil.
 
-Ketersediaan pembaca QR dicek `gd || imagick` — decoder memakai Imagick bila ada dan baru jatuh ke GD. Memeriksa GD saja membuat server ber-imagick-tanpa-gd melewatkan jalur gratis itu diam-diam, dan setiap kwitansi jatuh ke OCR berbayar atau kerja manual tanpa satu pun pesan yang menjelaskan kenapa.
+Ketersediaan pembaca QR dicek `gd || imagick` — decoder memakai Imagick bila ada dan baru jatuh ke GD. Memeriksa GD saja membuat server ber-imagick-tanpa-gd melewatkan jalur gratis itu diam-diam, dan setiap kwitansi jatuh ke kerja manual tanpa satu pun pesan yang menjelaskan kenapa.
 
 ### Kegagalan teknis vs "tidak terbaca"
 
@@ -466,43 +501,30 @@ Dua hal berbeda, dan hanya satu yang layak diulang:
 | Keadaan | Hasil | Perlakuan |
 |---|---|---|
 | Semua pembaca jalan normal, nomornya memang tak ada | `null` | langsung `FAILED` — diulang berapa kali pun hasilnya sama |
-| Pembaca meledak (decoder error, API OCR mati) | `ReceiptReadFailure` | **dilempar ulang** selama jatah percobaan tersisa, supaya queue benar-benar mengulang |
+| Pembaca meledak (decoder error) | `ReceiptReadFailure` | **dilempar ulang** selama jatah percobaan tersisa, supaya queue benar-benar mengulang |
 
 Jatah percobaan = `PaymentReceiptService::MAX_ATTEMPTS`, dan `MatchPaymentReceipt::$tries` mengambil angka dari konstanta yang sama — dua angka yang menggambarkan satu aturan tidak boleh ditulis dua kali.
 
-> Sebelumnya service menelan semua exception, jadi `$tries` pada job cuma konfigurasi mati: Gemini 503 sesaat langsung menandai kwitansi `FAILED` pada percobaan pertama.
+> Sebelumnya service menelan semua exception, jadi `$tries` pada job cuma konfigurasi mati: kegagalan teknis sesaat langsung menandai kwitansi `FAILED` pada percobaan pertama.
 
 Satu konsekuensi khusus koneksi queue **`sync`**: job berjalan seketika di dalam request upload, jadi exception-nya akan merambat jadi 500 padahal unggahannya sendiri sudah berhasil. Karena itu `dispatch()` dibungkus `try/catch` + `report()`. Pada Horizon (async) blok itu tak pernah kena.
 
 ### Urutan pembacaan & gerbang ganda
 
 ```
-upload → queue → QR (khanamiryan) ─ gagal ─→ OCR Gemini ─ gagal ─→ FAILED (manusia)
-                       │                          │
-                       └──── nomor terbaca ───────┘
+upload → queue → TEKS PDF ─ kosong ─→ QR (khanamiryan) ─ gagal ─→ FAILED (manusia)
+                     │                        │
+                     └──── nomor terbaca ─────┘
                                    ▼
                     ada payment dengan nomor itu?
                        ya → MATCHED        tidak → MISMATCH
 ```
 
-**Dua gerbang, bukan satu.** Gerbang pertama pola `PAY-YYYYMM-NNNN`; gerbang kedua keberadaan payment-nya di database. Nomor yang lolos pola tapi tak menunjuk pembayaran mana pun berakhir `MISMATCH` — **tidak pernah** dicocokkan asal. Inilah yang menahan halusinasi OCR maupun QR salah cetak.
-
-> ⚠️ **Sebelum mengisi `GEMINI_API_KEY`, baca
-> [`analisa-risiko-ocr-kwitansi.md`](../plan/kolektor/analisa-risiko-ocr-kwitansi.md).**
-> Hasil OCR saat ini diperlakukan sama persis dengan hasil QR — langsung ditempelkan. OCR bisa salah
-> baca satu digit, dan kalau nomor hasil salah-baca itu kebetulan ada di DB, berkasnya menempel
-> diam-diam ke pembayaran pelanggan lain dengan status hijau "Cocok". Lubang itu **dorman** selama
-> OCR mati dan **hidup pada hari key diisi**.
-
-### OCR mati secara default
-
-Tanpa `GEMINI_API_KEY`, `GeminiOcrReceiptNumberReader::isAvailable()` false dan jalur itu dilewati diam-diam. Itu **keadaan normal**, bukan error: modul harus jalan penuh tanpa layanan berbayar, dan tak boleh ada biaya keluar sebelum diputuskan.
-
-Saat aktif, permintaan ke model sengaja **sempit** — satu nomor dengan format tertentu, `temperature: 0`, jawaban `NONE` bila tak terbaca. Semakin sempit pertanyaannya, semakin kecil ruang mengarang; dan hasilnya tetap lewat dua gerbang di atas.
+**Dua gerbang, bukan satu.** Gerbang pertama pola `PAY-[A-Z0-9-]{5,40}` (longgar, lihat ID_NUMBERING_RULES §16.3); gerbang kedua keberadaan payment-nya di database. Nomor yang lolos pola tapi tak menunjuk pembayaran mana pun berakhir `MISMATCH` — **tidak pernah** dicocokkan asal. Inilah yang menahan QR salah cetak.
 
 ### Override manual wajib ada
 
-Status dokumen tak boleh disandera keberhasilan mesin. QR sobek dan OCR mati adalah kejadian normal, dan kwitansinya tetap harus sampai ke pelanggan yang benar. Admin bisa mencocokkan berkas `MISMATCH`/`FAILED` ke pembayaran mana pun **dalam POP scope-nya**, dan melepas kaitan yang keliru (dicatat di audit log).
+Status dokumen tak boleh disandera keberhasilan mesin. QR sobek/buram adalah kejadian normal, dan kwitansinya tetap harus sampai ke pelanggan yang benar. Admin bisa mencocokkan berkas `MISMATCH`/`FAILED` ke pembayaran mana pun **dalam POP scope-nya**, dan melepas kaitan yang keliru (dicatat di audit log).
 
 ### Aturan berkas
 
@@ -557,7 +579,7 @@ Review 2026-08-08 atas Fase 1–3 menemukan 9 temuan fungsional + 2 sisa dari pe
 | **Idempotency key mengidentifikasi ISI KIRIMAN**, bukan sesi/tab. Perbaikan yang menukar "uang dobel" jadi "uang hilang" bukan perbaikan | key dipakai bersama antar-permintaan yang sedang jalan |
 | Bug yang **gejalanya menyerupai keberhasilan** paling berbahaya — tak akan dilaporkan siapa pun | toast hijau padahal uang tak tercatat |
 | Re-validasi di bawah lock harus memeriksa **semua** syarat yang diperiksa fase cepat, bukan sebagiannya | status invoice terlewat, hanya nominal yang dicek ulang |
-| Satu komponen yang gagal tidak boleh menghentikan **rantai fallback** — justru fallback itu alasan rantainya ada | pembaca QR meledak ⇒ OCR tak pernah dicoba |
+| Satu komponen yang gagal tidak boleh menghentikan **rantai fallback** — justru fallback itu alasan rantainya ada | pembaca QR meledak ⇒ jalur berikutnya tak pernah dicoba (kasus OCR, sebelum dihapus) |
 | Pemeriksaan ketersediaan harus mencerminkan **semua** jalur yang dipakai library, bukan satu yang kita ingat | cek GD saja padahal decoder pakai Imagick bila ada |
 | Mencabut kaitan tak boleh **melebarkan** akses; informasi yang sudah diketahui jangan dibuang | `detach()` menolkan `pop_id` |
 | Data tanpa pemilik tetap butuh gerbang — "belum bisa di-scope" bukan berarti "boleh dilihat semua orang" | daftar berkas yatim bocor lintas cabang |

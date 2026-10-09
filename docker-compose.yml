@@ -33,7 +33,7 @@ services:
   # service ini adalah direktori HOST (service app memakai named volume untuk
   # storage), jadi yang diperbaiki memang berkas yang dipakai test.
   assets:
-    image: node:22-alpine
+    image: node:24-alpine
     container_name: whusnet-assets
     working_dir: /var/www
     restart: "no"

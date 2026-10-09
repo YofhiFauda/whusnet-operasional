@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\InternetPackage;
+use App\Models\PackageCategory;
+use App\Services\MasterRecordRemovalService;
+use App\Support\LikeSearch;
 use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,7 +17,7 @@ class InternetPackageController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $category = $request->query('category');
         $status = $request->query('status');
 
@@ -30,7 +33,7 @@ class InternetPackageController extends Controller
                         ->orWhere('description', 'like', "%{$search}%");
                 });
             })
-            ->when($category && array_key_exists($category, InternetPackage::CATEGORIES), function ($query) use ($category) {
+            ->when($category, function ($query) use ($category) {
                 $query->where('category', $category);
             })
             ->when($status === 'active', function ($query) {
@@ -44,12 +47,16 @@ class InternetPackageController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('master.paket.index', compact('packages', 'search', 'category', 'status'));
+        // Semua kategori (bukan cuma aktif) — filter list harus tetap bisa
+        // menyaring paket lama yang kategorinya sudah dinonaktifkan admin.
+        $categories = PackageCategory::query()->ordered()->get();
+
+        return view('master.paket.index', compact('packages', 'search', 'category', 'status', 'categories'));
     }
 
     public function create(): View
     {
-        return view('master.paket.create');
+        return view('master.paket.create', ['categories' => PackageCategory::options()]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -66,7 +73,18 @@ class InternetPackageController extends Controller
 
     public function edit(InternetPackage $paket): View
     {
-        return view('master.paket.edit', compact('paket'));
+        // Kategori aktif buat pilihan, ditambah kategori paket ini sendiri
+        // kalau kebetulan sudah dinonaktifkan admin — supaya select tidak
+        // diam-diam "mencopot" kategori paket lama begitu halaman edit dibuka.
+        $categories = PackageCategory::options();
+        if (! $categories->contains('name', $paket->category)) {
+            $current = PackageCategory::query()->where('name', $paket->category)->first();
+            if ($current) {
+                $categories->push($current);
+            }
+        }
+
+        return view('master.paket.edit', compact('paket', 'categories'));
     }
 
     public function update(Request $request, InternetPackage $paket): RedirectResponse
@@ -80,6 +98,18 @@ class InternetPackageController extends Controller
         return redirect()
             ->route('master.paket.index')
             ->with('success', 'Paket internet "'.$paket->package_code.'" berhasil diperbarui.');
+    }
+
+    public function destroy(InternetPackage $paket, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        $deleted = $removal->remove($paket, ['is_active' => false]);
+
+        return back()->with(
+            $deleted ? 'success' : 'warning',
+            $deleted
+                ? "Paket \"{$paket->package_code}\" berhasil dihapus."
+                : "Paket \"{$paket->package_code}\" sudah pernah ditagih/dipakai pelanggan, jadi hanya dinonaktifkan."
+        );
     }
 
     public function toggleStatus(InternetPackage $paket): RedirectResponse
@@ -116,7 +146,7 @@ class InternetPackageController extends Controller
                 Rule::unique('internet_packages', 'package_code')->ignore($package),
             ],
             'name' => 'required|string|max:150',
-            'category' => ['required', 'string', Rule::in(array_keys(InternetPackage::CATEGORIES))],
+            'category' => ['required', 'string', Rule::exists('package_categories', 'name')],
             'package_group' => 'required|string|max:150',
             'bandwidth_label' => 'required|string|max:50',
             'download_speed_mbps' => 'nullable|numeric|min:0|max:100000',

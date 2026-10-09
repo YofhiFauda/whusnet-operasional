@@ -238,13 +238,27 @@
                                 </svg>
                             </a>
 
+                            @if(auth()->user()->hasPermission('pops.delete'))
+                            <form action="{{ route('master.pop.destroy', $pop) }}" method="POST" class="inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit"
+                                        class="p-1 rounded-md transition-colors cursor-pointer text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                        title="Hapus POP"
+                                        onclick="event.preventDefault(); window.confirmDelete(@js('Hapus POP/Cabang '.($pop->name).'? Jika masih punya data terkait, POP hanya dinonaktifkan.'), this.closest('form'))">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </form>
+                            @endif
                             <!-- Toggle Status (Form) -->
                             <form action="{{ route('master.pop.toggle', $pop) }}" method="POST" class="inline">
                                 @csrf
                                 <button type="submit" 
                                         class="p-1 rounded-md transition-colors cursor-pointer {{ $pop->status === 'active' ? 'text-green-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20' }}"
                                         title="{{ $pop->status === 'active' ? 'Nonaktifkan POP' : 'Aktifkan POP' }}"
-                                        onclick="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengubah status POP {{ $pop->name }}?', this.closest('form'))">
+                                        onclick="event.preventDefault(); window.confirmAction(@js('Apakah Anda yakin ingin mengubah status POP '.($pop->name).'?'), this.closest('form'))">
                                     @if($pop->status === 'active')
                                     <!-- Toggle Active (Switch-on representation) -->
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

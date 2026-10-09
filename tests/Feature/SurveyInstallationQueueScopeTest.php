@@ -270,4 +270,80 @@ class SurveyInstallationQueueScopeTest extends TestCase
 
         $response->assertOk();
     }
+
+    // ── Sidebar Badges Scope ────────────────────────────────────────
+
+    public function test_technician_survey_sidebar_badge_only_counts_assigned_customers(): void
+    {
+        $technician = $this->makeUser('teknisi');
+        $otherTechnician = $this->makeUser('teknisi');
+
+        $assignedCustomer = $this->makeCustomer('waiting_survey', 'Survey Assigned Badge');
+        $otherAssignedCustomer = $this->makeCustomer('waiting_survey', 'Survey Other Badge');
+        $unassignedCustomer = $this->makeCustomer('waiting_survey', 'Survey Unassigned');
+
+        $this->assignTask($assignedCustomer, TaskType::SURVEY, $technician);
+        $this->assignTask($otherAssignedCustomer, TaskType::SURVEY, $otherTechnician);
+
+        // Technician should only see badge 1 on Antrean Survey
+        $response = $this->actingAs($technician)->get(route('surveys.queue'));
+        $response->assertOk();
+        $response->assertSee('<span>Antrean Survey</span>', false);
+        $response->assertSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">1</span>', false);
+        $response->assertDontSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">3</span>', false);
+
+        // Other technician also sees badge 1
+        $otherResponse = $this->actingAs($otherTechnician)->get(route('surveys.queue'));
+        $otherResponse->assertOk();
+        $otherResponse->assertSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">1</span>', false);
+
+        // NOC (supervisor) sees all 3 in the badge
+        $noc = $this->makeUser('noc');
+        $nocResponse = $this->actingAs($noc)->get(route('surveys.queue'));
+        $nocResponse->assertOk();
+        $nocResponse->assertSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">3</span>', false);
+    }
+
+    public function test_technician_installation_sidebar_badge_only_counts_assigned_customers(): void
+    {
+        $technician = $this->makeUser('teknisi');
+        $otherTechnician = $this->makeUser('teknisi');
+
+        $assignedCustomer = $this->makeCustomer('waiting_installation', 'Pasang Assigned Badge');
+        $otherAssignedCustomer = $this->makeCustomer('waiting_installation', 'Pasang Other Badge');
+        $unassignedCustomer = $this->makeCustomer('waiting_installation', 'Pasang Unassigned');
+
+        $this->assignTask($assignedCustomer, TaskType::PEMASANGAN, $technician);
+        $this->assignTask($otherAssignedCustomer, TaskType::PEMASANGAN, $otherTechnician);
+
+        // Technician should only see badge 1 on Verif & Pemasangan
+        $response = $this->actingAs($technician)->get(route('verifications.queue'));
+        $response->assertOk();
+        $response->assertSee('<span>Verif &amp; Pemasangan</span>', false);
+        $response->assertSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">1</span>', false);
+        $response->assertDontSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">3</span>', false);
+
+        // Other technician also sees badge 1
+        $otherResponse = $this->actingAs($otherTechnician)->get(route('verifications.queue'));
+        $otherResponse->assertOk();
+        $otherResponse->assertSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">1</span>', false);
+
+        // FOP (supervisor) sees all 3 in the badge
+        $fop = $this->makeUser('fop');
+        $fopResponse = $this->actingAs($fop)->get(route('verifications.queue'));
+        $fopResponse->assertOk();
+        $fopResponse->assertSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">3</span>', false);
+    }
+
+    public function test_technician_with_no_tasks_has_no_sidebar_badges(): void
+    {
+        $technician = $this->makeUser('teknisi');
+
+        $this->makeCustomer('waiting_survey', 'Survey Unassigned');
+        $this->makeCustomer('waiting_installation', 'Pasang Unassigned');
+
+        $response = $this->actingAs($technician)->get(route('surveys.queue'));
+        $response->assertOk();
+        $response->assertDontSee('<span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">', false);
+    }
 }

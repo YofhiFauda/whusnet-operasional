@@ -20,6 +20,9 @@ class StaffPortalTokenService
 
     public const PURPOSE_KOLEKTOR = 'kolektor';
 
+    // Teknisi yang mencatat pembayaran pelanggan di lapangan (ADHOC-122).
+    public const PURPOSE_TEKNISI = 'teknisi_bayar';
+
     /**
      * TTL pendek — pola sama `PortalAuthService::ACCESS_TTL_MINUTES`. Cukup
      * buat staf pindah ke Portal & isi form, tidak cukup buat jadi bearer

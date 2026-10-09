@@ -150,12 +150,28 @@ class FileUploadService
     }
 
     /**
+     * Foto kondisi modem hasil pengambilan alat (task DEAC, ADHOC-86).
+     * Folder: device-retrieval/. Pola nama sama `uploadMaintenancePhoto()`.
+     */
+    public static function uploadDeviceRetrievalPhoto(UploadedFile $file, ?Customer $customer): string
+    {
+        $customerId = self::getCustomerIdentifier($customer);
+        $customerName = self::getCustomerName($customer);
+        $ext = $file->getClientOriginalExtension();
+
+        $folder = 'device-retrieval';
+        $baseName = "kondisi-alat_{$customerId}_{$customerName}";
+        $fileName = self::getUniqueFileName($folder, $baseName, $ext);
+
+        return $file->storeAs($folder, $fileName, 'public');
+    }
+
+    /**
      * 6. Bukti Transfer Pembayaran
-     * Aturan folder: payments/{id_pelanggan}/{awal|bulanan|reaktivasi}
+     * Aturan folder: payments/{id_pelanggan}/{awal|bulanan}
      * Contoh format:
      * - pembayaran-awal_02-06-2026_RQ00012_Budi Santoso.jpg
      * - bulan_02-07-2026_RQ00012_Budi Santoso.jpg
-     * - reaktivasi_02-10-2026_RQ00012_Budi Santoso.jpg
      */
     public static function uploadPaymentProof(UploadedFile $file, ?Customer $customer, ?string $invoiceType, string $paymentDate): string
     {
@@ -171,9 +187,6 @@ class FileUploadService
         if ($type === 'awal') {
             $category = 'awal';
             $prefix = 'pembayaran-awal';
-        } elseif ($type === 'reaktivasi') {
-            $category = 'reaktivasi';
-            $prefix = 'reaktivasi';
         } else {
             $category = 'bulanan';
             $prefix = 'bulan';
@@ -181,6 +194,26 @@ class FileUploadService
 
         $folder = "payments/{$customerId}/{$category}";
         $baseName = "{$prefix}_{$dateStr}_{$customerId}_{$customerName}";
+        $fileName = self::getUniqueFileName($folder, $baseName, $ext);
+
+        return $file->storeAs($folder, $fileName, 'public');
+    }
+
+    /**
+     * 7. Bukti Fisik Klaim Kerugian Gudang (Fase 2 Prioritas 1,
+     * kontrol-anti-manipulasi.md §2) — foto kondisi barang rusak, BAP
+     * kehilangan, atau foto stock opname. Beda dari method lain di file ini:
+     * gak terikat `Customer` (klaim gudang berbasis Item/POP/teknisi, bukan
+     * pelanggan) — makanya nama file pakai timestamp+random, bukan
+     * identitas pelanggan.
+     * Aturan folder: warehouse/evidence/{type} (type: lost/damaged/opname)
+     */
+    public static function uploadWarehouseEvidence(UploadedFile $file, string $type): string
+    {
+        $ext = $file->getClientOriginalExtension();
+        $folder = 'warehouse/evidence/'.strtolower($type);
+        $baseName = strtolower($type).'_'.now()->format('Ymd_His');
+
         $fileName = self::getUniqueFileName($folder, $baseName, $ext);
 
         return $file->storeAs($folder, $fileName, 'public');

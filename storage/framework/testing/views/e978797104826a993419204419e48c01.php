@@ -33,6 +33,7 @@
                     $statusStyle = match($task->status->value) {
                         'terjadwal'  => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
                         'in_progress'=> 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
+                        'lapor_nanti'=> 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
                         'selesai'    => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
                         'dibatalkan' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
                         default      => 'background:var(--color-surface-muted); color:var(--color-text-muted); border-color:var(--color-border)',
@@ -219,6 +220,39 @@
                     <?php endif; ?>
 
                     
+                    <?php
+                        $ticketForBatch = $task->fopTask?->ticket;
+                    ?>
+                    <?php if($ticketForBatch?->isBatch()): ?>
+                    <div class="flex flex-col sm:flex-row sm:items-start py-3 border-b border-border gap-1.5 sm:gap-4 select-text">
+                        <span class="text-violet-700 dark:text-violet-400 sm:w-36 shrink-0 font-bold font-ui flex items-center gap-1.5 select-none">
+                            <svg class="h-3.5 w-3.5 text-violet-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 3c0-1.5-1.79-2.86-4-3.44M6 12.56C3.79 13.14 2 14.5 2 16" />
+                            </svg>
+                            Pelanggan Terdampak
+                        </span>
+                        <div class="flex-1 font-ui">
+                            <?php if($ticketForBatch->batchMembers->isEmpty()): ?>
+                            <p class="text-xs text-warning font-semibold">Belum ada pelanggan terdampak dicatat — cek halaman Worksheet Helpdesk (tiket <?php echo e($ticketForBatch->ticket_number); ?>).</p>
+                            <?php else: ?>
+                            <div class="bg-violet-50/70 dark:bg-violet-900/10 border border-violet-200/80 dark:border-violet-800/40 rounded-xl p-3 space-y-1.5 shadow-xs">
+                                <p class="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                                    <?php echo e($ticketForBatch->batchMembers->count()); ?> Pelanggan
+                                </p>
+                                <?php $__currentLoopData = $ticketForBatch->batchMembers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                                    <span class="font-bold text-text-main"><?php echo e($member->customer_name); ?></span>
+                                    <span class="font-mono text-[11px] text-text-muted"><?php echo e($member->cid ?: '—'); ?></span>
+                                    <span class="font-mono text-[11px] text-text-muted"><?php echo e($member->phone ?: '—'); ?></span>
+                                </div>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    
                     <?php if($task->fopTask?->ticket?->catatan_teknis): ?>
                     <div class="flex flex-col sm:flex-row sm:items-start py-3 border-b border-border gap-1.5 sm:gap-4 select-text">
                         <span class="text-sky-700 dark:text-sky-400 sm:w-36 shrink-0 font-bold font-ui flex items-center gap-1.5 select-none">
@@ -285,7 +319,8 @@
                             <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
-                            Alasan Pending
+                            <?php echo e($task->status === \App\Enums\TaskStatus::LAPOR_NANTI ? 'Alasan Lapor Nanti' : 'Alasan Pending'); ?>
+
                         </span>
                         <span class="font-bold flex-1 text-warning font-ui"><?php echo e($task->pending_reason); ?></span>
                     </div>
@@ -458,7 +493,8 @@
                         <div class="text-text-main font-semibold flex-1 font-ui">
                             <?php if($task->started_at && !$task->completed_at): ?>
                                 <?php
-                                    $elapsed = (int) $task->started_at->diffInMinutes(now());
+                                    // Lapor Nanti: berhenti di work_finished_at, bukan terus jalan.
+                                    $elapsed = (int) $task->started_at->diffInMinutes($task->slaReferenceTime());
                                     $remaining = $task->sla_minutes - $elapsed;
                                 ?>
                                 <div class="flex items-center gap-2">
@@ -630,6 +666,8 @@
                         </div>
                     </div>
 
+                    
+                    <?php if (! ($task->deviceRetrieval)): ?>
                     <div class="pt-3.5 border-t border-border space-y-2">
                         <span class="block text-[10px] text-text-main font-bold uppercase font-ui tracking-wider select-none">Aset ISP yang Wajib Ditarik</span>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -648,6 +686,7 @@
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <?php elseif($task->task_type === \App\Enums\TaskType::CREQ): ?>
@@ -698,7 +737,7 @@
                     <svg class="h-4.5 w-4.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
                     </svg>
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-text-main font-ui">Alat Kerja Wajib</h3>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-text-main font-ui">Alat Kerja Opsional</h3>
                 </div>
                 <div class="flex flex-wrap gap-2 select-text">
                     <?php $__currentLoopData = $workToolRows; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -915,15 +954,30 @@
             </div>
             <?php endif; ?>
 
+            <?php elseif($task->task_type->value === \App\Enums\TaskType::AMBIL_MODEM->value): ?>
+            
+            <?php echo $__env->make('tasks.partials.device-retrieval-report', ['task' => $task], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
             <?php else: ?>
             <?php
                 $maintenanceFopTask = app(\App\Services\TaskWorkToolService::class)->resolveTaskFor($task);
                 $materialsTerpakai = $maintenanceFopTask
                     ? $maintenanceFopTask->materials()->terpakai()->orderBy('id')->get()
                     : collect();
+                $installedSerials = $maintenanceFopTask
+                    ? \App\Models\InventoryTransaction::where('fop_task_id', $maintenanceFopTask->id)
+                        ->where('type', \App\Enums\InventoryTransactionType::INSTALL->value)
+                        ->with(['serial.item', 'item'])
+                        ->get()
+                    : collect();
                 $maintenanceReport = $task->maintenanceReport;
+                // Alat kerja & detail C-REQ ikut form laporan yang sama
+                // (TaskMaintenanceController) — sebelumnya tidak tampil di sini,
+                // jadi Detail Task tidak selengkap laporan yang dikirim teknisi.
+                $workToolsDipakai = $maintenanceFopTask ? $maintenanceFopTask->workTools()->orderBy('id')->get() : collect();
+                $creqDetailReport = $task->task_type === \App\Enums\TaskType::CREQ ? $task->creqDetail : null;
             ?>
-            <?php if($maintenanceReport || $materialsTerpakai->isNotEmpty()): ?>
+            <?php if($maintenanceReport || $materialsTerpakai->isNotEmpty() || $installedSerials->isNotEmpty() || $creqDetailReport): ?>
             <div class="pt-5 border-t border-border space-y-4 select-text">
                 <div class="flex items-center gap-2 mb-1 select-none">
                     <svg class="h-4.5 w-4.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -944,15 +998,56 @@
                 </div>
                 <?php endif; ?>
 
+                <?php if($creqDetailReport): ?>
+                <?php echo $__env->make('tasks.partials.creq-detail', ['task' => $task], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+                <?php endif; ?>
+
+                <?php if($installedSerials->isNotEmpty()): ?>
+                <div>
+                    <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui mb-2 select-none">Perangkat Terpasang (Modem/ONT)</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <?php $__currentLoopData = $installedSerials; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tx): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <div class="flex justify-between items-center bg-violet-50/60 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-900/50 p-3 rounded-xl shadow-xs">
+                            <div>
+                                <span class="text-violet-950 dark:text-violet-200 font-ui font-bold block"><?php echo e($tx->item->name); ?></span>
+                                <span class="font-mono text-[11px] text-violet-700 dark:text-violet-400">
+                                    <?php if(auth()->user()->hasPermission('warehouse_traceability.view') && $tx->serial): ?>
+                                        <a href="<?php echo e(route('warehouse.traceability.index', ['sn' => $tx->serial->serial_number])); ?>" class="hover:underline font-bold">SN: <?php echo e($tx->serial->serial_number); ?></a>
+                                    <?php else: ?>
+                                        SN: <?php echo e($tx->serial?->serial_number ?? '—'); ?>
+
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-violet-100 dark:bg-violet-900/60 text-violet-800 dark:text-violet-300 border border-violet-300 dark:border-violet-700">
+                                Terpasang di Pelanggan
+                            </span>
+                        </div>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <?php if($materialsTerpakai->isNotEmpty()): ?>
                 <div>
                     <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui mb-2 select-none">Material Terpakai</span>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         <?php $__currentLoopData = $materialsTerpakai; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <div class="flex justify-between items-center bg-surface-muted border border-border p-3 rounded-xl shadow-xs">
-                            <span class="text-text-secondary font-ui font-semibold"><?php echo e($material->item_name); ?><?php if($material->note): ?><span class="text-text-muted text-[10px]"> · <?php echo e($material->note); ?></span><?php endif; ?></span>
+                            <span class="text-text-secondary font-ui font-semibold"><?php echo e($material->item_name); ?><?php if($material->lot_no): ?><span class="text-text-muted text-[10px] font-mono"> · Roll <?php echo e($material->lot_no); ?></span><?php endif; ?> <?php if($material->note): ?><span class="text-text-muted text-[10px]"> · <?php echo e($material->note); ?></span><?php endif; ?></span>
                             <span class="font-mono font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 rounded border border-sky-200 dark:border-sky-900/50"><?php echo e(rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',')); ?> <?php echo e($material->unit); ?></span>
                         </div>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if($workToolsDipakai->isNotEmpty()): ?>
+                <div>
+                    <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui mb-2 select-none">Alat Kerja Opsional</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        <?php $__currentLoopData = $workToolsDipakai; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tool): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold font-ui bg-surface-muted text-text-secondary border border-border"><?php echo e($tool->tool_name); ?><?php if($tool->note): ?><span class="text-text-muted text-[10px] font-normal"> · <?php echo e($tool->note); ?></span><?php endif; ?></span>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </div>
                 </div>
@@ -1032,24 +1127,26 @@
         
         <?php if($task->status->value === 'selesai' && $task->fop_review_status === 'pending'): ?>
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('review', $task)): ?>
-        <?php if($task->task_type->value === 'PSB'): ?>
+        
+        <?php if(in_array($task->task_type->value, ['PSB', 'SURVEY'], true)): ?>
         <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
             <div class="min-w-0 flex-1">
-                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Approve Pemasangan (Verifikasi Admin)</h4>
-                <p class="text-[11px] text-text-muted font-ui leading-relaxed">Aktivasi layanan (CID + tagihan awal) hanya boleh diproses melalui halaman Verifikasi Admin.</p>
+                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui"><?php echo e($task->task_type->value === 'SURVEY' ? 'Verifikasi Survey (Menunggu ACC)' : 'Approve Pemasangan (Verifikasi Admin)'); ?></h4>
+                <p class="text-[11px] text-text-muted font-ui leading-relaxed"><?php echo e($task->task_type->value === 'SURVEY' ? 'Verifikasi hasil survey dan penerusan ke tim pemasangan diproses melalui halaman Verifikasi oleh Admin/CS.' : 'Aktivasi layanan (CID + tagihan awal) hanya boleh diproses melalui halaman Verifikasi Admin.'); ?></p>
             </div>
             <?php if($task->customer_id): ?>
                 <?php if(auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasFullAccess()): ?>
                 <a href="<?php echo e(route('customers.verification.admin', $task->customer_id)); ?>"
                    class="w-full sm:w-auto text-center inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-500/10 cursor-pointer font-ui active:scale-95"
                    style="background:var(--color-primary)">
-                    Buka Verifikasi Admin
+                    Buka Verifikasi
                 </a>
                 <?php else: ?>
-                <a href="<?php echo e(route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)])); ?>"
+                <a href="<?php echo e($task->task_type->value === 'SURVEY' ? route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]) : route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)])); ?>"
                    class="w-full sm:w-auto text-center inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-500/10 cursor-pointer font-ui active:scale-95"
                    style="background:var(--color-primary)">
-                    Lihat Laporan Pemasangan
+                    <?php echo e($task->task_type->value === 'SURVEY' ? 'Lihat Laporan Survey' : 'Lihat Laporan Pemasangan'); ?>
+
                 </a>
                 <?php endif; ?>
             <?php endif; ?>
@@ -1057,8 +1154,8 @@
         <?php else: ?>
         <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
             <div>
-                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Review Hasil Pekerjaan (Khusus FOP)</h4>
-                <p class="text-[11px] text-text-muted font-ui">Task ini telah diselesaikan oleh teknisi dan sedang menunggu persetujuan Anda.</p>
+                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Laporan Teknisi (Khusus FOP)</h4>
+                <p class="text-[11px] text-text-muted font-ui">Task sudah diselesaikan teknisi. Kalau laporannya keliru, kembalikan ke teknisi lewat Reject Laporan.</p>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <button x-data @click="$dispatch('open-modal', 'reject-task')"
@@ -1066,15 +1163,6 @@
                         style="border-color:var(--color-error-border); color:var(--color-error)">
                     Reject Laporan
                 </button>
-                <form action="<?php echo e(route('tasks.review', $task)); ?>" method="POST" class="flex-1 sm:flex-initial">
-                    <?php echo csrf_field(); ?>
-                    <input type="hidden" name="action" value="approve">
-                    <button type="submit"
-                            class="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl text-white transition-all shadow-md shadow-sky-600/10 cursor-pointer font-ui active:scale-95"
-                            style="background:var(--color-primary)">
-                        Approve Task
-                    </button>
-                </form>
             </div>
         </div>
         <?php endif; ?>
@@ -1083,7 +1171,7 @@
     </div>
 
     
-    <?php if(in_array($task->status->value, ['terjadwal', 'in_progress', 'pending'])): ?>
+    <?php if(in_array($task->status->value, ['terjadwal', 'in_progress', 'lapor_nanti', 'pending'])): ?>
     <div class="flex flex-wrap items-center justify-end gap-2.5 pt-1.5 font-ui select-none">
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('statusReschedule', $task)): ?>
         <button type="button" x-data @click="$dispatch('open-modal', 'reschedule-task-<?php echo e($task->id); ?>')"
@@ -1149,17 +1237,20 @@
             <?php endif; ?>
         <?php endif; ?>
 
+        
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('statusComplete', $task)): ?>
-        <?php if(in_array($task->status->value, ['in_progress', 'pending'])): ?>
+        <?php if($task->status->acceptsReport()): ?>
             <?php
                 $reportUrl = match(true) {
                     $task->task_type->value === \App\Enums\TaskType::SURVEY->value => route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]),
                     $task->task_type->value === \App\Enums\TaskType::PEMASANGAN->value => route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.show', $task)]),
+                    $task->task_type->value === \App\Enums\TaskType::AMBIL_MODEM->value => route('tasks.device-retrieval.report', $task),
                     default => route('tasks.maintenance.report', $task),
                 };
                 $reportLabel = match(true) {
                     $task->task_type->value === \App\Enums\TaskType::SURVEY->value => 'Laporan Survey',
                     $task->task_type->value === \App\Enums\TaskType::PEMASANGAN->value => 'Laporan Pemasangan',
+                    $task->task_type->value === \App\Enums\TaskType::AMBIL_MODEM->value => 'Laporan Ambil Alat',
                     default => 'Isi Laporan',
                 };
             ?>

@@ -27,8 +27,8 @@
                         default => 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
                     };
                     $statusLabel = $fopTask->task
-                        ? $fopTask->task->status->displayLabel($fopTask->task->report_deferred)
-                        : $fopTask->status->displayLabel();
+                        ? $fopTask->task->status->label()
+                        : $fopTask->status->label();
                 ?>
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border font-ui <?php echo e($statusBadge); ?>">
                     <?php echo e($statusLabel); ?>
@@ -255,6 +255,28 @@
         </div>
 
         
+        <?php if($ticket->isBatch()): ?>
+        <div class="px-4 pb-4">
+            <p class="text-[10px] font-semibold text-violet-500 dark:text-violet-400 uppercase tracking-wider font-ui mb-2">
+                Pelanggan Terdampak (<?php echo e($ticket->batchMembers->count()); ?>)
+            </p>
+            <?php if($ticket->batchMembers->isEmpty()): ?>
+                <p class="text-[11px] text-amber-600 dark:text-amber-400 font-ui">Belum ada pelanggan terdampak dicatat — cek halaman Worksheet Helpdesk.</p>
+            <?php else: ?>
+            <div class="border border-violet-200 dark:border-violet-800/50 bg-violet-50/60 dark:bg-violet-900/10 rounded p-3 space-y-1.5">
+                <?php $__currentLoopData = $ticket->batchMembers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-ui">
+                    <span class="font-bold text-slate-800 dark:text-slate-200"><?php echo e($member->customer_name); ?></span>
+                    <span class="font-mono text-slate-500 dark:text-slate-400"><?php echo e($member->cid ?: '—'); ?></span>
+                    <span class="font-mono text-slate-500 dark:text-slate-400"><?php echo e($member->phone ?: '—'); ?></span>
+                </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        
         <div class="px-4 pb-4 border-t border-slate-100 dark:border-slate-700/50 pt-3 space-y-3">
             <div class="border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 rounded overflow-hidden">
                 <p class="px-3 py-1.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider font-ui border-b border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20">
@@ -445,8 +467,26 @@
                     <p class="font-medium text-slate-800 dark:text-slate-200">Jitter <?php echo e($technicalDetail?->jitter_ms ?? '—'); ?>ms, Loss <?php echo e($technicalDetail?->packet_loss_percent ?? '—'); ?>%</p>
                 </div>
                 <?php
+                    // ADHOC-54 — gabungan Aktif (inventory_serials) + Pasif
+                    // (task_materials) per fop_task_id, sesuai §3.4 rancangan-ui.md.
+                    // Ditaruh DI SINI (bukan halaman Verifikasi Admin) karena FOP
+                    // gak punya `customers.detail.installation.validate` (itu
+                    // permission approval, bukan buat FOP) — halaman ini gerbangnya
+                    // `fop_tasks.view` yang FOP emang udah punya.
                     $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+                    $installedSerials = $fopTask->inventorySerials()->with('item')->get();
                 ?>
+                <?php if($installedSerials->isNotEmpty()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Perangkat Aktif Terpasang (Gudang)</p>
+                    <?php $__currentLoopData = $installedSerials; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $serial): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400"><?php echo e($serial->item->name ?? '-'); ?></span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">SN <?php echo e($serial->serial_number); ?></span>
+                    </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </div>
+                <?php endif; ?>
                 <?php if($materialTerpakai->isNotEmpty()): ?>
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Perangkat Pasif Terpakai</p>
@@ -480,13 +520,41 @@
             <?php else: ?>
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan pemasangan.</p>
             <?php endif; ?>
-        <?php elseif($fopTask->category === \App\Enums\TaskType::MAINTENANCE): ?>
+        <?php elseif(in_array($fopTask->category, [\App\Enums\TaskType::MAINTENANCE, \App\Enums\TaskType::CREQ, \App\Enums\TaskType::OREQ, \App\Enums\TaskType::INFR], true)): ?>
+            
             <?php if($maintenance): ?>
+            <?php
+                $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+                // SN modem yang dipasang lewat laporan ini — sumber sama dengan
+                // Detail Task (transaksi INSTALL per fop_task), bukan
+                // inventory_serials.fop_task_id yang bisa berpindah kalau SN
+                // itu belakangan ditarik & dipasang ulang di task lain.
+                $maintenanceInstalledSerials = \App\Models\InventoryTransaction::where('fop_task_id', $fopTask->id)
+                    ->where('type', \App\Enums\InventoryTransactionType::INSTALL->value)
+                    ->with(['serial.item', 'item'])
+                    ->get();
+            ?>
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line break-words [word-break:break-word]"><?php echo e($maintenance->kendala_teknis); ?></p>
                 </div>
+                <?php if($fopTask->category === \App\Enums\TaskType::CREQ && $fopTask->task?->creqDetail): ?>
+                <div class="col-span-2">
+                    <?php echo $__env->make('tasks.partials.creq-detail', ['task' => $fopTask->task], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+                </div>
+                <?php endif; ?>
+                <?php if($maintenanceInstalledSerials->isNotEmpty()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Modem/Perangkat Aktif Terpasang</p>
+                    <?php $__currentLoopData = $maintenanceInstalledSerials; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tx): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400"><?php echo e($tx->item->name ?? '-'); ?></span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">SN <?php echo e($tx->serial?->serial_number ?? '—'); ?></span>
+                    </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </div>
+                <?php endif; ?>
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
                     <div class="flex flex-wrap gap-1.5 mt-1">
@@ -497,6 +565,27 @@
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </div>
                 </div>
+                <?php if($materialTerpakai->isNotEmpty()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Material Terpakai (Gudang)</p>
+                    <?php $__currentLoopData = $materialTerpakai; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400"><?php echo e($material->item_name); ?><?php if($material->lot_no): ?><span class="font-mono text-slate-400 dark:text-slate-500"> · Roll <?php echo e($material->lot_no); ?></span><?php endif; ?> <?php if($material->note): ?><span class="text-slate-400 dark:text-slate-500"> · <?php echo e($material->note); ?></span><?php endif; ?></span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200"><?php echo e(rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',')); ?> <?php echo e($material->unit); ?></span>
+                    </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </div>
+                <?php endif; ?>
+                <?php if($fopTask->workTools->isNotEmpty()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Alat Kerja Opsional</p>
+                    <div class="flex flex-wrap gap-1.5 mt-1">
+                        <?php $__currentLoopData = $fopTask->workTools; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tool): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600"><?php echo e($tool->tool_name); ?></span>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <?php if($maintenance->opm_photo || $maintenance->speedtest_photo): ?>
                 <div class="col-span-2 flex gap-3 flex-wrap">
                     <?php if($maintenance->opm_photo): ?>
@@ -509,7 +598,96 @@
                 <?php endif; ?>
             </div>
             <?php else: ?>
-            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan maintenance.</p>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan <?php echo e($fopTask->category->label()); ?>.</p>
+            <?php endif; ?>
+        <?php elseif($fopTask->category === \App\Enums\TaskType::AMBIL_MODEM): ?>
+            
+            <?php
+                $retrieval = $fopTask->task?->deviceRetrieval;
+                $retrievalLogs = $retrieval
+                    ? \App\Models\DeviceRetrievalLog::where('task_id', $fopTask->task_id)
+                        ->with(['item', 'receivedBy', 'warehousePop'])
+                        ->orderBy('id')
+                        ->get()
+                    : collect();
+                $retrievalOutcome = $retrieval?->outcome;
+                $retrievalPhotoUrl = $retrieval ? foto_publik($retrieval->condition_photo) : null;
+            ?>
+            <?php if($retrieval): ?>
+            <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
+                <div>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Hasil di Lapangan</p>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border <?php echo e($retrievalOutcome->isRetrieved() ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'); ?>"><?php echo e($retrievalOutcome->label()); ?></span>
+                </div>
+                <div>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Dilaporkan Oleh</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200"><?php echo e($fopTask->task?->completedBy?->name ?? '—'); ?>
+
+                        <?php if($retrieval->updated_at): ?><span class="text-slate-400 dark:text-slate-500 font-normal font-mono"> · <?php echo e($retrieval->updated_at->format('d/m/Y H:i')); ?></span><?php endif; ?>
+                    </p>
+                </div>
+
+                <?php if($retrievalOutcome->isRetrieved()): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Modem yang Dibawa</p>
+                    <?php $__empty_1 = true; $__currentLoopData = $retrievalLogs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $log): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <div class="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-1.5">
+                        <span class="text-slate-600 dark:text-slate-400 min-w-0">
+                            <?php echo e($log->item?->name ?? 'Modem'); ?>
+
+                            <span class="block font-mono font-semibold text-slate-800 dark:text-slate-200 select-all">SN: <?php echo e($log->serial_number); ?></span>
+                        </span>
+                        <span class="text-right shrink-0">
+                            <?php if($log->isReceived()): ?>
+                            <span class="font-semibold text-emerald-600 dark:text-emerald-400">Diterima gudang</span>
+                            <span class="block text-slate-400 dark:text-slate-500"><?php echo e($log->warehousePop?->name); ?> · <?php echo e($log->receivedBy?->name ?? '—'); ?> · <?php echo e($log->received_at->format('d/m/Y')); ?></span>
+                            <?php if($log->condition): ?><span class="block text-slate-400 dark:text-slate-500">Kondisi: <?php echo e($log->condition->label()); ?></span><?php endif; ?>
+                            <?php else: ?>
+                            <span class="font-semibold text-amber-600 dark:text-amber-400">Transit — di teknisi</span>
+                            <span class="block text-slate-400 dark:text-slate-500">Menunggu diterima gudang</span>
+                            <?php endif; ?>
+                        </span>
+                    </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <p class="text-slate-400 dark:text-slate-500 italic">Belum ada SN tercatat untuk laporan ini.</p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kelengkapan yang Ikut Dibawa</p>
+                    <div class="flex flex-wrap gap-1.5 mt-1">
+                        <?php $__empty_1 = true; $__currentLoopData = ($retrieval->accessories ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $accessory): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100"><?php echo e(\App\Models\TaskDeviceRetrieval::ACCESSORY_OPTIONS[$accessory] ?? $accessory); ?></span>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                        <span class="text-slate-400 dark:text-slate-500">Tidak ada kelengkapan dicatat.</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if($retrieval->notes): ?>
+                <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5"><?php echo e($retrievalOutcome->isRetrieved() ? 'Catatan Teknisi' : 'Alasan Alat Tidak Diambil'); ?></p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line break-words [word-break:break-word]"><?php echo e($retrieval->notes); ?></p>
+                </div>
+                <?php endif; ?>
+
+                <?php if($retrievalPhotoUrl): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Foto Kondisi Alat</p>
+                    <a href="<?php echo e($retrievalPhotoUrl); ?>" target="_blank" class="inline-block">
+                        <img src="<?php echo e($retrievalPhotoUrl); ?>" alt="Foto Kondisi Alat" class="h-28 w-28 object-cover rounded border border-slate-200 dark:border-slate-700">
+                    </a>
+                    <a href="<?php echo e($retrievalPhotoUrl); ?>" target="_blank" class="block mt-1 text-blue-600 hover:underline">Foto Kondisi Alat →</a>
+                </div>
+                <?php elseif($retrieval->condition_photo): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 italic">Foto kondisi alat tercatat, tetapi filenya tidak ditemukan di penyimpanan.</p>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php else: ?>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan pengambilan alat.</p>
             <?php endif; ?>
         <?php else: ?>
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Tipe task ini tidak punya laporan lapangan terstruktur.</p>

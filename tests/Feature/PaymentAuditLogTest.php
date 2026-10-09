@@ -124,7 +124,7 @@ class PaymentAuditLogTest extends TestCase
             'customer_id' => $invoice->customer_id,
             'pop_id' => $pop->id,
             'payment_date' => '2026-06-13',
-            'payment_method' => 'qris',
+            'payment_method' => 'transfer',
             'amount' => 150000,
             'received_by' => $owner->id,
             'payment_status' => 'valid',

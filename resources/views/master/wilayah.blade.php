@@ -4,6 +4,11 @@
 @section('page_title', 'Master Data Wilayah')
 
 @section('content')
+@if(auth()->user()->hasPermission('master_wilayah.update') || auth()->user()->hasPermission('master_wilayah.create'))
+<div class="flex justify-end mb-4">
+    <a href="{{ route('master.wilayah.kelola') }}" class="px-3.5 py-2 text-sm font-semibold text-sky-700 dark:text-sky-300 bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-900/20">Kelola Wilayah (Tambah / Ubah / Hapus)</a>
+</div>
+@endif
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
     <!-- Left Panel: Search & Region Tree -->
     <div class="lg:col-span-2 flex flex-col gap-6">

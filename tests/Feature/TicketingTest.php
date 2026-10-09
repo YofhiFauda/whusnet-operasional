@@ -511,7 +511,8 @@ class TicketingTest extends TestCase
         return [
             'terjadwal' => [TaskStatus::TERJADWAL->value],
             'in progress' => [TaskStatus::IN_PROGRESS->value],
-            'pending / lapor nanti' => [TaskStatus::PENDING->value],
+            'pending' => [TaskStatus::PENDING->value],
+            'lapor nanti' => [TaskStatus::LAPOR_NANTI->value],
         ];
     }
 

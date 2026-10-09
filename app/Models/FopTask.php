@@ -186,6 +186,22 @@ class FopTask extends Model
     }
 
     /**
+     * Unit SERIALIZED (modem/ONT/router) yang terpasang lewat task ini —
+     * sumber "Perangkat Aktif" di analisa FOP (ADHOC-54, gabung dengan
+     * `materials()` buat "Material Pasif" — rancangan-ui.md §3.4). SENGAJA
+     * terpisah dari `materials()`, bukan disatukan ke `task_materials`.
+     */
+    public function inventorySerials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class);
+    }
+
+    public function inventoryTransactions(): HasMany
+    {
+        return $this->hasMany(InventoryTransaction::class);
+    }
+
+    /**
      * Batas waktu wajib mulai ditangani (Master Timeline SLA) dalam jam.
      * Pakai snapshot handling_sla_hours (di-freeze saat tiket dibuat, resolve
      * dari paket internet customer saat itu). Fallback ke default global

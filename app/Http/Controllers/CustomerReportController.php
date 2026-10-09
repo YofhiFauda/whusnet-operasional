@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\SubscriptionStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Spatie\SimpleExcel\SimpleExcelWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerReportController extends Controller
@@ -209,5 +211,151 @@ class CustomerReportController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Export data pelanggan ke XLSX (format Excel asli, bukan CSV). Filter dan
+     * scope sama persis dengan laporan pelanggan. Kolom mengikuti daftar
+     * "Export data pelanggan menjadi excel" — `exportHeaderRow()`/`exportDataRow()`.
+     */
+    public function exportXlsx(Request $request)
+    {
+        $query = $this->exportXlsxQuery($request);
+
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'data-pelanggan-'.uniqid().'.xlsx';
+        $writer = SimpleExcelWriter::create($path);
+
+        $header = $this->exportHeaderRow();
+
+        $query->chunkById(500, function ($customers) use ($writer, $header) {
+            $writer->addRows($customers->map(fn (Customer $customer) => array_combine(
+                $header,
+                $this->exportDataRow($customer)
+            ))->all());
+        });
+
+        $writer->close();
+
+        return response()->download($path, 'data-pelanggan-'.now()->format('Ymd-His').'.xlsx')
+            ->deleteFileAfterSend();
+    }
+
+    /**
+     * @return Builder<Customer>
+     */
+    private function exportXlsxQuery(Request $request): Builder
+    {
+        $user = auth()->user();
+        if (! $user->hasPermission('reports.view')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $popId = $request->query('pop_id', '');
+        $completenessStatus = $request->query('completeness_status', '');
+        $status = $request->query('status', '');
+        $startDate = $request->query('start_date', '');
+        $endDate = $request->query('end_date', '');
+
+        $allowedPopIds = Pop::forUser()->pluck('id')->toArray();
+        if ($popId !== '' && ! in_array((int) $popId, $allowedPopIds)) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $query = Customer::with(['pop', 'internetPackage', 'customerService', 'salesUser', 'agent'])
+            ->applyUserScope();
+
+        if ($popId !== '') {
+            $query->where('pop_id', $popId);
+        }
+
+        if ($completenessStatus !== '') {
+            $query->where('data_completeness_status', $completenessStatus);
+        }
+
+        if ($status !== '') {
+            $query->where('status', $status);
+        }
+
+        // Batas tanggal sengaja startOfDay/endOfDay — alasannya sama dengan export CSV di atas.
+        if ($startDate !== '') {
+            $query->where('registration_date', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+
+        if ($endDate !== '') {
+            $query->where('registration_date', '<=', Carbon::parse($endDate)->endOfDay());
+        }
+
+        return $query;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function exportHeaderRow(): array
+    {
+        return [
+            'ID Pelanggan',
+            'Nama Lengkap',
+            'Nomor Identitas (NIK KTP)',
+            'Jenis Kelamin',
+            'Nomor HP Utama (WhatsApp)',
+            'Nomor HP Alternatif',
+            'NPWP',
+            'Alamat Email',
+            'Tanggal Registrasi',
+            'POP Cabang',
+            'Alamat Instalasi Lengkap',
+            'Latitude',
+            'Longitude',
+            'Paket Internet',
+            'Jenis Kontrak',
+            'Masa Kontrak (Bulan)',
+            'Diskon Promosi (Rp)',
+            'ID Sales/ID Agent',
+        ];
+    }
+
+    /**
+     * ID pelanggan untuk kolom A. Satu sumber aturan: `Pop::resolveDisplayId()`
+     * (dulu disalin di sini, lalu tidak sinkron kalau aturan berubah). Tanpa POP,
+     * tidak ada prefix maupun pemotongan REQ ID, jadi pakai kode mentah.
+     */
+    private function exportCustomerId(Customer $customer): string
+    {
+        return $customer->pop
+            ? $customer->pop->resolveDisplayId($customer)
+            : (string) $customer->customer_code;
+    }
+
+    /**
+     * @return list<string|float|int>
+     */
+    private function exportDataRow(Customer $customer): array
+    {
+        $salesOrAgent = array_filter([
+            $customer->salesUser?->name,
+            $customer->agent?->code,
+        ]);
+
+        return [
+            $this->exportCustomerId($customer),
+            $customer->full_name,
+            $customer->identity_number ?? '-',
+            $customer->gender?->label() ?? '-',
+            $customer->primary_phone ?? '-',
+            $customer->alternative_phone ?? '-',
+            $customer->npwp ?? '-',
+            $customer->email ?? '-',
+            $customer->registration_date?->format('Y-m-d') ?? '-',
+            $customer->pop?->name ?? '-',
+            $customer->address ?? '-',
+            $customer->latitude ?? '-',
+            $customer->longitude ?? '-',
+            $customer->internetPackage?->name ?? '-',
+            $customer->customerService?->contract_type ?? '-',
+            $customer->contract_period_months ?? '-',
+            (int) ($customer->discount_amount ?? 0),
+            $salesOrAgent ? implode(' / ', $salesOrAgent) : '-',
+        ];
     }
 }

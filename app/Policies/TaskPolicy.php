@@ -18,8 +18,31 @@ class TaskPolicy
     /**
      * Owner dengan wildcard permission bypass semua.
      */
-    public function before(User $user, string $ability): ?bool
+    /**
+     * Aksi sisi FOP/koordinator yang DIKUNCI selama task Lapor Nanti —
+     * keputusan user 2026-09-26: Lapor Nanti terkunci ke teknisi, satu-satunya
+     * jalan keluar adalah teknisi mengirim laporan.
+     */
+    private const LOCKED_WHILE_REPORT_DEFERRED = [
+        'edit', 'editType', 'schedule', 'assignTeam',
+        'cancel', 'cancelViaFopTask',
+        'fopReject', 'fopPending', 'statusReschedule',
+    ];
+
+    public function before(User $user, string $ability, mixed ...$arguments): ?bool
     {
+        // Dicek SEBELUM bypass wildcard — tanpa ini owner ber-permission '*'
+        // tetap bisa reject/pending/batalkan task Lapor Nanti lewat URL
+        // langsung, dan kuncinya cuma berlaku buat role biasa.
+        $task = $arguments[0] ?? null;
+        if ($task instanceof Task
+            && $task->status instanceof TaskStatus
+            && $task->status->isLockedFromFop()
+            && in_array($ability, self::LOCKED_WHILE_REPORT_DEFERRED, true)
+        ) {
+            return false;
+        }
+
         // 'cancel' & 'cancelViaFopTask' sengaja DIKELUARIN dari bypass wildcard —
         // SRV/PSB gak boleh dibatalkan lewat jalur Task sama sekali (harus lewat
         // halaman Customer), aturan ini berlaku buat SEMUA role termasuk
@@ -161,6 +184,11 @@ class TaskPolicy
             return false;
         }
 
+        // Lapor Nanti terkunci ke teknisi (keputusan user 2026-09-26).
+        if ($task->status->isLockedFromFop()) {
+            return false;
+        }
+
         return $this->canTransitionTo($user, $task, 'dibatalkan') && ! in_array($task->status->value, ['selesai', 'dibatalkan']);
     }
 
@@ -192,7 +220,7 @@ class TaskPolicy
             return false;
         }
 
-        if (in_array($task->status->value, ['selesai', 'dibatalkan'], true)) {
+        if (in_array($task->status->value, ['selesai', 'dibatalkan'], true) || $task->status->isLockedFromFop()) {
             return false;
         }
 
@@ -254,24 +282,34 @@ class TaskPolicy
      */
     public function statusComplete(User $user, Task $task): bool
     {
-        $canTransition = $this->canTransitionTo($user, $task, 'selesai');
-        if (! $canTransition && $task->status === TaskStatus::PENDING && in_array($task->task_type->value, [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])) {
-            $canTransition = true;
+        // Status yang boleh menerima laporan diputuskan SATU tempat saja
+        // (TaskStatus::acceptsReport()) — dulu di sini ada daftar sendiri +
+        // pengecualian PENDING khusus SURVEY/PSB, dan task Lapor Nanti tipe
+        // lain (MTN/C-REQ/DEAC) kehilangan tombol laporannya.
+        if (! $task->status->acceptsReport() || ! $task->isMember($user->id)) {
+            return false;
         }
 
-        return $canTransition && $task->isMember($user->id);
+        // Lapor Nanti menumpang aturan transisi `in_progress → selesai`: dari
+        // sisi hak akses keduanya kejadian yang sama (teknisi yang kerja
+        // mengirim laporan), dan WorkflowTransitionPermissionSeeder men-
+        // truncate tabelnya tiap jalan — aturan baru `lapor_nanti → selesai`
+        // gak akan ada di DB produksi sampai seeder itu dijalankan ulang.
+        return $this->canTransition($user, TaskStatus::IN_PROGRESS->value, 'selesai');
     }
 
     /**
-     * Set task ke Pending.
+     * Lapor Nanti — cuma dari Sedang Dikerjakan, cuma anggota tim.
      */
-    public function statusPending(User $user, Task $task): bool
+    public function statusDeferReport(User $user, Task $task): bool
     {
-        return $user->hasPermission('task.execute') && $task->isMember($user->id);
+        return $user->hasPermission('task.execute')
+            && $task->isMember($user->id)
+            && $task->status === TaskStatus::IN_PROGRESS;
     }
 
     /**
-     * Pending top-level (reschedule penuh) — beda dari statusPending (Lapor Nanti,
+     * Pending top-level (reschedule penuh) — beda dari statusDeferReport (Lapor Nanti,
      * assignment tetap) dan fopPending (FOP-side, assignment tetap). Ini lepas
      * assignment & balik ke antrian FOP, cuma boleh sebelum task selesai.
      */
@@ -291,6 +329,11 @@ class TaskPolicy
     {
         $fromStatus = $task->status instanceof TaskStatus ? $task->status->value : $task->status;
 
+        return $this->canTransition($user, $fromStatus, $newStatus);
+    }
+
+    private function canTransition(User $user, string $fromStatus, string $newStatus): bool
+    {
         $rule = WorkflowTransitionPermission::where('from_status', $fromStatus)
             ->where('to_status', $newStatus)
             ->first();

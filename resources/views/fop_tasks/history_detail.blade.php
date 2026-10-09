@@ -28,8 +28,8 @@
                         default => 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
                     };
                     $statusLabel = $fopTask->task
-                        ? $fopTask->task->status->displayLabel($fopTask->task->report_deferred)
-                        : $fopTask->status->displayLabel();
+                        ? $fopTask->task->status->label()
+                        : $fopTask->status->label();
                 @endphp
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border font-ui {{ $statusBadge }}">
                     {{ $statusLabel }}
@@ -258,6 +258,35 @@
             </div>
         </div>
 
+        {{--
+            Pelanggan Terdampak — tiket batch (kategori is_batch, mis. ODP
+            LOS). Grid "Data Pelanggan" di atas mubazir buat kasus ini (gak
+            ada satu pelanggan yang diacu, kolomnya dash semua) — FOP yang
+            buka Detail Task dari papan WAJIB lihat daftar SEMUA pelanggan
+            terdampak di sini, sama kayak teknisi di tasks/show.blade.php
+            (Ticket::isBatch()/batchMembers()).
+        --}}
+        @if($ticket->isBatch())
+        <div class="px-4 pb-4">
+            <p class="text-[10px] font-semibold text-violet-500 dark:text-violet-400 uppercase tracking-wider font-ui mb-2">
+                Pelanggan Terdampak ({{ $ticket->batchMembers->count() }})
+            </p>
+            @if($ticket->batchMembers->isEmpty())
+                <p class="text-[11px] text-amber-600 dark:text-amber-400 font-ui">Belum ada pelanggan terdampak dicatat — cek halaman Worksheet Helpdesk.</p>
+            @else
+            <div class="border border-violet-200 dark:border-violet-800/50 bg-violet-50/60 dark:bg-violet-900/10 rounded p-3 space-y-1.5">
+                @foreach($ticket->batchMembers as $member)
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-ui">
+                    <span class="font-bold text-slate-800 dark:text-slate-200">{{ $member->customer_name }}</span>
+                    <span class="font-mono text-slate-500 dark:text-slate-400">{{ $member->cid ?: '—' }}</span>
+                    <span class="font-mono text-slate-500 dark:text-slate-400">{{ $member->phone ?: '—' }}</span>
+                </div>
+                @endforeach
+            </div>
+            @endif
+        </div>
+        @endif
+
         {{-- Issue/Gangguan & Catatan Teknis — dipisah jadi 2 blok utuh sendiri
              (bukan berbagi 1 baris grid), masing-masing sumbernya beda dan
              gak boleh ketuker: Issue/Gangguan dari $ticket->detail_keluhan
@@ -454,8 +483,26 @@
                     <p class="font-medium text-slate-800 dark:text-slate-200">Jitter {{ $technicalDetail?->jitter_ms ?? '—' }}ms, Loss {{ $technicalDetail?->packet_loss_percent ?? '—' }}%</p>
                 </div>
                 @php
+                    // ADHOC-54 — gabungan Aktif (inventory_serials) + Pasif
+                    // (task_materials) per fop_task_id, sesuai §3.4 rancangan-ui.md.
+                    // Ditaruh DI SINI (bukan halaman Verifikasi Admin) karena FOP
+                    // gak punya `customers.detail.installation.validate` (itu
+                    // permission approval, bukan buat FOP) — halaman ini gerbangnya
+                    // `fop_tasks.view` yang FOP emang udah punya.
                     $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+                    $installedSerials = $fopTask->inventorySerials()->with('item')->get();
                 @endphp
+                @if($installedSerials->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Perangkat Aktif Terpasang (Gudang)</p>
+                    @foreach($installedSerials as $serial)
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400">{{ $serial->item->name ?? '-' }}</span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">SN {{ $serial->serial_number }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
                 @if($materialTerpakai->isNotEmpty())
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Perangkat Pasif Terpakai</p>
@@ -489,13 +536,49 @@
             @else
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan pemasangan.</p>
             @endif
-        @elseif($fopTask->category === \App\Enums\TaskType::MAINTENANCE)
+        @elseif(in_array($fopTask->category, [\App\Enums\TaskType::MAINTENANCE, \App\Enums\TaskType::CREQ, \App\Enums\TaskType::OREQ, \App\Enums\TaskType::INFR], true))
+            {{-- MTN/C-REQ/O-REQ/INFR REQ SEMUA lewat form & controller yang sama
+                 (TaskMaintenanceController::store(), lihat komentar di sana) —
+                 satu-satunya yang dikecualikan dari form ini cuma SURVEY/PSB.
+                 Jadi ke-4 tipe ini WAJIB dapet tampilan Laporan + Material
+                 Terpakai yang sama, bukan cuma MAINTENANCE doang seperti
+                 sebelumnya (ketauan gap 2026-09-10: C-REQ/O-REQ/INFR punya
+                 maintenance_report + task_materials + custody kepotong di
+                 Gudang, tapi Detail Task FOP nampilin "tidak punya laporan
+                 terstruktur" — data-nya ADA, cuma gak ditampilin). --}}
             @if($maintenance)
+            @php
+                $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+                // SN modem yang dipasang lewat laporan ini — sumber sama dengan
+                // Detail Task (transaksi INSTALL per fop_task), bukan
+                // inventory_serials.fop_task_id yang bisa berpindah kalau SN
+                // itu belakangan ditarik & dipasang ulang di task lain.
+                $maintenanceInstalledSerials = \App\Models\InventoryTransaction::where('fop_task_id', $fopTask->id)
+                    ->where('type', \App\Enums\InventoryTransactionType::INSTALL->value)
+                    ->with(['serial.item', 'item'])
+                    ->get();
+            @endphp
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line break-words [word-break:break-word]">{{ $maintenance->kendala_teknis }}</p>
                 </div>
+                @if($fopTask->category === \App\Enums\TaskType::CREQ && $fopTask->task?->creqDetail)
+                <div class="col-span-2">
+                    @include('tasks.partials.creq-detail', ['task' => $fopTask->task])
+                </div>
+                @endif
+                @if($maintenanceInstalledSerials->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Modem/Perangkat Aktif Terpasang</p>
+                    @foreach($maintenanceInstalledSerials as $tx)
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400">{{ $tx->item->name ?? '-' }}</span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">SN {{ $tx->serial?->serial_number ?? '—' }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
                     <div class="flex flex-wrap gap-1.5 mt-1">
@@ -506,6 +589,27 @@
                         @endforeach
                     </div>
                 </div>
+                @if($materialTerpakai->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Material Terpakai (Gudang)</p>
+                    @foreach($materialTerpakai as $material)
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400">{{ $material->item_name }}@if($material->lot_no)<span class="font-mono text-slate-400 dark:text-slate-500"> · Roll {{ $material->lot_no }}</span>@endif @if($material->note)<span class="text-slate-400 dark:text-slate-500"> · {{ $material->note }}</span>@endif</span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+                @if($fopTask->workTools->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Alat Kerja Opsional</p>
+                    <div class="flex flex-wrap gap-1.5 mt-1">
+                        @foreach($fopTask->workTools as $tool)
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">{{ $tool->tool_name }}</span>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
                 @if($maintenance->opm_photo || $maintenance->speedtest_photo)
                 <div class="col-span-2 flex gap-3 flex-wrap">
                     @if($maintenance->opm_photo)
@@ -518,7 +622,99 @@
                 @endif
             </div>
             @else
-            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan maintenance.</p>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan {{ $fopTask->category->label() }}.</p>
+            @endif
+        @elseif($fopTask->category === \App\Enums\TaskType::AMBIL_MODEM)
+            {{-- Ambil Modem (DEAC) punya laporan sendiri (`task_device_retrievals`) —
+                 sebelumnya kategori ini jatuh ke @else di bawah ("tidak punya laporan
+                 lapangan terstruktur") sehingga Riwayat Task FOP tidak menampilkan
+                 apa pun dan foto kondisi alat tidak terlampir (ADHOC-88). SN per
+                 modem dibaca dari `device_retrieval_logs` (posisi sekarang: transit
+                 di teknisi atau sudah diterima gudang). --}}
+            @php
+                $retrieval = $fopTask->task?->deviceRetrieval;
+                $retrievalLogs = $retrieval
+                    ? \App\Models\DeviceRetrievalLog::where('task_id', $fopTask->task_id)
+                        ->with(['item', 'receivedBy', 'warehousePop'])
+                        ->orderBy('id')
+                        ->get()
+                    : collect();
+                $retrievalOutcome = $retrieval?->outcome;
+                $retrievalPhotoUrl = $retrieval ? foto_publik($retrieval->condition_photo) : null;
+            @endphp
+            @if($retrieval)
+            <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
+                <div>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Hasil di Lapangan</p>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border {{ $retrievalOutcome->isRetrieved() ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100' }}">{{ $retrievalOutcome->label() }}</span>
+                </div>
+                <div>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Dilaporkan Oleh</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->task?->completedBy?->name ?? '—' }}
+                        @if($retrieval->updated_at)<span class="text-slate-400 dark:text-slate-500 font-normal font-mono"> · {{ $retrieval->updated_at->format('d/m/Y H:i') }}</span>@endif
+                    </p>
+                </div>
+
+                @if($retrievalOutcome->isRetrieved())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Modem yang Dibawa</p>
+                    @forelse($retrievalLogs as $log)
+                    <div class="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-1.5">
+                        <span class="text-slate-600 dark:text-slate-400 min-w-0">
+                            {{ $log->item?->name ?? 'Modem' }}
+                            <span class="block font-mono font-semibold text-slate-800 dark:text-slate-200 select-all">SN: {{ $log->serial_number }}</span>
+                        </span>
+                        <span class="text-right shrink-0">
+                            @if($log->isReceived())
+                            <span class="font-semibold text-emerald-600 dark:text-emerald-400">Diterima gudang</span>
+                            <span class="block text-slate-400 dark:text-slate-500">{{ $log->warehousePop?->name }} · {{ $log->receivedBy?->name ?? '—' }} · {{ $log->received_at->format('d/m/Y') }}</span>
+                            @if($log->condition)<span class="block text-slate-400 dark:text-slate-500">Kondisi: {{ $log->condition->label() }}</span>@endif
+                            @else
+                            <span class="font-semibold text-amber-600 dark:text-amber-400">Transit — di teknisi</span>
+                            <span class="block text-slate-400 dark:text-slate-500">Menunggu diterima gudang</span>
+                            @endif
+                        </span>
+                    </div>
+                    @empty
+                    <p class="text-slate-400 dark:text-slate-500 italic">Belum ada SN tercatat untuk laporan ini.</p>
+                    @endforelse
+                </div>
+
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kelengkapan yang Ikut Dibawa</p>
+                    <div class="flex flex-wrap gap-1.5 mt-1">
+                        @forelse(($retrieval->accessories ?? []) as $accessory)
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">{{ \App\Models\TaskDeviceRetrieval::ACCESSORY_OPTIONS[$accessory] ?? $accessory }}</span>
+                        @empty
+                        <span class="text-slate-400 dark:text-slate-500">Tidak ada kelengkapan dicatat.</span>
+                        @endforelse
+                    </div>
+                </div>
+                @endif
+
+                @if($retrieval->notes)
+                <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">{{ $retrievalOutcome->isRetrieved() ? 'Catatan Teknisi' : 'Alasan Alat Tidak Diambil' }}</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line break-words [word-break:break-word]">{{ $retrieval->notes }}</p>
+                </div>
+                @endif
+
+                @if($retrievalPhotoUrl)
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Foto Kondisi Alat</p>
+                    <a href="{{ $retrievalPhotoUrl }}" target="_blank" class="inline-block">
+                        <img src="{{ $retrievalPhotoUrl }}" alt="Foto Kondisi Alat" class="h-28 w-28 object-cover rounded border border-slate-200 dark:border-slate-700">
+                    </a>
+                    <a href="{{ $retrievalPhotoUrl }}" target="_blank" class="block mt-1 text-blue-600 hover:underline">Foto Kondisi Alat →</a>
+                </div>
+                @elseif($retrieval->condition_photo)
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 italic">Foto kondisi alat tercatat, tetapi filenya tidak ditemukan di penyimpanan.</p>
+                </div>
+                @endif
+            </div>
+            @else
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan pengambilan alat.</p>
             @endif
         @else
             <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Tipe task ini tidak punya laporan lapangan terstruktur.</p>

@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DepositStatus;
+use App\Models\BankAccount;
 use App\Models\CollectorDeposit;
 use App\Models\CollectorVisit;
 use App\Services\CollectorBalanceService;
 use App\Services\CollectorWorklistService;
+use App\Services\CustomerBalanceService;
+use App\Support\LikeSearch;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -35,11 +39,26 @@ class CollectorWorklistController extends Controller
         private readonly CollectorBalanceService $balance,
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         $collector = $request->user();
 
-        $search = trim((string) $request->query('search', ''));
+        // Teknisi (termasuk PIC gudang) TIDAK punya worklist kolektor. Pelanggan
+        // teknisi tidak di-assign admin, jadi worklist ini (yang berbasis
+        // assignment) tidak pernah relevan buat mereka. Teknisi dikirim ke
+        // halaman Catat Pembayaran yang mencari pelanggan dalam POP scope-nya.
+        if ($collector->isTechnician()) {
+            return redirect()->route('technician-payments.index');
+        }
+
+        // Dua tab: `tagihan` (default, siapa yang perlu didatangi) dan
+        // `bayar` (siapa yang SUDAH bayar dan uangnya sedang menunggu
+        // disetor). Kolektor sering perlu cross check sendiri sebelum
+        // menekan "Setor ke Admin" — nama & nominal siapa saja yang bakal
+        // ikut ke setoran itu, bukan cuma total saldonya.
+        $tab = $request->query('tab') === 'bayar' ? 'bayar' : 'tagihan';
+
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
 
         $query = $this->worklist->dueInvoices($collector, $collector);
 
@@ -63,7 +82,6 @@ class CollectorWorklistController extends Controller
         // daftar invoice acak yang memaksa kolektor bolak-balik (§10 no. 2).
         $canPay = $collector->hasPermission('kolektor.pay') && $collector->hasRole('kolektor');
         $canDeposit = $collector->hasPermission('kolektor.deposit') && $collector->hasRole('kolektor');
-        $dueWindowDays = $this->worklist->dueWindowDays();
 
         // Saldo = Σ pembayaran yang belum ikut setoran. Angka TURUNAN, bukan
         // kolom — lihat CollectorBalanceService.
@@ -96,10 +114,27 @@ class CollectorWorklistController extends Controller
             ->orderByDesc('submitted_at')
             ->get();
 
+        // Rincian tab "Sudah Bayar" — daftar PAYMENT (bukan invoice) yang
+        // belum ikut setoran mana pun. Ini persis isi setoran yang akan
+        // terbentuk kalau tombol "Setor ke Admin" ditekan SEKARANG — kolektor
+        // berhak tahu siapa saja & berapa sebelum menyerahkan uangnya.
+        $unsettledPayments = $tab === 'bayar'
+            ? $this->balance->unsettledPaymentsQuery($collector)
+                ->with(['customer:id,full_name,cid,customer_code', 'invoice:id,billing_period'])
+                ->orderByDesc('id')
+                ->paginate(50, ['*'], 'unsettled_page')
+                ->withQueryString()
+            : null;
+
+        $bankAccounts = BankAccount::activeOptions();
+        $customerBalances = app(CustomerBalanceService::class)->balancesForCustomers(
+            collect($invoices->items())->pluck('customer_id')->all()
+        );
+
         return view('collector-worklist.index', compact(
-            'invoices', 'canPay', 'canDeposit', 'canLogVisit', 'dueWindowDays',
+            'tab', 'invoices', 'canPay', 'canDeposit', 'canLogVisit',
             'balance', 'unsettledCount', 'outstandingShortfall', 'pendingDeposits',
-            'visitCandidates', 'todayVisits', 'search',
+            'unsettledPayments', 'visitCandidates', 'todayVisits', 'search', 'bankAccounts', 'customerBalances',
         ));
     }
 }

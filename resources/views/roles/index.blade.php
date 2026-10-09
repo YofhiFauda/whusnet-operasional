@@ -273,7 +273,7 @@
                                     @if($canManage && auth()->user()->hasPermission('roles.update'))
                                         <button
                                             type="button"
-                                            onclick="openEditModal({{ $role->id }}, '{{ addslashes($role->name) }}', '{{ addslashes($role->code) }}', '{{ addslashes($role->description ?? '') }}', {{ $role->is_system ? 'true' : 'false' }})"
+                                            onclick="openEditModal({{ $role->id }}, '{{ addslashes($role->name) }}', '{{ addslashes($role->code) }}', '{{ addslashes($role->description ?? '') }}', {{ $role->is_system ? 'true' : 'false' }}, {{ $role->is_package_restricted ? 'true' : 'false' }})"
                                             class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline underline-offset-2 transition-colors"
                                             title="Edit role {{ $role->name }}"
                                         >
@@ -430,19 +430,30 @@
                 @enderror
             </div>
 
-        </div>
-
-        <x-slot name="footer">
-            <div class="flex items-center justify-end gap-2">
-                <x-ui.button type="button" variant="secondary" @click="show = false">
-                    Batal
-                </x-ui.button>
-                <x-ui.button type="submit" variant="primary" id="modalSubmitBtn">
-                    Simpan Role
-                </x-ui.button>
+            {{-- Restriksi Paket per Role (Skema 1, 2026-09-12) --}}
+            <div class="flex items-start gap-2 pt-1">
+                <input type="checkbox" name="is_package_restricted" id="roleIsPackageRestricted" value="1"
+                       class="mt-0.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                <label for="roleIsPackageRestricted" class="text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+                    <span class="font-semibold">Batasi pilihan paket internet</span> — role ini cuma boleh pilih paket dari daftar yang diatur Business Development di
+                    <a href="{{ route('business-development.package-restrictions.index') }}" target="_blank" class="text-sky-600 dark:text-sky-400 underline">Restriksi Paket</a>.
+                    Kalau daftarnya masih kosong, sementara tetap tampil semua paket aktif.
+                </label>
             </div>
-        </x-slot>
+
+        </div>
     </form>
+
+    <x-slot name="footer">
+        <div class="flex items-center justify-end gap-2">
+            <x-ui.button type="button" variant="secondary" @click="show = false">
+                Batal
+            </x-ui.button>
+            <x-ui.button type="submit" form="roleForm" variant="primary" id="modalSubmitBtn">
+                Simpan Role
+            </x-ui.button>
+        </div>
+    </x-slot>
 </x-ui.modal>
 
 @section('scripts')
@@ -509,8 +520,10 @@
 
         document.getElementById('roleName').value = '';
         document.getElementById('roleCode').value = '';
-        document.getElementById('roleCode').disabled = false;
+        document.getElementById('roleCode').readOnly = false;
+        document.getElementById('roleCode').classList.remove('opacity-50', 'cursor-not-allowed', 'bg-surface-muted');
         document.getElementById('roleDescription').value = '';
+        document.getElementById('roleIsPackageRestricted').checked = false;
 
         document.getElementById('codeHint').innerHTML =
             'Huruf kecil, angka, dan underscore. Contoh: <span class="font-mono text-slate-700 dark:text-slate-300">pop_admin</span>';
@@ -524,7 +537,7 @@
     }
 
     // ---- Buka modal untuk EDIT role ----
-    function openEditModal(id, name, code, description, isSystem) {
+    function openEditModal(id, name, code, description, isSystem, isPackageRestricted) {
         const form = document.getElementById('roleForm');
         form.action = '{{ url("roles") }}/' + id;
         document.getElementById('formMethod').value = 'PUT';
@@ -532,14 +545,20 @@
         document.getElementById('roleName').value = name;
         document.getElementById('roleCode').value = code;
         document.getElementById('roleDescription').value = description;
+        document.getElementById('roleIsPackageRestricted').checked = !!isPackageRestricted;
 
         const codeInput = document.getElementById('roleCode');
         const codeHint  = document.getElementById('codeHint');
         if (isSystem) {
-            codeInput.disabled = true;
+            // readonly, BUKAN disabled — input disabled gak ikut ke-submit
+            // browser standar, bikin field "code" kosong pas dikirim dan
+            // nabrak validasi required di server (ADHOC, 2026-09-10).
+            codeInput.readOnly = true;
+            codeInput.classList.add('opacity-50', 'cursor-not-allowed', 'bg-surface-muted');
             codeHint.textContent = 'Kode role sistem tidak dapat diubah.';
         } else {
-            codeInput.disabled = false;
+            codeInput.readOnly = false;
+            codeInput.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-surface-muted');
             codeHint.innerHTML = 'Huruf kecil, angka, dan underscore. Contoh: <span class="font-mono text-slate-700 dark:text-slate-300">pop_admin</span>';
         }
 

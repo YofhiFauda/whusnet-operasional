@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\CustomerPortal;
 
+use App\Enums\CollectorRole;
 use App\Http\Controllers\Controller;
+use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\StaffPortalToken;
 use App\Models\User;
 use App\Services\CollectorWorklistService;
-use App\Services\CustomerQrTokenService;
+use App\Services\CustomerBalanceService;
 use App\Traits\RecordsCollectorBatch;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\Response as ScrambleResponse;
@@ -31,7 +33,6 @@ class PortalStaffKolektorController extends Controller
     use RecordsCollectorBatch;
 
     public function __construct(
-        private readonly CustomerQrTokenService $qrTokens,
         private readonly CollectorWorklistService $worklist,
     ) {}
 
@@ -62,7 +63,7 @@ class PortalStaffKolektorController extends Controller
 
         /** @var User $collector */
         $collector = User::findOrFail($token->user_id);
-        $customer = $this->resolveTokenCustomer($token, $code);
+        $customer = $this->resolveStaffPortalCustomer($token, $code);
 
         $invoices = $this->worklist->dueInvoices($collector, $collector)
             ->whereHas('customer', fn ($q) => $q->where('customers.id', $customer->id))
@@ -81,7 +82,12 @@ class PortalStaffKolektorController extends Controller
                 'customer' => [
                     'customer_code' => $customer->customer_code,
                     'full_name' => $customer->full_name,
+                    // Saldo ikut dikirim supaya form bisa memakainya (pakai saldo
+                    // seperti Bayar admin). String desimal, sama konvensi response lain.
+                    'balance' => (string) app(CustomerBalanceService::class)->balance($customer),
                 ],
+                // Rekening tujuan Transfer — master, bukan input bebas (ADHOC-95).
+                'bank_accounts' => BankAccount::activeOptions(),
                 'invoices' => $invoices->map(fn ($invoice) => [
                     'id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number,
@@ -130,38 +136,8 @@ class PortalStaffKolektorController extends Controller
 
         $validated = $request->validate($this->batchValidationRules());
 
-        $response = $this->recordBatch($collector, $collector, $validated);
-
-        // Konsumsi HANYA kalau batch beneran diproses (bukan "sudah pernah
-        // diproses" — idempotency key lama dipanggil ulang seharusnya tidak
-        // menghanguskan token yang notabene belum pernah dipakai sukses) dan
-        // BUKAN kegagalan validasi (staf masih boleh perbaiki & submit ulang
-        // pakai token yang sama, sama pola dengan dedup guard tiket §1.2).
-        $payload = $response->getData(true);
-        if (($payload['success'] ?? false) === true && ($payload['already_processed'] ?? false) === false) {
-            $token->consume();
-        }
-
-        return $response;
-    }
-
-    /**
-     * Resolve QR `$code` → `Customer`, DAN pastikan itu pelanggan yang SAMA
-     * dengan yang tertaut ke `$token` — token diterbitkan buat satu pelanggan
-     * spesifik (§4 dokumen), `$code` di URL cuma bukti tambahan Portal masih
-     * di halaman yang benar, BUKAN sumber identitas pelanggan yang baru.
-     * Mencegah staf menukar `code` di URL manual buat "memakai" token
-     * pelanggan A ke pelanggan B.
-     */
-    private function resolveTokenCustomer(StaffPortalToken $token, string $code): Customer
-    {
-        [$rawToken, $signature] = array_pad(explode('.', $code, 2), 2, '');
-        $resolution = $this->qrTokens->resolve($rawToken, $signature);
-
-        if ($resolution['status'] !== 'success' || (int) $resolution['qrToken']->customer_id !== $token->customer_id) {
-            abort(404);
-        }
-
-        return Customer::findOrFail($token->customer_id);
+        // Kunci token, cek pelanggan token, konsumsi, dan notifikasi setelah commit:
+        // lihat RecordsCollectorBatch::recordStaffPortalBatch() (sama dengan jalur teknisi).
+        return $this->recordStaffPortalBatch($token, $collector, $validated, CollectorRole::KOLEKTOR);
     }
 }

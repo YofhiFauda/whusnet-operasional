@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ImportBatch;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -22,7 +23,7 @@ class ImportReportController extends Controller
         }
 
         // Ambil data filter
-        $search = $request->query('search', '');
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $status = $request->query('status', '');
         $startDate = $request->query('start_date', '');
         $endDate = $request->query('end_date', '');

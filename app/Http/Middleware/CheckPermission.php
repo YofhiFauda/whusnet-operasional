@@ -20,6 +20,7 @@ class CheckPermission
         }
 
         $user = auth()->user();
+        $user->loadMissing('role');
 
         // Support full-access bypass
         if ($user->hasPermission('*')) {

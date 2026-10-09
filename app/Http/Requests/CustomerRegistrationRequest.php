@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Enums\Gender;
+use App\Models\InternetPackage;
+use App\Models\RestrictedPackage;
 use App\Support\RupiahInput;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -71,16 +73,46 @@ class CustomerRegistrationRequest extends FormRequest
             'city_id' => 'required|exists:cities,id',
             'district_id' => 'required|exists:districts,id',
             'village_id' => 'required|exists:villages,id',
-            'internet_package_id' => 'required|exists:internet_packages,id',
+            'internet_package_id' => [
+                'required',
+                'exists:internet_packages,id',
+                // Restriksi Paket per Role (Skema 1, 2026-09-12) — role
+                // ber-`is_package_restricted` cuma boleh submit paket yang
+                // ada di restricted_packages, TERLEPAS dari apa yang
+                // ditampilkan dropdown (cegah bypass manipulasi request
+                // langsung). Lihat InternetPackage::scopeAvailableFor().
+                function ($attribute, $value, $fail) {
+                    // Fail-open selama restricted_packages masih kosong sama
+                    // sekali — lihat InternetPackage::scopeAvailableFor().
+                    if (auth()->user()?->role?->is_package_restricted
+                        && RestrictedPackage::query()->exists()
+                        && ! RestrictedPackage::where('package_id', $value)->exists()) {
+                        $fail('Paket yang dipilih tidak termasuk daftar paket yang diizinkan untuk role Anda.');
+                    }
+                },
+            ],
             'contract_period_months' => 'required|integer|min:1',
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
             'other_fee' => 'nullable|numeric|min:0',
+            // jenis_kontrak & npwp — input-nya sudah ada di form sejak awal
+            // tapi TIDAK PERNAH divalidasi di sini, jadi keduanya kekirim
+            // percuma (silent drop, npwp bukan kolom yang di-set manapun,
+            // jenis_kontrak gak pernah nyampe customer_services.contract_type).
+            // Ditemukan &amp; diperbaiki 2026-09-12 lewat sisir Edit Pelanggan
+            // vs Registrasi/Laporan Survey/Laporan Pemasangan.
+            'npwp' => 'nullable|string|max:30',
+            'jenis_kontrak' => 'nullable|string|in:sewa,beli',
 
-            // Referrals
+            // Referrals — kolom lama (varchar) dipertahankan buat kompatibilitas
+            // jalur import lama, TAPI form registrasi (Skema 3, 2026-09-12)
+            // sekarang pakai FK di bawah.
             'sales_code' => 'nullable|string|max:30',
             'agent_code' => 'nullable|string|max:30',
             'referral_customer_code' => 'nullable|string|max:30',
+            'sales_user_id' => 'nullable|exists:users,id',
+            'agent_id' => 'nullable|exists:agents,id',
+            'referral_customer_id' => 'nullable|exists:customers,id',
 
             // Technical specs
             'ont_sn' => 'nullable|string|max:100',
@@ -92,8 +124,32 @@ class CustomerRegistrationRequest extends FormRequest
             'status' => 'nullable|string|max:50',
 
             // Documents
-            'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
-            'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
+            // Foto Rumah cuma ada di blok Skip Survey (wajib di sana). Di jalur
+            // normal field ini dihapus, jadi upload yang nyasar ditolak, bukan
+            // diam-diam tersimpan.
+            'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'prohibited_unless:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf|max:2048',
+            // FAB (Formulir Akan Berlangganan Bisnis) — wajib kalau kategori
+            // paket yang dipilih adalah kategori Bisnis (mis. "Paket Bisnis
+            // Broadband/UKM/Dedicated"), BUKAN restricted_packages —
+            // restricted_packages itu whitelist paket per role (Skema 1,
+            // isinya bisa paket reguler seperti Net138), gak ada hubungan
+            // dengan jenis pelanggan bisnis/rumahan. Cocok kategori dicek
+            // via substring "bisnis" (case-insensitive) supaya gak hardcode
+            // ID/nama kategori — nama kategori dikelola admin lewat
+            // PackageCategory dan boleh berubah.
+            'fab_document' => [
+                'nullable',
+                Rule::requiredIf(function () {
+                    $packageId = $this->input('internet_package_id');
+                    $category = $packageId
+                        ? InternetPackage::where('id', $packageId)->value('category')
+                        : null;
+
+                    return $category && stripos($category, 'bisnis') !== false;
+                }),
+                'file', 'mimes:jpeg,png,jpg,webp,pdf', 'max:4096',
+            ],
 
             // Skip Survey — Sales input data survey langsung saat registrasi
             // (lihat ActionCode::SKIP_SURVEY). Field-field di bawah cuma
@@ -102,7 +158,7 @@ class CustomerRegistrationRequest extends FormRequest
             'nearest_odp' => ['nullable', 'required_if:skip_survey,1', 'string', 'max:255'],
             'cable_estimation_meter' => ['nullable', 'required_if:skip_survey,1', 'integer', 'min:0'],
             'difficulty_level' => ['nullable', 'required_if:skip_survey,1', 'in:MUDAH,SEDANG,SULIT'],
-            'survey_photo' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
+            'survey_photo' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             // Opsional (sama seperti Lapor Survey teknisi) — diisi hanya kalau
             // pelanggan minta dipasang di tanggal tertentu. after_or_equal:today:
             // tanggal lampau gak ada artinya dan bikin task lahir langsung
@@ -127,6 +183,7 @@ class CustomerRegistrationRequest extends FormRequest
             'latitude.required_if' => 'Titik koordinat (Latitude) wajib diisi saat Skip Survey aktif.',
             'longitude.required_if' => 'Titik koordinat (Longitude) wajib diisi saat Skip Survey aktif.',
             'foto_rumah.required_if' => 'Foto Rumah wajib diunggah saat Skip Survey aktif.',
+            'fab_document.required' => 'Formulir Akan Berlangganan Bisnis (FAB) wajib diunggah untuk paket yang divalidasi Business Development.',
             'nearest_odp.required_if' => 'ODP Terdekat wajib diisi saat Skip Survey aktif.',
             'cable_estimation_meter.required_if' => 'Estimasi Kabel wajib diisi saat Skip Survey aktif.',
             'difficulty_level.required_if' => 'Tingkat Kesulitan wajib dipilih saat Skip Survey aktif.',

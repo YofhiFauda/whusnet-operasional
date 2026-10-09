@@ -60,7 +60,7 @@ class FopTaskProvisioningService
             $customer->loadMissing(['pop', 'latestSurvey']);
 
             return FopTask::create([
-                'task_number' => $this->generateTaskNumber(),
+                'task_number' => app(NumberSequenceService::class)->fopTaskNumber(),
                 'task_date' => now(),
                 'category' => $category,
                 // Identitas pelanggan yang dipakai seluruh sistem, bukan label
@@ -108,21 +108,5 @@ class FopTaskProvisioningService
         }
 
         return $query->first();
-    }
-
-    /**
-     * Nomor TFOP berikutnya. Format wajib identik dengan
-     * `TicketService::generateFopTaskNumber()` — keduanya menulis ke deret yang
-     * sama (CLAUDE.md § penomoran).
-     */
-    public function generateTaskNumber(): string
-    {
-        $year = date('Y');
-        $lastNum = FopTask::where('task_number', 'like', "TFOP-{$year}-%")
-            ->pluck('task_number')
-            ->map(fn ($taskNumber) => (int) substr($taskNumber, strrpos($taskNumber, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('TFOP-%s-%04d', $year, $lastNum + 1);
     }
 }

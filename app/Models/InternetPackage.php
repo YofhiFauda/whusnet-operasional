@@ -41,13 +41,6 @@ class InternetPackage extends Model
 
     protected string $auditModule = 'Master Paket';
 
-    public const CATEGORIES = [
-        'Paket Home Broadband' => 'Paket Home Broadband',
-        'Paket Bisnis Broadband' => 'Paket Bisnis Broadband',
-        'Paket Bisnis UKM' => 'Paket Bisnis UKM',
-        'Paket Bisnis Dedicated' => 'Paket Bisnis Dedicated',
-    ];
-
     /**
      * @return array<string, string>
      */
@@ -72,6 +65,35 @@ class InternetPackage extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Daftar paket yang boleh ditampilkan/dipilih untuk user tertentu
+     * (Skema 1 — Restriksi Paket per Role, 2026-09-12). Role ber-
+     * `is_package_restricted = true` (mis. Sales, Teknisi) cuma boleh
+     * lihat paket yang ada di `restricted_packages`; role lain tetap lihat
+     * semua paket aktif seperti sebelumnya. Dipakai di SEMUA titik dropdown
+     * paket pada form Customer — jangan query InternetPackage mentah lagi
+     * di titik-titik itu.
+     */
+    public function scopeAvailableFor($query, ?User $user)
+    {
+        $query->active();
+
+        // Restriksi baru berlaku begitu Business Development benar-benar
+        // mengisi minimal satu paket ke `restricted_packages`. Selama daftar
+        // itu masih kosong (belum sempat diatur), ambigu — sama seperti
+        // getAllowedPopIds() untuk ALL_POP (lihat CLAUDE.md § POP Scope) —
+        // jadi fail-open (tampilkan semua paket aktif) daripada mengunci
+        // total role Sales/Teknisi dari registrasi pelanggan.
+        if ($user?->role?->is_package_restricted) {
+            $allowedIds = RestrictedPackage::query()->pluck('package_id');
+            if ($allowedIds->isNotEmpty()) {
+                $query->whereIn('id', $allowedIds);
+            }
+        }
+
+        return $query;
     }
 
     public function slaSettings(): HasMany

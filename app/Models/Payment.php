@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentPeriodType;
 use App\Enums\PaymentStatus;
+use App\Services\NumberSequenceService;
+use App\Support\BookPeriod;
+use App\Support\Money;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Facades\DB;
 
 class Payment extends Model
 {
@@ -32,12 +36,16 @@ class Payment extends Model
         'payment_date',
         'collected_date',
         'payment_method',
+        'bank_account_id',
         'bank_name',
         'account_number',
+        'sender_name',
         'amount',
+        'balance_used_amount',
         'overpay_amount',
         'received_by',
         'collected_by',
+        'collected_by_role',
         'proof_file',
         'payment_status',
         'reject_reason',
@@ -55,6 +63,7 @@ class Payment extends Model
             'payment_date' => 'date',
             'collected_date' => 'date',
             'amount' => 'decimal:2',
+            'balance_used_amount' => 'decimal:2',
             'overpay_amount' => 'decimal:2',
             'payment_status' => PaymentStatus::class,
             'rejected_at' => 'datetime',
@@ -198,6 +207,19 @@ class Payment extends Model
     }
 
     /**
+     * Rekening tujuan dari Master Rekening Bank (ADHOC-95). Null untuk
+     * non-Transfer dan untuk payment Transfer sebelum master ini ada.
+     * Tampilan riwayat tetap membaca SNAPSHOT `bank_name`/`account_number`,
+     * bukan relasi ini — rekening di master boleh diedit belakangan.
+     *
+     * @return BelongsTo<BankAccount, $this>
+     */
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
+    /**
      * Baris ledger saldo pelanggan yang menyebut payment ini — sebagai
      * SUMBER kredit (overpay) atau sebagai KONSUMEN debit (pemakaian
      * saldo). Dua peran, satu kolom `payment_id`; dibedakan lewat `type`
@@ -208,6 +230,30 @@ class Payment extends Model
     public function balanceMutations(): HasMany
     {
         return $this->hasMany(CustomerBalanceMutation::class);
+    }
+
+    /**
+     * Uang FISIK yang benar-benar diterima/dipegang dari payment ini —
+     * ADHOC-92 (G4), koreksi susulan 2026-09-24.
+     *
+     * `amount` (porsi diterapkan ke invoice) dikurangi `balance_used_amount`
+     * (porsi dari Saldo Pelanggan, BUKAN uang fisik) ditambah `overpay_amount`
+     * (uang lebih yang FISIK tetap, cuma disimpan di kolom terpisah dari
+     * `amount` — lihat PaymentService::record()). Dipakai di SEMUA tempat
+     * yang menghitung kewajiban setor/kas fisik (AdminCashBalanceService,
+     * CollectorBalanceService, CollectorDeposit::computedAmount(),
+     * CashDepositService) — sebelumnya masing-masing menjumlah `amount`
+     * mentah sendiri-sendiri, ada yang lupa `overpay_amount` (kelebihan tunai
+     * ikut tercatat sistem tapi hilang dari kewajiban setor) dan ada yang
+     * lupa `balance_used_amount` (saldo yang dipakai dihitung dobel sebagai
+     * uang fisik).
+     */
+    public function physicalAmount(): float
+    {
+        return Money::add(
+            Money::sub($this->amount, $this->balance_used_amount),
+            (float) ($this->overpay_amount ?? 0)
+        );
     }
 
     /**
@@ -254,6 +300,75 @@ class Payment extends Model
     }
 
     /**
+     * Klasifikasi payment ini terhadap periode tagihannya — lihat
+     * `PaymentPeriodType` untuk urutan prioritas & alasannya.
+     *
+     * SENGAJA tidak memakai `Invoice::isPiutang()`: method itu bersandar ke
+     * `invoice_status` SEKARANG (yang berubah jadi `lunas` begitu payment ini
+     * tercatat) dan ke `now()` (yang terus berjalan) — dipakai di sini, label
+     * sebuah payment lama diam-diam berubah besok. Klasifikasi payment harus
+     * BEKU sejak dia diterima: dibandingkan ke bulan payment ini SENDIRI
+     * (`collected_date` ?: `payment_date`), bukan ke bulan berjalan.
+     */
+    public function periodType(): PaymentPeriodType
+    {
+        if ($this->overpay_amount !== null && (float) $this->overpay_amount > 0.0) {
+            return PaymentPeriodType::LEBIH_BAYAR;
+        }
+
+        $billingPeriod = $this->invoice?->billing_period;
+        $referenceMonth = ($this->collected_date ?? $this->payment_date)?->format('Y-m');
+
+        if ($billingPeriod === null || $referenceMonth === null) {
+            return PaymentPeriodType::BULANAN;
+        }
+
+        return $billingPeriod < $referenceMonth
+            ? PaymentPeriodType::PIUTANG
+            : PaymentPeriodType::BULANAN;
+    }
+
+    /**
+     * Klasifikasi MAJEMUK payment ini — ADHOC-84 §8.1. Beda dari
+     * `periodType()` (3 label saling lepas, prioritas overpay > piutang >
+     * bulanan, dipakai badge tunggal yang sudah ada): method ini dipakai
+     * lima permukaan laporan/audit yang butuh label bertumpuk sekaligus,
+     * mis. payment yang mencicil piutang lama = [Piutang, Cicilan].
+     *
+     * Urutan label TIDAK menyatakan prioritas — semuanya independen:
+     *   - Base, SELALU tepat satu: BULANAN atau PIUTANG (posisi
+     *     `invoice->billing_period` terhadap bulan payment ini SENDIRI,
+     *     sama seperti `periodType()` — BUKAN `invoice_status`/`now()` yang
+     *     berubah-ubah, supaya label payment lama tak diam-diam berganti).
+     *   - Tambahan, PALING BANYAK satu (keduanya saling tiadakan — payment
+     *     tak mungkin under- dan over-pay sekaligus):
+     *       - LEBIH_BAYAR kalau `overpay_amount > 0`.
+     *       - CICILAN kalau `installmentContext()` bilang payment ini BUKAN
+     *         yang melunasi invoice-nya (`settles === false`).
+     *
+     * @return list<PaymentPeriodType>
+     */
+    public function classification(): array
+    {
+        $billingPeriod = $this->invoice?->billing_period;
+        $referenceMonth = ($this->collected_date ?? $this->payment_date)?->format('Y-m');
+
+        $labels = [
+            ($billingPeriod !== null && $referenceMonth !== null && $billingPeriod < $referenceMonth)
+                ? PaymentPeriodType::PIUTANG
+                : PaymentPeriodType::BULANAN,
+        ];
+
+        if ($this->overpay_amount !== null && (float) $this->overpay_amount > 0.0) {
+            $labels[] = PaymentPeriodType::LEBIH_BAYAR;
+        } elseif (($context = $this->installmentContext()) !== null && ! $context['settles']) {
+            $labels[] = PaymentPeriodType::CICILAN;
+        }
+
+        return $labels;
+    }
+
+    /**
      * Get audit logs for this payment.
      *
      * @return MorphMany<AuditLog, $this>
@@ -264,57 +379,134 @@ class Payment extends Model
     }
 
     /**
-     * Generate `payment_number` berikutnya untuk periode (Ym) tanggal bayar
-     * yang diberikan. Format: `PAY-{Ym}-{nomor berjalan}`.
-     *
-     * Pengganti MAX+1 (`orderBy(...)->lockForUpdate()->first()`) yang lama —
-     * pola itu tak mengunci apa pun kalau belum ada payment di periode itu
-     * (phantom read: dua request pertama bulan itu bisa dapat nomor sama).
-     * Di sini yang dikunci adalah baris `payment_number_sequences`, yang
-     * SELALU ada setelah dibuat sekali — pola sama `Pop::generateRegistrationNumber()`.
-     *
-     * Sinkronisasi dengan MAX existing tetap dilakukan (jaga-jaga data lama/
-     * import yang penomorannya di luar sequence ini), sama seperti pola POP.
-     *
-     * Lebar digit menyesuaikan otomatis begitu nomor berjalan lewat 9999
-     * (dari %04d ke %05d, dst) — bukan dipatok statis, supaya nomor lama
-     * (4 digit) tetap valid dan generator tak jebol di skala tinggi
-     * (docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §A-7 #5).
+     * Payment `saldo` dibuat SISTEM lewat
+     * `CustomerBalanceService::applyToOpenInvoices()`, bukan input manusia.
+     * Dicek dari `idempotency_key` sebagai jaring pengaman tambahan kalau
+     * suatu saat sumber auto-pay lain memakai metode berbeda dari SALDO —
+     * lihat docs/plan/billing/rancangan-edit-pembayaran-penuh.md F5 (K5).
      */
-    public static function generatePaymentNumber(string $paymentDate): string
+    public function isAutoSaldoPayment(): bool
     {
-        $periodCode = date('Ym', strtotime($paymentDate));
+        return $this->payment_method === PaymentMethod::SALDO->value
+            || str_starts_with((string) $this->idempotency_key, 'auto-saldo:');
+    }
 
-        return DB::transaction(function () use ($periodCode): string {
-            $sequence = PaymentNumberSequence::query()
-                ->where('period_code', $periodCode)
-                ->lockForUpdate()
-                ->first();
+    /**
+     * SATU sumber kebenaran "boleh diedit lewat Edit Pembayaran?" — dipakai
+     * tombol Edit (view), `PaymentController::edit()`, dan
+     * `PaymentService::revise()` (guard ulang di bawah lock). Jangan tulis
+     * daftar syarat sendiri di tempat lain (pola `TaskStatus::acceptsReport()`).
+     *
+     * SENGAJA tidak mengecek status invoice (BATAL/TAK_TERTAGIH) — itu butuh
+     * baris invoice TERKUNCI supaya tak berubah di antara pengecekan dan
+     * penyimpanan, jadi dicek ulang sendiri di `PaymentService::revise()`.
+     *
+     * @return string|null pesan Indonesia kalau terkunci, `null` kalau boleh diedit.
+     */
+    public function editBlockedReason(): ?string
+    {
+        if ($this->payment_status === PaymentStatus::DITOLAK) {
+            return 'Pembayaran yang sudah dikembalikan tidak dapat diedit.';
+        }
 
-            if (! $sequence) {
-                $sequence = PaymentNumberSequence::create([
-                    'period_code' => $periodCode,
-                    'current_number' => 0,
-                ]);
+        if ($this->isAutoSaldoPayment()) {
+            return 'Pembayaran dari Saldo Pelanggan dibuat otomatis oleh sistem dan tidak bisa diedit. Koreksi lewat Kembalikan.';
+        }
+
+        // K3 — ketat: hanya payment bulan berjalan yang boleh diedit, sama
+        // persis definisi tutup buku (BookPeriod). Payment bulan lalu hanya
+        // bisa dikoreksi lewat Kembalikan + catat ulang.
+        $period = $this->payment_date?->format('Y-m');
+
+        if (BookPeriod::isLocked($period)) {
+            return "Pembayaran periode {$period} sudah tutup buku — hanya pembayaran bulan berjalan yang bisa diedit. Gunakan Kembalikan lalu catat ulang di periode berjalan.";
+        }
+
+        // K4 — payment yang masuk setoran BOLEH diedit selama setorannya
+        // belum diverifikasi (setoran turunan, otomatis mengikuti angka
+        // baru). Begitu terverifikasi, dokumennya sudah disepakati dua pihak
+        // — sama persis batas di PaymentController::reject().
+        if ($this->relationLoaded('collectorDeposit') ? $this->collectorDeposit : $this->collectorDeposit()->first()) {
+            $deposit = $this->collectorDeposit;
+            if ($deposit->status->isVerified()) {
+                return "Pembayaran ini sudah masuk setoran {$deposit->deposit_number} yang berstatus {$deposit->status->label()}. Setoran terverifikasi tidak boleh diubah.";
             }
+        }
 
-            $numberStartsAt = strlen('PAY-'.$periodCode.'-') + 1;
-
-            $maxExisting = static::where('payment_number', 'like', "PAY-{$periodCode}-%")
-                ->selectRaw("MAX(CAST(SUBSTRING(payment_number, {$numberStartsAt}) AS UNSIGNED)) as max_num")
-                ->value('max_num') ?? 0;
-
-            if ($maxExisting >= $sequence->current_number) {
-                $sequence->current_number = $maxExisting;
+        if ($this->relationLoaded('cashDeposit') ? $this->cashDeposit : $this->cashDeposit()->first()) {
+            $cashDeposit = $this->cashDeposit;
+            if ($cashDeposit->status->isVerified()) {
+                return "Pembayaran ini sudah masuk setoran kas {$cashDeposit->deposit_number} yang berstatus {$cashDeposit->status->label()}. Setoran terverifikasi tidak boleh diubah.";
             }
+        }
 
-            $sequence->current_number++;
-            $sequence->save();
+        return null;
+    }
 
-            $width = max(4, strlen((string) $sequence->current_number));
+    public function isEditable(): bool
+    {
+        return $this->editBlockedReason() === null;
+    }
 
-            return sprintf("PAY-%s-%0{$width}d", $periodCode, $sequence->current_number);
-        });
+    /**
+     * Catat alasan koreksi (K2, opsional) sebagai entri audit TERPISAH dari
+     * baris 'update' otomatis — `reason` bukan kolom `payments`, jadi tak
+     * ikut diff `static::updated()` di atas. Dipanggil
+     * `PaymentService::revise()` SETELAH `$payment->update()` supaya urut
+     * kronologis dengan baris 'update' yang sudah tercatat lebih dulu.
+     */
+    public function logCorrectionReason(string $reason): void
+    {
+        $this->writeAuditLog('koreksi', null, ['alasan' => $reason]);
+    }
+
+    /**
+     * Generate `payment_number` untuk payment baru pada `$invoice`. Format:
+     * `PAY-{invoice_number}` untuk lunas sekali bayar, atau
+     * `PAY-{invoice_number}-{NN}` untuk cicilan (keputusan user 2026-10-02,
+     * revisi BUG 13/2026-10-01 — versi lama nempelin `-01` bahkan ke
+     * pembayaran lunas sekali bayar, bikin laporan susah bedain
+     * lunas-langsung vs cicilan dari nomornya saja).
+     * `invoice_number`-nya ditempel APA ADANYA (bukan dipetakan ulang ke
+     * prefix) — Payment dan Invoice yang sama langsung kelihatan berpasangan
+     * dari bentuk nomornya.
+     *
+     * `{NN}` CUMA muncul kalau pembayaran ini bagian dari cicilan — yaitu
+     * bukan pembayaran pertama pada invoice ini ($ordinal > 1), ATAU
+     * pembayaran pertama itu sendiri tidak langsung melunasi sisa tagihan
+     * ($appliedAmount < remaining_amount saat itu). Begitu sebuah invoice
+     * "ketahuan" cicilan (ordinal > 1), SEMUA baris di invoice itu termasuk
+     * yang nanti melunasi sisanya tetap kebagian `-NN` — nomor pertama yang
+     * sudah dicetak tanpa suffix TIDAK diubah lagi (beku begitu dicetak).
+     *
+     * `{NN}` = urutan pembayaran ke berapa pada invoice ini (2 digit), dari
+     * counter NumberSequenceService — SEMUA pembayaran dihitung apa pun
+     * statusnya (termasuk yang nanti ditolak atau di-hard delete), angka
+     * TIDAK PERNAH dipakai ulang. Ini SENGAJA beda basis dari badge "Cicilan Ke-N" di UI
+     * (`installmentContext()`, cuma menghitung yang VALID): nomor di sini
+     * identitas HISTORIS yang beku begitu dicetak, badge UI itu status
+     * TERKINI yang boleh bergeser kalau ada payment lama yang ditolak
+     * belakangan. Dua hal berbeda, jangan disamakan paksa.
+     *
+     * `$appliedAmount` wajib bagian yang menutup tagihan SAJA (bukan
+     * `overpay_amount`) — pemanggil sudah memisahkannya lewat
+     * `splitAmount()`/`Money::min()` sebelum ke sini.
+     *
+     * WAJIB dipanggil di dalam transaksi yang sama dengan `Payment::create()`
+     * (semua pemanggil sudah begitu) supaya kenaikan counter ikut rollback.
+     */
+    public static function generatePaymentNumber(Invoice $invoice, mixed $appliedAmount): string
+    {
+        $ordinal = app(NumberSequenceService::class)->paymentOrdinal($invoice);
+
+        $lunasSekaliBayar = $ordinal === 1
+            && Money::compare($appliedAmount, $invoice->remaining_amount) >= 0;
+
+        if ($lunasSekaliBayar) {
+            return "PAY-{$invoice->invoice_number}";
+        }
+
+        return sprintf('PAY-%s-%02d', $invoice->invoice_number, $ordinal);
     }
 
     /**
@@ -337,9 +529,12 @@ class Payment extends Model
             'payment_date',
             'collected_date',
             'payment_method',
+            'bank_account_id',
             'bank_name',
             'account_number',
+            'sender_name',
             'amount',
+            'balance_used_amount',
             'overpay_amount',
             'received_by',
             'collected_by',

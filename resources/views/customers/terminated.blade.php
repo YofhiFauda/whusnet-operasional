@@ -19,9 +19,24 @@
 @include('customers.partials._list_filters')
 
 <div class="@container bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
-    <div class="border-b border-slate-200 dark:border-slate-800 px-6 py-3.5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30">
+    <div class="border-b border-slate-200 dark:border-slate-800 px-6 py-3.5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30 gap-3 flex-wrap">
         <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Daftar Pelanggan Putus</span>
-        <a href="{{ route('customers.index') }}" class="text-xs text-sky-600 dark:text-sky-400 hover:underline">Lihat Semua Pelanggan</a>
+        <div class="flex items-center gap-2">
+            {{-- Filter Alasan Putus (ADHOC-69) — WHERE di level query, lihat
+                 RendersCustomerList::renderCustomerList(). --}}
+            <form action="{{ url()->current() }}" method="GET" class="flex items-center gap-2">
+                @if($search !== '')<input type="hidden" name="search" value="{{ $search }}">@endif
+                @if($sort !== '')<input type="hidden" name="sort" value="{{ $sort }}">@endif
+                <select name="termination_reason_id" onchange="this.form.submit()"
+                        class="text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-700 dark:text-slate-200">
+                    <option value="">Semua Alasan</option>
+                    @foreach($terminationReasonOptions as $reasonOption)
+                    <option value="{{ $reasonOption->id }}" {{ (string) $terminationReasonId === (string) $reasonOption->id ? 'selected' : '' }}>{{ $reasonOption->name }}</option>
+                    @endforeach
+                </select>
+            </form>
+            <a href="{{ route('customers.index') }}" class="text-xs text-sky-600 dark:text-sky-400 hover:underline whitespace-nowrap">Lihat Semua Pelanggan</a>
+        </div>
     </div>
 
     {{-- DESKTOP: Table layout, visible on container screens >= 64rem --}}
@@ -33,9 +48,15 @@
                     <th scope="col" class="py-3.5 px-4">Nama Pelanggan</th>
                     <th scope="col" class="py-3.5 px-4">POP</th>
                     <th scope="col" class="py-3.5 px-4">Kontrak</th>
-                    <th scope="col" class="py-3.5 px-4">Alasan Putus</th>
+                    <th scope="col" class="py-3.5 px-4">
+                        <a href="{{ request()->fullUrlWithQuery(['sort' => $sort === 'alasan' ? '' : 'alasan']) }}" class="hover:text-sky-600 dark:hover:text-sky-400">
+                            Alasan Putus {{ $sort === 'alasan' ? '▲' : '' }}
+                        </a>
+                    </th>
+                    <th scope="col" class="py-3.5 px-4">Input Oleh</th>
                     <th scope="col" class="py-3.5 px-4">Tgl Pemutusan</th>
                     <th scope="col" class="py-3.5 px-4 text-center">Status Alat</th>
+                    <th scope="col" class="py-3.5 px-4 text-center">Tagihan</th>
                     <th scope="col" class="py-3.5 px-5 text-right">Aksi</th>
                 </tr>
             </thead>
@@ -48,6 +69,17 @@
                         default => '-',
                     };
                     $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
+                    // "Sedang Diproses" = task Ambil Alat sudah dibuat tapi belum
+                    // selesai. Penanda buat FOP (mana yang sudah dijadwalkan), dan
+                    // tombol Ambil Alat disembunyikan selama status ini (juga saat
+                    // "Sudah Diambil") supaya tidak dijadwalkan dua kali.
+                    $isDeviceInProgress = ! $isDeviceRetrieved && (bool) ($customer->device_retrieval_in_progress ?? false);
+                    $deviceBadgeTone = $isDeviceRetrieved
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                        : ($isDeviceInProgress
+                            ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60'
+                            : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60');
+                    $deviceBadgeLabel = $isDeviceRetrieved ? 'Sudah Diambil' : ($isDeviceInProgress ? 'Sedang Diproses' : 'Belum Diambil');
                 @endphp
                 <tr class="hover:bg-sky-50/40 dark:hover:bg-sky-950/20 transition-colors">
                     <td class="px-5 py-3.5 font-mono font-semibold text-sky-600 dark:text-sky-400 whitespace-nowrap">
@@ -65,13 +97,19 @@
                     <td class="px-4 py-3.5 max-w-xs text-slate-600 dark:text-slate-400 truncate">
                         {{ $customer->termination_reason ?? '-' }}
                     </td>
+                    <td class="px-4 py-3.5 text-slate-600 dark:text-slate-400">
+                        {{ $customer->registered_by_name ?? $customer->creator?->name ?? '-' }}
+                    </td>
                     <td class="px-4 py-3.5 font-mono text-slate-500 whitespace-nowrap">
                         {{ $customer->terminated_at ? \App\Support\IndonesianDate::date($customer->terminated_at) : '-' }}
                     </td>
                     <td class="px-4 py-3.5 text-center">
-                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full border {{ $isDeviceRetrieved ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60' }}">
-                            {{ $isDeviceRetrieved ? 'Sudah Diambil' : 'Belum Diambil' }}
+                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full border {{ $deviceBadgeTone }}">
+                            {{ $deviceBadgeLabel }}
                         </span>
+                    </td>
+                    <td class="px-4 py-3.5 text-center">
+                        @include('customers.partials._terminated_write_offs')
                     </td>
                     <td class="px-5 py-3.5 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-2">
@@ -79,9 +117,10 @@
                                class="px-2.5 py-1 text-xs font-medium text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors">
                                 Detail
                             </a>
-                            @if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
+                            {{-- Tombol hanya untuk status "Belum Diambil": sudah diambil atau task-nya sedang berjalan → disembunyikan (server juga menolak duplikat). --}}
+                            @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                             <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">
+                                  onsubmit="event.preventDefault(); window.confirmAction(@js('Buat Task FOP pengambilan alat untuk '.($customer->full_name).'?'), this);">
                                 @csrf
                                 <button type="submit" class="px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
                                     Ambil Alat
@@ -90,7 +129,7 @@
                             @endif
                             @if(auth()->user()->hasPermission('customers.detail.installation.validate'))
                             <form action="{{ route('customers.reactivate', $customer->id) }}" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan {{ $customer->full_name }}?', this);">
+                                  onsubmit="event.preventDefault(); window.confirmAction(@js(($isDeviceRetrieved ? 'Alat pelanggan ini sudah diambil — Langganan Lagi akan memasukkan '.$customer->full_name.' ke Antrean Survey untuk pemasangan ulang. Lanjutkan?' : 'Aktifkan kembali langganan '.$customer->full_name.'?')), this);">
                                 @csrf
                                 <button type="submit" class="px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer">
                                     Langganan Lagi
@@ -102,7 +141,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
+                    <td colspan="10" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -120,6 +159,14 @@
                     default => '-',
                 };
                 $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
+                // Sama dengan tabel desktop di atas: penanda "Sedang Diproses" untuk FOP.
+                $isDeviceInProgress = ! $isDeviceRetrieved && (bool) ($customer->device_retrieval_in_progress ?? false);
+                $deviceBadgeTone = $isDeviceRetrieved
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                    : ($isDeviceInProgress
+                        ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60'
+                        : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60');
+                $deviceBadgeLabel = $isDeviceRetrieved ? 'Sudah Diambil' : ($isDeviceInProgress ? 'Sedang Diproses' : 'Belum Diambil');
             @endphp
             <article class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3.5 shadow-sm hover:border-sky-300 dark:hover:border-sky-700/60 transition-all duration-200 hover:shadow-md">
                 <div class="flex items-start justify-between gap-3">
@@ -129,8 +176,8 @@
                         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ $customer->pop->name ?? '-' }}</p>
                     </div>
                     <div class="shrink-0">
-                        <span class="inline-flex items-center px-2 py-0.5 text-[9px] font-bold rounded-full border {{ $isDeviceRetrieved ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60' }}">
-                            {{ $isDeviceRetrieved ? 'Sudah Diambil' : 'Belum Diambil' }}
+                        <span class="inline-flex items-center px-2 py-0.5 text-[9px] font-bold rounded-full border {{ $deviceBadgeTone }}">
+                            {{ $deviceBadgeLabel }}
                         </span>
                     </div>
                 </div>
@@ -150,6 +197,14 @@
                             {{ $customer->termination_reason ?? '-' }}
                         </dd>
                     </div>
+                    <div class="col-span-2 min-w-0">
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Input Oleh</dt>
+                        <dd class="text-slate-700 dark:text-slate-300 font-semibold mt-0.5">{{ $customer->registered_by_name ?? $customer->creator?->name ?? '-' }}</dd>
+                    </div>
+                    <div class="col-span-2 min-w-0">
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tagihan</dt>
+                        <dd class="mt-0.5">@include('customers.partials._terminated_write_offs')</dd>
+                    </div>
                 </dl>
 
                 <div class="border-t border-slate-100 dark:border-slate-800/80 pt-3 flex flex-wrap gap-2 justify-end">
@@ -157,10 +212,10 @@
                        class="flex-1 sm:flex-none h-10 px-3.5 text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors flex items-center justify-center cursor-pointer">
                         Detail
                     </a>
-                    @if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
+                    @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                     <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
                           class="flex-1 sm:flex-none flex"
-                          onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">
+                          onsubmit="event.preventDefault(); window.confirmAction(@js('Buat Task FOP pengambilan alat untuk '.($customer->full_name).'?'), this);">
                         @csrf
                         <button type="submit" class="w-full h-10 px-3.5 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
                             Ambil Alat
@@ -170,7 +225,7 @@
                     @if(auth()->user()->hasPermission('customers.detail.installation.validate'))
                     <form action="{{ route('customers.reactivate', $customer->id) }}" method="POST"
                           class="flex-1 sm:flex-none flex"
-                          onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan {{ $customer->full_name }}?', this);">
+                          onsubmit="event.preventDefault(); window.confirmAction(@js(($isDeviceRetrieved ? 'Alat pelanggan ini sudah diambil — Langganan Lagi akan memasukkan '.$customer->full_name.' ke Antrean Survey untuk pemasangan ulang. Lanjutkan?' : 'Aktifkan kembali langganan '.$customer->full_name.'?')), this);">
                         @csrf
                         <button type="submit" class="w-full h-10 px-3.5 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer">
                             Langganan Lagi

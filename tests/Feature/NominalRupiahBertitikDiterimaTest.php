@@ -182,6 +182,10 @@ class NominalRupiahBertitikDiterimaTest extends TestCase
             'registration_date' => $customer->registration_date->toDateString(),
             'pop_id' => $customer->pop_id,
             'status' => $customer->status,
+            // Form Edit asli selalu mengirim paket. Tanpa paket, pelanggan
+            // bertagihan ditolak (ADHOC-110) — dulu request ini diam-diam
+            // menghapus layanan + tagihannya lewat FK cascade.
+            'internet_package_id' => $invoice->internet_package_id,
             'discount_amount' => '10.000',
             'tax_percent' => 11,
             'other_fee' => '5.000',
@@ -194,26 +198,25 @@ class NominalRupiahBertitikDiterimaTest extends TestCase
 
     public function test_tagihan_manual_menerima_titik_ribuan(): void
     {
+        // ADHOC-70 (2026-09-23) merombak total InvoiceController::store() —
+        // bentuk request lama (banyak baris `lines[]` + revenue category/
+        // subcategory manual) diganti satu kategori + deskripsi + nominal.
         $this->loginAsAdmin();
         $invoice = $this->buatInvoice('C-RPH-7', 150000);
 
-        $this->post(route('customers.invoices.manual', $invoice->customer_id), [
-            'billing_period' => now()->addMonth()->format('Y-m'),
-            'issue_date' => now()->toDateString(),
-            'due_date' => now()->addDays(10)->toDateString(),
-            'invoice_type' => 'reaktivasi',
-            'prorate_amount' => '50.000',
-            'extra_cable_fee' => '25.000',
+        $this->post(route('invoices.store'), [
+            'customer_id' => $invoice->customer_id,
+            'manual_category' => 'lainnya',
+            'manual_subtype_name' => 'Jasa Tambahan',
+            'description' => 'Jasa Tambahan',
+            'amount' => '50.000',
         ])->assertSessionHasNoErrors();
 
         $manual = Invoice::where('customer_id', $invoice->customer_id)
             ->where('id', '!=', $invoice->id)
             ->firstOrFail();
 
-        // Dicek per komponen, bukan cuma totalnya: total juga memuat harga
-        // langganan, jadi salah baca satu komponen bisa tersamar di angka akhir.
-        $this->assertEquals(50000.0, (float) $manual->prorate_amount);
-        $this->assertEquals(25000.0, (float) $manual->extra_cable_fee);
+        $this->assertEquals(50000.0, (float) $manual->total_amount);
     }
 
     private function buatPop(): Pop

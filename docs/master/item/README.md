@@ -22,8 +22,9 @@ Stok, harga, lokasi gudang, minimum stock, pergerakan barang. Semua itu wilayah 
 | Tambah | `GET/POST /master/items/create` | `items.create` |
 | Ubah | `GET/PUT /master/items/{item}` | `items.update` |
 | Aktif/Nonaktif | `POST /master/items/{item}/toggle` | `items.update` |
+| Hapus | `DELETE /master/items/{item}` | `items.delete` |
 
-**Tidak ada aksi hapus.** Baris `task_materials` yang sudah tersimpan menunjuk ke `items`; menghapus master bikin laporan lama kehilangan rujukan. Barang yang tidak dipakai lagi **dinonaktifkan** (`is_active = false`) — pola yang sama dengan master lain di repo ini.
+**Hapus = hapus permanen kalau belum dipakai, nonaktif kalau sudah dipakai.** Dicek lewat `MasterRecordRemovalService` (FK introspection): kalau ada baris lain yang merujuk barang ini (`task_materials`, stok gudang, serial, transaksi, dll.), barang hanya dinonaktifkan (`is_active = false`) supaya laporan lama tetap punya rujukan. Pola sama untuk `pops`, `packages`, `item_categories`, `work_tools`, `ticket_issue_categories`.
 
 Permission digenerate `PermissionGeneratorService` dari feature `items` (`ItemFeatureSeeder`), bukan hardcode. Awalnya cuma owner yang punya (lewat wildcard `*`); role lain ditambahkan lewat UI Role Management.
 

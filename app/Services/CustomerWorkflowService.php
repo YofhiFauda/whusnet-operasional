@@ -9,7 +9,10 @@ use App\Jobs\SendCustomerActivationNotification;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerStatusLog;
+use App\Models\FopTask;
+use App\Models\FopTaskStatusHistory;
 use App\Models\Task;
+use App\Models\User;
 use App\Services\CustomerPortal\PortalAuthService;
 use Exception;
 use Illuminate\Support\Facades\Auth;
@@ -93,14 +96,12 @@ class CustomerWorkflowService
                     $titlePrefix = $nextStatus->value === 'waiting_survey' ? 'Survey Pelanggan: ' : 'Pemasangan Baru: ';
                     $existingTask = Task::where('customer_id', $customer->id)
                         ->where('task_type', $taskType)
-                        ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
+                        ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::LAPOR_NANTI->value])
                         ->exists();
 
                     if (! $existingTask) {
-                        $year = date('Y');
-                        $count = Task::whereYear('created_at', $year)->count() + 1;
                         Task::create([
-                            'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                            'task_number' => app(NumberSequenceService::class)->taskNumber(),
                             'task_type' => $taskType,
                             'title' => $titlePrefix.$customer->full_name,
                             'description' => null,
@@ -121,6 +122,8 @@ class CustomerWorkflowService
                         TaskType::from($taskType)
                     );
                 }
+
+                $this->closeTasksLeftBehind($customer, $currentStatusStr, $nextStatus, $note);
 
                 // S8.8-T005: Trigger notifikasi ke pelanggan setelah status Active
                 if ($nextStatus->value === 'active') {
@@ -170,5 +173,103 @@ class CustomerWorkflowService
 
             return $saved;
         }, 3);
+    }
+
+    /**
+     * Status pelanggan yang masih "dalam tahap" Survey / Pemasangan — selama
+     * pelanggan di sini, Task tipe itu memang boleh (dan harus) tetap terbuka.
+     *
+     * @var array<string, list<string>>
+     */
+    private const STAGE_STATUSES = [
+        'SURVEY' => ['waiting_survey', 'survey_in_progress'],
+        'PSB' => ['waiting_installation', 'installation_in_progress', 'revision_installation'],
+    ];
+
+    /**
+     * Tutup Task + FopTask Survey/PSB yang tertinggal begitu pelanggan
+     * meninggalkan tahapnya — ditolak (Gagal), atau tahapnya sudah beres
+     * dilaporkan lewat jalur lain.
+     *
+     * Bug 2026-09-29 (Testing 7 & 10): status pelanggan bisa berubah dari
+     * banyak pintu — Tolak di Verifikasi, Batalkan Survey/Pemasangan, laporan
+     * survey yang diisi Admin langsung dari Antrean Survey — dan tiap pintu
+     * dulu cuma menutup SATU task yang kebetulan ia kenal (mis. cuma yang
+     * `in_progress`, atau cuma yang sudah `selesai`). Task yang sudah
+     * dijadwalkan FOP ke teknisi lain tertinggal `terjadwal` selamanya di Task
+     * Saya teknisi itu, padahal pelanggannya sudah Gagal / sudah disurvey.
+     * Ditaruh di sini (bukan di tiap controller) supaya pintu yang ditambah
+     * nanti otomatis ikut benar.
+     *
+     * Dibatalkan, BUKAN diselesaikan (keputusan user 2026-09-29): teknisi yang
+     * ditinggal tidak mengerjakan apa pun, jadi tidak boleh terhitung selesai
+     * atau masuk SLA-nya. Task yang barusan dilaporkan sendiri sudah `selesai`
+     * sebelum transisi dipanggil (CustomerSurveyController::store(),
+     * CustomerInstallationController), jadi tidak tersentuh.
+     */
+    private function closeTasksLeftBehind(Customer $customer, string $fromStatus, WorkflowTransition $nextStatus, ?string $note): void
+    {
+        // Transisi dari scheduler/CLI tidak punya user login — pola fallback
+        // sama dengan `created_by => Auth::id() ?? 1` di atas.
+        $actor = Auth::user() ?? User::query()->orderBy('id')->first();
+
+        if (! $actor) {
+            return;
+        }
+
+        foreach (self::STAGE_STATUSES as $taskTypeValue => $stageStatuses) {
+            $leftStage = $nextStatus === WorkflowTransition::REJECTED
+                || (in_array($fromStatus, $stageStatuses, true) && ! in_array($nextStatus->value, $stageStatuses, true));
+
+            if (! $leftStage) {
+                continue;
+            }
+
+            $taskType = TaskType::from($taskTypeValue);
+            $reason = $nextStatus === WorkflowTransition::REJECTED
+                ? 'Pelanggan masuk Gagal'.($note ? ": {$note}" : '.')
+                : "{$taskType->label()} sudah dilaporkan oleh {$actor->name} — task ini tidak lagi diperlukan.";
+
+            $openTasks = Task::where('customer_id', $customer->id)
+                ->where('task_type', $taskType->value)
+                ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+                ->get();
+
+            // TaskService::cancel() → TaskObserver ikut membatalkan FopTask yang
+            // tertaut + menulis fop_task_status_history (penulis sisi FOP untuk
+            // jalur Task, CLAUDE.md § sinkronisasi aturan 7) + notif ke tim.
+            foreach ($openTasks as $task) {
+                app(TaskService::class)->cancel($task, $actor, $reason);
+            }
+
+            // FopTask yang belum pernah dijadwalkan (Draft, tanpa Task) tidak
+            // punya Task untuk menembus TaskObserver — tanpa ini ia menggantung
+            // di antrean /fop-tasks untuk pelanggan yang sudah Gagal. Riwayatnya
+            // ditulis di sini karena tidak ada penulis lain untuk kasus ini
+            // (FopTask tanpa Task & tanpa Ticket), jadi tidak mungkin dobel.
+            $orphanFopTasks = FopTask::where('customer_id', $customer->id)
+                ->where('category', $taskType->value)
+                ->whereNull('task_id')
+                ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+                ->get();
+
+            foreach ($orphanFopTasks as $fopTask) {
+                $fromFopStatus = $fopTask->status->value;
+
+                $fopTask->update([
+                    'status' => TaskStatus::DIBATALKAN,
+                    'cancelled_at' => now(),
+                    'cancel_reason' => $reason,
+                ]);
+
+                FopTaskStatusHistory::create([
+                    'fop_task_id' => $fopTask->id,
+                    'from_status' => $fromFopStatus,
+                    'to_status' => TaskStatus::DIBATALKAN->value,
+                    'changed_by' => $actor?->id,
+                    'changed_at' => now(),
+                ]);
+            }
+        }
     }
 }

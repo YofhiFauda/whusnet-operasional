@@ -13,7 +13,7 @@ use Zxing\QrReader;
  * jadi menyuruh model bahasa "membaca" kembali data yang kita tulis sendiri
  * adalah biaya tanpa informasi baru (§13.1).
  *
- * OCR tetap ada, tapi untuk kwitansi yang QR-nya sobek/buram/hasil fotokopi.
+ * Kwitansi yang QR-nya sobek/buram/hasil fotokopi jatuh ke pencocokan manual.
  */
 class QrReceiptNumberReader implements ReceiptNumberReader
 {
@@ -33,8 +33,8 @@ class QrReceiptNumberReader implements ReceiptNumberReader
         }
 
         // PDF dirender dulu jadi PNG. Dulu di sini cuma `return null` dengan
-        // alasan "jalur berikutnya yang menangani" — padahal jalur berikutnya
-        // (OCR) mati secara default, jadi SETIAP kwitansi PDF pasti berakhir
+        // alasan "jalur berikutnya yang menangani" — padahal tak ada jalur
+        // otomatis berikutnya, jadi SETIAP kwitansi PDF pasti berakhir
         // FAILED dan menunggu kerja manual. Halaman cetak kwitansi sendiri
         // mengembalikan HTML, sehingga Print → "Save as PDF" adalah alur yang
         // paling wajar ditempuh admin: format yang dipancing sistem sendiri
@@ -107,8 +107,7 @@ class QrReceiptNumberReader implements ReceiptNumberReader
     /**
      * `Zxing\QrReader` memakai Imagick kalau ada, dan baru jatuh ke GD kalau
      * tidak. Memeriksa GD saja membuat server ber-imagick-tanpa-gd melewatkan
-     * jalur QR sepenuhnya — setiap kwitansi jatuh ke OCR (berbayar) atau kerja
-     * manual, tanpa satu pun pesan error yang menjelaskan kenapa.
+     * jalur QR sepenuhnya — setiap kwitansi jatuh ke kerja manual, tanpa satu pun pesan error yang menjelaskan kenapa.
      */
     public function isAvailable(): bool
     {

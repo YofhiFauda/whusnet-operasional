@@ -6,8 +6,8 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 | Entity | Peran |
 |--------|-------|
-| `Invoice` | 1 row = 1 tagihan periode tertentu. Tipe: `awal` (PSB/aktivasi), `bulanan` (rutin), `reaktivasi`. |
-| `Payment` | 1 row = 1 transaksi pembayaran terhadap 1 Invoice. Invoice bisa punya banyak Payment (cicilan/partial) — urutannya dihitung `Payment::installmentContext()` ("Cicilan Ke-N"). |
+| `Invoice` | 1 row = 1 tagihan periode tertentu. Tipe: `awal` (PSB/aktivasi), `bulanan` (rutin), `insidental`, `manual` (Perbaikan/Lainnya/Pindah Lokasi — termasuk **Denda Putus Langganan**, ADHOC-69). `reaktivasi` **dihapus** 2026-09-26 (tidak pernah sesuai maksud aslinya — lihat `docs/plan/billing/rancangan-terminate-reactivate-state-machine.md` §11). |
+| `Payment` | 1 row = 1 transaksi pembayaran terhadap 1 Invoice. Invoice bisa punya banyak Payment (cicilan/partial) — urutannya dihitung `Payment::installmentContext()` ("Cicilan Ke-N"). Klasifikasi majemuk Bulanan/Piutang/Cicilan/Lebih Bayar (badge di laporan & audit) dihitung `Payment::classification()` (ADHOC-84 §8) — TIDAK disimpan sebagai kolom, selalu dihitung dari `invoice->billing_period`/`overpay_amount`/`installmentContext()`. |
 | `PaymentBatch` | 1 row = 1 sesi submit batch kolektor (idempotency + pengelompokan). BUKAN rekonsiliasi kas — fitur Setoran Kolektor di-drop dari scope. |
 
 **Invoice status** (derived dari akumulasi Payment VALID, dihitung `Invoice::recalculateFromPayments()`): `belum_dibayar` → `sebagian` → `lunas`, atau `batal` (dibatalkan, gak bisa terima pembayaran lagi).
@@ -16,7 +16,11 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 **Notifikasi in-app (2026-08-06/07)** — `PaymentController::reject()` notif ke pencatat pembayaran (`collected_by` kalau ada / fallback `received_by`), skip kalau yang reject = pencatat sendiri. `CollectorBatchController::store()` sukses notif role `pop_admin` di POP invoice yang kena (pengganti "Finance Pusat" — role itu gak ada di RBAC sistem ini, `pop_admin` dipilih karena pegang `payments.validate`/`reject` per POP). **Pesannya sengaja murni informatif** ("dicatat"), bukan "perlu direkonsiliasi" — selaras sama keputusan produk di atas (`PaymentBatch` BUKAN rekonsiliasi kas, fitur Setoran Kolektor formal di-drop dari scope). Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.3.
 
-**Lebih bayar** (`payments.overpay_amount`, 2026-08-04): admin ketik SATU nominal total diterima, sistem otomatis pisah bagian yang menutup tagihan (`amount`, tetap tak pernah melebihi sisa tagihan) dari kelebihannya (`overpay_amount`). **Bukan saldo kredit** — tak punya sisi debit, tak pernah dipakai otomatis untuk tagihan berikutnya. Tab khusus read-only di `/payments/overpay`.
+**Lebih bayar** (`payments.overpay_amount`, 2026-08-04): admin ketik SATU nominal total diterima, sistem otomatis pisah bagian yang menutup tagihan (`amount`, tetap tak pernah melebihi sisa tagihan) dari kelebihannya (`overpay_amount`). Sejak ADHOC-38 (2026-08-18) kelebihan itu **otomatis masuk ledger Saldo Pelanggan** (`customer_balance_mutations`, saldo = SUM(credit) − SUM(debit), lihat `CustomerBalanceService`) dan bisa dipakai **manual** lewat `use_balance_amount` saat bayar tagihan berikutnya. Tab khusus read-only di `/payments/overpay`.
+
+**Saldo Pelanggan — auto-pakai (ADHOC-92, 2026-09-24):** saldo aktif dipakai **OTOMATIS** ke tagihan `bulanan` terbuka begitu terbit, FIFO periode terlama dulu (`CustomerBalanceService::applyToOpenInvoices()`, dipanggil dari `GenerateMonthlyInvoicesCommand` dalam transaksi yang sama, dan dari command catch-up `billing:apply-balance` untuk saldo yang masuk setelah tagihan terbit). Satu `Payment` per invoice, method `PaymentMethod::SALDO`, ditandai `balance_used_amount` supaya laporan kas (`AdminCashBalanceService`/`CollectorBalanceService`) tidak menghitungnya sebagai uang fisik. Sumber kredit dibedakan lewat `BalanceMutationSource`: `bayar_di_muka` (overpay invoice AWAL) vs `kelebihan_bayar` (overpay lainnya) vs `pakai_otomatis`/`pakai_manual` (debit). Saldo kurang dari tagihan tetap dipakai semua → `sebagian`/cicilan. Rancangan: [plan/billing/analisa-rancangan-saldo-pelanggan.md](../plan/billing/analisa-rancangan-saldo-pelanggan.md).
+
+**Edit Pembayaran PENUH (ADHOC-108, 2026-09-29):** `/payments/{id}/edit` (halaman tersendiri, bukan modal — permission `payments.update` TERPISAH dari `payments.create`, default **hanya owner/admin**, role lain diatur lewat Role Matrix kapan pun tanpa deploy) mengizinkan koreksi nominal, saldo dipakai, tanggal, metode, rekening, kolektor, bukti, dan catatan pada payment yang sudah tersimpan — dulu cuma metode/tanggal/rekening/catatan yang bisa diedit. Batas (`Payment::editBlockedReason()`, satu sumber dipakai tombol Edit/`edit()`/`PaymentService::revise()`): hanya payment **bulan berjalan** (`BookPeriod`, payment bulan lalu wajib lewat Kembalikan + catat ulang), bukan payment metode `saldo` (auto-pay sistem), dan bukan payment yang setorannya (kolektor/kas) sudah **terverifikasi**. Payment yang masuk setoran **belum** terverifikasi boleh diedit nominalnya — `CollectorDeposit`/`CashDeposit::computedAmount()` turunan, otomatis mengikuti angka baru — tapi metode & kolektornya DIBEKUKAN (mencegah payment tersangkut di setoran yang salah). Koreksi saldo memakai **baris delta** (`BalanceMutationSource::KOREKSI`, kolom `revision`) lewat `CustomerBalanceService::applyCorrection()` — BUKAN `reverseCreditForPayment()`/`reverseDebitForPayment()` (keduanya untuk Kembalikan, sekali-jalan, bentrok index kalau payment yang sama diedit dua kali). Rancangan lengkap + analisa: [plan/billing/rancangan-edit-pembayaran-penuh.md](../plan/billing/rancangan-edit-pembayaran-penuh.md).
 
 ## Dokumen
 
@@ -40,12 +44,15 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 | `/invoices/lunas` | GET | `invoices.view` | `InvoiceController@lunas` |
 | `/invoices/belum-lunas` | GET | `invoices.view` | `InvoiceController@belumLunas` |
 | `/invoices/{invoice}` | GET | `invoices.view` | `InvoiceController@show` |
-| `/customers/{customer}/invoices/manual` | POST | `invoices.create` | `CustomerController@storeManualInvoice` |
+| `/invoices/create` | GET | `invoices.create` | `InvoiceController@create` |
+| `/invoices` | POST | `invoices.create` | `InvoiceController@store` |
 | `/payments` | GET | `payments.view` | `PaymentController@index` |
 | `/payments/overpay` | GET | `payments.view` | `PaymentController@overpay` |
 | `/payments/{payment}` | GET | `payments.view` | `PaymentController@show` |
 | `/payments/{payment}/kwitansi` | GET | `payments.view` | `PaymentController@receipt` |
 | `/payments/{payment}/reject` | POST | `payments.reject` | `PaymentController@reject` |
+| `/payments/{payment}/edit` | GET | `payments.update` | `PaymentController@edit` |
+| `/payments/{payment}` | PUT | `payments.update` | `PaymentController@update` |
 | `/invoices/{invoice}/payments/create` | GET | `payments.create` | `PaymentController@create` |
 | `/invoices/{invoice}/payments` | POST | `payments.create` | `PaymentController@store` |
 | `/collector-worksheet` | GET | `collector_worksheet.view` | `CollectorWorksheetController@index` |
@@ -56,8 +63,10 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 > **`/invoices/bulk-pay` (`PaymentController@bulkStore`) DIHAPUS 2026-08-11.** Tak pernah punya UI maupun test, dan jaminannya menyimpang dari jalur batch kolektor: transaksi **per invoice** (bukan all-or-nothing), tanpa idempotency, nominal dipaksa lunas penuh, dan `catch (\Throwable)` menelan semua error jadi angka "gagal" tanpa alasan maupun log. Aksi massal yang benar-benar ada: tab Pembayaran di Worksheet Kolektor (`payment-batches.store`) lewat `CollectorPaymentService`.
 | `/customers/{customer}/payment-info` | GET | (login) | `CustomerController@paymentInfo` |
-| `/reports/invoices`, `/reports/invoices/export` | GET | (report perm) | `InvoiceReportController` |
+| `/reports/invoices`, `/reports/invoices/export`, `/reports/invoices/export-xlsx` | GET | (report perm) | `InvoiceReportController` |
 | `/reports/payments`, `/reports/payments/export`, `/reports/payments/export-xlsx` | GET | (report perm) | `PaymentReportController` |
+| `/customers/{customer}/terminate` | POST | `customers.deactivate` | `CustomerTerminationController` (delegasi ke `CustomerTerminationService`, ADHOC-69) |
+| `/master/termination-reasons` (+ create/edit/toggle/destroy) | GET/POST/PUT/DELETE | `termination_reasons.*` | `Master\CustomerTerminationReasonController` |
 
 **POP scope:** semua query pakai `applyUserScope()` (trait `HasPopScope`) — admin non-owner cuma lihat invoice/payment di POP yang di-assign ke dia.
 
@@ -82,7 +91,86 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 **Batas tanggal bayar (2026-08-11):** `payment_date` di jalur Tagihan kini `before_or_equal:today`, sejajar dengan `collected_date` di jalur kolektor. Sebelumnya admin bisa memasukkan pembayaran bertanggal tahun depan — merusak pemotongan pendapatan per periode dan membuat laporan bulan berjalan memuat uang yang belum ada.
 
-Invoice gak punya unique index setara (data lama sebelum fix migrasi masih ada pelanggaran, dan invoice `batal` menempati slot periode — lihat catatan di `database-schema.md`) — guard invoice level DB baru ditegakkan di `CustomerController::storeManualInvoice` (app-layer check), belum hard constraint.
+Invoice gak punya unique index setara (data lama sebelum fix migrasi masih ada pelanggaran, dan invoice `batal` menempati slot periode — lihat catatan di `database-schema.md`) — guard invoice level DB tetap ditegakkan di `InvoiceObserver::creating()` (app-layer check), belum hard constraint.
+
+## Pelanggan Pindah POP — piutang lunas dulu, tagihan lama tetap (ADHOC-107, final 2026-09-29)
+
+Keputusan user 2026-09-28 (rancangan: `docs/plan/rancangan-pindah-pop-lanjutan.md`). Satu sumber aturan: `App\Services\CustomerRelocationService`; ditegakkan validasi Edit **dan** `CustomerObserver` (semua jalur). Garis batasnya **bulan berjalan** — sama dengan garis kunci buku kalender (`BookPeriod::isLocked()`, bulan berjalan tidak pernah terkunci).
+
+| Tagihan | Saat pindah POP |
+|---|---|
+| **Piutang** — `belum_dibayar`/`sebagian` dengan `billing_period` < bulan berjalan (`Invoice::scopePiutang()`) | **Penghalang**: pindah ditolak sampai lunas |
+| Bulan berjalan/sesudahnya berstatus `sebagian`, atau sudah punya pembayaran `valid` | **Penghalang** (K8): kalau ikut pindah, cicilannya tercatat di cabang lama sementara tagihannya di cabang baru → laporan dua cabang tidak sinambung |
+| Bulan berjalan/sesudahnya `belum_dibayar` tanpa pembayaran valid | **Ikut pindah** ke POP baru (per model, tercatat di `audit_logs`) → pembayarannya masuk cabang baru (`payments.pop_id = invoice.pop_id`) |
+| Lunas / batal / write-off | **Tidak pernah dipindah** — laporan pembayaran & piutang tetap milik cabang lama |
+| Tagihan bulan berikutnya | Terbit di cabang baru (`GenerateMonthlyInvoicesCommand` memakai `customers.pop_id`) |
+
+- Baris `payments` & `customer_balance_mutations` **tidak pernah disentuh**. Pembayaran `ditolak` tidak dihitung sebagai uang masuk (sama dengan laporan bulanan).
+- **Saldo lebih bayar terbawa** (K7): kredit dari cabang lama dipakai `billing:apply-balance` untuk tagihan cabang baru; debitnya ber-`pop_id` cabang baru, kredit asal tetap cabang lama — jejak lintas cabang jelas per baris ledger.
+- Hasilnya snapshot tutup buku (`PeriodClosing`) cabang lama tidak pernah *drift* karena pindah POP. Perilaku ADHOC-104 (semua outstanding ikut pindah) **dibatalkan** karena memecah rekonsiliasi dua cabang.
+
+Aturan pindah POP lengkap: [`../master/pop/business-logic.md` §7a](../master/pop/business-logic.md#7a-pindah-pop-adhoc-104--adhoc-107-final-2026-09-29).
+
+## Denda Putus Langganan (ADHOC-69)
+
+Putus langganan (`CustomerTerminationController` → `CustomerTerminationService`) **tanpa prorate** — invoice Bulanan periode berjalan & tunggakan lama dibiarkan apa adanya, dua rancangan ini sengaja terpisah (prorate cuma milik Upgrade/Downgrade Paket, ADHOC-68).
+
+**Denda cuma berlaku untuk masa langganan ≤1 tahun** (`customer_services.activation_date` s.d. tanggal submit; tepat 1 tahun tetap dianggap ≤1 tahun; `activation_date` NULL diperlakukan ≤1 tahun — jalur paling aman):
+- **≤1 tahun** → `penalty_amount` wajib diisi manual di form (0 sah, boleh diprefill dari `customer_termination_reasons.default_penalty_amount` tapi admin wajib konfirmasi/ubah). Kalau >0, invoice terbit: `invoice_type=manual`, `manual_category=lainnya`, `manual_subtype_name='Denda Putus Langganan'` (konstanta bersama `CustomerTerminationService::PENALTY_SUBTYPE_NAME` — supaya laporan yang mengelompokkan per sub tidak terpecah oleh salah ketik), `invoice_status=belum_dibayar`, **tanpa Payment** (ditagih kemudian lewat jalur bayar biasa).
+- **>1 tahun** → field denda **tidak tampil** di form, dan `penalty_amount` klien diabaikan sepenuhnya di server (guard anti tamper) — tidak ada invoice yang terbit sama sekali, apapun yang dikirim klien.
+
+List Tagihan/Detail Tagihan membedakan invoice ini dari Tagihan Manual "Lainnya" biasa lewat badge `manual_subtype_name` + baris `description` di Detail.
+
+Master alasan (`customer_termination_reasons`, `/master/termination-reasons`, permission `termination_reasons.*` — **terpisah** dari `customers.deactivate`) — hapus permanen diblok kalau masih dipakai ≥1 pelanggan. Detail skema: `database-schema.md`. Rancangan lengkap: `docs/plan/billing/analisa-rancangan-putus-langganan.md`.
+
+## Laporan Bulanan Admin Collector, Tutup Periode & Hapus Buku (ADHOC-90)
+
+Halaman `/reports/collector-monthly` (`collector_report.view`), export XLSX (`collector_report.export`). Logika di `CollectorMonthlyReportService` — **semua rumus kolom hanya di sana**. Satu baris = POP `pusat`/`cabang`; `mini_pop` dilipat ke induknya (`branchMap()`).
+
+**Dua basis yang sengaja dicampur:** Blok 1–3 basis *tagihan* dihitung "per akhir bulan P" (bayar dibatasi `payment_date` < awal bulan berikutnya, supaya hitung-ulang periode lama = snapshot). Blok 4 basis *kas* (`payment_date` di dalam P), sama dengan `/reports/payments` — piutang yang baru dibayar bulan ini masuk bulan ini.
+
+| Blok | Kolom → sumber |
+|---|---|
+| Tagihan | **Tagihan Terbit** = Σ `total_amount` invoice `bulanan` periode P (label kolom template lama "Terkini" diganti — gampang disalahartikan "sekarang"); Diskon = Σ `discount`; **Bulanan** = bagian yang sudah dibayar TUNAI (metode apa pun kecuali `saldo`, admin & kolektor digabung — tidak lagi dipecah); **Dimuka** = bagian yang dibayar dari **saldo pelanggan** (`payment_method = 'saldo'` — lihat catatan ADHOC-92 di bawah); **Total Pembayaran** = Bulanan + Dimuka + Diskon; Piutang = Σ sisa per akhir P. Persamaan block ini: `Tagihan Terbit = Total Pembayaran + Piutang` |
+| Piutang Bulan Lalu | pembuka = invoice `billing_period` < P yang masih bersisa pada awal P (dihitung ulang dari payment, tak bergantung snapshot bulan lalu); Sudah Dibayar = bayar bulan P atas invoice itu; Piutang tak Tertagih = Σ `written_off_amount` dengan `written_off_at` di P (dan belum dipulihkan sebelum akhir P); Tak Tertagih Dipulihkan = Σ `written_off_amount` hapus buku periode terkunci yang di-Kembalikan di P (ADHOC-105, pengurang; snapshot lama dibaca `?? 0`); Sisa Piutang = Belum Dibayar − Tak Tertagih + Tak Tertagih Dipulihkan |
+| Pelanggan | per invoice bulanan P: Belum Bayar = masih bersisa; **Dimuka** = lunas SELURUHNYA dari saldo pelanggan; Sudah Bayar = lunas lainnya |
+| Uang Diterima | payment VALID `payment_date` di P: Bulanan (invoice bulanan P), Piutang (invoice bulanan < P), Aktivasi (`awal`), Lainnya (`insidental`), Lebih Bayar (`overpay_amount`); Total = semuanya. Empat kolom selain Lebih Bayar = total `/reports/payments` |
+
+Persentase bernilai 0 (bukan `#DIV/0!`) saat pembagi 0. Pendapatan % dan Piutang % dihitung atas dasar **Tagihan Terbit**, bukan Bulanan.
+
+**Rincian per sel (drill-down, klarifikasi user 2026-09-22):** setiap angka yang berasal dari satu query tunggal (bukan komposit seperti Total Pembayaran/persentase/Sisa Piutang) bisa diklik untuk melihat "siapa saja yang membentuk angka ini" — daftar pelanggan/invoice/pembayaran di balik sel itu, dalam modal (`<x-ui.modal name="report-detail">`). Endpoint `GET /reports/collector-monthly/detail` (permission sama dengan halaman: `collector_report.view`), logika di `CollectorMonthlyReportService::detail()` + `detailableColumns()`. **Selalu LIVE dari DB**, tidak pernah dari `period_closings` — kalau periode sudah ditutup, modal menampilkan peringatan bahwa rinciannya bisa sedikit beda dari angka beku di tabel. Kolom `bulanan`/`dimuka`/`sudah_dibayar`/pembayaran lain menampilkan baris per TRANSAKSI (payment), kolom lain (`tagihan_terbit`, `diskon`, `piutang`, `pembuka`, dst.) menampilkan baris per INVOICE/pelanggan. Komponen Blade: `<x-reports.detail-cell>`. Modal juga punya tombol **Unduh Excel** (`GET /reports/collector-monthly/detail/export`, XLSX via `SimpleExcelWriter` — konsisten dengan seluruh laporan lain di repo ini, bukan CSV; permission `collector_report.export`, sama dengan tombol Export laporan, bukan izin baru) untuk daftar tagih/kejar di luar layar (mis. daftar 100+ pelanggan piutang untuk ditelepon kolektor).
+
+> **Catatan "Dimuka" (klarifikasi user 2026-09-22, ADHOC-92 — BELUM diimplementasikan):** kolom ini merepresentasikan tagihan bulan berjalan yang dilunasi otomatis dari **saldo pelanggan** (uang yang dititipkan di muka, `docs/plan/billing/analisa-rancangan-saldo-pelanggan.md`). `PaymentMethod::SALDO` belum ada di enum — kolom ini SAH bernilai 0 di semua laporan sekarang, bukan bug. Begitu ADHOC-92 rilis dan mulai mencatat payment ber-metode `saldo`, kolom ini otomatis terisi tanpa perubahan kode laporan (`CollectorMonthlyReportService::paidPerInvoiceByMethod()` sudah memfilter berdasarkan string method).
+
+**Tutup buku otomatis & kunci permanen (2026-09-23, menggantikan tombol manual).** Tutup buku bukan aksi user: begitu bulan berganti, buku baru terbuka dan **semua periode < bulan berjalan terkunci permanen** — tidak ada buka ulang. Sumber tunggal: `App\Support\BookPeriod::isLocked()` (diturunkan dari kalender, **bukan** dari ada/tidaknya baris `period_closings`, supaya scheduler yang telat tidak membuka celah).
+- **Snapshot angka:** scheduler `billing:close-period` (tanggal 1, 00:10; `--period=YYYY-MM` untuk menambal bulan terlewat, idempoten) menyimpan angka live ke `period_closings.figures` untuk semua POP pusat/cabang, `closed_by = null` (sistem), audit `periode_ditutup`. Halaman membaca snapshot; bila angka live berbeda (mis. impor legacy) tampil ⚠, angka tetap snapshot.
+- **Yang ditolak di periode terkunci:** catat pembayaran dengan `payment_date` di bulan terkunci (`PaymentService::record()`, input tanggal diberi `min`). **Batalkan hapus buku periode terkunci tidak lagi ditolak (ADHOC-105, opsi A2)** — lihat paragraf Hapus buku piutang di bawah.
+- **Kembalikan pembayaran (dulu "Tolak") tetap boleh untuk bulan terkunci.** Nama aksi & label diganti "Kembalikan"/"Dikembalikan" (nilai DB tetap `ditolak`, route/permission tetap `payments.reject`). Buku lama tidak bergeser: laporan menghitung pembayaran sah **per tanggal** (`CollectorMonthlyReportService::countedAsOf()` — VALID, atau dikembalikan pada/sesudah tanggal acuan), jadi hitung-ulang bulan lama = snapshot. Pengembaliannya dibukukan di bulan terjadinya sebagai kolom **Dikembalikan** Blok 4 (pengurang Total Uang Diterima; snapshot lama tanpa kolom ini dibaca `?? 0`). Pengembalian pembayaran bulan berjalan tidak jadi pengurang — pembayarannya cukup tak terhitung. Catatan: tagihan yang kembali jadi piutang karena pengembalian baru masuk *Piutang Bulan Lalu* bulan berikutnya (pembuka bulan pengembalian tetap = posisi penutupan bulan sebelumnya). Penjaga lama tetap: pembayaran dalam setoran kolektor terverifikasi tidak bisa dikembalikan.
+- **Pembayaran yang dikembalikan disembunyikan dari daftar** staf (`/payments` — filter status dihapus, detail invoice, tab pembayaran pelanggan). Detailnya tetap bisa dibuka (notifikasi/audit) dan tetap muncul di Laporan Pembayaran. Portal pelanggan TIDAK diubah — keputusan lama: pembayaran dikembalikan tetap tampil ke pelanggan dengan pesan generik.
+- **Piutang dibayar belakangan** dicatat dengan tanggal bayar hari ini → masuk Blok 4 (Uang Diterima, kolom Piutang) bulan berjalan; laporan bulan tagihannya tidak bergeser.
+- Tombol "Tutup Periode"/"Buka Ulang" + route `reports.collector-monthly.close|reopen` + permission `collector_report.approve|cancel` **dihapus**. Salah input di bulan terkunci dikoreksi di periode berjalan, bukan dengan membuka periode lama.
+- Jalur impor legacy (`CustomerController` import) tidak diblokir — datanya memang historis; efeknya terlihat sebagai ⚠ drift.
+
+**Hapus buku piutang** (`invoices.approve`, `InvoiceWriteOffService`): hanya `isPiutang()` (bulan lalu ke belakang & bersisa) → status `tak_tertagih`, `written_off_amount` = snapshot `remaining_amount` (kolom `remaining_amount` sendiri tidak disentuh supaya bisa dibatalkan). Invoice `tak_tertagih` menolak pembayaran (controller, `PaymentService`, `CollectorPaymentService`), `recalculateFromPayments()` tidak menyentuhnya, dan keluar dari `scopePiutang()` otomatis. Ditolak bila periode berjalan POP-nya sudah ditutup. Bukan `batal`: tagihan sah tetap tercatat.
+
+**Pembatalan hapus buku (`InvoiceWriteOffService::reverse()`, ADHOC-105 opsi A2):** selalu boleh, termasuk untuk hapus buku yang periodenya sudah terkunci — pelanggan putus harus tetap bisa membayar tagihannya kapan pun.
+- Hapus buku **periode berjalan** → kolom `written_off_*` dikosongkan (laporan tak terpengaruh), tapi `write_off_reversed_at/by` tetap diisi sebagai penanda "pernah dikembalikan".
+- **Invoice yang pernah dikembalikan tidak dihapus buku otomatis lagi** oleh `billing:write-off-terminated` (opsi A, 2026-09-28) — supaya Kembalikan tidak cuma bertahan sampai tanggal 1 berikutnya. Sesudahnya ditagih sampai lunas atau dihapus buku manual oleh admin.
+- Hapus buku **periode terkunci** → `written_off_at/amount/reason` **dipertahankan** sebagai riwayat; hanya `write_off_reversed_at/by` yang diisi. Laporan membacanya "sah per tanggal" (pola `payments.rejected_at`, `CollectorMonthlyReportService::notWrittenOffAsOf()`): angka bulan hapus bukunya tidak bergeser, pemulihannya dibukukan di bulan terjadinya (kolom **Tak Tertagih Dipulihkan** Blok 2), dan sisa piutangnya masuk pembuka bulan berikutnya.
+- Hapus buku ulang atas invoice yang sama (`writeOff()`) mengosongkan `write_off_reversed_*` — siklus baru. Riwayat siklus lama ada di audit log model Invoice.
+
+**Hapus buku otomatis pelanggan putus (ADHOC-105).** Scheduler `billing:write-off-terminated` (tanggal 1, 00:20, sesudah `billing:close-period`; `--dry-run`, `--as-of=`) menghapus buku SEMUA invoice `belum_dibayar`/`sebagian` milik pelanggan `terminated` yang masa tenggangnya habis: sisa bulan pemutusan (M) + seluruh bulan M+1, dieksekusi tanggal 1 bulan M+2, dihitung dari `customers.terminated_at` (satu bundel per pelanggan — denda putus & piutang lama). Logika di `TerminatedCustomerWriteOffService`, memakai `writeOff()` apa adanya (denda putus punya `billing_period` terisi = bulan pemutusan, jadi lolos guard `isPiutang()`); invoice yang ditolak `writeOff()` dilog dan dilewati. Notifikasi in-app satu kali per pelanggan ke pendaftar asli + user ber-`invoices.approve` dalam POP scope pelanggan. Detail pelanggan putus & gate Langganan Lagi: [`../customer-lifecycle/business-logic.md`](../customer-lifecycle/business-logic.md) §8.
+
+### Laporan Bayar Kolektor (`/reports/collector-payments`, ADHOC-90)
+
+Laporan **lain** dari Laporan Bulanan Admin di atas: daftar transaksi per kolektor — pengganti tabel manual "Bayar Wifi Cash" (`docs/plan/billing/tabel-bayar-list-kolektor.md`). Permission sendiri `collector_payment_report.view` / `.export`; data dibatasi POP scope (`Payment::applyUserScope`). Logika di `CollectorPaymentReportService`.
+
+- Baris = payment VALID yang ditagih kolektor (`collected_by` ≠ null); semua metode, ada kolom Metode; filter kolektor, rentang tanggal, metode.
+- Tanggal = `COALESCE(collected_date, payment_date)` (tanggal uang diterima di lapangan).
+- **Kelompok = satu sesi input (`payment_batch_id`)**; **Total Sub** = jumlah kelompok, tampil di baris terakhirnya; tanggal hanya di baris pertama. Payment tanpa batch = kelompok sendiri.
+- **Kas Terkumpul** = jumlah SEMUA baris pada filter (bukan saldo belum disetor — untuk itu pakai `CollectorBalanceService`).
+- Jumlah = `payments.amount` (tanpa `overpay_amount`) — sama dengan saldo kolektor & `/reports/payments`. Keterangan = `payments.note`.
+- Pencarian di halaman hanya menyembunyikan baris; Total Sub & Kas Terkumpul tetap dihitung server.
 
 ## Format Nominal — `150.000`, bukan `150000`
 
@@ -97,7 +185,7 @@ Semua kolom uang yang diketik manusia memakai masking ribuan: ketik `150000`, la
 | `declared_amount`, `settlement_amount` | verifikasi setoran | `CollectorDepositController@verify` |
 | `monthly_price`, `installation_fee` | master paket internet | `Master\InternetPackageController` |
 | `discount_amount`, `other_fee` | registrasi & edit pelanggan | `CustomerRegistrationRequest`, `CustomerController@update` |
-| `prorate_amount`, `extra_*_fee` | modal tagihan manual | `CustomerController@storeManualInvoice` |
+| `prorate_amount`, `extra_*_fee` | verifikasi admin & Business Development (tagihan awal) | `CustomerVerificationController`, `CustomerAcquisitionController` |
 | `extra_*_fee`, `other_fee`, `prorate_amount_override` | verifikasi admin (tagihan awal) | `CustomerVerificationController` |
 
 > **Persen BUKAN rupiah.** `tax_percent`, `ppn`, dan `discount_default` sengaja **tidak** dimasking dan tidak dinormalkan — nilainya 0–100 dan tidak pernah pakai pemisah ribuan. Ikut memasking keduanya membuat `11` berisiko terbaca `11.000`.

@@ -111,4 +111,20 @@ class CustomerTechnicalDetail extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    /**
+     * Trigger completeness recalculation on parent Customer.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::saved(function (CustomerTechnicalDetail $detail) {
+            $detail->customer?->recalculateCompleteness();
+        });
+
+        static::deleted(function (CustomerTechnicalDetail $detail) {
+            $detail->customer?->recalculateCompleteness();
+        });
+    }
 }

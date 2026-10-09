@@ -215,6 +215,32 @@ class ReportPaymentTest extends TestCase
         $responseDate->assertDontSee('PAY-001');
     }
 
+    /**
+     * Regresi: dropdown filter Metode dulu hardcode
+     * ['cash','transfer','qris','lainnya'] — ketinggalan 'kolektor'
+     * (PaymentMethod::KOLEKTOR, dipakai Modal Bayar Cepat admin saat mencatat
+     * uang yang ditagih kolektor). Transaksi metode kolektor tak pernah bisa
+     * difilter, dan begitu ditambahkan tanpa label ikut ditambah, dropdown-nya
+     * error "Undefined array key" (2026-09-22).
+     */
+    public function test_kolektor_method_is_filterable_and_page_renders_without_error(): void
+    {
+        $ownerRole = Role::where('name', 'Owner')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $ownerRole->id, 'status' => 'active']);
+
+        $pop = $this->createPop('SDA', 'SDA', 'POP Sidoarjo');
+        $invoice = $this->createInvoice($pop, 'Pelanggan Kolektor', 'INV-KOL-001');
+        $this->createPayment($invoice, 'PAY-KOL-001', '2026-06-01', 'kolektor', 'valid', 150000);
+
+        $response = $this->actingAs($user)->get('/reports/payments');
+        $response->assertOk();
+        $response->assertSee('Kolektor');
+
+        $filtered = $this->actingAs($user)->get('/reports/payments?payment_method=kolektor');
+        $filtered->assertOk();
+        $filtered->assertSee('PAY-KOL-001');
+    }
+
     public function test_export_csv_enforces_pop_boundaries_for_admin_cabang(): void
     {
         $adminCabangRole = Role::where('name', '=', 'POP Admin', 'and')->firstOrFail();

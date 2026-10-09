@@ -8,11 +8,15 @@ use App\Models\Task;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class TaskScheduled implements ShouldBroadcast
+/**
+ * `ShouldBroadcastNow` — dipicu aksi FOP assign/reschedule/cancel tim task
+ * (klik tombol), payload ringkas. Lihat catatan `TaskStarted`, alasan sama.
+ */
+class TaskScheduled implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

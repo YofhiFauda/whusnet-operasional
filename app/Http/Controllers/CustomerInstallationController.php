@@ -2,31 +2,47 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EquipmentClass;
 use App\Enums\MaterialKind;
+use App\Enums\OwnershipMode;
+use App\Enums\RollStatus;
+use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Enums\TrackingType;
 use App\Enums\WorkflowTransition;
 use App\Events\InstallationActivated;
 use App\Events\InstallationCompleted;
 use App\Events\InstallationStarted;
+use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\InternetPackage;
+use App\Models\InventoryRoll;
+use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Task;
+use App\Models\TechnicianCustody;
+use App\Models\User;
 use App\Models\WorkTool;
+use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
+use App\Services\InventoryService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
 use App\Support\SafeUrl;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class CustomerInstallationController extends Controller
@@ -70,20 +86,57 @@ class CustomerInstallationController extends Controller
             ->first();
 
         if ($activeTask) {
-            return redirect()->back()->with('error', "Tidak dapat memulai pemasangan karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu.");
+            return redirect()->back()->with('error', "Tidak dapat memulai pemasangan karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau tandai Lapor Nanti task sebelumnya terlebih dahulu.");
         }
 
         try {
             DB::transaction(function () use ($customer, $workflowService, $taskService, $task) {
                 $installation = $customer->installations()->latest()->first();
 
+                // Pemasangan dari masa langganan SEBELUM putus = siklus baru
+                // (Langganan Lagi → pemasangan ulang): record baru supaya
+                // foto/BAP/perangkat pemasangan lama tetap jadi riwayat, gak
+                // tertimpa. Alasan sama dengan CustomerSurveyController::start().
+                if ($installation && $customer->terminated_at && $installation->created_at?->lt($customer->terminated_at)) {
+                    $installation = null;
+                }
+
+                // "Mulai" = sesi kerja baru — waktu selesai sesi sebelumnya
+                // dikosongkan supaya laporan menghitung ulang completed_at.
                 $updateData = [
                     'started_at' => now(),
                     'start_time' => now()->toTimeString(),
                     'installation_status' => 'in_progress',
+                    'completed_at' => null,
+                    'finished_date' => null,
+                    'end_time' => null,
                 ];
                 if ($task) {
                     $updateData['fop_id'] = $task->fop_id ?? $task->created_by;
+
+                    $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                    $currentUserId = auth()->id();
+
+                    $memberIndex = 1;
+                    foreach ($teamMembers as $idx => $member) {
+                        if ($member->user_id == $currentUserId) {
+                            $memberIndex = $idx + 1;
+                            break;
+                        }
+                    }
+                    $updateData['technicians'] = "Teknisi {$memberIndex} - ".auth()->user()->name;
+                    $updateData['technician_id'] = auth()->id();
+
+                    $otherMembers = $teamMembers->filter(fn ($m) => $m->user_id != $currentUserId)->values();
+                    if ($otherMembers->isNotEmpty()) {
+                        $updateData['technician_2_id'] = $otherMembers[0]->user_id;
+                    }
+                    if ($otherMembers->count() > 1) {
+                        $updateData['technician_3_id'] = $otherMembers[1]->user_id;
+                    }
+                } else {
+                    $updateData['technician_id'] = auth()->id();
+                    $updateData['technicians'] = 'Teknisi 1 - '.auth()->user()->name;
                 }
 
                 if ($installation) {
@@ -151,6 +204,103 @@ class CustomerInstallationController extends Controller
         return redirect()->back()->with('success', 'Pemasangan pelanggan berhasil dibatalkan: tidak layak lanjut.');
     }
 
+    /**
+     * SN Perangkat Aktif yang boleh dipasang ke pelanggan ini — custody
+     * anggota tim task yang sedang berjalan, status ISSUED, item-nya
+     * installable (bukan company_asset kayak OTDR). SATU-SATUNYA sumber SN
+     * yang boleh disimpan (koreksi lanjutan ADHOC-54, permintaan eksplisit
+     * user): teknisi TANPA SN di custody TIDAK BISA mengisi SN sama sekali
+     * lagi — fallback teks manual yang dulu ada buat device belum ke-track
+     * Inventory sengaja DICABUT, supaya SN yang tersimpan selalu bisa
+     * ditelusuri balik ke barang yang benar-benar diserahkan Gudang.
+     * Dipakai report() (render dropdown) & storePemasangan() (validasi
+     * keanggotaan) — satu query, dua pemakai, biar gak menyimpang.
+     */
+    private function eligibleSerialsForTeam(?Task $task)
+    {
+        $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
+
+        return $teamTechnicianIds === []
+            ? collect()
+            : InventorySerial::query()
+                ->whereIn('current_technician_id', $teamTechnicianIds)
+                ->where('status', SerialStatus::ISSUED->value)
+                ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
+                ->with('item')
+                ->get();
+    }
+
+    /**
+     * Padanan `eligibleSerialsForTeam()` buat barang PASIF (kabel, RJ45, dst)
+     * — versi QUANTITY/BATCH dari custody, bukan SN per-unit. Dikelompokkan
+     * per item, sisa custody digabung SELURUH anggota tim (sama prinsipnya
+     * dengan FIFO lintas anggota di `InventoryService::consumeFromCustody()`
+     * — siapa pun di tim boleh submit laporan, jadi sisa custody yang
+     * ditampilkan pun gabungan tim, bukan per-orang).
+     *
+     * Cuma pagar UI/UX (nunjuk barang mana yang ADA di custody + sisanya
+     * berapa, supaya ketauan dari awal kalau cabang belum nge-issue kabel/RJ
+     * ke teknisi) — penegakan SEBENARNYA tetap di
+     * `InventoryService::consumeFromCustody()` saat `storeSpeedtest()`
+     * (lihat komentar di sana kenapa potongnya di titik itu, bukan di sini).
+     *
+     * @return Collection<int, array{item_id:int, code:?string, name:string, unit:string, type:?string, available:float}>
+     */
+    private function eligiblePassiveCustodyForTeam(?Task $task)
+    {
+        $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
+
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        return TechnicianCustody::query()
+            ->whereIn('technician_id', $teamTechnicianIds)
+            ->active()
+            ->with('item.category')
+            ->get()
+            ->filter(fn (TechnicianCustody $custody) => $custody->item
+                && $custody->item->tracking_type !== TrackingType::SERIALIZED
+                && $custody->item->effective_equipment_class === EquipmentClass::PASIF)
+            ->groupBy('item_id')
+            ->map(function ($rows) {
+                $item = $rows->first()->item;
+
+                return [
+                    'item_id' => $item->id,
+                    'code' => $item->code,
+                    'name' => $item->name,
+                    'unit' => $item->unit,
+                    'type' => $item->category?->code,
+                    'available' => (float) $rows->sum('qty_remaining'),
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * Padanan `eligibleSerialsForTeam()` buat roll kabel
+     * (App\Enums\TrackingType::ROLL) — list INDIVIDUAL roll (bukan agregat
+     * kayak `eligiblePassiveCustodyForTeam()`), karena teknisi harus milih
+     * roll FISIK mana yang dipotong (tiap roll punya `length_remaining`
+     * sendiri, gak bisa digabung kayak custody QUANTITY/BATCH). Penegakan
+     * sebenarnya tetap di `InventoryService::consumeFromRoll()` saat
+     * `storeSpeedtest()`, sama pola `eligiblePassiveCustodyForTeam()`.
+     */
+    private function eligibleRollsForTeam(?Task $task)
+    {
+        $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
+
+        return $teamTechnicianIds === []
+            ? collect()
+            : InventoryRoll::query()
+                ->whereIn('current_technician_id', $teamTechnicianIds)
+                ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+                ->where('length_remaining', '>', 0)
+                ->with('item')
+                ->get();
+    }
+
     public function report(Customer $customer, Request $request)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
@@ -170,7 +320,7 @@ class CustomerInstallationController extends Controller
         // termasuk NOC (keputusan eksplisit: no exemption).
         $task = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::PEMASANGAN->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -189,8 +339,37 @@ class CustomerInstallationController extends Controller
         $customer->loadMissing(['customerDevice', 'customerTechnicalDetail', 'latestSurvey', 'internetPackage']);
 
         $materialService = app(TaskMaterialService::class);
-        $items = Item::active()->with('category')->orderBy('name')->get();
-        $itemCategories = ItemCategory::options();
+
+        // Split Aktif/Pasif (ADHOC-54, rancangan-ui.md §3.2-3.3) — form REALISASI
+        // (fase ini) dibatasi ke item PASIF doang; Perangkat Aktif dipilih lewat
+        // dropdown SN custody terpisah di bawah, bukan lewat picker material
+        // generik ini. Filter di PHP (bukan query DB) karena klasifikasi efektif
+        // butuh resolusi dua-level (`Item::getEffectiveEquipmentClassAttribute()`)
+        // yang gak bisa diterjemahkan jadi satu klausa where.
+        $items = Item::active()->with('category')->orderBy('name')->get()
+            ->filter(fn (Item $item) => $item->effective_equipment_class === EquipmentClass::PASIF)
+            ->values();
+        $itemCategories = ItemCategory::active()->ordered()->where('equipment_class', EquipmentClass::PASIF->value)->get();
+
+        // Dropdown "Perangkat Aktif" — SN yang lagi di custody anggota tim
+        // task ini, item-nya boleh dipasang ke pelanggan (bukan company_asset
+        // kayak OTDR). Kosong = teknisi belum ambil barang dari Gudang —
+        // storePemasangan() menolak submit-nya, lihat eligibleSerialsForTeam().
+        $eligibleSerials = $this->eligibleSerialsForTeam($task);
+
+        // Material Terpakai (Perangkat Pasif) — SEKARANG dibatasi custody tim
+        // ini juga, sama prinsipnya dengan SN Perangkat Aktif di atas (ADHOC,
+        // 2026-09-12: sebelumnya dropdown ini nampilin SEMUA item master PASIF
+        // tanpa peduli teknisi beneran pegang barangnya atau tidak, jadi
+        // laporan bisa diklaim biarpun cabang belum nge-issue kabel/RJ ke
+        // teknisi — ketauannya baru di storeSpeedtest() lewat
+        // InsufficientCustodyException, telat & bikin teknisi harus ngulang
+        // dari step 5). Lihat eligiblePassiveCustodyForTeam().
+        $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($task);
+
+        // Dropdown "Roll Kabel" — sama prinsip eligibleSerials di atas, roll
+        // INDIVIDUAL (bukan agregat) yang lagi di custody tim ini.
+        $eligibleRolls = $this->eligibleRollsForTeam($task);
 
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
         // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
@@ -201,9 +380,40 @@ class CustomerInstallationController extends Controller
             ? $installFopTask->materials()->terpakai()->orderBy('id')->get()
             : collect();
 
-        $sourceRows = $existingUsage->isNotEmpty()
-            ? $existingUsage
-            : $materialService->estimatesForCustomer($customer);
+        // Estimasi survey sekarang per KATEGORI (bukan model), jadi patokannya
+        // dibaca dari equipment_class kategori. Estimasi TIDAK lagi di-prefill
+        // jadi baris realisasi: realisasi harus berasal dari custody (SN/roll/
+        // barang pasif yang benar-benar dibawa), jadi estimasi hanya tampil
+        // sebagai patokan di seksi yang sesuai.
+        //   - kategori AKTIF               → patokan seksi SN Perangkat Aktif
+        //   - kategori PASIF, satuan meter → patokan seksi Roll Kabel
+        //   - kategori PASIF, sisanya      → patokan seksi Perangkat Pasif
+        $estimasiAll = $materialService->estimatesForCustomer($customer);
+        $equipmentClassByCode = ItemCategory::whereIn('code', $estimasiAll->pluck('item_type')->filter()->unique())
+            ->get()
+            ->mapWithKeys(fn ($category) => [$category->code => $category->equipment_class?->value]);
+        $isAktif = fn ($row) => ($equipmentClassByCode[$row->item_type] ?? null) === EquipmentClass::AKTIF->value;
+
+        $estimasiPerangkatAktif = $estimasiAll->filter($isAktif)->values();
+        $estimasiPasifSemua = $estimasiAll->reject($isAktif)->values();
+        $estimasiRoll = $estimasiPasifSemua->filter(fn ($row) => $row->unit === 'meter')->values();
+        $estimasiPasif = $estimasiPasifSemua->reject(fn ($row) => $row->unit === 'meter')->values();
+
+        $sourceRows = $existingUsage;
+
+        // Baris freeform ("Lainnya" — item_id null) TIDAK BISA di-prefill lagi
+        // ke sini (koreksi lanjutan ADHOC-54, 2026-09-12) — dropdown Material
+        // Terpakai udah gak punya opsi "Lainnya", jadi baris begini bakal
+        // ke-render dengan Barang KOSONG/gak kepilih di layar tapi qty-nya
+        // TETAP ke-submit diam-diam (input hidden di belakang dropdown yang
+        // gak match), lolos ke request tanpa disadari teknisi — nabrak
+        // validasi `item_id required_with:qty` walau teknisi belum nyentuh
+        // section ini sama sekali (bug nyata, ketemu 2026-09-14: submit
+        // Aktivasi gagal padahal cuma isi device+ODP). Estimasi survey lama
+        // yang gak nunjuk item master emang gak bisa diwakili custody — biar
+        // hilang dari prefill daripada diam-diam gagal.
+        $droppedFreeformEstimateNames = $sourceRows->whereNull('item_id')->pluck('item_name')->filter()->values();
+        $sourceRows = $sourceRows->whereNotNull('item_id');
 
         $materialRows = $sourceRows->map(fn ($row) => [
             'item_id' => $row->item_id,
@@ -236,7 +446,12 @@ class CustomerInstallationController extends Controller
             && $installFopTask
             && $installFopTask->materials()->terpakai()->exists();
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete'));
+        // Dropdown untuk form koreksi Step 1 (kota) & Step 3 (paket internet).
+        $cities = City::orderBy('name')->get(['id', 'name']);
+        $internetPackages = InternetPackage::orderBy('name')->get();
+        $surveyFields = $customer->latestSurvey?->difficultyAndNote() ?? ['difficulty_level' => null, 'survey_note' => null];
+
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -258,7 +473,7 @@ class CustomerInstallationController extends Controller
         // pengecualian, keputusan eksplisit biar konsisten satu alur).
         $assignmentTask = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::PEMASANGAN->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -288,6 +503,12 @@ class CustomerInstallationController extends Controller
             'olt_slot' => 'nullable|string|max:20',
             'olt_port' => 'nullable|string|max:50',
             'vlan' => 'nullable|string|max:20',
+
+            // Technician info
+            'technician_id' => 'nullable|exists:users,id',
+            'technician_2_id' => 'nullable|exists:users,id',
+            'technician_3_id' => 'nullable|exists:users,id',
+            'technicians' => 'nullable|string|max:255',
 
             // Speedtest
             'test_upload' => 'nullable|numeric',
@@ -402,11 +623,46 @@ class CustomerInstallationController extends Controller
 
                 $task = Task::where('customer_id', $customer->id)
                     ->where('task_type', TaskType::PEMASANGAN->value)
-                    ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                    ->whereIn('status', [...TaskStatus::reportableValues(), TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
                     ->latest('id')
                     ->first();
                 if ($task && ! $installation->fop_id) {
                     $installation->fop_id = $task->fop_id ?? $task->created_by;
+                }
+
+                $installation->technician_id = $validated['technician_id'] ?? $installation->technician_id ?? auth()->id();
+                if (isset($validated['technician_2_id'])) {
+                    $installation->technician_2_id = $validated['technician_2_id'];
+                }
+                if (isset($validated['technician_3_id'])) {
+                    $installation->technician_3_id = $validated['technician_3_id'];
+                }
+                if (isset($validated['technicians'])) {
+                    $installation->technicians = $validated['technicians'];
+                }
+
+                if ($task && (! $installation->technician_2_id || ! $installation->technicians)) {
+                    $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                    $currentUserId = $installation->technician_id ?? auth()->id();
+                    $memberIndex = 1;
+                    foreach ($teamMembers as $idx => $member) {
+                        if ($member->user_id == $currentUserId) {
+                            $memberIndex = $idx + 1;
+                            break;
+                        }
+                    }
+                    if (! $installation->technicians) {
+                        $installation->technicians = "Teknisi {$memberIndex} - ".(User::find($currentUserId)?->name ?? auth()->user()->name);
+                    }
+                    $otherMembers = $teamMembers->filter(fn ($m) => $m->user_id != $currentUserId)->values();
+                    if ($otherMembers->isNotEmpty() && ! $installation->technician_2_id) {
+                        $installation->technician_2_id = $otherMembers[0]->user_id;
+                    }
+                    if ($otherMembers->count() > 1 && ! $installation->technician_3_id) {
+                        $installation->technician_3_id = $otherMembers[1]->user_id;
+                    }
+                } elseif (! $installation->technicians) {
+                    $installation->technicians = 'Teknisi 1 - '.auth()->user()->name;
                 }
 
                 if (! $installation->completed_at) {
@@ -507,7 +763,7 @@ class CustomerInstallationController extends Controller
                 // Selesaikan task pemasangan jika ada
                 $task = Task::where('customer_id', $customer->id)
                     ->where('task_type', TaskType::PEMASANGAN->value)
-                    ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                    ->whereIn('status', TaskStatus::reportableValues())
                     ->latest('id')
                     ->first();
 
@@ -555,6 +811,168 @@ class CustomerInstallationController extends Controller
     }
 
     /**
+     * Koreksi Step 1 (Data Diri) dari Laporan Pemasangan. Guard sama dengan
+     * report(): status pemasangan harus berjalan dan teknisi wajib anggota tim
+     * Task pemasangan. Kota/kecamatan/desa & koordinat ikut dikirim dari form —
+     * updateIdentity() menulis ulang customer_addresses, jadi yang tidak ikut
+     * terkirim akan ter-null-kan.
+     */
+    public function updateIdentity(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->abortUnlessInstallationReportEditable($customer);
+
+        $validated = $request->validate([
+            'full_name' => 'required|string|max:150',
+            'identity_number' => 'nullable|string|size:16|regex:/^[0-9]+$/',
+            'primary_phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'alternative_phone' => ['nullable', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'email' => 'nullable|email|max:100',
+            'address' => 'required|string',
+            'city_id' => 'nullable|exists:cities,id',
+            'district_id' => 'nullable|exists:districts,id',
+            'village_id' => 'nullable|exists:villages,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateIdentity($customer, $validated, $request->user());
+
+        return $this->redirectBackToInstallationReport($request, $customer, 'Data diri pelanggan diperbarui.');
+    }
+
+    /**
+     * Koreksi Step 3 (Paket Internet) dari Laporan Pemasangan — dipakai saat
+     * pemasangan menemukan paket yang dipilih saat registrasi tidak sesuai.
+     */
+    public function updatePackage(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->abortUnlessInstallationReportEditable($customer);
+
+        $validated = $request->validate([
+            'internet_package_id' => 'required|exists:internet_packages,id',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+
+        return $this->redirectBackToInstallationReport($request, $customer, 'Paket internet pelanggan diperbarui.');
+    }
+
+    /**
+     * Koreksi Step 4 (Laporan Survey Lapangan) dari Laporan Pemasangan. Survey
+     * yang dikoreksi di sini adalah laporan survey terakhir — sama dengan yang
+     * dibaca halaman ini.
+     */
+    public function updateSurveyData(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->abortUnlessInstallationReportEditable($customer);
+
+        $survey = $customer->latestSurvey()->first();
+        abort_unless($survey !== null, 422, 'Pelanggan ini belum punya data survey untuk dikoreksi.');
+
+        $validated = $request->validate([
+            'nearest_odp' => 'nullable|string|max:255',
+            'cable_estimation_meter' => 'nullable|integer|min:0',
+            'requested_installation_date' => 'nullable|date',
+            'difficulty_level' => 'nullable|in:MUDAH,SEDANG,SULIT',
+            'survey_note' => 'nullable|string',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateSurveyData($survey, $validated, $request->user());
+
+        return $this->redirectBackToInstallationReport($request, $customer, 'Laporan survey diperbarui.');
+    }
+
+    /**
+     * Ganti foto Step 2 (Foto Rumah & Foto ODP) dari Laporan Pemasangan. Foto
+     * yang diganti dihapus dari disk, sama seperti penggantian di survey.
+     * Field yang tidak diisi dibiarkan apa adanya.
+     */
+    public function updatePhotos(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->abortUnlessInstallationReportEditable($customer);
+
+        $survey = $customer->latestSurvey()->first();
+        abort_unless($survey !== null, 422, 'Pelanggan ini belum punya data survey untuk diganti fotonya.');
+
+        $validated = $request->validate([
+            'house_photo' => 'nullable|image|max:2048',
+            'survey_photo' => 'nullable|image|max:2048',
+        ]);
+
+        // Urutan aman: unggah foto baru → simpan DB → baru hapus foto lama. Dulu
+        // foto lama dihapus dulu; kalau unggah/simpan gagal, record masih menunjuk
+        // file yang sudah hilang dan tidak bisa dipulihkan.
+        $changes = [];
+        $oldPaths = [];
+        foreach (['house_photo' => 'house', 'survey_photo' => 'odp'] as $field => $photoType) {
+            if (! $request->hasFile($field)) {
+                continue;
+            }
+
+            $changes[$field] = FileUploadService::uploadSurveyPhoto($request->file($field), $customer, $photoType);
+
+            if ($survey->{$field}) {
+                $oldPaths[] = $survey->{$field};
+            }
+        }
+
+        if ($changes !== []) {
+            try {
+                DB::transaction(fn () => $survey->update($changes));
+            } catch (\Throwable $e) {
+                // Foto baru yatim kalau DB gagal: bersihkan, foto lama dibiarkan.
+                foreach ($changes as $newPath) {
+                    Storage::disk('public')->delete($newPath);
+                }
+
+                throw $e;
+            }
+
+            foreach ($oldPaths as $oldPath) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+
+        return $this->redirectBackToInstallationReport($request, $customer, $changes === [] ? 'Tidak ada foto yang diganti.' : 'Foto survey diperbarui.');
+    }
+
+    /**
+     * Guard edit Step 1–4 Laporan Pemasangan — sama dengan report(): permission,
+     * status, dan keanggotaan tim Task pemasangan (no exemption untuk NOC).
+     */
+    private function abortUnlessInstallationReportEditable(Customer $customer): void
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
+
+        abort_unless(
+            in_array($customer->status, ['installation_in_progress', 'revision_installation'], true),
+            403,
+            'Data pelanggan hanya bisa diubah selama tahap pemasangan berjalan.'
+        );
+
+        $task = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->whereIn('status', TaskStatus::reportableValues())
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($task && $task->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
+        );
+    }
+
+    private function redirectBackToInstallationReport(Request $request, Customer $customer, string $message): RedirectResponse
+    {
+        $returnTo = SafeUrl::resolveReturnTo($request->input('return_to'), 'verifications.queue');
+
+        return redirect()->route('customers.installation.report', ['customer' => $customer, 'return_to' => $returnTo])
+            ->with('success', $message);
+    }
+
+    /**
      * Simpan Laporan Pemasangan & Perangkat (step 5 wizard) — TIDAK
      * menyelesaikan task/transisi workflow. Ini "tombol Aktivasi" yang
      * membuka Laporan Speedtest (step 6): tanpa data pemasangan lengkap
@@ -577,7 +995,7 @@ class CustomerInstallationController extends Controller
 
         $assignmentTask = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::PEMASANGAN->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -587,6 +1005,17 @@ class CustomerInstallationController extends Controller
             403,
             'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
         );
+
+        // SN Perangkat Aktif dihitung SEBELUM $request->validate() supaya
+        // aturan 'selected_inventory_serial_id' bisa dibatasi ke custody tim
+        // ini (Rule::in) — lihat eligibleSerialsForTeam(). Ambil dari task
+        // yang sama dengan $assignmentTask di atas, bukan query baru.
+        $eligibleSerialIds = $this->eligibleSerialsForTeam($assignmentTask)->pluck('id');
+
+        // Roll kabel — OPSIONAL (beda dari SN Perangkat Aktif yang wajib):
+        // gak semua pemasangan pakai kabel yang ke-track per-roll, jadi
+        // submit tanpa pilih roll tetap harus jalan biasa.
+        $eligibleRollIds = $this->eligibleRollsForTeam($assignmentTask)->pluck('id');
 
         $validated = $request->validate([
             // Informasi Perangkat Aktif + Nomor/Port ODP — SATU-SATUNYA syarat
@@ -599,7 +1028,11 @@ class CustomerInstallationController extends Controller
             'device_type' => 'required|string|in:modem,ont,onu,router,other',
             'brand' => 'nullable|string|max:100',
             'model' => 'nullable|string|max:100',
-            'serial_number' => 'required|string|max:100',
+            // Teks manual DICABUT (koreksi lanjutan ADHOC-54) — klien tidak
+            // boleh lagi ngirim SN sendiri, SN cuma boleh datang dari
+            // selected_inventory_serial_id (override di bawah). 'prohibited'
+            // jaga-jaga kalau ada jalur lama yang masih ngirim field ini.
+            'serial_number' => 'prohibited',
             'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
             'wifi_ssid' => 'required|string|max:150',
             'wifi_password' => 'required|string|max:150',
@@ -615,6 +1048,20 @@ class CustomerInstallationController extends Controller
             'vlan' => 'nullable|string|max:20',
             'initial_attenuation' => 'nullable|string|max:50',
 
+            // WAJIB & dibatasi ke custody tim ini (koreksi lanjutan ADHOC-54)
+            // — kalau $eligibleSerialIds kosong (teknisi belum ambil barang
+            // dari Gudang), Rule::in([]) selalu gagal: submit ditolak dengan
+            // pesan custom di bawah, bukan cuma "format salah". Draft
+            // pointer doang — aksi INSTALL sungguhan baru jalan di
+            // storeSpeedtest(), lihat komentar di sana.
+            'selected_inventory_serial_id' => ['required', 'integer', Rule::in($eligibleSerialIds)],
+
+            // OPSIONAL — sama pola draft pointer di atas (dibatasi custody
+            // tim ini), aksi potong-meter sungguhan (consumeFromRoll()) baru
+            // jalan di storeSpeedtest().
+            'selected_inventory_roll_id' => ['nullable', 'integer', Rule::in($eligibleRollIds)],
+            'roll_meters_used' => ['nullable', 'numeric', 'min:0.01', 'required_with:selected_inventory_roll_id'],
+
             'installation_photo' => 'nullable|image|max:2048',
             'contract_photo' => 'nullable|image|max:2048',
             'signature_photo' => 'nullable|image|max:2048',
@@ -622,8 +1069,19 @@ class CustomerInstallationController extends Controller
 
             'started_at' => 'nullable|date',
 
-            'materials' => 'nullable|array',
-            'materials.*.item_id' => 'nullable|integer|exists:items,id',
+            // Opsi "Lainnya (isi manual)" DICABUT dari dropdown Material
+            // Terpakai (koreksi lanjutan ADHOC-54, 2026-09-12) — sama alasan
+            // serial_number di atas: barang yang dipakai musti bisa ditelusuri
+            // balik ke custody Gudang, gak boleh lagi ada nama karangan tanpa
+            // dasar sistem. `required_with:qty`, BUKAN `required` polos — form
+            // repeatable selalu menyisakan satu baris kosong terakhir (lihat
+            // catatan di material-rows.blade.php), baris itu harus tetap boleh
+            // lolos validasi (dibuang diam-diam belakangan oleh normalizeRow()
+            // di TaskMaterialService, bukan digagalkan di sini). Kecukupan
+            // sisa custody per-item dicek SETELAH validate() ini lolos (butuh
+            // agregasi qty per item lintas baris, gak bisa satu Rule::in()),
+            // lihat blok setelah $validated.
+            'materials.*.item_id' => 'nullable|required_with:materials.*.qty|integer|exists:items,id',
             'materials.*.item_name' => 'nullable|string|max:150',
             'materials.*.item_type' => ['nullable', 'string', Rule::exists('item_categories', 'code')->where('is_active', true)],
             'materials.*.qty' => 'nullable|numeric|min:0',
@@ -634,7 +1092,62 @@ class CustomerInstallationController extends Controller
             'work_tools_manual' => 'nullable|array',
             'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
             'work_tools_manual.*.note' => 'nullable|string|max:255',
+        ], [
+            // Pesan sama buat 'required' maupun 'in' (Rule::in([]) gagal
+            // dengan kode 'in', bukan 'required', begitu custody kosong) —
+            // dari sudut pandang teknisi keduanya berarti sama: gak ada SN
+            // yang bisa dipilih, harus ambil barang dari Gudang dulu.
+            'selected_inventory_serial_id.required' => 'SN Perangkat Aktif wajib dipilih dari Gudang. Anda tidak memiliki SN di custody — ambil barang (Issue) dari Gudang terlebih dahulu sebelum bisa mengisi Laporan Pemasangan.',
+            'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
+            'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
+            'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
         ]);
+
+        // selected_inventory_serial_id sudah divalidasi wajib & anggota
+        // custody tim ini di atas — SN yang disimpan SELALU berasal dari sini,
+        // gak ada lagi teks manual yang bisa menyimpang. Mencegah dua sumber
+        // kebenaran: installSerial() di storeSpeedtest() jalan dari
+        // selected_inventory_serial_id yang sama persis.
+        $validated['serial_number'] = InventorySerial::findOrFail($validated['selected_inventory_serial_id'])->serial_number;
+
+        // Sisa custody Material Terpakai (koreksi lanjutan ADHOC-54,
+        // 2026-09-12) — CUMA peringatan informasional di flash message, BUKAN
+        // gerbang blocking. Sempat ditulis pakai throw ValidationException
+        // (koreksi 2026-09-12 versi awal), tapi itu SALAH & langsung bikin 2
+        // bug nyata (2026-09-14): (1) Aktivasi jadi bisa gagal gara-gara
+        // Material Terpakai, padahal aturan tegasnya "Aktivasi cuma butuh
+        // Informasi Perangkat Aktif + Distribusi Jaringan (ODP/OLT) — foto,
+        // material, alat kerja itu syarat BUKA STEP 6, bukan syarat submit
+        // step 5" (ditegaskan user dua kali); (2) baris material LAMA (SN
+        // Perangkat Aktif yang salah ke-klasifikasi PASIF di master, atau
+        // custody yang sudah berubah sejak submit sebelumnya) yang ke-resubmit
+        // otomatis lewat prefill bikin Aktivasi ke-block PADAHAL teknisi belum
+        // nyentuh Material Terpakai sama sekali — dan gagal validasi bikin
+        // redirect balik TANPA ?activated=1, jadi wizard keliatan "reset ke
+        // step 1". Penegakan SUNGGUHAN tetap di
+        // `InventoryService::consumeFromCustody()` (storeSpeedtest(), lock+FIFO
+        // beneran) — di sini cuma info dini, TIDAK menghentikan penyimpanan.
+        // Qty digabung per item_id dulu (satu barang bisa muncul di lebih dari
+        // satu baris).
+        $custodyWarnings = [];
+        $requestedQtyByItem = collect($validated['materials'] ?? [])
+            ->filter(fn ($row) => ! empty($row['item_id']) && (float) ($row['qty'] ?? 0) > 0)
+            ->groupBy('item_id')
+            ->map(fn ($rows) => (float) $rows->sum('qty'));
+
+        if ($requestedQtyByItem->isNotEmpty()) {
+            $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($assignmentTask)->keyBy('item_id');
+
+            foreach ($requestedQtyByItem as $itemId => $qtyRequested) {
+                $available = (float) ($eligiblePassiveCustody[$itemId]['available'] ?? 0);
+
+                if ($qtyRequested > $available) {
+                    $itemName = $eligiblePassiveCustody[$itemId]['name'] ?? Item::find($itemId)?->name ?? "Barang #{$itemId}";
+
+                    $custodyWarnings[] = "{$itemName} (diklaim ".number_format($qtyRequested, 2).', tersedia '.number_format($available, 2).')';
+                }
+            }
+        }
 
         $installation = $customer->installations()->latest()->first();
         if (! $installation) {
@@ -660,22 +1173,53 @@ class CustomerInstallationController extends Controller
                 $installation->signature_photo = FileUploadService::uploadInstallationPhoto($request->file('signature_photo'), $customer, 'ttd');
             }
             $installation->installation_note = $validated['installation_note'] ?? null;
+            // Draft pointer doang — resubmit-safe, gak ada side effect ke
+            // inventory_serials di sini (cuma nunjuk, belum diinstall).
+            $installation->selected_inventory_serial_id = $validated['selected_inventory_serial_id'] ?? null;
+            // Roll kabel — draft pointer sama, konsumsi sungguhan (potong
+            // meter) baru jalan di storeSpeedtest().
+            $installation->selected_inventory_roll_id = $validated['selected_inventory_roll_id'] ?? null;
+            $installation->roll_meters_used = $validated['roll_meters_used'] ?? null;
 
             // Status TETAP in_progress di sini — completed baru ditetapkan di
             // storeSpeedtest(), begitu Laporan Speedtest ikut tersimpan.
             $installation->installation_status = 'in_progress';
 
-            if (! empty($validated['started_at'])) {
-                $installation->started_at = $validated['started_at'];
-            }
-
             $task = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::PEMASANGAN->value)
-                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                ->whereIn('status', [...TaskStatus::reportableValues(), TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
                 ->latest('id')
                 ->first();
             if ($task && ! $installation->fop_id) {
                 $installation->fop_id = $task->fop_id ?? $task->created_by;
+            }
+
+            if (! $installation->technician_id) {
+                $installation->technician_id = auth()->id();
+            }
+
+            if ($task) {
+                $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                $currentUserId = $installation->technician_id ?? auth()->id();
+                $memberIndex = 1;
+                foreach ($teamMembers as $idx => $member) {
+                    if ($member->user_id == $currentUserId) {
+                        $memberIndex = $idx + 1;
+                        break;
+                    }
+                }
+                if (! $installation->technicians) {
+                    $installation->technicians = "Teknisi {$memberIndex} - ".(User::find($currentUserId)?->name ?? auth()->user()->name);
+                }
+                $otherMembers = $teamMembers->filter(fn ($m) => $m->user_id != $currentUserId)->values();
+                if ($otherMembers->isNotEmpty() && ! $installation->technician_2_id) {
+                    $installation->technician_2_id = $otherMembers[0]->user_id;
+                }
+                if ($otherMembers->count() > 1 && ! $installation->technician_3_id) {
+                    $installation->technician_3_id = $otherMembers[1]->user_id;
+                }
+            } elseif (! $installation->technicians) {
+                $installation->technicians = 'Teknisi 1 - '.auth()->user()->name;
             }
 
             $installation->save();
@@ -753,19 +1297,47 @@ class CustomerInstallationController extends Controller
             // harus balik lagi upload foto & catat material). Hitung ulang di
             // sini (bukan pakai $pemasanganComplete dari report(), request beda)
             // — logika sama persis, lihat catatan di report().
+            $hasMaterialTerpakai = $installFopTask && $installFopTask->materials()->terpakai()->exists();
             $fase6Unlocked = $installation->installation_photo
                 && $installation->contract_photo
                 && $installation->signature_photo
-                && $installFopTask
-                && $installFopTask->materials()->terpakai()->exists();
+                && $hasMaterialTerpakai;
+
+            // Kasus nyata (2026-09-12, laporan Siti Nuryani 2): teknisi menekan
+            // Aktivasi berkali-kali yakin sudah isi foto+material, tapi
+            // hasFile()/materials-nya kosong tiap kali — flash generik "lengkapi
+            // foto & material" gak nunjuk mana yang sebenarnya belum nyangkut,
+            // jadi teknisi gak sadar submit-nya gak membawa apa-apa. Sebutkan
+            // persis yang kosong di sini supaya ketauan dari pesan sukses ini
+            // sendiri, bukan cuma dari status "Fase 6 terkunci" yang generik.
+            if (! $fase6Unlocked) {
+                $missingParts = array_filter([
+                    ! $installation->installation_photo ? 'Foto Pemasangan' : null,
+                    ! $installation->contract_photo ? 'Foto Kontrak' : null,
+                    ! $installation->signature_photo ? 'Foto TTD Pelanggan' : null,
+                    ! $hasMaterialTerpakai ? 'Material Terpakai (minimal 1 baris, jumlah > 0)' : null,
+                ]);
+
+                $message = 'Data Pemasangan & Perangkat tersimpan, TAPI belum lengkap untuk membuka Laporan Speedtest — belum tersimpan: '
+                    .implode(', ', $missingParts)
+                    .'. Cek lagi isian di atas (foto harus dipilih ulang, file tidak bisa dipertahankan otomatis oleh browser), lalu tekan Aktivasi lagi.';
+            } else {
+                $message = 'Laporan Pemasangan & Perangkat tersimpan. Laporan Speedtest sudah bisa diisi.';
+            }
+
+            // Info sisa custody (non-blocking, lihat komentar di atas
+            // $custodyWarnings) — ditempel di message SUKSES yang sama, bukan
+            // flash 'error' terpisah: submit ini tetap berhasil, ini cuma
+            // ngingetin sebelum kejadian beneran ketolak di storeSpeedtest().
+            if (! empty($custodyWarnings)) {
+                $message .= ' ⚠ Sisa custody tim mungkin tidak cukup untuk: '.implode('; ', $custodyWarnings).' — perbaiki sebelum menyelesaikan Laporan Speedtest, kalau tidak submit itu akan ditolak.';
+            }
 
             return redirect()->route('customers.installation.report', [
                 'customer' => $customer->id,
                 'return_to' => $request->input('return_to'),
                 'activated' => 1,
-            ])->with('success', $fase6Unlocked
-                ? 'Laporan Pemasangan & Perangkat tersimpan. Laporan Speedtest sudah bisa diisi.'
-                : 'Data Pemasangan & Perangkat tersimpan. Lengkapi foto & material terpakai lalu tekan Aktivasi lagi untuk membuka Laporan Speedtest.');
+            ])->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -791,7 +1363,7 @@ class CustomerInstallationController extends Controller
 
         $assignmentTask = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::PEMASANGAN->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -862,17 +1434,80 @@ class CustomerInstallationController extends Controller
                 ? Carbon::parse($validated['completed_at'])
                 : now();
 
+            $task = Task::where('customer_id', $customer->id)
+                ->where('task_type', TaskType::PEMASANGAN->value)
+                ->whereIn('status', [...TaskStatus::reportableValues(), TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value])
+                ->latest('id')
+                ->first();
+
+            if (! $installation->technician_id) {
+                $installation->technician_id = auth()->id();
+            }
+            if ($task) {
+                if (! $installation->fop_id) {
+                    $installation->fop_id = $task->fop_id ?? $task->created_by;
+                }
+                $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                $currentUserId = $installation->technician_id ?? auth()->id();
+                $memberIndex = 1;
+                foreach ($teamMembers as $idx => $member) {
+                    if ($member->user_id == $currentUserId) {
+                        $memberIndex = $idx + 1;
+                        break;
+                    }
+                }
+                if (! $installation->technicians) {
+                    $installation->technicians = "Teknisi {$memberIndex} - ".(User::find($currentUserId)?->name ?? auth()->user()->name);
+                }
+                $otherMembers = $teamMembers->filter(fn ($m) => $m->user_id != $currentUserId)->values();
+                if ($otherMembers->isNotEmpty() && ! $installation->technician_2_id) {
+                    $installation->technician_2_id = $otherMembers[0]->user_id;
+                }
+                if ($otherMembers->count() > 1 && ! $installation->technician_3_id) {
+                    $installation->technician_3_id = $otherMembers[1]->user_id;
+                }
+            } elseif (! $installation->technicians) {
+                $installation->technicians = 'Teknisi 1 - '.auth()->user()->name;
+            }
+
             $installation->installation_status = 'completed';
             $installation->completed_at = $completedAt;
             $installation->finished_date = $completedAt->toDateString();
             $installation->end_time = $completedAt->toTimeString();
             $installation->save();
 
-            $task = Task::where('customer_id', $customer->id)
-                ->where('task_type', TaskType::PEMASANGAN->value)
-                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
-                ->latest('id')
-                ->first();
+            // Reconcile custody Gudang/Inventory (ADHOC-54) DI SINI — storeSpeedtest()
+            // itu SATU-SATUNYA titik penyelesaian pemasangan (ADHOC-41, gak bisa
+            // dipanggil dua kali buat customer yang sama karena status pelanggan
+            // udah pindah dari installation_in_progress/revision_installation
+            // begitu transaksi ini commit). Custody teknisi TIDAK boleh dipotong
+            // di storePemasangan() — itu bisa disubmit berkali-kali (edit foto,
+            // tambah material) sebelum beneran selesai, potong custody di situ
+            // bakal dobel-potong tiap resubmit. Lihat rancangan-ui.md §3.4/§3.7.
+            if ($task && $installFopTask && $task->teamMembers->isNotEmpty()) {
+                $teamTechnicians = User::whereIn('id', $task->teamMembers->pluck('user_id'))->get();
+
+                app(InventoryService::class)->reconcileMaterialsAgainstCustody($installFopTask, $customer, $teamTechnicians, auth()->user());
+
+                // Perangkat Aktif (ADHOC-54) — draft pointer dari storePemasangan()
+                // dieksekusi jadi INSTALL beneran DI SINI (sama alasan reconcile
+                // material di atas: titik penyelesaian tunggal, resubmit-safe).
+                // Field opsional — mayoritas instalasi belum punya device
+                // ke-track Inventory, gak wajib diisi.
+                if ($installation->selected_inventory_serial_id) {
+                    $serial = InventorySerial::findOrFail($installation->selected_inventory_serial_id);
+                    app(InventoryService::class)->installSerial($serial, $customer, $installFopTask, $teamTechnicians, auth()->user());
+                }
+
+                // Roll kabel — draft pointer dari storePemasangan() dieksekusi
+                // jadi potong-meter beneran DI SINI, sama alasan Perangkat
+                // Aktif di atas (titik penyelesaian tunggal, resubmit-safe).
+                if ($installation->selected_inventory_roll_id && $installation->roll_meters_used) {
+                    $roll = InventoryRoll::findOrFail($installation->selected_inventory_roll_id);
+                    app(InventoryService::class)->consumeFromRoll($roll, (float) $installation->roll_meters_used, $teamTechnicians, $installFopTask, $customer, auth()->user());
+                }
+            }
+
             if ($task) {
                 app(TaskService::class)->complete($task, auth()->user());
             }

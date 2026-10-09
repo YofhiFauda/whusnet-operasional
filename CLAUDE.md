@@ -76,6 +76,7 @@ docker compose exec app php artisan package:discover --ansi
 | Service | Tanggung jawab |
 |---|---|
 | `TicketService` | Semua transisi status tiket: `create()` (snapshot pelanggan + lampiran, **tanpa** bikin FopTask) → `close()`/`cancel()`/`escalateToNoc()`/`onCheckNoc()`/`escalateToFop()`/`returnToHelpdesk()`. FopTask cuma kebentuk di `escalateToFop()` atau submit dari halaman Task FOP |
+| `NumberSequenceService` | Satu-satunya penghasil nomor TKT/TFOP/TASK/invoice/payment (counter `number_sequences`) |
 | `TaskService` | task teknisi: `create/update/start/complete/setPending/cancel/reassignTeam/detectConflicts` + sync balik ke FopTask |
 | `FopTaskTeamService` | `rebuildTeamsForDate()` — tim harian FOP, dipanggil tiap jadwal berubah |
 | `CustomerWorkflowService` | transisi status pelanggan (`WorkflowTransition`) |
@@ -87,7 +88,9 @@ docker compose exec app php artisan package:discover --ansi
 | `TelegramBotService` | notifikasi teknisi (opsional, pelengkap in-app notif) |
 
 ### Enum — jangan bikin string baru
-- `TaskStatus`: `draft`, `terjadwal`, `in_progress`, `selesai`, `dibatalkan`, `pending`
+- `TaskStatus`: `draft`, `terjadwal`, `in_progress`, `selesai`, `dibatalkan`, `pending`, `lapor_nanti`
+  → **`pending` ≠ `lapor_nanti`.** Pending = kerja berhenti, tim dilepas, balik ke antrian FOP buat dijadwal ulang. Lapor Nanti = kerja lapangan beres, laporan menyusul, tim tetap nempel, **terkunci ke teknisi** (FOP gak boleh reject/pending/batal/edit/ganti tim — `TaskStatus::isLockedFromFop()`, `TaskPolicy::before()`, `FopTaskController::abortIfReportDeferred()`). Dulu Lapor Nanti = `pending` + flag `report_deferred` (kolom sudah dihapus) → bug tombol laporan hilang, jangan dibalikin.
+  → "Boleh kirim laporan?" cuma ditanya ke `TaskStatus::acceptsReport()` / `reportableValues()`. **Jangan tulis daftar status sendiri** di policy/view/controller laporan.
 - `TaskType`: `SURVEY`, `PSB`, `MTN`, `DEAC`, `C-REQ`, `O-REQ`, `INFR REQ`. `SURVEY`/`PSB`/`DEAC` = `autoOnlyValues()` — gak bisa dipilih manual, `DEAC` cuma lewat tombol "Ambil Alat" di List Putus Langganan. `RELOKASI` dihapus permanen dari sistem.
 - `TicketHandler`: `helpdesk`, `noc`, `fop` — siapa yang lagi pegang tiket. Beku permanen begitu `fop`.
 - `TicketHandlingStatus`: `open`, `closed`, `cancelled` — status internal tiket, cuma bermakna selama `handler` ≠ `fop`.
@@ -103,7 +106,7 @@ docker compose exec app php artisan package:discover --ansi
 Bagian paling rawan di repo ini. Tiga entitas, tiga nomor, sinkron dua arah.
 
 ```
-Ticket (TKT-YYYY-NNNN)          FopTask TIDAK auto-dibuat saat submit!
+Ticket (TKT-YYYYMMDD-NNNNNN)         FopTask TIDAK auto-dibuat saat submit!
   handler=HELPDESK, status=OPEN
        │
        ├─ close()/cancel()  → selesai/batal TANPA pernah nyentuh FOP
@@ -113,10 +116,10 @@ Ticket (TKT-YYYY-NNNN)          FopTask TIDAK auto-dibuat saat submit!
        │                       = ['helpdesk','noc']). Gak ada langkah "terima".
        │
        └─ escalateToFop()   → SATU-SATUNYA titik FopTask kebentuk
-             └─ syncToFopTask() → FopTask (TFOP-YYYY-NNNN, status DRAFT)
+             └─ syncToFopTask() → FopTask (TFOP-YYYYMMDD-NNNNNN, status DRAFT)
                                     ├─ ticket.fop_task_id → FopTask
                                     ├─ ticket.handler = FOP  (TERMINAL)
-                                    └─ fop_task.task_id → Task (TASK-YYYY-NNNN)
+                                    └─ fop_task.task_id → Task (TASK-YYYYMMDD-NNNNNN)
                                           └─ TaskService::syncToFopTask()
                                                sync teknisi + task_date balik ke FopTask
                                                lalu FopTaskTeamService::rebuildTeamsForDate()
@@ -130,7 +133,7 @@ Aturan:
 3. **`Ticket::holderRoles()` = SATU-SATUNYA sumber "siapa yang boleh act"** — handler=HELPDESK ⇒ `['helpdesk']`; handler=NOC ⇒ `['helpdesk','noc']` (dipegang berdua); handler=FOP ⇒ `[]`. Dipakai bareng `TicketService::assertActorOwnsTicket()` (otorisasi asli) dan `Ticket::actionFlagsFor()` (gerbang tombol). Jangan duplikasi logic ini di tempat ketiga.
    → Window **"Pending NOC"** + aksi **Oncheck NOC** sudah **DIHAPUS** (ADHOC-06, 2026-07-29): assign ke NOC = langsung diproses. Kolom `noc_checked_at`, endpoint `tickets.oncheck-noc`, flag `can_oncheck_noc`, dan label `Pending NOC`/`OnCheck NOC` tidak ada lagi. Jangan dihidupkan sebagian — kalau perlu balik, balikkan utuh.
    → Dua tab di Worksheet NOC (**Tiket Masuk** = `handler=noc & open`, **Assign FOP** = `handler=fop` + jejak eskalasi lewat NOC; ADHOC-09) **bukan** tab Pending NOC yang itu: keduanya murni turunan data, satu permission (`noc_worksheet.view`), dan tetap tanpa langkah "terima tiket".
-4. **`TFOP-` digenerate di dua tempat** — `TicketService::generateFopTaskNumber()` dan `FopTaskController::generateTaskNumber()`. Format wajib identik, keduanya nulis ke deret yang sama.
+4. **`TFOP-` hanya digenerate lewat `NumberSequenceService::fopTaskNumber()`** — satu deret untuk semua jalur (Ticketing, form manual FOP, maintenance).
 5. **`fop_task.tugas` = `"{display_id}_{full_name}"`** (mis. `C1X4ARQ000631_Masudah Yuni Fitri`) — identitas pelanggan konsisten seluruh sistem, bukan label tipe tiket generik.
 6. **`fop_task.notes` cuma pointer pendek** (`"Ticket TKT-… — dikirim oleh …"`). Jangan salin `catatan_teknis` ke sini — itu bikin dua sumber kebenaran yang gampang menyimpang.
 7. **Riwayat pembatalan: satu aksi, dua riwayat, satu penulis per sisi.**
@@ -184,7 +187,7 @@ Permission & scope **di-cache**. Setelah mengubah role/permission/scope, panggil
 1. **Dilarang bikin role per cabang** (`NOC Ponorogo`, `Teknisi Siman`). Role global, batasi lewat scope.
 2. **Dilarang kasih permission langsung ke user** tanpa lewat matrix role.
 3. **Setiap query pelanggan/task/invoice/laporan wajib lewat POP scope.** Query tanpa scope = kebocoran data lintas cabang → berhenti dan tanya.
-4. Teknisi tak boleh catat pembayaran. `pop_admin` tak boleh lihat pelanggan luar scope. Helpdesk tak boleh ubah nominal tagihan terbit. Sales tak boleh akses laporan keuangan.
+4. Teknisi boleh catat pembayaran **terbatas**: hanya pelanggan dalam POP scope-nya (tanpa perlu di-assign), wajib menyetor saldo (peringatan "belum setor" lewat tutup hari 23:59), tanpa batas nominal harian, tanpa akses worklist kolektor. Lewat permission `kolektor.pay`/`kolektor.deposit` di Role Matrix role `teknisi` — bukan kode hardcode. Rancangan: `docs/plan/kolektor/rancangan-pembayaran-teknisi.md`. `pop_admin` tak boleh lihat pelanggan luar scope. Helpdesk tak boleh ubah nominal tagihan terbit. Sales tak boleh akses laporan keuangan.
 
 ## Business Rules
 
@@ -196,8 +199,14 @@ Wajib untuk siap billing: nama lengkap, nomor HP, alamat lengkap, desa, kecamata
 ### Billing
 Tagihan turunan dari Pelanggan Aktif + Paket Aktif + Harga Layanan + Periode — bukan dibuat dari nol. Harga diambil dari `customer_services`. Tidak boleh dobel per periode (ada unique index, lihat migration `add_duplicate_guard_indexes_to_invoices_and_payments`). Tagihan lunas tidak dihapus sembarangan.
 
+**FK induk → `invoices`/`payments` = `restrictOnDelete`** (sejak 2026-09-28; dulu `cascadeOnDelete` sehingga hapus layanan/pelanggan menyapu seluruh riwayat keuangan tanpa audit). Jangan dikembalikan ke cascade. Pelanggan yang punya tagihan/pembayaran **diputus langganan, bukan dihapus**; paket di Edit wajib kalau layanan sudah pernah ditagih.
+
+**Pindah Cabang (pop_id) wajib lunas piutang dulu** — piutang (`Invoice::scopePiutang()`, periode < bulan berjalan) & tagihan yang sudah dicicil. Satu sumber aturan: `CustomerRelocationService`, ditegakkan validasi Edit **dan** `CustomerObserver::updating()` (semua jalur). Tagihan periode lalu **tidak** pernah dipindah (laporan pembayaran & piutang tetap milik cabang lama); tagihan bulan berjalan yang **belum dibayar sama sekali** ikut pindah supaya dibayar ke cabang baru; tagihan bulanan berikutnya terbit di cabang baru. Kolektor **selalu** dilepas saat pindah Cabang. Mini POP & Distribusi cuma berubah lewat Edit kalau Cabang ikut dipindah (dan terkunci kalau pra-pemasangan / tanpa `customers.detail.installation.validate`). CID cuma lewat `CustomerCidService` — jangan hitung CID di controller. Rancangan & keputusan user: `docs/plan/rancangan-pindah-pop-lanjutan.md`.
+
 ### Pembayaran
 Wajib terhubung invoice + pelanggan + POP. Penuh → `lunas`; kurang → `sebagian`; ditolak → tidak boleh jadi `lunas`. Semua perubahan masuk audit log.
+
+Batch (kolektor, teknisi, portal staf) **tidak menerima lebih bayar**: tunai + saldo per tagihan ≤ sisa tagihan. Lebih bayar hanya lewat form Tagihan admin. Penjaga: `CollectorPaymentService::validateRows()`. Detail: `docs/BUSINESS_RULES.md` §8.
 
 `PaymentObserver::creating()` menolak nominal ≤ 0 dari **semua** jalur masuk — data legacy punya baris "pembayaran" `BAYAR=0` yang sebenarnya placeholder log aktivasi. Jangan lemahkan guard ini.
 
@@ -208,7 +217,9 @@ Wajib terhubung invoice + pelanggan + POP. Penuh → `lunas`; kurang → `sebagi
 `PackageSlaSetting` untuk SLA paket. **Bukan** untuk SLA pengerjaan teknisi.
 
 ### Penomoran & ID
-- `TKT-{tahun}-{4 digit}`, `TFOP-{tahun}-{4 digit}`, `TASK-{tahun}-{4 digit}`
+- `TKT-{YYYYMMDD}-{6 digit}`, `TFOP-{YYYYMMDD}-{6 digit}`, `TASK-{YYYYMMDD}-{6 digit}` (counter reset per hari)
+- Invoice `{PREFIX}-{YYYYMMDD}-{6 digit}`; payment `PAY-{invoice_number}` (lunas sekali bayar) atau `PAY-{invoice_number}-{NN}` (cicilan)
+- **Semua nomor dokumen lewat `NumberSequenceService`** (tabel `number_sequences`, counter atomik per key). Jangan pakai `count()+1` / `max()+1` di atas tabel dokumen — itu race dan bisa dipakai ulang setelah hard delete.
 - CID pelanggan digenerate per-POP: prefix di tabel `pops` + `PopSequence`. Lihat `docs/ID_NUMBERING_RULES.md` dan `docs/master/pop/business-logic.md`.
 - Data legacy multi-cabang (jetis_db, sand_db) punya risiko tabrakan ID (PE/RQ/IDBIAYA). **ID legacy wajib di-namespace per cabang.**
 
@@ -218,6 +229,7 @@ Lampiran tiket disimpan di disk **`local` (privat)**, bukan `public` — isinya 
 ## Testing
 
 - ~90 file `tests/Feature`, 4 `tests/Unit`. **Fitur/perbaikan baru wajib ada test.**
+- **JANGAN jalankan full suite** (`composer test` / `php artisan test` tanpa filter) — aturan user 2026-09-26. Jalankan cuma file/filter test yang terdampak (`php artisan test --compact tests/Feature/XxxTest.php` atau `--filter=`). Full suite dijalankan user sendiri.
 - `RefreshDatabase`, sqlite `:memory:`, `QUEUE_CONNECTION=sync`, `BROADCAST_CONNECTION=null`, locale `id` / `Asia/Jakarta`.
 - Pakai atribut PHPUnit modern: `#[DataProvider]`, `#[Test]` — bukan anotasi docblock.
 - `Tests\TestCase::loginAsAdmin()` — helper login sebagai Owner (auto-seed `RoleSeeder` kalau perlu).
@@ -229,6 +241,11 @@ Lampiran tiket disimpan di disk **`local` (privat)**, bukan `public` — isinya 
 - **Urutan route: static dulu, dynamic belakangan.** `routes/web.php` menandai ini eksplisit (`// Customers Management - Static Routes First` … `- Dynamic Routes Last`). Route `{id}` yang naik ke atas akan menelan route statis.
 - **Target aksi yang mengubah data dirender server-side.** URL POST/PUT/DELETE datang dari `route()` — di `action`, atribut `data-*`, atau field respons JSON. Klien boleh memilih di antara URL yang diberikan server, tapi **tidak boleh merakit path-nya** (`/invoices/${id}/payments`, `:action` yang menyusun URL dari state). Alasannya bukan estetika: form yang atribut `action`-nya gagal terisi akan POST ke URL halaman sendiri — aksi gagal tanpa pesan apa pun (bug assign kolektor 2026-08-08, ADHOC-20). Penjaga: `PostTargetRenderedServerSideTest`.
 - **Redirect setelah simpan pakai pola PRG.** Handler `POST`/`PUT`/`DELETE` selalu redirect (jangan render view langsung — refresh = double-submit). Create/update satu record → halaman Detail (`*.show`); list/board hanya untuk aksi list-oriented (import massal, papan FOP). Aturan + peta lengkap: `docs/PRG_REDIRECT_CONVENTION.md`.
+- **Aksi baru: modal, halaman create, atau inline toggle — 3 pola, bukan asal pilih (2026-09-07, ketauan pas modul Gudang nyampur tanpa aturan tertulis).**
+  1. **View-only** (lihat data, gak nulis apa pun ke DB) → **modal**. Contoh: daftar SN tersedia, preview bukti foto BAP.
+  2. **Mutasi data** (nulis ledger/ubah status, biasanya py validasi server + kadang input majemuk seperti scan kamera) → **halaman create tersendiri**, bukan modal. Alasannya teknis, bukan selera: `back()->withErrors()->withInput()` balik ke *referer* — kalau formnya modal di atas halaman List, gagal validasi bakal nutup modal dan nampilin List kosong tanpa pesan error yang nyantol. Contoh: Receive, Transfer, Issue, Adjustment, Reassign, Opname, Threshold.
+  3. **Aksi lanjutan di halaman Detail miliknya sendiri** (situ udah di halaman spesifik 1 record, bukan di List) → **inline toggle Alpine** di halaman itu juga, bukan modal baru, bukan pindah halaman. Contoh: "Catat Pengiriman"/"Tolak" di `warehouse.stock-requests.show`.
+  Shortcut per-baris di halaman List (dropdown "⋮ Aksi") boleh nge-link ke pola manapun di atas — yang gak boleh: bikin pola ke-4 sendiri tanpa alasan baru.
 - Sederhana, tidak overengineered. Hindari abstraksi sebelum dibutuhkan, otomatisasi sebelum flow manual stabil, tabel baru kalau kolom cukup, campur banyak modul dalam satu task.
 - Jalankan `vendor/bin/pint` sebelum commit.
 

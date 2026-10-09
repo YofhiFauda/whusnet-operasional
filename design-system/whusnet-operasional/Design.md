@@ -1,20 +1,20 @@
-# Design.md — WHUSNET Admin Payment
-## ISP Billing Enterprise · Clean, Minimalist & Modern UI
+# Design.md — WHUSNET Operasional
+## ISP Billing Enterprise & Warehouse Logistics · Clean, Minimalist & Modern UI
 
-**Project:** WHUSNET Admin Payment  
-**Stack:** Laravel · Blade · Tailwind CSS · Alpine.js · Laravel Reverb · Filament  
-**Design System Base:** Design-System-Enterprise-Grade-v3  
+**Project:** WHUSNET Operasional (Billing, Pelanggan, Jaringan & Logistik Pergudangan)  
+**Stack:** Laravel · Blade · Tailwind CSS v4 · Alpine.js · Laravel Reverb  
+**Design System Base:** Design-System-Enterprise-Grade-v4  
 **Design Theme:** Modern Sky Blue & Slate Neutral (Light & Dark)  
-**Version:** `v2.0.0`  
-**Status:** Primary UI/UX Design Specification — sumber tunggal, menggantikan seluruh varian sebelumnya  
-**Last Updated:** 2026-07-22
-**Patch Tambahan**  Mencegah AI default ke "card-per-section"
+**Version:** `v2.5.0`  
+**Status:** Primary UI/UX Design Specification — sumber tunggal untuk seluruh modul Operasional & Gudang  
+**Last Updated:** 2026-09-08  
+**Core Directive:** Single Panel Architecture (Card Budget = 1), 8px Radius (`rounded-lg`), Solid Sky Blue, JetBrains Mono, Naked Headers & Filters
 
 ---
 
-## Filosofi Desain WHUSNET Admin Payment
+## Filosofi Desain WHUSNET Operasional
 
-WHUSNET Admin Payment adalah aplikasi billing dan manajemen pelanggan ISP yang digunakan setiap hari oleh tim Finance, NOC, dan Admin POP. Antarmuka tidak boleh terasa berat, kaku, atau melelahkan. Desain harus mencapai keseimbangan antara:
+WHUSNET Operasional adalah aplikasi operasional ISP terpadu yang mencakup billing, manajemen pelanggan, jaringan POP, serta logistik pergudangan (Warehouse & Barcode Tracking) yang digunakan setiap hari oleh tim Finance, NOC, Admin POP, Teknisi, dan Staf Gudang. Antarmuka tidak boleh terasa berat, kaku, atau melelahkan. Desain harus mencapai keseimbangan antara:
 
 > **Enterprise-grade** (aman, presisi, auditable) + **Clean & Minimalist** (bersih, lega, cepat dibaca)
 
@@ -2832,7 +2832,100 @@ Tabel node dengan kolom:
 
 ---
 
-## 10. Halaman Laporan Keuangan
+## 10. Modul Gudang & Inventori Logistik (Warehouse)
+
+Modul Gudang mengelola seluruh aset fisik ISP: penerimaan barang dari vendor (Inbound/Receive), pergerakan antar gudang POP (Transfer), pengeluaran untuk instalasi/pemeliharaan (Issue/Outbound), penyesuaian stok (Adjustment), pelacakan barang di tangan teknisi (Custody), serta pencarian riwayat serial number perangkat (Traceability).
+
+### 10.1 Prinsip Desain Modul Gudang
+1. **Single Panel (Card Budget = 1):** Sama seperti modul Billing dan Pelanggan, dilarang memecah form gudang menjadi tumpukan bento cards terpisah. Seluruh form transaksi menggunakan Single Container Panel dengan pemisah divider 1px (`border-slate-200 dark:border-slate-700`).
+2. **Naked Filter Bar:** Halaman stok dan riwayat menggunakan filter telanjang (tanpa background card putih tebal).
+3. **JetBrains Mono Wajib untuk Nilai Teknis:** Kode SKU barang, Nomor Serial (SN), MAC Address, No. Surat Jalan, dan Kode Batch wajib menggunakan `font-mono` (`JetBrains Mono`, 12px/13px, `tabular-nums`).
+4. **Solid Sky Blue (No Gradients):** Tombol aksi utama, tombol scanner, dan highlight interaktif menggunakan warna solid `bg-sky-600 hover:bg-sky-700` (`#0284C7`). Dilarang memakai gradien ungu-indigo (`from-violet-600 to-indigo-600`).
+5. **Radius Konsisten 8px (`rounded-lg`):** Seluruh input, tombol, badge, panel, dan modal menggunakan `rounded-lg` (8px). Dilarang memakai `rounded-2xl` (16px) yang merusak estetika enterprise.
+
+---
+
+### 10.2 Halaman Stok Barang (Type A — Data List)
+
+```
+[Page Header — naked: Title "Stok Barang" + Breadcrumb Gudang › Stok + Tombol Scan & Aksi]
+[Summary Strip — flat bar 1 container dengan divider vertikal]
+  ┌─────────────────┬──────────────────┬─────────────────┬──────────────────┐
+  │ TOTAL SKU AKTIF │ TOTAL UNIT FISIK │ STOK MENIPIS    │ TOTAL POP AKTIF  │
+  │ 48 Item         │ 1.240 Unit       │ 3 Perlu Restok  │ 6 Gudang POP     │
+  └─────────────────┴──────────────────┴─────────────────┴──────────────────┘
+[Filter Bar — naked: Search SKU/Nama + POP Select + Tracking Type Select + Filter Cepat Pill]
+┌───────────────────────────────────────────────────────────────────────────┐ ← 1 CARD PANEL
+│ DAFTAR STOK BARANG GUDANG                                                 │
+├───────┬─────────────────────────┬──────────────┬─────────────┬────────────┤
+│ KODE  │ NAMA BARANG & KATEGORI  │ JENIS        │ SALDO STOK  │ AKSI CEPAT │
+├───────┼─────────────────────────┼──────────────┼─────────────┼────────────┤
+│ ONT01 │ Fiberhome HG6145F       │ [SERIALIZED] │ 42 Unit     │ [···]      │
+│       │ Kategori: ONT / ONU     │              │ ● 32 Ready  │            │
+│       │                         │              │ ◐ 8 Custody │            │
+│       │                         │              │ ✖ 2 Rusak   │            │
+├───────┼─────────────────────────┼──────────────┼─────────────┼────────────┤
+│ CAB02 │ Drop Core 1 Core 1000m  │ [NON-SERIAL] │ 8 Haspel    │ [···]      │
+│       │ Kategori: Kabel Fiber   │              │ ⚠ Rendah    │            │
+└───────┴─────────────────────────┴──────────────┴─────────────┴────────────┘
+│ [Pagination Data]                                                         │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 10.3 Halaman Transaksi Gudang (Type B — Single Panel Form)
+*Berlaku untuk: Barang Masuk (Receive), Transfer Antar POP, Pengeluaran (Issue), dan Penyesuaian (Adjustment).*
+
+```
+[Page Header — naked: Back Button + Title Transaksi + Subtitle Status]
+┌───────────────────────────────────────────────────────────────────────────┐ ← 1 CARD PANEL
+│ HEADER IDENTITAS TRANSAKSI                                                │
+│ Gudang Asal / Tujuan : [ POP Pusat ▾ ]      No. Surat Jalan : [ SJ-2026..]│
+│ Petugas / Penerima   : [ Budi (Teknisi) ▾ ] Tanggal         : [ 2026-09-08]│
+├───────────────────────────────────────────────────────────────────────────┤ ← Divider 1px
+│ DETAIL RINCIAN BARANG                                                     │
+│ [ + Tambah Baris Barang ]  [ 📷 Buka Scanner Barcode ]                    │
+│                                                                           │
+│ Baris 1: ONT Fiberhome HG6145F (Serialized)                               │
+│ Jumlah: 2 Unit | SN: [FHTT12345678 ✖] [FHTT87654321 ✖] [ + Scan / Input ] │
+│                                                                           │
+│ Baris 2: Drop Core 1C (Non-Serialized)                                    │
+│ Jumlah: [ 1 ] Haspel (1000m)                                              │
+├───────────────────────────────────────────────────────────────────────────┤ ← Divider 1px
+│ CATATAN & FOOTER AKSI                                                     │
+│ Catatan Dokumen: [                                                      ] │
+│ [ Batal ]                                            [ Simpan & Terbitkan ]│
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 10.4 Komponen Barcode & QR Code Scanner UI
+1. **Modal Scanner Viewport:**
+   - Container modal dengan radius `rounded-lg` (8px), border `border-slate-700`, latar belakang gelap transparan (`bg-slate-900/90 backdrop-blur-sm`).
+   - Kamera viewfinder rasio 1:1 atau 4:3 dengan corner guide `border-sky-500` dan garis laser animasi `bg-sky-400` bergerak vertikal (bukan ungu/violet).
+2. **Input Scanner Hardware Support:**
+   - Input field autofocus yang mendengarkan input keyboard/HID barcode scanner USB/Bluetooth dengan auto-submit saat karakter Enter diterima.
+3. **Audio & Visual Feedback:**
+   - **Beep Sukses:** 880Hz audio tone (100ms) + border hijau kilat + Chip serial warna emerald (`bg-emerald-50 text-emerald-700 border-emerald-200`).
+   - **Beep Gagal / Duplikat:** 220Hz low audio tone (250ms) + border merah kilat + Toast peringatan.
+4. **Serial Chip Badges:**
+   - Format: `<span class="font-mono text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md">SN123456 <button>✖</button></span>`.
+
+---
+
+### 10.5 Status Lifecycle Perangkat & Serial Number
+Setiap serial number yang tercatat dalam sistem memiliki 5 status baku:
+- `AVAILABLE` (`bg-emerald-50 text-emerald-700 border-emerald-200`): Siap digunakan di rak gudang.
+- `IN_CUSTODY` (`bg-sky-50 text-sky-700 border-sky-200`): Sedang dibawa oleh teknisi untuk tugas lapangan.
+- `DEPLOYED` (`bg-indigo-50 text-indigo-700 border-indigo-200`): Sudah terpasang di rumah pelanggan / node aktif.
+- `DEFECTIVE / RMA` (`bg-rose-50 text-rose-700 border-rose-200`): Rusak / menunggu penggantian vendor.
+- `RESERVED` (`bg-amber-50 text-amber-700 border-amber-200`): Dialokasikan untuk SPK tertentu.
+
+---
+
+## 11. Halaman Laporan Keuangan
 
 ### 10.1 Layout Laporan
 
@@ -3665,7 +3758,7 @@ Urutan implementasi yang disarankan berdasarkan nilai bisnis:
 
 ---
 
-## 22. ## Ringkasan Patch — Aturan Satu Kalimat untuk AI Prompt
+## 22. Ringkasan Patch — Aturan Satu Kalimat untuk AI Prompt
 
 Jika kamu memberikan DESIGN.md ke AI design tool (Stitch, Claude Design,
 atau tools lain), tambahkan instruksi berikut di awal prompt:
@@ -3765,4 +3858,14 @@ CRITICAL RULES — NEVER VIOLATE:
     ? di topbar, item di user menu, DAN tombol ?. Petunjuk pintasan juga
     ditempel in-context (footer row menu, bulk bar) — panel bantuan saja
     tidak cukup untuk membuat orang hafal.
+
+23. WAREHOUSE SINGLE PANEL FORM: Seluruh form transaksi gudang (Inbound, 
+    Transfer, Issue, Adjustment) menggunakan SATU container panel dengan 
+    divider 1px. Dilarang memecah form menjadi 4-5 card terpisah. 
+    Seluruh input dan tombol menggunakan rounded-lg (8px) dan Solid Sky Blue.
+
+24. BARCODE SCANNER INTEGRATION: Viewport scanner kamera wajib menggunakan 
+    border 8px dan laser guide Sky Blue (#0284C7) — Dilarang gradien 
+    ungu-indigo pada tombol Scan. Nomor seri perangkat (SN) wajib 
+    ditampilkan dengan font-mono (JetBrains Mono).
 ```

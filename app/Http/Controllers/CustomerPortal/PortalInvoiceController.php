@@ -30,7 +30,7 @@ class PortalInvoiceController extends Controller
      * dari kolom, tidak dihitung ulang — `Invoice::recalculateFromPayments()`
      * satu-satunya sumber kebenaran.
      */
-    #[QueryParameter('status', description: 'Filter invoice_status.', example: 'lunas')]
+    #[QueryParameter('status', description: 'Filter invoice_status. Kirim eksplisit `status=batal` untuk tetap melihat invoice yang dibatalkan (ADHOC-87) — tanpa parameter ini, invoice `batal` TIDAK ikut di hasil "Semua Status" (lihat catatan di bawah).', example: 'lunas')]
     #[QueryParameter('exclude_status', description: 'Kecualikan satu invoice_status dari hasil — dipakai halaman daftar tagihan Portal biar tagihan `lunas` gak dobel tampil (sudah lengkap direpresentasikan di /me/payments). Additive, TIDAK mengubah arti `status=` biasa — kirim salah satu, bukan dua-duanya.', example: 'lunas')]
     #[QueryParameter('period', description: 'Filter billing_period, format Y-m.', example: '2026-08')]
     #[Response(200, description: 'Daftar tagihan berhasil diambil.', examples: [[
@@ -54,6 +54,16 @@ class PortalInvoiceController extends Controller
         $status = $request->string('status')->toString();
         if ($status !== '' && in_array($status, array_column(InvoiceStatus::cases(), 'value'), true)) {
             $query->where('invoice_status', $status);
+        } elseif ($status === '') {
+            // ADHOC-87 §4.6 (keputusan user: API yang menyaring, bukan
+            // Portal) — invoice `batal` (dibatalkan lewat write-off/waiver,
+            // atau data legacy) SENGAJA tidak masuk "Semua Status". Cuma
+            // berlaku saat `status` kosong: kirim `status=batal` eksplisit
+            // kalau memang mau lihatnya (opsi "Batal" di dropdown Portal
+            // tetap berfungsi), dan `show()` (detail per nomor) TIDAK
+            // disaring sama sekali — pelanggan yang buka nomor invoice batal
+            // tetap melihatnya dengan badge "Batal", bukan 404.
+            $query->where('invoice_status', '!=', InvoiceStatus::BATAL->value);
         }
 
         // `exclude_status` — dipakai list Portal (bukan detail/`show()`)

@@ -31,12 +31,17 @@ class Task extends Model
         'status',
         'scheduled_at',
         'started_at',
+        'started_via',
+        'started_latitude',
+        'started_longitude',
+        'started_accuracy_meters',
+        'started_distance_meters',
+        'work_finished_at',
         'completed_at',
         'completed_by',
         'cancelled_at',
         'cancel_reason',
         'pending_reason',
-        'report_deferred',
         'reject_reason',
         'fop_review_status',
         'fop_id',
@@ -51,10 +56,10 @@ class Task extends Model
         'status' => TaskStatus::class,
         'scheduled_at' => 'datetime',
         'started_at' => 'datetime',
+        'work_finished_at' => 'datetime',
         'completed_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'conflict_override' => 'boolean',
-        'report_deferred' => 'boolean',
     ];
 
     // ─── Relasi ─────────────────────────────────────────────────
@@ -89,6 +94,11 @@ class Task extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
     public function completedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by');
@@ -109,9 +119,28 @@ class Task extends Model
         return $this->hasOne(TaskMaintenance::class);
     }
 
+    /**
+     * Detail kategori C-REQ + status verifikasi biaya oleh CS (helpdesk) —
+     * hanya terisi untuk `task_type = CREQ`. Lihat docs/plan/task-teknisi/
+     * rancangan-biaya-creq-verifikasi-cs.md.
+     */
+    public function creqDetail(): HasOne
+    {
+        return $this->hasOne(TaskCreqDetail::class);
+    }
+
     public function report(): HasOne
     {
         return $this->hasOne(TaskReport::class);
+    }
+
+    /**
+     * Laporan task Ambil Modem (DEAC) — ADHOC-86. Hanya terisi untuk
+     * `task_type = DEAC`.
+     */
+    public function deviceRetrieval(): HasOne
+    {
+        return $this->hasOne(TaskDeviceRetrieval::class);
     }
 
     // ─── Helper Methods ─────────────────────────────────────────
@@ -137,11 +166,28 @@ class Task extends Model
      */
     public function actualDurationMinutes(): ?int
     {
-        if (! $this->started_at || ! $this->completed_at) {
+        $finishedAt = $this->work_finished_at ?? $this->completed_at;
+
+        if (! $this->started_at || ! $finishedAt) {
             return null;
         }
 
-        return (int) $this->started_at->diffInMinutes($this->completed_at);
+        return (int) $this->started_at->diffInMinutes($finishedAt);
+    }
+
+    /**
+     * Titik waktu pembanding SLA pengerjaan: kapan kerja lapangan berhenti.
+     *
+     * Lapor Nanti (2026-09-28, keputusan user: SLA = waktu kerja lapangan,
+     * konsisten dengan task_reports) — `work_finished_at` diisi saat teknisi
+     * menunda laporan, jadi jeda menunggu laporan gak bikin countdown habis
+     * atau badge "Melewati SLA" nyala, dan laporan yang dikirim besoknya
+     * (`completed_at`) juga gak dihitung telat. Task biasa: `completed_at`;
+     * masih dikerjakan: sekarang.
+     */
+    public function slaReferenceTime(): Carbon
+    {
+        return $this->work_finished_at ?? $this->completed_at ?? now();
     }
 
     /**
@@ -195,7 +241,7 @@ class Task extends Model
             return false;
         }
 
-        $reference = $this->completed_at ?? now();
+        $reference = $this->slaReferenceTime();
 
         return $deadline->lt($reference);
     }

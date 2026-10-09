@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" x-data="{ dark: localStorage.getItem('theme') === 'dark', sidebarOpen: true }" :class="{ 'dark': dark }" @keydown.d.ctrl.window="dark = !dark; localStorage.setItem('theme', dark ? 'dark' : 'light')">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" x-data="{ dark: localStorage.getItem('whusnet-theme') === 'dark' || (!localStorage.getItem('whusnet-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches), sidebarOpen: true }" :class="{ 'dark': dark }" @keydown.d.ctrl.window="dark = !dark; localStorage.setItem('whusnet-theme', dark ? 'dark' : 'light')">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

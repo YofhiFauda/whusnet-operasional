@@ -10,6 +10,7 @@ use App\Models\Ticket;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Support\IndonesianDate;
+use App\Support\LikeSearch;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -59,8 +60,11 @@ class TicketHistoryController extends Controller
                 'customer.pop:id,name,cid_prefix',
                 'creator:id,name',
                 'pop:id,name',
-                'issueCategory:id,name',
+                'issueCategory:id,name,is_batch',
                 'histories.actor:id,name',
+                // Pelanggan terdampak (tiket batch) — History nampilin Parent
+                // + SEMUA Child, lihat Ticket::isBatch()/batchMembers().
+                'batchMembers',
             ])
             ->latest('created_at')
             ->paginate(50)
@@ -100,6 +104,9 @@ class TicketHistoryController extends Controller
                 'pop:id,name',
                 'issueCategory:id,name',
                 'histories.actor:id,name',
+                // Export xlsx TIDAK menampilkan batchMembers (exportRow() gak
+                // punya kolomnya) — sengaja gak dieager-load di sini, beda
+                // dari index() di atas.
             ])
             ->orderBy('created_at')
             ->chunk(500, function ($tickets) use ($writer) {
@@ -134,7 +141,7 @@ class TicketHistoryController extends Controller
             ])->orWhere('handler', TicketHandler::FOP->value);
         });
 
-        if ($search = trim((string) $request->query('q', ''))) {
+        if ($search = LikeSearch::sanitize((string) $request->query('q', ''))) {
             $query->where(function (Builder $q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
                     ->orWhere('detail_keluhan', 'like', "%{$search}%")

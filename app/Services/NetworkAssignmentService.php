@@ -35,12 +35,17 @@ use Illuminate\Support\Facades\DB;
 class NetworkAssignmentService
 {
     /**
-     * Status yang belum boleh di-assign Mini POP/Distribusi — SAMA PERSIS
-     * `CustomerNetworkAssignmentController::BLOCKED_STATUSES`. Pemasangan
+     * Status yang belum boleh di-assign Mini POP/Distribusi — pemasangan
      * belum mulai, jadi belum ada dasar teknis buat nentuin OLT/Distribusi
-     * mana. Kalau daftar di sana berubah, ubah juga di sini.
+     * mana.
+     *
+     * SATU-SATUNYA daftar (ADHOC-107 R6): modal staf
+     * (CustomerNetworkAssignmentController), Edit Pelanggan
+     * (CustomerController::edit()/update()) dan endpoint API ini semua
+     * merujuk konstanta ini. Jangan bikin salinan lagi — dulu ada dua salinan
+     * dengan catatan "kalau di sana berubah, ubah juga di sini".
      */
-    private const BLOCKED_STATUSES = [
+    public const BLOCKED_STATUSES = [
         'registered',
         'waiting_survey',
         'survey_in_progress',
@@ -49,6 +54,41 @@ class NetworkAssignmentService
         'waiting_installation',
         'rejected',
     ];
+
+    /**
+     * Aturan hierarki jaringan `Cabang → Mini POP → Distribusi`, bagian 1:
+     * Mini POP sah untuk sebuah Cabang kalau `type = mini_pop` dan
+     * `parent_id` = Cabang itu. Satu sumber (ADHOC-107 R6) untuk validasi
+     * Edit, modal staf, endpoint API, dan CustomerObserver::updating().
+     */
+    public static function miniPopBelongsToPop(int|string|null $miniPopId, int|string|null $popId): bool
+    {
+        if (! $miniPopId || ! $popId) {
+            return false;
+        }
+
+        return Pop::whereKey($miniPopId)
+            ->where('type', 'mini_pop')
+            ->where('parent_id', $popId)
+            ->exists();
+    }
+
+    /**
+     * Aturan hierarki jaringan bagian 2: Distribusi sah kalau tergantung
+     * langsung di Mini POP itu (`distributions.pop_id = mini_pop_id`).
+     * Distribusi tanpa Mini POP tidak pernah sah — kalau dibiarkan, segmen
+     * OLT CID tidak punya sumber yang benar (lihat ADHOC-107 T4/K3).
+     */
+    public static function distributionBelongsToMiniPop(int|string|null $distributionId, int|string|null $miniPopId): bool
+    {
+        if (! $distributionId || ! $miniPopId) {
+            return false;
+        }
+
+        return Distribution::whereKey($distributionId)
+            ->where('pop_id', $miniPopId)
+            ->exists();
+    }
 
     /**
      * `POST /api/v1/installations/network-assignment`. Konfirmasi Mini POP +
@@ -311,25 +351,13 @@ class NetworkAssignmentService
 
     private function applyAssignment(Customer $customer, Pop $miniPop, Distribution $distribution): void
     {
+        // CID lewat rumus satu pintu (CustomerCidService, ADHOC-107 R3) — satu
+        // rumus untuk Edit, modal staf, endpoint ini, dan aktivasi. sync()
+        // eksplisit supaya konfirmasi ulang tanpa perubahan pilihan tetap
+        // membetulkan CID yang terlanjur basi (lihat CustomerCidService::sync()).
         $customer->mini_pop_id = $miniPop->id;
         $customer->distribution_id = $distribution->id;
-
-        // CID tidak auto-update sendiri — tersimpan statis di customer.cid,
-        // bukan dihitung ulang tiap saat. Persis
-        // CustomerNetworkAssignmentController::update() baris :118.
-        if (in_array($customer->status, ['active', 'suspended'], true)) {
-            // Wajib eager-load SEBELUM generateComplexCid() dipanggil —
-            // Pop::resolveMiniPopSegment() membaca customer->miniPop dan
-            // customer->customerTechnicalDetail, Model::preventLazyLoading()
-            // aktif di dev/test (AppServiceProvider) jadi akses lazy di sini
-            // akan melempar LazyLoadingViolationException.
-            $customer->loadMissing(['pop', 'miniPop', 'customerTechnicalDetail', 'distribution']);
-
-            if ($customer->pop) {
-                $customer->cid = $customer->pop->generateComplexCid($customer, $customer->distribution);
-            }
-        }
-
+        CustomerCidService::sync($customer);
         $customer->save();
     }
 

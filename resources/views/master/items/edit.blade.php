@@ -15,7 +15,7 @@
 </div>
 
 <!-- Form Container -->
-<form action="{{ route('master.items.update', $item) }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto">
+<form action="{{ route('master.items.update', $item) }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto" x-data="{ trackingType: '{{ old('tracking_type', $item->tracking_type->value) }}' }">
     @csrf
     @method('PUT')
 
@@ -64,14 +64,20 @@
                 @enderror
             </div>
 
-            <!-- Satuan -->
+            <!-- Satuan — dikunci ke "meter" buat tracking_type=roll, sama
+                 pola create.blade.php (koreksi 2026-09-16). -->
             <div>
-                <label for="unit" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Satuan <span class="text-rose-500">*</span></label>
-                <input type="text" name="unit" id="unit" value="{{ old('unit', $item->unit) }}" required
-                       class="w-full px-3 py-2 border @error('unit') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1">
+                <label for="unit" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Satuan <span class="text-rose-500" x-show="trackingType !== 'roll'">*</span></label>
+                <input type="text" name="unit" id="unit" value="{{ old('unit', $item->unit) }}"
+                       :disabled="trackingType === 'roll'" :required="trackingType !== 'roll'"
+                       class="w-full px-3 py-2 border @error('unit') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 disabled:bg-slate-50 dark:disabled:bg-slate-900/40 disabled:text-slate-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed">
                 @error('unit')
                     <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
                 @enderror
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1" x-show="trackingType === 'roll'" x-cloak>Roll kabel selalu dilacak dalam meter — satuan gak bisa diganti.</p>
+                <template x-if="trackingType === 'roll'">
+                    <input type="hidden" name="unit" value="meter">
+                </template>
             </div>
 
             <!-- Status -->
@@ -83,6 +89,80 @@
                     <option value="0" {{ old('is_active', $item->is_active ? '1' : '0') === '0' ? 'selected' : '' }}>Nonaktif</option>
                 </select>
                 @error('is_active')
+                    <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+
+        <div class="border-t border-slate-100 dark:border-slate-700/50 pt-4 mt-1">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Cara Lacak Stok</h3>
+            @if($trackingTypeLocked)
+            <p class="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Barang ini udah punya pergerakan gudang (Barang Masuk/Transfer/Issue) — cara lacak stok gak bisa diganti lagi, biar data yang udah jalan gak jadi gak konsisten.</p>
+            @else
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Pilih <strong>Bernomor Seri</strong> buat barang aktif (modem, ONT, router) — cuma barang berjenis ini yang muncul di dropdown SN Laporan Pemasangan.</p>
+            @endif
+        </div>
+
+        @if($trackingTypeLocked)
+        <div class="flex items-center gap-2">
+            <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->tracking_type->label() }}</span>
+            @if($item->tracking_type->value === 'serialized')
+            <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->ownership_mode->label() }}</span>
+            <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->auto_generate_serial ? 'SN Digenerate Sistem' : 'SN Manual' }}</span>
+            @endif
+        </div>
+        @else
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            @foreach($trackingTypes as $tt)
+            <label class="flex items-start gap-2 border rounded-md p-3 cursor-pointer transition-colors {{ old('tracking_type', $item->tracking_type->value) === $tt->value ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/30' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600' }}">
+                <input type="radio" name="tracking_type" value="{{ $tt->value }}" x-model="trackingType" {{ old('tracking_type', $item->tracking_type->value) === $tt->value ? 'checked' : '' }} class="mt-0.5">
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $tt->label() }}</span>
+            </label>
+            @endforeach
+        </div>
+        @error('tracking_type')
+            <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+        @enderror
+
+        <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kepemilikan</label>
+            <select name="ownership_mode" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                @foreach($ownershipModes as $om)
+                <option value="{{ $om->value }}" {{ old('ownership_mode', $item->ownership_mode->value) === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
+                @endforeach
+            </select>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — gak pernah tercatat terpasang ke pelanggan, cuma dipinjam-pakaikan lalu wajib balik.</p>
+
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5 mt-4">Sumber Serial Number</label>
+            <select name="auto_generate_serial" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                <option value="0" {{ old('auto_generate_serial', $item->auto_generate_serial ? '1' : '0') === '0' ? 'selected' : '' }}>Manual (barang punya SN asli dari vendor — modem, ONT, router)</option>
+                <option value="1" {{ old('auto_generate_serial', $item->auto_generate_serial ? '1' : '0') === '1' ? 'selected' : '' }}>Digenerate Sistem (barang gak punya SN — ODP, Splitter, dll)</option>
+            </select>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Digenerate Sistem: staf cukup isi jumlah unit pas Barang Masuk, SN + label barcode dibuatkan otomatis.</p>
+        </div>
+        @endif
+
+        {{-- Roll Kabel — TETAP bisa diedit walau tracking_type udah locked
+             (ini konfigurasi operasional, bukan sumbu cara-hitung-stok yang
+             dikunci di atas). --}}
+        <div x-show="trackingType === 'roll'" x-cloak class="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="meter_per_roll" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Panjang per Roll (meter) <span class="text-rose-500">*</span></label>
+                <input type="number" step="0.01" min="0.01" name="meter_per_roll" id="meter_per_roll" value="{{ old('meter_per_roll', $item->meter_per_roll) }}" placeholder="mis. 1000"
+                       :disabled="trackingType !== 'roll'"
+                       class="w-full px-3 py-2 border @error('meter_per_roll') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1">
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Konversi Roll→Meter tetap — di-snapshot ke tiap roll saat Receive, ubah nilai ini gak nyeret roll lama.</p>
+                @error('meter_per_roll')
+                    <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+                @enderror
+            </div>
+            <div>
+                <label for="minimum_length" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Ambang "Sisa Kecil" (meter, opsional)</label>
+                <input type="number" step="0.01" min="0.01" name="minimum_length" id="minimum_length" value="{{ old('minimum_length', $item->minimum_length) }}" placeholder="mis. 50"
+                       :disabled="trackingType !== 'roll'"
+                       class="w-full px-3 py-2 border @error('minimum_length') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1">
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Roll dengan sisa di bawah ini di-flag "Sisa Kecil" di Custody/Dashboard — tetap tercatat stok, gak otomatis dihapus.</p>
+                @error('minimum_length')
                     <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
                 @enderror
             </div>

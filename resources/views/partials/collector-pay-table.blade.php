@@ -41,7 +41,7 @@
             </thead>
             <tbody class="block xl:table-row-group p-2.5 sm:p-3 xl:p-0 space-y-2.5 xl:space-y-0 divide-y-0 xl:divide-y divide-slate-100 dark:divide-slate-700/50">
                 @forelse ($invoices as $invoice)
-                    <tr class="block xl:table-row bg-white dark:bg-slate-800/90 xl:bg-transparent rounded-2xl xl:rounded-none border border-slate-200/80 dark:border-slate-700/80 xl:border-x-0 xl:border-t-0 xl:border-b p-3 sm:p-3.5 xl:p-0 shadow-xs xl:shadow-none hover:border-sky-300 dark:hover:border-sky-600/50 xl:hover:bg-slate-50/80 dark:xl:hover:bg-slate-700/30 transition-all space-y-2 xl:space-y-0" data-invoice-row="{{ $invoice->id }}">
+                    <tr class="block xl:table-row bg-white dark:bg-slate-800/90 xl:bg-transparent rounded-2xl xl:rounded-none border border-slate-200/80 dark:border-slate-700/80 xl:border-x-0 xl:border-t-0 xl:border-b p-3 sm:p-3.5 xl:p-0 shadow-xs xl:shadow-none hover:border-sky-300 dark:hover:border-sky-600/50 xl:hover:bg-slate-50/80 dark:xl:hover:bg-slate-700/30 transition-all space-y-2 xl:space-y-0" data-invoice-row="{{ $invoice->id }}" data-customer-id="{{ $invoice->customer_id }}">
                         {{-- 1. Checkbox & Mobile Card Header --}}
                         <td class="block xl:table-cell px-0 pb-1 xl:px-3 xl:py-3 xl:w-10">
                             <div class="flex items-center justify-between gap-2">
@@ -78,10 +78,11 @@
                                 <div class="flex items-center justify-between text-xs gap-2 border-t border-slate-200/60 dark:border-slate-700/40 pt-1.5">
                                     <span class="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">Jatuh Tempo</span>
                                     <div class="shrink-0 text-right">
-                                        @if ($invoice->due_date && $invoice->due_date->isPast())
+                                        {{-- Merah hanya kalau piutang (periode lalu). due_date hanya label. --}}
+                                        @if ($invoice->isPiutang())
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                                {{ $invoice->due_date->format('d/m/Y') }} (Terlewat)
+                                                {{ $invoice->due_date?->format('d/m/Y') ?? '-' }} (Piutang)
                                             </span>
                                         @else
                                             <span class="text-xs font-semibold text-slate-700 dark:text-slate-300 font-mono">
@@ -106,10 +107,10 @@
 
                         {{-- 4. Due Date (Desktop Table View) --}}
                         <td class="hidden xl:table-cell px-3 xl:px-4 py-3 whitespace-nowrap text-xs xl:min-w-[95px]">
-                            @if ($invoice->due_date && $invoice->due_date->isPast())
+                            @if ($invoice->isPiutang())
                                 <span class="inline-flex items-center gap-1 px-1.5 xl:px-2 py-0.5 rounded-lg text-[10px] xl:text-[11px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
                                     <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                    {{ $invoice->due_date->format('d/m/Y') }}
+                                    {{ $invoice->due_date?->format('d/m/Y') ?? '-' }}
                                 </span>
                             @else
                                 <span class="text-slate-600 dark:text-slate-300 font-medium">
@@ -135,6 +136,25 @@
                                          Pengecekannya ada di collector-pay-script. --}}
                                     <input type="text" inputmode="decimal" data-rupiah data-max="{{ (float) $invoice->remaining_amount }}" value="{{ \App\Helpers\FormatHelper::rupiahInput($invoice->remaining_amount) }}" class="cb-amount w-full xl:w-32 2xl:w-36 font-mono text-xs pl-6 pr-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                                 </div>
+                                @php($balanceCustomer = (float) ($customerBalances[$invoice->customer_id] ?? 0))
+                                @if ($balanceCustomer > 0)
+                                    {{-- Pola sama dengan form Bayar admin: satu input nominal saja kecuali
+                                         kasir mencentang "Pakai saldo". Saat dicentang, saldo terisi
+                                         otomatis = min(saldo, sisa) dan nominal tunai menyesuaikan. --}}
+                                    <label class="flex items-start gap-1.5 text-[11px] leading-tight text-sky-700 dark:text-sky-400 font-medium cursor-pointer max-w-[11rem]" title="Saldo pelanggan tersedia: Rp {{ number_format($balanceCustomer, 0, ',', '.') }}">
+                                        <input type="checkbox" class="cb-use-saldo mt-px rounded border-sky-300 text-sky-600 focus:ring-sky-500 w-3.5 h-3.5 shrink-0">
+                                        <span>Pakai saldo <span class="font-mono font-semibold">{{ number_format($balanceCustomer, 0, ',', '.') }}</span></span>
+                                    </label>
+                                    <div class="cb-saldo-wrap hidden relative">
+                                        <span class="absolute left-2 top-2 text-xs font-semibold text-slate-400">Rp</span>
+                                        {{-- Diisi cbAutoFillSaldo(). data-balance = saldo utuh pelanggan (dibagi
+                                             antar baris satu pelanggan di JS), data-max = min(saldo, sisa). --}}
+                                        <input type="text" inputmode="decimal" data-rupiah data-balance="{{ $balanceCustomer }}" data-max="{{ min($balanceCustomer, (float) $invoice->remaining_amount) }}" value="0" class="cb-saldo w-full xl:w-32 2xl:w-36 font-mono text-xs pl-6 pr-1.5 py-1.5 border border-sky-200 dark:border-sky-500/30 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                    </div>
+                                @endif
+                                {{-- Pratinjau cicilan / lunas / lebih bayar — diisi cbRefreshHint(), sama
+                                     polanya dengan pratinjau di form Bayar admin. --}}
+                                <p class="cb-hint hidden inline-block text-[10px] leading-tight font-semibold px-1.5 py-0.5 rounded"></p>
                             </div>
                         </td>
 
@@ -142,12 +162,23 @@
                         <td class="block float-left w-[48%] xl:w-auto xl:float-none xl:table-cell px-0 py-0.5 xl:px-3 xl:py-3 xl:min-w-[85px]">
                             <div class="space-y-0.5">
                                 <label class="xl:hidden text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Metode</label>
-                                <select class="cb-method w-full xl:w-26 2xl:w-28 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                <select class="cb-method w-full xl:w-26 2xl:w-28 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500" onchange="cbToggleNote(this)">
                                     <option value="cash">Cash</option>
                                     <option value="transfer">Transfer</option>
-                                    <option value="qris">QRIS</option>
                                     <option value="lainnya">Lainnya</option>
                                 </select>
+                                {{-- Wajib diisi kalau metode = Lainnya (dicek cbValidateRows()
+                                     sebelum submit) — lihat PaymentMethod::requiresDescription(). --}}
+                                <input type="text" placeholder="Metode apa? (mis. OVO)" class="cb-note hidden w-full xl:w-26 2xl:w-28 mt-0.5 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                {{-- Transfer wajib rekening tujuan (Master Rekening Bank) — sama dengan
+                                     form Bayar admin. Nama pengirim opsional, untuk rekonsiliasi. --}}
+                                <select class="cb-bank hidden w-full xl:w-26 2xl:w-28 mt-0.5 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                    <option value="">Pilih rekening</option>
+                                    @foreach ($bankAccounts as $bankAccount)
+                                        <option value="{{ $bankAccount['id'] }}">{{ $bankAccount['name'] }}</option>
+                                    @endforeach
+                                </select>
+                                <input type="text" placeholder="Nama pengirim" maxlength="150" class="cb-sender hidden w-full xl:w-26 2xl:w-28 mt-0.5 text-xs px-1.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                             </div>
                         </td>
 
@@ -205,4 +236,21 @@
             </button>
         </div>
     </div>
+
+    {{-- Konfirmasi lebih bayar — sama dengan modal di form Bayar admin (ADHOC-84 §2.3).
+         Satu-satunya jeda sadar sebelum kelebihan uang masuk saldo pelanggan. --}}
+    <x-ui.modal name="cb-overpay-confirm" title="Konfirmasi Lebih Bayar" maxWidth="sm">
+        <p class="text-xs text-text-secondary" id="cb-overpay-message"></p>
+
+        <x-slot name="footer">
+            <button type="button" onclick="cbProceedOverpay()"
+                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer">
+                Lanjutkan
+            </button>
+            <button type="button" onclick="cbCancelOverpay()"
+                    class="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-surface-muted cursor-pointer">
+                Batal, Cek Lagi
+            </button>
+        </x-slot>
+    </x-ui.modal>
 @endif

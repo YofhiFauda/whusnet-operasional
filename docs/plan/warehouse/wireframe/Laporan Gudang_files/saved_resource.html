@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<!-- saved from url=(0253)https://fad57389-9973-4445-b4cb-49f04a96c913.frame.claudeusercontent.com/_f/1788748079-7d75/?__frame_t=ryD1S2v7LfCgNxPvNur2MPkd.dfd2098b-8d1c-45bd-bbf4-f41e268a10ca.352da5f9-7485-4abf-b8b9-464d9b38f424.1788751680&__frame_v=manifest.44244f2523adb29d.json -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><!-- frame-runtime --><script>window.__FRAME_PREAMBLE={"v":1,"capabilities":{"artifact":"artifact.DfA2To-s.js","assets":"assets.8Gk803W0.js","comments":"comments.hEoja5zd.js","db":"db.h-3sndFg.js","downloads":"downloads.th1YuAIk.js","embed":"embed.eqL6deQM.js","endpoints":"endpoints.CfzSv5nM.js","mcp":"mcp.Bvma3qD7.js","network":"network.B5UA9Su4.js","permissions":"permissions.BNySkLV5.js","room":"room.VSdFwTE9.js","sample":"sample.BW2Uysoh.js","self":"artifact.DfA2To-s.js","user":"user.BpKav-Rf.js"},"transforms":"_transforms.-IAc0qoT.js","comments":"_comments.C-AkolIB.js","translate":"_translate.5HCW4BJh.js","ldx":"_ldx.6JS5dhCp.js"}</script><script>(function(){"use strict";var le=["light","dark","system"],ue=/^[A-Za-z0-9_-]{1,64}$/,J=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,fe=new Set(["class","hidden","value","checked","style","title","alt","placeholder","lang","dir","role","tabindex","disabled","readonly","contenteditable","open","colspan","rowspan"]);function de(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||fe.has(t)}var We="http://www.w3.org/1999/xhtml",pe="http://www.w3.org/2000/svg",me=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),he=new Set(["script","style"]);function _e(e){const t=e.localName.toLowerCase();return e.namespaceURI==="http://www.w3.org/1999/xhtml"?!me.has(t):e.namespaceURI===pe?!he.has(t):!1}function I(e,t){return e===t||(e===160||e===32)&&(t===160||t===32)}function ve(e,t){const r=e.length,n=t.length;let a=0;for(;a<r&&a<n&&I(e.charCodeAt(a),t.charCodeAt(a));)a++;let s=0;for(;s<r-a&&s<n-a&&I(e.charCodeAt(r-1-s),t.charCodeAt(n-1-s));)s++;return{p:a,s}}function ye(e,t){const r=e.firstChild;if(e.childNodes.length!==1||r===null||r.nodeType!==Node.TEXT_NODE){e.textContent=t;return}const n=r.data,a=n.length,s=t.length,{p:c,s:i}=ve(n,t);c===a&&i===0&&a===s||r.replaceData(c,a-c-i,t.slice(c,s-i));const p=r.data,f=e.ownerDocument.getSelection?.()??null,v=f!==null&&f.rangeCount>0&&(f.anchorNode===r||f.focusNode===r)?{anchor:f.anchorNode,anchorOffset:f.anchorOffset,focus:f.focusNode,focusOffset:f.focusOffset}:null;let d=-1,y=-1;for(let _=0;_<p.length&&_<t.length;_++){const E=p.charCodeAt(_),T=t.charCodeAt(_);E!==T&&I(E,T)&&(d<0&&(d=_),y=_)}const w=d>=0;if(w&&r.replaceData(d,y-d+1,t.slice(d,y+1)),w&&v!==null&&v.anchor!==null&&v.focus!==null)try{f.setBaseAndExtent(v.anchor,v.anchorOffset,v.focus,v.focusOffset)}catch{}}var we=new Set(["html","head","body","frameset"]);function be(e){return e.namespaceURI==="http://www.w3.org/1999/xhtml"&&we.has(e.localName)}function Ee(e){if(e===null||typeof e!="object")return!1;const t=e;if(typeof t.target!="string"||!ue.test(t.target)||t.text!==void 0&&typeof t.text!="string")return!1;if(t.attrsSet!==void 0){if(t.attrsSet===null||typeof t.attrsSet!="object")return!1;for(const[r,n]of Object.entries(t.attrsSet))if(!J.test(r)||typeof n!="string")return!1}if(t.attrsRemoved!==void 0){if(!Array.isArray(t.attrsRemoved))return!1;for(const r of t.attrsRemoved)if(typeof r!="string"||!J.test(r))return!1}return!0}function ge(e,t){if(e===null||typeof e!="object")return!1;const{seq:r,elements:n}=e;if(typeof r!="number"||!Number.isSafeInteger(r)||!Array.isArray(n)||n.length===0||n.length>64)return!1;for(let a=0;a<n.length;a++)if(!t(n[a]))return!1;return!0}function Ae(e){return e===null||typeof e!="object"?!1:ge(e.__frame_patch,Ee)}function Te(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function Re(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function Le(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const r=t.theme;return typeof r=="string"&&le.includes(r)}var L=/^[\w.-]+\.js$/;function Se(e,t,r){return r?"inert":typeof t=="string"&&L.test(t)?e?[t]:"inert":e?"inert":"framed"}var Ke="frame_ldx_runtime",$e="script#an-form";function ke(){return{post(e,t){parent.postMessage(e,t)},on(e){const t=r=>{r.source===parent&&e(r.data,r.origin,r.isTrusted)};return addEventListener("message",t),()=>removeEventListener("message",t)}}}function Pe(){return{post:()=>{},on:()=>()=>{}}}var U="__frame_scroll",Oe=150,Ce=310,Me=160,je=3e4;function Ne(){let e=0,t=!1,r=!1,n=!1,a=0,s=null;const c=u=>{try{sessionStorage.setItem(U,JSON.stringify({y:u}))}catch{}},i=()=>{if(clearTimeout(e),s===null)return;const u=s;s=null,c(u)},p=()=>{if(t){t=!1;return}r=!0,s=scrollY,clearTimeout(e),e=setTimeout(i,Oe)};try{addEventListener("scroll",p,{passive:!0}),addEventListener("pagehide",i)}catch{}const f=()=>{let u;try{u=sessionStorage.getItem(U)}catch{return null}if(u===null)return null;let b;try{b=JSON.parse(u)}catch{b=null}const o=b?.y;if(!(typeof o=="number"&&Number.isFinite(o)&&o>=0)){try{sessionStorage.removeItem(U)}catch{}return null}return o};let v=!1;const d=u=>{try{const b=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),a=u,n=!0,clearTimeout(e),s=null,c(u);const o=scrollY;o!==b&&(t=!0),o!==u&&!v&&(v=!0,addEventListener("load",()=>{try{if(scrollY===o){const m=f();d(m!==null?m:a)}}catch{}},{once:!0}))}catch{}},y=()=>{try{return!!location.hash}catch{return!0}};let w=!1;const _=()=>{try{if(w||innerWidth>Ce||innerHeight>Me)return;w=!0;const u=Date.now(),b=()=>{try{removeEventListener("resize",b)}catch{}if(Date.now()-u>je||r||y())return;const o=f();d(o!==null?o:a)};addEventListener("resize",b)}catch{}};let E=!1,T=!1;return{restore(){if(E||(E=!0,y()))return;const u=f();u!==null&&(d(u),_())},promoted(){if(T||(T=!0,y()))return;const u=f();u!==null?(d(u),_()):n&&d(a)}}}function Be(e,t,r,n){let a=null;try{a=window.trustedTypes?.createPolicy("frame-runtime",{createScriptURL:p=>p})??null}catch{}const s=window.Worker,c=s?.prototype,i=Object.freeze({Worker:s,workerOn:c?.addEventListener,workerPost:c?.postMessage,workerTerminate:c?.terminate,fetch:window.fetch.bind(window),preventDefault:Event.prototype.preventDefault,policy:a,origins:t});r(e).then(p=>p?.bootTopLevel?p.bootTopLevel(i,n):n.settle()).catch(()=>n.settle())}var qe="modulepreload",Xe=function(e){return"/"+e},Ye={},De=function(t,r,n){let a=Promise.resolve();function s(c){const i=new Event("vite:preloadError",{cancelable:!0});if(i.payload=c,window.dispatchEvent(i),!i.defaultPrevented)throw c}return a.then(c=>{for(const i of c||[])i.status==="rejected"&&s(i.reason);return t().catch(s)})},Ie=window===top,Q=Object.getOwnPropertyDescriptor(window,"claude"),C=Se(Ie,window.__FRAME_PREAMBLE?.topLevel,Q?.writable===!1),x=typeof C=="object"&&C[0],h=x?Pe():ke();(function(){const e=Object.defineProperty,t=globalThis,r=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let n=0;for(let a=0;a<r.length;a++){const s=r[a];try{e(t,s,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[s]}catch{}try{e(t,s,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[s]=="function"&&n++}if(n&&C==="framed")try{h.post({__frame_rtc_lockdown_failed:n},"*")}catch{}})();var Ue=1e4,xe=2e3,ee=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function te(e){for(const t of ee)if(t.endsWith(":*"))try{const r=new URL(e);if(`${r.protocol}//${r.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var M=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),F=window.__FRAME_PREAMBLE?.transforms,z=window.__FRAME_PREAMBLE?.comments,H=window.__FRAME_PREAMBLE?.translate,W=window.__FRAME_PREAMBLE?.ldx;function S(e){return De(()=>import("/_runtime/"+e),void 0)}function re(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:q,hooks:N,pipe:()=>({wrap:(r,n)=>(...a)=>{try{return n(...a)}catch(s){return Promise.reject(s)}}})}}var j=null,A=null;function ne(e,t,r){try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var K=!1,N={editBefore:null,edit:null};function Fe(e,t,r=!1){const n=[];let a;if(r)try{N.editBefore?.(e)}catch{}for(const s of e.elements){const c=document.querySelector(`[data-id="${s.target}"]`);if(!c){a=s.target;break}if([...Object.keys(s.attrsSet??{}),...s.attrsRemoved??[]].some(i=>!de(i))){a=s.target;break}if(s.text!==void 0&&(!_e(c)||be(c))){a=s.target;break}for(const[i,p]of Object.entries(s.attrsSet??{}))if(!se(c,i)){try{c.setAttribute(i,p)}catch{}oe(c,i,p)}for(const i of s.attrsRemoved??[])se(c,i)||(c.removeAttribute(i),oe(c,i,null));typeof s.text=="string"&&ye(c,s.text),n.push(s.target)}if(r)try{N.edit?.(e.seq,n,a)}catch{}if(a!==void 0){h.post({__frame_patch_miss:{seq:e.seq}},t);return}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function oe(e,t,r){if(!(e instanceof HTMLInputElement))return;const n=t.toLowerCase();n==="checked"?e.checked=r!==null:n==="value"&&e.type!=="file"&&(e.value=r??"")}function se(e,t){const r=t.toLowerCase(),n=e;return r==="data-id"||(r==="value"||r==="checked")&&(n.__artifactSecret===!0||/^(password|hidden|file)$/.test(n.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${n.autocomplete??""}`))}function ae(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,K=!0):K&&(delete t.dataset.theme,t.style.colorScheme="",K=!1)}var B=new Map;function ze(){let e;const t={u:new Promise(r=>{e=r}),r:r=>{t.done=!0,e(r)},done:!1,nulled:!1};return t}function $(){for(const e of B.values())e.done||(e.nulled=!0,e.r(null))}var He=Object.freeze(Object.assign(Object.create(null),{call:Function.prototype.call,apply:Function.prototype.apply,bind:Function.prototype.bind})),q=(e,t)=>{const r=B.get(e);if(!r||r.done){r?.nulled&&A&&h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:e}},A);return}const n=typeof t=="function"?Object.setPrototypeOf(t,He):Object.assign(Object.create(null),t);typeof n.then=="function"&&delete n.then,r.r(Object.freeze(n))};function ie(){const e=Q?.value??{};ne(window,"claude",e);for(const t of Object.keys(M)){if(e[t]!==void 0){ne(e,t,e[t]);continue}B.set(t,ze())}if(e.use===void 0){const t=r=>{if(typeof r!="string"||!Object.hasOwn(M,r))return Promise.resolve(null);const n=B.get(r);return n?n.u:Promise.resolve(e[r]??null)};try{Object.defineProperty(e,"use",{value:t,writable:!0,configurable:!0,enumerable:!1})}catch{}}}if(C==="framed"){const e=F&&L.test(F)?S(F).catch(()=>{}):Promise.resolve(void 0),t=o=>{if(o.type==="auxclick"&&o.button!==1)return;const m=o.target,k=m&&m.closest?m.closest("a[href],area[href]"):null;if(!k)return;const O=k.getAttribute("href");if(!O)return;let R;try{R=new URL(O,document.baseURI)}catch{return}if((R.protocol==="http:"||R.protocol==="https:")&&R.origin!==location.origin){o.preventDefault();const P=(k.getAttribute("target")??"").toLowerCase(),g=o.type==="auxclick"||o.metaKey||o.ctrlKey||o.shiftKey||o.altKey||!["","_self","_top","_parent"].includes(P);h.post({__frame_nav:!0,url:R.href,newTab:g},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const r={},n=o=>{o.isTrusted&&(r.pointer=!0)},a=o=>{o.isTrusted&&(r.click=!0)};addEventListener("pointermove",n,{capture:!0,passive:!0}),addEventListener("click",a,{capture:!0,passive:!0});const s={cb:null};addEventListener("keydown",o=>s.cb?.(o),!0),e.then(o=>o?.installEscapeForward?.(s,m=>{A&&h.post(m,A)})),e.then(o=>{o?.wireNav&&(o.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",n,!0),removeEventListener("click",a,!0),o.wireEngagement?.(r))});let c=null;try{c=Ne()}catch{}ie();let i=null,p=null,f=0;const v=h.on((o,m)=>{te(m)&&Te(o)&&(i=o.__frame_init,A=m,v(),clearTimeout(f),p?.())});h.post({__frame_connect:!0},"*");const d=setTimeout,y=clearTimeout;let w=0;const _=()=>{try{h.post({__frame_alive:!0},"*")}catch{}w=d(_,xe)},E=()=>y(w);_(),addEventListener("load",E,{once:!0});const T=new Promise(o=>{p=o,f=setTimeout(()=>{v(),o()},Ue)}),u=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();u.then(()=>{try{c?.restore()}catch{}});const b={cb:null};h.on((o,m)=>{if(te(m)&&Re(o)){try{c?.promoted()}catch{}b.cb?.()}}),T.then(async()=>{if(!i||!A){$();return}ae(i.theme);const o=A;let m=!1,k=!1;h.on((l,Y,D)=>{if(Y!==o)return;Le(l)&&ae(l.__frame_theme.theme),Ae(l)&&Fe(l.__frame_patch,o,D);const G=l?.__fc_mode;G&&typeof G=="object"&&!m&&z&&L.test(z)&&(m=!0,S(z).then(Z=>Z.install?.(o,G.on===!0)).catch(()=>{}));const V=l?.__ft_cmd;V&&typeof V=="object"&&!k&&H&&L.test(H)&&(k=!0,S(H).then(Z=>Z.install?.(o,V)).catch(()=>{}))});const O=Object.keys(i.capabilities??{}).filter(l=>Object.hasOwn(M,l)).map(l=>[l,M[l]]).filter(l=>typeof l[1]=="string"&&L.test(l[1])),R=await Promise.allSettled(O.map(([,l])=>S(l))),P=await e,g=A;if(P?.buildBoot||h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},g),P?.buildBoot)try{j=P.buildBoot(i,P.TRANSFORMS??{},{shellOrigin:g,mount:q,hooks:N},l=>h.post({__frame_cap_telemetry:l},g))}catch{h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},g),j=re(i,g)}else j=re(i,g);const X=l=>h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:l}},g),ce=j;R.forEach((l,Y)=>{const D=O[Y][0];if(l.status!=="fulfilled"){X(D);return}try{l.value?.install?.(ce)}catch{X(D)}}),$(),await u,E(),h.post({__frame_ready:!0},A),e.then(l=>l?.installSizeReporter?.(g,b)),ce.flags.has("frame_ldx_runtime")&&W&&L.test(W)&&document.querySelector("script#an-form")&&S(W).then(l=>l?.boot?.()).catch(()=>!1).then(l=>{l!==!0&&X("_ldx")})})}else x&&(ie(),Be(x,ee,S,{settle:$,mount:q}))})();</script><!-- /frame-runtime --><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>Laporan Gudang</title>
+<meta name="description" content="Prototipe interaktif laporan agregat gudang — pergerakan barang &amp; rekapitulasi kerugian per periode, dengan grafik dan tabel noise-free.">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link rel="stylesheet" href="./css2">
+<style>
+  :root{
+    --bg:#f3f6f6; --surface:#ffffff; --surface-2:#eef3f3; --border:#d9e2e2;
+    --text:#131c1e; --text-muted:#5c7072; --text-faint:#8a9b9c;
+    --accent:#0d7d7a; --accent-ink:#ffffff; --accent-soft:#e0f1ef; --accent-soft-border:#b9dcd8;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --good-soft:#e4f4e9; --warn-soft:#fef3da; --crit-soft:#fbe6e2;
+    /* categorical chart slots (validated: node validate_palette.js, PASS light+dark on this surface) */
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+    --grid:#e1e0d9; --axis:#c3c2b7;
+    --shadow: 0 1px 2px rgba(20,30,31,.04), 0 8px 24px -12px rgba(20,30,31,.12);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1516; --surface:#161f20; --surface-2:#1b2526; --border:#2a3536;
+      --text:#e7eeee; --text-muted:#98abac; --text-faint:#6d8081;
+      --accent:#4fd6ce; --accent-ink:#06201e; --accent-soft:#17302e; --accent-soft-border:#294a46;
+      --good:#0ca30c; --warn:#fab219; --crit:#e66767;
+      --good-soft:#173226; --warn-soft:#332b16; --crit-soft:#361f1c;
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+      --grid:#2c2c2a; --axis:#383835;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1516; --surface:#161f20; --surface-2:#1b2526; --border:#2a3536;
+    --text:#e7eeee; --text-muted:#98abac; --text-faint:#6d8081;
+    --accent:#4fd6ce; --accent-ink:#06201e; --accent-soft:#17302e; --accent-soft-border:#294a46;
+    --good:#0ca30c; --warn:#fab219; --crit:#e66767;
+    --good-soft:#173226; --warn-soft:#332b16; --crit-soft:#361f1c;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --grid:#2c2c2a; --axis:#383835;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box;}
+  body{background:var(--bg); color:var(--text); font-family:"IBM Plex Sans", system-ui, sans-serif; font-size:14px; line-height:1.5;}
+  h1,h2,h3{font-family:"Manrope", system-ui, sans-serif; text-wrap:balance; margin:0;}
+  code,.mono{font-family:"IBM Plex Mono", ui-monospace, monospace;}
+  .num{font-variant-numeric:tabular-nums;}
+  button,select,input{font-family:inherit; font-size:inherit;}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  .app{max-width:1320px; margin:0 auto; padding:20px 24px 64px;}
+
+  .topbar{display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; justify-content:space-between; padding-bottom:16px; margin-bottom:16px; border-bottom:1px solid var(--border);}
+  .topbar-id{display:flex; flex-direction:column; gap:4px;}
+  .eyebrow{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint); font-weight:600;}
+  .topbar-id h1{font-size:22px; font-weight:800;}
+  .topbar-id .desc{font-size:12.5px; color:var(--text-muted);}
+  .export-bar{display:flex; gap:8px;}
+  .export-btn{display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); color:var(--text); padding:9px 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;}
+  .export-btn:hover{border-color:var(--accent); background:var(--accent-soft);}
+
+  .toolbar{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:16px;}
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint);}
+  .field select{background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 12px; color:var(--text); appearance:none; cursor:pointer; min-width:180px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 14px) calc(1em - 1px), calc(100% - 9px) calc(1em - 1px);
+    background-size: 5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:30px;}
+
+  .tabs{display:flex; gap:6px; margin-bottom:16px;}
+  .tab-btn{background:var(--surface); border:1px solid var(--border); color:var(--text-muted); padding:9px 16px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;}
+  .tab-btn.active{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+
+  .kpi-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px;}
+  .kpi-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; display:flex; flex-direction:column; gap:6px;}
+  .kpi-card .label{font-size:12px; color:var(--text-muted); font-weight:600;}
+  .kpi-card .value{font-family:"Manrope"; font-size:24px; font-weight:800;}
+  .kpi-card .foot{font-size:11.5px; color:var(--text-faint);}
+
+  .tab-panel[hidden]{display:none;}
+
+  .chart-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:16px;}
+  .chart-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; flex-wrap:wrap; gap:8px;}
+  .chart-head h3{font-size:14.5px; font-weight:700;}
+  .chart-head .note{font-size:11.5px; color:var(--text-faint);}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:10px;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); font-weight:600;}
+  .legend-swatch{width:10px; height:10px; border-radius:2px;}
+  .chart-svg-wrap{overflow-x:auto;}
+  svg text{font-family:"IBM Plex Sans", system-ui, sans-serif;}
+  .bar-mark{cursor:pointer;}
+  .bar-value{font-size:11px; font-weight:600; fill:var(--text);}
+  .axis-label{font-size:11px; fill:var(--text-muted);}
+  .axis-cat{font-size:12px; font-weight:600; fill:var(--text);}
+
+  .chart-tooltip{position:fixed; background:var(--text); color:var(--surface); font-size:12px; padding:7px 10px; border-radius:7px; pointer-events:none; z-index:60; box-shadow:var(--shadow); white-space:nowrap;}
+  .chart-tooltip[hidden]{display:none;}
+  .chart-tooltip .tt-val{font-weight:700;}
+
+  .table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);}
+  table.report{width:100%; border-collapse:collapse; min-width:820px;}
+  table.report thead th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:700; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--surface-2); white-space:nowrap;}
+  table.report td{padding:11px 14px; border-bottom:1px solid var(--border); font-size:13px;}
+  table.report tbody tr:last-child td{border-bottom:none;}
+  table.report tbody tr:hover{background:var(--surface-2);}
+  .type-tag{display:inline-block;}
+  .footnote{font-size:11.5px; color:var(--text-faint); padding:10px 14px; border-top:1px solid var(--border);}
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{position:fixed; inset:0; background:rgba(10,16,17,.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;}
+  .modal-backdrop[hidden]{display:none;}
+  .modal{background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); max-width:420px; width:100%; padding:22px; display:flex; flex-direction:column; gap:12px;}
+  .modal h3{font-size:16px;}
+  .modal p{font-size:13px; color:var(--text-muted); line-height:1.6;}
+  .modal .route{font-size:12px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:8px 10px;}
+  .modal-close{align-self:flex-end; background:var(--accent); color:var(--accent-ink); border:none; border-radius:7px; padding:8px 16px; font-weight:700; cursor:pointer;}
+
+  @media (max-width: 900px){ .kpi-grid{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width: 620px){ table.report{min-width:680px;} }
+</style>
+
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-id">
+      <span class="eyebrow">Modul Gudang · Whusnet Operasional</span>
+      <h1>Laporan Agregat Gudang &amp; Logistik</h1>
+      <span class="desc">Rekapitulasi pergerakan barang dan catatan kerugian per periode bulanan.</span>
+    </div>
+    <div class="export-bar">
+      <button class="export-btn" data-modal="pdf">🖨️ Cetak PDF</button>
+      <button class="export-btn" data-modal="excel">📥 Export Excel</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field">
+      <label for="periodSelect">Periode Bulan</label>
+      <select id="periodSelect">
+        <option value="2026-09">September 2026</option>
+        <option value="2026-08">Agustus 2026</option>
+        <option value="2026-07">Juli 2026</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="popSelect">Gudang</label>
+      <select id="popSelect">
+        <option value="all">Semua POP (Nasional)</option>
+        <option value="Gudang Pusat">Gudang Pusat</option>
+        <option value="Cabang Siman">Cabang Siman</option>
+        <option value="Cabang Babadan">Cabang Babadan</option>
+        <option value="Cabang Kauman">Cabang Kauman</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="kpi-grid" id="kpiGrid"><div class="kpi-card"><div class="label">Total Inbound Masuk</div><div class="value num">350 Unit/Meter</div><div class="foot">dari supplier ke Gudang Pusat</div></div><div class="kpi-card"><div class="label">Total Kirim ke Cabang</div><div class="value num">210 Unit</div><div class="foot">lewat Transfer Antar Gudang</div></div><div class="kpi-card"><div class="label">Total ke Teknisi</div><div class="value num">210 Unit/Meter</div><div class="foot">diserahkan via Issue</div></div><div class="kpi-card"><div class="label">Total Kerugian (BAP)</div><div class="value num">4 Kejadian</div><div class="foot">Damaged/Lost/Scrapped/Opname Diff</div></div></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="movement">📦 1. Pergerakan Barang (Movement)</button>
+    <button class="tab-btn" data-tab="loss">⚠️ 2. Rekapitulasi Kerugian (Loss &amp; Adjustment)</button>
+  </div>
+
+  <!-- TAB 1 -->
+  <div class="tab-panel" id="panelMovement">
+    <div class="chart-card">
+      <div class="chart-head">
+        <h3>Pergerakan Barang per Gudang</h3>
+        <span class="note">Satuan: unit/meter dicampur per baris — grafik menghitung volume transaksi, bukan qty fisik gabungan</span>
+      </div>
+      <div class="legend" id="legendMovement"><span class="legend-item"><span class="legend-swatch" style="background: var(--s1);"></span>Inbound Baru</span><span class="legend-item"><span class="legend-swatch" style="background: var(--s2);"></span>Transfer Masuk</span><span class="legend-item"><span class="legend-swatch" style="background: var(--s3);"></span>Transfer Keluar</span><span class="legend-item"><span class="legend-swatch" style="background: var(--s4);"></span>Keluar ke Teknisi</span></div>
+      <div class="chart-svg-wrap"><svg id="chartMovement" role="img" aria-label="Grafik pergerakan barang per gudang" viewBox="0 0 770 300" width="770" height="300"><line x1="46" x2="754" y1="254" y2="254" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="258" text-anchor="end" class="axis-label">0</text><line x1="46" x2="754" y1="194.16" y2="194.16" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="198.16" text-anchor="end" class="axis-label">88</text><line x1="46" x2="754" y1="135" y2="135" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="139" text-anchor="end" class="axis-label">175</text><line x1="46" x2="754" y1="75.16" y2="75.16" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="79.16" text-anchor="end" class="axis-label">263</text><line x1="46" x2="754" y1="16" y2="16" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="20" text-anchor="end" class="axis-label">350</text><line x1="46" x2="754" y1="254" y2="254" stroke="var(--axis)" stroke-width="1.5"></line><rect x="54" y="16" width="30" height="238" rx="4" ry="4" fill="var(--s1)" class="bar-mark"></rect><text x="69" y="11" text-anchor="middle" class="bar-value">350</text><rect x="87" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s2)" class="bar-mark"></rect><rect x="120" y="111.20000000000002" width="30" height="142.79999999999998" rx="4" ry="4" fill="var(--s3)" class="bar-mark"></rect><text x="135" y="106.20000000000002" text-anchor="middle" class="bar-value">210</text><rect x="153" y="237" width="30" height="17" rx="4" ry="4" fill="var(--s4)" class="bar-mark"></rect><text x="168" y="232" text-anchor="middle" class="bar-value">25</text><text x="134.5" y="276" text-anchor="middle" class="axis-cat">Gudang Pusat</text><rect x="231" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s1)" class="bar-mark"></rect><rect x="264" y="172.4" width="30" height="81.6" rx="4" ry="4" fill="var(--s2)" class="bar-mark"></rect><text x="279" y="167.4" text-anchor="middle" class="bar-value">120</text><rect x="297" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s3)" class="bar-mark"></rect><rect x="330" y="189.4" width="30" height="64.6" rx="4" ry="4" fill="var(--s4)" class="bar-mark"></rect><text x="345" y="184.4" text-anchor="middle" class="bar-value">95</text><text x="311.5" y="276" text-anchor="middle" class="axis-cat">Cabang Siman</text><rect x="408" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s1)" class="bar-mark"></rect><rect x="441" y="192.8" width="30" height="61.199999999999996" rx="4" ry="4" fill="var(--s2)" class="bar-mark"></rect><text x="456" y="187.8" text-anchor="middle" class="bar-value">90</text><rect x="474" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s3)" class="bar-mark"></rect><rect x="507" y="213.2" width="30" height="40.8" rx="4" ry="4" fill="var(--s4)" class="bar-mark"></rect><text x="522" y="208.2" text-anchor="middle" class="bar-value">60</text><text x="488.5" y="276" text-anchor="middle" class="axis-cat">Cabang Babadan</text><rect x="585" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s1)" class="bar-mark"></rect><rect x="618" y="226.8" width="30" height="27.2" rx="4" ry="4" fill="var(--s2)" class="bar-mark"></rect><text x="633" y="221.8" text-anchor="middle" class="bar-value">40</text><rect x="651" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s3)" class="bar-mark"></rect><rect x="684" y="233.6" width="30" height="20.4" rx="4" ry="4" fill="var(--s4)" class="bar-mark"></rect><text x="699" y="228.6" text-anchor="middle" class="bar-value">30</text><text x="665.5" y="276" text-anchor="middle" class="axis-cat">Cabang Kauman</text></svg></div>
+    </div>
+    <div class="table-wrap">
+      <table class="report">
+        <thead><tr><th>Gudang POP</th><th>Tipe Gudang</th><th>Inbound Baru</th><th>Trf Masuk</th><th>Trf Keluar</th><th>Keluar ke Teknisi</th></tr></thead>
+        <tbody id="tableMovement"><tr><td>Gudang Pusat</td><td>PUSAT (HQ)</td><td class="num">350 Unit</td><td class="num">—</td><td class="num">210 Unit</td><td class="num">25 Unit</td></tr><tr><td>Cabang Siman</td><td>CABANG</td><td class="num">—</td><td class="num">120 Unit</td><td class="num">—</td><td class="num">95 Unit</td></tr><tr><td>Cabang Babadan</td><td>CABANG</td><td class="num">—</td><td class="num">90 Unit</td><td class="num">—</td><td class="num">60 Unit</td></tr><tr><td>Cabang Kauman</td><td>CABANG</td><td class="num">—</td><td class="num">40 Unit</td><td class="num">—</td><td class="num">30 Unit</td></tr></tbody>
+      </table>
+      <div class="footnote" id="footMovement">Menampilkan 4 dari 4 gudang — baris tanpa transaksi periode ini otomatis disembunyikan (prinsip no-zero-rows).</div>
+    </div>
+  </div>
+
+  <!-- TAB 2 -->
+  <div class="tab-panel" id="panelLoss" hidden="">
+    <div class="chart-card">
+      <div class="chart-head">
+        <h3>Jumlah Kejadian Kerugian per Lokasi</h3>
+        <span class="note">Dihitung dari jumlah transaksi, bukan total unit/qty (satuan campur)</span>
+      </div>
+      <div class="legend" id="legendLoss"><span class="legend-item"><span class="legend-swatch" style="background: var(--s1);"></span>Rusak (Damaged)</span><span class="legend-item"><span class="legend-swatch" style="background: var(--s2);"></span>Hilang (Lost)</span><span class="legend-item"><span class="legend-swatch" style="background: var(--s4);"></span>Selisih Opname</span></div>
+      <div class="chart-svg-wrap"><svg id="chartLoss" role="img" aria-label="Grafik jumlah kejadian kerugian per lokasi" viewBox="0 0 640 300" width="640" height="300"><line x1="46" x2="624" y1="254" y2="254" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="258" text-anchor="end" class="axis-label">0</text><line x1="46" x2="624" y1="192.12" y2="192.12" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="196.12" text-anchor="end" class="axis-label">13</text><line x1="46" x2="624" y1="135" y2="135" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="139" text-anchor="end" class="axis-label">25</text><line x1="46" x2="624" y1="73.12" y2="73.12" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="77.12" text-anchor="end" class="axis-label">38</text><line x1="46" x2="624" y1="16" y2="16" stroke="var(--grid)" stroke-width="1"></line><text x="38" y="20" text-anchor="end" class="axis-label">50</text><line x1="46" x2="624" y1="254" y2="254" stroke="var(--axis)" stroke-width="1.5"></line><rect x="54" y="244.48" width="30" height="9.52" rx="4" ry="4" fill="var(--s1)" class="bar-mark"></rect><text x="69" y="239.48" text-anchor="middle" class="bar-value">2</text><rect x="87" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s2)" class="bar-mark"></rect><rect x="120" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s4)" class="bar-mark"></rect><text x="142.33333333333331" y="276" text-anchor="middle" class="axis-cat">Cabang Siman (Gudang)</text><rect x="246.66666666666666" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s1)" class="bar-mark"></rect><rect x="279.66666666666663" y="249.24" width="30" height="4.76" rx="4" ry="4" fill="var(--s2)" class="bar-mark"></rect><text x="294.66666666666663" y="244.24" text-anchor="middle" class="bar-value">1</text><rect x="312.66666666666663" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s4)" class="bar-mark"></rect><text x="335" y="276" text-anchor="middle" class="axis-cat">— (Custody Teknisi)</text><rect x="439.3333333333333" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s1)" class="bar-mark"></rect><rect x="472.3333333333333" y="254" width="30" height="0" rx="4" ry="4" fill="var(--s2)" class="bar-mark"></rect><rect x="505.3333333333333" y="249.24" width="30" height="4.76" rx="4" ry="4" fill="var(--s4)" class="bar-mark"></rect><text x="520.3333333333333" y="244.24" text-anchor="middle" class="bar-value">1</text><text x="527.6666666666666" y="276" text-anchor="middle" class="axis-cat">Cabang Babadan</text></svg></div>
+    </div>
+    <div class="table-wrap">
+      <table class="report">
+        <thead><tr><th>Kategori Kerugian / BAP</th><th>Lokasi / Sumber</th><th>Jml Kejadian</th><th>Total Unit / Qty</th></tr></thead>
+        <tbody id="tableLoss"><tr><td><span class="type-tag" style="color:var(--s1)">●</span> Rusak (DAMAGED)</td><td>Cabang Siman (Gudang)</td><td class="num">2 Transaksi</td><td class="num">2 Unit ONT</td></tr><tr><td><span class="type-tag" style="color:var(--s2)">●</span> Hilang (LOST)</td><td>— (Custody Teknisi)</td><td class="num">1 Transaksi</td><td class="num">1 Unit ONT</td></tr><tr><td><span class="type-tag" style="color:var(--s4)">●</span> Selisih Stock Opname</td><td>Cabang Babadan</td><td class="num">1 Transaksi</td><td class="num">−15 Meter Dropcore</td></tr></tbody>
+      </table>
+      <div class="footnote">*Kerugian di tangan teknisi ditandai "— (Custody Teknisi)" karena terjadi di luar gudang.</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop" hidden="">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">Judul</h3>
+    <div id="modalBody"></div>
+  </div>
+</div>
+<div class="chart-tooltip" id="chartTooltip" style="left: 1111px; top: 750px;" hidden=""><strong>Cabang Babadan</strong><br>Keluar ke Teknisi: <span class="tt-val num">60</span></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var MOVE_SERIES = [
+    {key:"inbound", label:"Inbound Baru", color:"var(--s1)"},
+    {key:"trfMasuk", label:"Transfer Masuk", color:"var(--s2)"},
+    {key:"trfKeluar", label:"Transfer Keluar", color:"var(--s3)"},
+    {key:"issue", label:"Keluar ke Teknisi", color:"var(--s4)"}
+  ];
+  var LOSS_SERIES = [
+    {key:"DAMAGED", label:"Rusak (Damaged)", color:"var(--s1)"},
+    {key:"LOST", label:"Hilang (Lost)", color:"var(--s2)"},
+    {key:"SCRAPPED", label:"Usang (Scrapped)", color:"var(--s3)"},
+    {key:"STOCK_OPNAME_DIFF", label:"Selisih Opname", color:"var(--s4)"}
+  ];
+
+  // Dataset per periode. Baris dengan SEMUA nilai 0 sengaja dihilangkan saat render (prinsip no-zero-rows §6.4).
+  var MOVEMENT = {
+    "2026-09": [
+      {pop:"Gudang Pusat", type:"pusat", inbound:350, trfMasuk:0, trfKeluar:210, issue:25},
+      {pop:"Cabang Siman", type:"cabang", inbound:0, trfMasuk:120, trfKeluar:0, issue:95},
+      {pop:"Cabang Babadan", type:"cabang", inbound:0, trfMasuk:90, trfKeluar:0, issue:60},
+      {pop:"Cabang Kauman", type:"cabang", inbound:0, trfMasuk:40, trfKeluar:0, issue:30}
+    ],
+    "2026-08": [
+      {pop:"Gudang Pusat", type:"pusat", inbound:300, trfMasuk:0, trfKeluar:180, issue:20},
+      {pop:"Cabang Siman", type:"cabang", inbound:0, trfMasuk:100, trfKeluar:0, issue:80},
+      {pop:"Cabang Babadan", type:"cabang", inbound:0, trfMasuk:70, trfKeluar:0, issue:50},
+      {pop:"Cabang Kauman", type:"cabang", inbound:0, trfMasuk:0, trfKeluar:0, issue:0}
+    ],
+    "2026-07": [
+      {pop:"Gudang Pusat", type:"pusat", inbound:210, trfMasuk:0, trfKeluar:110, issue:15},
+      {pop:"Cabang Siman", type:"cabang", inbound:0, trfMasuk:60, trfKeluar:0, issue:45},
+      {pop:"Cabang Babadan", type:"cabang", inbound:0, trfMasuk:0, trfKeluar:0, issue:0},
+      {pop:"Cabang Kauman", type:"cabang", inbound:0, trfMasuk:0, trfKeluar:0, issue:0}
+    ]
+  };
+
+  var LOSS = {
+    "2026-09": [
+      {pop:"Cabang Siman", label:"Cabang Siman (Gudang)", DAMAGED:2, LOST:0, SCRAPPED:0, STOCK_OPNAME_DIFF:0, qty:"2 Unit ONT"},
+      {pop:"__custody__", label:"— (Custody Teknisi)", DAMAGED:0, LOST:1, SCRAPPED:0, STOCK_OPNAME_DIFF:0, qty:"1 Unit ONT"},
+      {pop:"Cabang Babadan", label:"Cabang Babadan", DAMAGED:0, LOST:0, SCRAPPED:0, STOCK_OPNAME_DIFF:1, qty:"−15 Meter Dropcore"}
+    ],
+    "2026-08": [
+      {pop:"Cabang Siman", label:"Cabang Siman (Gudang)", DAMAGED:1, LOST:0, SCRAPPED:0, STOCK_OPNAME_DIFF:0, qty:"1 Unit ONT"},
+      {pop:"__custody__", label:"— (Custody Teknisi)", DAMAGED:0, LOST:0, SCRAPPED:1, STOCK_OPNAME_DIFF:0, qty:"1 Unit Router (usang)"}
+    ],
+    "2026-07": [
+      {pop:"__custody__", label:"— (Custody Teknisi)", DAMAGED:0, LOST:2, SCRAPPED:0, STOCK_OPNAME_DIFF:0, qty:"2 Unit ONT"}
+    ]
+  };
+
+  function el(tag, cls, html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!==undefined) e.innerHTML=html; return e; }
+  function fmt(n){ return n.toLocaleString("id-ID"); }
+  function resolveVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name.replace("var(","").replace(")","")).trim(); }
+
+  var state = {period:"2026-09", pop:"all", tab:"movement"};
+
+  // ---------- Tabs ----------
+  document.querySelectorAll(".tab-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      state.tab = btn.dataset.tab;
+      document.getElementById("panelMovement").hidden = state.tab !== "movement";
+      document.getElementById("panelLoss").hidden = state.tab !== "loss";
+    });
+  });
+
+  // ---------- KPI ----------
+  function renderKPI(){
+    var mv = MOVEMENT[state.period].filter(function(r){ return state.pop === "all" || r.pop === state.pop; });
+    var ls = LOSS[state.period].filter(function(r){ return state.pop === "all" || r.pop === state.pop; });
+    var totalInbound = mv.reduce(function(s,r){ return s + r.inbound; }, 0);
+    var totalKirim = mv.reduce(function(s,r){ return s + r.trfKeluar; }, 0);
+    var totalTeknisi = mv.reduce(function(s,r){ return s + r.issue; }, 0);
+    var totalKejadian = ls.reduce(function(s,r){ return s + r.DAMAGED + r.LOST + r.SCRAPPED + r.STOCK_OPNAME_DIFF; }, 0);
+
+    var cards = [
+      {label:"Total Inbound Masuk", value:fmt(totalInbound) + " Unit/Meter", foot:"dari supplier ke Gudang Pusat"},
+      {label:"Total Kirim ke Cabang", value:fmt(totalKirim) + " Unit", foot:"lewat Transfer Antar Gudang"},
+      {label:"Total ke Teknisi", value:fmt(totalTeknisi) + " Unit/Meter", foot:"diserahkan via Issue"},
+      {label:"Total Kerugian (BAP)", value:fmt(totalKejadian) + " Kejadian", foot:"Damaged/Lost/Scrapped/Opname Diff"}
+    ];
+    var grid = document.getElementById("kpiGrid");
+    grid.innerHTML = "";
+    cards.forEach(function(c){
+      var card = el("div", "kpi-card");
+      card.appendChild(el("div", "label", c.label));
+      card.appendChild(el("div", "value num", c.value));
+      card.appendChild(el("div", "foot", c.foot));
+      grid.appendChild(card);
+    });
+  }
+
+  // ---------- Generic grouped bar chart (SVG) ----------
+  var tooltip = document.getElementById("chartTooltip");
+
+  function renderLegend(container, series){
+    container.innerHTML = "";
+    series.forEach(function(s){
+      var item = el("span", "legend-item");
+      var sw = el("span", "legend-swatch");
+      sw.style.background = s.color;
+      item.appendChild(sw);
+      item.appendChild(document.createTextNode(s.label));
+      container.appendChild(item);
+    });
+  }
+
+  function drawGroupedBar(svgEl, rows, series, catKey, catLabelKey){
+    var W = Math.max(640, rows.length * 170 + 90);
+    var H = 300;
+    var padL = 46, padR = 16, padT = 16, padB = 46;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    var maxVal = 1;
+    rows.forEach(function(r){ series.forEach(function(s){ maxVal = Math.max(maxVal, r[s.key] || 0); }); });
+    // scale ticks: round up to nice number
+    var niceMax = Math.ceil(maxVal / 50) * 50 || 50;
+
+    svgEl.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svgEl.setAttribute("width", W);
+    svgEl.setAttribute("height", H);
+    svgEl.innerHTML = "";
+
+    var ns = "http://www.w3.org/2000/svg";
+    function make(tag, attrs){
+      var e = document.createElementNS(ns, tag);
+      Object.keys(attrs).forEach(function(k){ e.setAttribute(k, attrs[k]); });
+      return e;
+    }
+
+    // gridlines + y ticks
+    var ticks = 4;
+    for(var i=0; i<=ticks; i++){
+      var val = Math.round(niceMax * i / ticks);
+      var y = padT + plotH - (val / niceMax) * plotH;
+      svgEl.appendChild(make("line", {x1:padL, x2:W-padR, y1:y, y2:y, stroke:"var(--grid)", "stroke-width":1}));
+      var t = make("text", {x:padL-8, y:y+4, "text-anchor":"end", class:"axis-label"});
+      t.textContent = fmt(val);
+      svgEl.appendChild(t);
+    }
+    // baseline
+    svgEl.appendChild(make("line", {x1:padL, x2:W-padR, y1:padT+plotH, y2:padT+plotH, stroke:"var(--axis)", "stroke-width":1.5}));
+
+    var groupW = plotW / rows.length;
+    var barGap = 3;
+    var barW = Math.min(30, (groupW - 16) / series.length - barGap);
+
+    rows.forEach(function(row, ri){
+      var groupX = padL + ri * groupW;
+      series.forEach(function(s, si){
+        var val = row[s.key] || 0;
+        var barH = (val / niceMax) * plotH;
+        var x = groupX + 8 + si * (barW + barGap);
+        var y = padT + plotH - barH;
+        var rect = make("rect", {x:x, y:y, width:barW, height:Math.max(barH,0), rx:4, ry:4, fill:s.color, class:"bar-mark"});
+        rect.addEventListener("mousemove", function(e){
+          tooltip.innerHTML = "<strong>" + row[catLabelKey || catKey] + "</strong><br>" + s.label + ": <span class='tt-val num'>" + fmt(val) + "</span>";
+          tooltip.style.left = (e.clientX + 14) + "px";
+          tooltip.style.top = (e.clientY + 14) + "px";
+          tooltip.hidden = false;
+        });
+        rect.addEventListener("mouseleave", function(){ tooltip.hidden = true; });
+        svgEl.appendChild(rect);
+        if(val > 0){
+          var lbl = make("text", {x:x + barW/2, y:y-5, "text-anchor":"middle", class:"bar-value"});
+          lbl.textContent = fmt(val);
+          svgEl.appendChild(lbl);
+        }
+      });
+      var catLbl = make("text", {x:groupX + groupW/2, y:padT+plotH+22, "text-anchor":"middle", class:"axis-cat"});
+      catLbl.textContent = row[catLabelKey || catKey];
+      svgEl.appendChild(catLbl);
+    });
+  }
+
+  // ---------- Movement tab ----------
+  function renderMovement(){
+    var rows = MOVEMENT[state.period]
+      .filter(function(r){ return state.pop === "all" || r.pop === state.pop; })
+      .filter(function(r){ return r.inbound + r.trfMasuk + r.trfKeluar + r.issue > 0; }); // no-zero-rows
+
+    renderLegend(document.getElementById("legendMovement"), MOVE_SERIES);
+    drawGroupedBar(document.getElementById("chartMovement"), rows, MOVE_SERIES, "pop");
+
+    var body = document.getElementById("tableMovement");
+    body.innerHTML = "";
+    if(rows.length === 0){
+      var tr = el("tr"); var td = el("td", "", "Tidak ada pergerakan barang pada periode &amp; gudang ini."); td.colSpan = 6; tr.appendChild(td); body.appendChild(tr);
+    } else {
+      rows.forEach(function(r){
+        var tr = el("tr");
+        tr.appendChild(el("td", "", r.pop));
+        tr.appendChild(el("td", "", r.type === "pusat" ? "PUSAT (HQ)" : "CABANG"));
+        tr.appendChild(el("td", "num", r.inbound > 0 ? fmt(r.inbound) + " Unit" : "—"));
+        tr.appendChild(el("td", "num", r.trfMasuk > 0 ? fmt(r.trfMasuk) + " Unit" : "—"));
+        tr.appendChild(el("td", "num", r.trfKeluar > 0 ? fmt(r.trfKeluar) + " Unit" : "—"));
+        tr.appendChild(el("td", "num", r.issue > 0 ? fmt(r.issue) + " Unit" : "—"));
+        body.appendChild(tr);
+      });
+    }
+    var totalPops = MOVEMENT[state.period].length;
+    document.getElementById("footMovement").textContent =
+      "Menampilkan " + rows.length + " dari " + totalPops + " gudang — baris tanpa transaksi periode ini otomatis disembunyikan (prinsip no-zero-rows).";
+  }
+
+  // ---------- Loss tab ----------
+  var LOSS_LABEL = {DAMAGED:"Rusak (DAMAGED)", LOST:"Hilang (LOST)", SCRAPPED:"Usang (SCRAPPED)", STOCK_OPNAME_DIFF:"Selisih Stock Opname"};
+
+  function renderLoss(){
+    var rows = (LOSS[state.period] || [])
+      .filter(function(r){ return state.pop === "all" || r.pop === state.pop || r.pop === "__custody__"; });
+
+    // dinamis: cuma tampilkan legend untuk kategori yang benar2 punya kejadian di periode ini
+    var activeSeries = LOSS_SERIES.filter(function(s){ return rows.some(function(r){ return r[s.key] > 0; }); });
+    renderLegend(document.getElementById("legendLoss"), activeSeries.length ? activeSeries : LOSS_SERIES);
+    drawGroupedBar(document.getElementById("chartLoss"), rows, activeSeries.length ? activeSeries : LOSS_SERIES, "pop", "label");
+
+    var body = document.getElementById("tableLoss");
+    body.innerHTML = "";
+    if(rows.length === 0){
+      var tr = el("tr"); var td = el("td", "", "Tidak ada catatan kerugian pada periode &amp; gudang ini. 🎉"); td.colSpan = 4; tr.appendChild(td); body.appendChild(tr);
+    } else {
+      rows.forEach(function(r){
+        LOSS_SERIES.forEach(function(s){
+          if(r[s.key] > 0){
+            var tr2 = el("tr");
+            tr2.appendChild(el("td", "", "<span class='type-tag' style='color:" + s.color + "'>●</span> " + LOSS_LABEL[s.key]));
+            tr2.appendChild(el("td", "", r.label));
+            tr2.appendChild(el("td", "num", fmt(r[s.key]) + " Transaksi"));
+            tr2.appendChild(el("td", "num", r.qty));
+            body.appendChild(tr2);
+          }
+        });
+      });
+    }
+  }
+
+  function renderAll(){
+    renderKPI();
+    renderMovement();
+    renderLoss();
+  }
+
+  document.getElementById("periodSelect").addEventListener("change", function(e){ state.period = e.target.value; renderAll(); });
+  document.getElementById("popSelect").addEventListener("change", function(e){ state.pop = e.target.value; renderAll(); });
+
+  // ---------- Modals ----------
+  var backdrop = document.getElementById("modalBackdrop");
+  var modalTitle = document.getElementById("modalTitle");
+  var modalBody = document.getElementById("modalBody");
+  var MODAL_COPY = {
+    pdf: {title:"Cetak PDF", body:"Membuat PDF laporan periode &amp; gudang terfilter saat ini, siap cetak untuk rapat evaluasi bulanan.", route:"GET /warehouse/reports/print"},
+    excel: {title:"Export Excel", body:"Mengunduh kedua tab (Movement &amp; Loss) sebagai file .xlsx, satu sheet per tab.", route:"GET /warehouse/reports/export"}
+  };
+  document.addEventListener("click", function(e){
+    var trigger = e.target.closest("[data-modal]");
+    if(trigger){
+      var c = MODAL_COPY[trigger.getAttribute("data-modal")];
+      modalTitle.textContent = c.title;
+      modalBody.innerHTML = "<p>" + c.body + "</p><div class='route mono'>" + c.route + "</div><button class='modal-close' id='dynClose'>Tutup</button>";
+      backdrop.hidden = false;
+      document.getElementById("dynClose").addEventListener("click", function(){ backdrop.hidden = true; });
+      return;
+    }
+    if(e.target === backdrop) backdrop.hidden = true;
+  });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") backdrop.hidden = true; });
+
+  renderAll();
+})();
+</script>
+
+</body></html>

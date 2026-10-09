@@ -1,0 +1,135 @@
+<table border="1" style="border-collapse: collapse; text-align: center; font-family: Arial, sans-serif;">
+  <thead>
+    <!-- BARIS 1 HEADER (Utama) -->
+    <tr style="color: white; font-weight: bold; font-size: 13px;">
+      <th rowspan="2" style="background-color: #2b70b3; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 12px;">No</th>
+      <th rowspan="2" style="background-color: #2b70b3; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 14px;">Nama Barang</th>
+      <th rowspan="2" style="background-color: #2b70b3; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 12px;">Satuan</th>
+      
+      <!-- Barang Masuk -->
+      <th colspan="5" style="background-color: #4f7928; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 12px;">Barang Masuk</th>
+      
+      <!-- STOK AWAL -->
+      <th colspan="5" style="background-color: #b8860b; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 12px;">STOK AWAL<br><span style="font-weight: normal; font-size: 10px;">(Stok di Gudang dari Barang Beli)</span></th>
+      
+      <!-- STOK TERPAKAI -->
+      <th rowspan="2" style="background-color: #b30000; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 12px;">STOK TERPAKAI<br><span style="font-weight: normal; font-size: 10px;">(Terpakai Teknisi)</span></th>
+      
+      <!-- STOK AKHIR -->
+      <th colspan="5" style="background-color: #7a00cc; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 12px;">STOK AKHIR<br><span style="font-weight: normal; font-size: 10px;">(Setelah Transfer / Diserahkan)</span></th>
+      
+      <!-- Barang Rusak -->
+      <th colspan="2" style="background-color: #d9534f; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 12px;">Barang Rusak</th>
+      
+      <!-- Hilang -->
+      <th colspan="2" style="background-color: #333333; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 8px 12px;">Hilang</th>
+    </tr>
+    
+    <!-- BARIS 2 HEADER (Sub-Header) -->
+    <tr style="color: white; font-size: 11px;">
+      <!-- Barang Masuk -->
+      <th style="background-color: #4f7928; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 10px;">Qty</th>
+      <th style="background-color: #4f7928; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Harga Awal Satuan (Rp)</th>
+      <th style="background-color: #4f7928; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 10px;">Qty</th>
+      <th style="background-color: #4f7928; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Harga Baru Satuan (Rp)</th>
+      <th style="background-color: #4f7928; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Nilai (Rp)</th>
+      
+      <!-- STOK AWAL -->
+      <th style="background-color: #b8860b; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 10px;">Qty</th>
+      <th style="background-color: #b8860b; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Harga Awal Satuan (Rp)</th>
+      <th style="background-color: #b8860b; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 10px;">Qty</th>
+      <th style="background-color: #b8860b; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Harga Baru Satuan (Rp)</th>
+      <th style="background-color: #b8860b; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Nilai (Rp)</th>
+      
+      <!-- STOK AKHIR -->
+      <th style="background-color: #7a00cc; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 10px;">Qty</th>
+      <th style="background-color: #7a00cc; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Harga Awal Satuan (Rp)</th>
+      <th style="background-color: #7a00cc; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 10px;">Qty</th>
+      <th style="background-color: #7a00cc; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Harga Baru Satuan (Rp)</th>
+      <th style="background-color: #7a00cc; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Nilai (Rp)</th>
+      
+      <!-- Barang Rusak -->
+      <th style="background-color: #d9534f; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 10px;">Qty</th>
+      <th style="background-color: #d9534f; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Nilai Rugi (Rp)</th>
+      
+      <!-- Hilang -->
+      <th style="background-color: #333333; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 10px;">Qty</th>
+      <th style="background-color: #333333; border: 1px solid #ffffff; text-align: center; vertical-align: middle; white-space: nowrap; padding: 6px 12px;">Nilai Rugi (Rp)</th>
+    </tr>
+  </thead>
+
+  <!-- ISI BARIS DATA -->
+  <tbody>
+    <tr>
+      <!-- Kolom No (tanpa background #FFF2CC) -->
+      <td style="border: 1px solid #dcdcdc; text-align: center; vertical-align: middle; padding: 6px 8px;">1</td>
+      
+      <!-- Kolom Lainnya (Background #FFF2CC, Teks #1403F3, All Border Hitam, Format Rupiah) -->
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: left; vertical-align: middle; padding: 6px 10px; font-weight: 500;">Kabel UTP Cat6</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: center; vertical-align: middle; padding: 6px 8px;">Roll</td>
+      
+      <!-- Barang Masuk -->
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      
+      <!-- STOK AWAL -->
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      
+      <!-- STOK TERPAKAI -->
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      
+      <!-- STOK AKHIR -->
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      
+      <!-- Barang Rusak -->
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+      
+      <!-- Hilang -->
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">0</td>
+      <td style="background-color: #FFF2CC; color: #1403F3; border: 1px solid #000000; text-align: right; vertical-align: middle; padding: 6px 8px;">Rp 0</td>
+    </tr>
+  </tbody>
+
+  <!-- FOOTER (TOTAL NOMINAL) -->
+  <tfoot>
+    <tr style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; font-size: 12px; vertical-align: middle;">
+      <!-- Label TOTAL -->
+      <td colspan="3" style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; text-align: center; vertical-align: middle; padding: 8px 10px; border: 1px solid #000000;">TOTAL</td>
+      
+      <!-- Barang Masuk -->
+      <td colspan="4" style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; border: 1px solid #000000;"></td>
+      <td style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; text-align: right; vertical-align: middle; padding: 8px 10px; border: 1px solid #000000;">Rp 0</td>
+      
+      <!-- STOK AWAL -->
+      <td colspan="4" style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; border: 1px solid #000000;"></td>
+      <td style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; text-align: right; vertical-align: middle; padding: 8px 10px; border: 1px solid #000000;">Rp 0</td>
+      
+      <!-- STOK TERPAKAI -->
+      <td style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; border: 1px solid #000000;"></td>
+      
+      <!-- STOK AKHIR -->
+      <td colspan="4" style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; border: 1px solid #000000;"></td>
+      <td style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; text-align: right; vertical-align: middle; padding: 8px 10px; border: 1px solid #000000;">Rp 0</td>
+      
+      <!-- Barang Rusak -->
+      <td style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; border: 1px solid #000000;"></td>
+      <td style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; text-align: right; vertical-align: middle; padding: 8px 10px; border: 1px solid #000000;">Rp 0</td>
+      
+      <!-- Hilang -->
+      <td style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; border: 1px solid #000000;"></td>
+      <td style="background-color: #D9E1F2; color: #1403F3; font-weight: bold; text-align: right; vertical-align: middle; padding: 8px 10px; border: 1px solid #000000;">Rp 0</td>
+    </tr>
+  </tfoot>
+</table>

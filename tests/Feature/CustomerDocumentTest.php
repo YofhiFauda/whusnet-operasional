@@ -43,12 +43,12 @@ class CustomerDocumentTest extends TestCase
         Storage::fake('public');
 
         $pop = $this->createPop('DOC1');
-        $technician = $this->createUserWithRole('Teknisi');
-        $technician->pops()->attach($pop->id);
-        $this->grantPopScope($technician, $pop);
+        $helpdesk = $this->createUserWithRole('Helpdesk');
+        $helpdesk->pops()->attach($pop->id);
+        $this->grantPopScope($helpdesk, $pop);
         $customer = $this->createCustomer($pop, 'TEST-DOC-001');
 
-        $response = $this->actingAs($technician)
+        $response = $this->actingAs($helpdesk)
             ->from(route('customers.show', $customer->id))
             ->post(route('customers.documents.store', $customer->id), [
                 'document_type' => 'rumah',
@@ -60,11 +60,11 @@ class CustomerDocumentTest extends TestCase
         $document = CustomerDocument::firstOrFail();
         $this->assertSame($customer->id, $document->customer_id);
         $this->assertSame('rumah', $document->document_type->value);
-        $this->assertSame($technician->id, $document->uploaded_by);
+        $this->assertSame($helpdesk->id, $document->uploaded_by);
         Storage::disk('public')->assertExists($document->file_path);
 
         $this->assertDatabaseHas('audit_logs', [
-            'user_id' => $technician->id,
+            'user_id' => $helpdesk->id,
             'module' => 'Dokumen Pelanggan',
             'action' => 'upload',
             'auditable_type' => CustomerDocument::class,
@@ -144,10 +144,10 @@ class CustomerDocumentTest extends TestCase
         Storage::fake('local');
 
         $pop = $this->createPop('DOC5');
-        $customerService = $this->createUserWithRole('NOC');
+        $technician = $this->createUserWithRole('Teknisi');
         $customer = $this->createCustomer($pop, 'TEST-DOC-005');
 
-        $response = $this->actingAs($customerService)
+        $response = $this->actingAs($technician)
             ->post(route('customers.documents.store', $customer->id), [
                 'document_type' => 'pemasangan',
                 'document_file' => UploadedFile::fake()->image('installation.jpg'),

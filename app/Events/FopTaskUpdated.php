@@ -6,11 +6,17 @@ use App\Models\FopTask;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
+ * `ShouldBroadcastNow` (bukan `ShouldBroadcast`/queue) — dispatch manual di
+ * titik aksi tombol (switchTechnician/assignToTeam/update), payload cuma ID.
+ * Gantung ke availability worker Horizon buat event board sekecil ini lebih
+ * mahal drpd nunggu push sinkron beberapa ms (docs/plan/analisa-broadcast-
+ * vs-lonceng-notif.md §2).
+ *
  * Sinyal "baris Task FOP ini berubah" — dipakai /fop-tasks (fop_tasks/index.blade.php)
  * buat refetch 3 sel (Teknisi/Team/Status) di tempat, ganti setTimeout(reload)
  * lama (docs/plan/analisa-realtime-spa-operasional.md §2.2 no. 13).
@@ -26,7 +32,7 @@ use Illuminate\Queue\SerializesModels;
  * cabang tombol (switch teknisi, team conflict, cancel), listener refetch
  * lewat endpoint fop-tasks.row yang udah lolos scope & permission user.
  */
-class FopTaskUpdated implements ShouldBroadcast
+class FopTaskUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

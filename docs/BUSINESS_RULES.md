@@ -217,6 +217,7 @@ Field berikut boleh kosong pada awal registrasi, namun wajib dilengkapi oleh Tek
 1.  **Bukan Manual dari Nol:** Invoice bulanan harus diturunkan otomatis dari kombinasi: Pelanggan Aktif + Paket Aktif + Harga Layanan Snapshot + Periode Tagihan.
 2.  **Pencegahan Invoice Ganda:** Sistem harus memblokir pembuatan invoice dengan periode tagihan yang sama untuk satu pelanggan yang sama guna mencegah double billing.
 3.  **Status Invoice:** Terdiri dari `belum_dibayar`, `sebagian`, `lunas`, dan `batal`. Invoice yang sudah berstatus `lunas` tidak boleh dihapus atau dibatalkan tanpa hak akses Owner dan audit log yang ketat.
+4.  **Jatuh Tempo vs Piutang (2026-09-21):** `due_date` (default tanggal 10) hanya formalitas sistem / label UI — tidak ada denda, blokir, atau status "terlambat" karena lewat tanggal itu. Batas riil pembayaran adalah akhir bulan `billing_period`. Begitu bulan berganti, tagihan `belum_dibayar`/`sebagian` dari periode lalu menjadi **piutang**, karena kas admin/pembukuan bulan sebelumnya ditutup **selalu tanggal 1** setiap bulan — jadi batas piutang = pergantian bulan kalender persis, tidak perlu dikonfigurasi. Alur: tagihan terbit tanggal 1 (`billing:generate-monthly-invoices`, 01:00) → `due_date` tanggal 10 (label) → bebas bayar sampai akhir bulan → tanggal 1 bulan berikutnya jadi piutang. Tagihan `sebagian` ikut jadi piutang sebesar `remaining_amount`; `lunas`/`batal` tidak pernah piutang. Pelunasan piutang tercatat di laporan uang masuk pada bulan uang diterima. **Istilah baku:** *tunggakan* = *piutang* (periode sebelum bulan berjalan, belum lunas); *belum dibayar* = semua tagihan belum lunas termasuk bulan berjalan. Angka berlabel "Tunggakan"/"Piutang" (dashboard, halaman Tagihan, Laporan Tagihan, hub pelanggan) wajib memakai `scopePiutang()`; angka kolektor (Worksheet/Worklist) memakai "Belum Dibayar" karena kolektor menagih bulan berjalan juga. Satu-satunya definisi di kode: `Invoice::scopePiutang()` / `Invoice::isPiutang()`; jangan bandingkan `due_date` dengan hari ini untuk menentukan terlambat. **Worklist Kolektor ikut berbasis periode (2026-09-23):** tagihan boleh ditagih kolektor begitu periodenya berjalan (`billing_period <= bulan ini`, `CollectorWorklistService::dueInvoices()`) — jendela lama `collector_due_window_days` (`due_date <= hari ini + N`) dihapus. Ganti paket (upgrade/downgrade) juga tidak mengubah `due_date`.
 
 ---
 
@@ -225,6 +226,9 @@ Field berikut boleh kosong pada awal registrasi, namun wajib dilengkapi oleh Tek
 1.  Pembayaran wajib mencatat relasi ke Invoice, Pelanggan, POP/Cabang, dan User Penerima (Kasir/Admin POP yang memproses).
 2.  Status pembayaran terdiri dari `pending`, `valid`, dan `ditolak`. Status `ditolak` tidak boleh mengurangi nilai sisa tagihan pada invoice.
 3.  Setiap pencatatan pembayaran wajib menulis log ke audit log sistem secara instan.
+4.  **Batch kolektor, teknisi, dan portal staf tidak menerima lebih bayar (2026-10-05).** Tunai + saldo per tagihan tidak boleh melebihi sisa tagihan. Kelebihan uang hanya bisa dicatat lewat form Tagihan admin, yang masuk saldo pelanggan dengan konfirmasi.
+5.  **Saldo pelanggan boleh dipakai kolektor, teknisi, dan portal staf** per tagihan (checkbox "Pakai saldo", default tidak dicentang), dengan batas `min(saldo, sisa tagihan)`. Saldo bukan uang fisik dan tidak masuk setoran tunai.
+6.  **Transfer** wajib memilih rekening aktif dari master. Snapshot rekening disimpan di payment.
 
 ---
 
@@ -239,3 +243,40 @@ Field berikut boleh kosong pada awal registrasi, namun wajib dilengkapi oleh Tek
 
 1.  Audit log wajib mencatat detail: `user_id`, `action` (create, update, delete, dll), `model_type`, `model_id`, `before_values` (JSON), `after_values` (JSON), `ip_address`, dan `user_agent`.
 2.  Audit log dilindungi secara ketat: tidak boleh diedit atau dihapus oleh role manapun kecuali Owner (atau otomatis terarsipkan secara aman di server).
+
+---
+
+# 11. Studi Kasus Operasional: Putus Langganan, Cuti, & Status Tagihan (2026-10-02)
+
+### 11.1 Prinsip Dasar Hubungan Tagihan & Pelanggan Putus/Cuti
+1. **Putus Langganan (*Termination*):** Menghentikan langganan secara permanen. Status pelanggan berubah menjadi `terminated`. Penarikan perangkat dijadwalkan ke teknisi. Cron bulanan **otomatis berhenti selamanya** untuk pelanggan ini.
+2. **Cuti Berlangganan (*Billing Waiver*):** Libur sementara (1–2 bulan). Status pelanggan tetap aktif/berjalan. Tagihan pada periode cuti diubah menjadi status **Batal (*Waiver*)** dan cron tidak men-generate tagihan baru di bulan cuti.
+3. **Pemisahan Aksi:** Aksi Putus Langganan fokus pada status putus + denda + penarikan alat. Aksi Bebas Tagihan (Cuti) dilakukan mandiri via tombol *Bebaskan Tagihan Periode* di Detail Pelanggan.
+
+### 11.2 4 Studi Kasus Nyata
+
+#### Kasus 1: Pindah Domisili (Normal — Tanpa Masalah / Skema 1)
+- **Kondisi:** Pelanggan berhenti baik-baik karena pindah rumah. Tagihan bulan berjalan sudah lunas.
+- **Tindakan Admin:** Form Putus Langganan $\rightarrow$ Alasan: *Pindah Domisili* $\rightarrow$ Denda: *Rp 0* (karena masa kontrak sudah > 1 tahun).
+- **Efek Sistem:** Pelanggan menjadi `terminated`, tiket penarikan modem terbit ke teknisi, tidak ada tagihan baru di bulan-bulan berikutnya (*Case Closed*).
+
+#### Kasus 2: Berhenti Sebelum Kontrak Berakhir (Kena Denda Penalti)
+- **Kondisi:** Pelanggan berhenti di bulan ke-3 (kontrak minimal 12 bulan).
+- **Tindakan Admin:** Form Putus Langganan $\rightarrow$ Alasan: *Permintaan Sendiri* $\rightarrow$ Input Denda: *Rp 250.000*.
+- **Efek Sistem:** Status `terminated`, 1 invoice Tagihan Manual (Denda) terbit di menu Tagihan. Pelanggan melunasi denda $\rightarrow$ alat ditarik $\rightarrow$ selesai.
+
+#### Kasus 3: Menolak Bayar karena Layanan Mati di Bulan Terakhir (Bebas Tagihan / Cuti)
+- **Kondisi:** Pelanggan tidak bayar September karena internet mati sepanjang bulan. Awal Oktober pelanggan konfirmasi berhenti.
+- **Tindakan Admin:**
+  1. Di Detail Pelanggan, klik *Bebaskan Tagihan / Cuti* $\rightarrow$ Pilih periode *September* (status tagihan September menjadi `batal`).
+  2. Klik *Request Putus Langganan* $\rightarrow$ Alasan: *Tutup Layanan*.
+- **Efek Sistem:** Tagihan September dibatalkan (hilang dari piutang), pelanggan putus bersih tanpa sisa utang gantung.
+
+#### Kasus 4: Pelanggan Macet / Kabur (Hapus Buku $\rightarrow$ Skema 2)
+- **Kondisi:** Pelanggan menunggak 2 bulan lalu kabur. Kolektor gagal menagih.
+- **Tindakan Admin:**
+  1. Admin memutus sepihak (*Request Putus Langganan* $\rightarrow$ Alasan: *Macet / Menunggak*).
+  2. Sisa tagihan macet dibiarkan hingga masa tenggang lewat $\rightarrow$ otomatis/manual di-**Hapus Buku (*Write-Off / Tak Tertagih*)**.
+- **Efek Sistem:** Tagihan **HILANG dari menu Tagihan aktif** (agar tidak mengotori target kerja bulanan kasir) dan **PINDAH ke tabel Pelanggan Putus** pada kolom *Tagihan Tak Tertagih*.
+- **Pemulihan (*Reactivate*):** Jika pelanggan suatu saat ingin pasang internet baru, admin membuka list Pelanggan Putus $\rightarrow$ klik badge Tak Tertagih $\rightarrow$ klik **"Kembalikan ke Tagihan"** $\rightarrow$ tagihan muncul kembali di menu Tagihan untuk dilunasi sebelum aktivasi baru.
+

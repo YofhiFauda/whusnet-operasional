@@ -32,19 +32,29 @@
 
         @if(auth()->user()->hasPermission('customers.detail.survey.view'))
         <a href="{{ route('surveys.queue') }}" title="Antrean Survey"
-           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('surveys.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           class="flex items-center justify-between gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('surveys.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
            :class="{ 'justify-center px-0': !sidebarOpen }">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-            <span x-show="sidebarOpen" class="truncate">Antrean Survey</span>
+            <div class="flex items-center gap-3 truncate">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span x-show="sidebarOpen" class="truncate">Antrean Survey</span>
+            </div>
+            @if(isset($badge_survey_count) && $badge_survey_count > 0)
+                <span x-show="sidebarOpen" class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_survey_count }}</span>
+            @endif
         </a>
         @endif
         
         @if(auth()->user()->hasPermission('customers.detail.installation.view'))
         <a href="{{ route('verifications.queue') }}" title="Verifikasi & Instalasi"
-           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('verifications.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           class="flex items-center justify-between gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('verifications.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
            :class="{ 'justify-center px-0': !sidebarOpen }">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
-            <span x-show="sidebarOpen" class="truncate">Verifikasi & Instalasi</span>
+            <div class="flex items-center gap-3 truncate">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
+                <span x-show="sidebarOpen" class="truncate">Verifikasi & Instalasi</span>
+            </div>
+            @if(isset($badge_verification_count) && $badge_verification_count > 0)
+                <span x-show="sidebarOpen" class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_verification_count }}</span>
+            @endif
         </a>
         @endif
         @endif
@@ -57,7 +67,7 @@
         </div>
 
         @if(auth()->user()->hasPermission('invoices.view'))
-        <a href="{{ route('invoices.index') }}" title="Tagihan"
+        <a href="{{ route('invoices.belum-lunas') }}" title="Tagihan"
            class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('invoices.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
            :class="{ 'justify-center px-0': !sidebarOpen }">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -67,12 +77,29 @@
 
         @if(auth()->user()->hasPermission('payments.view'))
         <a href="{{ route('payments.index') }}" title="Pembayaran"
-           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('payments.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('payments.index') || (request()->routeIs('payments.*') && !request()->routeIs('payments.overpay')) ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
            :class="{ 'justify-center px-0': !sidebarOpen }">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             <span x-show="sidebarOpen" class="truncate">Pembayaran</span>
         </a>
+
+        <a href="{{ route('payments.overpay') }}" title="Overpay"
+           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('payments.overpay') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           :class="{ 'justify-center px-0': !sidebarOpen }">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 6v2m0 8v2"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Overpay</span>
+        </a>
         @endif
+        @endif
+
+        <!-- Busdev (Customer Acquisition) -->
+        @if(auth()->user()->hasPermission('customer_acquisitions.view'))
+        <a href="{{ route('customer-acquisitions.index') }}" title="Busdev"
+           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('customer-acquisitions.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           :class="{ 'justify-center px-0': !sidebarOpen }">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Busdev</span>
+        </a>
         @endif
 
         <!-- Laporan -->
@@ -91,7 +118,7 @@
         @endif
 
         <!-- Master Data -->
-        @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view'))
+        @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view'))
         <div class="pt-3 pb-1">
             <p x-show="sidebarOpen" class="px-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Master Data</p>
             <div x-show="!sidebarOpen" class="w-full border-t border-border my-2"></div>
@@ -148,6 +175,24 @@
            :class="{ 'justify-center px-0': !sidebarOpen }">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
             <span x-show="sidebarOpen" class="truncate">Alat Kerja</span>
+        </a>
+        @endif
+
+        @if(auth()->user()->hasPermission('master_rekening.view'))
+        <a href="{{ route('master.rekening.index') }}" title="Rekening Bank"
+           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('master.rekening.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           :class="{ 'justify-center px-0': !sidebarOpen }">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M3 21h18"/><path d="M3 10h18"/><path d="m12 3 9 7H3z"/><path d="M5 10v11"/><path d="M19 10v11"/><path d="M9 14v3"/><path d="M15 14v3"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Rekening Bank</span>
+        </a>
+        @endif
+
+        @if(auth()->user()->hasPermission('termination_reasons.view'))
+        <a href="{{ route('master.termination-reasons.index') }}" title="Alasan Putus Langganan"
+           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('master.termination-reasons.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           :class="{ 'justify-center px-0': !sidebarOpen }">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Alasan Putus Langganan</span>
         </a>
         @endif
         @endif

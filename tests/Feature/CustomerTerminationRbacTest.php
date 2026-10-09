@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerTerminationReason;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -68,8 +69,14 @@ class CustomerTerminationRbacTest extends TestCase
 
     private function terminate(User $actor)
     {
+        $reason = CustomerTerminationReason::firstOrCreate(['name' => 'Pelanggan minta berhenti']);
+
         return $this->actingAs($actor)->post(route('customers.terminate', $this->customer), [
-            'reason' => 'Pelanggan minta berhenti.',
+            'termination_reason_id' => $reason->id,
+            // Pelanggan test ini tidak punya customer_services →
+            // activation_date NULL → diperlakukan <=1 tahun (§3.1), denda
+            // wajib diisi (0 sah).
+            'penalty_amount' => 0,
         ]);
     }
 

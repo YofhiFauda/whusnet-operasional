@@ -112,9 +112,11 @@ class CustomerActionRedirectPermissionGapTest extends TestCase
 
         // Data harus tetap tersimpan — bug lama bukan soal gagal simpan,
         // tapi soal redirect abis submit sukses.
+        // ADHOC-73 — status berhenti di `registered` sampai Verifikasi
+        // Registrasi disetujui, gak lagi langsung `waiting_survey`.
         $this->assertDatabaseHas('customers', [
             'full_name' => 'Pelanggan Gap Test',
-            'status' => 'waiting_survey',
+            'status' => 'registered',
         ]);
 
         // Redirect ke form registrasi (bukan customers.show yang bakal 403,

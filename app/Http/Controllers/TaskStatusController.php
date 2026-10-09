@@ -31,7 +31,7 @@ class TaskStatusController extends Controller
             ->first();
 
         if ($activeTask) {
-            return back()->with('error', "Tidak dapat memulai task karena teknisi dalam tim sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu.");
+            return back()->with('error', "Tidak dapat memulai task karena teknisi dalam tim sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau tandai Lapor Nanti task sebelumnya terlebih dahulu.");
         }
 
         $this->taskService->start($task, auth()->user());
@@ -54,25 +54,20 @@ class TaskStatusController extends Controller
     }
 
     /**
-     * Set task ke Pending.
-     * Guard: task.status.pending — hanya anggota tim
+     * Lapor Nanti — kerja lapangan beres, laporan menyusul.
+     * Guard: statusDeferReport — hanya anggota tim, hanya dari Sedang Dikerjakan.
      */
-    public function pending(Request $request, Task $task): RedirectResponse
+    public function reportLater(Request $request, Task $task): RedirectResponse
     {
-        $this->authorize('statusPending', $task);
+        $this->authorize('statusDeferReport', $task);
 
         $validated = $request->validate([
-            'pending_reason' => 'required|string|max:500',
-            'report_deferred' => 'sometimes|boolean',
+            // Task.pending_reason varchar(255) — max harus samain kapasitas kolom.
+            'pending_reason' => 'required|string|max:255',
         ]);
 
-        $this->taskService->setPending(
-            $task,
-            auth()->user(),
-            $validated['pending_reason'],
-            (bool) ($validated['report_deferred'] ?? false)
-        );
+        $this->taskService->deferReport($task, auth()->user(), $validated['pending_reason']);
 
-        return back()->with('success', "Task [{$task->task_number}] dipending.");
+        return back()->with('success', "Task [{$task->task_number}] ditandai Lapor Nanti — lanjutkan laporannya kapan saja dari Tasks Saya.");
     }
 }

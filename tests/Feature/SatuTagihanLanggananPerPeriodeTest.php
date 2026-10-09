@@ -142,21 +142,6 @@ class SatuTagihanLanggananPerPeriodeTest extends TestCase
         $this->assertSame(2, Invoice::where('customer_id', $customer->id)->count());
     }
 
-    public function test_reaktivasi_boleh_berdampingan_dengan_tagihan_langganan(): void
-    {
-        $customer = $this->createPelangganAktif();
-
-        $this->buatInvoice($customer, InvoiceType::BULANAN->value, '2026-07');
-
-        // Suspend lalu aktif lagi di bulan yang sama — bukan dobel.
-        $reaktivasi = $this->buatInvoice($customer, InvoiceType::REAKTIVASI->value, '2026-07', [
-            'total_amount' => 50000,
-            'remaining_amount' => 50000,
-        ]);
-
-        $this->assertNotNull($reaktivasi->id);
-    }
-
     public function test_replay_data_legacy_tetap_boleh_masuk(): void
     {
         $customer = $this->createPelangganAktif();

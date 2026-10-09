@@ -16,6 +16,16 @@ Schedule::command('check:countdown --minutes=60')->everyFiveMinutes();
 // bersifat FINAL; penundaan sehari lewat Pending atau ubah tanggal.
 // Penjaga: FopTasksTest::test_cancelled_task_stays_cancelled_and_is_never_auto_revived().
 Schedule::command('billing:generate-monthly-invoices')->monthlyOn(1, '01:00');
+// Tutup buku otomatis — bekukan angka Laporan Bulanan Admin bulan lalu.
+// Kuncinya sendiri sudah berlaku sejak 00:00 (BookPeriod::isLocked()),
+// jadi jam berapa pun command ini jalan tidak membuka celah.
+Schedule::command('billing:close-period')->monthlyOn(1, '00:10');
+// Hapus buku otomatis utang pelanggan putus yang masa tenggangnya habis
+// (ADHOC-105). Jalan SETELAH close-period: write-off distempel bulan berjalan
+// (bukan bulan yang sedang dibekukan), jadi urutannya tidak menggeser laporan
+// bulan lalu — tapi tetap dijadwalkan sesudahnya supaya snapshot bulan lalu
+// dipastikan sudah selesai dibuat sebelum data invoice berubah.
+Schedule::command('billing:write-off-terminated')->monthlyOn(1, '00:20');
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
 Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();
 // '01:15' — hindari bentrok dgn billing:generate-monthly-invoices (01:00,
@@ -27,3 +37,7 @@ Schedule::command('webhook-outbox:prune')->dailyAt('01:15');
 // fop:reset-cancelled-tasks di atas, dihapus 2026-08-13) — arah command ini
 // SEBALIKNYA: melepas task yang belum final, bukan menghidupkan yang sudah.
 Schedule::command('tasks:auto-pending-overdue')->dailyAt('00:05');
+
+// Peringatan belum setor teknisi (ADHOC-122). Jam sama dengan config
+// `billing.technician_close_time` (default 23:59). Hanya notifikasi.
+Schedule::command('technicians:notify-unsettled')->dailyAt((string) config('billing.technician_close_time', '23:59'));

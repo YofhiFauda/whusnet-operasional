@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 /**
- * Siklus hidup berkas kwitansi: upload → dibaca (QR/OCR) → cocok / butuh
+ * Siklus hidup berkas kwitansi: upload → dibaca (teks/QR) → cocok / butuh
  * manusia → dicocokkan manual.
  *
  * Semuanya di sumbu DOKUMEN. Tak satu pun operasi di sini boleh menyentuh
@@ -65,8 +65,8 @@ class PaymentReceiptService
             'status' => ReceiptStatus::PENDING->value,
         ]);
 
-        // Pembacaan di queue, bukan di request: OCR bisa lambat dan upload
-        // bulk bisa puluhan berkas sekaligus. Admin tak boleh menunggu.
+        // Pembacaan di queue, bukan di request: raster PDF bisa lambat dan
+        // upload bulk bisa puluhan berkas sekaligus. Admin tak boleh menunggu.
         //
         // Dibungkus try/catch karena pada koneksi queue `sync` job berjalan
         // SEKETIKA di dalam request ini, dan kegagalan teknis pembacaan
@@ -289,7 +289,7 @@ class PaymentReceiptService
      * Admin mencocokkan sendiri berkas yang gagal dibaca.
      *
      * Jalur ini WAJIB ada: status dokumen tak boleh disandera keberhasilan
-     * mesin. QR sobek dan OCR mati adalah kejadian normal, dan kwitansinya
+     * mesin. QR sobek/buram adalah kejadian normal, dan kwitansinya
      * tetap harus bisa sampai ke pelanggan yang benar.
      */
     public function matchManually(PaymentReceipt $receipt, Payment $payment, User $actor): PaymentReceipt

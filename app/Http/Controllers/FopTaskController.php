@@ -23,8 +23,11 @@ use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskProvisioningService;
 use App\Services\FopTaskTeamService;
+use App\Services\NumberSequenceService;
 use App\Services\TaskService;
+use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -46,9 +49,9 @@ class FopTaskController extends Controller
         $query = FopTask::with([
             'village',
             'technicians',
-            'task:id,scheduled_at,status,report_deferred,fop_review_status',
+            'task:id,scheduled_at,status,fop_review_status',
             'statusHistories',
-            'customer:id,created_at,updated_at',
+            'customer:id,full_name,primary_phone,cid,address,latitude,longitude,created_at,updated_at',
             'customer.tasks' => function ($q) {
                 $q->where('task_type', TaskType::SURVEY->value)
                     ->where('status', TaskStatus::SELESAI->value)
@@ -65,23 +68,37 @@ class FopTaskController extends Controller
         ])
             ->applyUserScope()
             ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
+            // Urutan papan (keputusan eksplisit user, 2026-09-10 — membalik
+            // rancangan lama di flowchart.md §8/user-flow.md yang urut
+            // prioritas dulu baru tanggal, dua dokumen itu sudah disinkronkan
+            // ke aturan baru ini di komit yang sama): TANGGAL KERJA DULU,
+            // PRIORITAS JADI TIE-BREAKER.
+            //   1. Bucket client_request_date "belum waktunya" (PSB nunggu
+            //      tanggal request pelanggan) TETAP di-sink ke bawah duluan —
+            //      ini bukan soal urutan tanggal/prioritas, tapi "belum layak
+            //      masuk antrean sama sekali" (lihat catatan asli Task 8).
+            //   2. `task_date` ASC — tanggal kerja terjadwal paling dekat di
+            //      atas. NULL (harusnya gak pernah kejadian — store()/
+            //      syncToFopTask() selalu isi nilai — tapi kolomnya nullable
+            //      di skema) sengaja disink ke bawah, bukan nyelonong ke atas
+            //      kayak default ASC NULL-first di MySQL/SQLite.
+            //   3. Prioritas (Urgent→Low) — cuma dipakai kalau `task_date`-nya
+            //      SAMA PERSIS.
+            //   4. `created_at` ASC — tie-breaker terakhir (urutan masuk),
+            //      biar dua task tanggal+prioritas sama tetap stabil urutannya
+            //      antar-request, bukan berubah-ubah ngikut query plan.
             ->orderByRaw('CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END', [now()->addDay()->toDateString()])
+            ->orderByRaw('CASE WHEN task_date IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('task_date', 'asc')
             ->orderByRaw(
                 'CASE priority '.self::priorityOrderCaseSql().' ELSE 5 END',
                 self::priorityOrderBindings()
             )
-            ->orderByRaw(
-                'CASE WHEN category IN ('.implode(',', array_fill(0, count(TaskType::autoOnlyValues()), '?')).') THEN created_at END ASC',
-                TaskType::autoOnlyValues()
-            )
-            ->orderByRaw(
-                'CASE WHEN category NOT IN ('.implode(',', array_fill(0, count(TaskType::autoOnlyValues()), '?')).') THEN created_at END DESC',
-                TaskType::autoOnlyValues()
-            );
+            ->orderBy('created_at', 'asc');
 
         // Search filter
         if ($request->filled('search')) {
-            $search = $request->input('search');
+            $search = LikeSearch::sanitize((string) $request->input('search', ''));
             $query->where(function ($q) use ($search) {
                 $q->where('task_number', 'like', "%{$search}%")
                     ->orWhere('tugas', 'like', "%{$search}%")
@@ -134,9 +151,10 @@ class FopTaskController extends Controller
         $pops = Pop::orderBy('name', 'asc')->get();
 
         // Get technicians for assignee selector
-        $technicians = User::whereHas('role', function ($q) {
-            $q->where('code', 'teknisi');
-        })->where('status', 'active')->orderBy('name', 'asc')->get();
+        // ->technicians() = Role::TECHNICIAN_CODES ('teknisi' + 'pic_gudang') —
+        // jangan balikin ke where('code','teknisi') manual, PIC gudang hilang
+        // dari dropdown assign (docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md).
+        $technicians = User::technicians()->where('status', 'active')->orderBy('name', 'asc')->get();
 
         // Categories mapping using Enum
         $categories = collect(TaskType::cases())->mapWithKeys(function ($category) {
@@ -189,8 +207,10 @@ class FopTaskController extends Controller
         // punya task_date: switchTeam() menolak task tanpa task_date (team tujuan
         // wajib se-tanggal), jadi task tanpa tanggal tidak pernah bisa jadi target
         // dan cuma membebani JSON yang di-render ke halaman.
+        // Lapor Nanti gak boleh jadi tujuan switch teknisi — terkunci ke tim
+        // teknisinya sendiri (switchTechnician() juga nolak).
         $switchTargetTasks = FopTask::applyUserScope()
-            ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
+            ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::LAPOR_NANTI])
             ->whereNotNull('task_date')
             ->with('technicians:id,name')
             ->get(['id', 'task_number', 'tugas', 'task_date'])
@@ -203,7 +223,23 @@ class FopTaskController extends Controller
             ])
             ->values();
 
-        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks'));
+        $today = now()->toDateString();
+        $todayWorkloadByTech = DB::table('fop_task_user')
+            ->join('fop_tasks', 'fop_tasks.id', '=', 'fop_task_user.fop_task_id')
+            ->whereDate('fop_tasks.task_date', $today)
+            ->whereNotIn('fop_tasks.status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+            ->groupBy('fop_task_user.user_id')
+            ->select('fop_task_user.user_id', DB::raw('count(*) as count'))
+            ->pluck('count', 'user_id');
+
+        $technicians->each(function ($tech) use ($todayWorkloadByTech) {
+            $tech->today_task_count = (int) ($todayWorkloadByTech->get($tech->id, 0));
+        });
+
+        // Tim aktif khusus hari ini (untuk Roster Summary Bar di atas tabel)
+        $todayTeams = $teams->filter(fn ($t) => $t['work_date'] === $today)->values();
+
+        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks', 'todayTeams', 'todayWorkloadByTech'));
     }
 
     /**
@@ -226,11 +262,105 @@ class FopTaskController extends Controller
         $fopTask->load([
             'technicians',
             'team:id,name',
-            'task:id,scheduled_at,status,report_deferred,fop_review_status',
+            'task:id,scheduled_at,status,fop_review_status',
             'ticket:id',
         ]);
 
         return view('fop_tasks.partials.row-cells', ['task' => $fopTask]);
+    }
+
+    /**
+     * Get availability, workload, and active teams for technicians on a specific date.
+     * Used dynamically by Tambah Task and Edit Task modals.
+     */
+    public function techniciansAvailability(Request $request): JsonResponse
+    {
+        $this->authorizeAccess();
+
+        $dateInput = $request->input('date', now()->toDateString());
+        try {
+            $targetDate = Carbon::parse($dateInput)->toDateString();
+        } catch (\Throwable $e) {
+            $targetDate = now()->toDateString();
+        }
+
+        $excludeTaskId = $request->input('exclude_task_id');
+
+        // ->technicians() = Role::TECHNICIAN_CODES ('teknisi' + 'pic_gudang') —
+        // jangan balikin ke where('code','teknisi') manual, PIC gudang hilang
+        // dari dropdown assign (docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md).
+        $technicians = User::technicians()->where('status', 'active')->orderBy('name', 'asc')->get();
+
+        $fopTasksQuery = FopTask::with(['technicians:id,name', 'village:id,name'])
+            ->applyUserScope()
+            ->whereDate('task_date', $targetDate)
+            ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
+
+        if ($excludeTaskId) {
+            $fopTasksQuery->where('id', '!=', $excludeTaskId);
+        }
+
+        $activeTasks = $fopTasksQuery->get();
+
+        $techWorkload = [];
+        $techTasks = [];
+
+        foreach ($technicians as $tech) {
+            $techWorkload[$tech->id] = 0;
+            $techTasks[$tech->id] = [];
+        }
+
+        foreach ($activeTasks as $task) {
+            foreach ($task->technicians as $tech) {
+                if (isset($techWorkload[$tech->id])) {
+                    $techWorkload[$tech->id]++;
+                    $techTasks[$tech->id][] = [
+                        'id' => $task->id,
+                        'task_number' => $task->task_number,
+                        'tugas' => $task->tugas,
+                        'time' => $task->task_date ? $task->task_date->format('H:i') : null,
+                        'village' => $task->village?->name,
+                        'status' => $task->status instanceof TaskStatus ? $task->status->value : $task->status,
+                    ];
+                }
+            }
+        }
+
+        $teams = FopTaskTeam::with(['members:id,name'])
+            ->whereDate('work_date', $targetDate)
+            ->get()
+            ->map(fn ($team) => [
+                'id' => $team->id,
+                'name' => $team->name,
+                'member_ids' => $team->members->pluck('id')->all(),
+                'member_names' => $team->members->pluck('name')->all(),
+            ]);
+
+        $result = $technicians->map(function ($tech) use ($techWorkload, $techTasks) {
+            $count = $techWorkload[$tech->id] ?? 0;
+            $level = $count === 0 ? 'free' : ($count <= 2 ? 'medium' : 'busy');
+
+            return [
+                'id' => $tech->id,
+                'name' => $tech->name,
+                'task_count' => $count,
+                'status_label' => $count === 0 ? 'Standby (0 task)' : ($count <= 2 ? "Normal ({$count} task)" : "Padat ({$count} task)"),
+                'status_level' => $level,
+                'tasks' => $techTasks[$tech->id] ?? [],
+            ];
+        });
+
+        return response()->json([
+            'date' => $targetDate,
+            'technicians' => $result,
+            'teams' => $teams,
+            'summary' => [
+                'total' => $technicians->count(),
+                'free' => $result->where('status_level', 'free')->count(),
+                'medium' => $result->where('status_level', 'medium')->count(),
+                'busy' => $result->where('status_level', 'busy')->count(),
+            ],
+        ]);
     }
 
     /**
@@ -249,7 +379,9 @@ class FopTaskController extends Controller
             'customer_id' => ['nullable', 'exists:customers,id'],
             'issue' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
-            'status' => ['required', 'string', Rule::enum(TaskStatus::class)],
+            // Lapor Nanti cuma lahir dari teknisi (TaskService::deferReport()),
+            // gak boleh dipilih manual dari papan FOP.
+            'status' => ['required', 'string', Rule::enum(TaskStatus::class)->except(TaskStatus::LAPOR_NANTI)],
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
             'pending_reason' => ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
@@ -261,7 +393,7 @@ class FopTaskController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated) {
-            $taskNumber = $this->generateTaskNumber();
+            $taskNumber = app(NumberSequenceService::class)->fopTaskNumber();
 
             $fopTask = new FopTask;
             $fopTask->task_number = $taskNumber;
@@ -339,6 +471,7 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
         $this->authorizeFopTaskScope($fopTask);
+        $this->abortIfReportDeferred($fopTask);
 
         // Task 14 — record existing Survey/Pemasangan cuma dibolehin submit balik
         // category yang sama (hidden input di form tetap ngirim nilai existing biar
@@ -359,7 +492,7 @@ class FopTaskController extends Controller
             'customer_id' => ['nullable', 'exists:customers,id'],
             'issue' => ['sometimes', 'required', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
-            'status' => ['sometimes', 'required', 'string', Rule::enum(TaskStatus::class)],
+            'status' => ['sometimes', 'required', 'string', Rule::enum(TaskStatus::class)->except(TaskStatus::LAPOR_NANTI)],
             'priority' => ['sometimes', 'required', 'string', Rule::enum(FopTaskPriority::class)],
             'pending_reason' => ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
@@ -606,7 +739,9 @@ class FopTaskController extends Controller
                     ];
 
                     if (! $fopTask->task_id && ! empty($technicians)) {
-                        $task = app(TaskService::class)->create($taskData, auth()->user());
+                        // createForFopTask(), bukan create(): Survey/PSB memakai
+                        // Task antrean yang sudah ada — lihat docblock-nya.
+                        $task = app(TaskService::class)->createForFopTask($fopTask, $taskData, auth()->user());
                         $fopTask->task_id = $task->id;
                         $fopTask->save();
                     } elseif ($fopTask->task_id) {
@@ -667,6 +802,7 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
         $this->authorizeFopTaskScope($fopTask);
+        $this->abortIfReportDeferred($fopTask);
 
         // SRV/PSB gak boleh dihapus dari sini SAMA SEKALI — di bawah ini,
         // destroy() beneran mentransisikan customer ke status 'rejected' (efek
@@ -728,6 +864,7 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
         $this->authorizeFopTaskScope($fopTask);
+        $this->abortIfReportDeferred($fopTask);
 
         $validated = $request->validate([
             'team_id' => ['nullable', 'integer', 'exists:fop_task_teams,id'],
@@ -816,6 +953,115 @@ class FopTaskController extends Controller
     }
 
     /**
+     * Bulk assign multiple FOP tasks to a team.
+     */
+    public function bulkAssignTeam(Request $request)
+    {
+        $this->authorizeAccess();
+
+        $validated = $request->validate([
+            'task_ids' => ['required', 'array', 'min:1'],
+            'task_ids.*' => ['required', 'integer', 'exists:fop_tasks,id'],
+            'team_id' => ['required', 'integer', 'exists:fop_task_teams,id'],
+        ]);
+
+        $team = FopTaskTeam::with('members')->findOrFail($validated['team_id']);
+        $teamWorkDate = $team->work_date->toDateString();
+
+        $tasks = FopTask::with(['technicians', 'task'])
+            ->whereIn('id', $validated['task_ids'])
+            ->get();
+
+        // Otorisasi & Scope check untuk setiap task
+        foreach ($tasks as $task) {
+            $this->authorizeFopTaskScope($task);
+        }
+
+        $assignedCount = 0;
+        $errors = [];
+
+        DB::transaction(function () use ($tasks, $team, $teamWorkDate, &$assignedCount, &$errors) {
+            foreach ($tasks as $task) {
+                // FopTask DAN Task eksekusinya (yang otoritatif) — sama
+                // persis dengan abortIfReportDeferred(); kalau cuma cek
+                // FopTask, status yang tidak ikut ter-sync bikin kunci bocor.
+                if ($task->status->isLockedFromFop() || $task->task?->status?->isLockedFromFop()) {
+                    $errors[] = "Task {$task->task_number} berstatus Lapor Nanti — terkunci sampai teknisi mengirim laporan.";
+
+                    continue;
+                }
+
+                if (! $task->task_date) {
+                    $errors[] = "Task {$task->task_number} belum memiliki tanggal jadwal.";
+
+                    continue;
+                }
+
+                if ($task->task_date->toDateString() !== $teamWorkDate) {
+                    $errors[] = "Task {$task->task_number} memiliki tanggal {$task->task_date->toDateString()}, berbeda dari tanggal tim ({$teamWorkDate}).";
+
+                    continue;
+                }
+
+                $oldValues = $task->toArray();
+                $task->team_id = $team->id;
+                $task->manual_override_at = now();
+
+                $teamMemberIds = $team->members->pluck('id')->all();
+                if (! empty($teamMemberIds)) {
+                    $task->technicians()->sync($teamMemberIds);
+
+                    if ($task->status === TaskStatus::DRAFT) {
+                        $task->status = TaskStatus::TERJADWAL;
+                        FopTaskStatusHistory::create([
+                            'fop_task_id' => $task->id,
+                            'from_status' => TaskStatus::DRAFT->value,
+                            'to_status' => TaskStatus::TERJADWAL->value,
+                            'changed_by' => auth()->id(),
+                            'changed_at' => now(),
+                        ]);
+                    }
+                }
+
+                $task->save();
+
+                if ($task->task_id && $task->task) {
+                    app(TaskService::class)->update($task->task, [
+                        'team_member_ids' => $teamMemberIds,
+                    ], auth()->user());
+                }
+
+                if (class_exists(AuditLog::class)) {
+                    AuditLog::log($task, 'bulk_assign_team', $oldValues, $task->fresh()->toArray());
+                }
+
+                event(new FopTaskUpdated($task));
+                $assignedCount++;
+            }
+        });
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => $assignedCount > 0,
+                'message' => "Berhasil menugaskan {$assignedCount} task ke tim \"{$team->name}\".".(count($errors) > 0 ? ' Beberapa task dilewati: '.implode(' ', $errors) : ''),
+                'assigned_count' => $assignedCount,
+                'errors' => $errors,
+            ]);
+        }
+
+        if ($assignedCount > 0) {
+            $msg = "Berhasil menugaskan {$assignedCount} task ke tim \"{$team->name}\".";
+            if (! empty($errors)) {
+                $msg .= ' Peringatan: '.implode(' ', $errors);
+            }
+
+            return back()->with('success', $msg);
+        }
+
+        return back()->withErrors(['task_ids' => implode(' ', $errors) ?: 'Tidak ada task yang berhasil ditugaskan ke tim.']);
+    }
+
+    /**
      * Switch Teknisi antar Team (1 payload sekali submit, atomic) — sesuai kebutuhan poin 2.
      * Mindahin `technician_id` dari Task asal ke Task tujuan, DAN wajib isi `replacement_technician_id`
      * buat gantiin dia di Task asal — supaya Task asal gak pernah kosong teknisi. Cuma boleh
@@ -837,6 +1083,8 @@ class FopTaskController extends Controller
         $toTask = FopTask::with('technicians')->findOrFail($validated['to_task_id']);
         $this->authorizeFopTaskScope($fromTask);
         $this->authorizeFopTaskScope($toTask);
+        $this->abortIfReportDeferred($fromTask);
+        $this->abortIfReportDeferred($toTask);
 
         if (! $fromTask->technicians->contains('id', $validated['technician_id'])) {
             return $this->switchTechnicianError($request, 'technician_id', 'Teknisi yang dipilih bukan anggota Task asal.');
@@ -1107,20 +1355,45 @@ class FopTaskController extends Controller
     }
 
     /**
+     * Task Lapor Nanti terkunci ke teknisi (keputusan user 2026-09-26) —
+     * papan FOP gak boleh mengedit, mengganti tim/teknisi, mem-pending,
+     * membatalkan, atau menghapusnya. Berlaku juga buat owner: kerja
+     * lapangannya sudah beres, satu-satunya langkah sah berikutnya adalah
+     * teknisi mengirim laporan (lalu status jadi Selesai lewat TaskObserver).
+     *
+     * Dicek terhadap FopTask DAN Task eksekusinya — dua kolom status itu
+     * biasanya identik (TaskObserver meng-copy), tapi yang otoritatif Task.
+     */
+    protected function abortIfReportDeferred(FopTask $fopTask): void
+    {
+        $locked = $fopTask->status?->isLockedFromFop()
+            || $fopTask->task?->status?->isLockedFromFop();
+
+        abort_if($locked, 422, "Task {$fopTask->task_number} berstatus Lapor Nanti — terkunci sampai teknisi mengirim laporan.");
+    }
+
+    /**
      * Display a listing of completed and cancelled FOP tasks.
      */
     public function history(Request $request)
     {
         $this->authorizeAccess();
 
-        $query = FopTask::with(['village', 'technicians', 'task:id,status,report_deferred'])
+        $query = FopTask::with([
+            'village',
+            'technicians',
+            'task:id,status',
+            'ticket:id,ticket_number,customer_name,customer_phone,customer_address,customer_latitude,customer_longitude',
+            'ticket.customer:id,cid',
+            'customer:id,full_name,primary_phone,cid,address,latitude,longitude',
+        ])
             ->applyUserScope()
             ->whereIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->orderBy('updated_at', 'desc');
 
         // Search filter
         if ($request->filled('search')) {
-            $search = $request->input('search');
+            $search = LikeSearch::sanitize((string) $request->input('search', ''));
             $query->where(function ($q) use ($search) {
                 $q->where('task_number', 'like', "%{$search}%")
                     ->orWhere('tugas', 'like', "%{$search}%")
@@ -1163,9 +1436,10 @@ class FopTaskController extends Controller
         $pops = Pop::orderBy('name', 'asc')->get();
 
         // Get technicians for assignee selector
-        $technicians = User::whereHas('role', function ($q) {
-            $q->where('code', 'teknisi');
-        })->where('status', 'active')->orderBy('name', 'asc')->get();
+        // ->technicians() = Role::TECHNICIAN_CODES ('teknisi' + 'pic_gudang') —
+        // jangan balikin ke where('code','teknisi') manual, PIC gudang hilang
+        // dari dropdown assign (docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md).
+        $technicians = User::technicians()->where('status', 'active')->orderBy('name', 'asc')->get();
 
         // Categories mapping using Enum
         $categories = collect(TaskType::cases())->mapWithKeys(function ($category) {
@@ -1238,6 +1512,13 @@ class FopTaskController extends Controller
             'task.report',
             'task.teamMembers.user:id,name',
             'task.maintenanceReport',
+            // Laporan Ambil Modem (DEAC) — ADHOC-88; tanpa ini kategori itu jatuh
+            // ke "tidak punya laporan lapangan terstruktur" di Riwayat Task FOP.
+            'task.deviceRetrieval',
+            // Detail Laporan C-REQ (kategori, tikor, biaya & verifikasi) —
+            // dirender partial tasks.partials.creq-detail.
+            'task.creqDetail',
+            'task.completedBy:id,name',
             // MTN & C-REQ yang asalnya dari Ticketing — detail keluhan/catatan
             // teknis/data pelanggan/lampiran/riwayat harus mengikuti apa yang
             // dilihat di /tickets, bukan cuma issue 255 char yang kepotong.
@@ -1247,7 +1528,12 @@ class FopTaskController extends Controller
             // Kategori Issue (Master Issue) — belum ditampilkan sama sekali
             // di Detail Task, padahal udah ada field-nya sejak Master Issue
             // ditambah (docs/plan/RANCANGAN_MASTER_ISSUE_TICKETING.md).
-            'ticket.issueCategory:id,name',
+            'ticket.issueCategory:id,name,is_batch',
+            // Pelanggan terdampak (tiket batch, mis. ODP LOS) — FOP yang buka
+            // Detail Task dari papan /fop-tasks WAJIB lihat daftar ini juga,
+            // sama kayak teknisi di tasks/show.blade.php (Ticket::isBatch()/
+            // batchMembers()).
+            'ticket.batchMembers',
         ]);
 
         $survey = null;
@@ -1276,7 +1562,14 @@ class FopTaskController extends Controller
         // --- 1. Auto-Sync Survey ---
         // 'pop' WAJIB ikut eager-load — Customer::getDisplayIdAttribute() butuh
         // relasi ini buat resolve CID (format tugas "{CID}_{Nama}" di bawah).
-        $surveyCustomers = Customer::whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
+        //
+        // `registered` (Verifikasi Registrasi, ADHOC-73) SENGAJA tidak ikut:
+        // pelanggan di status itu masih menunggu Admin/CS memverifikasi
+        // (CustomerRegistrationVerificationController). FopTask Survey baru
+        // boleh lahir saat approve → waiting_survey. Kalau `registered`
+        // dimasukkan lagi, jaring pengaman ini membuat FopTask SURVEY tiap
+        // halaman /fop-tasks dibuka dan verifikasi CS jadi bisa dilangkahi.
+        $surveyCustomers = Customer::whereIn('status', ['calon_pelanggan', 'waiting_survey'])
             ->with('pop')
             ->whereDoesntHave('fopTasks', function ($q) {
                 $q->where('category', TaskType::SURVEY->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
@@ -1295,7 +1588,12 @@ class FopTaskController extends Controller
         // --- 2. Auto-Sync Installation ---
         // 'latestSurvey' ikut di-eager-load karena tanggal request pemasangan
         // pelanggan disimpan di sana (customer_surveys.requested_installation_date).
-        $installCustomers = Customer::whereIn('status', ['waiting_installation', 'waiting_installations', 'surveyed'])
+        //
+        // `waiting_acc` / `surveyed` SENGAJA tidak ikut: pelanggan di status
+        // itu masih menunggu Admin/CS memverifikasi laporan survey di halaman
+        // Verifikasi Pemasangan (CustomerVerificationController::processToTeam).
+        // FopTask Pemasangan baru boleh lahir saat CS memproses ke TIM → waiting_installation.
+        $installCustomers = Customer::whereIn('status', ['waiting_installation'])
             ->with(['pop', 'latestSurvey'])
             ->whereDoesntHave('fopTasks', function ($q) {
                 $q->where('category', TaskType::PEMASANGAN->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
@@ -1443,22 +1741,5 @@ class FopTaskController extends Controller
             ->sortBy(fn (FopTaskPriority $p) => $p->sortOrder())
             ->map(fn (FopTaskPriority $p) => $p->value)
             ->all();
-    }
-
-    /**
-     * Generate a unique sequential task number for the current year.
-     *
-     * Nomor urut dihitung di PHP (bukan `ORDER BY` SQL raw kayak
-     * `SUBSTRING_INDEX`) biar portable — jalan di MySQL (prod) maupun SQLite
-     * (test env), bukan cuma di salah satu driver.
-     */
-    /**
-     * Nomor TFOP untuk form manual /fop-tasks. Didelegasikan ke
-     * FopTaskProvisioningService supaya deret yang sama tidak punya dua
-     * implementasi generator di file ini.
-     */
-    private function generateTaskNumber(): string
-    {
-        return app(FopTaskProvisioningService::class)->generateTaskNumber();
     }
 }

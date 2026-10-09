@@ -44,10 +44,14 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                    <label for="category" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Kategori <span class="text-rose-500">*</span></label>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label for="category" class="block text-xs font-semibold text-slate-600 dark:text-slate-400">Kategori <span class="text-rose-500">*</span></label>
+                        <button type="button" onclick="openPackageCategoryModal(this.dataset.storeUrl)" data-store-url="{{ route('master.paket.categories.store') }}"
+                                class="text-[11px] font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 cursor-pointer">+ Tambah Kategori</button>
+                    </div>
                     <select id="category" name="category" class="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-slate-800 {{ $errors->has('category') ? 'border-rose-400 bg-rose-50 dark:bg-rose-900/20' : 'border-slate-300 dark:border-slate-600' }}">
-                        @foreach(\App\Models\InternetPackage::CATEGORIES as $value => $label)
-                            <option value="{{ $value }}" {{ old('category', $paket->category) === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @foreach($categories as $item)
+                            <option value="{{ $item->name }}" {{ old('category', $paket->category) === $item->name ? 'selected' : '' }}>{{ $item->name }}</option>
                         @endforeach
                     </select>
                     @error('category')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
@@ -186,10 +190,23 @@
         </form>
     </div>
 </div>
+
+@include('master.paket.partials._category_modal')
 @endsection
 
 @section('scripts')
 <script>
+    // Sama seperti halaman create — kategori baru langsung tersisip &
+    // terpilih di <select> tanpa reload.
+    document.addEventListener('package-category-created', function (e) {
+        const select = document.getElementById('category');
+        const option = document.createElement('option');
+        option.value = e.detail.name;
+        option.textContent = e.detail.name;
+        option.selected = true;
+        select.appendChild(option);
+    });
+
     function updateTotalPreview() {
         // Sama seperti halaman create: kolom harga bermasking ribuan. Di sini
         // lebih terasa — nilainya sudah bermasking sejak halaman dimuat, jadi

@@ -123,8 +123,9 @@ class FopTaskVerificationOverlayTest extends TestCase
         $this->assertEquals(TaskStatus::SELESAI, $fopTask->status);
         $this->assertNull($fopTask->verificationStatus());
 
+        // Tanpa langkah Approve untuk MTN (2026-09-28) — langsung "selesai".
         $latestHistory = $fopTask->statusHistories()->first();
-        $this->assertEquals('selesai_menunggu_verifikasi', $latestHistory->to_status);
+        $this->assertEquals('selesai', $latestHistory->to_status);
     }
 
     public function test_selesai_pemasangan_task_shows_in_riwayat_regardless_of_review_outcome(): void

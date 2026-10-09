@@ -67,7 +67,7 @@
                             </a>
                             @if(auth()->user()->hasPermission('customers.detail.installation.validate') && $customer->status_before_reject)
                             <form action="{{ route('customers.restore-from-failed', $customer->id) }}" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Kembalikan {{ $customer->full_name }} ke proses sebelum ditolak?', this);">
+                                  onsubmit="event.preventDefault(); window.confirmAction(@js('Kembalikan '.($customer->full_name).' ke proses sebelum ditolak?'), this);">
                                 @csrf
                                 <button type="submit" class="px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer">
                                     Kembalikan
@@ -133,7 +133,7 @@
                     @if(auth()->user()->hasPermission('customers.detail.installation.validate') && $customer->status_before_reject)
                     <form action="{{ route('customers.restore-from-failed', $customer->id) }}" method="POST"
                           class="flex-1 sm:flex-none flex"
-                          onsubmit="event.preventDefault(); window.confirmAction('Kembalikan {{ $customer->full_name }} ke proses sebelum ditolak?', this);">
+                          onsubmit="event.preventDefault(); window.confirmAction(@js('Kembalikan '.($customer->full_name).' ke proses sebelum ditolak?'), this);">
                         @csrf
                         <button type="submit" class="w-full h-10 px-3.5 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer">
                             Kembalikan

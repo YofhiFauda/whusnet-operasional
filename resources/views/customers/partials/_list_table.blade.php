@@ -96,7 +96,7 @@
                         <td class="py-3.5 px-2 xl:px-3 font-mono text-[11px] hidden 2xl:table-cell">
                             @if($customer->latestInvoice)
                                 @php
-                                    $isOverdue = $customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast() && $customer->latestInvoice->invoice_status !== \App\Enums\InvoiceStatus::LUNAS;
+                                    $isOverdue = $customer->latestInvoice->isPiutang();
                                 @endphp
                                 <span class="{{ $isOverdue ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-600 dark:text-slate-400' }}">
                                     {{ \App\Support\IndonesianDate::date($customer->latestInvoice->due_date) }}
@@ -110,13 +110,13 @@
                             @if($customer->latestInvoice)
                                 @php
                                     $isPaid = $customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS;
-                                    $isOverdue = !$isPaid && $customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast();
+                                    $isOverdue = !$isPaid && $customer->latestInvoice->isPiutang();
                                 @endphp
                                 <span class="font-bold {{ $isPaid ? 'text-emerald-600 dark:text-emerald-400' : ($isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white') }}">
                                     Rp {{ number_format($customer->latestInvoice->total_amount, 0, ',', '.') }}
                                 </span>
                                 <span class="block text-[10px] font-sans font-semibold {{ $isPaid ? 'text-emerald-500' : ($isOverdue ? 'text-rose-500' : 'text-slate-400') }}">
-                                    {{ $isPaid ? 'Lunas' : ($isOverdue ? 'Lewat Tempo' : 'Belum Bayar') }}
+                                    {{ $isPaid ? 'Lunas' : ($isOverdue ? 'Piutang' : 'Belum Bayar') }}
                                 </span>
                             @else
                                 <span class="text-slate-400">-</span>
@@ -174,18 +174,21 @@
                                     data-lng="{{ $customer->customerAddress->longitude ?? '' }}"
                                     data-completeness-pct="{{ $completeness['percentage'] }}"
                                     data-completeness-status="{{ Str::headline($customer->data_completeness_status ?? 'draft') }}"
-                                    data-pppoe="{{ $customer->customerService->pppoe_username ?? '-' }}"
-                                    data-vlan="{{ $customer->customerService->vlan_id ?? '-' }}"
-                                    data-onu="{{ $customer->customerDevice->onu_sn ?? ($customer->customerDevice->mac_address ?? '-') }}"
-                                    data-onu-brand="{{ $customer->customerDevice->onu_brand ?? '-' }}"
-                                    data-router="{{ $customer->customerDevice->router_sn ?? '-' }}"
-                                    data-router-brand="{{ $customer->customerDevice->router_brand ?? '-' }}"
+                                    data-pppoe="{{ $customer->customerDevice?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?: '-')) }}"
+                                    data-vlan="{{ $customer->customerDevice?->vlan_id ?? ($customer->vlan_id ?? '-') }}"
+                                    data-onu="{{ $customer->customerDevice?->serial_number ?? ($customer->ont_sn ?? ($customer->customerDevice?->mac_address ?? '-')) }}"
+                                    data-onu-brand="{{ $customer->customerDevice?->brand ?? '-' }}"
+                                    data-router="{{ ($customer->customerDevice?->brand ? trim($customer->customerDevice->brand . ' ' . ($customer->customerDevice->model ?? '')) : ($customer->customerDevice?->mac_address ?? '-')) ?: '-' }}"
+                                    data-router-brand="{{ $customer->customerDevice?->model ?? '-' }}"
                                     data-contract="{{ match($customer->customerService->contract_type ?? null) { 'sewa' => 'Sewa', 'beli' => 'Beli', default => '-' } }}"
-                                    data-distribution="{{ $customer->distribution->name ?? '-' }}"
+                                    data-distribution="{{ $customer->customerDevice?->odp ?: ($customer->distribution->name ?? ($customer->odp_code ?? '-')) }}"
                                     data-detail-url="{{ route('customers.show', $customer->id) }}"
                                     data-payment-info-url="{{ route('customers.payment-info', $customer->id) }}"
                                     data-network-update-url="{{ route('customers.network-assignment.update', $customer->id) }}"
                                     data-network-data-url="{{ route('customers.network-assignment.data', $customer->id) }}"
+                                    data-package-update-url="{{ route('customers.package.update', $customer->id) }}"
+                                    data-current-package-id="{{ $customer->customerService->internet_package_id ?? '' }}"
+                                    data-toggle-suspend-url="{{ route('customers.toggle-suspend', $customer->id) }}"
                                     class="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-slate-700 hover:border-sky-300 text-slate-500 hover:text-sky-600 inline-flex items-center justify-center transition-all shadow-sm cursor-pointer"
                                     title="Buka Modal Hub Aksi Cepat">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
@@ -308,20 +311,23 @@
                                 data-lng="{{ $customer->customerAddress->longitude ?? '' }}"
                                 data-completeness-pct="{{ $completeness['percentage'] }}"
                                 data-completeness-status="{{ Str::headline($customer->data_completeness_status ?? 'draft') }}"
-                                data-pppoe="{{ $customer->customerService->pppoe_username ?? '-' }}"
-                                data-vlan="{{ $customer->customerService->vlan_id ?? '-' }}"
-                                data-onu="{{ $customer->customerDevice->onu_sn ?? ($customer->customerDevice->mac_address ?? '-') }}"
-                                data-onu-brand="{{ $customer->customerDevice->onu_brand ?? '-' }}"
-                                data-router="{{ $customer->customerDevice->router_sn ?? '-' }}"
-                                data-router-brand="{{ $customer->customerDevice->router_brand ?? '-' }}"
+                                data-pppoe="{{ $customer->customerDevice?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?: '-')) }}"
+                                data-vlan="{{ $customer->customerDevice?->vlan_id ?? ($customer->vlan_id ?? '-') }}"
+                                data-onu="{{ $customer->customerDevice?->serial_number ?? ($customer->ont_sn ?? ($customer->customerDevice?->mac_address ?? '-')) }}"
+                                data-onu-brand="{{ $customer->customerDevice?->brand ?? '-' }}"
+                                data-router="{{ ($customer->customerDevice?->brand ? trim($customer->customerDevice->brand . ' ' . ($customer->customerDevice->model ?? '')) : ($customer->customerDevice?->mac_address ?? '-')) ?: '-' }}"
+                                data-router-brand="{{ $customer->customerDevice?->model ?? '-' }}"
                                 data-contract="{{ match($customer->customerService->contract_type ?? null) { 'sewa' => 'Sewa', 'beli' => 'Beli', default => '-' } }}"
-                                data-distribution="{{ $customer->distribution->name ?? '-' }}"
+                                data-distribution="{{ $customer->customerDevice?->odp ?: ($customer->distribution->name ?? ($customer->odp_code ?? '-')) }}"
                                     data-detail-url="{{ route('customers.show', $customer->id) }}"
                                     data-payment-info-url="{{ route('customers.payment-info', $customer->id) }}"
                                     data-network-update-url="{{ route('customers.network-assignment.update', $customer->id) }}"
                                     data-network-data-url="{{ route('customers.network-assignment.data', $customer->id) }}"
+                                    data-package-update-url="{{ route('customers.package.update', $customer->id) }}"
+                                    data-current-package-id="{{ $customer->customerService->internet_package_id ?? '' }}"
+                                    data-toggle-suspend-url="{{ route('customers.toggle-suspend', $customer->id) }}"
                                 class="flex-1 py-1.5 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center justify-center gap-1 shadow-md shadow-sky-600/20 transition-all btn-interactive touch-target min-w-0">
-                            <span class="truncate">Quick Hub</span>
+                            <span class="truncate">Detail Pelanggan</span>
                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                     </div>

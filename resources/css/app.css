@@ -34,7 +34,7 @@
   --color-success-bg: #ECFDF5;
   --color-success-border: #A7F3D0;
 
-  --color-warning: #F59E0B;
+  --color-warning: #B45309;
   --color-warning-bg: #FFFBEB;
   --color-warning-border: #FDE68A;
 
@@ -101,33 +101,7 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Dark Mode Token System */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0F172A;      /* slate-900 */
-    --color-surface: #1E293B;         /* slate-800 */
-    --color-surface-muted: #334155;   /* slate-700 */
-    --color-border: #334155;          /* slate-700 */
-    --color-border-strong: #475569;   /* slate-600 */
-    --color-text-main: #F8FAFC;
-    --color-text-secondary: #CBD5E1;
-    --color-text-muted: #94A3B8;
-    --color-text-disabled: #475569;
-    --color-primary: #38BDF8;         /* sky-400 (dark) */
-    --color-primary-hover: #0284C7;   /* sky-600 (dark hover) */
-    --color-primary-soft: #0C4A6E;    /* sky-900 (dark soft) */
-    --color-primary-border: #0369A1;  /* sky-700 (dark border) */
-    --color-success-bg: #064E3B;
-    --color-success-border: #065F46;
-    --color-warning-bg: #451A03;
-    --color-warning-border: #78350F;
-    --color-error-bg: #450A0A;
-    --color-error-border: #7F1D1D;
-    --color-info-bg: #172554;
-    --color-info-border: #1E3A8A;
-  }
-}
-
+/* Dark Mode Token System (Controlled via .dark class on html root) */
 .dark {
   --color-background: #0F172A;      /* slate-900 */
   --color-surface: #1E293B;         /* slate-800 */
@@ -141,13 +115,16 @@
   --color-primary: #38BDF8;         /* sky-400 (dark) */
   --color-primary-hover: #0284C7;
   --color-primary-soft: #0C4A6E;
-  --color-primary-border: #0369A1;
+  --color-success: #34D399;
   --color-success-bg: #064E3B;
   --color-success-border: #065F46;
+  --color-warning: #FBBF24;
   --color-warning-bg: #451A03;
   --color-warning-border: #78350F;
+  --color-error: #F87171;
   --color-error-bg: #450A0A;
   --color-error-border: #7F1D1D;
+  --color-info: #60A5FA;
   --color-info-bg: #172554;
   --color-info-border: #1E3A8A;
 }
@@ -1097,6 +1074,22 @@ html {
   align-items: start;
 }
 
+/* ─────────────────────────────────────────────────────────
+   Barcode Camera Scanner — garis laser bolak-balik di dalam
+   bingkai persegi panjang pemandu 1D (`<x-warehouse.barcode-scanner>`,
+   dipakai Lacak Barang/SN tab Scan Masuk). Bingkainya sendiri LEBAR
+   (rasio ~5:2), beda dari kotak QR — barcode linear butuh area
+   horizontal, bukan persegi.
+   ───────────────────────────────────────────────────────── */
+@keyframes barcode-scanline {
+  0%, 100% { top: 8%; }
+  50% { top: 88%; }
+}
+
+.barcode-scanline {
+  animation: barcode-scanline 1.8s ease-in-out infinite;
+}
+
 /*
    Motion panel lipat/buka. Yang dianimasikan cuma `width` + `opacity`
    dengan kurva ease-in-out standar (tanpa overshoot) dan durasi yang SAMA
@@ -1108,11 +1101,21 @@ html {
    pakai durasi + easing yang sama, jadi transisinya konsisten di semua lebar
    layar. `width` sengaja tetap di daftar walau di bawah xl gak dianimasikan —
    satu kelas buat dua rezim, biar gak ada dua sumber timing. */
+/* `translate` WAJIB ada di daftar, dan itu BUKAN duplikat dari `transform`:
+   Tailwind v4 gak lagi nulis `transform: translateX(...)` buat utility
+   `translate-x-*` — yang dikeluarin properti CSS standalone
+   `translate: var(--tw-translate-x) var(--tw-translate-y)` (cek hasil build:
+   `.-translate-x-full{--tw-translate-x:-100%;translate:...}`). Selama daftar
+   ini cuma nyebut `transform`, panel di bawah `lg` (rezim OVERLAY yang geser
+   pakai translate) LONCAT tanpa animasi, sementara di `lg` ke atas kelihatan
+   mulus karena di situ yang dianimasikan `width` — persis gejala "di mobile &
+   tablet gak ada slide, di desktop ada". `transform` sengaja ditahan buat
+   utility lama/manual yang masih nulis transform beneran. */
 .panel-motion {
-  transition-property: width, transform, opacity;
+  transition-property: width, translate, transform, opacity;
   transition-duration: 320ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: width, transform;
+  will-change: width, translate;
 }
 
 /* Dipasang sebelum frame pertama selesai — cegah animasi "mental sendiri"
@@ -1173,4 +1176,44 @@ html {
     padding-left: 0 !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   No Scrollbar Utility — hide scrollbar while keeping scrollable
+   ───────────────────────────────────────────────────────── */
+.no-scrollbar {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important;    /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;            /* Chrome, Safari and Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Smooth Scrolling & Momentum Touch Utilities
+   ───────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+.scroll-smooth {
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.smooth-scroll-x {
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.smooth-scroll-y {
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
 

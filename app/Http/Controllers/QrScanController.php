@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\CollectorWorklistService;
 use App\Services\CustomerQrTokenService;
 use App\Services\EffectiveAccessService;
+use App\Services\QrAttendanceService;
 use App\Services\StaffPortalTokenService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -66,6 +67,7 @@ class QrScanController extends Controller
         private readonly CustomerQrTokenService $qrTokens,
         private readonly CollectorWorklistService $worklist,
         private readonly StaffPortalTokenService $staffTokens,
+        private readonly QrAttendanceService $attendance,
     ) {}
 
     public function dispatch(Request $request, string $code): RedirectResponse
@@ -108,9 +110,14 @@ class QrScanController extends Controller
             abort(403, 'Anda tidak memiliki akses ke pelanggan di POP ini.');
         }
 
-        // Fungsi C (absen teknisi, Fase 3) belum dibangun — cabang "punya
-        // task terjadwal hari ini" di §5 SENGAJA dilewati, jatuh ke cabang
-        // kolektor/ticketing/fallback di bawah.
+        // Fungsi C (absen teknisi, Fase 3, §5) — paling depan karena teknisi di
+        // lapangan adalah pemindai paling sering. Hanya kalau user BENAR anggota
+        // tim task terjadwal hari ini untuk pelanggan ini; staf tanpa penugasan
+        // (termasuk owner `*`) tidak masuk sini dan tetap ke kolektor/ticketing.
+        if ($user->hasPermission('tasks.qr_attendance.create')
+            && $this->attendance->todaysTasks($customer, $user)->isNotEmpty()) {
+            return redirect()->route('qr.attendance.show', ['code' => $code]);
+        }
 
         $eligibility = $this->resolveEligibility($user, $customer);
 
@@ -225,17 +232,34 @@ class QrScanController extends Controller
      */
     private function resolveEligibility(User $user, Customer $customer): array
     {
-        $canKolektorRole = $user->hasRole('kolektor') && $user->hasPermission('kolektor.qr.pay');
+        // Syarat ganda `kolektor.pay` + `kolektor.qr.pay`, sama dengan jalur Portal
+        // (RecordsCollectorBatch::assertStaffPortalAuthorized). Mencabut salah satu
+        // harus menutup pembayaran lewat QR juga.
+        $canKolektorRole = $user->hasRole('kolektor') && $this->canPayViaQr($user);
 
         $kolektorEligible = $canKolektorRole && $this->worklist->dueInvoices($user, $user)
             ->whereHas('customer', fn ($q) => $q->where('customers.id', $customer->id))
             ->exists();
 
+        // Teknisi (ADHOC-122): pelanggan tidak perlu di-assign — cukup dalam
+        // POP scope, yang sudah dicek di `dispatch()` sebelum sampai sini.
+        // Kalau tidak, jalur ini tidak boleh ikut meloloskan pelanggan luar POP.
+        $canTeknisiRole = $user->isTechnician() && $this->canPayViaQr($user);
+
         return [
-            'kolektor' => $kolektorEligible,
+            'kolektor' => $kolektorEligible || $canTeknisiRole,
             'tickets' => $user->hasPermission('tickets.qr.create'),
-            'canKolektorRole' => $canKolektorRole,
+            'canKolektorRole' => $canKolektorRole || $canTeknisiRole,
         ];
+    }
+
+    /**
+     * Syarat ganda pembayaran via QR: `kolektor.pay` DAN `kolektor.qr.pay`. Sama
+     * dengan RecordsCollectorBatch::assertStaffPortalAuthorized() di jalur Portal.
+     */
+    private function canPayViaQr(User $user): bool
+    {
+        return $user->hasPermission('kolektor.pay') && $user->hasPermission('kolektor.qr.pay');
     }
 
     /**
@@ -282,11 +306,18 @@ class QrScanController extends Controller
 
     private function finalizeKolektor(Request $request, CustomerQrToken $qrToken, Customer $customer, User $user, string $code): RedirectResponse
     {
-        $token = $this->staffTokens->issue($user, $customer, StaffPortalTokenService::PURPOSE_KOLEKTOR, $request->ip());
+        // Identitas struktural menentukan jalur: pemegang role kolektor → jalur
+        // kolektor (worklist), selain itu teknisi → jalur teknisi (ADHOC-122).
+        $isKolektor = $user->hasRole('kolektor');
+
+        $purpose = $isKolektor ? StaffPortalTokenService::PURPOSE_KOLEKTOR : StaffPortalTokenService::PURPOSE_TEKNISI;
+        $portalPath = $isKolektor ? '/staff/kolektor' : '/staff/teknisi';
+
+        $token = $this->staffTokens->issue($user, $customer, $purpose, $request->ip());
 
         $this->logScan($request, $qrToken->id, $customer->id, 'payment', 'success');
 
-        return $this->redirectToPortal("/staff/kolektor?code={$code}&staff_token={$token['plaintext']}");
+        return $this->redirectToPortal("{$portalPath}?code={$code}&staff_token={$token['plaintext']}");
     }
 
     private function finalizeTicketing(Request $request, CustomerQrToken $qrToken, Customer $customer, User $user, string $code): RedirectResponse

@@ -3,15 +3,20 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\CustomerTerminationReason;
 use App\Models\District;
+use App\Models\FopTask;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\SubscriptionStatus;
 use App\Models\User;
 use App\Models\Village;
+use App\Support\LikeSearch;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -38,7 +43,7 @@ trait RendersCustomerList
         ?string $forcedStatusGroup = null,
         string $view = 'customers.index'
     ): View {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $statusGroup = $forcedStatusGroup ?? trim((string) $request->query('status_group', ''));
         // Default to empty string '' (Semua active & suspend) if not specified
         $status = $request->query('status', '');
@@ -65,6 +70,11 @@ trait RendersCustomerList
         ));
         $completenessStatus = $request->query('completeness_status', '');
         $collectorId = $request->query('collector_id', '');
+        // Filter alasan putus (ADHOC-69) — cuma bermakna di List Putus, tapi
+        // aman dibaca di halaman lain (query string diabaikan kalau
+        // statusGroup != 'terminated', lihat blok filter di bawah).
+        $terminationReasonId = $request->query('termination_reason_id', '');
+        $sort = $request->query('sort', '');
 
         // Fase 5.6 — batasi kolom yang ditarik untuk daftar (G/row bloat).
         // `customers` punya ~45 kolom termasuk banyak yang TIDAK dipakai di list
@@ -83,14 +93,30 @@ trait RendersCustomerList
                 'rejected_at', 'terminated_at', 'address',
                 'pop_id', 'distribution_id', 'mini_pop_id', 'collector_id',
                 'city_id', 'district_id', 'village_id', 'internet_package_id',
+                'sales_user_id', 'termination_reason_id', 'termination_note',
+                'registered_by_name', 'created_by',
                 'created_at', 'updated_at',
             ])
             ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice', 'latestPayment', 'collector:id,name']);
 
+        // List Putus (ADHOC-69 & Bug 5) butuh relasi creator (petugas input)
+        // dan terminationReason untuk List Putus — dipisah supaya query List
+        // Data Pelanggan biasa tidak ikut menanggung eager-load yang percuma.
+        if ($statusGroup === 'terminated') {
+            $query->with([
+                'creator:id,name',
+                'terminationReason:id,name',
+            ]);
+        }
+
         // Search filter — Fase 5.3. Diarahkan per BENTUK input, bukan LIKE '%x%'
         // di 8 kolom sekaligus (yang memaksa full scan tiap ketik):
         //  - ada '@'  → email (identifier, prefix)
-        //  - ada digit → kode/HP/NIK/CID → PREFIX 'x%' (sargable, pakai index)
+        //  - ada digit → customer_code/old_customer_id/old_request_id → PREFIX
+        //    'x%' (sargable, pakai index)
+        //  - CID/HP/NIK substring '%x%' — sering dicari dari potongan tengah
+        //    atau buntut (mis. "0004" dari CID "C1X4ARQ000004", 4 digit
+        //    terakhir HP/NIK), bukan dari awal string
         //  - selainnya → nama → substring '%x%' (nama memang butuh potongan tengah,
         //                cuma 1 kolom, jauh lebih murah dari 8-kolom OR)
         // Konsekuensi UX yang disengaja: query nama tidak lagi mencocokkan kode,
@@ -101,11 +127,11 @@ trait RendersCustomerList
                     $q->where('email', 'like', "{$search}%");
                 } elseif (preg_match('/\d/', $search)) {
                     $q->where('customer_code', 'like', "{$search}%")
-                        ->orWhere('cid', 'like', "{$search}%")
+                        ->orWhere('cid', 'like', "%{$search}%")
                         ->orWhere('old_customer_id', 'like', "{$search}%")
                         ->orWhere('old_request_id', 'like', "{$search}%")
-                        ->orWhere('primary_phone', 'like', "{$search}%")
-                        ->orWhere('identity_number', 'like', "{$search}%");
+                        ->orWhere('primary_phone', 'like', "%{$search}%")
+                        ->orWhere('identity_number', 'like', "%{$search}%");
                 } else {
                     $q->where('full_name', 'like', "%{$search}%");
                 }
@@ -178,6 +204,14 @@ trait RendersCustomerList
             $query->where('collector_id', $collectorId);
         }
 
+        // Filter & sort alasan putus (ADHOC-69) — di level QUERY (WHERE/ORDER
+        // BY), bukan di memori setelah fetch seperti $customer->termination_reason
+        // lama (§2.3 rancangan: itu yang bikin filter/sort salah setelah
+        // pagination). Cuma berlaku untuk List Putus.
+        if ($statusGroup === 'terminated' && $terminationReasonId !== '') {
+            $query->where('termination_reason_id', $terminationReasonId);
+        }
+
         if ($statusGroup === 'failed') {
             // Fase 5.1 — urut pakai kolom nyata rejected_at. Versi lama memakai
             // subquery JSON berkorelasi ke audit_logs di ORDER BY (dieksekusi
@@ -186,7 +220,18 @@ trait RendersCustomerList
             // CustomerWorkflowService, import, dan command backfill.
             $query->orderByDesc('rejected_at');
         } elseif ($statusGroup === 'terminated') {
-            $query->orderByDesc('terminated_at');
+            // Sort by alasan (nama) butuh JOIN — kolom `name` bukan milik
+            // `customers`. `select('customers.*', ...)` WAJIB ditambah begitu
+            // JOIN dipakai, kalau tidak kolom `name` master ikut nyampur ke
+            // hasil select pelanggan (ambigu antar tabel).
+            if ($sort === 'alasan') {
+                $query->select('customers.*')
+                    ->leftJoin('customer_termination_reasons', 'customer_termination_reasons.id', '=', 'customers.termination_reason_id')
+                    ->orderBy('customer_termination_reasons.name')
+                    ->orderByDesc('customers.terminated_at');
+            } else {
+                $query->orderByDesc('terminated_at');
+            }
         } else {
             $query->orderBy('customer_code', 'asc');
         }
@@ -237,11 +282,43 @@ trait RendersCustomerList
                 ->unique('auditable_id')
                 ->keyBy('auditable_id');
 
+            // Badge "Sedang Diproses" (hanya penanda untuk FOP): pelanggan yang
+            // task Ambil Alat-nya sudah dibuat tapi belum selesai/dibatalkan.
+            // Definisi "belum selesai" SAMA dengan penjaga di
+            // CustomerController::retrieveDevice() supaya badge dan penolakan
+            // tombol tidak saling bertentangan. Satu kueri untuk seluruh halaman.
+            $customersWithOpenRetrieval = FopTask::query()
+                ->whereIn('customer_id', $customerIds)
+                ->where('category', TaskType::AMBIL_MODEM->value)
+                ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+                ->pluck('customer_id')
+                ->flip();
+
+            // Kolom Tagihan (ADHOC-105): invoice tak tertagih per pelanggan,
+            // satu kueri untuk seluruh halaman (bukan per baris). Halaman ini
+            // sudah dibatasi POP scope lewat daftar `$customerIds` di atas.
+            $writtenOffByCustomer = Invoice::query()
+                ->whereIn('customer_id', $customerIds)
+                ->where('invoice_status', InvoiceStatus::TAK_TERTAGIH->value)
+                ->orderBy('written_off_at')
+                ->orderBy('id')
+                ->get()
+                ->groupBy('customer_id');
+
             foreach ($customers as $customer) {
+                $customer->tak_tertagih_invoices = $writtenOffByCustomer->get($customer->id, collect());
                 $log = $terminateLogs->get($customer->id);
-                $customer->termination_reason = $log?->new_values['reason'] ?? '-';
-                $customer->terminated_at = $log?->created_at;
+                // ADHOC-69: sumber utama sekarang relasi `terminationReason`
+                // (master, bisa di-filter/sort di level query — §2.3
+                // rancangan). AuditLog cuma fallback untuk data LAMA yang
+                // putus sebelum fitur ini live (`termination_reason_id` NULL
+                // — §4.5, sengaja tidak di-backfill).
+                $customer->termination_reason = $customer->terminationReason?->name
+                    ?? $log?->new_values['reason']
+                    ?? '-';
+                $customer->terminated_at = $customer->terminated_at ?? $log?->created_at;
                 $customer->device_retrieved_at = $customer->customerDevice?->device_retrieved_at;
+                $customer->device_retrieval_in_progress = $customersWithOpenRetrieval->has($customer->id);
             }
         }
 
@@ -272,6 +349,11 @@ trait RendersCustomerList
             ->whereHas('role', fn ($q) => $q->where('code', 'kolektor'))
             ->orderBy('name')
             ->get(['id', 'name']);
+        // Dropdown filter Alasan Putus (ADHOC-69) — cuma dipakai List Putus,
+        // tapi murah untuk di-resolve di halaman lain juga (query kecil).
+        $terminationReasonOptions = $statusGroup === 'terminated'
+            ? CustomerTerminationReason::orderBy('name')->get(['id', 'name'])
+            : collect();
 
         // Customer count by status (for badge list / submenus)
         $statusCounts = Customer::applyUserScope()->selectRaw('status, count(*) as count')
@@ -282,12 +364,12 @@ trait RendersCustomerList
         // Total is active + suspended customers
         $totalCustomers = ($statusCounts['active'] ?? 0) + ($statusCounts['suspended'] ?? 0);
 
-        // Jumlah pelanggan aktif dengan invoice lewat tempo (untuk summary strip)
+        // Jumlah tagihan piutang (periode lalu belum lunas) milik pelanggan aktif
+        // (untuk summary strip). Bukan `due_date < now()` — lihat Invoice::scopePiutang().
         $overdueCount = Invoice::whereHas('customer', function ($q) {
             $q->applyUserScope()->where('status', 'active');
         })
-            ->where('invoice_status', '!=', InvoiceStatus::LUNAS->value)
-            ->where('due_date', '<', now())
+            ->piutang()
             ->count();
 
         return view($view, compact(
@@ -311,7 +393,10 @@ trait RendersCustomerList
             'miniPopIds',
             'completenessStatus',
             'collectorId',
-            'collectorOptions'
+            'collectorOptions',
+            'terminationReasonId',
+            'terminationReasonOptions',
+            'sort'
         ));
     }
 }

@@ -121,7 +121,12 @@
                         {{ $categories->firstItem() + $index }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $category->name }}</div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $category->name }}</span>
+                            @if($category->is_batch)
+                            <span title="Support Parent/Child banyak pelanggan di Worksheet Helpdesk" class="inline-flex px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-800/50">Batch</span>
+                            @endif
+                        </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="text-sm text-slate-600 dark:text-slate-400">{{ $category->default_priority?->value }}</span>
@@ -147,12 +152,26 @@
                             </a>
 
                             <!-- Toggle Status (Form) -->
+                            @if(auth()->user()->hasPermission('ticket_issue_categories.delete'))
+                            <form action="{{ route('master.ticket-issue-categories.destroy', $category) }}" method="POST" class="inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit"
+                                        class="p-1 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-md transition-colors cursor-pointer"
+                                        title="Hapus Kategori"
+                                        onclick="event.preventDefault(); window.confirmDelete(@js('Hapus kategori '.($category->name).'? Jika masih dipakai tiket, data hanya dinonaktifkan.'), this.closest('form'))">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </form>
+                            @endif
                             <form action="{{ route('master.ticket-issue-categories.toggle', $category) }}" method="POST" class="inline">
                                 @csrf
                                 <button type="submit"
                                         class="p-1 text-slate-400 dark:text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-md transition-colors cursor-pointer"
                                         title="{{ $category->is_active ? 'Nonaktifkan' : 'Aktifkan' }} Kategori"
-                                        onclick="event.preventDefault(); window.confirmDelete('Apakah Anda yakin ingin {{ $category->is_active ? 'menonaktifkan' : 'mengaktifkan' }} kategori {{ $category->name }}?', this.closest('form'))">
+                                        onclick="event.preventDefault(); window.confirmDelete(@js('Apakah Anda yakin ingin '.($category->is_active ? 'menonaktifkan' : 'mengaktifkan').' kategori '.($category->name).'?'), this.closest('form'))">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                     </svg>

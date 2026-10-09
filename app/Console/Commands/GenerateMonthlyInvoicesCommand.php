@@ -6,7 +6,13 @@ use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
 use App\Enums\WorkflowTransition;
 use App\Models\Customer;
+use App\Models\CustomerBillingWaiver;
 use App\Models\Invoice;
+use App\Models\RevenueCategory;
+use App\Models\RevenueSubcategory;
+use App\Services\CustomerBalanceService;
+use App\Services\InvoiceItemBuilder;
+use App\Services\InvoiceNumberGenerator;
 use Carbon\Carbon;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -87,8 +93,6 @@ class GenerateMonthlyInvoicesCommand extends Command
             // (dulu terisi registration_date), pelanggan menerima AWAL + BULANAN
             // untuk periode yang sama.
             //
-            // REAKTIVASI sengaja tidak dihitung: pelanggan yang disuspend lalu
-            // aktif lagi di bulan yang sama memang boleh punya dua record.
             // Invoice BATAL juga tidak dihitung, kalau tidak tagihan yang sudah
             // dibatalkan akan memblokir penerbitan penggantinya. Aturan ini
             // sama persis dengan InvoiceObserver::rejectSecondSubscriptionInvoice
@@ -97,6 +101,18 @@ class GenerateMonthlyInvoicesCommand extends Command
             $alreadyExists = Invoice::hasActiveSubscriptionInvoiceForPeriod($customer->id, $billingPeriod);
 
             if ($alreadyExists) {
+                $skipped++;
+
+                continue;
+            }
+
+            // ADHOC-87 — Cuti Berlangganan bisa membebaskan periode yang
+            // BELUM terbit (baris waiver dengan invoice_id null). Tanpa
+            // guard ini, menjalankan generator untuk periode itu (jadwal
+            // tanggal 1, atau --period menambal bulan lama) akan menerbitkan
+            // tagihan yang justru sedang sengaja dibebaskan. Guard yang sama
+            // (InvoiceObserver) menutup jalur pembuatan invoice manual/import.
+            if (CustomerBillingWaiver::existsFor($customer->id, $billingPeriod)) {
                 $skipped++;
 
                 continue;
@@ -118,22 +134,14 @@ class GenerateMonthlyInvoicesCommand extends Command
                     $ppnAmount = round($afterDiscount * ($ppnPercent / 100), 2);
                     $totalAmount = $afterDiscount + $ppnAmount;
 
-                    $periodCode = str_replace('-', '', $billingPeriod);
-                    $lastInvoice = Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
-                        ->orderBy('invoice_number', 'desc')
-                        ->lockForUpdate()
-                        ->first();
-
-                    $nextSeq = 1;
-                    if ($lastInvoice) {
-                        $parts = explode('-', $lastInvoice->invoice_number);
-                        if (count($parts) === 3) {
-                            $nextSeq = ((int) $parts[2]) + 1;
-                        }
-                    }
-
-                    Invoice::create([
-                        'invoice_number' => sprintf('INV-%s-%04d', $periodCode, $nextSeq),
+                    // Penomoran dipindah ke InvoiceNumberGenerator (ADHOC-60) —
+                    // sebelumnya salinan identik dari blok ini juga hidup di
+                    // bekas CustomerController::storeManualInvoice (dihapus
+                    // ADHOC-70), dan keduanya
+                    // menulis ke deret yang sama. Tetap dipanggil DI DALAM
+                    // transaksi supaya lockForUpdate()-nya bermakna.
+                    $invoice = Invoice::create([
+                        'invoice_number' => app(InvoiceNumberGenerator::class)->nextFor(InvoiceType::BULANAN, null, $periodStart),
                         'invoice_type' => InvoiceType::BULANAN->value,
                         'customer_id' => $customer->id,
                         'pop_id' => $customer->pop_id,
@@ -159,6 +167,30 @@ class GenerateMonthlyInvoicesCommand extends Command
                         'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
                         'created_by' => null,
                     ]);
+
+                    // Tagihan bulanan rutin isinya persis satu komponen:
+                    // langganan sebulan penuh. Nominalnya `subtotal`, BUKAN
+                    // `total_amount` — diskon & PPN berlaku di level tagihan,
+                    // tidak dipecah per baris (lihat InvoiceItemBuilder).
+                    app(InvoiceItemBuilder::class)->rebuildFor($invoice, [[
+                        'category_code' => RevenueCategory::CODE_JASA_LAYANAN_INTERNET,
+                        'subcategory_code' => RevenueSubcategory::CODE_LANGGANAN_BULANAN,
+                        'description' => "Langganan {$billingPeriod}",
+                        'amount' => $subtotal,
+                    ]]);
+
+                    // ADHOC-92 — KEPUTUSAN 2026-09-21: saldo pelanggan dipakai
+                    // OTOMATIS begitu tagihan BULANAN terbit, dalam transaksi
+                    // yang sama dengan pembuatan invoice-nya (bukan job
+                    // terpisah). Kegagalan auto-pay TIDAK BOLEH membatalkan
+                    // penerbitan tagihan — di-catch di sini (bukan dibiarkan
+                    // menembus ke luar transaksi) supaya invoice yang sudah
+                    // dibuat di atas tetap commit walau auto-pay-nya gagal.
+                    try {
+                        app(CustomerBalanceService::class)->applyToOpenInvoices($customer);
+                    } catch (\Throwable $e) {
+                        $this->error("Auto-pay saldo gagal untuk {$customer->customer_code}: {$e->getMessage()}");
+                    }
                 });
 
                 $created++;

@@ -35,4 +35,18 @@ return [
     | lihat guard di QrScanController).
     */
     'portal_base_url' => env('PORTAL_BASE_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Radius absen teknisi (Fase 3, rancangan §6.3)
+    |--------------------------------------------------------------------------
+    | ≤ `attendance_radius_meters` → lolos. Antara itu dan
+    | `attendance_hard_limit_meters` → lolos + perlu_review. Di atas hard
+    | limit → ditolak. Angka 150 m dipilih karena akurasi GPS HP di area
+    | padat rutin meleset 50–100 m; lebih ketat dari itu membuat teknisi
+    | selalu jatuh ke tombol manual dan guard-nya mati dalam praktik.
+    */
+    'attendance_radius_meters' => (int) env('QR_ATTENDANCE_RADIUS_METERS', 150),
+
+    'attendance_hard_limit_meters' => (int) env('QR_ATTENDANCE_HARD_LIMIT_METERS', 500),
 ];

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice - WHUSNET</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .invoice-container {
+            background-color: #ffffff;
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            color: #000;
+        }
+
+        /* Header Layout */
+        .header-section {
+            margin-bottom: 20px;
+        }
+
+        .company-name {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        .company-info {
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
+        .doc-number {
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+
+        .customer-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .customer-address {
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
+        .date-table {
+            float: right;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .date-table td {
+            padding: 2px 5px;
+        }
+
+        .clear {
+            clear: both;
+        }
+
+        /* Invoice Table */
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+            font-size: 13px;
+        }
+
+        .invoice-table th, 
+        .invoice-table td {
+            border: 1px solid #000;
+            padding: 4px 8px;
+            text-align: left;
+        }
+
+        .invoice-table th {
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .align-center {
+            text-align: center;
+        }
+
+        .align-right {
+            text-align: right;
+        }
+
+        /* Empty Rows */
+        .empty-row td {
+            height: 20px;
+        }
+
+        /* Summary Table */
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .summary-table td {
+            border: 1px solid #000;
+            padding: 4px 8px;
+        }
+
+        .summary-label {
+            width: 70%;
+            text-align: left;
+        }
+
+        .summary-value {
+            width: 30%;
+        }
+
+        .total-row {
+            font-weight: bold;
+            font-size: 15px;
+        }
+
+        .thank-you {
+            margin-top: 15px;
+            text-align: right;
+            font-size: 13px;
+            padding-right: 40px;
+        }
+
+        /* Footer / Notes */
+        .notes-section {
+            margin-top: 40px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .notes-title {
+            margin-bottom: 5px;
+        }
+
+        .notes-list {
+            margin: 0;
+            padding-left: 18px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="invoice-container">
+    
+    <!-- Dates Header -->
+    <table class="date-table">
+        <tr>
+            <td>Tanggal :</td>
+            <td>1-Aug-26</td>
+        </tr>
+        <tr>
+            <td>Tgl. Jatuh tempo :</td>
+            <td>10-Aug-26</td>
+        </tr>
+    </table>
+
+    <!-- Company Info -->
+    <div class="header-section">
+        <div class="company-name">WHUSNET by CONNEXA DIGITAL NETWORK</div>
+        <div class="company-info">
+            Jl. Waseso Aji RT.01 RW.01 Doyong, Ngampel, Balong, Ponorogo 63461<br>
+            Tlp. 081809130009
+        </div>
+        
+        <div class="doc-number">D00RQ000807</div>
+        <div class="customer-name">Parnen Prasetyo</div>
+        <div class="customer-address">Perum Grand Kusuma Blok D No 4, Kel. Purbosuman, Kec. Ponorogo</div>
+    </div>
+
+    <div class="clear"></div>
+
+    <!-- Main Table -->
+    <table class="invoice-table">
+        <thead>
+            <tr>
+                <th style="width: 5%;">No</th>
+                <th style="width: 45%;">Keterangan</th>
+                <th style="width: 20%;">Paket</th>
+                <th style="width: 15%;">Harga</th>
+                <th style="width: 15%;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="align-center">1</td>
+                <td>Pembayaran Layanan Internet Bulan Agustus</td>
+                <td class="align-center">Up to 25 Mbps</td>
+                <td>Rp 111,000</td>
+                <td class="align-right">Rp 111,000</td>
+            </tr>
+            <tr class="empty-row">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr class="empty-row">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Summary Section -->
+    <table class="summary-table">
+        <tr>
+            <td class="summary-label" style="border-top: none; border-left: none; border-bottom: none;"></td>
+            <td style="width: 15%;">Sub Total</td>
+            <td class="align-right" style="width: 15%;">Rp 111,000</td>
+        </tr>
+        <tr>
+            <td class="summary-label" style="border-top: none; border-left: none; border-bottom: none;"></td>
+            <td>DP</td>
+            <td></td>
+        </tr>
+        <tr class="total-row">
+            <td class="summary-label" style="border-top: none; border-left: none; border-bottom: none;"></td>
+            <td>Total</td>
+            <td class="align-right">Rp111,000</td>
+        </tr>
+    </table>
+
+    <div class="thank-you">Terima kasih</div>
+
+    <!-- Notes -->
+    <div class="notes-section">
+        <div class="notes-title">Perhatian :</div>
+        <ol class="notes-list">
+            <li>Lakukan pembayaran sebelum jatuh tempo agar koneksi tetap aktif.</li>
+            <li>Konfirmasi Pembayaran Hub 0817585853</li>
+            <li>Layanan Teknisi Gangguan Hub 0818415131 (24jam).</li>
+            <li>Nilai tagihan sudah termasuk PPN 11%</li>
+        </ol>
+    </div>
+
+</div>
+
+</body>
+</html>

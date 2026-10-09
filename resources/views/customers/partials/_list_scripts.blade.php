@@ -24,7 +24,8 @@
 
         function anyModalOpen() {
             return !document.getElementById('actions-modal')?.classList.contains('hidden')
-                || !document.getElementById('network-modal-wrapper')?.classList.contains('hidden');
+                || !document.getElementById('network-modal-wrapper')?.classList.contains('hidden')
+                || !document.getElementById('package-change-modal-wrapper')?.classList.contains('hidden');
         }
 
         document.addEventListener('keydown', e => {
@@ -42,6 +43,12 @@
                 if (netModal && !netModal.classList.contains('hidden')) {
                     e.preventDefault();
                     closeNetworkAssignmentModal();
+                    return;
+                }
+                const pkgModal = document.getElementById('package-change-modal-wrapper');
+                if (pkgModal && !pkgModal.classList.contains('hidden')) {
+                    e.preventDefault();
+                    closePackageChangeModal();
                     return;
                 }
             }
@@ -89,6 +96,7 @@
     })();
 
     let selectedCustomerData = {};
+    let hubRemainingAmount = 0;
 
     // Cuma kelas STATE yang ditukar, bukan className utuh. Menimpa className
     // penuh (versi lama) ikut menghapus kelas responsif tab (text-[11px]
@@ -98,7 +106,7 @@
     const TAB_INACTIVE_CLASSES = ['font-medium', 'border-transparent', 'text-slate-500', 'hover:text-slate-700', 'dark:hover:text-slate-300'];
 
     function switchActionTab(tabName) {
-        const tabs = ['finance', 'technical', 'field', 'profile'];
+        const tabs = ['profile', 'technical', 'field', 'documents', 'finance'];
         tabs.forEach(t => {
             const btn = document.getElementById(`tab-btn-${t}`);
             const content = document.getElementById(`tab-content-${t}`);
@@ -122,60 +130,58 @@
         setTimeout(() => {
             toast.classList.add('hidden');
             toast.classList.remove('flex');
-        }, 3000);
+        }, 3500);
     }
 
-    function toggleWaDropdown() {
-        const dropdown = document.getElementById('wa-menu-dropdown');
-        if (dropdown) dropdown.classList.toggle('hidden');
-    }
+    /* ── DIHAPUS: Dropdown & link template WA (toggleWaDropdown/
+       focusWaTemplates/getWaLink + listener klik-di-luar). Tombol Kirim WA
+       sudah dicabut dari footer aksi (restrukturisasi 2026-10, gak kepake) —
+       markup wa-dropdown-container/wa-menu-dropdown/btn-wa-* sudah tidak ada,
+       fungsi ini jadi dead code. ── */
 
-    // Tombol WA di bar aksi footer memakai dropdown template yang SUDAH ADA di
-    // tab Ringkasan — bukan salinan kedua. Menduplikasi dropdown berarti dua
-    // elemen dengan id btn-wa-* yang sama, dan href template cuma keisi di salah
-    // satunya. Jadi: pindah tab, scroll ke atas, lalu buka dropdown aslinya.
-    function focusWaTemplates() {
-        switchActionTab('finance');
+    /* ── DIHAPUS: Helper Form Pembayaran Modal Hub (restrukturisasi tab
+       2026-10). Catat bayar sekarang cuma lewat halaman Detail Pelanggan /
+       Invoice — Quick Hub cuma baca Ringkasan Tagihan + Riwayat Pembayaran.
+       Fungsi hubToggle/Populate/Apply/Set/Refresh* beserta pemanggilnya
+       (listener #payment-form, #hub-pay-use-balance) ikut dibuang karena
+       elemen target-nya sudah tidak ada di markup. ── */
 
-        const dropdown = document.getElementById('wa-menu-dropdown');
-        const container = document.getElementById('wa-dropdown-container');
-        if (!dropdown || !container) return;
+    function updateHubStatusUi(rawStatus) {
+        selectedCustomerData.rawStatus = rawStatus;
+        const isActive = rawStatus === 'active';
+        const isSuspended = rawStatus === 'suspended';
 
-        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        dropdown.classList.remove('hidden');
-    }
-
-    document.addEventListener('click', function(e) {
-        const container = document.getElementById('wa-dropdown-container');
-        const dropdown = document.getElementById('wa-menu-dropdown');
-        // [data-wa-trigger] dikecualikan: klik tombol WA di footer membuka
-        // dropdown lalu event-nya bubble ke sini, dan tanpa pengecualian ini
-        // dropdown-nya langsung ketutup lagi di klik yang sama.
-        if (container && dropdown && !container.contains(e.target) && !e.target.closest('[data-wa-trigger]')) {
-            dropdown.classList.add('hidden');
+        // Update Modal Status Badge
+        const badgeEl = document.getElementById('actions-modal-status-badge');
+        if (badgeEl) {
+            const statusLabelSpan = badgeEl.querySelector('span:last-child') || badgeEl;
+            statusLabelSpan.innerText = isSuspended ? 'ISOLIR' : (isActive ? 'ACTIVE' : rawStatus.toUpperCase());
+            if (isActive) {
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+            } else if (isSuspended) {
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+            } else {
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
+            }
         }
-    });
 
-    function getWaLink(type) {
-        if (!selectedCustomerData.phone) return '#';
-        let cleanPhone = selectedCustomerData.phone.replace(/[^0-9]/g, '');
-        if (cleanPhone.startsWith('0')) cleanPhone = '62' + cleanPhone.substring(1);
-        const name = selectedCustomerData.name || 'Pelanggan';
-        const code = selectedCustomerData.code || '';
-        const price = selectedCustomerData.price || '';
-        const dueDate = selectedCustomerData.dueDate || '';
-
-        let msg = '';
-        if (type === 'reminder') {
-            msg = `Halo Kak ${name} (${code}), menginformasikan tagihan internet Whusnet untuk bulan ini sebesar ${price} dengan jatuh tempo ${dueDate}. Pembayaran dapat dilakukan via Kasir POP atau Transfer. Terima kasih!`;
-        } else if (type === 'confirmation') {
-            msg = `Halo Kak ${name} (${code}), pembayaran tagihan internet Whusnet sebesar ${price} telah kami terima. Terima kasih telah berlangganan Whusnet!`;
-        } else if (type === 'isolir') {
-            msg = `Halo Kak ${name} (${code}), menginformasikan layanan internet Whusnet saat ini tertangguh (isolir) karena telah melewati jatuh tempo. Mohon lakukan konfirmasi pembayaran untuk aktivasi kembali.`;
-        } else {
-            msg = `Halo Kak ${name} (${code}), ada yang bisa kami bantu terkait layanan internet Whusnet?`;
+        // Update Button Top
+        const toggleBtn = document.getElementById('btn-hub-toggle-status');
+        const toggleBtnText = document.getElementById('btn-hub-toggle-status-text');
+        if (toggleBtn && toggleBtnText) {
+            toggleBtnText.innerText = isActive ? 'Isolir Layanan' : 'Aktifkan Layanan';
+            if (isActive) {
+                toggleBtn.className = 'flex-1 min-w-[140px] h-11 px-2.5 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-amber-100 transition-all btn-interactive touch-target';
+            } else {
+                toggleBtn.className = 'flex-1 min-w-[140px] h-11 px-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-emerald-100 transition-all btn-interactive touch-target';
+            }
         }
-        return 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(msg);
+
+        // Update Footer Toggle Button
+        const footerToggleText = document.getElementById('btn-hub-footer-toggle-text');
+        if (footerToggleText) {
+            footerToggleText.innerText = isActive ? 'Isolir' : 'Aktifkan';
+        }
     }
 
     function openActionsModal(button) {
@@ -216,12 +222,13 @@
             routerBrand: button.getAttribute('data-router-brand') || '-',
             contract: button.getAttribute('data-contract') || '-',
             distribution: button.getAttribute('data-distribution') || '-',
-            // URL aksi dirender server-side (route()) di tombolnya, bukan dirakit
-            // di JS dari id. ADHOC-20 langkah 3.
             paymentInfoUrl: button.getAttribute('data-payment-info-url') || '',
             networkUpdateUrl: button.getAttribute('data-network-update-url') || '',
             networkDataUrl: button.getAttribute('data-network-data-url') || '',
             detailUrl: button.getAttribute('data-detail-url') || '',
+            packageUpdateUrl: button.getAttribute('data-package-update-url') || '',
+            currentPackageId: button.getAttribute('data-current-package-id') || '',
+            toggleSuspendUrl: button.getAttribute('data-toggle-suspend-url') || '',
         };
 
         const setElemText = (id, txt) => {
@@ -238,29 +245,10 @@
             avatarEl.innerText = selectedCustomerData.name.substring(0, 2).toUpperCase();
         }
 
-        const badgeEl = document.getElementById('actions-modal-status-badge');
-        if (badgeEl) {
-            const statusLabelSpan = badgeEl.querySelector('span:last-child') || badgeEl;
-            statusLabelSpan.innerText = selectedCustomerData.status.toUpperCase();
-            if (selectedCustomerData.rawStatus === 'active') {
-                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
-            } else if (selectedCustomerData.rawStatus === 'suspended') {
-                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
-            } else {
-                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
-            }
-        }
+        updateHubStatusUi(selectedCustomerData.rawStatus);
 
         const fullLoc = `${selectedCustomerData.pop} (${selectedCustomerData.village})`;
         setElemText('actions-modal-location-text', fullLoc);
-
-        // WA Links
-        const waReminder = document.getElementById('btn-wa-reminder');
-        const waConfirmation = document.getElementById('btn-wa-confirmation');
-        const waIsolir = document.getElementById('btn-wa-isolir');
-        if (waReminder) waReminder.href = getWaLink('reminder');
-        if (waConfirmation) waConfirmation.href = getWaLink('confirmation');
-        if (waIsolir) waIsolir.href = getWaLink('isolir');
 
         // Maps Link
         const fieldMapsBtn = document.getElementById('btn-field-launch-maps');
@@ -273,25 +261,13 @@
         }
         if (fieldMapsBtn) fieldMapsBtn.href = mapsUrl;
 
-        // Toggle Status Button Text
-        const isActiveService = selectedCustomerData.rawStatus === 'active';
-        const toggleBtnText = document.getElementById('btn-hub-toggle-status-text');
-        if (toggleBtnText) {
-            toggleBtnText.innerText = isActiveService ? 'Isolir Layanan' : 'Aktifkan Layanan';
-        }
-        // Label kembar di bar aksi footer (mobile/tablet) — versinya dipendekkan
-        // karena slotnya cuma selebar ikon.
-        const footerToggleText = document.getElementById('btn-hub-footer-toggle-text');
-        if (footerToggleText) {
-            footerToggleText.innerText = isActiveService ? 'Isolir' : 'Aktifkan';
-        }
-
         // Pre-fill Static Data
-        setElemText('hub-fin-package', selectedCustomerData.package);
-        setElemText('hub-fin-price', selectedCustomerData.price);
         setElemText('hub-fin-due-date', selectedCustomerData.dueDate);
+        setElemText('hub-prof-package', selectedCustomerData.package);
+        setElemText('hub-prof-price', selectedCustomerData.price);
 
         setElemText('hub-tech-pppoe', selectedCustomerData.pppoe);
+        document.getElementById('hub-tech-pppoe-warning')?.classList.add('hidden');
         setElemText('hub-tech-vlan', selectedCustomerData.vlan);
         setElemText('hub-tech-bandwidth', selectedCustomerData.bandwidth);
         setElemText('hub-tech-onu', selectedCustomerData.onu);
@@ -317,62 +293,47 @@
         const compBar = document.getElementById('hub-prof-completeness-bar');
         if (compBar) compBar.style.width = selectedCustomerData.completenessPct + '%';
 
-        switchActionTab('finance');
+        switchActionTab('profile');
         modal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
 
-        // Set initial state saat data tagihan dimuat
-        togglePaymentFormState(false, 'Memuat data tagihan pelanggan...');
-        // Struk & berkas ikut direset — kalau tidak, data pelanggan sebelumnya
-        // masih nempel selama fetch berjalan.
         setLatestReceipt(null);
         renderHubDocuments(null, null);
 
         // Fetch Live Payment Info
+        loadHubPaymentInfo();
+    }
+
+    function loadHubPaymentInfo() {
+        if (!selectedCustomerData.paymentInfoUrl) return;
+
         const loadingEl = document.getElementById('modal-hub-loading');
         if (loadingEl) loadingEl.classList.remove('hidden');
 
-        // URL dari atribut data-* yang dirender route() di tombolnya — sama seperti
-        // aksi tulis, biar tidak ada definisi path yang hidup dua kali.
         fetch(selectedCustomerData.paymentInfoUrl)
             .then(res => res.json())
             .then(data => {
                 if (loadingEl) loadingEl.classList.add('hidden');
                 const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
+                hubRemainingAmount = parseFloat(data.remaining_amount) || 0;
+
                 if (data.invoice_id) {
-                    setElemText('hub-invoice-period-badge', `Periode: ${data.billing_period || '-'}`);
-                    setElemText('hub-fin-due-date', data.due_date || selectedCustomerData.dueDate);
-                    setElemText('hub-fin-arrears', data.total_piutang > 0 ? formatRp(data.total_piutang) : 'Rp 0');
-                    setElemText('hub-fin-total-pay', formatRp(data.remaining_amount));
-
-                    // URL dari server (payment_store_url), BUKAN dirakit di sini.
-                    // Tanpa URL-nya form dibiarkan mati — lebih baik tombol tidak
-                    // jalan daripada POST nyasar ke URL halaman daftar.
-                    const payForm = document.getElementById('payment-form');
-                    if (payForm && data.payment_store_url) {
-                        payForm.action = data.payment_store_url;
-                    }
-                    
-                    // Enable form jika pelanggan punya tagihan aktif
-                    togglePaymentFormState(true);
-
-                    const amountInput = document.getElementById('payment_amount');
-                    if (amountInput) {
-                        // Nilai dari AJAX ikut dimasking supaya sisa tagihan
-                        // tampil 150.000, bukan 150000 di sebelah field yang
-                        // seluruh isinya berformat ribuan.
-                        amountInput.value = window.Rupiah
-                            ? window.Rupiah.formatDariServer(String(data.remaining_amount))
-                            : data.remaining_amount;
-                    }
+                    const elPeriod = document.getElementById('hub-invoice-period-badge');
+                    if (elPeriod) elPeriod.innerText = `Periode: ${data.billing_period || '-'}`;
+                    const elDue = document.getElementById('hub-fin-due-date');
+                    if (elDue) elDue.innerText = data.due_date || selectedCustomerData.dueDate;
+                    const elArrears = document.getElementById('hub-fin-arrears');
+                    if (elArrears) elArrears.innerText = data.total_piutang > 0 ? formatRp(data.total_piutang) : 'Rp 0';
+                    const elTotalPay = document.getElementById('hub-fin-total-pay');
+                    if (elTotalPay) elTotalPay.innerText = formatRp(hubRemainingAmount);
                 } else {
-                    setElemText('hub-invoice-period-badge', 'Tidak Ada Tagihan Aktif');
-                    setElemText('hub-fin-total-pay', 'Rp 0');
-                    setElemText('hub-fin-arrears', 'Rp 0');
-
-                    // Disable form jika belum ada tagihan
-                    togglePaymentFormState(false, 'Pelanggan ini belum memiliki tagihan aktif untuk dibayar.');
+                    const elPeriod = document.getElementById('hub-invoice-period-badge');
+                    if (elPeriod) elPeriod.innerText = 'Tidak Ada Tagihan Aktif';
+                    const elTotalPay = document.getElementById('hub-fin-total-pay');
+                    if (elTotalPay) elTotalPay.innerText = 'Rp 0';
+                    const elArrears = document.getElementById('hub-fin-arrears');
+                    if (elArrears) elArrears.innerText = 'Rp 0';
                 }
 
                 const tbody = document.getElementById('hub-recent-payments-body');
@@ -396,8 +357,6 @@
                     }
                 }
 
-                // Struk hanya bisa dicetak kalau pelanggan sudah pernah bayar —
-                // recent_payments sudah urut terbaru dari server.
                 setLatestReceipt(data.recent_payments && data.recent_payments.length > 0
                     ? data.recent_payments[0].receipt_url
                     : null);
@@ -405,22 +364,38 @@
                 renderHubDocuments(data.documents, data.documents_upload_url);
 
                 if (data.technical) {
-                    setElemText('hub-tech-pppoe', data.technical.pppoe_username || selectedCustomerData.pppoe);
-                    setElemText('hub-tech-onu', data.technical.onu_sn || selectedCustomerData.onu);
-                    setElemText('hub-tech-router', data.technical.router_sn || selectedCustomerData.router);
-                    setElemText('hub-tech-distribution', data.technical.distribution || selectedCustomerData.distribution);
+                    const elPppoe = document.getElementById('hub-tech-pppoe');
+                    if (elPppoe) elPppoe.innerText = data.technical.pppoe_username || selectedCustomerData.pppoe;
+                    // Peringatan PPPoE ≠ CID (ADHOC-107 K2) — teks dari server, klien cuma menampilkan.
+                    const elPppoeWarning = document.getElementById('hub-tech-pppoe-warning');
+                    if (elPppoeWarning) {
+                        elPppoeWarning.innerText = data.technical.pppoe_warning || '';
+                        elPppoeWarning.classList.toggle('hidden', !data.technical.pppoe_warning);
+                    }
+                    const elVlan = document.getElementById('hub-tech-vlan');
+                    if (elVlan) elVlan.innerText = data.technical.vlan || selectedCustomerData.vlan;
+                    const elBw = document.getElementById('hub-tech-bandwidth');
+                    if (elBw) elBw.innerText = data.technical.bandwidth || selectedCustomerData.bandwidth;
+                    const elOnu = document.getElementById('hub-tech-onu');
+                    if (elOnu) elOnu.innerText = data.technical.onu_sn || selectedCustomerData.onu;
+                    const elRouter = document.getElementById('hub-tech-router');
+                    if (elRouter) elRouter.innerText = data.technical.router_sn || selectedCustomerData.router;
+                    const elDist = document.getElementById('hub-tech-distribution');
+                    if (elDist) elDist.innerText = data.technical.distribution || selectedCustomerData.distribution;
+                    const elContract = document.getElementById('hub-tech-contract');
+                    if (elContract) elContract.innerText = data.technical.contract_type || selectedCustomerData.contract;
+                    const elAttenuation = document.getElementById('hub-tech-attenuation');
+                    if (elAttenuation) elAttenuation.innerText = data.technical.attenuation || '-';
                 }
             })
             .catch(err => {
                 console.error(err);
                 if (loadingEl) loadingEl.classList.add('hidden');
-                togglePaymentFormState(false, 'Gagal memuat informasi tagihan.');
                 setLatestReceipt(null);
             });
     }
 
     // URL struk pembayaran terakhir pelanggan yang lagi dibuka di Modal Hub.
-    // Direset tiap modal dibuka supaya tidak mencetak struk pelanggan sebelumnya.
     let latestReceiptUrl = null;
 
     function setLatestReceipt(url) {
@@ -437,7 +412,6 @@
     function printLatestReceipt() {
         if (!latestReceiptUrl) {
             showModalToast('Belum ada pembayaran yang bisa dicetak.');
-
             return;
         }
         window.open(latestReceiptUrl, '_blank');
@@ -481,95 +455,141 @@
         });
     }
 
-    function togglePaymentFormState(enabled, message = '') {
-        const payForm = document.getElementById('payment-form');
-        if (!payForm) return;
-
-        const amountInput = document.getElementById('payment_amount');
-        const methodSelect = payForm.querySelector('select[name="payment_method"]');
-        const dateInput = document.getElementById('payment_date');
-        const submitBtn = payForm.querySelector('button[type="submit"]');
-        const noticeEl = document.getElementById('payment-form-notice');
-        const noticeText = document.getElementById('payment-form-notice-text');
-
-        if (enabled) {
-            if (amountInput) {
-                amountInput.disabled = false;
-                amountInput.classList.remove('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
-            }
-            if (methodSelect) {
-                methodSelect.disabled = false;
-                methodSelect.classList.remove('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
-            }
-            if (dateInput) {
-                dateInput.disabled = false;
-                dateInput.classList.remove('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
-            }
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
-            }
-            if (noticeEl) noticeEl.classList.add('hidden');
-        } else {
-            if (amountInput) {
-                amountInput.disabled = true;
-                amountInput.value = '';
-                amountInput.classList.add('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
-            }
-            if (methodSelect) {
-                methodSelect.disabled = true;
-                methodSelect.classList.add('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
-            }
-            if (dateInput) {
-                dateInput.disabled = true;
-                dateInput.classList.add('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
-            }
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
-            }
-            if (noticeEl) {
-                if (noticeText && message) noticeText.innerText = message;
-                noticeEl.classList.remove('hidden');
-            }
-        }
-    }
-
     function closeActionsModal() {
         const modal = document.getElementById('actions-modal');
         if (modal) modal.classList.add('hidden');
         document.body.classList.remove('overflow-hidden');
-        // Dropdown template WA ikut ditutup — kalau tidak, dia masih terbuka
-        // waktu modal dibuka lagi untuk pelanggan lain.
-        const waDropdown = document.getElementById('wa-menu-dropdown');
-        if (waDropdown) waDropdown.classList.add('hidden');
     }
 
     function copyTechInfo() {
+        const pppoe = document.getElementById('hub-tech-pppoe')?.innerText || selectedCustomerData.pppoe;
+        const vlan = document.getElementById('hub-tech-vlan')?.innerText || selectedCustomerData.vlan;
+        const bw = document.getElementById('hub-tech-bandwidth')?.innerText || selectedCustomerData.bandwidth;
+        const onu = document.getElementById('hub-tech-onu')?.innerText || selectedCustomerData.onu;
+        const devInfo = document.getElementById('hub-tech-router')?.innerText || selectedCustomerData.router;
+        const dist = document.getElementById('hub-tech-distribution')?.innerText || selectedCustomerData.distribution;
+
         const textToCopy = `[DATA TEKNIS PELANGGAN]
 Nama: ${selectedCustomerData.name} (${selectedCustomerData.code})
 POP: ${selectedCustomerData.pop}
-PPPoE: ${selectedCustomerData.pppoe}
-ONU SN: ${selectedCustomerData.onu}
-Router SN: ${selectedCustomerData.router}
-ODP/Distribusi: ${selectedCustomerData.distribution}`;
+PPPoE: ${pppoe}
+VLAN: ${vlan}
+Bandwidth: ${bw}
+SN Perangkat: ${onu}
+Merk/Model/MAC: ${devInfo}
+ODP/Distribusi: ${dist}`;
 
         navigator.clipboard.writeText(textToCopy).then(() => {
             showModalToast('Kredensial teknis berhasil disalin!');
         });
     }
 
+    function copyPppoeUsername() {
+        const pppoe = document.getElementById('hub-tech-pppoe')?.innerText || selectedCustomerData.pppoe;
+        if (!pppoe || pppoe === '-') return;
+        navigator.clipboard.writeText(pppoe).then(() => {
+            showModalToast('Username PPPoE berhasil disalin!');
+        });
+    }
+
+    /* ── Fungsi Nyata Suspend / Isolir Layanan Pelanggan ── */
     function triggerHubToggleConnection() {
+        if (!selectedCustomerData.id) return;
         const isCurrentActive = selectedCustomerData.rawStatus === 'active';
+        const isSuspended = selectedCustomerData.rawStatus === 'suspended';
+
+        if (!isCurrentActive && !isSuspended) {
+            showModalToast('Layanan hanya dapat diisolir atau diaktifkan untuk pelanggan aktif atau terisolir.');
+            return;
+        }
+
         const actionText = isCurrentActive ? 'mengisolir / menonaktifkan' : 'mengaktifkan kembali';
 
-        if (window.confirmAction) {
-            if (confirm(`Apakah Anda yakin ingin ${actionText} koneksi internet untuk ${selectedCustomerData.name}?`)) {
-                showModalToast(`Status layanan ${selectedCustomerData.name} berhasil diubah.`);
+        // window.Dialog — modal konfirmasi standar app (lihat layouts/app.blade.php).
+        // Dulu pakai confirm() bawaan browser: gak konsisten sama modal lain di
+        // app ini, dan di beberapa kombinasi browser/extension bisa ke-suppress
+        // diam-diam sehingga tombol kelihatan "gak ngapa-ngapain".
+        window.Dialog.show({
+            title: isCurrentActive ? 'Isolir Layanan' : 'Aktifkan Kembali Layanan',
+            message: `Apakah Anda yakin ingin ${actionText} koneksi internet untuk pelanggan "${selectedCustomerData.name}"?`,
+            icon: 'warning',
+            buttons: [
+                { text: 'Batal', type: 'secondary', onClick: () => window.Dialog.close() },
+                {
+                    text: isCurrentActive ? 'Ya, Isolir' : 'Ya, Aktifkan',
+                    type: isCurrentActive ? 'danger' : 'primary',
+                    onClick: () => {
+                        window.Dialog.close();
+                        submitHubToggleConnection(isCurrentActive);
+                    },
+                },
+            ],
+        });
+    }
+
+    function submitHubToggleConnection(isCurrentActive) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value;
+        const btnTop = document.getElementById('btn-hub-toggle-status');
+        const btnText = document.getElementById('btn-hub-toggle-status-text');
+
+        if (btnTop) btnTop.disabled = true;
+        if (btnText) btnText.innerText = 'Memproses...';
+
+        {{-- Target POST dirender server-side (data-toggle-suspend-url di
+             tombol Aksi) — jangan rakit URL-nya di sini. ADHOC-20 langkah 3. --}}
+        fetch(selectedCustomerData.toggleSuspendUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({
+                _token: csrfToken,
+                note: isCurrentActive ? 'Isolir Layanan dari List Pelanggan' : 'Aktivasi Kembali Layanan dari List Pelanggan'
+            })
+        })
+        .then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.message || 'Gagal mengubah status layanan.');
             }
-        } else if (confirm(`Apakah Anda yakin ingin ${actionText} koneksi internet untuk ${selectedCustomerData.name}?`)) {
-            showModalToast(`Status layanan ${selectedCustomerData.name} berhasil diubah.`);
-        }
+            return data;
+        })
+        .then(data => {
+            updateHubStatusUi(data.raw_status);
+            showModalToast(data.message || 'Status layanan berhasil diperbarui.');
+
+            // Update status badge di tabel list utama secara realtime jika elemennya ada
+            const tableRows = document.querySelectorAll(`button[data-id="${selectedCustomerData.id}"]`);
+            tableRows.forEach(btn => {
+                btn.setAttribute('data-raw-status', data.raw_status);
+                btn.setAttribute('data-status', data.status_label);
+                const tr = btn.closest('tr');
+                if (tr) {
+                    const statusTd = tr.querySelector('td:nth-last-child(2)');
+                    if (statusTd) {
+                        const isNowActive = data.raw_status === 'active';
+                        const isNowSuspended = data.raw_status === 'suspended';
+                        statusTd.innerHTML = `
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${isNowActive ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (isNowSuspended ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800')}">
+                                <span class="w-1.5 h-1.5 rounded-full ${isNowActive ? 'bg-emerald-500 animate-pulse-glow' : (isNowSuspended ? 'bg-amber-500' : 'bg-rose-500')} mr-1.5"></span>
+                                <span>${data.status_label}</span>
+                            </span>
+                        `;
+                    }
+                }
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            showModalToast(err.message || 'Terjadi kesalahan sistem.');
+            updateHubStatusUi(selectedCustomerData.rawStatus);
+        })
+        .finally(() => {
+            if (btnTop) btnTop.disabled = false;
+        });
     }
 
     function triggerDetail() {
@@ -577,14 +597,65 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
         window.location.href = selectedCustomerData.detailUrl;
     }
 
-    // Jembatan Modal Hub → Modal Atur Jaringan. Dua modal tidak boleh tampil
-    // bersamaan (keduanya z-50 + backdrop), jadi hub ditutup dulu baru network dibuka.
+    // Jembatan Modal Hub → Modal Atur Jaringan.
     function triggerNetworkAssignmentFromHub() {
         if (!selectedCustomerData || !selectedCustomerData.networkUpdateUrl) return;
         const updateUrl = selectedCustomerData.networkUpdateUrl;
         const dataUrl = selectedCustomerData.networkDataUrl;
         closeActionsModal();
         openNetworkAssignmentModal(updateUrl, dataUrl);
+    }
+
+    // Jembatan Modal Hub → Modal Ganti Paket. Data (paket/harga aktif) sudah
+    // ada di selectedCustomerData (dari data-* baris tabel), jadi tidak perlu
+    // fetch ulang seperti Atur Jaringan.
+    function triggerPackageChangeFromHub() {
+        if (!selectedCustomerData || !selectedCustomerData.packageUpdateUrl) return;
+        closeActionsModal();
+        openPackageChangeModal(
+            selectedCustomerData.packageUpdateUrl,
+            selectedCustomerData.currentPackageId,
+            selectedCustomerData.package,
+            selectedCustomerData.price,
+            selectedCustomerData.name
+        );
+    }
+
+    /* ── Modal Ganti Paket Internet ──
+       @param {string} updateUrl PUT target (customers.package.update), dirender
+       server-side lewat data-package-update-url di tombol pemanggil. JANGAN
+       merakit path dari id pelanggan di sini — ADHOC-20 langkah 3. */
+    function openPackageChangeModal(updateUrl, currentPackageId, currentPackageLabel, currentPriceLabel, customerName) {
+        const wrapper = document.getElementById('package-change-modal-wrapper');
+        const form = document.getElementById('package-change-form');
+        const select = document.getElementById('pkg-select');
+        const nameEl = document.getElementById('pkg-customer-name');
+        const currentPackageEl = document.getElementById('pkg-current-package');
+        const currentPriceEl = document.getElementById('pkg-current-price');
+
+        if (!wrapper || !form) return;
+        if (!updateUrl) {
+            if (window.Toast) {
+                window.Toast.error('Aksi Gagal', 'Target penyimpanan paket tidak dikenal. Muat ulang halaman.');
+            }
+
+            return;
+        }
+
+        form.action = updateUrl;
+        if (select) select.value = currentPackageId || '';
+        if (nameEl) nameEl.textContent = customerName || '-';
+        if (currentPackageEl) currentPackageEl.textContent = currentPackageLabel || '-';
+        if (currentPriceEl) currentPriceEl.textContent = currentPriceLabel || '-';
+
+        wrapper.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closePackageChangeModal() {
+        const wrapper = document.getElementById('package-change-modal-wrapper');
+        if (wrapper) wrapper.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
     }
 
     function triggerEdit() {
@@ -594,9 +665,11 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
     function triggerTerminate() {
         closeActionsModal();
         if (!selectedCustomerData.detailUrl) return;
-        if (confirm(`Apakah Anda yakin ingin melakukan PEMUTUSAN / TERMINASI untuk ${selectedCustomerData.name}?`)) {
-            window.location.href = selectedCustomerData.detailUrl + '#terminate';
-        }
+        // Konfirmasi (+ alasan wajib) sudah ditangani panel "Putus Langganan"
+        // di halaman Detail (window.confirmDelete) — bukan di sini, biar gak
+        // dobel dialog dan halaman Detail tetap satu-satunya tempat forms
+        // mutasi data ini benar-benar dirender (lihat customers/show.blade.php).
+        window.location.href = selectedCustomerData.detailUrl + '#terminate';
     }
 
 @include('customers.partials._network_assignment_js')

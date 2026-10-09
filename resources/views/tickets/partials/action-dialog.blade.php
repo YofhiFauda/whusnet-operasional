@@ -38,52 +38,67 @@
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
         })[c]);
 
+        const doConfirm = () => {
+            const input = document.getElementById(fieldId);
+            const reason = (input?.value || '').trim();
+
+            if (opts.required && reason === '') {
+                document.getElementById(errorId)?.classList.remove('hidden');
+                input?.focus();
+                return;
+            }
+
+            window.Dialog.close();
+            opts.onConfirm(reason);
+        };
+
         window.Dialog.show({
             title: opts.title,
             icon: opts.icon || 'warning',
             contentHtml: `
-                <p class="mb-4">${escape(opts.message)}</p>
-                <label for="${fieldId}" class="block text-xs font-semibold text-text-secondary mb-1.5">
+                <p class="mb-3 text-text-main font-medium">${escape(opts.message)}</p>
+                <label for="${fieldId}" class="block text-xs font-bold text-text-secondary mb-1 uppercase tracking-wider">
                     ${escape(opts.label)}
                 </label>
                 <textarea id="${fieldId}" rows="3" maxlength="1000"
-                    class="w-full text-sm rounded-lg border border-border bg-background p-2.5 text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all"></textarea>
-                <p id="${errorId}" class="hidden text-xs text-rose-600 mt-1.5">Alasan wajib diisi untuk aksi ini.</p>
+                    placeholder="Ketik alasan / catatan jika ada, lalu tekan Enter..."
+                    class="w-full text-xs rounded-lg border border-border bg-background p-2.5 text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"></textarea>
+                <div class="flex items-center justify-between mt-1 text-[10px] text-text-muted">
+                    <span>Tekan <kbd class="px-1 py-0.2 bg-surface-muted rounded border border-border font-mono">Enter</kbd> untuk konfirmasi, <kbd class="px-1 py-0.2 bg-surface-muted rounded border border-border font-mono">Shift+Enter</kbd> baris baru</span>
+                    <span id="${errorId}" class="hidden text-rose-600 font-semibold">Alasan wajib diisi</span>
+                </div>
             `,
             buttons: [
                 {
-                    text: 'Batal',
+                    text: 'Batal (Esc)',
                     type: 'secondary',
                     onClick: () => window.Dialog.close(),
                 },
                 {
-                    text: opts.confirmText || 'Ya, Lanjutkan',
+                    text: (opts.confirmText || 'Ya, Lanjutkan') + ' (Enter)',
                     type: opts.confirmType || 'primary',
-                    onClick: (e) => {
-                        const button = e.currentTarget;
-                        const input = document.getElementById(fieldId);
-                        const reason = (input?.value || '').trim();
-
-                        if (opts.required && reason === '') {
-                            document.getElementById(errorId)?.classList.remove('hidden');
-                            // window.Dialog nge-disable tombol begitu diklik —
-                            // hidupin lagi biar user bisa submit ulang abis
-                            // ngisi alasannya (kalau enggak, dialog jadi buntu).
-                            button.disabled = false;
-                            button.classList.remove('opacity-50', 'cursor-not-allowed');
-                            input?.focus();
-
-                            return;
-                        }
-
-                        window.Dialog.close();
-                        opts.onConfirm(reason);
-                    },
+                    onClick: () => doConfirm(),
                 },
             ],
         });
 
-        setTimeout(() => document.getElementById(fieldId)?.focus(), 350);
+        setTimeout(() => {
+            const textarea = document.getElementById(fieldId);
+            if (textarea) {
+                textarea.focus();
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        doConfirm();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.Dialog.close();
+                    }
+                });
+            }
+        }, 50);
     };
 </script>
 @endpush

@@ -34,42 +34,40 @@ class DatabaseSeeder extends Seeder
         $this->call(ItemFeatureSeeder::class); // Master Barang/Material
         $this->call(ItemCategoryFeatureSeeder::class); // Master Kategori Barang
         $this->call(WorkToolFeatureSeeder::class); // Master Alat Kerja
-        $this->call(QrFeatureSeeder::class); // QR Pelanggan (Fase 1)
-        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.* ke-sync ke owner
+        $this->call(BankAccountFeatureSeeder::class); // Master Rekening Bank (ADHOC-95)
+        $this->call(QrFeatureSeeder::class); // QR Pelanggan (Fase 1) Permission QR
+        $this->call(WarehouseFeatureSeeder::class); // Gudang/Inventory (ADHOC-54, Fase 1)
+        $this->call(FopAnalyticsFeatureSeeder::class); // Dashboard Analitik FOP
+        $this->call(CustomerAcquisitionFeatureSeeder::class); // Customer Acquisition (Busdev) - Pelanggan Aktif < 30 Hari
+        $this->call(BusinessDevelopmentVerificationFeatureSeeder::class); // Antrean Menunggu Verifikasi BD (pelanggan Bisnis pra-ACTIVE)
+        $this->call(CustomerRegistrationVerificationFeatureSeeder::class); // Antrean Verifikasi Registrasi (ADHOC-73)
+        $this->call(BusinessDevelopmentFeatureSeeder::class); // agents/package_restrictions/sales_omset_dashboard/business_customers (Skema 1-3, 2026-09-12)
+        $this->call(CustomerTerminationReasonFeatureSeeder::class); // Master Alasan Putus Langganan (ADHOC-69)
+        $this->call(BillingWaiverFeatureSeeder::class); // Pembebasan Tagihan Periode (ADHOC-87)
+        $this->call(CustomerBalanceFeatureSeeder::class); // Saldo Pelanggan — Bayar di Muka + Auto-Pakai (ADHOC-92)
+        $this->call(CreqBillingVerificationFeatureSeeder::class); // Antrean Verifikasi Biaya C-REQ (docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)
+        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.*/warehouse*.*/fop_analytics.*/customer_acquisitions.*/agents.*/package_restrictions.*/sales_omset_dashboard.*/customer_registration_verification.*/termination_reasons.*/billing_waivers.*/customer_balance.*/creq_billing_verification.* ke-sync ke owner
         $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
+        $this->call(ItemCategorySeeder::class); // Kategori tambahan non-system (modem_ont, router_gateway) — sebelum ItemSeeder, dirujuk barangnya
         $this->call(ItemSeeder::class); // Isi awal master barang — tambah sisanya lewat Master Data
         $this->call(WorkToolSeeder::class); // Isi awal master alat kerja
 
         // $this->call(CustomerSeeder::class);
         // $this->call(MasterPopSeeder::class);
-        $this->call(TechnicianSeeder::class);
-        $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
+
+        // $this->call(TechnicianSeeder::class);
+        // $this->call(PicGudangSeeder::class); // Demo PIC Gudang Jetis & Sandya (ADHOC-120), WAJIB setelah RoleSeeder/RolePermissionSeeder
+        // $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
+        // $this->call(BusinessCustomerSeeder::class); // Data List Pelanggan Bisnis (7 pelanggan dari docs/plan/bussiness-development/tabel_paket_bisnis.md) — WAJIB setelah ItemCategorySeeder & CustomerAcquisitionFeatureSeeder
+        // $this->call(BusinessDevelopmentSeeder::class); // Data demo Busdev: Restriksi Paket, Master Agent, Omset Sales (Skema 1-3) — reuse Sales/Teknisi di atas, WAJIB setelah keduanya
+        // $this->call(FopSeeder::class);
+        // $this->call(KolektorSeeder::class);
+        // $this->call(AdminGudangPusatSeeder::class);
+        // $this->call(AdminGudangCabangSeeder::class);
+        // $this->call(NocSeeder::class);
+        // $this->call(HelpdeskSeeder::class);
 
         // User::factory(10)->create();
 
-        // $ownerRole = \App\Models\Role::where('name', 'Owner')->first();
-        // $adminRole = \App\Models\Role::where('name', 'Admin')->first();
-
-        // User::updateOrCreate([
-        //     'email' => 'owner@whusnet.net',
-        // ], [
-        //     'name' => 'Owner Whusnet',
-        //     'email_verified_at' => now(),
-        //     'phone' => '081234567890',
-        //     'password' => bcrypt('password'),
-        //     'status' => 'active',
-        //     'role_id' => $ownerRole ? $ownerRole->id : null,
-        // ]);
-
-        // User::updateOrCreate([
-        //     'email' => 'admin@whusnet.net',
-        // ], [
-        //     'name' => 'Admin Whusnet',
-        //     'email_verified_at' => now(),
-        //     'phone' => '081234567890',
-        //     'password' => bcrypt('password'),
-        //     'status' => 'active',
-        //     'role_id' => $adminRole ? $adminRole->id : null,
-        // ]);
     }
 }

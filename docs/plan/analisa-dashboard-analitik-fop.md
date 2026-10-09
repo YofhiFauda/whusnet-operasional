@@ -1,8 +1,13 @@
-# BELUM DI IMPLEMENTASIKAN
-
 # Analisa Dashboard Analitik FOP — Alat Kerja, Wilayah, Performa Teknisi
 
-Status: **Analisa awal + mockup, belum eksekusi.** Belum masuk sprint aktif — perlu entry task baru di `docs/TASKS.md` sebelum dikerjakan.
+
+Status: **Selesai diimplementasikan — 2026-09-08 (ADHOC-59, lihat `docs/TASKS.md`).** Halaman `/fop/analitik`, controller `FopAnalyticsController`, view `resources/views/fop/analytics.blade.php`, test `FopAnalyticsDashboardTest`.
+
+Open questions di bawah (§ "Open questions") sudah diputuskan user sebelum eksekusi:
+1. Proksi "task gagal" (`status=dibatalkan`) & "komplain" (`task_type=MTN`) — **dipakai**, label UI eksplisit.
+2. "Beban tugas" — **semua status** task, dihitung per baris `TaskTeam` (assignment individual, bukan per task).
+3. Granularitas wilayah — **kecamatan** (`district_id`).
+4. Backlog — **Task saja**, tidak termasuk FopTask draft standalone.
 
 Mockup visual (Artifact, data contoh — bukan hasil query): https://claude.ai/code/artifact/41cb4da2-4046-472d-b6b3-db63351e7e02
 

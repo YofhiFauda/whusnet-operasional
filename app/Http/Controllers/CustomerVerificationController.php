@@ -2,29 +2,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\InvoiceStatus;
-use App\Enums\InvoiceType;
 use App\Enums\NotificationType;
 use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Models\AuditLog;
+use App\Models\City;
 use App\Models\Customer;
-use App\Models\Invoice;
+use App\Models\InternetPackage;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Services\CustomerCidService;
+use App\Services\CustomerVerificationDetailService;
+use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
-use App\Services\TaskMaterialService;
-use App\Services\TaskWorkToolService;
 use App\Services\TeknisiWorkloadService;
 use App\Services\TelegramBotService;
+use App\Support\LikeSearch;
 use App\Support\RupiahInput;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -64,7 +65,7 @@ class CustomerVerificationController extends Controller
         // dijadwalkan buat dirinya — bukan seluruh antrean verifikasi/pemasangan.
         // NOC/FOP/Admin/Owner (hasFullAccess) tetap liat semua buat supervisi.
         // Lihat catatan sama di CustomerSurveyController::index().
-        if (! auth()->user()->hasFullAccess() && auth()->user()->hasRole('teknisi')) {
+        if (! auth()->user()->hasFullAccess() && auth()->user()->isTechnician()) {
             $query->whereHas('tasks', function ($q) {
                 $q->where('task_type', TaskType::PEMASANGAN->value)
                     ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', auth()->id()));
@@ -72,7 +73,7 @@ class CustomerVerificationController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = LikeSearch::sanitize((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
                     ->orWhere('id_number', 'like', "%{$search}%")
@@ -117,7 +118,7 @@ class CustomerVerificationController extends Controller
 
         $this->authorizeCustomerPopScope($user, $customer);
 
-        if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+        if (! $user->hasFullAccess() && $user->isTechnician()) {
             $isAssigned = Task::where('customer_id', $customer->id)
                 ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
                 ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id))
@@ -171,7 +172,7 @@ class CustomerVerificationController extends Controller
         // #1). Dicek ke task SURVEY *atau* PEMASANGAN karena halaman ini
         // dipakai buat pelanggan di berbagai tahap (waiting_acc s/d
         // verification_admin) — task yang relevan beda-beda tergantung tahap.
-        if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+        if (! $user->hasFullAccess() && $user->isTechnician()) {
             $isAssigned = Task::where('customer_id', $customer->id)
                 ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
                 ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id))
@@ -180,62 +181,20 @@ class CustomerVerificationController extends Controller
             abort_unless($isAssigned, 403, 'Anda bukan anggota tim yang ditugaskan untuk pelanggan ini.');
         }
 
-        $customer->loadMissing([
-            'customerDevice',
-            'customerTechnicalDetail',
-            'latestInstallation.technician',
-            'latestInstallation.technician2',
-            'latestInstallation.technician3',
-            'latestInstallation.fop',
-            'latestSurvey.technician',
-            'latestSurvey.surveyor2',
-            'latestSurvey.surveyor3',
-            'latestSurvey.fop',
-            'customerService',
-            'internetPackage',
-            'pop',
-            'village.district',
-            'city',
-        ]);
+        // Eager-load + material/alat kerja per tahap — DIEKSTRAK ke
+        // CustomerVerificationDetailService, dipakai bareng
+        // BusinessDevelopmentVerificationController::show() (reuse view
+        // yang sama, ADHOC-67 susulan). Otorisasi TETAP di sini, service-nya
+        // gak tau apa-apa soal permission.
+        $detail = app(CustomerVerificationDetailService::class)->load($customer);
 
-        // Selisih estimasi vs realisasi material — inti nilai bisnis pencatatan
-        // material sebelum modul Inventory ada. Kosong untuk pelanggan lama yang
-        // laporannya dibuat sebelum fitur ini.
-        $materialService = app(TaskMaterialService::class);
-        $materialVariance = $materialService->varianceForCustomer($customer);
+        // Dipakai form edit cepat Data Diri + Paket (verifications.partials.
+        // _registration-info, tab Data Registrasi) — cuma query ringan, aman
+        // dimuat tiap buka halaman.
+        $verifCities = City::orderBy('name')->get(['id', 'name']);
+        $verifPackages = InternetPackage::orderBy('name')->get(['id', 'name', 'package_code', 'monthly_price']);
 
-        // Baris material mentah per tahap — tabel variance saja tidak cukup:
-        // variance mengagregasi dan membuang catatan per baris, padahal yang
-        // diinput teknisi adalah daftar barang beserta catatannya. Estimasi
-        // ditampilkan di tab Survey (di situ diinputnya), realisasi di tab
-        // Pemasangan.
-        $surveyMaterials = $materialService->estimatesForCustomer($customer);
-        $installationFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN);
-        $installationMaterials = $installationFopTask
-            ? $installationFopTask->materials()->terpakai()->orderBy('id')->get()
-            : collect();
-
-        // Checklist alat kerja diinput teknisi di form Survey DAN form Pemasangan,
-        // tapi ditulis ke task_work_tools — bukan ke kolom customer_surveys /
-        // customer_installations. Tanpa dibaca eksplisit di sini, halaman
-        // verifikasi cuma menampilkan teks bebas `required_tools` dan admin
-        // kehilangan daftar alat yang sebenarnya dicatat.
-        $workToolService = app(TaskWorkToolService::class);
-        $surveyWorkTools = $workToolService->rowsFor(
-            $workToolService->resolveTaskForCustomer($customer, TaskType::SURVEY)
-        );
-        $installationWorkTools = $workToolService->rowsFor(
-            $workToolService->resolveTaskForCustomer($customer, TaskType::PEMASANGAN)
-        );
-
-        return view('verifications.admin', compact(
-            'customer',
-            'materialVariance',
-            'surveyMaterials',
-            'installationMaterials',
-            'surveyWorkTools',
-            'installationWorkTools'
-        ));
+        return view('verifications.admin', array_merge(['customer' => $customer, 'verifCities' => $verifCities, 'verifPackages' => $verifPackages], $detail));
     }
 
     public function processToTeam(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -276,7 +235,7 @@ class CustomerVerificationController extends Controller
             // kalau task PENDING/TERJADWAL/IN_PROGRESS udah ada).
             $installTaskForNotif = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::PEMASANGAN->value)
-                ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
+                ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::LAPOR_NANTI->value])
                 ->latest()
                 ->first();
 
@@ -291,6 +250,14 @@ class CustomerVerificationController extends Controller
                 $surveyTask->update([
                     'fop_review_status' => 'approved',
                     'updated_by' => auth()->id(),
+                ]);
+            }
+
+            // D. Simpan audit timestamp & PIC review admin pada customer_services
+            if ($customer->customerService) {
+                $customer->customerService->update([
+                    'admin_filter_at' => now(),
+                    'admin_filter_by_name' => auth()->user()->name,
                 ]);
             }
 
@@ -374,13 +341,16 @@ class CustomerVerificationController extends Controller
             return redirect()->back()->with('error', 'Data layanan pelanggan tidak ditemukan.');
         }
 
-        $issueDate = Carbon::parse($validated['issue_date']);
-
-        // Tagihan awal dibayar di tempat saat aktivasi, bukan menunggu tempo.
-        // Tempo tanggal 10 hanya berlaku untuk tagihan bulanan
-        // (GenerateMonthlyInvoicesCommand), jangan disamakan.
-        $billingPeriod = $issueDate->format('Y-m');
-        $dueDate = $issueDate->format('Y-m-d');
+        // Kategori Bisnis: biaya instalasi ditagih TERPISAH oleh BD
+        // (`/business-development-verifications`, `InstallationFeeInvoiceService`)
+        // — bukan di sini. Server MENIMPA ke 0 di sini juga (bukan cuma
+        // disabled di form) — input disabled tidak submit sama sekali, tapi
+        // POST manual/replay masih bisa mengirim nilai apa pun.
+        $service->loadMissing('internetPackage');
+        $needsBusinessDevelopmentVerification = $customer->needsBusdevInstallationFeeVerification();
+        if ($needsBusinessDevelopmentVerification) {
+            $validated['extra_installation_fee'] = 0;
+        }
 
         $billing = app(InitialInvoiceService::class)->calculate(
             $service,
@@ -396,37 +366,35 @@ class CustomerVerificationController extends Controller
         try {
             DB::beginTransaction();
 
-            // 1. Generate Invoice
-            $invoiceNumber = 'INV-'.now()->format('Ymd').'-'.strtoupper(uniqid());
+            // 1. Generate Invoice — TAPI kategori Bisnis TIDAK di sini.
+            // Ditandai sebagai bug oleh user (2026-09-14): sebelumnya Invoice
+            // AWAL ikut terbit persis di titik ini walau status pelanggan
+            // masih menunggu BD, padahal dari sisi bisnis tagihan pertama
+            // baru sah terbit setelah BD JUGA menyetujui (ada Biaya Instalasi
+            // yang keputusannya harus disatukan). Snapshot `$billing` +
+            // `issue_date` dititipkan ke `customers.pending_initial_invoice`,
+            // invoice-nya baru diterbitkan
+            // `BusinessDevelopmentVerificationController::verify()` dengan
+            // angka PERSIS yang sama (lihat `InitialInvoiceService::issue()`).
+            // Paket non-Bisnis TIDAK BERUBAH — invoice tetap terbit langsung.
+            $targetStatus = $needsBusinessDevelopmentVerification
+                ? WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value
+                : WorkflowTransition::ACTIVE->value;
 
-            $invoice = Invoice::create([
-                'invoice_number' => $invoiceNumber,
-                'invoice_type' => InvoiceType::AWAL->value,
-                'customer_id' => $customer->id,
-                'pop_id' => $customer->pop_id,
-                'customer_service_id' => $service->id,
-                'internet_package_id' => $service->internet_package_id,
-                'billing_period' => $billingPeriod,
-                'issue_date' => $validated['issue_date'],
-                'due_date' => $dueDate,
-                'subtotal' => $billing['subtotal'],
-                'discount' => $billing['discount'],
-                'ppn' => $billing['ppn'],
-                'prorate_amount' => $billing['prorate_amount'],
-                'extra_installation_fee' => $billing['extra_installation_fee'],
-                'extra_cable_fee' => $billing['extra_cable_fee'],
-                'extra_pole_fee' => $billing['extra_pole_fee'],
-                'other_fee' => $billing['other_fee'],
-                'total_amount' => $billing['total_amount'],
-                'remaining_amount' => $billing['total_amount'],
-                'paid_amount' => 0,
-                'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
-                'created_by' => auth()->id(),
-            ]);
+            $pendingInitialInvoice = null;
+            if ($needsBusinessDevelopmentVerification) {
+                $pendingInitialInvoice = [
+                    'billing' => $billing,
+                    'issue_date' => $validated['issue_date'],
+                ];
+            } else {
+                app(InitialInvoiceService::class)->issue($customer, $service, $billing, $validated['issue_date'], auth()->id());
+            }
 
             // 2. Activate Customer
-            $customer->loadMissing(['customerTechnicalDetail', 'distribution', 'village']);
-            $cid = $pop->generateComplexCid($customer, $customer->distribution);
+            // Rumus CID satu pintu (CustomerCidService, ADHOC-107 R3).
+            // cid_prefix sudah dipastikan terisi di atas, jadi tidak null.
+            $cid = CustomerCidService::resolve($customer) ?? $customer->cid;
 
             $oldValues = [
                 'cid' => $customer->cid,
@@ -439,8 +407,9 @@ class CustomerVerificationController extends Controller
 
             $customer->update([
                 'cid' => $cid,
-                'status' => 'active',
+                'status' => $targetStatus,
                 'data_completeness_status' => 'siap_billing',
+                'pending_initial_invoice' => $pendingInitialInvoice,
             ]);
 
             // `activation_date` WAJIB ditimpa di sini, tidak boleh dipertahankan.
@@ -472,7 +441,7 @@ class CustomerVerificationController extends Controller
 
             $newValues = [
                 'cid' => $cid,
-                'status' => 'active',
+                'status' => $targetStatus,
                 'data_completeness_status' => 'siap_billing',
                 'service_status' => 'aktif',
                 'billing_status' => 'active',
@@ -482,7 +451,7 @@ class CustomerVerificationController extends Controller
             AuditLog::create([
                 'user_id' => auth()->id(),
                 'module' => 'Data Pelanggan',
-                'action' => 'activate_from_verification',
+                'action' => $needsBusinessDevelopmentVerification ? 'waiting_business_development_verification_from_verification' : 'activate_from_verification',
                 'auditable_type' => get_class($customer),
                 'auditable_id' => $customer->id,
                 'old_values' => $oldValues,
@@ -495,11 +464,17 @@ class CustomerVerificationController extends Controller
             // Optionally notify telegram
             try {
                 $telegram = app(TelegramBotService::class);
-                $message = "🎉 <b>Pelanggan Aktif (Dari Verifikasi)</b>\n";
+                $message = $needsBusinessDevelopmentVerification
+                    ? "⏳ <b>Menunggu Verifikasi Busdev</b>\n"
+                    : "🎉 <b>Pelanggan Aktif (Dari Verifikasi)</b>\n";
                 $message .= "Pelanggan: {$customer->full_name}\n";
                 $message .= "CID: {$cid}\n";
-                $message .= 'Tagihan Awal: Rp '.number_format($billing['total_amount'], 0, ',', '.')."\n";
-                $message .= 'Diaktifkan oleh: '.auth()->user()->name;
+                $message .= $needsBusinessDevelopmentVerification
+                    ? 'Estimasi Tagihan Awal: Rp '.number_format($billing['total_amount'], 0, ',', '.')." (belum terbit)\n"
+                    : 'Tagihan Awal: Rp '.number_format($billing['total_amount'], 0, ',', '.')."\n";
+                $message .= $needsBusinessDevelopmentVerification
+                    ? 'Menunggu Busdev isi Biaya Instalasi & verifikasi — diverifikasi CS oleh: '.auth()->user()->name
+                    : 'Diaktifkan oleh: '.auth()->user()->name;
                 $telegram->sendMessage($message);
             } catch (\Exception $e) {
                 // Ignore telegram errors
@@ -523,7 +498,9 @@ class CustomerVerificationController extends Controller
 
             if ($installTask) {
                 $this->notifyTaskTeam($installTask, 'Pelanggan Diaktifkan: '.$installTask->task_number,
-                    "Pemasangan {$customer->full_name} disetujui admin, pelanggan resmi aktif (CID {$cid}).",
+                    $needsBusinessDevelopmentVerification
+                        ? "Pemasangan {$customer->full_name} disetujui admin, menunggu verifikasi Busdev sebelum resmi aktif (CID {$cid})."
+                        : "Pemasangan {$customer->full_name} disetujui admin, pelanggan resmi aktif (CID {$cid}).",
                     NotificationType::SUCCESS
                 );
             }
@@ -532,12 +509,18 @@ class CustomerVerificationController extends Controller
             // `customers.created_by`) dikasih tau pelanggannya resmi aktif —
             // sebelumnya nol notif buat transisi besar status pelanggan
             // (docs/plan/analisa-status-implementasi-notifikasi.md §5).
-            $this->notifyCustomerCreatorIfDifferentActor($customer, 'Pelanggan Aktif: '.$customer->full_name,
-                "Pelanggan {$customer->full_name} (CID {$cid}) resmi aktif, tagihan awal sudah terbit.",
-                NotificationType::SUCCESS
-            );
+            // Kategori Bisnis belum "resmi aktif" di titik ini — notif menyusul
+            // dari BusinessDevelopmentVerificationController::verify() begitu BD kelar.
+            if (! $needsBusinessDevelopmentVerification) {
+                $this->notifyCustomerCreatorIfDifferentActor($customer, 'Pelanggan Aktif: '.$customer->full_name,
+                    "Pelanggan {$customer->full_name} (CID {$cid}) resmi aktif, tagihan awal sudah terbit.",
+                    NotificationType::SUCCESS
+                );
+            }
 
-            return redirect()->route('verifications.queue')->with('success', 'Pelanggan berhasil diaktifkan dan tagihan pertama dibuat.');
+            return redirect()->route('verifications.queue')->with('success', $needsBusinessDevelopmentVerification
+                ? 'Verifikasi CS tersimpan. Pelanggan ini kategori Bisnis — tagihan pertama BELUM terbit, menunggu Busdev isi Biaya Instalasi & verifikasi di menu Verifikasi BD.'
+                : 'Pelanggan berhasil diaktifkan dan tagihan pertama dibuat.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
@@ -653,6 +636,181 @@ class CustomerVerificationController extends Controller
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Status yang boleh dikoreksi lewat aksi edit di bawah — tab Registrasi
+     * (Data Diri + Paket) & tab Survey (Data Survey) di `verifications/admin`
+     * tampil sejak `waiting_acc` sampai pelanggan aktif (lihat $isVerifAdminStage
+     * di admin.blade.php). Sebelum itu (waiting_survey/survey_in_progress) FopTask
+     * Survey belum tentu ada teknisinya, dan `showAdmin()` bukan halaman utama
+     * di tahap itu (surveys.report yang dipakai) — edit cuma dibuka begitu
+     * pelanggan sudah masuk antrean ini.
+     */
+    private const EDITABLE_STAGES = [
+        'waiting_acc', 'surveyed',
+        'waiting_installation', 'installation_in_progress', 'revision_installation',
+        'installed', 'verification_admin', 'active',
+        'waiting_business_development_verification',
+    ];
+
+    /**
+     * Data Pemasangan (Data Perangkat + ODP/OLT) & Data Pengujian (speedtest) —
+     * cuma dibuka di tahap Validasi Admin (bug 2026-09-30 lanjutan, permintaan
+     * eksplisit user), BUKAN sepanjang EDITABLE_STAGES. Alasan: selama
+     * `waiting_installation`/`installation_in_progress`/`revision_installation`
+     * tim masih di lapangan dan datanya masih bisa berubah lewat laporan
+     * mereka sendiri (`CustomerInstallationController`) — membuka edit CS di
+     * saat yang sama membuka jalan dua penulis berebut baris yang sama tanpa
+     * saling tahu. Sama persis dengan `$isVerifAdminStage` di
+     * verifications/admin.blade.php.
+     */
+    private const DEVICE_EDIT_STAGES = [
+        'installed', 'verification_admin', 'active',
+        'waiting_business_development_verification',
+    ];
+
+    /**
+     * Data Diri + Paket Internet — sama seperti Verifikasi Registrasi, dibuka
+     * kembali di sini karena CS masih sering perlu koreksi di tahap
+     * Survey/Pemasangan/Validasi Admin (bug 2026-09-30). Permission
+     * `customers.detail.installation.validate` DISENGAJA (bukan `.view`) —
+     * cuma actor yang boleh memutuskan hasil verifikasi (approve/reject/final)
+     * yang boleh mengubah datanya, konsisten dengan aksi tulis lain di
+     * controller ini.
+     */
+    public function updateIdentity(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::EDITABLE_STAGES, true), 422, 'Data pelanggan ini tidak bisa diedit dari tahap saat ini.');
+
+        $validated = $request->validate([
+            'full_name' => 'required|string|max:150',
+            'identity_number' => 'nullable|string|size:16|regex:/^[0-9]+$/',
+            'primary_phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'email' => 'nullable|email|max:100',
+            'address' => 'required|string',
+            'city_id' => 'nullable|exists:cities,id',
+            'district_id' => 'nullable|exists:districts,id',
+            'village_id' => 'nullable|exists:villages,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateIdentity($customer, $validated, $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Data diri pelanggan diperbarui.');
+    }
+
+    public function updatePackage(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::EDITABLE_STAGES, true), 422, 'Data pelanggan ini tidak bisa diedit dari tahap saat ini.');
+
+        $validated = $request->validate([
+            'internet_package_id' => 'required|exists:internet_packages,id',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Paket internet pelanggan diperbarui.');
+    }
+
+    /**
+     * Data Survey — koreksi hasil laporan teknisi (ODP terdekat, estimasi
+     * kabel, tanggal request pemasangan, catatan surveyor). Cuma masuk akal
+     * kalau laporan survey memang sudah ada.
+     */
+    public function updateSurveyData(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::EDITABLE_STAGES, true), 422, 'Data pelanggan ini tidak bisa diedit dari tahap saat ini.');
+
+        $survey = $customer->latestSurvey()->first();
+        abort_unless($survey !== null, 422, 'Pelanggan ini belum punya data survey untuk dikoreksi.');
+
+        $validated = $request->validate([
+            'nearest_odp' => 'nullable|string|max:255',
+            'cable_estimation_meter' => 'nullable|integer|min:0',
+            'requested_installation_date' => 'nullable|date',
+            'survey_note' => 'nullable|string',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateSurveyData($survey, $validated, $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Data survey pelanggan diperbarui.');
+    }
+
+    /**
+     * Data Pemasangan — Data Perangkat + Distribusi Jaringan (ODP/OLT) +
+     * catatan pemasangan. Cuma tahap Validasi Admin (self::DEVICE_EDIT_STAGES),
+     * BUKAN sepanjang tahap Pemasangan masih berjalan — lihat docblock konstanta.
+     * Rules SAMA PERSIS dengan `CustomerController::update()` supaya tidak ada
+     * aturan kedua yang menyimpang untuk field yang sama.
+     */
+    public function updateInstallationData(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::DEVICE_EDIT_STAGES, true), 422, 'Data Pemasangan pelanggan ini cuma bisa diedit dari sini saat status Validasi Admin.');
+
+        $validated = $request->validate([
+            'device_type' => 'nullable|string|in:modem,ont,onu,router,other',
+            'brand' => 'nullable|string|max:100',
+            'model' => 'nullable|string|max:100',
+            'serial_number' => 'nullable|string|max:100',
+            'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
+            'connection_mode' => 'nullable|string|in:bridge,router,pppoe,static,dhcp,other',
+            'pppoe_username' => 'nullable|string|max:150',
+            'pppoe_password' => 'nullable|string|max:150',
+            'wifi_ssid' => 'nullable|string|max:150',
+            'wifi_password' => 'nullable|string|max:150',
+            'odp_number' => 'nullable|string|max:100',
+            'odp_port' => 'nullable|string|max:50',
+            'olt_number' => 'nullable|string|max:50',
+            'olt_slot' => 'nullable|string|max:20',
+            'olt_port' => 'nullable|string|max:50',
+            'vlan' => 'nullable|string|max:20',
+            'router_number' => 'nullable|string|max:50',
+            'initial_attenuation' => 'nullable|numeric',
+            'installation_note' => 'nullable|string',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateInstallationData($customer, $validated, $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Data pemasangan pelanggan diperbarui.');
+    }
+
+    /**
+     * Data Pengujian — hasil speedtest & kualitas sinyal. Cuma tahap Validasi
+     * Admin, sama seperti Data Pemasangan.
+     */
+    public function updateTestReport(Request $request, Customer $customer): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('customers.detail.installation.validate'), 403);
+        $this->authorizeCustomerPopScope($user, $customer);
+        abort_unless(in_array($customer->status, self::DEVICE_EDIT_STAGES, true), 422, 'Data Pengujian pelanggan ini cuma bisa diedit dari sini saat status Validasi Admin.');
+
+        $validated = $request->validate([
+            'test_download' => 'nullable|numeric|min:0',
+            'test_upload' => 'nullable|numeric|min:0',
+            'latency_ms' => 'nullable|numeric|min:0',
+            'jitter_ms' => 'nullable|numeric|min:0',
+            'packet_loss_percent' => 'nullable|numeric|min:0|max:100',
+            'actual_attenuation' => 'nullable|numeric',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateTestReport($customer, $validated, $user);
+
+        return redirect()->route('customers.verification.admin', $customer)->with('success', 'Data pengujian pelanggan diperbarui.');
     }
 
     /**

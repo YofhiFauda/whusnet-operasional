@@ -6,6 +6,11 @@
 @section('content')
 
 @php
+// Fitur yang checkbox-nya lepas dari rantai "wajib centang Lihat Data induk".
+// Sumbernya SAMA dengan batas auto-grant di server
+// (RoleManagementService::syncPermissions) supaya UI & server tidak menyimpang.
+$independentFeatureCodes = config('rbac.view_autogrant_chain_boundary', []);
+
 // 1. Pemetaan Kategori Fungsional (Grouping Berdasarkan Fungsi)
 $functionalCategories = [
     'group_users' => [
@@ -57,6 +62,25 @@ $functionalCategories = [
         'badge' => 'bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800',
         'features' => ['dashboard', 'reports'],
     ],
+    'group_warehouse' => [
+        'title' => 'Gudang & Inventory',
+        'subtitle' => 'Distribusi barang dari Gudang Pusat ke Cabang, custody teknisi, dan pelacakan aset bernomor seri.',
+        'icon' => 'archive-box',
+        'badge' => 'bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+        'features' => [
+            'warehouse', 'warehouse_transfer', 'warehouse_transfer_invoice', 'warehouse_issue',
+            'warehouse_custody', 'warehouse_traceability',
+            'warehouse_adjustment', 'warehouse_reassign',
+            'warehouse_report', 'warehouse_stock_request',
+        ],
+    ],
+    'group_busdev' => [
+        'title' => 'Business Development',
+        'subtitle' => 'Monitoring akuisisi pelanggan, restriksi paket Sales/Teknisi, master Agent, dan omset Sales.',
+        'icon' => 'chart-bar',
+        'badge' => 'bg-fuchsia-50 dark:bg-fuchsia-950/50 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-800',
+        'features' => ['customer_acquisitions', 'agents', 'package_restrictions', 'sales_omset_dashboard', 'business_customers'],
+    ],
 ];
 
 // 2. Pemetaan Nama Ramah (Human-Friendly) & Deskripsi Fitur
@@ -98,6 +122,21 @@ $featureMeta = [
     'cash_deposit' => ['name' => 'Setoran Kas Admin ke Owner / Bank', 'desc' => 'Uang yang sudah diterima admin (dari setoran kolektor + pembayaran tunai di kantor) diteruskan ke Owner atau rekening bank, lalu diperiksa.'],
     'reports' => ['name' => 'Laporan Operasional & Keuangan', 'desc' => 'Laporan rekapitulasi pembayaran, piutang pelanggan, statistik aktivasi, dan cetak laporan.'],
     'audit_logs' => ['name' => 'Catatan Aktivitas Sistem (Audit Log)', 'desc' => 'Jejak audit keamanan yang mencatat seluruh aksi penting pengguna dalam sistem.'],
+    'warehouse' => ['name' => 'Dashboard & Ledger Gudang', 'desc' => 'Ringkasan stok tiap gudang, barang hampir habis, dan riwayat seluruh transaksi keluar-masuk barang.'],
+    'warehouse_transfer' => ['name' => 'Transfer Antar Gudang', 'desc' => 'Pengiriman barang dari Gudang Pusat ke Gudang Cabang, dan konfirmasi penerimaan fisik di cabang.'],
+    'warehouse_transfer_invoice' => ['name' => 'Invoice & Surat Jalan Transfer', 'desc' => 'Cetak invoice harga satuan dan surat jalan pengiriman transfer antar gudang.'],
+    'warehouse_issue' => ['name' => 'Issue Barang ke Teknisi', 'desc' => 'Mengeluarkan barang dari gudang cabang untuk dibawa teknisi ke lapangan.'],
+    'warehouse_custody' => ['name' => 'Custody Barang di Tangan Teknisi', 'desc' => 'Melihat barang yang sedang dipegang tiap teknisi (belum dipasang/dikembalikan).'],
+    'warehouse_traceability' => ['name' => 'Pelacakan Aset (Asset Traceability)', 'desc' => 'Menelusuri riwayat lengkap satu barang bernomor seri, dari gudang sampai ke pelanggan.'],
+    'warehouse_adjustment' => ['name' => 'Adjustment Stok (Rusak/Hilang/Opname)', 'desc' => 'Lapor barang rusak/hilang, stock opname, dan ambang batas stok rendah per gudang.'],
+    'warehouse_reassign' => ['name' => 'Reassign Custody Teknisi', 'desc' => 'Pindahkan barang di tangan teknisi (custody/serial) ke teknisi lain — untuk kasus resign/cuti.'],
+    'warehouse_report' => ['name' => 'Laporan Gudang (Agregat Periodik)', 'desc' => 'Laporan agregat pergerakan & kerugian barang per gudang/cabang dalam suatu periode.'],
+    'warehouse_stock_request' => ['name' => 'Permintaan Stok Cabang', 'desc' => 'Ajukan permintaan stok dari Cabang ke Pusat saat stok cabang menipis, beserta persetujuannya.'],
+    'customer_acquisitions' => ['name' => 'Pelanggan Aktif < 30 Hari (Busdev)', 'desc' => 'Monitoring pelanggan baru diverifikasi admin, dikelompokkan per bulan — dipakai Busdev untuk rekap komisi Sales.'],
+    'agents' => ['name' => 'Master Agent', 'desc' => 'Kelola data mitra Agent (bukan akun login) yang dipakai saat mendaftarkan pelanggan atas nama Agent.'],
+    'package_restrictions' => ['name' => 'Restriksi Paket per Role', 'desc' => 'Atur daftar paket internet yang boleh dipilih role bertanda "Batasi pilihan paket internet" (mis. Sales, Teknisi).'],
+    'business_customers' => ['name' => 'List Pelanggan Bisnis', 'desc' => 'Daftar pelanggan kategori paket Bisnis: harga paket, alat yang ditinggalkan, biaya instalasi & tanggal aktivasi (read-only).'],
+    'sales_omset_dashboard' => ['name' => 'Dashboard Omset Sales', 'desc' => 'Pantau omset (Biaya Langganan − PPN 11%) per Sales, per periode bulan.'],
 ];
 
 // 3. Pemetaan Aksi Hak Akses (Human-Friendly Action Labels, Badges & Deskripsi Fungsi)
@@ -124,6 +163,7 @@ $actionMetaMap = [
     'pay' => ['label' => 'Catat Pembayaran', 'desc' => 'Mencatat uang bayar yang diterima dari pelanggan.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
     'deposit' => ['label' => 'Setor Penagihan', 'desc' => 'Menyetorkan uang hasil penagihan ke kasir.', 'type' => 'write', 'badge' => 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'],
     'visit' => ['label' => 'Catat Kunjungan', 'desc' => 'Mencatat laporan hasil kunjungan lapangan.', 'type' => 'write', 'badge' => 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400 border-sky-200 dark:border-sky-800'],
+    'receive' => ['label' => 'Konfirmasi Terima', 'desc' => 'Dapat mengonfirmasi penerimaan fisik barang kiriman.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
 ];
 
 // 3b. Deskripsi PER KODE PERMISSION — sumbernya fungsi NYATA di modul
@@ -157,13 +197,13 @@ $permissionDescMap = [
 
     // ── Master Data & Infrastruktur ──────────────────────────────
     'master_wilayah.view' => 'Buka Master Wilayah: hirarki provinsi → kota/kabupaten → kecamatan → desa.',
-    'master_wilayah.create' => '[Belum aktif] Data wilayah diisi lewat seeder, belum ada form tambah di UI.',
-    'master_wilayah.update' => '[Belum aktif] Data wilayah diisi lewat seeder, belum ada form ubah di UI.',
-    'master_wilayah.delete' => '[Belum aktif] Tidak menggerbangi route apa pun — wilayah tidak dihapus dari UI.',
+    'master_wilayah.create' => 'Tambah Kota/Kabupaten, Kecamatan, atau Desa/Kelurahan baru di Kelola Wilayah.',
+    'master_wilayah.update' => 'Ubah nama wilayah (dan kode pos desa). Induk wilayah tidak bisa diubah.',
+    'master_wilayah.delete' => 'Hapus wilayah. Ditolak kalau masih dipakai pelanggan atau punya wilayah di bawahnya.',
     'pops.view' => 'Buka daftar POP/Cabang & Mini POP beserta prefix penomoran CID pelanggan.',
     'pops.create' => 'Tambah POP atau Mini POP baru, termasuk prefix CID-nya.',
     'pops.update' => 'Ubah data POP: nama, induk, wilayah, prefix CID, dan status aktif.',
-    'pops.delete' => '[Belum aktif] POP dinonaktifkan lewat status, tidak pernah dihapus (CID lama harus tetap terlacak).',
+    'pops.delete' => 'Hapus POP/Cabang. Kalau masih punya data terkait (pelanggan, tagihan, stok, user, sequence CID, dll) otomatis hanya dinonaktifkan.',
     'master_distribusi.view' => 'Lihat daftar titik distribusi jaringan (ODC/ODP/tiang) beserta kapasitas port.',
     'master_distribusi.create' => 'Tambah titik distribusi baru ke master jaringan.',
     'master_distribusi.update' => 'Ubah data titik distribusi: nama, POP, kapasitas port, koordinat.',
@@ -171,7 +211,7 @@ $permissionDescMap = [
     'packages.view' => 'Lihat daftar paket internet: kecepatan, harga bulanan, dan status aktifnya.',
     'packages.create' => 'Tambah paket internet baru beserta tarif bulanannya.',
     'packages.update' => 'Ubah paket internet dan aktif/nonaktifkan paket lewat tombol Toggle Status.',
-    'packages.delete' => '[Belum aktif] Paket dinonaktifkan lewat Toggle Status, bukan dihapus — tagihan lama harus tetap merujuk paketnya.',
+    'packages.delete' => 'Hapus paket internet. Kalau sudah pernah dipakai pelanggan/ditagih otomatis hanya dinonaktifkan.',
     'master_status_pelanggan.view' => 'Lihat daftar master status pelanggan (Draft, Perlu Dilengkapi, Lengkap, Siap Billing).',
     'master_status_pelanggan.create' => '[Belum aktif] Daftar status di-seed sistem, belum ada form tambah di UI.',
     'master_status_pelanggan.update' => '[Belum aktif] Daftar status di-seed sistem, belum ada form ubah di UI.',
@@ -181,19 +221,19 @@ $permissionDescMap = [
     'item_categories.view' => 'Lihat daftar kategori barang (Modem, Kabel, Aksesoris, dll).',
     'item_categories.create' => 'Tambah kategori barang baru.',
     'item_categories.update' => 'Ubah nama kategori barang dan status aktifnya.',
-    'item_categories.delete' => '[Belum aktif] Kategori dinonaktifkan lewat status aktif, bukan dihapus.',
+    'item_categories.delete' => 'Hapus kategori barang. Kalau sudah dipakai barang otomatis hanya dinonaktifkan. Kategori "Lainnya" tidak bisa dihapus.',
     'items.view' => 'Lihat katalog barang & material (modem, kabel, konektor) beserta satuannya.',
     'items.create' => 'Tambah barang/material baru ke katalog.',
     'items.update' => 'Ubah data barang dan status aktifnya.',
-    'items.delete' => '[Belum aktif] Barang dinonaktifkan lewat status aktif — laporan lama harus tetap punya rujukan.',
+    'items.delete' => 'Hapus barang/material. Kalau sudah punya riwayat stok atau transaksi otomatis hanya dinonaktifkan.',
     'work_tools.view' => 'Lihat daftar alat kerja teknisi (splicer, OPM, tangga, dll).',
     'work_tools.create' => 'Tambah alat kerja baru ke inventaris.',
     'work_tools.update' => 'Ubah data alat kerja dan status aktifnya.',
-    'work_tools.delete' => '[Belum aktif] Alat kerja dinonaktifkan lewat status aktif, bukan dihapus.',
+    'work_tools.delete' => 'Hapus alat kerja teknisi. Kalau pernah dipinjam teknisi otomatis hanya dinonaktifkan.',
     'ticket_issue_categories.view' => 'Lihat daftar kategori kendala tiket (jenis gangguan/keluhan).',
     'ticket_issue_categories.create' => 'Tambah kategori kendala tiket baru.',
     'ticket_issue_categories.update' => 'Ubah nama kategori kendala dan status aktifnya.',
-    'ticket_issue_categories.delete' => '[Belum aktif] Kategori dinonaktifkan lewat status aktif biar tiket lama tidak kehilangan jejak.',
+    'ticket_issue_categories.delete' => 'Hapus kategori kendala tiket. Kalau masih dipakai tiket otomatis hanya dinonaktifkan.',
 
     // ── Data Pelanggan ───────────────────────────────────────────
     'customers.view' => 'Buka halaman List Data Pelanggan. Isinya otomatis dibatasi POP scope user.',
@@ -258,8 +298,6 @@ $permissionDescMap = [
     'tickets.history.view' => 'Buka History Ticketing: semua tiket lintas handler & status, termasuk yang masih berjalan.',
     'tickets.history.export' => 'Unduh isi History Ticketing ke Excel.',
     'noc_worksheet.view' => 'Buka halaman kerja Worksheet NOC (tiket yang dipegang NOC + jejak eskalasi ke FOP).',
-    'noc_worksheet.masuk.view' => '[Nonaktif] Tab lama Ticket Masuk, sudah dilebur ke Worksheet NOC. Tidak menggerbangi apa pun.',
-    'noc_worksheet.diproses.view' => '[Nonaktif] Tab lama Ticket Diproses, sudah dilebur ke Worksheet NOC. Tidak menggerbangi apa pun.',
     'noc_dashboard.view' => 'Buka Dashboard NOC: monitoring tiket gangguan dan agregat insiden.',
 
     // ── Tagihan & Keuangan ───────────────────────────────────────
@@ -270,8 +308,8 @@ $permissionDescMap = [
     'invoices.print' => '[Belum aktif] Cetak invoice belum punya route sendiri; struk pembayaran ikut `payments.view`.',
     'payments.view' => 'Buka daftar Pembayaran, detail pembayaran, halaman lebih-bayar, dan cetak kwitansi.',
     'payments.create' => 'Catat pembayaran atas invoice mana pun, termasuk mencatat setoran mewakili kolektor.',
-    'payments.reject' => 'Tolak pembayaran yang sudah tercatat (pembayaran ditolak tidak boleh jadi lunas).',
-    'payments.update' => '[Belum aktif] Belum ada route ubah pembayaran — koreksi dilakukan lewat tolak + catat ulang.',
+    'payments.reject' => 'Kembalikan pembayaran yang salah input (pembayaran yang dikembalikan tidak boleh jadi lunas).',
+    'payments.update' => 'Edit Pembayaran (ADHOC-108): ubah tanggal, metode, nominal, saldo pelanggan yang dipakai, bukti, catatan — HANYA pembayaran bulan berjalan, setoran/tagihan ikut terhitung ulang. Tidak berlaku untuk pembayaran bulan lalu, pembayaran Saldo, atau yang sudah masuk setoran terverifikasi (jalur itu tetap lewat Kembalikan). Permission ini mengubah UANG, bukan cuma metode — berikan hanya ke peran yang memegang kas.',
     'payments.delete' => '[Belum aktif] Belum ada route hapus pembayaran — jejak kas tidak dihapus.',
     'payments.validate' => '[Belum aktif] Verifikasi kas kolektor memakai `collector_worksheet.validate`, bukan permission ini.',
     'payments.approve' => '[Belum aktif] Belum dipakai route mana pun.',
@@ -290,10 +328,39 @@ $permissionDescMap = [
     'cash_deposit.validate' => 'Periksa uang yang diserahkan lalu tutup setoran kas. Pemeriksa tidak boleh sama dengan penyetor.',
     'cash_deposit.approve' => 'Tutup selisih kas — titik kerugian (atau kelebihan) diakui. Sengaja terpisah dari memeriksa.',
 
+    // ── Gudang & Inventory ───────────────────────────────────────
+    'warehouse.view' => 'Buka Dashboard & Ledger Gudang: ringkasan stok tiap gudang, barang hampir habis, dan riwayat transaksi keluar-masuk.',
+    'warehouse_transfer.view' => 'Lihat daftar & detail transfer antar gudang, termasuk Surat Jalan pengiriman (discope POP user).',
+    'warehouse_transfer.create' => 'Kirim barang dari Gudang Pusat ke Gudang Cabang (buat transfer baru).',
+    'warehouse_transfer.receive' => 'Konfirmasi penerimaan fisik barang kiriman transfer di Gudang Cabang.',
+    'warehouse_transfer_invoice.view' => 'Cetak Invoice Transfer (harga satuan barang) — root permission terpisah dari `warehouse_transfer.view` karena memuat harga yang gak semua pemegang akses Surat Jalan boleh lihat.',
+    'warehouse_issue.view' => 'Lihat riwayat barang yang sudah dikeluarkan gudang cabang ke teknisi.',
+    'warehouse_issue.create' => 'Keluarkan barang dari gudang cabang untuk dibawa teknisi ke lapangan.',
+    'warehouse_custody.view' => 'Lihat barang yang sedang dipegang tiap teknisi (belum dipasang/dikembalikan).',
+    'warehouse_traceability.view' => 'Telusuri riwayat lengkap satu barang bernomor seri, dari gudang sampai ke pelanggan.',
+    'warehouse_adjustment.create' => 'Lapor rusak/hilang/scrapped, isi stock opname, ambil alat pelanggan putus (custody/serial), dan atur ambang stok rendah.',
+    'warehouse_reassign.create' => 'Pindahkan custody barang (per-batch atau per-serial) dari satu teknisi ke teknisi lain.',
+    'warehouse_report.view' => 'Buka Laporan Gudang: agregat pergerakan & kerugian barang per gudang/cabang, discope POP user.',
+    'warehouse_stock_request.view' => 'Buka daftar & detail Permintaan Stok Cabang.',
+    'warehouse_stock_request.create' => 'Ajukan Permintaan Stok baru dari Cabang ke Pusat.',
+    'warehouse_stock_request.approve' => 'Setujui permintaan stok dan catat pengiriman (deliver/fulfill) dari Pusat.',
+    'warehouse_stock_request.reject' => 'Tolak permintaan stok yang diajukan cabang.',
+    'warehouse_stock_request.cancel' => 'Batalkan permintaan stok yang diajukan sendiri.',
+
     // ── Laporan ──────────────────────────────────────────────────
     'reports.view' => 'Buka SEMUA halaman laporan (pelanggan, tagihan, pembayaran, import) sekaligus tombol ekspornya.',
     'reports.export' => '[Belum aktif] Tombol ekspor laporan sudah digerbangi `reports.view`; permission ini belum dipasang ke route.',
     'reports.print' => '[Belum aktif] Belum ada route cetak laporan terpisah.',
+
+    // ── Business Development (Skema 1-3, 2026-09-12) ──────────────
+    'customer_acquisitions.view' => 'Buka daftar pelanggan aktif < 30 hari diverifikasi, dikelompokkan per bulan.',
+    'agents.view' => 'Buka daftar Master Agent (mitra akuisisi pelanggan).',
+    'agents.create' => 'Tambah Agent baru.',
+    'agents.update' => 'Ubah data Agent & aktif/nonaktifkan lewat tombol Toggle Status.',
+    'package_restrictions.view' => 'Buka halaman Restriksi Paket: lihat daftar paket yang diizinkan untuk role restricted.',
+    'package_restrictions.update' => 'Ubah daftar paket yang diizinkan untuk role bertanda "Batasi pilihan paket internet".',
+    'business_customers.view' => 'Buka List Pelanggan Bisnis: daftar pelanggan paket Bisnis beserta harga, alat, biaya instalasi & tanggal aktivasi.',
+    'sales_omset_dashboard.view' => 'Buka Dashboard Omset Sales: agregasi omset per Sales, per periode bulan, dengan rincian per pelanggan.',
 ];
 
 // Helper Function: Ambil Info Aksi
@@ -638,7 +705,7 @@ foreach ($features as $f) {
                                                data-parent-feature-id="{{ $feature->parent_id ?? '' }}"
                                                data-permission-code="{{ $perm->code }}"
                                                data-is-view="{{ str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false' }}"
-                                               data-independent-channel="{{ str_ends_with($feature->code, '.qr') ? 'true' : 'false' }}"
+                                               data-independent-channel="{{ in_array($feature->code, $independentFeatureCodes, true) ? 'true' : 'false' }}"
                                                onchange="handleCheckboxChange(this)"
                                                class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                       {{ $isSensitive
@@ -720,7 +787,7 @@ foreach ($features as $f) {
                                                            data-parent-feature-id="{{ $child->parent_id ?? '' }}"
                                                            data-permission-code="{{ $perm->code }}"
                                                            data-is-view="{{ str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false' }}"
-                                                           data-independent-channel="{{ str_ends_with($child->code, '.qr') ? 'true' : 'false' }}"
+                                                           data-independent-channel="{{ in_array($child->code, $independentFeatureCodes, true) ? 'true' : 'false' }}"
                                                            onchange="handleCheckboxChange(this)"
                                                            class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                                   {{ $isSensitive
@@ -788,7 +855,7 @@ foreach ($features as $f) {
                                                                    data-parent-feature-id="{{ $grandchild->parent_id ?? '' }}"
                                                                    data-permission-code="{{ $perm->code }}"
                                                                    data-is-view="{{ str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false' }}"
-                                                                   data-independent-channel="{{ str_ends_with($grandchild->code, '.qr') ? 'true' : 'false' }}"
+                                                                   data-independent-channel="{{ in_array($grandchild->code, $independentFeatureCodes, true) ? 'true' : 'false' }}"
                                                                    onchange="handleCheckboxChange(this)"
                                                                    class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                                           {{ $isSensitive

@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'default_priority',
     'sla_source',
     'is_active',
+    'is_batch',
 ])]
 class TicketIssueCategory extends Model
 {
@@ -28,6 +29,7 @@ class TicketIssueCategory extends Model
         return [
             'default_priority' => FopTaskPriority::class,
             'is_active' => 'boolean',
+            'is_batch' => 'boolean',
         ];
     }
 

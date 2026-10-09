@@ -97,6 +97,9 @@
                         </svg>
                         Export Excel/CSV
                     </a>
+                    <a href="{{ route('reports.customers.export-xlsx', request()->query()) }}" class="w-full sm:w-auto inline-flex justify-center items-center rounded-md bg-teal-600 dark:bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
+                        Export Excel (.xlsx)
+                    </a>
                 </div>
             </div>
         </form>

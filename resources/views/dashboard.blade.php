@@ -16,6 +16,7 @@
         'sebagian' => 'Dibayar Sebagian',
         'lunas' => 'Lunas',
         'batal' => 'Batal',
+        'tak_tertagih' => 'Tak Tertagih',
     ];
 @endphp
 
@@ -144,22 +145,342 @@
                     <p class="metric-card-value text-2xl">{{ $currency($stats['total_unpaid_amount']) }}</p>
                 </div>
             </div>
-            <p class="metric-card-footer">Invoice belum lunas pada filter</p>
+            <p class="metric-card-footer">Sisa piutang periode sebelum bulan ini</p>
         </div>
 
-        <!-- Tagihan Jatuh Tempo (Operational Status Card - Danger) -->
+        <!-- Piutang Tagihan (Operational Status Card - Danger) -->
         <div class="metric-card status-error">
             <div>
                 <div class="metric-card-label">
-                    <span>Tagihan Jatuh Tempo</span>
+                    <span>Piutang Tagihan</span>
                 </div>
                 <div class="metric-card-value-container">
                     <p class="metric-card-value">{{ number_format($stats['due_invoices_count']) }}</p>
                 </div>
             </div>
-            <p class="metric-card-footer">Invoice belum lunas melewati batas</p>
+            <p class="metric-card-footer">Belum lunas dari periode sebelum bulan ini</p>
         </div>
+
+        <!-- Net Customer Growth (KPI Strip — Pilar 1) -->
+        <div class="metric-card {{ $stats['net_customer_growth'] >= 0 ? 'status-success' : 'status-error' }}">
+            <div>
+                <div class="metric-card-label">
+                    <span>Net Customer Growth</span>
+                </div>
+                <div class="metric-card-value-container">
+                    <p class="metric-card-value">{{ $stats['net_customer_growth'] >= 0 ? '+' : '' }}{{ number_format($stats['net_customer_growth']) }}</p>
+                </div>
+            </div>
+            <p class="metric-card-footer">{{ number_format($stats['new_active_customers']) }} aktif baru &middot; {{ number_format($stats['terminated_customers']) }} putus</p>
+        </div>
+
+        {{-- Omset per Segmen (Sales/Teknisi/Bisnis) — REKAP PERUSAHAAN, bukan
+             omset pribadi. Sebelumnya tanpa gerbang permission sama sekali:
+             role `sales` biasa (tanpa `sales_omset_dashboard.view`) ikut
+             melihat omset SELURUH sales lain di perusahaan lewat dashboard —
+             bertentangan sama aturan "Sales tak boleh akses laporan
+             keuangan". Gerbang sama persis dengan link sidebar "Omset Sales". --}}
+        @can('sales_omset_dashboard.view')
+        <!-- Omset Sales (Metric Card) -->
+        <div class="metric-card">
+            <div>
+                <div class="metric-card-label flex items-center justify-between">
+                    <span>Omset Sales</span>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300 rounded-full">Sales</span>
+                </div>
+                <div class="metric-card-value-container">
+                    <p class="metric-card-value text-2xl text-sky-600 dark:text-sky-400">{{ $currency($stats['omset_sales_amount']) }}</p>
+                </div>
+            </div>
+            <p class="metric-card-footer"><span class="font-mono">{{ number_format($stats['omset_sales_count']) }}</span> pelanggan aktif dari Sales</p>
+        </div>
+
+        <!-- Omset Teknisi (Metric Card) -->
+        <div class="metric-card">
+            <div>
+                <div class="metric-card-label flex items-center justify-between">
+                    <span>Omset Teknisi</span>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 rounded-full">Teknisi</span>
+                </div>
+                <div class="metric-card-value-container">
+                    <p class="metric-card-value text-2xl text-emerald-600 dark:text-emerald-400">{{ $currency($stats['omset_teknisi_amount']) }}</p>
+                </div>
+            </div>
+            <p class="metric-card-footer"><span class="font-mono">{{ number_format($stats['omset_teknisi_count']) }}</span> pelanggan aktif dari Teknisi</p>
+        </div>
+
+        <!-- Omset Bisnis (Metric Card) -->
+        <div class="metric-card">
+            <div>
+                <div class="metric-card-label flex items-center justify-between">
+                    <span>Omset Bisnis</span>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 rounded-full">Bisnis</span>
+                </div>
+                <div class="metric-card-value-container">
+                    <p class="metric-card-value text-2xl text-amber-600 dark:text-amber-400">{{ $currency($stats['omset_bisnis_amount']) }}</p>
+                </div>
+            </div>
+            <p class="metric-card-footer"><span class="font-mono">{{ number_format($stats['omset_bisnis_count']) }}</span> pelanggan aktif segmen Bisnis</p>
+        </div>
+        @endcan
     </div>
+
+    @if($canViewCash)
+    <!-- Posisi Keuangan & Arus Kas (Pilar 2) -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <x-ui.card class="p-5 xl:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-text-main">Posisi Keuangan & Arus Kas</h3>
+                <div class="flex items-center gap-2">
+                    @if($stats['cash_deposit_open_difference_count'] > 0)
+                        <x-ui.badge variant="error">{{ $stats['cash_deposit_open_difference_count'] }} selisih admin</x-ui.badge>
+                    @endif
+                    @if($stats['collector_shortfall_count'] > 0)
+                        <x-ui.badge variant="error">{{ $stats['collector_shortfall_count'] }} kurang setor kolektor</x-ui.badge>
+                    @endif
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Kas Mengendap di Kasir POP</p>
+                    <p class="text-lg font-semibold text-text-main font-mono">{{ $currency($stats['cash_at_office_amount']) }}</p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Uang di Tangan Kolektor</p>
+                    <p class="text-lg font-semibold text-text-main font-mono">{{ $currency($stats['cash_with_collector_amount']) }}</p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Setoran Menunggu Verifikasi</p>
+                    <p class="text-lg font-semibold text-text-main font-mono">{{ $currency($stats['cash_deposit_pending_amount']) }}</p>
+                    <p class="text-xs text-text-muted mt-0.5">{{ number_format($stats['cash_deposit_pending_count']) }} setoran</p>
+                </div>
+                <div class="rounded-md border p-3 {{ $stats['collector_shortfall_count'] > 0 ? 'border-error-border' : 'border-border' }}">
+                    <p class="text-xs text-text-muted mb-1">Kurang Setor Kolektor</p>
+                    <p class="text-lg font-semibold {{ $stats['collector_shortfall_count'] > 0 ? 'text-error' : 'text-text-main' }} font-mono">{{ $currency($stats['collector_shortfall_amount']) }}</p>
+                    <p class="text-xs text-text-muted mt-0.5">{{ number_format($stats['collector_shortfall_count']) }} kolektor</p>
+                </div>
+            </div>
+        </x-ui.card>
+
+        <!-- Action Center: Setoran Kas Pending (Pilar 6) -->
+        <x-ui.card class="p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-text-main">Butuh Verifikasi</h3>
+                @if(auth()->user()->hasPermission('cash_deposit.view'))
+                    <x-ui.link href="{{ route('cash-deposits.index') }}" class="text-xs">Lihat Semua</x-ui.link>
+                @endif
+            </div>
+
+            <div class="space-y-2">
+                @forelse($pendingCashDeposits as $deposit)
+                    <a href="{{ route('cash-deposits.index') }}" class="flex items-center justify-between rounded-md border border-border p-2.5 text-sm hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <span>
+                            <span class="block font-medium text-text-main">{{ $deposit->pop?->name ?? '-' }}</span>
+                            <span class="block text-xs text-text-muted">{{ $deposit->depositor?->name ?? '-' }}</span>
+                        </span>
+                        <span class="font-mono font-semibold text-text-main">{{ $currency($deposit->declared_amount) }}</span>
+                    </a>
+                @empty
+                    <p class="text-sm text-text-muted">Tidak ada setoran menunggu verifikasi.</p>
+                @endforelse
+            </div>
+        </x-ui.card>
+    </div>
+    @endif
+
+    <!-- Funnel Akuisisi & Retensi Pelanggan (Pilar 3) -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <x-ui.card class="p-5 xl:col-span-2">
+            <h3 class="text-sm font-semibold text-text-main mb-4">Funnel Akuisisi Pelanggan Baru</h3>
+
+            <div class="flex flex-col sm:flex-row items-stretch gap-2">
+                @foreach([
+                    ['label' => 'Menunggu Survey', 'value' => $stats['funnel_waiting_survey']],
+                    ['label' => 'Menunggu ACC Admin', 'value' => $stats['funnel_waiting_acc']],
+                    ['label' => 'Proses Pemasangan', 'value' => $stats['funnel_waiting_installation']],
+                    ['label' => 'Menunggu Verifikasi Admin', 'value' => $stats['funnel_verification_admin']],
+                ] as $index => $stage)
+                    <div class="flex-1 rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">{{ $index + 1 }}. {{ $stage['label'] }}</p>
+                        <p class="text-xl font-semibold text-text-main font-mono">{{ number_format($stage['value']) }}</p>
+                    </div>
+                    @if(!$loop->last)
+                        <div class="hidden sm:flex items-center justify-center text-text-disabled">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    @endif
+                @endforeach
+            </div>
+            <p class="text-xs text-text-muted mt-3">{{ number_format($stats['rejected_customers']) }} pelanggan gagal/batal pada periode {{ $filters['period_label'] }}.</p>
+        </x-ui.card>
+
+        <!-- Retensi & Status Pelanggan (Metric Card kecil) -->
+        <x-ui.card class="p-5">
+            <h3 class="text-sm font-semibold text-text-main mb-4">Retensi & Status Pelanggan</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Aktif</p>
+                    <p class="text-lg font-semibold text-success font-mono">{{ number_format($stats['active_customers']) }}</p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Isolir</p>
+                    <p class="text-lg font-semibold text-warning font-mono">{{ number_format($stats['suspended_customers']) }}</p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Putus (Periode Ini)</p>
+                    <p class="text-lg font-semibold text-error font-mono">{{ number_format($stats['terminated_customers']) }}</p>
+                </div>
+                <div class="rounded-md border border-border p-3">
+                    <p class="text-xs text-text-muted mb-1">Siap Tagih</p>
+                    <p class="text-lg font-semibold text-text-main font-mono">{{ number_format($stats['ready_billing_customers']) }}</p>
+                </div>
+            </div>
+        </x-ui.card>
+    </div>
+
+    @if($canViewTickets)
+    <!-- Kualitas Layanan & Gangguan / Ticketing SLA (Pilar 4) -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <x-ui.card class="p-5 xl:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-text-main">Kualitas Layanan & Gangguan (Ticketing)</h3>
+                @if($stats['ticket_sla_breach_count'] > 0)
+                    <x-ui.badge variant="error">{{ $stats['ticket_sla_breach_count'] }} breach SLA</x-ui.badge>
+                @endif
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                @if(auth()->user()->hasPermission('noc_worksheet.view'))
+                    <a href="{{ route('noc.worksheet') }}" class="rounded-md border border-border p-3 text-center hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <p class="text-xs text-text-muted mb-1">Masuk</p>
+                        <p class="text-lg font-semibold text-text-main font-mono">{{ number_format($stats['ticket_bucket_masuk']) }}</p>
+                    </a>
+                    <a href="{{ route('noc.worksheet') }}" class="rounded-md border border-border p-3 text-center hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <p class="text-xs text-text-muted mb-1">Diproses</p>
+                        <p class="text-lg font-semibold text-text-main font-mono">{{ number_format($stats['ticket_bucket_diproses']) }}</p>
+                    </a>
+                @else
+                    <div class="rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">Masuk</p>
+                        <p class="text-lg font-semibold text-text-main font-mono">{{ number_format($stats['ticket_bucket_masuk']) }}</p>
+                    </div>
+                    <div class="rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">Diproses</p>
+                        <p class="text-lg font-semibold text-text-main font-mono">{{ number_format($stats['ticket_bucket_diproses']) }}</p>
+                    </div>
+                @endif
+
+                @if(auth()->user()->hasPermission('tickets.selesai.view'))
+                    <a href="{{ route('tickets.selesai') }}" class="rounded-md border border-border p-3 text-center hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <p class="text-xs text-text-muted mb-1">Selesai</p>
+                        <p class="text-lg font-semibold text-success font-mono">{{ number_format($stats['ticket_bucket_selesai']) }}</p>
+                    </a>
+                @else
+                    <div class="rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">Selesai</p>
+                        <p class="text-lg font-semibold text-success font-mono">{{ number_format($stats['ticket_bucket_selesai']) }}</p>
+                    </div>
+                @endif
+
+                @if(auth()->user()->hasPermission('tickets.dibatalkan.view'))
+                    <a href="{{ route('tickets.dibatalkan') }}" class="rounded-md border border-border p-3 text-center hover:bg-surface-muted hover:border-primary-border transition-all duration-150">
+                        <p class="text-xs text-text-muted mb-1">Dibatalkan</p>
+                        <p class="text-lg font-semibold text-text-muted font-mono">{{ number_format($stats['ticket_bucket_dibatalkan']) }}</p>
+                    </a>
+                @else
+                    <div class="rounded-md border border-border p-3 text-center">
+                        <p class="text-xs text-text-muted mb-1">Dibatalkan</p>
+                        <p class="text-lg font-semibold text-text-muted font-mono">{{ number_format($stats['ticket_bucket_dibatalkan']) }}</p>
+                    </div>
+                @endif
+            </div>
+        </x-ui.card>
+
+        <!-- Top 5 Kategori Gangguan -->
+        <x-ui.card class="p-5">
+            <h3 class="text-sm font-semibold text-text-main mb-4">Top Kategori Gangguan ({{ $filters['period_label'] }})</h3>
+            <div class="space-y-3">
+                @forelse($topIssueCategories as $row)
+                    <div>
+                        <div class="flex justify-between gap-4 text-sm">
+                            <span class="font-medium text-text-secondary">{{ $row->issueCategory?->name ?? 'Tanpa Kategori' }}</span>
+                            <span class="font-semibold text-text-main font-mono">{{ number_format($row->total) }}</span>
+                        </div>
+                        <div class="mt-1.5 h-2 rounded-full bg-surface-muted">
+                            <div class="h-2 rounded-full bg-primary" style="width: {{ min(100, ((int) $row->total / max(1, (int) $topIssueCategories->max('total'))) * 100) }}%"></div>
+                        </div>
+                    </div>
+                @empty
+                    <p class="text-sm text-text-muted">Tidak ada tiket dengan kategori pada periode ini.</p>
+                @endforelse
+            </div>
+        </x-ui.card>
+    </div>
+    @endif
+
+    @if($canViewFopDelivery)
+    <!-- Efisiensi Delivery Lapangan (Pilar 5) -->
+    <x-ui.card class="p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-text-main">Efisiensi Delivery Lapangan ({{ $filters['period_label'] }})</h3>
+            <x-ui.link href="{{ route('fop.dashboard') }}" class="text-xs">Lihat Dashboard FOP</x-ui.link>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="rounded-md border border-border p-3">
+                <p class="text-xs text-text-muted mb-1">Survey Selesai</p>
+                <p class="text-lg font-semibold text-text-main font-mono">{{ number_format($stats['fop_survey_completed_count']) }}</p>
+            </div>
+            <div class="rounded-md border border-border p-3">
+                <p class="text-xs text-text-muted mb-1">PSB Selesai</p>
+                <p class="text-lg font-semibold text-text-main font-mono">{{ number_format($stats['fop_psb_completed_count']) }}</p>
+            </div>
+            <div class="rounded-md border border-border p-3">
+                <p class="text-xs text-text-muted mb-1">Rata-rata Lead Time PSB</p>
+                <p class="text-lg font-semibold text-text-main font-mono">{{ is_null($stats['fop_psb_avg_lead_time_days']) ? '-' : $stats['fop_psb_avg_lead_time_days'].' hari' }}</p>
+            </div>
+            <div class="rounded-md border p-3 {{ $stats['fop_overdue_survey_count'] + $stats['fop_overdue_psb_count'] > 0 ? 'border-error-border' : 'border-border' }}">
+                <p class="text-xs text-text-muted mb-1">Overdue Antrean</p>
+                <p class="text-lg font-semibold {{ $stats['fop_overdue_survey_count'] + $stats['fop_overdue_psb_count'] > 0 ? 'text-error' : 'text-text-main' }} font-mono">
+                    {{ number_format($stats['fop_overdue_survey_count']) }} survey &middot; {{ number_format($stats['fop_overdue_psb_count']) }} PSB
+                </p>
+            </div>
+        </div>
+    </x-ui.card>
+    @endif
+
+    @if($canViewWarehouse)
+    <!-- Alert Stok Kritis POP (Pilar 6) -->
+    <x-ui.card class="p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-text-main">Alert Stok Kritis POP</h3>
+            <div class="flex items-center gap-2">
+                @if($stats['low_stock_count'] > 0)
+                    <x-ui.badge variant="error">{{ $stats['low_stock_count'] }} item kritis</x-ui.badge>
+                @endif
+                <x-ui.link href="{{ route('warehouse.index') }}" class="text-xs">Lihat Semua</x-ui.link>
+            </div>
+        </div>
+
+        <x-ui.table :headers="['POP', 'Barang', 'Sisa Stok', 'Batas Minimum']">
+            @forelse($lowStockItems as $balance)
+                <tr>
+                    <td class="text-left text-text-muted">{{ $balance->pop?->name ?? '-' }}</td>
+                    <td class="text-left font-medium text-text-main">{{ $balance->item?->name ?? '-' }}</td>
+                    <td class="data-cell text-left text-error font-semibold">{{ number_format($balance->qty, 0) }} {{ $balance->item?->unit }}</td>
+                    <td class="data-cell text-left text-text-muted">{{ number_format($balance->minimum_stock, 0) }} {{ $balance->item?->unit }}</td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="4" class="py-6 text-center text-text-muted">Tidak ada stok di bawah batas minimum.</td>
+                </tr>
+            @endforelse
+        </x-ui.table>
+    </x-ui.card>
+    @endif
 
     <!-- Details Section Grid -->
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -190,24 +511,24 @@
         <!-- Due Invoices Table -->
         <x-ui.card class="p-5 xl:col-span-2">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-semibold text-text-main">Tagihan Jatuh Tempo</h3>
+                <h3 class="text-sm font-semibold text-text-main">Piutang Tagihan</h3>
                 @if(auth()->user()->hasPermission('view_invoices'))
                     <x-ui.link href="{{ route('invoices.index') }}" class="text-xs">Lihat Semua</x-ui.link>
                 @endif
             </div>
 
-            <x-ui.table :headers="['Invoice', 'Pelanggan', 'POP', 'Jatuh Tempo', 'Sisa Tagihan']">
+            <x-ui.table :headers="['Invoice', 'Pelanggan', 'POP', 'Periode', 'Sisa Tagihan']">
                 @forelse($dueInvoices as $invoice)
                     <tr>
                         <td class="data-cell text-left font-medium text-text-main">{{ $invoice->invoice_number }}</td>
                         <td class="text-left text-text-secondary">{{ $invoice->customer?->full_name ?? '-' }}</td>
                         <td class="text-left text-text-muted">{{ $invoice->pop?->name ?? '-' }}</td>
-                        <td class="data-cell text-left text-error font-semibold">{{ optional($invoice->due_date)->format('d/m/Y') }}</td>
+                        <td class="data-cell text-left text-error font-semibold">{{ $invoice->billing_period }}</td>
                         <td class="data-cell text-right font-semibold text-text-main">{{ $currency($invoice->remaining_amount) }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="py-6 text-center text-text-muted">Tidak ada tagihan jatuh tempo.</td>
+                        <td colspan="5" class="py-6 text-center text-text-muted">Tidak ada piutang tagihan.</td>
                     </tr>
                 @endforelse
             </x-ui.table>

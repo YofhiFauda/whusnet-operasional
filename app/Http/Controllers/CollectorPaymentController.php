@@ -20,9 +20,13 @@ use Illuminate\Http\Request;
  *   - cuma dalam POP scope dirinya — `applyUserScope($actor)` di service yang
  *     sama, jadi pelanggan yang terlanjur ter-assign lalu POP-nya keluar dari
  *     scope tetap ditolak;
- *   - nominal tak boleh melebihi sisa tagihan; kelebihan bayar dikembalikan
- *     fisik, tak jadi kredit (§B-8 no. 6, tetap berlaku).
+ *   - nominal BOLEH melebihi sisa tagihan (ADHOC-84 §2.5, ganti aturan lama
+ *     "kelebihan dikembalikan fisik") — kelebihannya otomatis kredit saldo
+ *     pelanggan, sama seperti jalur admin `PaymentService::record()`. Yang
+ *     beda dua jalur ini cuma SIAPA yang membayar (admin di kantor vs
+ *     kolektor di lapangan), bukan cara kelebihan bayarnya diperlakukan.
  *
+
  * docs/plan/kolektor/analisa-alur-kolektor-2.0.md §9, §14.
  */
 class CollectorPaymentController extends Controller

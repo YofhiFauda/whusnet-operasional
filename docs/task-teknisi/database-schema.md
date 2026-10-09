@@ -8,6 +8,7 @@ tasks ──belongsTo──▶ customers (nullable)
       ──belongsTo──▶ users (fop_id, created_by, updated_by, completed_by)
       ──hasMany───▶ task_teams ──belongsTo──▶ users
       ──hasOne────▶ task_maintenances
+      ──hasOne────▶ task_creq_details
 ```
 
 > **`task_evidences` dihapus (2026-08-06)** — fitur Foto Bukti generik dibuang total (model, controller, route, tabel). Migration `2026_08_06_140732_drop_task_evidences_table.php` (`down()` reversible kalau perlu rollback). Alasan & pengganti: lihat [business-logic.md § 5](business-logic.md#5-syarat-complete--laporan-pekerjaan-teknisi).
@@ -63,6 +64,45 @@ Migrasi: `2026_07_01_152851_create`. 1:1 dengan `tasks` (khusus task tipe non-Su
 | `kabel`, `modem`, `patchcord`, `sleeve`, `lainnya` | string | Opsional, catatan part yang dipakai |
 | `opm_photo`, `speedtest_photo` | string | Wajib diisi saat submit laporan |
 
+## Tabel `task_creq_details` (2026-09-26)
+
+Migrasi: `2026_09_26_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe `CREQ`) — kategori pekerjaan + tikor + status verifikasi biaya. Lihat [business-logic.md § 7b](business-logic.md#7b-kategori-c-req--verifikasi-biaya-2026-09-26) dan [rancangan](../plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md).
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | bigint PK | |
+| `task_id` | FK → `tasks.id`, cascade delete | |
+| `category` | string | Enum `App\Enums\CReqCategory`: `pindah_lokasi`/`pindah_kabel`/`tambah_modem`/`migrasi`/`lainnya` |
+| `category_custom_name` | string nullable | Wajib kalau `category=lainnya` |
+| `target_pop_id` | FK → `pops.id`, null on delete, nullable | Migrasi `2026_10_08_100000_add_target_pop_id` (ADHOC-108). Wajib kalau `category=migrasi` — POP tujuan pindah, dieksekusi via `$customer->update(['pop_id' => ...])` biasa di `TaskMaintenanceController::store()` |
+| `tikor_lama_lat`, `tikor_lama_lng`, `tikor_baru_lat`, `tikor_baru_lng` | decimal(10,7) nullable | Wajib kalau `category` = `pindah_lokasi`/`pindah_kabel`/`migrasi` |
+| `is_billable` | boolean, default false | Checkbox "Task ini berbayar" di form |
+| `billing_note` | text nullable | Wajib kalau `is_billable=true` |
+| `verification_status` | string, default `pending` | Enum `App\Enums\CReqVerificationStatus`: `pending`/`verified`/`rejected` — hanya bermakna kalau `is_billable=true` |
+| `verified_by` | FK → `users.id`, null on delete | CS (role helpdesk) yang approve/reject |
+| `verified_at` | timestamp nullable | |
+| `rejection_reason` | text nullable | Wajib diisi saat reject |
+| `invoice_id` | FK → `invoices.id`, null on delete, nullable | Migrasi `2026_09_28_120000_add_invoice_id`. Tagihan Manual yang terbit saat "Setujui & Terbitkan Tagihan" (satu transaksi dengan verifikasi) |
+
+`task_id` **unique** sejak migrasi `2026_09_28_100000_add_unique_task_id` — satu detail C-REQ per task.
+
+Relasi: `Task::creqDetail()` (HasOne), `TaskCreqDetail::task()`, `TaskCreqDetail::verifier()` (BelongsTo `User`, `verified_by`), `TaskCreqDetail::invoice()` (BelongsTo `Invoice`).
+
+## Tabel `task_device_retrievals` (ADHOC-86)
+
+Migrasi: `2026_09_19_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe Ambil Modem / `DEAC`) — laporan lapangan pengambilan alat. Tabel sendiri, bukan numpang `task_maintenances`, karena form DEAC tidak punya kendala teknis / foto OPM / speedtest — memaksa kolom itu terisi berarti data palsu.
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | bigint PK | |
+| `task_id` | FK → `tasks.id`, **unique**, cascade delete | Satu laporan per task; kirim ulang setelah FOP me-reject memakai `updateOrCreate` |
+| `outcome` | string(20) | `App\Enums\DeviceRetrievalOutcome`: `diambil` / `tidak_ditemukan` / `ditolak` |
+| `condition_photo` | string nullable | Foto kondisi alat (disk `public`, folder `device-retrieval/`); wajib kalau `outcome=diambil` |
+| `accessories` | json nullable | Kunci dari `TaskDeviceRetrieval::ACCESSORY_OPTIONS` (`adaptor`, `patchcord`, `kabel_lan`, `remote`) |
+| `notes` | text nullable | Catatan teknisi; **wajib** kalau `outcome` ≠ `diambil` (alasan alat tidak diambil) |
+
+**SN yang dibawa TIDAK disimpan di sini** — sumber kebenarannya `inventory_serials` + ledger `inventory_transactions` + `device_retrieval_logs` ([warehouse/database-schema.md](../warehouse/database-schema.md#device_retrieval_logs-2026_09_21_100000-adhoc-88)), supaya tidak ada dua salinan yang bisa menyimpang. Relasi: `Task::deviceRetrieval()` (HasOne), `TaskDeviceRetrieval::task()`.
+
 ## Perbandingan dengan `FopTask` / `fop_tasks`
 
 | | `tasks` (modul ini) | `fop_tasks` (lihat [docs/fop-task](../fop-task/README.md)) |
@@ -81,6 +121,8 @@ pop(): BelongsTo(Pop::class)
 fop(): BelongsTo(User::class, 'fop_id')
 teamMembers(): HasMany(TaskTeam::class)
 maintenanceReport(): HasOne(TaskMaintenance::class)
+creqDetail(): HasOne(TaskCreqDetail::class)             // khusus task C-REQ, 2026-09-26
+deviceRetrieval(): HasOne(TaskDeviceRetrieval::class)   // khusus task Ambil Modem (DEAC), ADHOC-86
 auditLogs(): MorphMany(AuditLog::class, 'auditable')
 
 // TaskTeam

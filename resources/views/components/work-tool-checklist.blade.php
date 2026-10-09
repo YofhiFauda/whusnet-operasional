@@ -21,8 +21,8 @@
     'name' => 'work_tools',
     'tools' => null,
     'rows' => [],
-    'label' => 'Alat Kerja Yang Perlu Dibawa',
-    'hint' => 'Centang alat yang harus dibawa tim ke lokasi. Ini peralatan kerja — dibawa lalu dibawa pulang, bukan material yang dipasang di pelanggan.',
+    'label' => 'Alat Kerja Opsional',
+    'hint' => 'Centang alat yang boleh dibawa bila dibutuhkan di lokasi. Tidak wajib dibawa. Ini peralatan kerja — dibawa lalu dibawa pulang, bukan material yang dipasang di pelanggan.',
 ])
 
 @php

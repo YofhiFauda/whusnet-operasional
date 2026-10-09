@@ -58,6 +58,7 @@ Ketiganya pakai logic sama: kumpulkan `user_id` anggota tim (+ diri sendiri), ca
   - Survey (`CustomerSurveyController::store()`) — `survey_photo` + `house_photo` wajib saat `survey_status=completed`.
   - Pemasangan (`CustomerInstallationController::store()`) — `installation_photo`, `contract_photo`, `signature_photo`, `speedtest_photo` wajib saat `installation_status=completed`.
   - Maintenance/lainnya (`TaskMaintenanceController::store()`) — `opm_photo` + `speedtest_photo` wajib, langsung memicu `TaskService::complete()`.
+- **Task Ambil Modem (DEAC) punya form laporan sendiri (ADHOC-86, 2026-09-19):** `/tasks/{task}/device-retrieval-report` (`TaskDeviceRetrievalController`), bukan form Maintenance (URL lamanya dialihkan). Isinya hasil lapangan (diambil / tidak ditemukan / pelanggan menolak), SN fisik, foto kondisi, kelengkapan, alasan. Disimpan di tabel `task_device_retrievals` (relasi `Task::deviceRetrieval()`), bukan `task_maintenances`. Task DEAC **tidak bisa selesai tanpa laporan ini**, dan `device_retrieved_at` hanya terisi kalau hasilnya "diambil". Alur inventori & konfirmasi gudang: `docs/warehouse/business-logic.md` §12a.
 - **Blok "Laporan Pekerjaan Teknisi" di Detail Task (2026-08-06):** apa yang teknisi kerjakan (kendala teknis, material terpakai dari `FopTask::materials()->terpakai()`, foto OPM/Speedtest) sebelumnya cuma tersimpan di DB tanpa pernah tampil lagi di `/tasks/{id}`. Sekarang `TaskController::show()` eager-load `maintenanceReport`, dan view nampilinnya di section baru — berlaku untuk task non-Survey/Pemasangan (MTN, C-REQ, O-REQ, INFR, Ambil Modem), karena Survey/Pemasangan sudah punya halaman laporan lengkap sendiri (link "Lihat/Lanjutkan Laporan").
 - **Tile ringkasan "Foto Bukti" diganti "Durasi Aktual"** (`actualDurationMinutes()`, format jam/menit, merah kalau `isOverSla()`) di ringkasan atas Detail Task — bekas tempat count foto yang sekarang gak ada lagi.
 
@@ -99,6 +100,48 @@ FOP review (approve/reject/pending) via TaskController::review()
 - Task tipe `MAINTENANCE` (dan tipe non-Survey/Pemasangan lain) pakai form laporan sendiri (`TaskMaintenanceController`), bukan form Survey/Instalasi.
 - Guard eksplisit menolak akses form ini kalau `task_type` Survey/Pemasangan — 2 form gak boleh dipakai silang.
 - Submit laporan maintenance **langsung** panggil `TaskService::complete()` di akhir — 1 submit = simpan laporan + selesaikan task sekaligus (beda dari Survey/Instalasi yang punya form "lapor" terpisah dari transisi status, laporan maintenance gak py status draft/progress).
+
+## 7b. Kategori C-REQ & Verifikasi Biaya (2026-09-26)
+
+Task tipe `C-REQ` pakai form yang **sama persis** dengan §7 di atas (`TaskMaintenanceController`), ditambah field khusus yang cuma tampil/divalidasi kalau `task_type = CREQ`:
+
+- Dropdown **Kategori C-REQ** (`App\Enums\CReqCategory`): `Pindah Lokasi`/`Pindah Kabel` (tikor lama+baru wajib), `Tambah Modem` (wajib pilih SN dari custody tim — memperketat `selected_inventory_serial_id` yang di form ini defaultnya opsional), `Migrasi` (pindah lokasi LINTAS POP — tikor lama+baru wajib SAMA seperti Pindah Lokasi, ditambah dropdown **POP Tujuan** wajib; lihat sub-bagian di bawah), `Lainnya` (nama kategori bebas wajib).
+
+  **"Tambah Modem" = NAMBAH, bukan GANTI (koreksi 2026-10-08).** Pelanggan dapat modem KEDUA yang aktif bersamaan (mis. repeater/ONT tambahan) — modem lama yang masih `INSTALLED` **TIDAK** ikut diretur. Ini SATU-SATUNYA kategori/task_type yang beda: MTN (maintenance biasa, field modem opsional) dan kategori C-REQ lain yang kebetulan pilih SN di field ini defaultnya tetap **GANTI** — modem lama otomatis diretur begitu SN baru diinstall (`InventoryService::installSerial($returnExistingSerial)`, `App\Enums\CReqCategory::addsModemWithoutReturningExisting()`). `customer_devices` cuma 1 baris per pelanggan (`hasOne`) — saat nambah, baris itu TETAP nunjuk modem pertama/utama; modem tambahan cuma tertrack di `inventory_serials` (customer_id terisi, status INSTALLED), gak tampil sebagai "device utama" di Detail Pelanggan. Test: `TaskCreqBillingReportTest::tambah_modem_tidak_meretur_modem_lama_pelanggan`, `TaskMaintenanceModemInstallTest::pilih_sn_baru_otomatis_meretur_modem_lama_pelanggan` (kontrol, buktikan MTN tetap ganti).
+- Checkbox **"Task ini berbayar"** + catatan biaya — kalau dicentang, tersimpan sebagai `TaskCreqDetail.is_billable=true`, `verification_status=pending`, masuk antrean **Verifikasi Biaya C-REQ**.
+
+Disimpan di tabel terpisah `task_creq_details` (lihat [database-schema.md](database-schema.md#tabel-task_creq_details-2026-09-26)) — bukan kolom tambahan di `task_maintenances`, karena field ini murni khusus C-REQ dan tak relevan buat MTN/O-REQ/INFR REQ yang berbagi controller/view yang sama.
+
+**Alur verifikasi** (sejak 2026-09-28 — "Setujui & Terbitkan Tagihan"):
+
+```
+Teknisi submit (is_billable=true) → verification_status=pending (task tetap selesai seperti biasa)
+CS (role helpdesk, permission creq_billing_verification.*) buka /tasks-creq-billing/{task}
+  → Setujui → CS isi nominal + deskripsi (+ nama sub kalau Lainnya) DI HALAMAN INI,
+              SATU transaksi: Tagihan Manual terbit (ManualCategoryInvoiceService::issue()),
+              verification_status=verified, task_creq_details.invoice_id = tagihan itu
+  → Tolak   → verification_status=rejected + rejection_reason (wajib), tanpa tagihan
+```
+
+Awalnya (2026-09-26) Setujui cuma menandai verified lalu redirect ke `/invoices/create` dengan prefill. Diganti karena tagihannya tidak tertaut ke task, dan kalau CS tidak menuntaskan form itu, biaya tercatat "disetujui" tapi tidak pernah ditagih. Sekarang gagal di titik mana pun (mis. pelanggan belum punya layanan) = tidak ada yang berubah.
+
+Kontrol race-condition: `approve()`/`reject()` (`TaskCreqBillingController`) mengunci baris (`lockForUpdate()`) **di dalam** `DB::transaction()` dan mengecek ulang `verification_status=pending` di situ — mencegah dua request bersamaan saling menimpa hasil verifikasi atau menerbitkan tagihan dua kali.
+
+**Jenis Tagihan diturunkan dari Jenis Permintaan, bukan input CS.** `ManualInvoiceCategory` (enum FINAL 3 nilai, ADHOC-70) **tidak ditambah**; `CReqCategory::toManualInvoiceCategory()`: `pindah_lokasi`/`migrasi`→`pindah_lokasi`, `pindah_kabel`/`tambah_modem`→`perbaikan`, `lainnya`→`lainnya` (nama sub diisi awal dari `category_custom_name`). Konsekuensi: kategori salah pilih oleh teknisi = jenis tagihan ikut salah; koreksinya lewat **Tolak**, bukan ganti jenis tagihan.
+
+### Kategori `MIGRASI` — pindah lokasi lintas POP (ADHOC-108, 2026-10-08)
+
+Beda dari `PINDAH_LOKASI`: `PINDAH_LOKASI` = alamat baru, POP pelanggan tetap sama; `MIGRASI` = alamat baru SEKALIGUS beda POP. Tagihannya tetap SAMA (`ManualInvoiceCategory::PINDAH_LOKASI`, "Tagihan Pindah Lokasi") — yang beda cuma penanganan lapangan & efek ke master data.
+
+- Form teknisi tambah dropdown **POP Tujuan** (`creq_target_pop_id`, kolom `task_creq_details.target_pop_id` FK `pops`) — cuma tampil/wajib untuk kategori ini (`CReqCategory::requiresTargetPop()`). Opsinya SEMUA Cabang (`type=cabang`) berstatus aktif, **tanpa** batas POP scope teknisi — keputusan pindah POP datang dari CS/NOC, teknisi cuma eksekusi fisiknya. Validasi menolak kalau POP tujuan = POP pelanggan sekarang.
+- `TaskMaintenanceController::store()` mengeksekusi pindah `pop_id` pelanggan dengan `$customer->update(['pop_id' => $target])` **biasa** — bukan logic baru. Semua invariant Pindah Cabang (guard piutang wajib lunas dulu, kolektor dilepas, Mini POP/Distribusi dilepas kalau tidak cocok, CID dihitung ulang, tagihan bulan berjalan ikut pindah) satu sumber tetap di `CustomerObserver::updating()`/`CustomerRelocationService` (lihat CLAUDE.md § Pindah Cabang) — **TIDAK diduplikasi** di controller ini.
+- Kalau masih ada piutang, `CustomerObserver` melempar `CustomerRelocationBlockedException` — ditangkap catch umum `store()`, task **TIDAK** selesai, pop_id **TIDAK** berubah (seluruh `DB::transaction()` laporan rollback). Teknisi harus minta CS lunaskan piutang dulu, baru kirim ulang laporan.
+- Checkbox "Task ini berbayar" tetap pilihan manual, sama seperti kategori lain — tidak otomatis tercentang untuk `MIGRASI`.
+- Test: `TaskCreqMigrasiTest`.
+
+**Laporan tampil lengkap di 3 halaman (2026-09-29).** Isi laporan C-REQ yang dikirim teknisi wajib terlihat utuh di Detail Task (`/tasks/{task}`), Riwayat Task FOP (`/fop-tasks/history/{fop_task}`), dan Verifikasi Biaya (`/tasks-creq-billing/{task}`): kendala teknis, Jenis Permintaan + nama kategori, tikor lama/baru (+ link Maps), modem/SN terpasang, material terpakai (termasuk potongan roll kabel, kode roll dari `task_materials.lot_no`), alat kerja, foto OPM/speedtest, serta status berbayar/verifikasi/tagihan. Bagian khusus `task_creq_details` dirender satu partial bersama `tasks/partials/creq-detail.blade.php` (Detail Task & Riwayat FOP); halaman Verifikasi punya tata letak sendiri. Penjaga: `CreqReportIncompleteOnDetailPagesTest`.
+
+Rancangan lengkap: [`docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md`](../plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md).
 
 ## 8. Audit
 

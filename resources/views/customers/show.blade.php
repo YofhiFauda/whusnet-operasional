@@ -18,29 +18,37 @@
 
     $discountedPrice = max(0, $monthlyPrice - $discount);
     $ppnAmount       = round($discountedPrice * ($ppnPercent / 100), 2);
+    // $otherFee SENGAJA TIDAK ikut $totalBill (2026-09-14) — Tagihan Bulanan
+    // murni harga+PPN, sama seperti GenerateMonthlyInvoicesCommand &
+    // CustomerController::store()/update(). $otherFee (materai dkk) cuma
+    // sekali di Tagihan Awal/Registrasi, ditampilkan terpisah di breakdown
+    // di bawah (tab Billing), bukan ditambah ke total di sini.
     $totalBill       = $customer->customerService
         ? (float)$customer->customerService->total_monthly_bill
-        : ($discountedPrice + $ppnAmount + $otherFee);
+        : ($discountedPrice + $ppnAmount);
 
     $isActive = in_array($customer->status, ['active', 'suspended']) || $customer->data_completeness_status === 'siap_billing';
 @endphp
 
 <!-- LAYER 1: NAKED PAGE HEADER (Strict Design System Rule: No card wrapper) -->
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-    <div>
-        <div class="flex items-center gap-3 flex-wrap">
-            <h1 class="text-xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">{{ $customer->full_name }}</h1>
+<div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-5 sm:mb-6">
+    <div class="space-y-2 flex-1 min-w-0">
+        <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+            <h1 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-50 tracking-tight leading-tight">
+                {{ $customer->full_name }}
+            </h1>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold {{ $customer->subscriptionStatus?->badgeClasses() ?? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' }}">
                 ● Status: {{ $customer->subscriptionStatus->name ?? Str::headline($customer->status) }}
             </span>
-            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
+            <div class="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-700/80 px-2 py-0.5 rounded text-xs font-mono font-medium text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-600/60">
                 <span>{{ $displayIdLabel ?? 'CID' }}: {{ $displayId }}</span>
-                <button type="button" onclick="copyText('{{ $displayId }}', 'CID')" class="text-slate-400 hover:text-sky-600 ml-1 cursor-pointer" title="Salin CID">
+                <button type="button" onclick="copyText('{{ $displayId }}', 'CID')" class="text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 ml-1 cursor-pointer transition-colors" title="Salin CID">
                     <i class="fa-regular fa-copy"></i>
                 </button>
             </div>
             @if($customer->collector)
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20" title="Kolektor yang rutin menagih pelanggan ini">
+                    <i class="fa-solid fa-user-tag mr-1 text-[10px] opacity-70"></i>
                     Kolektor: {{ $customer->collector->name }}
                 </span>
             @else
@@ -49,25 +57,39 @@
                 </span>
             @endif
 
-            @php
-                // Total uang lebih yang pernah diserahkan pelanggan ini.
-                // Pembayaran DITOLAK tak ikut dijumlah — kalau pembayarannya
-                // dibatalkan, lebih bayarnya ikut batal.
-                $totalOverpay = $customer->payments
-                    ->filter(fn ($p) => $p->payment_status === \App\Enums\PaymentStatus::VALID)
-                    ->sum(fn ($p) => (float) $p->overpay_amount);
-            @endphp
-            @if($totalOverpay > 0)
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20" title="Total uang lebih yang pernah diserahkan. Catatan saja — bukan saldo, tidak otomatis dipakai untuk tagihan berikutnya.">
-                    Lebih Bayar: Rp {{ number_format($totalOverpay, 0, ',', '.') }}
-                </span>
-            @endif
+            {{-- Saldo Pelanggan (ADHOC-92) — pengganti badge "Lebih Bayar" lama.
+                 Beda dari total overpay historis: ini saldo AKTIF (SUM kredit −
+                 SUM debit), otomatis dipakai untuk tagihan Bulanan berikutnya
+                 begitu terbit (FIFO periode terlama). Bukan sekadar catatan. --}}
+            @can('customer_balance.view')
+                @if($customerBalance > 0)
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20" title="Saldo aktif pelanggan ini — otomatis dipakai untuk tagihan Bulanan berikutnya begitu terbit (FIFO periode terlama dulu). Lihat riwayat di tab Billing.">
+                        <i class="fa-solid fa-wallet mr-1 text-[10px] opacity-70"></i>
+                        Saldo: Rp {{ number_format($customerBalance, 0, ',', '.') }}
+                    </span>
+                @endif
+            @endcan
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Paket: <strong>{{ $customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket' }}</strong> (Rp {{ number_format($totalBill, 0, ',', '.') }}/bln) — {{ $customer->pop->name ?? 'POP Belum Set' }} ({{ $customer->miniPop->name ?? 'Mini POP Belum Set' }}) — Terdaftar sejak {{ $regDate }}
-        </p>
+        <div class="flex items-center gap-x-3 gap-y-1.5 flex-wrap text-xs text-slate-500 dark:text-slate-400">
+            <span class="inline-flex items-center gap-1.5">
+                <i class="fa-solid fa-wifi text-sky-500 text-[11px]"></i>
+                <span>Paket: <strong class="text-slate-800 dark:text-slate-200 font-semibold">{{ $customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket' }}</strong></span>
+                <span class="text-slate-500 dark:text-slate-400 font-mono">(Rp {{ number_format($totalBill, 0, ',', '.') }}/bln)</span>
+            </span>
+            <span class="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
+            <span class="inline-flex items-center gap-1.5">
+                <i class="fa-solid fa-network-wired text-indigo-500 text-[11px]"></i>
+                <span>{{ $customer->pop->name ?? 'POP Belum Set' }}</span>
+                <span class="text-slate-400">({{ $customer->miniPop->name ?? 'Mini POP Belum Set' }})</span>
+            </span>
+            <span class="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
+            <span class="inline-flex items-center gap-1.5 text-slate-400">
+                <i class="fa-regular fa-calendar-check text-[11px]"></i>
+                <span>Terdaftar sejak {{ $regDate }}</span>
+            </span>
+        </div>
     </div>
-    <div class="flex items-center gap-2 shrink-0 flex-wrap">
+    <div class="flex items-center gap-2 shrink-0 flex-wrap w-full xl:w-auto pt-1 xl:pt-0">
         @can('customers.detail.installation.activate')
             @php
                 $hasWorkflowTask = isset($customerTasks) && $customerTasks->whereIn('task_type', [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])->isNotEmpty();
@@ -77,46 +99,47 @@
                 <form action="{{ route('customers.activate', $customer->id) }}" method="POST" class="inline" onsubmit="event.preventDefault(); window.confirmAction('Pelanggan ini belum aktif lewat proses verifikasi normal. Aktifkan manual sekarang? CID akan dibuat dan tagihan pertama akan diterbitkan.', this);">
                     @csrf
                     <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer"
+                            class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs cursor-pointer"
                             title="Khusus pelanggan migrasi lama."
                             @if(!$completeness['is_ready_billing']) disabled title="Data profil belum lengkap untuk diaktifkan" @endif>
                         <i class="fa-solid fa-circle-check"></i>
-                        Aktivasi Manual
+                        <span>Aktivasi Manual</span>
                     </button>
                 </form>
             @endif
         @endcan
 
-        <a href="{{ route('customers.edit', $customer->id) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+        <a href="{{ route('customers.edit', $customer->id) }}" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs">
             <i class="fa-solid fa-pen-to-square"></i>
-            Edit Profil
+            <span>Edit Profil</span>
         </a>
 
         @can('customers.qr.view')
-            <a href="{{ route('customers.qr.show', $customer->id) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm">
-                <i class="fa-solid fa-qrcode"></i>
-                QR Pelanggan
+            <a href="{{ route('customers.qr.show', $customer->id) }}" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-2xs">
+                <i class="fa-solid fa-qrcode text-slate-500 dark:text-slate-400"></i>
+                <span>QR Pelanggan</span>
             </a>
         @endcan
 
         @can('invoices.create')
             @if($isActive && $customer->customerService)
-                <button type="button" onclick="openInvoiceModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
+                <a href="{{ route('invoices.create', ['customer_id' => $customer->id]) }}" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs">
                     <i class="fa-solid fa-plus"></i>
-                    Buat Tagihan
-                </button>
+                    <span>Buat Tagihan</span>
+                </a>
             @endif
         @endcan
 
         @can('customers.detail.installation.validate')
-            <button type="button" x-data @click="$dispatch('open-modal', 'network-assignment')" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
+            <button type="button" x-data @click="$dispatch('open-modal', 'network-assignment')" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs cursor-pointer">
                 <i class="fa-solid fa-diagram-project"></i>
-                Atur Mini POP
+                <span>Atur Mini POP</span>
             </button>
         @endcan
 
-        <a href="{{ route('customers.index') }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm">
-            Kembali
+        <a href="{{ route('customers.index') }}" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-2xs">
+            <i class="fa-solid fa-arrow-left text-slate-400"></i>
+            <span>Kembali</span>
         </a>
     </div>
 </div>
@@ -124,38 +147,51 @@
 <!-- LAYER 3: SINGLE UNIFIED DETAIL PANEL (Card Budget = 1) -->
 <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm overflow-hidden">
 
-    <!-- SECTION A: QUICK METRIC STRIP (Flat summary bar with dividers) -->
-    <div class="grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-slate-200 dark:divide-slate-700 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
-        <div class="p-4 flex flex-col justify-center">
+    <!-- SECTION A: QUICK METRIC STRIP (Responsive hairline grid for Mobile, Tablet, & Desktop) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-px bg-slate-200 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-700">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">LANGGANAN & BIAYA</span>
-            <span class="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1 truncate">{{ $customer->internetPackage->name ?? 'Belum Ada Paket' }}</span>
+            <span class="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1 truncate" title="{{ $customer->internetPackage->name ?? 'Belum Ada Paket' }}">
+                {{ $customer->internetPackage->name ?? 'Belum Ada Paket' }}
+            </span>
             <span class="text-xs font-mono font-semibold text-sky-600 dark:text-sky-400">Rp {{ number_format($totalBill, 0, ',', '.') }}/bln (Nett)</span>
         </div>
-        <div class="p-4 flex flex-col justify-center">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PPPOE</span>
-            <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
-                <span>{{ $customer->customerTechnicalDetail->pppoe_username ?? ($customer->pppoe_username ?? '-') }}</span>
+            @php
+                $pppoeShown = $customer->customerDevice?->pppoe_username ?: ($customer->customerTechnicalDetail?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?? '-')));
+                $pppoeWarning = \App\Services\CustomerCidService::pppoeMismatchWarning($customer, $pppoeShown);
+            @endphp
+            <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100 truncate" title="{{ $pppoeShown }}">
+                <span class="truncate">{{ $pppoeShown }}</span>
             </div>
+            @if($pppoeWarning)
+                <span class="text-[11px] text-amber-600 dark:text-amber-400 mt-1 leading-snug">{{ $pppoeWarning }}</span>
+            @endif
         </div>
-        <div class="p-4 flex flex-col justify-center">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
-            <span class="text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 truncate">{{ $customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang') }}</span>
+            <span class="text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 truncate" title="{{ $customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang') }}">
+                {{ $customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang') }}
+            </span>
             <span class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">Redaman: {{ $customer->customerTechnicalDetail->fiber_signal ?? ($customer->customerDevice->signal_power ?? '-') }}</span>
         </div>
-        <div class="p-4 flex flex-col justify-center">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>
             @if($latestInvoice)
-                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 truncate">{{ $latestInvoice->invoice_number }} ({{ $latestInvoice->invoice_status->label() }})</span>
+                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 truncate" title="{{ $latestInvoice->invoice_number }} ({{ $latestInvoice->invoice_status->label() }})">
+                    {{ $latestInvoice->invoice_number }} ({{ $latestInvoice->invoice_status->label() }})
+                </span>
             @else
                 <span class="text-xs font-bold text-slate-400 mt-1">Belum Ada Tagihan</span>
             @endif
             <span class="text-[11px] text-slate-500">Jatuh Tempo: {{ $customer->customerService?->due_date ? 'Tgl ' . \Carbon\Carbon::parse($customer->customerService->due_date)->day . ' Per Bulan' : '-' }}</span>
         </div>
-        <div class="p-4 flex flex-col justify-center col-span-2 md:col-span-1">
+        <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0 sm:col-span-2 lg:col-span-1">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
             <div class="flex items-center justify-between mt-1">
                 <span class="text-xs font-bold {{ count($completeness['missing_required']) > 0 ? 'text-rose-600' : (count($completeness['missing_optional']) > 0 ? 'text-amber-600' : 'text-emerald-600') }}">{{ $completeness['percentage'] }}% Lengkap</span>
-                <span class="text-[10px] font-mono text-slate-400">{{ 28 - count($completeness['missing_required']) - count($completeness['missing_optional']) }}/28 Parameter</span>
+                <span class="text-[10px] font-mono text-slate-400">{{ $completeness['filled_count'] }}/{{ $completeness['total_count'] }} Parameter</span>
             </div>
             <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-1.5 overflow-hidden">
                 <div class="{{ count($completeness['missing_required']) > 0 ? 'bg-rose-500' : (count($completeness['missing_optional']) > 0 ? 'bg-amber-500' : 'bg-emerald-500') }} h-full rounded-full transition-all duration-300" style="width: {{ $completeness['percentage'] }}%"></div>
@@ -165,9 +201,9 @@
 
     <!-- SECTION C: SEARCH & EXACT 15-TAB NAV BAR -->
     <div class="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-        <!-- Omni-Search Bar & Mode Toggle -->
-        <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            <div class="relative flex-1">
+        <!-- Omni-Search Bar & Mode Toggle (Fully Responsive for Mobile/Tablet/Desktop) -->
+        <div class="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div class="relative flex-1 min-w-0">
                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 <input type="text" id="omni-search" onkeyup="filterContent()" placeholder="⚡ Cari apapun di seluruh tab (contoh: IP, ZTE, PPPoE, Speedtest, NIK, Prorate, Tiang, Kontrak)..."
                        class="w-full pl-9 pr-10 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
@@ -175,50 +211,54 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs shrink-0">
-                <button type="button" onclick="setViewMode('tabs')" id="view-mode-tabs" class="px-3 py-1.5 rounded-md font-semibold bg-white dark:bg-slate-800 text-sky-600 shadow-sm transition-all cursor-pointer">📑 Mode Tab (15 Tab)</button>
-                <button type="button" onclick="setViewMode('all')" id="view-mode-all" class="px-3 py-1.5 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all cursor-pointer">⚡ All-In-One (Scroll Semua)</button>
+            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs shrink-0 self-start sm:self-auto">
+                <button type="button" onclick="setViewMode('tabs')" id="view-mode-tabs" class="px-2.5 sm:px-3 py-1.5 rounded-md font-semibold bg-white dark:bg-slate-800 text-sky-600 shadow-xs transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs">
+                    📑 <span class="hidden sm:inline">Mode </span>Tab (15)
+                </button>
+                <button type="button" onclick="setViewMode('all')" id="view-mode-all" class="px-2.5 sm:px-3 py-1.5 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-all cursor-pointer whitespace-nowrap text-[11px] sm:text-xs">
+                    ⚡ All-In-One<span class="hidden md:inline"> (Scroll)</span>
+                </button>
             </div>
         </div>
 
-        <!-- 15 Tab Buttons Nav -->
-        <div id="tab-nav-wrapper" class="overflow-x-auto flex border-b border-slate-200 dark:border-slate-700 scrollbar-none px-2 bg-slate-50/50 dark:bg-slate-900/30">
-            <button type="button" onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap cursor-pointer">Ringkasan (Overview)</button>
+        <!-- 15 Tab Buttons Nav with Smooth Scroll & Touch Support -->
+        <div id="tab-nav-wrapper" class="overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth flex border-b border-slate-200 dark:border-slate-700 px-2 bg-slate-50/50 dark:bg-slate-900/30 touch-pan-x">
+            <button type="button" onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap cursor-pointer transition-colors">Ringkasan (Overview)</button>
             @if(auth()->user()->hasPermission('customers.detail.identity.view'))
-            <button type="button" onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Identitas</button>
+            <button type="button" onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Identitas</button>
             @endif
             @if(auth()->user()->hasPermission('customers.detail.address.view'))
-            <button type="button" onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Alamat</button>
+            <button type="button" onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Alamat</button>
             @endif
-            <button type="button" onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">POP/Cabang</button>
+            <button type="button" onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">POP/Cabang</button>
             @if(auth()->user()->hasPermission('customers.detail.survey.view'))
-            <button type="button" onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Survey</button>
+            <button type="button" onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Survey</button>
             @endif
             @if(auth()->user()->hasPermission('customers.detail.installation.view'))
-            <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Pemasangan</button>
+            <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Pemasangan</button>
             @endif
             @if(auth()->user()->hasPermission('customers.detail.devices.view'))
-            <button type="button" onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Perangkat</button>
+            <button type="button" onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Perangkat</button>
             @endif
             @if(auth()->user()->hasPermission('customers.detail.packages.view'))
-            <button type="button" onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Paket & Layanan</button>
+            <button type="button" onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Paket & Layanan</button>
             @endif
-            <button type="button" onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Billing</button>
-            <button type="button" onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Tagihan</button>
-            <button type="button" onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Pembayaran</button>
+            <button type="button" onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Billing</button>
+            <button type="button" onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Tagihan</button>
+            <button type="button" onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Pembayaran</button>
             @if(auth()->user()->hasPermission('customers.detail.documents.view'))
-            <button type="button" onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Dokumen & Berkas</button>
+            <button type="button" onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Dokumen & Berkas</button>
             @endif
-            <button type="button" onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Riwayat Ticketing</button>
-            <button type="button" onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Riwayat Perubahan</button>
+            <button type="button" onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Riwayat Ticketing</button>
+            <button type="button" onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Riwayat Perubahan</button>
             @if($customer->customerTechnicalDetail)
-            <button type="button" onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer">Detail Teknis Lama</button>
+            <button type="button" onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Detail Teknis Lama</button>
             @endif
         </div>
     </div>
 
     <!-- SECTION D: UNIFIED DETAILS BODY (All Data Tabs) -->
-    <div class="p-6 text-xs" id="details-container">
+    <div class="p-2 md:p-6 text-xs" id="details-container">
 
         <!-- TAB 1: RINGKASAN (OVERVIEW) -->
         <div id="tab-content-ringkasan" class="tab-content space-y-6 searchable-section">
@@ -233,7 +273,7 @@
                         ● {{ Str::headline($customer->data_completeness_status) }}
                     </span>
                     <span class="text-xs text-slate-600 dark:text-slate-300">
-                        Profil data terisi <strong class="{{ count($completeness['missing_required']) > 0 ? 'text-rose-600' : 'text-emerald-600' }} font-bold">{{ $completeness['percentage'] }}%</strong> dari total 28 parameter evaluasi sistem.
+                        Profil data terisi <strong class="{{ count($completeness['missing_required']) > 0 ? 'text-rose-600' : 'text-emerald-600' }} font-bold">{{ $completeness['percentage'] }}%</strong> dari total {{ $completeness['total_count'] }} parameter evaluasi sistem.
                     </span>
                 </div>
             </div>
@@ -253,7 +293,7 @@
                     </p>
                 @endif
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                     @foreach(($timeline ?? []) as $index => $step)
                         @php
                             $stepTone = match($step['status']) {
@@ -495,15 +535,16 @@
                 <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">ID SALES</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->sales_code ?? '-' }}</span>
+                        {{-- Skema 3 (2026-09-12) — FK jadi sumber utama, kode lama (varchar) fallback data legacy. --}}
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->salesUser?->name ?? $customer->sales_code ?? '-' }}</span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">KODE AGENT</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->agent_code ?? '-' }}</span>
+                        <span class="block text-[9px] font-bold text-slate-400 uppercase">AGENT</span>
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->agent?->name ?? $customer->agent_code ?? '-' }}</span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">REFERRAL PELANGGAN</span>
-                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->referral_customer_code ?? '-' }}</span>
+                        <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->referralCustomer?->full_name ?? $customer->referral_customer_code ?? '-' }}</span>
                     </div>
                 </div>
             </div>
@@ -666,6 +707,183 @@
                     </div>
                     @endif
 
+                    @if($customer->customerService && auth()->user()->hasPermission('customers.detail.packages.change'))
+                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30" x-data="{ gantiPaketOpen: false }">
+                        <div class="flex items-center justify-between">
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
+                            <template x-if="!gantiPaketOpen">
+                                <button type="button" @click="gantiPaketOpen = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
+                            </template>
+                        </div>
+                        <template x-if="gantiPaketOpen">
+                            <form action="{{ route('customers.package.update', $customer) }}" method="POST" class="mt-3 flex flex-col sm:flex-row gap-2">
+                                @csrf
+                                @method('PUT')
+                                <select name="internet_package_id" required class="flex-1 text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                    <option value="">Pilih paket baru...</option>
+                                    @foreach($availablePackages as $package)
+                                    <option value="{{ $package->id }}" @selected($customer->customerService->internet_package_id === $package->id)>{{ $package->name }} — {{ $package->download_speed_mbps }}/{{ $package->upload_speed_mbps }} Mbps — Rp {{ number_format((float) $package->monthly_price, 0, ',', '.') }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Simpan</button>
+                                    <button type="button" @click="gantiPaketOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                </div>
+                            </form>
+                        </template>
+                        <p class="text-[10px] text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
+                    </div>
+                    @endif
+
+                    {{-- Putus Langganan — inline toggle Alpine di halaman Detail miliknya
+                         sendiri (bukan modal, bukan halaman baru), sama pola dengan
+                         "Ganti Paket" di atas. Sebelumnya tombol "Putus Langganan" di
+                         Quick Hub List cuma window.location ke '#terminate' tanpa ada
+                         elemen id="terminate" sama sekali di sini — link mati, form
+                         terminasi gak pernah dirender. x-init di bawah baca hash URL
+                         DAN $errors->has('termination_reason_id') (kalau validasi server
+                         gagal, biar panelnya otomatis kebuka lagi pas redirect back).
+                         Field nominal denda cuma dirender kalau
+                         $terminationPenaltyEligible (masa langganan <=1 tahun, dihitung
+                         server) — ADHOC-69 §3.1: masa >1 tahun TIDAK ada field-nya sama
+                         sekali, bukan field kosong/nonaktif. --}}
+                    @if($customer->customerService && auth()->user()->hasPermission('customers.deactivate') && in_array($customer->status, ['active', 'suspended'], true))
+                    <div id="terminate" class="border border-rose-200 dark:border-rose-900/40 rounded-lg p-4 bg-rose-50/40 dark:bg-rose-950/20"
+                         x-data="{ terminateOpen: {{ $errors->has('termination_reason_id') ? 'true' : 'false' }} }"
+                         x-init="if (window.location.hash === '#terminate' || terminateOpen) {
+                            terminateOpen = true;
+                            switchTab('paket-layanan');
+                            $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+                         }">
+                        <div class="flex items-center justify-between">
+                            <span class="block text-[9px] font-bold text-rose-500 uppercase tracking-wider">REQUEST PUTUS LANGGANAN</span>
+                            <template x-if="!terminateOpen">
+                                <button type="button" @click="terminateOpen = true" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400">Request Putus Langganan</button>
+                            </template>
+                        </div>
+                        <template x-if="terminateOpen">
+                            <form action="{{ route('customers.terminate', $customer) }}" method="POST" class="mt-3 space-y-2"
+                                  onsubmit="event.preventDefault(); window.confirmDelete(@js('Yakin memutuskan langganan pelanggan '.($customer->full_name).'? Layanan akan dihentikan permanen dan tidak bisa diaktifkan lagi lewat toggle Isolir.'), this);">
+                                @csrf
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Alasan Putus <span class="text-rose-500">*</span></label>
+                                    <select name="termination_reason_id" required
+                                            @if($terminationPenaltyEligible)
+                                            onchange="const opt=this.selectedOptions[0]; const f=this.closest('form').querySelector('[name=penalty_amount]'); if(f && opt && opt.dataset.default !== undefined){ f.value = opt.dataset.default; window.formatInputRupiah && window.formatInputRupiah(); }"
+                                            @endif
+                                            class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                        <option value="">-- Pilih Alasan --</option>
+                                        @foreach($terminationReasons as $reason)
+                                        <option value="{{ $reason->id }}" data-default="{{ (int) $reason->default_penalty_amount }}" {{ old('termination_reason_id') == $reason->id ? 'selected' : '' }}>{{ $reason->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('termination_reason_id')
+                                        <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                @if($terminationPenaltyEligible)
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Nominal Denda <span class="text-rose-500">*</span></label>
+                                    <input type="text" inputmode="decimal" name="penalty_amount" data-rupiah required value="{{ old('penalty_amount', 0) }}"
+                                           class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                    <p class="text-[10px] text-slate-400 mt-1">Masa langganan pelanggan ini &le;1 tahun — denda wajib diisi (boleh 0). Nilai diprefill dari alasan terpilih, tapi tetap wajib dikonfirmasi/diubah sebelum submit.</p>
+                                    @error('penalty_amount')
+                                        <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                @else
+                                <p class="text-[10px] text-emerald-600 dark:text-emerald-400">Masa langganan pelanggan ini &gt;1 tahun — tidak ada denda putus langganan.</p>
+                                @endif
+
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Catatan Tambahan (opsional)</label>
+                                    <textarea name="termination_note" rows="2" maxlength="1000" placeholder="Detail lebih spesifik, opsional..."
+                                              class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">{{ old('termination_note') }}</textarea>
+                                    @error('termination_note')
+                                        <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                {{-- ADHOC-87, disederhanakan 2026-09-24: pembebasan tagihan
+                                     SENGAJA bukan lagi bagian form ini (dulu ada dropdown
+                                     "Bebaskan Tagihan Periode" di sini). Satu pintu: aksi
+                                     "Bebaskan Tagihan Periode" terpisah di bawah (bisa dipakai
+                                     sebelum ATAU sesudah putus). --}}
+
+                                <div class="flex gap-2">
+                                    <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Putuskan Langganan</button>
+                                    <button type="button" @click="terminateOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                </div>
+                            </form>
+                        </template>
+                        <p class="text-[10px] text-rose-500/80 mt-2" x-show="terminateOpen" x-cloak>Tindakan permanen — status pelanggan jadi Terminated/Berhenti. Beda dengan Isolir yang masih bisa diaktifkan kembali.</p>
+                    </div>
+                    @endif
+
+                    {{-- Cuti Berlangganan / Bebaskan Tagihan Periode (ADHOC-87, disederhanakan
+                         2026-09-24) — SATU-SATUNYA pintu ke BillingPeriodWaiverService sekarang.
+                         Independen dari Request Putus Langganan di atas (beda form, beda
+                         endpoint) — status pelanggan cuma berubah kalau memang lewat form Putus
+                         Langganan sendiri, bukan lewat sini. Sengaja tetap ditampilkan untuk
+                         pelanggan yang SUDAH putus juga (G6 BillingPeriodWaiverService) — buat
+                         bersihin tagihan yang kelupaan dibebaskan sebelum diputus. --}}
+                    @if($customer->customerService && auth()->user()->hasPermission('billing_waivers.create') && in_array($customer->status, ['active', 'suspended', 'terminated'], true))
+                    <div class="border border-amber-200 dark:border-amber-900/40 rounded-lg p-4 bg-amber-50/40 dark:bg-amber-950/20"
+                         x-data="{ leaveOpen: {{ $errors->has('periods') ? 'true' : 'false' }} }">
+                        <div class="flex items-center justify-between">
+                            <span class="block text-[9px] font-bold text-amber-600 uppercase tracking-wider">CUTI BERLANGGANAN / BEBASKAN TAGIHAN</span>
+                            <template x-if="!leaveOpen">
+                                <button type="button" @click="leaveOpen = true" class="text-[11px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400">Cuti Berlangganan</button>
+                            </template>
+                        </div>
+                        <template x-if="leaveOpen">
+                            <form action="{{ route('billing-waivers.store', $customer) }}" method="POST" class="mt-3 space-y-2">
+                                @csrf
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Bebaskan Tagihan Periode <span class="text-rose-500">*</span></label>
+                                    <div class="space-y-1 max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-900/60">
+                                        @forelse($leaveWaiverPeriods as $row)
+                                        <label class="flex items-center gap-2 text-[11px] {{ $row['eligible'] ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-600' }}">
+                                            <input type="checkbox" name="periods[]" value="{{ $row['billing_period'] }}"
+                                                   {{ $row['eligible'] ? '' : 'disabled' }}
+                                                   class="rounded border-slate-300 dark:border-slate-600">
+                                            <span class="font-mono">{{ $row['billing_period'] }}</span>
+                                            @if($row['invoice'])
+                                            <span>— Rp {{ number_format((float) $row['invoice']->total_amount, 0, ',', '.') }} (sudah terbit)</span>
+                                            @else
+                                            <span class="text-slate-400">(belum terbit)</span>
+                                            @endif
+                                            @if(! $row['eligible'])
+                                            <span class="italic">({{ $row['reason'] }})</span>
+                                            @endif
+                                        </label>
+                                        @empty
+                                        <p class="text-[11px] text-slate-400">Tidak ada periode yang bisa dibebaskan.</p>
+                                        @endforelse
+                                    </div>
+                                    @error('periods')
+                                        <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Catatan <span class="text-rose-500">*</span></label>
+                                    <textarea name="reason" rows="2" required maxlength="1000" placeholder="Mis. pelanggan minta cuti September, kembali Oktober..."
+                                              class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">{{ old('reason') }}</textarea>
+                                    @error('reason')
+                                        <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Bebaskan Tagihan</button>
+                                    <button type="button" @click="leaveOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                </div>
+                            </form>
+                        </template>
+                        <p class="text-[10px] text-amber-600/80 dark:text-amber-400/70 mt-2" x-show="leaveOpen" x-cloak>Status pelanggan TIDAK berubah — cuma tagihan periode terpilih yang dibebaskan. Cuti tidak otomatis mengisolir koneksi; pakai toggle Isolir terpisah kalau perlu mematikan layanan.</p>
+                    </div>
+                    @endif
+
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
                         <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">INTEGRASI TEKNIS JARINGAN</span>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 font-mono text-xs">
@@ -779,7 +997,7 @@
                      extra_pole_fee, other_fee, discount, ppn). Tidak ada kolom
                      formula/qty di skema, jadi keterangan cuma label deskriptif. --}}
                 @php
-                    $initialInvoice = $customer->invoices->first(fn ($inv) => in_array($inv->invoice_type?->value, ['awal', 'reaktivasi'], true));
+                    $initialInvoice = $customer->invoices->first(fn ($inv) => $inv->invoice_type?->value === 'awal');
                 @endphp
                 @if($initialInvoice)
                     @php
@@ -851,23 +1069,23 @@
 
         <!-- TAB 10: TAGIHAN -->
         <div id="tab-content-tagihan" class="tab-content hidden space-y-6 searchable-section">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+            <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h3>
                     <p class="text-[11px] text-slate-500 mt-0.5">Daftar invoice tagihan bulanan yang diterbitkan secara manual maupun sistem.</p>
                 </div>
                 @can('invoices.create')
                     @if($isActive && $customer->customerService)
-                        <button type="button" onclick="openInvoiceModal()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold shadow-sm cursor-pointer">
-                            + Buat Tagihan Manual
-                        </button>
+                        <a href="{{ route('invoices.create', ['customer_id' => $customer->id]) }}" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 shrink-0 transition-colors">
+                            <i class="fa-solid fa-plus text-xs"></i> Buat Tagihan Manual
+                        </a>
                     @endif
                 @endcan
             </div>
 
             @if($customer->invoices && $customer->invoices->count() > 0)
                 @php
-                    $invoicesAwal = $customer->invoices->filter(fn($inv) => in_array($inv->invoice_type?->value, ['awal', 'reaktivasi'], true));
+                    $invoicesAwal = $customer->invoices->filter(fn($inv) => $inv->invoice_type?->value === 'awal');
                     $invoicesBulanan = $customer->invoices->filter(fn($inv) => $inv->invoice_type?->value === 'bulanan');
                 @endphp
 
@@ -965,18 +1183,124 @@
                     <p class="text-[11px] text-slate-500 mt-1">Gunakan tombol "Buat Tagihan Manual" untuk membuat invoice pertama pelanggan.</p>
                 </div>
             @endif
+
+            {{-- Riwayat Pembebasan Tagihan (ADHOC-87) — Request Putus Langganan
+                 & Cuti Berlangganan, dua pintu satu tabel. --}}
+            @if($activeBillingWaivers->isNotEmpty())
+            <div class="mt-6">
+                <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Riwayat Pembebasan Tagihan ({{ $activeBillingWaivers->count() }})</h4>
+                <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-400 uppercase text-[10px]">
+                                <th class="px-4 py-3">Periode</th>
+                                <th class="px-4 py-3">Sumber</th>
+                                <th class="px-4 py-3">Catatan</th>
+                                <th class="px-4 py-3">Dibebaskan Oleh</th>
+                                <th class="px-4 py-3">Kapan</th>
+                                @can('billing_waivers.delete')
+                                <th class="px-4 py-3 text-center">Aksi</th>
+                                @endcan
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300 font-mono">
+                            @foreach($activeBillingWaivers as $waiver)
+                            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                                <td class="px-4 py-3 font-bold">{{ $waiver->billing_period }}</td>
+                                <td class="px-4 py-3 font-sans">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $waiver->source->value === 'termination' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-amber-50 text-amber-600 border-amber-200' }}">
+                                        {{ $waiver->source->label() }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 font-sans max-w-xs">{{ $waiver->reason }}</td>
+                                <td class="px-4 py-3 font-sans">{{ $waiver->creator->name ?? '-' }}</td>
+                                <td class="px-4 py-3 font-sans">{{ \App\Support\IndonesianDate::date($waiver->created_at) }}</td>
+                                @can('billing_waivers.delete')
+                                <td class="px-4 py-3 text-center font-sans">
+                                    <form action="{{ route('billing-waivers.destroy', $waiver) }}" method="POST" class="inline-flex items-center gap-1"
+                                          onsubmit="event.preventDefault(); const alasan = prompt('Alasan mencabut pembebasan periode {{ $waiver->billing_period }}:'); if (alasan === null || alasan.trim() === '') return; this.querySelector('[name=reason]').value = alasan; this.submit();">
+                                        @csrf
+                                        @method('DELETE')
+                                        <input type="hidden" name="reason" value="">
+                                        <button type="submit" class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-rose-600 border border-rose-200 dark:border-rose-800 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer">
+                                            Cabut
+                                        </button>
+                                    </form>
+                                </td>
+                                @endcan
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1.5">Mencabut TIDAK menghidupkan kembali invoice yang sudah dibatalkan — jalankan generator tagihan bulanan untuk periode itu kalau perlu ditagih ulang.</p>
+            </div>
+            @endif
         </div>
 
         <!-- TAB 11: PEMBAYARAN -->
         <div id="tab-content-pembayaran" class="tab-content hidden space-y-6 searchable-section">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+            {{-- Kartu Saldo Pelanggan (ADHOC-92) — saldo aktif + perkiraan
+                 "cukup N bulan" + riwayat ledger. Gerbang permission sendiri
+                 (`customer_balance.view`), terpisah dari `payments.view` yang
+                 menggerbang tab ini — sales/teknisi yang kebetulan punya akses
+                 tab Pembayaran tidak otomatis lihat saldo. --}}
+            @can('customer_balance.view')
+            <div class="border border-sky-200 dark:border-sky-500/20 bg-sky-50/60 dark:bg-sky-500/10 rounded-lg p-4 space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                        <h3 class="text-xs font-bold text-sky-900 dark:text-sky-300 uppercase tracking-wider">Saldo Pelanggan</h3>
+                        <p class="text-[11px] text-sky-700/80 dark:text-sky-400/80 mt-0.5">Otomatis dipakai untuk tagihan Bulanan berikutnya begitu terbit (FIFO periode terlama dulu).</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-lg font-bold font-mono text-sky-900 dark:text-sky-300">Rp {{ number_format($customerBalance, 0, ',', '.') }}</p>
+                        @if($customerBalance > 0 && $totalBill > 0)
+                            <p class="text-[10px] text-sky-700/80 dark:text-sky-400/80">≈ cukup {{ floor($customerBalance / $totalBill) }} bulan tagihan (Rp {{ number_format($totalBill, 0, ',', '.') }}/bln)</p>
+                        @endif
+                    </div>
+                </div>
+
+                @if($customerBalanceMutations->isNotEmpty())
+                <div class="overflow-x-auto border border-sky-200/60 dark:border-sky-500/20 rounded-lg">
+                    <table class="w-full text-left border-collapse text-[11px]">
+                        <thead>
+                            <tr class="bg-sky-50 dark:bg-sky-500/10 border-b border-sky-200/60 dark:border-sky-500/20 font-semibold text-sky-700/70 dark:text-sky-400/70 uppercase text-[9px]">
+                                <th class="px-3 py-2">Tanggal</th>
+                                <th class="px-3 py-2">Sumber</th>
+                                <th class="px-3 py-2">Tagihan</th>
+                                <th class="px-3 py-2 text-right">Mutasi</th>
+                                <th class="px-3 py-2">Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-sky-200/40 dark:divide-sky-500/10 font-mono">
+                            @foreach($customerBalanceMutations as $mutation)
+                                <tr>
+                                    <td class="px-3 py-2 font-sans">{{ $mutation->created_at->format('d/m/Y') }}</td>
+                                    <td class="px-3 py-2 font-sans">{{ $mutation->source?->label() ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-sans">{{ $mutation->payment?->invoice?->invoice_number ?? '-' }}</td>
+                                    <td class="px-3 py-2 text-right font-semibold {{ $mutation->type->value === 'credit' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
+                                        {{ $mutation->type->value === 'credit' ? '+' : '-' }}Rp {{ number_format((float) $mutation->amount, 0, ',', '.') }}
+                                    </td>
+                                    <td class="px-3 py-2 font-sans text-slate-500 dark:text-slate-400">{{ $mutation->note }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @endif
+            </div>
+            @endcan
+
+            <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Pembayaran Pelanggan</h3>
                     <p class="text-[11px] text-slate-500 mt-0.5">Pembayaran yang terhubung ke invoice pelanggan ini.</p>
                 </div>
             </div>
 
-            @if($customer->payments && $customer->payments->count() > 0)
+            {{-- Pembayaran yang dikembalikan disembunyikan dari daftar. --}}
+            @php $listedPayments = $customer->payments?->where('payment_status', \App\Enums\PaymentStatus::VALID) ?? collect(); @endphp
+            @if($listedPayments->count() > 0)
                 <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
@@ -991,7 +1315,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
-                            @foreach($customer->payments as $payment)
+                            @foreach($listedPayments as $payment)
                                 <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
                                     <td class="px-4 py-3 font-bold text-slate-900 dark:text-slate-100 searchable-text">{{ $payment->payment_number }}</td>
                                     <td class="px-4 py-3 searchable-text">
@@ -1002,7 +1326,17 @@
                                         @endcan
                                     </td>
                                     <td class="px-4 py-3 font-sans searchable-text">{{ \App\Support\IndonesianDate::date($payment->payment_date) }}</td>
-                                    <td class="px-4 py-3 font-sans uppercase searchable-text">{{ strtoupper($payment->payment_method->value ?? (string)$payment->payment_method) }}</td>
+                                    <td class="px-4 py-3 font-sans uppercase searchable-text">
+                                        {{-- SALDO (ADHOC-92) diberi label sendiri — dana ini bukan uang
+                                             tunai/transfer yang diterima. Metode lain TETAP uppercase mentah
+                                             seperti sebelumnya (jangan diseragamkan pakai label(), itu
+                                             mengubah tampilan metode lain yang sudah dites di tempat lain). --}}
+                                        @if(\App\Enums\PaymentMethod::tryFrom((string) $payment->payment_method) === \App\Enums\PaymentMethod::SALDO)
+                                            Saldo Pelanggan
+                                        @else
+                                            {{ strtoupper((string) $payment->payment_method) }}
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                         Rp {{ number_format((float) $payment->amount, 2, ',', '.') }}
                                         @if((float) $payment->overpay_amount > 0)
@@ -1040,14 +1374,14 @@
         <!-- TAB 12: DOKUMEN & BERKAS -->
         <div id="tab-content-dokumen" class="tab-content hidden space-y-6 searchable-section">
             @if(auth()->user()->hasPermission('customers.detail.documents.view'))
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                         <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">LAMPIRAN DOKUMEN PENDUKUNG</h3>
                         <p class="text-[11px] text-slate-500 mt-0.5">Dokumen disimpan aman & private sesuai hak akses permission sistem.</p>
                     </div>
                     @if(auth()->user()->hasPermission('upload_customer_documents'))
-                    <button type="button" onclick="openModal('document-upload-modal')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold cursor-pointer">
-                        + Upload Dokumen Baru
+                    <button type="button" onclick="openModal('document-upload-modal')" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors">
+                        <i class="fa-solid fa-cloud-arrow-up text-xs"></i> Upload Dokumen Baru
                     </button>
                     @endif
                 </div>
@@ -1155,72 +1489,6 @@
 </div>
 
 <!-- MODALS SECTION -->
-<!-- MODAL: Manual Invoice -->
-@can('invoices.create')
-    @if($isActive && $customer->customerService)
-        @php
-            $defaultPeriod = now()->format('Y-m');
-            $defaultIssueDate = now()->format('Y-m-d');
-            $defaultDueDate = now()->addDays(14)->format('Y-m-d');
-            if ($customer->customerService->due_date) {
-                $dueDay = \Carbon\Carbon::parse($customer->customerService->due_date)->day;
-                try {
-                    $defaultDueDate = now()->day($dueDay)->format('Y-m-d');
-                } catch (\Exception $e) {
-                    $defaultDueDate = now()->addDays(14)->format('Y-m-d');
-                }
-            }
-        @endphp
-        <div id="manual-invoice-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-            <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
-                <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Buat Tagihan Manual</h3>
-                    <button type="button" onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <i class="fa-solid fa-xmark text-base"></i>
-                    </button>
-                </div>
-                <form action="{{ route('customers.invoices.manual', $customer->id) }}" method="POST">
-                    @csrf
-                    <div class="p-6 space-y-4 text-xs">
-                        <div class="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
-                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pelanggan: {{ $customer->full_name }}</span>
-                            <span class="text-xs font-bold text-slate-900 dark:text-slate-100">{{ $customer->customerService->package_name_snapshot }} (Rp {{ number_format($totalBill, 0, ',', '.') }})</span>
-                        </div>
-                        <div>
-                            <label for="billing_period" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Periode Tagihan</label>
-                            <input type="month" name="billing_period" id="billing_period" value="{{ $defaultPeriod }}" required class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tanggal Terbit & Jatuh Tempo</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <input type="date" name="issue_date" id="issue_date" value="{{ $defaultIssueDate }}" required class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                                <input type="date" name="due_date" id="due_date" value="{{ $defaultDueDate }}" required class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                            </div>
-                        </div>
-                        <div>
-                            <label for="invoice_type" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Jenis Tagihan</label>
-                            <select name="invoice_type" id="invoice_type" required class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-semibold text-xs text-slate-800 dark:text-slate-200">
-                                <option value="bulanan" {{ $customer->invoices->count() > 0 ? 'selected' : '' }}>Tagihan Bulanan Rutin</option>
-                                <option value="awal" {{ $customer->invoices->count() === 0 ? 'selected' : '' }}>Tagihan Awal (PSB)</option>
-                                <option value="reaktivasi">Tagihan Reaktivasi</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="prorate_amount" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tagihan Prorate (Opsional)</label>
-                            {{-- data-rupiah butuh type="text"; batas nilai
-                                 ditegakkan validasi server. --}}
-                            <input type="text" inputmode="decimal" data-rupiah name="prorate_amount" id="prorate_amount" value="0" oninput="recalcInvoiceTotal()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
-                        </div>
-                        <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                            <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
-                            <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-sm cursor-pointer">Proses Tagihan</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    @endif
-@endcan
 
 <!-- MODAL: Document Upload Modal -->
 @if(auth()->user()->hasPermission('upload_customer_documents'))
@@ -1245,7 +1513,7 @@
                 </div>
                 <div>
                     <label for="document_file" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">File Gambar / PDF</label>
-                    <input type="file" name="document_file" id="document_file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" required>
+                    <input type="file" name="document_file" id="document_file" accept="image/*,application/pdf" class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" required>
                 </div>
                 <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                     <button type="button" onclick="closeModal('document-upload-modal')" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
@@ -1521,9 +1789,6 @@
     function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
 
-    function openInvoiceModal() { openModal('manual-invoice-modal'); }
-    function closeInvoiceModal() { closeModal('manual-invoice-modal'); }
-
     // Modal milik partial tab Pemasangan & Perangkat. Sebelumnya fungsi ini HANYA
     // ada di customers/fieldwork.blade.php, jadi tombol "Isi Data Pemasangan" /
     // "Isi Laporan Uji" / "Isi Ubah Data Perangkat" di halaman Detail Pelanggan
@@ -1535,16 +1800,5 @@
     function openDeviceModal() { openModal('device-modal'); }
     function closeDeviceModal() { closeModal('device-modal'); }
 
-    const BASE_NETT = {{ (float)$totalBill }};
-    function recalcInvoiceTotal() {
-        // Kolom prorata bermasking ribuan — parseFloat('50.000') = 50, dan
-        // pratinjau total tagihan akan berbohong tanpa parser ini.
-        const prorateEl = document.getElementById('prorate_amount');
-        const prorate = (prorateEl && window.Rupiah ? window.Rupiah.angka(prorateEl.value) : parseFloat(prorateEl?.value || 0)) || 0;
-        const total   = BASE_NETT + prorate;
-        const fmt = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
-        const totalEl = document.getElementById('preview-total');
-        if (totalEl) totalEl.textContent = fmt(total);
-    }
 </script>
 @endsection

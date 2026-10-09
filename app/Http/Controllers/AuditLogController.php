@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\Payment;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
@@ -13,7 +15,7 @@ class AuditLogController extends Controller
     {
         $module = trim((string) $request->query('module', ''));
         $action = trim((string) $request->query('action', ''));
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
 
         $query = AuditLog::query()
             ->with('user')
@@ -57,6 +59,17 @@ class AuditLogController extends Controller
             fn () => AuditLog::query()->select('action')->distinct()->orderBy('action')->pluck('action')->toArray()
         );
 
-        return view('audit-logs.index', compact('auditLogs', 'modules', 'actions', 'module', 'action', 'search'));
+        // Klasifikasi (ADHOC-84 §8.2) dihitung dari Payment yang MASIH ADA,
+        // bukan dari payload JSON beku — payload lama tidak selalu menyimpan
+        // billing_period invoice (kolom itu legacy, sering null untuk
+        // payment baru). Di-batch per halaman (bukan query per baris) dan
+        // dilewati kalau paymentnya sudah tak ada — daripada meleset atau crash.
+        $paymentsForAuditRows = Payment::query()
+            ->with('invoice:id,billing_period,total_amount')
+            ->whereIn('id', $auditLogs->where('auditable_type', Payment::class)->pluck('auditable_id'))
+            ->get()
+            ->keyBy('id');
+
+        return view('audit-logs.index', compact('auditLogs', 'modules', 'actions', 'module', 'action', 'search', 'paymentsForAuditRows'));
     }
 }

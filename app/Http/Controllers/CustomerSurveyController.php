@@ -8,6 +8,7 @@ use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Events\SurveyCompleted;
 use App\Events\SurveyStarted;
+use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerSurvey;
 use App\Models\InternetPackage;
@@ -15,6 +16,7 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Task;
 use App\Models\WorkTool;
+use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
@@ -22,7 +24,9 @@ use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
+use App\Support\LikeSearch;
 use App\Support\SafeUrl;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -52,7 +56,7 @@ class CustomerSurveyController extends Controller
         // Sengaja dicek pakai role, bukan permission kayak task.view.own/all —
         // customers.detail.survey belum punya split permission serupa (lihat
         // config/rbac.php), dan bikin split baru buat 1 kasus ini overkill.
-        if (! auth()->user()->hasFullAccess() && auth()->user()->hasRole('teknisi')) {
+        if (! auth()->user()->hasFullAccess() && auth()->user()->isTechnician()) {
             $query->whereHas('tasks', function ($q) {
                 $q->where('task_type', TaskType::SURVEY->value)
                     ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', auth()->id()));
@@ -60,7 +64,7 @@ class CustomerSurveyController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = LikeSearch::sanitize((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
                     ->orWhere('identity_number', 'like', "%{$search}%")
@@ -120,16 +124,28 @@ class CustomerSurveyController extends Controller
             ->first();
 
         if ($activeTask) {
-            return redirect()->back()->with('error', "Tidak dapat memulai survey karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu.");
+            return redirect()->back()->with('error', "Tidak dapat memulai survey karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau tandai Lapor Nanti task sebelumnya terlebih dahulu.");
         }
 
         DB::transaction(function () use ($customer, $workflowService, $taskService, $task) {
             $survey = $customer->latestSurvey()->first();
 
-            if (! $survey) {
-                // Should not happen if assigned properly, but just in case
+            // Survey dari masa langganan SEBELUM putus (Langganan Lagi dengan
+            // alat sudah diambil → Antrean Survey, ADHOC-102) = siklus baru:
+            // record baru, riwayat survey lama tetap utuh. Dulu record lama
+            // dipakai ulang — hasil survey pertama tertimpa dan completed_at
+            // lamanya bikin durasi survey baru gak pernah tercatat.
+            if (! $survey || ($customer->terminated_at && $survey->created_at?->lt($customer->terminated_at))) {
                 $survey = new CustomerSurvey(['customer_id' => $customer->id]);
             }
+
+            // "Mulai" = sesi kerja baru. Waktu selesai sesi sebelumnya (mis.
+            // timer yang dihentikan saat Pending) wajib dikosongkan, kalau
+            // tidak store() melewati perhitungan completed_at/durasi.
+            $survey->completed_at = null;
+            $survey->end_date = null;
+            $survey->end_time = null;
+            $survey->duration_minutes = null;
 
             $survey->survey_status = 'pending'; // Or 'in_progress' if we add it to the enum
             $survey->started_at = now();
@@ -217,7 +233,7 @@ class CustomerSurveyController extends Controller
         // start()/store() — supervisi/koreksi data tetap lewat hasFullAccess).
         $task = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::SURVEY->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -271,7 +287,64 @@ class CustomerSurveyController extends Controller
         $existingHousePhoto = isset($stagedPhotos['house_photo']) ? Storage::disk('public')->url($stagedPhotos['house_photo']) : null;
         $existingSurveyPhoto = isset($stagedPhotos['survey_photo']) ? Storage::disk('public')->url($stagedPhotos['survey_photo']) : null;
 
-        return view('surveys.report', compact('customer', 'survey', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'internetPackages', 'existingHousePhoto', 'existingSurveyPhoto'));
+        // Dropdown Kota buat form Edit Data Diri (Step 1). Kecamatan & desa
+        // diisi lewat JS dari endpoint /api/cities & /api/districts.
+        $cities = City::orderBy('name')->get(['id', 'name']);
+
+        return view('surveys.report', compact('customer', 'survey', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'internetPackages', 'existingHousePhoto', 'existingSurveyPhoto', 'cities'));
+    }
+
+    /**
+     * Koreksi Data Diri (Step 1) langsung dari Pelaporan Survey — teknisi sering
+     * nemu typo nama/HP/alamat pas di lapangan, dulu harus minta CS buka Edit
+     * Pelanggan. Guard sama persis dengan store(): tahap survey harus berjalan
+     * dan teknisi wajib anggota tim Task survey yang aktif.
+     *
+     * Kota/kecamatan/kelurahan & koordinat ikut dikirim dari form (boleh kosong,
+     * sama seperti Edit Verifikasi). Wajib dikirim semua: updateIdentity()
+     * menulis ulang customer_addresses, jadi id wilayah yang tidak ikut terkirim
+     * akan ter-null-kan.
+     */
+    public function updateIdentity(Request $request, Customer $customer): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.survey.update'), 403);
+
+        abort_unless(
+            $customer->status === 'survey_in_progress',
+            403,
+            'Data diri hanya bisa diubah selama tahap survey berjalan.'
+        );
+
+        $assignmentTask = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::SURVEY->value)
+            ->whereIn('status', TaskStatus::reportableValues())
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($assignmentTask && $assignmentTask->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk survey pelanggan ini.'
+        );
+
+        $validated = $request->validate([
+            'full_name' => 'required|string|max:150',
+            'identity_number' => 'nullable|string|size:16|regex:/^[0-9]+$/',
+            'primary_phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'alternative_phone' => ['nullable', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
+            'email' => 'nullable|email|max:100',
+            'address' => 'required|string',
+            'city_id' => 'nullable|exists:cities,id',
+            'district_id' => 'nullable|exists:districts,id',
+            'village_id' => 'nullable|exists:villages,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        app(CustomerVerificationEditService::class)->updateIdentity($customer, $validated, $request->user());
+
+        return redirect()->route('customers.survey.report', $customer)->with('success', 'Data diri pelanggan diperbarui.');
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -293,7 +366,7 @@ class CustomerSurveyController extends Controller
         // pengecualian, keputusan eksplisit biar konsisten satu alur).
         $assignmentTask = Task::where('customer_id', $customer->id)
             ->where('task_type', TaskType::SURVEY->value)
-            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->whereIn('status', TaskStatus::reportableValues())
             ->latest('id')
             ->first();
 
@@ -404,13 +477,9 @@ class CustomerSurveyController extends Controller
         $validated['house_photo'] = $stagedPhotos['house_photo'] ?? null;
         $validated['survey_photo'] = $stagedPhotos['survey_photo'] ?? null;
 
-        $difficulty = $validated['difficulty_level'] ?? null;
-        $note = $difficulty ? ('Tingkat Kesulitan: '.$difficulty) : '';
-        if (! empty($validated['survey_note'])) {
-            $note .= ($note ? "\n" : '').'Catatan: '.$validated['survey_note'];
-        }
-        $validated['survey_note'] = $note;
-        unset($validated['difficulty_level']);
+        // Tingkat kesulitan punya kolom sendiri (difficulty_level) — tidak lagi
+        // digabung ke survey_note. Lihat CustomerSurvey::difficultyAndNote().
+        $validated['survey_note'] = $validated['survey_note'] ?? null;
 
         // Baris material dipisah dari payload survey — tujuannya tabel lain
         // (task_materials), bukan kolom customer_surveys.
@@ -467,6 +536,20 @@ class CustomerSurveyController extends Controller
             ]);
         }
 
+        // Estimasi survey itu per KATEGORI, bukan per model (ZTEF609 vs ZTEF609L
+        // sama-sama "ONT"). Form sudah tidak mengirim item_id; baris yang masih
+        // membawa item_id (form lama / POST tangan) dipaksa jadi kategori saja
+        // supaya realisasi di pemasangan tidak dianggap sudah memilih model.
+        $masterCategoryCodes = Item::with('category')
+            ->whereIn('id', collect($materialRows)->pluck('item_id')->filter())
+            ->get()
+            ->mapWithKeys(fn ($item) => [$item->id => $item->category?->code]);
+
+        $materialRows = array_map(fn ($row) => array_merge($row, [
+            'item_id' => null,
+            'item_type' => ! empty($row['item_id']) ? ($masterCategoryCodes[$row['item_id']] ?? $row['item_type'] ?? null) : ($row['item_type'] ?? null),
+        ]), $materialRows);
+
         DB::transaction(function () use ($customer, $validated, $materialRows, $workToolRows, $workflowService, $correctedPackageId) {
             // Koreksi Paket Internet dari lapangan — cuma jalan kalau teknisi
             // benar-benar ganti dropdown-nya (beda dari paket yang sudah
@@ -506,7 +589,7 @@ class CustomerSurveyController extends Controller
 
             $task = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::SURVEY->value)
-                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                ->whereIn('status', TaskStatus::reportableValues())
                 ->latest('id')
                 ->first();
 

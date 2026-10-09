@@ -9,6 +9,7 @@ use App\Http\Controllers\CustomerPortal\PortalInvoiceController;
 use App\Http\Controllers\CustomerPortal\PortalMeController;
 use App\Http\Controllers\CustomerPortal\PortalPaymentController;
 use App\Http\Controllers\CustomerPortal\PortalStaffKolektorController;
+use App\Http\Controllers\CustomerPortal\PortalStaffTeknisiController;
 use App\Http\Controllers\CustomerPortal\PortalStaffTicketController;
 use App\Http\Controllers\CustomerPortal\PortalTicketController;
 use Illuminate\Support\Facades\Route;
@@ -159,6 +160,16 @@ Route::prefix('customer-portal')->middleware(['throttle:customer-portal-api'])->
 
             Route::post('/payments', [PortalStaffKolektorController::class, 'payments'])
                 ->name('api.customer-portal.kolektor.payments');
+        });
+
+        // Teknisi (ADHOC-122) — token purpose `teknisi_bayar`, path terpisah
+        // dari `/kolektor` supaya token kolektor tidak lolos ke sini dan sebaliknya.
+        Route::middleware(['portal_staff_token:teknisi_bayar'])->prefix('teknisi')->group(function () {
+            Route::get('/worklist/{code}', [PortalStaffTeknisiController::class, 'worklist'])
+                ->name('api.customer-portal.teknisi.worklist');
+
+            Route::post('/payments', [PortalStaffTeknisiController::class, 'payments'])
+                ->name('api.customer-portal.teknisi.payments');
         });
     });
 });

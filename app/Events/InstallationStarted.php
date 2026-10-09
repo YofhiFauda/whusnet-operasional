@@ -5,11 +5,14 @@ namespace App\Events;
 use App\Models\Customer;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class InstallationStarted implements ShouldBroadcast
+/**
+ * `ShouldBroadcastNow` — lihat catatan `InstallationCompleted`, alasan sama.
+ */
+class InstallationStarted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

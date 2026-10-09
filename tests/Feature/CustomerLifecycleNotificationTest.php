@@ -7,6 +7,7 @@ use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
+use App\Models\CustomerTerminationReason;
 use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Pop;
@@ -153,8 +154,11 @@ class CustomerLifecycleNotificationTest extends TestCase
 
         Notification::fake();
 
+        $reason = CustomerTerminationReason::create(['name' => 'Pelanggan pindah rumah']);
+
         $this->post(route('customers.terminate', $customer), [
-            'reason' => 'Pelanggan pindah rumah',
+            'termination_reason_id' => $reason->id,
+            'penalty_amount' => 0,
         ])->assertRedirect();
 
         Notification::assertSentTo(
@@ -195,8 +199,11 @@ class CustomerLifecycleNotificationTest extends TestCase
 
         Notification::fake();
 
+        $reason = CustomerTerminationReason::create(['name' => 'Test self']);
+
         $this->post(route('customers.terminate', $customer), [
-            'reason' => 'Test self.',
+            'termination_reason_id' => $reason->id,
+            'penalty_amount' => 0,
         ])->assertRedirect();
 
         Notification::assertNothingSentTo($registrar);

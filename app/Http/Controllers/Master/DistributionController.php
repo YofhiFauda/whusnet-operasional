@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Distribution;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,7 +19,7 @@ class DistributionController extends Controller
      */
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $pop_id = $request->query('pop_id');
 
         $distributions = Distribution::query()

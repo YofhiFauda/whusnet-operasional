@@ -2,11 +2,39 @@
 
 @section('title', 'Riwayat Transaksi Pembayaran - Whusnet Operasional')
 @section('page_title', 'Riwayat Transaksi Pembayaran')
-{{-- Tanpa breadcrumb_parent — halaman ini puncak grup "Pembayaran" di nav,
-     sama seperti invoices.index puncak grup "Tagihan" (lihat pola sana). --}}
 
 @section('content')
-<div class="space-y-6">
+<div class="space-y-6" x-data="{
+    modalVisible: false,
+    copied: false,
+    item: {},
+    open(data) {
+        this.item = data;
+        this.copied = false;
+        this.modalVisible = true;
+    },
+    close() {
+        this.modalVisible = false;
+    },
+    copy(text) {
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                this.copied = true;
+                setTimeout(() => this.copied = false, 2000);
+            });
+        } else {
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            this.copied = true;
+            setTimeout(() => this.copied = false, 2000);
+        }
+    }
+}">
     @include('payments.partials.riwayat-banner')
 
     <!-- Naked Page Header -->
@@ -24,11 +52,11 @@
                 </svg>
                 <span>Lebih Bayar</span>
             </a>
-            <a href="{{ route('invoices.index') }}" class="inline-flex items-center gap-2 px-3.5 py-2 border border-border bg-surface hover:bg-surface-muted text-text-main rounded-lg transition-colors text-xs font-semibold shadow-xs">
+            <a href="{{ route('invoices.belum-lunas') }}" class="inline-flex items-center gap-2 px-3.5 py-2 border border-border bg-surface hover:bg-surface-muted text-text-main rounded-lg transition-colors text-xs font-semibold shadow-xs">
                 <svg class="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span>Daftar Tagihan</span>
+                <span>Tagihan</span>
             </a>
         </div>
     </div>
@@ -71,23 +99,27 @@
         <!-- Payment Methods Breakdown (Current Page) -->
         <div class="bg-surface border border-border rounded-xl p-4 transition-all hover:border-violet-500/40 shadow-2xs">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-text-muted uppercase tracking-wider">Metode Bayar</span>
+                <span class="text-xs font-semibold text-text-muted uppercase tracking-wider">Metode Bayar (Hal. Ini)</span>
                 <span class="p-2 rounded-lg bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                 </span>
             </div>
-            <div class="mt-2 flex items-center gap-3 text-xs">
+            <div class="mt-2 flex items-center gap-3 text-xs flex-wrap">
                 @php
                     $cashCount = $payments->filter(fn($p) => strtolower($p->payment_method) === 'cash')->count();
-                    $transferCount = $payments->filter(fn($p) => in_array(strtolower($p->payment_method), ['transfer', 'qris']))->count();
+                    $transferCount = $payments->filter(fn($p) => strtolower($p->payment_method) === 'transfer')->count();
+                    $saldoCount = $payments->filter(fn($p) => strtolower($p->payment_method) === 'saldo' || (float)$p->balance_used_amount > 0)->count();
                 @endphp
-                <span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
+                <span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold font-mono text-[11px]">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Cash: {{ $cashCount }}
                 </span>
-                <span class="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-semibold font-mono">
-                    <span class="w-2 h-2 rounded-full bg-sky-500"></span> Non-Cash: {{ $transferCount }}
+                <span class="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-semibold font-mono text-[11px]">
+                    <span class="w-2 h-2 rounded-full bg-sky-500"></span> Transfer: {{ $transferCount }}
+                </span>
+                <span class="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold font-mono text-[11px]">
+                    <span class="w-2 h-2 rounded-full bg-purple-500"></span> Saldo: {{ $saldoCount }}
                 </span>
             </div>
         </div>
@@ -110,86 +142,94 @@
         </div>
     </div>
 
-    <!-- Filter Panel Card -->
-    <div class="bg-surface border border-border rounded-xl p-5 shadow-2xs">
+    <!-- Filter & Search Control Card (Kelola Gudang Style) -->
+    <div class="bg-surface border border-border rounded-xl p-4 sm:p-5 shadow-xs">
         <form action="{{ route('payments.index') }}" method="GET" class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-                <!-- Search Field -->
+            <!-- Row 1: Search and Primary Inputs Unified -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                <!-- Search Input: Positioned next to inputs -->
                 <div class="sm:col-span-2 lg:col-span-2">
-                    <label for="search" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Cari Pembayaran</label>
+                    <label for="search" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
+                        Cari Pembayaran
+                    </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
-                        <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Nama, CID, No. Pembayaran, Invoice..." 
+                        <input type="text" name="search" id="search" value="{{ $search }}" 
+                               placeholder="Cari No. Bayar, Invoice, Nama, CID, HP, Rekening..." 
                                class="w-full pl-9 pr-3 py-2 text-xs border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 placeholder:text-text-muted/60 transition-colors">
                     </div>
                 </div>
 
-                <!-- Date From -->
+                <!-- Dari Tanggal -->
                 <div>
-                    <label for="date_from" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Dari Tanggal</label>
+                    <label for="date_from" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Dari Tanggal</label>
                     <input type="date" name="date_from" id="date_from" value="{{ $dateFrom }}" 
-                           class="w-full px-3 py-2 text-xs border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors font-mono">
+                           class="w-full px-3 py-2 text-xs font-mono border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors">
                 </div>
 
-                <!-- Date To -->
+                <!-- Sampai Tanggal -->
                 <div>
-                    <label for="date_to" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Sampai Tanggal</label>
+                    <label for="date_to" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Sampai Tanggal</label>
                     <input type="date" name="date_to" id="date_to" value="{{ $dateTo }}" 
-                           class="w-full px-3 py-2 text-xs border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors font-mono">
+                           class="w-full px-3 py-2 text-xs font-mono border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors">
                 </div>
 
-                <!-- POP Select -->
+                <!-- POP / Cabang -->
                 <div>
-                    <label for="pop_id" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">POP / Cabang</label>
+                    <label for="pop_id" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">POP / Cabang</label>
                     <select name="pop_id" id="pop_id" class="w-full px-3 py-2 text-xs border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors">
-                        <option value="">Semua POP</option>
+                        <option value="">— Semua Cabang POP —</option>
                         @foreach($pops as $pop)
-                            <option value="{{ $pop->id }}" {{ (string) $popId === (string) $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
+                            <option value="{{ $pop->id }}" {{ (string) $popId === (string) $pop->id ? 'selected' : '' }}>
+                                {{ $pop->name }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
 
-                <!-- Method Select -->
+                <!-- Metode Bayar -->
                 <div>
-                    <label for="method" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Metode Bayar</label>
+                    <label for="method" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Metode Bayar</label>
                     <select name="method" id="method" class="w-full px-3 py-2 text-xs border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors">
-                        <option value="">Semua Metode</option>
+                        <option value="">— Semua Metode —</option>
                         @foreach($allowedMethods as $paymentMethod)
-                            <option value="{{ $paymentMethod }}" {{ $method === $paymentMethod ? 'selected' : '' }}>{{ strtoupper($paymentMethod) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Status Select -->
-                <div>
-                    <label for="status" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Status Validasi</label>
-                    <select name="status" id="status" class="w-full px-3 py-2 text-xs border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors">
-                        <option value="">Semua Status</option>
-                        @foreach($allowedStatuses as $paymentStatus)
-                            <option value="{{ $paymentStatus }}" {{ $status === $paymentStatus ? 'selected' : '' }}>{{ ucwords(str_replace('_', ' ', $paymentStatus)) }}</option>
+                            <option value="{{ $paymentMethod }}" {{ $method === $paymentMethod ? 'selected' : '' }}>
+                                {{ strtoupper($paymentMethod) }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
             </div>
 
-            <!-- Action Filter Buttons -->
-            <div class="flex items-center justify-between pt-2 border-t border-border/60">
-                <div class="text-[11px] text-text-muted">
-                    Menampilkan <span class="font-semibold text-text-main">{{ $payments->firstItem() ?? 0 }}</span> - <span class="font-semibold text-text-main">{{ $payments->lastItem() ?? 0 }}</span> dari <span class="font-semibold text-text-main">{{ $payments->total() }}</span> pembayaran
+            <!-- Row 2: Secondary Filters & Action Buttons -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/70">
+                <div class="flex items-center gap-2 flex-wrap text-xs text-text-muted">
+                    <span>Menampilkan <strong class="text-text-main">{{ $payments->firstItem() ?? 0 }}</strong> - <strong class="text-text-main">{{ $payments->lastItem() ?? 0 }}</strong> dari <strong class="text-text-main">{{ $payments->total() }}</strong> pembayaran</span>
+                    @if($search !== '' || $popId !== '' || $dateFrom !== '' || $dateTo !== '' || $method !== '' || $status !== '' || $invoiceType !== '')
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                            Filter Aktif
+                        </span>
+                    @endif
                 </div>
+
                 <div class="flex items-center gap-2">
                     @if($search !== '' || $popId !== '' || $dateFrom !== '' || $dateTo !== '' || $method !== '' || $status !== '' || $invoiceType !== '')
-                        <a href="{{ route('payments.index') }}" class="px-3.5 py-1.5 border border-border bg-surface hover:bg-surface-muted text-text-secondary rounded-lg transition-colors text-xs font-semibold text-center">
-                            Reset Filter
+                        <a href="{{ route('payments.index') }}" 
+                           class="inline-flex items-center gap-1 px-3.5 py-1.5 border border-border bg-surface hover:bg-surface-muted text-text-secondary rounded-lg transition-colors text-xs font-semibold">
+                            <svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            <span>Reset Filter</span>
                         </a>
                     @endif
-                    <button type="submit" class="px-4 py-1.5 bg-primary hover:bg-primary-focus text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary/25 flex items-center gap-1.5">
+                    <button type="submit" 
+                            class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-primary hover:bg-primary-focus text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/25">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
                         </svg>
                         <span>Terapkan Filter</span>
                     </button>
@@ -213,8 +253,7 @@
                         <th class="px-4 py-3.5">Metode</th>
                         <th class="px-4 py-3.5">Penerima / Kolektor</th>
                         <th class="px-4 py-3.5 text-right">Nominal (Rp)</th>
-                        <th class="px-4 py-3.5 text-center">Status</th>
-                        <th class="px-4 py-3.5 text-right">Aksi</th>
+                        <th class="px-4 py-3.5 text-center w-16">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
@@ -229,12 +268,7 @@
                                 default => 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
                             };
 
-                            $methodBadge = match(strtolower($payment->payment_method)) {
-                                'cash' => 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20',
-                                'transfer' => 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20',
-                                'qris' => 'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20',
-                                default => 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
-                            };
+                            $isSaldoSettled = strtolower($payment->payment_method) === 'saldo' || ((float)$payment->balance_used_amount > 0 && (float)$payment->balance_used_amount >= (float)$payment->amount);
                         @endphp
                         <tr class="hover:bg-surface-muted/50 transition-colors">
                             <td class="px-4 py-3.5 text-center text-text-muted font-mono">{{ ($payments->currentPage() - 1) * $payments->perPage() + $loop->iteration }}</td>
@@ -287,25 +321,56 @@
                                 {{ optional($payment->payment_date)->format('d/m/Y') }}
                             </td>
 
-                            <!-- Payment Method -->
+                            <!-- Payment Method (Label for Transfer) -->
                             <td class="px-4 py-3.5 whitespace-nowrap">
-                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-md border uppercase tracking-wider {{ $methodBadge }}">
-                                    {{ strtoupper($payment->payment_method) }}
-                                </span>
+                                @if(strtolower($payment->payment_method) === 'transfer')
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold rounded-md border bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20 w-fit">
+                                        <svg class="w-3 h-3 text-sky-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        <span>{{ $payment->bankAccount?->label ?? ($payment->bank_name ? $payment->bank_name.($payment->account_number ? ' - '.$payment->account_number : '') : 'Transfer Bank') }}</span>
+                                    </span>
+                                @elseif(strtolower($payment->payment_method) === 'cash')
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md border uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        CASH
+                                    </span>
+                                @elseif(strtolower($payment->payment_method) === 'kolektor')
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md border uppercase tracking-wider bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+                                        KOLEKTOR
+                                    </span>
+                                @elseif(strtolower($payment->payment_method) === 'saldo')
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold rounded-md border bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60">
+                                        <svg class="w-3 h-3 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span>Lunas dari Saldo</span>
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md border uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">
+                                        {{ strtoupper($payment->payment_method) }}
+                                    </span>
+                                @endif
                             </td>
 
                             <!-- Receiver / Collector -->
                             <td class="px-4 py-3.5 whitespace-nowrap">
                                 @if($payment->collector)
                                     <div class="flex flex-col">
-                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20 w-fit">
-                                            Kolektor: {{ $payment->collector->name }}
-                                        </span>
+                                        @if($payment->collected_by_role === \App\Enums\CollectorRole::TEKNISI->value)
+                                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20 w-fit">
+                                                Teknisi: {{ $payment->collector->name }}
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20 w-fit">
+                                                Kolektor: {{ $payment->collector->name }}
+                                            </span>
+                                        @endif
                                     </div>
                                 @else
-                                    <span class="text-text-muted text-[11px]">Direct / Kasir</span>
+                                    <span class="text-text-muted text-[11px]">Bayar Langsung</span>
                                 @endif
-                                <div class="text-[10px] text-text-muted mt-0.5">by {{ $payment->receiver->name ?? 'System' }}</div>
                             </td>
 
                             <!-- Amount & Overpay -->
@@ -318,37 +383,51 @@
                                         +{{ number_format((float) $payment->overpay_amount, 0, ',', '.') }} lebih
                                     </span>
                                 @endif
+                                @if((float) $payment->balance_used_amount > 0 && strtolower($payment->payment_method) !== 'saldo')
+                                    <div class="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
+                                        (Pakai Saldo: Rp {{ number_format((float) $payment->balance_used_amount, 0, ',', '.') }})
+                                    </div>
+                                @endif
                             </td>
 
-                            <!-- Status Badge -->
+                            <!-- Action Icon & Modal Trigger -->
                             <td class="px-4 py-3.5 text-center whitespace-nowrap">
-                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold rounded-full border {{ $badgeClass }}">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
-                                    {{ $statusLabel }}
-                                </span>
-                            </td>
-
-                            <!-- Action Buttons -->
-                            <td class="px-4 py-3.5 text-right whitespace-nowrap">
-                                <div class="flex items-center justify-end gap-1.5">
-                                    <a href="{{ route('payments.show', $payment->id) }}" class="inline-flex items-center gap-1 px-2.5 py-1 border border-border bg-surface hover:bg-surface-muted text-text-main rounded-md transition-colors text-xs font-semibold shadow-2xs">
-                                        <svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        <span>Detail</span>
-                                    </a>
-                                    <a href="{{ route('payments.receipt', $payment->id) }}" target="_blank" class="p-1 border border-border bg-surface hover:bg-surface-muted text-text-secondary rounded-md transition-colors text-xs" title="Cetak Struk Thermal">
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                        </svg>
-                                    </a>
-                                </div>
+                                <button type="button"
+                                        @click="open({
+                                            id: {{ $payment->id }},
+                                            paymentNumber: '{{ $payment->payment_number }}',
+                                            oldPaymentId: '{{ $payment->old_payment_id ?? '' }}',
+                                            customerName: '{{ addslashes($payment->customer->full_name ?? '-') }}',
+                                            customerCid: '{{ $payment->customer->cid ?? $payment->customer->customer_code ?? '-' }}',
+                                            invoiceNumber: '{{ $payment->invoice->invoice_number ?? '' }}',
+                                            invoiceId: '{{ $payment->invoice_id ?? '' }}',
+                                            popName: '{{ addslashes($payment->pop->name ?? '-') }}',
+                                            paymentDate: '{{ optional($payment->payment_date)->format('d/m/Y') }}',
+                                            paymentMethod: '{{ strtoupper($payment->payment_method) }}',
+                                            amountFormatted: 'Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}',
+                                            overpayFormatted: '{{ (float) $payment->overpay_amount > 0 ? 'Rp ' . number_format((float) $payment->overpay_amount, 0, ',', '.') : '' }}',
+                                            balanceUsedFormatted: '{{ ((float) $payment->balance_used_amount > 0 && strtolower($payment->payment_method) !== 'saldo') ? 'Rp ' . number_format((float) $payment->balance_used_amount, 0, ',', '.') : '' }}',
+                                            showUrl: '{{ route('payments.show', $payment->id) }}',
+                                            receiptUrl: '{{ route('payments.receipt', $payment->id) }}',
+                                            invoiceUrl: '{{ $payment->invoice_id ? route('invoices.show', $payment->invoice_id) : '' }}',
+                                            customerUrl: '{{ $payment->customer_id ? route('customers.show', $payment->customer_id) : '' }}',
+                                            editUrl: '{{ (auth()->user()->can('payments.update') && $payment->isEditable()) ? route('payments.edit', $payment->id) : '' }}',
+                                            statusLabel: '{{ $statusLabel }}',
+                                            statusVal: '{{ $statusVal }}',
+                                            badgeClass: '{{ $badgeClass }}',
+                                            receiverInfo: '{{ addslashes($payment->collector?->name ? 'Kolektor: ' . $payment->collector->name : ($payment->receiver?->name ? 'Penerima: ' . $payment->receiver->name : 'Bayar Langsung')) }}'
+                                        })"
+                                        class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs hover:border-primary/40 active:scale-95 transition-all cursor-pointer"
+                                        title="Pilih Aksi Pembayaran">
+                                    <svg class="w-4 h-4 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6.75a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6.75a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
+                                    </svg>
+                                </button>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="11" class="px-6 py-12 text-center text-text-muted">
+                            <td colspan="10" class="px-6 py-12 text-center text-text-muted">
                                 <div class="max-w-xs mx-auto space-y-2">
                                     <svg class="w-10 h-10 mx-auto text-text-muted/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
@@ -367,5 +446,200 @@
             {{ $payments->links() }}
         </div>
     </div>
+
+    <!-- Modal: Action Sheet Transaksi Pembayaran -->
+    <template x-teleport="body">
+        <div x-show="modalVisible" x-cloak
+             x-effect="document.body.classList.toggle('overflow-hidden', modalVisible)"
+             class="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+             @click.self="close()" @keydown.escape.window="close()">
+            
+            <div x-show="modalVisible"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 translate-y-full sm:translate-y-4 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave-end="opacity-0 translate-y-full sm:translate-y-4 sm:scale-95"
+                 class="bg-surface rounded-t-3xl sm:rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-border p-5 space-y-4 text-left">
+                
+                <!-- Drag Handle for Mobile -->
+                <div class="w-12 h-1.5 bg-border rounded-full mx-auto -mt-1 sm:hidden"></div>
+
+                <!-- Header Info -->
+                <div class="flex items-start justify-between gap-3 pb-3 border-b border-border">
+                    <div class="space-y-1.5 min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <!-- Payment Number & Copy -->
+                            <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-surface-muted border border-border font-mono text-[11px] font-bold text-text-main">
+                                <span x-text="item.paymentNumber"></span>
+                                <button type="button" @click="copy(item.paymentNumber)" class="text-text-muted hover:text-primary transition-colors cursor-pointer ml-0.5" :title="copied ? 'Tersalin!' : 'Salin No. Bayar'">
+                                    <template x-if="!copied">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                    </template>
+                                    <template x-if="copied">
+                                        <svg class="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </template>
+                                </button>
+                            </div>
+
+                            <template x-if="item.oldPaymentId">
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-primary/10 text-primary border-primary/20" x-text="'Migrasi #' + item.oldPaymentId"></span>
+                            </template>
+
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border" :class="item.badgeClass" x-text="item.statusLabel"></span>
+
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-muted text-text-secondary border border-border" x-text="item.popName"></span>
+                        </div>
+
+                        <!-- Customer Name & CID -->
+                        <div class="space-y-0.5">
+                            <h3 class="text-sm sm:text-base font-bold text-text-main leading-snug truncate" x-text="item.customerName"></h3>
+                            <div class="flex items-center gap-2 text-xs font-mono text-text-muted">
+                                <span x-text="'CID: ' + item.customerCid"></span>
+                                <span>•</span>
+                                <span x-text="item.paymentDate"></span>
+                            </div>
+                        </div>
+
+                        <!-- Nominal & Badges -->
+                        <div class="flex items-baseline gap-2 pt-1">
+                            <span class="text-lg sm:text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400" x-text="item.amountFormatted"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-muted text-text-muted border border-border" x-text="item.paymentMethod"></span>
+                        </div>
+
+                        <template x-if="item.overpayFormatted">
+                            <div class="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                                <span>+Lebih Bayar: </span><strong x-text="item.overpayFormatted"></strong>
+                            </div>
+                        </template>
+
+                        <template x-if="item.balanceUsedFormatted">
+                            <div class="text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+                                <span>(Pakai Saldo: </span><strong x-text="item.balanceUsedFormatted"></strong><span>)</span>
+                            </div>
+                        </template>
+                    </div>
+
+                    <button type="button" @click="close()" class="w-8 h-8 rounded-full bg-surface-muted hover:bg-border text-text-muted hover:text-text-main flex items-center justify-center shrink-0 transition-colors cursor-pointer" title="Tutup Modal">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Action Items List -->
+                <div class="space-y-2">
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted px-1">Pilih Aksi Transaksi</span>
+
+                    <!-- 1. Detail Transaksi Pembayaran -->
+                    <a :href="item.showUrl"
+                       class="flex items-center gap-3 p-3 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 dark:bg-sky-950/30 dark:hover:bg-sky-900/40 border border-sky-100 dark:border-sky-900/50 text-sky-900 dark:text-sky-200 transition-colors group">
+                        <div class="w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold truncate">Detail Pembayaran</div>
+                            <div class="text-[10px] text-sky-700/80 dark:text-sky-400/80 truncate">Lihat informasi lengkap transaksi, alokasi dana, dan riwayat</div>
+                        </div>
+                        <svg class="w-4 h-4 text-sky-400 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+
+                    <!-- 2. Cetak Struk / Kwitansi -->
+                    <a :href="item.receiptUrl" target="_blank"
+                       class="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/80 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-900/50 text-emerald-900 dark:text-emerald-200 transition-colors group">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold truncate">Cetak Kwitansi (Struk)</div>
+                            <div class="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 truncate">Buka dokumen bukti pembayaran siap cetak format A4 & Thermal</div>
+                        </div>
+                        <svg class="w-4 h-4 text-emerald-500 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                    </a>
+
+                    <!-- 3. Edit Pembayaran (Koreksi) -->
+                    <template x-if="item.editUrl">
+                        <a :href="item.editUrl"
+                           class="flex items-center gap-3 p-3 rounded-xl bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 border border-amber-100 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 transition-colors group">
+                            <div class="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-xs font-bold truncate">Edit Pembayaran</div>
+                                <div class="text-[10px] text-amber-700/80 dark:text-amber-400/80 truncate">Koreksi metode transaksi, rekening tujuan, atau catatan</div>
+                            </div>
+                            <svg class="w-4 h-4 text-amber-500 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </template>
+
+                    <!-- 4. Lihat Tagihan (Invoice) -->
+                    <template x-if="item.invoiceUrl">
+                        <a :href="item.invoiceUrl"
+                           class="flex items-center gap-3 p-3 rounded-xl bg-violet-50/70 hover:bg-violet-100/80 dark:bg-violet-950/30 dark:hover:bg-violet-900/40 border border-violet-100 dark:border-violet-900/50 text-violet-900 dark:text-violet-200 transition-colors group">
+                            <div class="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-xs font-bold truncate">Detail Tagihan Terkait</div>
+                                <div class="text-[10px] text-violet-700/80 dark:text-violet-400/80 truncate" x-text="'Buka invoice ' + item.invoiceNumber + ' & status tagihan'"></div>
+                            </div>
+                            <svg class="w-4 h-4 text-violet-500 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </template>
+
+                    <!-- 5. Profil Pelanggan -->
+                    <template x-if="item.customerUrl">
+                        <a :href="item.customerUrl"
+                           class="flex items-center gap-3 p-3 rounded-xl bg-indigo-50/70 hover:bg-indigo-100/80 dark:bg-indigo-950/30 dark:hover:bg-indigo-900/40 border border-indigo-100 dark:border-indigo-900/50 text-indigo-900 dark:text-indigo-200 transition-colors group">
+                            <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-xs font-bold truncate">Profil Master Pelanggan</div>
+                                <div class="text-[10px] text-indigo-700/80 dark:text-indigo-400/80 truncate">Buka master pelanggan, kontak HP, alamat, & layanan aktif</div>
+                            </div>
+                            <svg class="w-4 h-4 text-indigo-500 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </template>
+                </div>
+
+                <!-- Footer Info & Close -->
+                <div class="flex items-center justify-between pt-2 border-t border-border text-[11px] text-text-muted">
+                    <span x-text="item.receiverInfo"></span>
+                    <button type="button" @click="close()" class="px-3.5 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary text-xs font-semibold transition-colors cursor-pointer">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
 </div>
+
 @endsection

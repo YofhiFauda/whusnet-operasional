@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\CustomerService;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Pop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,6 +39,18 @@ class ImportLegacyTanpaBillingTest extends TestCase
         // dijalankan di server. Tanpa ini pelanggan tetap masuk tapi layanannya
         // gagal dipetakan, dan test gagal karena alasan yang salah.
         $this->seed();
+
+        // Cabang baru dari command wajib nempel ke Pop type=pusat yang sudah
+        // ada — di produksi ini dibuat manual lewat Master POP sebelum import.
+        Pop::create([
+            'code' => 'PST',
+            'pop_code' => 'PST',
+            'name' => 'Pusat',
+            'type' => 'pusat',
+            'status' => 'active',
+            'registration_prefix' => 'RQ',
+            'cid_prefix' => 'P',
+        ]);
     }
 
     private function import(array $options = []): void
@@ -46,6 +59,7 @@ class ImportLegacyTanpaBillingTest extends TestCase
             'file' => $this->fixturePath,
             '--branch-code' => 'C',
             '--branch-name' => 'Jetis',
+            '--pusat-code' => 'PST',
         ], $options))->assertExitCode(0);
     }
 

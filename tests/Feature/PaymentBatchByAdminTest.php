@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\ScopeType;
+use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -132,7 +133,7 @@ class PaymentBatchByAdminTest extends TestCase
             'idempotency_key' => 'batch-test-001',
             'rows' => [
                 ['invoice_id' => $invoice1->id, 'amount' => 100000, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
-                ['invoice_id' => $invoice2->id, 'amount' => 200000, 'payment_method' => 'transfer', 'collected_date' => '2026-06-13'],
+                ['invoice_id' => $invoice2->id, 'amount' => 200000, 'payment_method' => 'transfer', 'bank_account_id' => BankAccount::factory()->create()->id, 'collected_date' => '2026-06-13'],
             ],
         ]);
 
@@ -151,6 +152,50 @@ class PaymentBatchByAdminTest extends TestCase
             'idempotency_key' => 'batch-test-001',
             'collector_id' => $this->kolektor->id,
             'submitted_by' => $this->admin->id,
+        ]);
+    }
+
+    /**
+     * QRIS dihapus dari PaymentMethod (2026-09-22); metode Lainnya wajib
+     * mengisi 'note' (keterangan metode apa persisnya) — lihat
+     * PaymentMethod::requiresDescription(), CollectorPaymentService::validateRows().
+     */
+    public function test_qris_ditolak_dan_lainnya_wajib_keterangan(): void
+    {
+        $invoiceQris = $this->createUnpaidInvoice('C-CBP-Q1', $this->kolektor->id, 100000);
+
+        $rejectedQris = $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
+            'idempotency_key' => 'batch-test-qris',
+            'rows' => [
+                ['invoice_id' => $invoiceQris->id, 'amount' => 100000, 'payment_method' => 'qris', 'collected_date' => '2026-06-13'],
+            ],
+        ]);
+        $rejectedQris->assertStatus(422);
+        $this->assertDatabaseCount('payments', 0);
+
+        $invoiceNoNote = $this->createUnpaidInvoice('C-CBP-Q2', $this->kolektor->id, 100000);
+        $rejectedNoNote = $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
+            'idempotency_key' => 'batch-test-lainnya-no-note',
+            'rows' => [
+                ['invoice_id' => $invoiceNoNote->id, 'amount' => 100000, 'payment_method' => 'lainnya', 'collected_date' => '2026-06-13'],
+            ],
+        ]);
+        $rejectedNoNote->assertStatus(422);
+        $rejectedNoNote->assertJsonFragment(['reason' => "{$invoiceNoNote->invoice_number}: metode Lainnya wajib diisi keterangannya."]);
+        $this->assertDatabaseCount('payments', 0);
+
+        $invoiceOk = $this->createUnpaidInvoice('C-CBP-Q3', $this->kolektor->id, 100000);
+        $accepted = $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
+            'idempotency_key' => 'batch-test-lainnya-ok',
+            'rows' => [
+                ['invoice_id' => $invoiceOk->id, 'amount' => 100000, 'payment_method' => 'lainnya', 'collected_date' => '2026-06-13', 'note' => 'OVO an. Budi'],
+            ],
+        ]);
+        $accepted->assertOk();
+        $this->assertDatabaseHas('payments', [
+            'invoice_id' => $invoiceOk->id,
+            'payment_method' => 'lainnya',
+            'note' => 'Batch kolektor: '.$this->kolektor->name.' — OVO an. Budi',
         ]);
     }
 
@@ -183,8 +228,11 @@ class PaymentBatchByAdminTest extends TestCase
             'idempotency_key' => 'batch-test-003',
             'rows' => [
                 ['invoice_id' => $goodInvoice->id, 'amount' => 100000, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
-                // Nominal melebihi sisa tagihan — baris ini harus gagal.
-                ['invoice_id' => $badInvoice->id, 'amount' => 999999, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
+                // Metode Lainnya tanpa keterangan — baris ini harus gagal.
+                // (ADHOC-84 §2.5/§4.4, 2026-09-23: nominal melebihi sisa
+                // BUKAN lagi penyebab tolak — kelebihannya otomatis kredit
+                // saldo, lihat CollectorSelfPaymentTest::test_kolektor_overpay_…)
+                ['invoice_id' => $badInvoice->id, 'amount' => 50000, 'payment_method' => 'lainnya', 'collected_date' => '2026-06-13'],
             ],
         ]);
 

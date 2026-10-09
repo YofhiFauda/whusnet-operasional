@@ -72,9 +72,13 @@ class CashDepositService
                 throw new RuntimeException('Tidak ada uang tunai yang belum disetorkan. Saldo kas Anda sedang kosong.');
             }
 
+            // Payment::physicalAmount() (ADHOC-92 G4, koreksi 2026-09-24) —
+            // bukan cuma pluck('amount'): kelebihan tunai (overpay) admin
+            // terima di kantor tetap uang fisik yang wajib ikut disetor,
+            // porsi dari Saldo Pelanggan (balance_used_amount) dikeluarkan.
             $total = Money::add(
                 Money::sum($collectorDeposits->map(fn (CollectorDeposit $deposit) => $deposit->cashReceivedByOffice())),
-                Money::sum($manualPayments->pluck('amount'))
+                Money::sum($manualPayments->map(fn (Payment $p) => $p->physicalAmount()))
             );
 
             $deposit = CashDeposit::create([

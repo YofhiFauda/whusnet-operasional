@@ -5,20 +5,42 @@
     $isSurveyStage = in_array($status, ['waiting_survey', 'survey_in_progress']);
     $isWaitingAccStage = in_array($status, ['waiting_acc', 'surveyed']);
     $isInstallationStage = in_array($status, ['waiting_installation', 'installation_in_progress', 'revision_installation']);
-    $isVerifAdminStage = in_array($status, ['installed', 'verification_admin', 'active']);
+    // 'waiting_business_development_verification' (kategori Bisnis, gate BD,
+    // ADHOC-67 susulan) TERMASUK di sini — pelanggan tahap ini SUDAH lolos
+    // CS (tab Registrasi/Survey/Pemasangan/Pengujian sudah final), cuma tab
+    // Verifikasi yang beda isinya (lihat cabang BD di dalamnya).
+    $isVerifAdminStage = in_array($status, ['installed', 'verification_admin', 'active', \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value]);
+    $isWaitingBdStageForBadge = $status === \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value;
 
     $showTabSurvey = !$isSurveyStage;
     $showTabPemasangan = !$isSurveyStage && !$isWaitingAccStage;
     $showTabPengujian = $isVerifAdminStage;
     $showTabVerifikasi = $isVerifAdminStage;
 
-    $breadcrumbQueueName = $isSurveyStage ? 'Antrean Survey' : 'Antrean Verifikasi & Pemasangan';
-    $breadcrumbQueueRoute = $isSurveyStage ? route('surveys.queue') : route('verifications.queue');
+    // Data Pemasangan (Data Perangkat + ODP/OLT) & Data Pengujian (speedtest)
+    // cuma boleh diedit CS di tahap Validasi Admin, BUKAN sepanjang tahap
+    // Pemasangan masih berjalan — tim di lapangan masih bisa mengubahnya lewat
+    // laporan sendiri (CustomerInstallationController), dua penulis pada data
+    // yang sama tanpa saling tahu itu yang mau dihindari (permintaan lanjutan
+    // user 2026-09-30). Lihat CustomerVerificationController::DEVICE_EDIT_STAGES.
+    $canEditDeviceData = $isVerifAdminStage && auth()->user()->hasPermission('customers.detail.installation.validate');
+
+    $breadcrumbQueueName = match(true) {
+        $isSurveyStage => 'Antrean Survey',
+        $isWaitingBdStageForBadge => 'Menunggu Verifikasi BD',
+        default => 'Antrean Verifikasi & Pemasangan',
+    };
+    $breadcrumbQueueRoute = match(true) {
+        $isSurveyStage => route('surveys.queue'),
+        $isWaitingBdStageForBadge => route('business-development-verifications.index'),
+        default => route('verifications.queue'),
+    };
 
     $stageBadgeLabel = match(true) {
         $isSurveyStage => 'Antrean Survey',
         $isWaitingAccStage => 'Menunggu ACC Survey',
         $isInstallationStage => 'Proses Pemasangan',
+        $isWaitingBdStageForBadge => 'Verifikasi BD',
         $isVerifAdminStage => 'Verifikasi Admin',
         default => Str::headline($status),
     };
@@ -117,105 +139,13 @@
         {{-- TAB 0: DATA REGISTRASI --}}
         {{-- ============================================================ --}}
         <div id="tab-registrasi" class="tab-panel p-6 md:p-8">
-            <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
-                Informasi Registrasi Pelanggan
-            </h4>
-                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-5 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Tanggal Registrasi</span>
-                        <span class="block text-sm font-bold text-text-main">{{ $customer->registration_date ? $customer->registration_date->format('d M Y') : '-' }}</span>
-                    </div>
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Nama Lengkap</span>
-                        <span class="block text-sm font-bold text-text-main">{{ $customer->full_name }}</span>
-                    </div>
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Nomor Identitas (KTP/SIM)</span>
-                        <span class="block text-sm font-mono text-text-main">{{ $customer->identity_number ?? '-' }}</span>
-                    </div>
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Tipe Pelanggan</span>
-                        <span class="block text-sm text-text-main">{{ ucfirst($customer->customer_type ?? '-') }}</span>
-                    </div>
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Telepon Utama</span>
-                        <span class="block text-sm font-mono text-text-main">{{ $customer->primary_phone ?? '-' }}</span>
-                    </div>
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Email</span>
-                        <span class="block text-sm text-text-main">{{ $customer->email ?? '-' }}</span>
-                    </div>
-                    <div class="md:col-span-3">
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Alamat Pemasangan</span>
-                        <span class="block text-sm text-text-main">
-                            {{ $customer->address }}
-                            @if($customer->village)
-                                <br><span class="text-xs text-text-secondary">Kel/Desa. {{ $customer->village->name }}, Kec. {{ $customer->village->district->name ?? '-' }}, {{ $customer->city->name ?? '-' }}</span>
-                            @endif
-                        </span>
-                    </div>
-                    @if($customer->latitude && $customer->longitude)
-                    <div class="md:col-span-3">
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Koordinat (Latitude, Longitude)</span>
-                        <a href="https://maps.google.com/?q={{ $customer->latitude }},{{ $customer->longitude }}" target="_blank" class="text-sm font-mono text-primary hover:underline flex items-center gap-1">
-                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            {{ $customer->latitude }}, {{ $customer->longitude }}
-                        </a>
-                    </div>
-                    @endif
-                </div>
-            </div>
-            
-            <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                Layanan Terpilih
-            </h4>
-            <div class="bg-primary-soft border border-primary-border rounded-xl p-5 mb-3">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Paket Internet</span>
-                        <span class="block text-sm font-bold text-primary">{{ $customer->internetPackage->name ?? '-' }}</span>
-                    </div>
-                    <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Biaya Berlangganan</span>
-                        <span class="block text-sm font-mono font-bold text-primary">Rp {{ number_format($customer->customerService->total_monthly_bill ?? 0, 0, ',', '.') }}</span>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Dokumen Foto Pelanggan --}}
-            <div class="mb-6">
-                <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    Dokumen & Foto
-                </h4>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    @php
-                        $fotoRumahUrl = foto_publik($customer->foto_rumah);
-                        $fotoKontrakUrl = foto_publik($customer->foto_kontrak);
-                    @endphp
-                    @if($fotoRumahUrl)
-                    <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Rumah</span>
-                        <img src="{{ $fotoRumahUrl }}" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $fotoRumahUrl }}', 'Foto Rumah')">
-                    </div>
-                    @endif
-                    @if($fotoKontrakUrl)
-                    <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Kontrak</span>
-                        <img src="{{ $fotoKontrakUrl }}" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $fotoKontrakUrl }}', 'Foto Kontrak')">
-                    </div>
-                    @endif
-                    @if(!$fotoRumahUrl && !$fotoKontrakUrl)
-                    <div class="col-span-2 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
-                        <svg class="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi, atau berkas tidak tersedia di penyimpanan.</p>
-                    </div>
-                    @endif
-                </div>
-            </div>
+            @include('verifications.partials._registration-info', [
+                'canEditVerificationData' => auth()->user()->hasPermission('customers.detail.installation.validate'),
+                'identityUpdateRoute' => 'customers.verification.update-identity',
+                'packageUpdateRoute' => 'customers.verification.update-package',
+                'verifCities' => $verifCities ?? [],
+                'verifPackages' => $verifPackages ?? [],
+            ])
         </div>
 
         {{-- ============================================================ --}}
@@ -271,20 +201,74 @@
                         <span class="block text-sm font-bold text-text-main">{{ $survey->technician->name ?? '-' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Surveyor 2</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Teknisi Kedua</span>
                         <span class="block text-sm text-text-main">{{ $survey->surveyor2->name ?? '-' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Surveyor 3</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Teknisi Ketiga</span>
                         <span class="block text-sm text-text-main">{{ $survey->surveyor3->name ?? '-' }}</span>
                     </div>
                 </div>
             </div>
 
-            <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Hasil Survey Teknis
-            </h4>
+            @php
+                $canEditSurveyData = auth()->user()->hasPermission('customers.detail.installation.validate');
+            @endphp
+            <div @if($canEditSurveyData) x-data="{ editingSurvey: false }" @endif>
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Hasil Survey Teknis
+                    </h4>
+                    @if($canEditSurveyData)
+                        <button type="button" @click="editingSurvey = ! editingSurvey"
+                                class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover px-3 py-1.5 rounded-lg border border-primary-border hover:bg-primary-soft transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            <span x-text="editingSurvey ? 'Batal' : 'Edit Data Survey'"></span>
+                        </button>
+                    @endif
+                </div>
+
+                @if($canEditSurveyData)
+                    <form action="{{ route('customers.verification.update-survey-data', $customer) }}" method="POST"
+                          x-show="editingSurvey" x-cloak x-collapse
+                          class="mb-4 p-4 sm:p-5 rounded-xl border border-primary-border bg-primary-soft/30 space-y-3.5">
+                        @csrf
+                        @method('PUT')
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                            <div>
+                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">ODP Terdekat</label>
+                                <input type="text" name="nearest_odp" value="{{ old('nearest_odp', $survey->nearest_odp) }}" maxlength="255"
+                                       class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                @error('nearest_odp')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Estimasi Kabel (Meter)</label>
+                                <input type="number" name="cable_estimation_meter" value="{{ old('cable_estimation_meter', $survey->cable_estimation_meter) }}" min="0"
+                                       class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                @error('cable_estimation_meter')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Request Pemasangan Pelanggan</label>
+                                <input type="date" name="requested_installation_date" value="{{ old('requested_installation_date', $survey->requested_installation_date?->toDateString()) }}"
+                                       class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                @error('requested_installation_date')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Catatan Surveyor</label>
+                                <textarea name="survey_note" rows="3"
+                                          class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">{{ old('survey_note', $survey->survey_note) }}</textarea>
+                                @error('survey_note')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-1">
+                            <button type="button" @click="editingSurvey = false" class="px-3.5 py-2 text-xs font-semibold text-text-secondary hover:text-text-main border border-border rounded-lg bg-surface">Batal</button>
+                            <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors">Simpan Data Survey</button>
+                        </div>
+                    </form>
+                @endif
+            </div>
+
             <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-5 mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
@@ -333,7 +317,7 @@
             ])
 
             @include('verifications.partials.work-tools', [
-                'title' => 'Alat Kerja Dicatat Surveyor',
+                'title' => 'Alat Kerja Opsional · Survey',
                 'rows' => $surveyWorkTools,
             ])
 
@@ -460,6 +444,126 @@
             </div>
             @endif
 
+            @if($canEditDeviceData)
+            <div class="mb-6" x-data="{ editingInstallation: false }">
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs text-text-muted">Data Perangkat & Distribusi Jaringan bisa dikoreksi selama Validasi Admin.</p>
+                    <button type="button" @click="editingInstallation = ! editingInstallation"
+                            class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover px-3 py-1.5 rounded-lg border border-primary-border hover:bg-primary-soft transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <span x-text="editingInstallation ? 'Batal' : 'Edit Data Pemasangan'"></span>
+                    </button>
+                </div>
+                <form action="{{ route('customers.verification.update-installation-data', $customer) }}" method="POST"
+                      x-show="editingInstallation" x-cloak x-collapse
+                      class="mb-6 p-4 sm:p-5 rounded-xl border border-primary-border bg-primary-soft/30 space-y-3.5">
+                    @csrf
+                    @method('PUT')
+                    <h5 class="text-[10px] font-bold uppercase tracking-wider text-primary">Data Perangkat</h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Jenis Perangkat</label>
+                            <select name="device_type" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <option value="">-</option>
+                                @foreach(['modem' => 'Modem', 'ont' => 'ONT', 'onu' => 'ONU', 'router' => 'Router', 'other' => 'Lainnya'] as $val => $label)
+                                    <option value="{{ $val }}" {{ old('device_type', $device?->device_type) === $val ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('device_type')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Mode Koneksi</label>
+                            <select name="connection_mode" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <option value="">-</option>
+                                @foreach(['bridge' => 'Bridge', 'router' => 'Router', 'pppoe' => 'PPPoE', 'static' => 'Static', 'dhcp' => 'DHCP', 'other' => 'Lainnya'] as $val => $label)
+                                    <option value="{{ $val }}" {{ old('connection_mode', $device?->connection_mode) === $val ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Merk</label>
+                            <input type="text" name="brand" value="{{ old('brand', $device?->brand) }}" maxlength="100" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Tipe / Model</label>
+                            <input type="text" name="model" value="{{ old('model', $device?->model) }}" maxlength="100" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Serial Number</label>
+                            <input type="text" name="serial_number" value="{{ old('serial_number', $device?->serial_number) }}" maxlength="100" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">MAC Address</label>
+                            <input type="text" name="mac_address" value="{{ old('mac_address', $device?->mac_address) }}" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            @error('mac_address')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Username PPPoE</label>
+                            <input type="text" name="pppoe_username" value="{{ old('pppoe_username', $device?->pppoe_username) }}" maxlength="150" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Password PPPoE</label>
+                            <input type="text" name="pppoe_password" value="{{ old('pppoe_password', $device?->pppoe_password) }}" maxlength="150" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">SSID WiFi</label>
+                            <input type="text" name="wifi_ssid" value="{{ old('wifi_ssid', $device?->wifi_ssid) }}" maxlength="150" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Password WiFi</label>
+                            <input type="text" name="wifi_password" value="{{ old('wifi_password', $device?->wifi_password) }}" maxlength="150" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                    </div>
+
+                    <h5 class="text-[10px] font-bold uppercase tracking-wider text-primary pt-2">Distribusi Jaringan (ODP / OLT)</h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Nomor ODP</label>
+                            <input type="text" name="odp_number" value="{{ old('odp_number', $techDetail?->odp_number) }}" maxlength="100" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Port ODP</label>
+                            <input type="text" name="odp_port" value="{{ old('odp_port', $techDetail?->odp_port) }}" maxlength="50" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Nomor OLT</label>
+                            <input type="text" name="olt_number" value="{{ old('olt_number', $techDetail?->olt_number) }}" maxlength="50" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Slot OLT</label>
+                            <input type="text" name="olt_slot" value="{{ old('olt_slot', $techDetail?->olt_slot) }}" maxlength="20" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Port OLT</label>
+                            <input type="text" name="olt_port" value="{{ old('olt_port', $techDetail?->olt_port) }}" maxlength="50" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">VLAN</label>
+                            <input type="text" name="vlan" value="{{ old('vlan', $techDetail?->vlan) }}" maxlength="20" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Nomor Router</label>
+                            <input type="text" name="router_number" value="{{ old('router_number', $techDetail?->router_number) }}" maxlength="50" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Redaman Awal (dBm)</label>
+                            <input type="text" name="initial_attenuation" value="{{ old('initial_attenuation', $techDetail?->initial_attenuation) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Catatan Pemasangan</label>
+                        <textarea name="installation_note" rows="2" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20">{{ old('installation_note', $installation?->installation_note) }}</textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-1">
+                        <button type="button" @click="editingInstallation = false" class="px-3.5 py-2 text-xs font-semibold text-text-secondary hover:text-text-main border border-border rounded-lg bg-surface">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors">Simpan Data Pemasangan</button>
+                    </div>
+                </form>
+            </div>
+            @endif
+
             {{-- DATA PERANGKAT --}}
             <div class="mb-6">
                 <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -493,6 +597,10 @@
                     </div>
                 </div>
             </div>
+
+            @include('verifications.partials.installed-devices', [
+                'rows' => $installedSerials,
+            ])
 
             @include('verifications.partials.materials', [
                 'title' => 'Material Terpakai Saat Pemasangan',
@@ -540,7 +648,7 @@
             @endif
 
             @include('verifications.partials.work-tools', [
-                'title' => 'Alat Kerja Dipakai Tim Pemasangan',
+                'title' => 'Alat Kerja Opsional · Pemasangan',
                 'rows' => $installationWorkTools,
             ])
 
@@ -627,6 +735,58 @@
         {{-- TAB 2: PENGUJIAN --}}
         {{-- ============================================================ --}}
         <div id="tab-pengujian" class="tab-panel p-6 md:p-8 hidden">
+
+            @if($canEditDeviceData)
+            <div class="mb-6" x-data="{ editingTestReport: false }">
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs text-text-muted">Hasil speedtest & kualitas sinyal bisa dikoreksi selama Validasi Admin.</p>
+                    <button type="button" @click="editingTestReport = ! editingTestReport"
+                            class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover px-3 py-1.5 rounded-lg border border-primary-border hover:bg-primary-soft transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <span x-text="editingTestReport ? 'Batal' : 'Edit Data Pengujian'"></span>
+                    </button>
+                </div>
+                <form action="{{ route('customers.verification.update-test-report', $customer) }}" method="POST"
+                      x-show="editingTestReport" x-cloak x-collapse
+                      class="mb-6 p-4 sm:p-5 rounded-xl border border-primary-border bg-primary-soft/30 space-y-3.5">
+                    @csrf
+                    @method('PUT')
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Download (Mbps)</label>
+                            <input type="number" step="0.01" name="test_download" value="{{ old('test_download', $techDetail?->test_download) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            @error('test_download')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Upload (Mbps)</label>
+                            <input type="number" step="0.01" name="test_upload" value="{{ old('test_upload', $techDetail?->test_upload) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Latency (ms)</label>
+                            <input type="number" step="0.01" name="latency_ms" value="{{ old('latency_ms', $techDetail?->latency_ms) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Jitter (ms)</label>
+                            <input type="number" step="0.01" name="jitter_ms" value="{{ old('jitter_ms', $techDetail?->jitter_ms) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Packet Loss (%)</label>
+                            <input type="number" step="0.01" name="packet_loss_percent" value="{{ old('packet_loss_percent', $techDetail?->packet_loss_percent) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            @error('packet_loss_percent')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">Redaman Aktual (dBm)</label>
+                            <input type="number" step="0.01" name="actual_attenuation" value="{{ old('actual_attenuation', $techDetail?->actual_attenuation) }}" class="w-full text-sm px-3 py-2 border border-border rounded-lg bg-surface text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-text-muted">% Sesuai Paket dihitung ulang otomatis dari Download & paket pelanggan.</p>
+                    <div class="flex justify-end gap-2 pt-1">
+                        <button type="button" @click="editingTestReport = false" class="px-3.5 py-2 text-xs font-semibold text-text-secondary hover:text-text-main border border-border rounded-lg bg-surface">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors">Simpan Data Pengujian</button>
+                    </div>
+                </form>
+            </div>
+            @endif
 
             @if($techDetail)
             {{-- Speed Metrics --}}
@@ -744,15 +904,192 @@
 
             @php
                 $service = $customer->customerService;
+                $isWaitingBdStage = $customer->status === \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value;
             @endphp
 
+            @if($isWaitingBdStage)
+                {{-- CABANG BD: pelanggan sudah lolos verifikasi CS (Invoice Awal
+                     sudah terbit, tab Registrasi/Survey/Pemasangan/Pengujian di
+                     atas ini sudah final) — nyangkut di sini nunggu Business
+                     Development isi "Biaya Instalasi" & aktivasi. Halaman & data
+                     yang ditampilkan SAMA PERSIS dengan verifikasi CS (reuse view
+                     ini, bukan halaman terpisah) — cuma tab ini yang beda:
+                     `BusinessDevelopmentVerificationController::verify()`, TANPA
+                     jalur Tolak/Revisi (dikonfirmasi user, beda dari cabang CS
+                     di bawah). --}}
+                <div class="mb-6 bg-success-bg border border-success-border rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-success shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <div>
+                            <p class="text-sm font-semibold text-success dark:text-white">Langkah Terakhir: Verifikasi BD</p>
+                            <p class="text-xs text-success dark:text-white mt-1">CS sudah menerbitkan tagihan awal &amp; menyelesaikan teknis (lihat tab sebelumnya). Isi Biaya Instalasi lalu tekan "Verifikasi &amp; Aktifkan" untuk menerbitkan tagihan Biaya Instalasi sekaligus mengaktifkan pelanggan ini. <span class="font-semibold">Tidak ada jalur tolak</span> — pastikan nominalnya benar sebelum submit.</p>
+                        </div>
+                    </div>
+                </div>
+
+                @if($service)
+                <div class="mb-6">
+                    <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Ringkasan Layanan</h4>
+                    <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-5">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Paket Internet</span>
+                                <span class="block text-sm font-bold text-text-main">{{ $customer->internetPackage->name ?? '-' }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Biaya Bulanan</span>
+                                <span class="block text-sm font-mono font-bold text-text-main">Rp {{ number_format($service->total_monthly_bill ?? 0, 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Diskon</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format($service->discount ?? 0, 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">PPN</span>
+                                <span class="block text-sm font-mono text-text-main">{{ number_format($service->ppn ?? 0, 0, ',', '.') }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                {{-- Hasil Verifikasi CS — data hasil hitung CS di
+                     `finalVerify()`, bukan Ringkasan Layanan statis. Invoice
+                     AWAL kategori Bisnis sengaja BELUM terbit di titik CS
+                     (nunggu BD juga setuju), jadi ada dua bentuk: $initialInvoice
+                     kalau sudah terbit (invoice sungguhan + link detail),
+                     $pendingInitialInvoice kalau masih snapshot (badge "Belum
+                     Terbit"). BD butuh liat ini SEBELUM isi Biaya Instalasi:
+                     tanggal aktivasi yang CS pakai, dan bukti "Biaya
+                     Pemasangan" di tagihan CS memang 0 (ditagih terpisah di
+                     sini, bukan kecatet dobel). --}}
+                @if($initialInvoice)
+                <div class="mb-6">
+                    <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
+                        <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider">Hasil Verifikasi CS — {{ $initialInvoice->invoice_number }}</h4>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $initialInvoice->invoice_status->value === 'lunas' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' }}">
+                            {{ $initialInvoice->invoice_status->label() }}
+                        </span>
+                    </div>
+                    <div class="bg-surface border border-border rounded-xl p-5">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 mb-4">
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Tanggal Aktivasi</span>
+                                <span class="block text-sm font-bold text-text-main">{{ $initialInvoice->issue_date?->translatedFormat('d F Y') ?? '-' }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Prorata</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format((float) $initialInvoice->prorate_amount, 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Biaya Pemasangan (CS)</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format((float) $initialInvoice->extra_installation_fee, 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Total Tagihan Awal</span>
+                                <span class="block text-sm font-mono font-bold text-primary">Rp {{ number_format((float) $initialInvoice->total_amount, 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+                        <a href="{{ route('invoices.show', $initialInvoice) }}" class="text-xs font-semibold text-primary hover:underline">
+                            Lihat Detail Tagihan Awal →
+                        </a>
+                    </div>
+                </div>
+                @elseif($pendingInitialInvoice)
+                {{-- Kategori Bisnis, BD BELUM verifikasi — Invoice AWAL sengaja
+                     belum terbit (baru terbit saat form di bawah disubmit,
+                     lihat BusinessDevelopmentVerificationController::verify()).
+                     Angkanya tetap ditampilkan dari snapshot yang dititipkan
+                     CS, biar BD gak nebak dari Ringkasan Layanan statis. --}}
+                <div class="mb-6">
+                    <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
+                        <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider">Hasil Verifikasi CS</h4>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                            Belum Terbit
+                        </span>
+                    </div>
+                    <div class="bg-surface border border-border rounded-xl p-5">
+                        <p class="text-xs text-text-muted mb-4">Tagihan awal baru terbit setelah Anda verifikasi di bawah, digabung SATU invoice dengan Biaya Instalasi yang Anda isi — angka berikut hasil hitung CS saat verifikasi, belum termasuk Biaya Instalasi.</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Tanggal Aktivasi</span>
+                                <span class="block text-sm font-bold text-text-main">{{ \Illuminate\Support\Carbon::parse($pendingInitialInvoice['issue_date'])->translatedFormat('d F Y') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Prorata</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format((float) $pendingInitialInvoice['billing']['prorate_amount'], 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Biaya Pemasangan (CS)</span>
+                                <span class="block text-sm font-mono text-text-main">Rp {{ number_format((float) $pendingInitialInvoice['billing']['extra_installation_fee'], 0, ',', '.') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Subtotal CS (Estimasi, Belum + Biaya Instalasi)</span>
+                                <span class="block text-sm font-mono font-bold text-primary">Rp {{ number_format((float) $pendingInitialInvoice['billing']['total_amount'], 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                @if($customer->canInstallationFeeBeValidatedBy(auth()->user()))
+                    <form method="POST" action="{{ route('business-development-verifications.verify', $customer) }}" class="space-y-6">
+                        @csrf
+                        @method('PUT')
+
+                        <div>
+                            <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Form Verifikasi BD</h4>
+                            <div class="bg-surface border border-border rounded-xl p-6 space-y-5 shadow-sm">
+                                <div>
+                                    <label for="installation_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">BIAYA INSTALASI <span class="text-red-500">*</span></label>
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
+                                        {{-- Prefill dari biaya instalasi bawaan paket (Master Paket
+                                             Internet) — tetap bisa diubah BD (nego harga per klien
+                                             Bisnis). `?? 0` wajib — ada paket yang installation_fee
+                                             bawaannya null (lihat InternetPackageSeeder). --}}
+                                        <input type="text" inputmode="decimal" data-rupiah name="installation_fee" id="installation_fee"
+                                            value="{{ old('installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->customerService?->internetPackage?->installation_fee ?? 0)) }}" required autofocus
+                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
+                                    </div>
+                                    @error('installation_fee')
+                                        <p class="text-xs text-error mt-1">{{ $message }}</p>
+                                    @enderror
+                                    <p class="text-[11px] text-text-muted mt-1">Terisi otomatis dari biaya instalasi bawaan paket — boleh diubah kalau ada nego harga. Submit langsung menerbitkan tagihan Insidental (kategori Jasa Instalasi), terpisah dari Tagihan Awal yang dibuat CS.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-5 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <a href="{{ route('business-development-verifications.index') }}"
+                                class="text-sm font-medium text-text-secondary hover:text-text-main transition-colors px-4 py-2 border border-border rounded-lg hover:bg-surface-muted">
+                                ← Kembali ke Antrean
+                            </a>
+                            <button type="submit"
+                                class="flex justify-center items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                Verifikasi & Aktifkan
+                            </button>
+                        </div>
+                    </form>
+                @else
+                    <div class="bg-surface-muted border border-border rounded-xl p-5 text-sm text-text-secondary">
+                        Anda tidak punya izin memvalidasi Biaya Instalasi kategori paket ini.
+                    </div>
+                @endif
+            @else
             {{-- Info notifikasi --}}
             <div class="mb-6 bg-success-bg border border-success-border rounded-xl p-4">
                 <div class="flex items-start gap-3">
                     <svg class="w-5 h-5 text-success shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <div>
-                        <p class="text-sm font-semibold text-success dark:text-white">Langkah Terakhir: Verifikasi & Aktivasi Pelanggan</p>
-                        <p class="text-xs text-success dark:text-white mt-1">Periksa kembali data pemasangan dan pengujian di tab sebelumnya, kemudian isi form di bawah ini untuk mengaktifkan pelanggan dan menerbitkan tagihan pertama.</p>
+                        @if($customer->needsBusdevInstallationFeeVerification())
+                            <p class="text-sm font-semibold text-success dark:text-white">Langkah Terakhir: Verifikasi CS (Kategori Bisnis — Lanjut ke BD)</p>
+                            <p class="text-xs text-success dark:text-white mt-1">Periksa kembali data pemasangan dan pengujian di tab sebelumnya, kemudian isi form di bawah ini untuk menerbitkan tagihan pertama. Pelanggan kategori Bisnis <span class="font-semibold">belum resmi Aktif</span> setelah ini — menunggu Business Development (BD) verifikasi Biaya Instalasi dulu.</p>
+                        @else
+                            <p class="text-sm font-semibold text-success dark:text-white">Langkah Terakhir: Verifikasi & Aktivasi Pelanggan</p>
+                            <p class="text-xs text-success dark:text-white mt-1">Periksa kembali data pemasangan dan pengujian di tab sebelumnya, kemudian isi form di bawah ini untuk mengaktifkan pelanggan dan menerbitkan tagihan pertama.</p>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -787,7 +1124,8 @@
             {{-- FORM VERIFIKASI --}}
 
 
-            <form id="verifyForm" method="POST" action="{{ route('customers.verification.final', $customer) }}" class="space-y-6">
+            <form id="verifyForm" method="POST" action="{{ route('customers.verification.final', $customer) }}" class="space-y-6"
+                  data-needs-bd="{{ $customer->needsBusdevInstallationFeeVerification() ? '1' : '0' }}">
                 @csrf
 
                 <div>
@@ -833,13 +1171,29 @@
                                     <label for="extra_installation_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">BIAYA PEMASANGAN</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
-                                        {{-- Prefill dari master paket, tapi tetap bisa diubah: pemasangan
-                                             boleh digratiskan/promo. `?? 0` wajib — ada paket yang
-                                             installation_fee-nya null (lihat InternetPackageSeeder). --}}
-                                        <input type="text" inputmode="decimal" data-rupiah name="extra_installation_fee" id="fv_extra_installation_fee"
-                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
-                                            value="{{ old('extra_installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->internetPackage->installation_fee ?? 0)) }}" onkeyup="calculateFees()" onchange="calculateFees()">
+                                        @if($customer->needsBusdevInstallationFeeVerification())
+                                            {{-- Kategori paket ini butuh validasi BD (Master Kategori Paket)
+                                                 — biaya instalasi ditagih TERPISAH oleh BD setelah verifikasi
+                                                 ini (`/business-development-verifications`), bukan di sini.
+                                                 Dikunci ke 0 & disabled biar CS gak keliru mengisi dobel;
+                                                 server (`finalVerify()`) tetap menimpa ke 0 kalau ada yang
+                                                 nekat kirim manual. --}}
+                                            <input type="text" disabled
+                                                class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface-muted font-mono text-text-disabled cursor-not-allowed"
+                                                value="0">
+                                            <input type="hidden" name="extra_installation_fee" value="0">
+                                        @else
+                                            {{-- Prefill dari master paket, tapi tetap bisa diubah: pemasangan
+                                                 boleh digratiskan/promo. `?? 0` wajib — ada paket yang
+                                                 installation_fee-nya null (lihat InternetPackageSeeder). --}}
+                                            <input type="text" inputmode="decimal" data-rupiah name="extra_installation_fee" id="fv_extra_installation_fee"
+                                                class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+                                                value="{{ old('extra_installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->internetPackage->installation_fee ?? 0)) }}" onkeyup="calculateFees()" onchange="calculateFees()">
+                                        @endif
                                     </div>
+                                    @if($customer->needsBusdevInstallationFeeVerification())
+                                        <p class="text-[11px] text-text-muted mt-1">Kategori Bisnis — biaya instalasi diisi &amp; ditagih BD setelah pelanggan ini diverifikasi.</p>
+                                    @endif
                                 </div>
                                 <div>
                                     <label for="other_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">MATERAI</label>
@@ -967,13 +1321,17 @@
                                 <button type="submit" id="btn-activate"
                                     class="flex justify-center items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    Aktivasi & Terbitkan Tagihan
+                                    {{-- Kategori Bisnis TIDAK langsung Aktif di sini — nyangkut dulu
+                                         di antrean BD (WAITING_BUSINESS_DEVELOPMENT_VERIFICATION).
+                                         Label WAJIB jujur soal ini, jangan bilang "Aktivasi". --}}
+                                    {{ $customer->needsBusdevInstallationFeeVerification() ? 'Verifikasi & Terbitkan Tagihan' : 'Aktivasi & Terbitkan Tagihan' }}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </form>
+            @endif
         </div>
     </div>
 </div>
@@ -1064,17 +1422,11 @@
 
     // ── LIGHTBOX ───────────────────────────────────────────────────────
     function openPhotoLightbox(src, caption) {
-        const lb = document.getElementById('photo-lightbox');
-        document.getElementById('lightbox-img').src = src;
-        document.getElementById('lightbox-caption').textContent = caption || '';
-        lb.classList.remove('hidden');
-        lb.classList.add('flex');
+        window.dispatchEvent(new CustomEvent('open-image-preview', { detail: { url: src, label: caption } }));
     }
 
     function closePhotoLightbox() {
-        const lb = document.getElementById('photo-lightbox');
-        lb.classList.add('hidden');
-        lb.classList.remove('flex');
+        // Handled by x-ui.image-preview-modal
     }
 
     // Escape key for modals
@@ -1148,8 +1500,19 @@
     }
 
     function calculateFees() {
+        // Cabang BD (WAITING_BUSINESS_DEVELOPMENT_VERIFICATION) tidak
+        // merender form CS sama sekali — `billing_params`/`verifyForm`
+        // gak ada di DOM. Guard di sini (satu titik), bukan di tiap
+        // pemanggil (inline onkeyup/onchange DAN initial call di
+        // DOMContentLoaded), supaya aman dari null tanpa nyisir semua
+        // titik panggil satu-satu.
+        const billingParams = document.getElementById('billing_params');
+        if (!billingParams) {
+            return;
+        }
+
         // Parameter layanan dititipkan di data-* supaya tidak ikut ter-POST.
-        const params = document.getElementById('billing_params').dataset;
+        const params = billingParams.dataset;
         const baseMonthly = parseFloat(params.monthlyPrice) || 0;
         const discount = parseFloat(params.discount) || 0;
         const ppnRate = parseFloat(params.ppn) || 0;
@@ -1290,25 +1653,117 @@
                 e.preventDefault();
                 const total = verifyForm.dataset.totalAmount || 0;
                 const totalFormatted = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(total);
+                const needsBd = verifyForm.dataset.needsBd === '1';
 
-                const message = `
-                    <div class="space-y-3">
-                        <p>Tindakan ini akan:</p>
-                        <ul class="list-disc list-inside text-text-secondary space-y-1 ml-2">
-                            <li>Mengaktifkan pelanggan (status &rarr; <span class="font-bold text-success">Aktif</span>)</li>
-                            <li>Menerbitkan tagihan pertama sebesar <span class="font-bold font-mono text-text-main">${totalFormatted}</span></li>
-                        </ul>
-                        <p class="font-medium text-text-main mt-2">Apakah Anda yakin?</p>
+                const message = needsBd
+                    ? `
+                    <div class="whitespace-normal space-y-4 text-left">
+                        <p class="text-sm text-text-secondary leading-relaxed">
+                            Tindakan ini akan memproses verifikasi CS dan mengarahkan data pelanggan ke antrean verifikasi Business Development:
+                        </p>
+
+                        <div class="space-y-2.5">
+                            <!-- Card 1: Tagihan Pertama -->
+                            <div class="p-3.5 bg-surface border border-border rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-900/50">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-semibold text-text-secondary">Tagihan Pertama (Prorata)</div>
+                                        <div class="text-[11px] text-text-muted truncate">Diterbitkan tanpa biaya instalasi</div>
+                                    </div>
+                                </div>
+                                <div class="font-mono font-bold text-sm text-text-main bg-surface-muted px-2.5 py-1 rounded-md border border-border shrink-0">
+                                    ${totalFormatted}
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Status Pelanggan & Alur BD -->
+                            <div class="p-3.5 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-800/40 rounded-xl space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-6 h-6 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300 flex items-center justify-center shrink-0">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <span class="text-xs font-semibold text-amber-900 dark:text-amber-200">Status Selanjutnya</span>
+                                    </div>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                                        Menunggu Verifikasi BD
+                                    </span>
+                                </div>
+                                <p class="text-xs text-amber-900/90 dark:text-amber-300/90 leading-relaxed pl-8">
+                                    Pelanggan <span class="font-bold underline decoration-amber-400 underline-offset-2">belum resmi Aktif</span> sampai Tim Business Development memvalidasi & mengisi <span class="font-semibold">Biaya Instalasi</span>.
+                                </p>
+                            </div>
+                        </div>
+
+                        <p class="text-xs font-medium text-text-muted pt-1">
+                            Apakah Anda yakin ingin memproses verifikasi dan melanjutkan ke BD?
+                        </p>
+                    </div>
+                `
+                    : `
+                    <div class="whitespace-normal space-y-4 text-left">
+                        <p class="text-sm text-text-secondary leading-relaxed">
+                            Tindakan ini akan mengaktifkan layanan pelanggan dengan rincian berikut:
+                        </p>
+
+                        <div class="space-y-2.5">
+                            <!-- Card 1: Status Pelanggan -->
+                            <div class="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-800/40 rounded-xl flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-800">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-semibold text-text-secondary">Status Layanan</div>
+                                        <div class="text-[11px] text-text-muted">Pelanggan langsung resmi aktif</div>
+                                    </div>
+                                </div>
+                                <span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 shrink-0">
+                                    Aktif
+                                </span>
+                            </div>
+
+                            <!-- Card 2: Tagihan Pertama -->
+                            <div class="p-3.5 bg-surface border border-border rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-900/50">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-semibold text-text-secondary">Tagihan Pertama</div>
+                                        <div class="text-[11px] text-text-muted truncate">Total tagihan awal terbit</div>
+                                    </div>
+                                </div>
+                                <div class="font-mono font-bold text-sm text-text-main bg-surface-muted px-2.5 py-1 rounded-md border border-border shrink-0">
+                                    ${totalFormatted}
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-xs font-medium text-text-muted pt-1">
+                            Apakah Anda yakin ingin memproses aktivasi pelanggan ini?
+                        </p>
                     </div>
                 `;
 
                 window.Dialog.show({
-                    title: 'Konfirmasi Aktivasi Pelanggan',
+                    title: needsBd ? 'Konfirmasi Verifikasi CS (Lanjut ke BD)' : 'Konfirmasi Aktivasi Pelanggan',
                     contentHtml: message,
                     icon: 'warning',
                     buttons: [
                         { text: 'Batal', type: 'secondary' },
-                        { text: 'Lanjutkan Aktivasi', type: 'primary', onClick: () => {
+                        { text: needsBd ? 'Lanjutkan' : 'Lanjutkan Aktivasi', type: 'primary', onClick: () => {
                             window.Dialog.close();
                             // Submit programatik melewati listener `submit`
                             // global — kolom biaya bermasking dibersihkan di sini.
@@ -1326,4 +1781,6 @@
         @endif
     });
 </script>
+
+<x-ui.image-preview-modal />
 @endsection

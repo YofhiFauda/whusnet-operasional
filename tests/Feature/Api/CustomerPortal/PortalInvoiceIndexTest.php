@@ -127,4 +127,65 @@ class PortalInvoiceIndexTest extends TestCase
         $this->assertSame('150000.00', $response->json('data.0.total_amount'));
         $this->assertIsString($response->json('data.0.total_amount'));
     }
+
+    /**
+     * ADHOC-87 §4.6 — invoice `batal` (dibatalkan lewat Request Putus
+     * Langganan/Cuti Berlangganan, atau data legacy) TIDAK ikut "Semua
+     * Status" tanpa parameter `status`.
+     */
+    public function test_semua_status_tidak_menyertakan_batal(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $this->seedInvoice($seed['customer'], ['invoice_status' => 'belum_dibayar', 'invoice_number' => 'INV-AKTIF', 'billing_period' => '2026-06']);
+        $this->seedInvoice($seed['customer'], ['invoice_status' => 'batal', 'invoice_number' => 'INV-BATAL', 'billing_period' => '2026-07']);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->getInvoices($tokens['access_token']);
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('INV-AKTIF', $response->json('data.0.invoice_number'));
+    }
+
+    public function test_status_batal_eksplisit_tetap_menampilkan_invoice_batal(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $this->seedInvoice($seed['customer'], ['invoice_status' => 'batal', 'invoice_number' => 'INV-BATAL2', 'billing_period' => '2026-07']);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->getInvoices($tokens['access_token'], '?status=batal');
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('INV-BATAL2', $response->json('data.0.invoice_number'));
+    }
+
+    public function test_exclude_status_lunas_tetap_mengecualikan_batal(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $this->seedInvoice($seed['customer'], ['invoice_status' => 'lunas', 'invoice_number' => 'INV-LUNAS', 'billing_period' => '2026-06']);
+        $this->seedInvoice($seed['customer'], ['invoice_status' => 'belum_dibayar', 'invoice_number' => 'INV-BELUM', 'billing_period' => '2026-07']);
+        $this->seedInvoice($seed['customer'], ['invoice_status' => 'batal', 'invoice_number' => 'INV-BATAL3', 'billing_period' => '2026-08']);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->getInvoices($tokens['access_token'], '?exclude_status=lunas');
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('INV-BELUM', $response->json('data.0.invoice_number'));
+    }
+
+    public function test_status_belum_dibayar_dashboard_tidak_berubah(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $this->seedInvoice($seed['customer'], ['invoice_status' => 'belum_dibayar', 'invoice_number' => 'INV-DASH', 'billing_period' => '2026-06']);
+        $this->seedInvoice($seed['customer'], ['invoice_status' => 'batal', 'invoice_number' => 'INV-DASH-BATAL', 'billing_period' => '2026-07']);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->getInvoices($tokens['access_token'], '?status=belum_dibayar');
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('INV-DASH', $response->json('data.0.invoice_number'));
+    }
 }

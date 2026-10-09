@@ -18,12 +18,12 @@ registered ──▶ waiting_survey ──▶ survey_in_progress ──┬──
                   rejected (final)
 
 active ──┬──▶ suspended ──┬──▶ active (reaktivasi)
-         │                └──▶ terminated (final)
-         └──▶ terminated (final)
+         │                └──▶ terminated ──▶ active (Langganan Lagi, ADHOC-85)
+         └──▶ terminated ──▶ active (Langganan Lagi, ADHOC-85)
          └──▶ installed / verification_admin / revision_installation (kasus khusus re-verifikasi)
 ```
 
-Catatan: `terminated` via `CustomerTerminationController` **tidak lewat state machine ini** — bisa terjadi dari status manapun tanpa validasi (lihat [business-logic.md §8](business-logic.md#8-terminasi-layanan-customerterminationcontroller)).
+Catatan: `terminated` via `CustomerTerminationController`/`CustomerTerminationService` **lewat state machine ini sejak ADHOC-85 (2026-09-19)** — hanya `active`/`suspended` yang bisa transisi ke `terminated` (guard `canTransitionTo()`), dan `terminated` **bukan lagi final**, punya jalur resmi balik ke `active` ("Langganan Lagi"). Sebelum ADHOC-85, klaim di sini benar (bisa terjadi dari status manapun tanpa validasi) — sudah usang, jangan diikuti. Detail denda putus langganan (ADHOC-69): [business-logic.md §8](business-logic.md#8-terminasi-layanan-customerterminationcontroller--customerterminationservice-denda-adhoc-69).
 
 Catatan lain (2026-08-21): edge `registered → waiting_acc` di enum ada khusus buat **Skip Survey** (§2a) — di alur nyata gak lewat state machine ini juga (status di-set langsung di `Customer::create()`, bukan lewat `CustomerWorkflowService::transition()`), tapi edge-nya tetap didaftarkan biar sah kalau ada kode lain yang nanti transisi eksplisit dari `registered`.
 

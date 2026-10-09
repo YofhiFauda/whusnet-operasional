@@ -72,6 +72,47 @@ class ReportInvoiceTest extends TestCase
         $response->assertSee('POP Surabaya');
     }
 
+    /**
+     * Repo ini pakai Excel sebagai format arsip laporan, bukan CSV
+     * (2026-09-22) — Laporan Pembayaran sudah punya XLSX sejak lama,
+     * Laporan Tagihan dulu cuma CSV. Regresi: pastikan tombolnya konsisten.
+     */
+    public function test_owner_can_export_xlsx(): void
+    {
+        $ownerRole = Role::where('name', 'Owner')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $ownerRole->id, 'status' => 'active']);
+        $pop = $this->createPop('SDA', 'SDA', 'POP Sidoarjo');
+        $this->createInvoice($pop, 'Pelanggan Satu', 'INV-XLSX-001', '2026-06', 'belum_dibayar');
+
+        $response = $this->actingAs($user)->get('/reports/invoices/export-xlsx');
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+
+    public function test_export_xlsx_requires_permission_and_validates_pop_scope(): void
+    {
+        $teknisi = User::factory()->create([
+            'role_id' => Role::where('name', 'Teknisi')->firstOrFail()->id,
+            'status' => 'active',
+        ]);
+        $this->actingAs($teknisi)->get('/reports/invoices/export-xlsx')->assertStatus(403);
+
+        $adminCabangRole = Role::where('name', 'POP Admin')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $adminCabangRole->id, 'status' => 'active']);
+        $popA = $this->createPop('SDA', 'SDA', 'POP Sidoarjo');
+        $popB = $this->createPop('SBY', 'SBY', 'POP Surabaya');
+
+        $scope = UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $adminCabangRole->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $popA->id]);
+
+        $this->actingAs($user)->get('/reports/invoices/export-xlsx?pop_id='.$popB->id)->assertStatus(403);
+    }
+
     public function test_admin_cabang_only_sees_assigned_pop_in_filters_and_data(): void
     {
         $adminCabangRole = Role::where('name', 'POP Admin')->firstOrFail();

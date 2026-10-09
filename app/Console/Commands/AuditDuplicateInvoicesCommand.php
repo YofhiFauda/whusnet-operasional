@@ -55,8 +55,7 @@ class AuditDuplicateInvoicesCommand extends Command
         }
 
         // Kelompok yang dicari: pelanggan + periode yang punya >1 tagihan
-        // LANGGANAN. REAKTIVASI tidak dihitung (suspend lalu aktif lagi di bulan
-        // sama itu sah) dan BATAL tidak dihitung (tagihan yang sudah dianulir
+        // LANGGANAN. BATAL tidak dihitung (tagihan yang sudah dianulir
         // bukan tagihan berjalan).
         $groups = Invoice::query()
             ->selectRaw('customer_id, billing_period, COUNT(*) as jumlah')

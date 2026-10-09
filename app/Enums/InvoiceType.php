@@ -6,14 +6,20 @@ enum InvoiceType: string
 {
     case AWAL = 'awal';
     case BULANAN = 'bulanan';
-    case REAKTIVASI = 'reaktivasi';
+
+    /**
+     * Tagihan Manual (ADHOC-70) — Perbaikan / Lainnya / Pindah Lokasi, diisi
+     * dari `/invoices/create`.
+     * Di luar `Invoice::SUBSCRIPTION_TYPES` — boleh terbit bareng tagihan Bulanan.
+     */
+    case MANUAL = 'manual';
 
     public function label(): string
     {
         return match ($this) {
-            self::AWAL => 'Tagihan Awal (PSB)',
+            self::AWAL => 'Aktivasi',
             self::BULANAN => 'Tagihan Bulanan Rutin',
-            self::REAKTIVASI => 'Tagihan Reaktivasi',
+            self::MANUAL => 'Tagihan Manual',
         };
     }
 
@@ -22,7 +28,7 @@ enum InvoiceType: string
         return match ($this) {
             self::AWAL => 'pembayaran-awal',
             self::BULANAN => 'bulan',
-            self::REAKTIVASI => 'reaktivasi',
+            self::MANUAL => 'manual',
         };
     }
 }

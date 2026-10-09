@@ -134,7 +134,7 @@ Dua event berjalan di kanal yang sama, keduanya **`ShouldBroadcastNow`** (tidak 
 | **Fase 3** | Visit Log + laporan aging per kolektor | 2026-08-08 |
 | **Perbaikan review Fase 1–3** | 10 temuan (#1–#9 + kebersihan) & 2 sisa (R1, R2) | 2026-08-08 |
 | **Perbaikan review Fase 4** | 11 temuan — termasuk satu **HIGH**: idempotency key sempat dipakai bersama antar-permintaan yang sedang jalan, sehingga pembayaran kedua hilang dengan gejala toast hijau | 2026-08-08 |
-| **Fase 4** | Kwitansi ber-QR, upload bulk, pencocokan otomatis (QR) + OCR cadangan + override manual | 2026-08-08 |
+| **Fase 4** | Kwitansi ber-QR, upload bulk, pencocokan otomatis (QR) + override manual (OCR cadangan dihapus 2026-09-26) | 2026-08-08 |
 | **Fase 5** | Pencocokan kwitansi lewat **lapisan teks PDF** (jalur utama, 100% akurat vs QR halaman-penuh 0%), lembar borongan 8 kwitansi/berkas, panel progres pembacaan | 2026-08-11 |
 | **Fase 6** | **Realtime setoran** (`CollectorDepositUpdated`, dua kanal) + notifikasi hapus buku ke kolektor | 2026-08-11 |
 | **Fase 7** | **Realtime aktivitas kas** (`CollectorActivityUpdated`) — pembayaran dicatat/ditolak & perubahan rute; notifikasi assign/lepas yang sebelumnya nol; kanal diganti nama jadi `collector-activity.{popId}` | 2026-08-11 |

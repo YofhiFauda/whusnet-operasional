@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<!-- saved from url=(0253)https://401c10dd-882d-4b25-8617-a72db4eadf12.frame.claudeusercontent.com/_f/1788747551-aa63/?__frame_t=BUBD95SbQ4csM7fHhGqFYjFv.dfd2098b-8d1c-45bd-bbf4-f41e268a10ca.352da5f9-7485-4abf-b8b9-464d9b38f424.1788751172&__frame_v=manifest.44244f2523adb29d.json -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><!-- frame-runtime --><script>window.__FRAME_PREAMBLE={"v":1,"capabilities":{"artifact":"artifact.DfA2To-s.js","assets":"assets.8Gk803W0.js","comments":"comments.hEoja5zd.js","db":"db.h-3sndFg.js","downloads":"downloads.th1YuAIk.js","embed":"embed.eqL6deQM.js","endpoints":"endpoints.CfzSv5nM.js","mcp":"mcp.Bvma3qD7.js","network":"network.B5UA9Su4.js","permissions":"permissions.BNySkLV5.js","room":"room.VSdFwTE9.js","sample":"sample.BW2Uysoh.js","self":"artifact.DfA2To-s.js","user":"user.BpKav-Rf.js"},"transforms":"_transforms.-IAc0qoT.js","comments":"_comments.C-AkolIB.js","translate":"_translate.5HCW4BJh.js","ldx":"_ldx.6JS5dhCp.js"}</script><script>(function(){"use strict";var le=["light","dark","system"],ue=/^[A-Za-z0-9_-]{1,64}$/,J=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,fe=new Set(["class","hidden","value","checked","style","title","alt","placeholder","lang","dir","role","tabindex","disabled","readonly","contenteditable","open","colspan","rowspan"]);function de(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||fe.has(t)}var We="http://www.w3.org/1999/xhtml",pe="http://www.w3.org/2000/svg",me=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),he=new Set(["script","style"]);function _e(e){const t=e.localName.toLowerCase();return e.namespaceURI==="http://www.w3.org/1999/xhtml"?!me.has(t):e.namespaceURI===pe?!he.has(t):!1}function I(e,t){return e===t||(e===160||e===32)&&(t===160||t===32)}function ve(e,t){const r=e.length,n=t.length;let a=0;for(;a<r&&a<n&&I(e.charCodeAt(a),t.charCodeAt(a));)a++;let s=0;for(;s<r-a&&s<n-a&&I(e.charCodeAt(r-1-s),t.charCodeAt(n-1-s));)s++;return{p:a,s}}function ye(e,t){const r=e.firstChild;if(e.childNodes.length!==1||r===null||r.nodeType!==Node.TEXT_NODE){e.textContent=t;return}const n=r.data,a=n.length,s=t.length,{p:c,s:i}=ve(n,t);c===a&&i===0&&a===s||r.replaceData(c,a-c-i,t.slice(c,s-i));const p=r.data,f=e.ownerDocument.getSelection?.()??null,v=f!==null&&f.rangeCount>0&&(f.anchorNode===r||f.focusNode===r)?{anchor:f.anchorNode,anchorOffset:f.anchorOffset,focus:f.focusNode,focusOffset:f.focusOffset}:null;let d=-1,y=-1;for(let _=0;_<p.length&&_<t.length;_++){const E=p.charCodeAt(_),T=t.charCodeAt(_);E!==T&&I(E,T)&&(d<0&&(d=_),y=_)}const w=d>=0;if(w&&r.replaceData(d,y-d+1,t.slice(d,y+1)),w&&v!==null&&v.anchor!==null&&v.focus!==null)try{f.setBaseAndExtent(v.anchor,v.anchorOffset,v.focus,v.focusOffset)}catch{}}var we=new Set(["html","head","body","frameset"]);function be(e){return e.namespaceURI==="http://www.w3.org/1999/xhtml"&&we.has(e.localName)}function Ee(e){if(e===null||typeof e!="object")return!1;const t=e;if(typeof t.target!="string"||!ue.test(t.target)||t.text!==void 0&&typeof t.text!="string")return!1;if(t.attrsSet!==void 0){if(t.attrsSet===null||typeof t.attrsSet!="object")return!1;for(const[r,n]of Object.entries(t.attrsSet))if(!J.test(r)||typeof n!="string")return!1}if(t.attrsRemoved!==void 0){if(!Array.isArray(t.attrsRemoved))return!1;for(const r of t.attrsRemoved)if(typeof r!="string"||!J.test(r))return!1}return!0}function ge(e,t){if(e===null||typeof e!="object")return!1;const{seq:r,elements:n}=e;if(typeof r!="number"||!Number.isSafeInteger(r)||!Array.isArray(n)||n.length===0||n.length>64)return!1;for(let a=0;a<n.length;a++)if(!t(n[a]))return!1;return!0}function Ae(e){return e===null||typeof e!="object"?!1:ge(e.__frame_patch,Ee)}function Te(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function Re(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function Le(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const r=t.theme;return typeof r=="string"&&le.includes(r)}var L=/^[\w.-]+\.js$/;function Se(e,t,r){return r?"inert":typeof t=="string"&&L.test(t)?e?[t]:"inert":e?"inert":"framed"}var Ke="frame_ldx_runtime",$e="script#an-form";function ke(){return{post(e,t){parent.postMessage(e,t)},on(e){const t=r=>{r.source===parent&&e(r.data,r.origin,r.isTrusted)};return addEventListener("message",t),()=>removeEventListener("message",t)}}}function Pe(){return{post:()=>{},on:()=>()=>{}}}var U="__frame_scroll",Oe=150,Ce=310,Me=160,je=3e4;function Ne(){let e=0,t=!1,r=!1,n=!1,a=0,s=null;const c=u=>{try{sessionStorage.setItem(U,JSON.stringify({y:u}))}catch{}},i=()=>{if(clearTimeout(e),s===null)return;const u=s;s=null,c(u)},p=()=>{if(t){t=!1;return}r=!0,s=scrollY,clearTimeout(e),e=setTimeout(i,Oe)};try{addEventListener("scroll",p,{passive:!0}),addEventListener("pagehide",i)}catch{}const f=()=>{let u;try{u=sessionStorage.getItem(U)}catch{return null}if(u===null)return null;let b;try{b=JSON.parse(u)}catch{b=null}const o=b?.y;if(!(typeof o=="number"&&Number.isFinite(o)&&o>=0)){try{sessionStorage.removeItem(U)}catch{}return null}return o};let v=!1;const d=u=>{try{const b=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),a=u,n=!0,clearTimeout(e),s=null,c(u);const o=scrollY;o!==b&&(t=!0),o!==u&&!v&&(v=!0,addEventListener("load",()=>{try{if(scrollY===o){const m=f();d(m!==null?m:a)}}catch{}},{once:!0}))}catch{}},y=()=>{try{return!!location.hash}catch{return!0}};let w=!1;const _=()=>{try{if(w||innerWidth>Ce||innerHeight>Me)return;w=!0;const u=Date.now(),b=()=>{try{removeEventListener("resize",b)}catch{}if(Date.now()-u>je||r||y())return;const o=f();d(o!==null?o:a)};addEventListener("resize",b)}catch{}};let E=!1,T=!1;return{restore(){if(E||(E=!0,y()))return;const u=f();u!==null&&(d(u),_())},promoted(){if(T||(T=!0,y()))return;const u=f();u!==null?(d(u),_()):n&&d(a)}}}function Be(e,t,r,n){let a=null;try{a=window.trustedTypes?.createPolicy("frame-runtime",{createScriptURL:p=>p})??null}catch{}const s=window.Worker,c=s?.prototype,i=Object.freeze({Worker:s,workerOn:c?.addEventListener,workerPost:c?.postMessage,workerTerminate:c?.terminate,fetch:window.fetch.bind(window),preventDefault:Event.prototype.preventDefault,policy:a,origins:t});r(e).then(p=>p?.bootTopLevel?p.bootTopLevel(i,n):n.settle()).catch(()=>n.settle())}var qe="modulepreload",Xe=function(e){return"/"+e},Ye={},De=function(t,r,n){let a=Promise.resolve();function s(c){const i=new Event("vite:preloadError",{cancelable:!0});if(i.payload=c,window.dispatchEvent(i),!i.defaultPrevented)throw c}return a.then(c=>{for(const i of c||[])i.status==="rejected"&&s(i.reason);return t().catch(s)})},Ie=window===top,Q=Object.getOwnPropertyDescriptor(window,"claude"),C=Se(Ie,window.__FRAME_PREAMBLE?.topLevel,Q?.writable===!1),x=typeof C=="object"&&C[0],h=x?Pe():ke();(function(){const e=Object.defineProperty,t=globalThis,r=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let n=0;for(let a=0;a<r.length;a++){const s=r[a];try{e(t,s,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[s]}catch{}try{e(t,s,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[s]=="function"&&n++}if(n&&C==="framed")try{h.post({__frame_rtc_lockdown_failed:n},"*")}catch{}})();var Ue=1e4,xe=2e3,ee=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function te(e){for(const t of ee)if(t.endsWith(":*"))try{const r=new URL(e);if(`${r.protocol}//${r.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var M=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),F=window.__FRAME_PREAMBLE?.transforms,z=window.__FRAME_PREAMBLE?.comments,H=window.__FRAME_PREAMBLE?.translate,W=window.__FRAME_PREAMBLE?.ldx;function S(e){return De(()=>import("/_runtime/"+e),void 0)}function re(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:q,hooks:N,pipe:()=>({wrap:(r,n)=>(...a)=>{try{return n(...a)}catch(s){return Promise.reject(s)}}})}}var j=null,A=null;function ne(e,t,r){try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var K=!1,N={editBefore:null,edit:null};function Fe(e,t,r=!1){const n=[];let a;if(r)try{N.editBefore?.(e)}catch{}for(const s of e.elements){const c=document.querySelector(`[data-id="${s.target}"]`);if(!c){a=s.target;break}if([...Object.keys(s.attrsSet??{}),...s.attrsRemoved??[]].some(i=>!de(i))){a=s.target;break}if(s.text!==void 0&&(!_e(c)||be(c))){a=s.target;break}for(const[i,p]of Object.entries(s.attrsSet??{}))if(!se(c,i)){try{c.setAttribute(i,p)}catch{}oe(c,i,p)}for(const i of s.attrsRemoved??[])se(c,i)||(c.removeAttribute(i),oe(c,i,null));typeof s.text=="string"&&ye(c,s.text),n.push(s.target)}if(r)try{N.edit?.(e.seq,n,a)}catch{}if(a!==void 0){h.post({__frame_patch_miss:{seq:e.seq}},t);return}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function oe(e,t,r){if(!(e instanceof HTMLInputElement))return;const n=t.toLowerCase();n==="checked"?e.checked=r!==null:n==="value"&&e.type!=="file"&&(e.value=r??"")}function se(e,t){const r=t.toLowerCase(),n=e;return r==="data-id"||(r==="value"||r==="checked")&&(n.__artifactSecret===!0||/^(password|hidden|file)$/.test(n.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${n.autocomplete??""}`))}function ae(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,K=!0):K&&(delete t.dataset.theme,t.style.colorScheme="",K=!1)}var B=new Map;function ze(){let e;const t={u:new Promise(r=>{e=r}),r:r=>{t.done=!0,e(r)},done:!1,nulled:!1};return t}function $(){for(const e of B.values())e.done||(e.nulled=!0,e.r(null))}var He=Object.freeze(Object.assign(Object.create(null),{call:Function.prototype.call,apply:Function.prototype.apply,bind:Function.prototype.bind})),q=(e,t)=>{const r=B.get(e);if(!r||r.done){r?.nulled&&A&&h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:e}},A);return}const n=typeof t=="function"?Object.setPrototypeOf(t,He):Object.assign(Object.create(null),t);typeof n.then=="function"&&delete n.then,r.r(Object.freeze(n))};function ie(){const e=Q?.value??{};ne(window,"claude",e);for(const t of Object.keys(M)){if(e[t]!==void 0){ne(e,t,e[t]);continue}B.set(t,ze())}if(e.use===void 0){const t=r=>{if(typeof r!="string"||!Object.hasOwn(M,r))return Promise.resolve(null);const n=B.get(r);return n?n.u:Promise.resolve(e[r]??null)};try{Object.defineProperty(e,"use",{value:t,writable:!0,configurable:!0,enumerable:!1})}catch{}}}if(C==="framed"){const e=F&&L.test(F)?S(F).catch(()=>{}):Promise.resolve(void 0),t=o=>{if(o.type==="auxclick"&&o.button!==1)return;const m=o.target,k=m&&m.closest?m.closest("a[href],area[href]"):null;if(!k)return;const O=k.getAttribute("href");if(!O)return;let R;try{R=new URL(O,document.baseURI)}catch{return}if((R.protocol==="http:"||R.protocol==="https:")&&R.origin!==location.origin){o.preventDefault();const P=(k.getAttribute("target")??"").toLowerCase(),g=o.type==="auxclick"||o.metaKey||o.ctrlKey||o.shiftKey||o.altKey||!["","_self","_top","_parent"].includes(P);h.post({__frame_nav:!0,url:R.href,newTab:g},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const r={},n=o=>{o.isTrusted&&(r.pointer=!0)},a=o=>{o.isTrusted&&(r.click=!0)};addEventListener("pointermove",n,{capture:!0,passive:!0}),addEventListener("click",a,{capture:!0,passive:!0});const s={cb:null};addEventListener("keydown",o=>s.cb?.(o),!0),e.then(o=>o?.installEscapeForward?.(s,m=>{A&&h.post(m,A)})),e.then(o=>{o?.wireNav&&(o.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",n,!0),removeEventListener("click",a,!0),o.wireEngagement?.(r))});let c=null;try{c=Ne()}catch{}ie();let i=null,p=null,f=0;const v=h.on((o,m)=>{te(m)&&Te(o)&&(i=o.__frame_init,A=m,v(),clearTimeout(f),p?.())});h.post({__frame_connect:!0},"*");const d=setTimeout,y=clearTimeout;let w=0;const _=()=>{try{h.post({__frame_alive:!0},"*")}catch{}w=d(_,xe)},E=()=>y(w);_(),addEventListener("load",E,{once:!0});const T=new Promise(o=>{p=o,f=setTimeout(()=>{v(),o()},Ue)}),u=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();u.then(()=>{try{c?.restore()}catch{}});const b={cb:null};h.on((o,m)=>{if(te(m)&&Re(o)){try{c?.promoted()}catch{}b.cb?.()}}),T.then(async()=>{if(!i||!A){$();return}ae(i.theme);const o=A;let m=!1,k=!1;h.on((l,Y,D)=>{if(Y!==o)return;Le(l)&&ae(l.__frame_theme.theme),Ae(l)&&Fe(l.__frame_patch,o,D);const G=l?.__fc_mode;G&&typeof G=="object"&&!m&&z&&L.test(z)&&(m=!0,S(z).then(Z=>Z.install?.(o,G.on===!0)).catch(()=>{}));const V=l?.__ft_cmd;V&&typeof V=="object"&&!k&&H&&L.test(H)&&(k=!0,S(H).then(Z=>Z.install?.(o,V)).catch(()=>{}))});const O=Object.keys(i.capabilities??{}).filter(l=>Object.hasOwn(M,l)).map(l=>[l,M[l]]).filter(l=>typeof l[1]=="string"&&L.test(l[1])),R=await Promise.allSettled(O.map(([,l])=>S(l))),P=await e,g=A;if(P?.buildBoot||h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},g),P?.buildBoot)try{j=P.buildBoot(i,P.TRANSFORMS??{},{shellOrigin:g,mount:q,hooks:N},l=>h.post({__frame_cap_telemetry:l},g))}catch{h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},g),j=re(i,g)}else j=re(i,g);const X=l=>h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:l}},g),ce=j;R.forEach((l,Y)=>{const D=O[Y][0];if(l.status!=="fulfilled"){X(D);return}try{l.value?.install?.(ce)}catch{X(D)}}),$(),await u,E(),h.post({__frame_ready:!0},A),e.then(l=>l?.installSizeReporter?.(g,b)),ce.flags.has("frame_ldx_runtime")&&W&&L.test(W)&&document.querySelector("script#an-form")&&S(W).then(l=>l?.boot?.()).catch(()=>!1).then(l=>{l!==!0&&X("_ldx")})})}else x&&(ie(),Be(x,ee,S,{settle:$,mount:q}))})();</script><!-- /frame-runtime --><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>Permintaan Stok Cabang</title>
+<meta name="description" content="Prototipe interaktif 3 layar Permintaan Stok — antrean, form ajukan, dan eksekusi pemenuhan parsial via Transfer.">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link rel="stylesheet" href="./css2">
+<style>
+  :root{
+    --bg:#f3f6f6; --surface:#ffffff; --surface-2:#eef3f3; --border:#d9e2e2;
+    --text:#131c1e; --text-muted:#5c7072; --text-faint:#8a9b9c;
+    --accent:#0d7d7a; --accent-ink:#ffffff; --accent-soft:#e0f1ef; --accent-soft-border:#b9dcd8;
+    --good:#1a7a45; --good-soft:#e4f4e9;
+    --warn:#a3650b; --warn-soft:#fbedd8;
+    --crit:#b23b2e; --crit-soft:#fbe6e2;
+    --blue:#2461c9; --blue-soft:#e3ecfc;
+    --transit:#8347b8; --transit-soft:#f1e7f9;
+    --shadow: 0 1px 2px rgba(20,30,31,.04), 0 8px 24px -12px rgba(20,30,31,.12);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1516; --surface:#161f20; --surface-2:#1b2526; --border:#2a3536;
+      --text:#e7eeee; --text-muted:#98abac; --text-faint:#6d8081;
+      --accent:#4fd6ce; --accent-ink:#06201e; --accent-soft:#17302e; --accent-soft-border:#294a46;
+      --good:#5cc98a; --good-soft:#173226;
+      --warn:#e0a94f; --warn-soft:#332b16;
+      --crit:#ec8478; --crit-soft:#361f1c;
+      --blue:#7ea9f0; --blue-soft:#182740;
+      --transit:#c3a2e6; --transit-soft:#2a2035;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1516; --surface:#161f20; --surface-2:#1b2526; --border:#2a3536;
+    --text:#e7eeee; --text-muted:#98abac; --text-faint:#6d8081;
+    --accent:#4fd6ce; --accent-ink:#06201e; --accent-soft:#17302e; --accent-soft-border:#294a46;
+    --good:#5cc98a; --good-soft:#173226;
+    --warn:#e0a94f; --warn-soft:#332b16;
+    --crit:#ec8478; --crit-soft:#361f1c;
+    --blue:#7ea9f0; --blue-soft:#182740;
+    --transit:#c3a2e6; --transit-soft:#2a2035;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box;}
+  body{background:var(--bg); color:var(--text); font-family:"IBM Plex Sans", system-ui, sans-serif; font-size:14px; line-height:1.5;}
+  h1,h2,h3{font-family:"Manrope", system-ui, sans-serif; text-wrap:balance; margin:0;}
+  code,.mono{font-family:"IBM Plex Mono", ui-monospace, monospace;}
+  .num{font-variant-numeric:tabular-nums;}
+  button,select,input,textarea{font-family:inherit; font-size:inherit;}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  .app{max-width:1200px; margin:0 auto; padding:20px 24px 64px;}
+
+  .topbar{display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; padding-bottom:16px; margin-bottom:18px; border-bottom:1px solid var(--border);}
+  .topbar-id{display:flex; flex-direction:column; gap:2px;}
+  .eyebrow{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint); font-weight:600;}
+  .topbar-id h1{font-size:22px; font-weight:800;}
+  select.scope{appearance:none; background:var(--surface); border:1px solid var(--border); color:var(--text); padding:8px 34px 8px 12px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) calc(1em + 1px), calc(100% - 11px) calc(1em + 1px);
+    background-size: 5px 5px, 5px 5px; background-repeat:no-repeat;}
+
+  .view[hidden]{display:none;}
+
+  /* ---- shared bits ---- */
+  .back-link{display:inline-flex; align-items:center; gap:6px; color:var(--text-muted); font-weight:600; font-size:13px; cursor:pointer; background:none; border:none; padding:0; margin-bottom:14px;}
+  .back-link:hover{color:var(--accent);}
+  .page-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px; flex-wrap:wrap;}
+  .page-head h2{font-size:18px; font-weight:800;}
+  .page-head .sub{font-size:12.5px; color:var(--text-muted); margin-top:3px;}
+  .primary-btn{background:var(--accent); color:var(--accent-ink); border:none; border-radius:8px; padding:10px 18px; font-weight:700; font-size:13.5px; cursor:pointer;}
+  .primary-btn:hover{filter:brightness(1.05);}
+  .primary-btn:disabled{opacity:.5; cursor:not-allowed;}
+  .ghost-btn{background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:9px 16px; font-weight:600; font-size:13px; cursor:pointer;}
+  .ghost-btn:hover{border-color:var(--accent); background:var(--accent-soft);}
+  .danger-btn{background:var(--surface); border:1px solid var(--crit); color:var(--crit); border-radius:8px; padding:9px 16px; font-weight:600; font-size:13px; cursor:pointer;}
+  .danger-btn:hover{background:var(--crit-soft);}
+
+  .status-badge{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; padding:4px 11px; border-radius:99px; text-transform:uppercase; letter-spacing:.02em;}
+  .status-badge .dot{width:7px; height:7px; border-radius:50%;}
+  .status-badge.pending{background:var(--warn-soft); color:var(--warn);}
+  .status-badge.partial{background:var(--blue-soft); color:var(--blue);}
+  .status-badge.fulfilled{background:var(--good-soft); color:var(--good);}
+  .status-badge.rejected{background:var(--crit-soft); color:var(--crit);}
+  .status-badge.cancelled{background:var(--surface-2); color:var(--text-faint);}
+
+  /* ---- Layar 1 : List ---- */
+  .toolbar{display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:14px;}
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint);}
+  .field input, .field select{background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px; color:var(--text);}
+  .field select{appearance:none; cursor:pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 14px) calc(1em - 1px), calc(100% - 9px) calc(1em - 1px);
+    background-size: 5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:28px;}
+  .field select:disabled{opacity:.6; cursor:not-allowed;}
+
+  .table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);}
+  table.req{width:100%; border-collapse:collapse; min-width:840px;}
+  table.req thead th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:700; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--surface-2); white-space:nowrap;}
+  table.req td{padding:12px 14px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:top;}
+  table.req tbody tr{cursor:pointer;}
+  table.req tbody tr:hover{background:var(--surface-2);}
+  table.req tbody tr:last-child td{border-bottom:none;}
+  .req-no{color:var(--accent); font-weight:700;}
+  .item-line{display:block; font-size:12.5px;}
+  .item-line .prog{color:var(--text-faint); font-size:11px;}
+  .table-foot{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; font-size:12px; color:var(--text-faint); border-top:1px solid var(--border);}
+  .empty-state{padding:48px 20px; text-align:center; color:var(--text-faint);}
+
+  /* ---- Layar 2 : Form ---- */
+  .form-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; display:flex; flex-direction:column; gap:18px; max-width:820px;}
+  .form-section{display:flex; flex-direction:column; gap:10px;}
+  .form-section .sec-label{font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em;}
+  .locked-field{background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:9px 12px; font-weight:600; color:var(--text-muted); display:flex; align-items:center; gap:8px;}
+  textarea{width:100%; background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:10px 12px; color:var(--text); resize:vertical; min-height:64px;}
+
+  table.item-form{width:100%; border-collapse:collapse;}
+  table.item-form th{text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-faint); font-weight:700; padding:0 8px 8px; letter-spacing:.03em;}
+  table.item-form td{padding:6px 8px 6px 0; vertical-align:top;}
+  table.item-form select, table.item-form input{width:100%; background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px; color:var(--text);}
+  .rm-row-btn{background:none; border:none; color:var(--crit); cursor:pointer; font-size:16px; padding:6px;}
+  .add-row-btn{align-self:flex-start; background:none; border:1px dashed var(--border); color:var(--accent); border-radius:7px; padding:8px 14px; font-weight:600; font-size:13px; cursor:pointer;}
+  .add-row-btn:hover{background:var(--accent-soft);}
+  .form-actions{display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); padding-top:14px;}
+
+  /* ---- Layar 3 : Detail ---- */
+  .detail-grid{display:grid; grid-template-columns:1.6fr 1fr; gap:16px; align-items:start;}
+  .panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:14px;}
+  .meta-row{display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px dashed var(--border);}
+  .meta-row:last-child{border-bottom:none;}
+  .meta-row .k{color:var(--text-muted);}
+  .meta-row .v{font-weight:600; text-align:right;}
+  .note-box{background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:13px; color:var(--text-muted);}
+
+  .item-detail{display:flex; flex-direction:column; gap:12px;}
+  .item-detail-row{display:flex; flex-direction:column; gap:6px; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px;}
+  .item-detail-head{display:flex; justify-content:space-between; font-size:13px;}
+  .item-detail-head .name{font-weight:700;}
+  .item-detail-head .qty{color:var(--text-muted); font-size:12px;}
+  .bar-track{height:6px; border-radius:4px; background:var(--border); overflow:hidden;}
+  .bar-fill{height:100%; border-radius:4px; background:var(--good);}
+  .bar-fill.partial{background:var(--blue);}
+
+  .fulfill-log{display:flex; flex-direction:column; gap:6px;}
+  .fulfill-log-row{display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);}
+  .fulfill-log-row .ref{color:var(--accent); font-weight:600;}
+
+  .action-list{display:flex; flex-direction:column; gap:8px;}
+  .reject-reason{font-size:12.5px; color:var(--crit); background:var(--crit-soft); border-radius:7px; padding:8px 10px;}
+
+  /* ---- Modal ---- */
+  .modal-backdrop{position:fixed; inset:0; background:rgba(10,16,17,.5); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;}
+  .modal-backdrop[hidden]{display:none;}
+  .modal{background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; display:flex; flex-direction:column; gap:12px; max-height:85vh; overflow-y:auto;}
+  .modal h3{font-size:16px;}
+  .modal p{font-size:13px; color:var(--text-muted); line-height:1.6;}
+  .modal-row{display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; padding:6px 0;}
+  .modal-row input{width:100px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:6px 8px; color:var(--text); text-align:right;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:6px;}
+
+  @media (max-width: 1000px){ .detail-grid{grid-template-columns:1fr;} }
+  @media (max-width: 720px){ .toolbar{grid-template-columns:1fr;} table.req{min-width:720px;} }
+</style>
+
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-id">
+      <span class="eyebrow">Modul Gudang · Whusnet Operasional</span>
+      <h1>Permintaan Stok Cabang</h1>
+    </div>
+    <select class="scope" id="roleSelect" aria-label="Simulasikan peran login">
+      <option value="siman">🏬 Login sebagai pop_admin — Cabang Siman</option>
+      <option value="babadan">🏬 Login sebagai pop_admin — Cabang Babadan</option>
+      <option value="kauman">🏬 Login sebagai pop_admin — Cabang Kauman</option>
+      <option value="pusat">🏢 Login sebagai Gudang Pusat / Admin / Owner</option>
+    </select>
+  </div>
+
+  <!-- ============ LAYAR 1 : ANTREAN ============ -->
+  <section class="view" id="viewList">
+    <div class="page-head">
+      <div>
+        <h2>Antrean Permintaan Stok</h2>
+        <div class="sub" id="listSub">Riwayat permintaan stok yang diajukan Cabang Siman ke Gudang Pusat.</div>
+      </div>
+      <button class="primary-btn" id="btnNewRequest">+ Ajukan Permintaan Stok</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="fltStatus">Status</label>
+        <select id="fltStatus">
+          <option value="all">Semua Status</option>
+          <option value="pending">Menunggu (Pending)</option>
+          <option value="partial">Sebagian (Partial)</option>
+          <option value="fulfilled">Dipenuhi (Fulfilled)</option>
+          <option value="rejected">Ditolak (Rejected)</option>
+          <option value="cancelled">Dibatalkan (Cancelled)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fltCabang">Cabang</label>
+        <select id="fltCabang" disabled=""><option value="siman">Cabang Siman (terkunci scope)</option></select>
+      </div>
+      <div class="field">
+        <label for="fltSearch">Cari No Request / Item</label>
+        <input type="search" id="fltSearch" placeholder="PST-… atau nama barang">
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="req">
+        <thead><tr><th>No. Request</th><th>Cabang</th><th>Pengaju</th><th>Rincian Barang</th><th>Status</th><th>Waktu</th></tr></thead>
+        <tbody id="listBody"><tr><td class="req-no mono">PST-20260905-000012</td><td>Cabang Siman</td><td>Agus (Admin)</td><td><div class="item-line">• 10 Unit ONT Huawei HG8245H5</div><div class="item-line">• 1.000 Meter Dropcore 1 Core 1000M</div></td><td><span class="status-badge pending"><span class="dot"></span>Pending</span></td><td class="mono">05 Sep 2026, 09:30</td></tr><tr><td class="req-no mono">PST-20260902-000009</td><td>Cabang Siman</td><td>Agus (Admin)</td><td><div class="item-line">• 20 Pack RJ45 Cat5e (Pack) <span class="prog num">(20/20 terkirim)</span></div></td><td><span class="status-badge fulfilled"><span class="dot"></span>Fulfilled</span></td><td class="mono">02 Sep 2026, 10:05</td></tr></tbody>
+      </table>
+      <div class="table-foot"><span id="listCount">Menampilkan 2 dari 5 Permintaan</span><span class="mono">Halaman 1 / 1</span></div>
+    </div>
+  </section>
+
+  <!-- ============ LAYAR 2 : FORM ============ -->
+  <section class="view" id="viewForm" hidden="">
+    <button class="back-link" id="backFromForm">← Kembali ke Antrean</button>
+    <div class="page-head"><h2>Form Pengajuan Permintaan Stok ke Pusat</h2></div>
+
+    <div class="form-card">
+      <div class="form-section">
+        <span class="sec-label">1. Informasi Cabang Pemohon</span>
+        <div class="locked-field">🏬 <span id="formCabangLabel">Cabang Siman</span> <span style="color:var(--text-faint); font-weight:400;">(terkunci otomatis sesuai login)</span></div>
+        <textarea id="formCatatan" placeholder="Contoh: Restock kabel &amp; ONT menipis untuk jadwal pasang baru WO Desa Siman minggu ini."></textarea>
+      </div>
+
+      <div class="form-section">
+        <span class="sec-label">2. Daftar Barang yang Diminta</span>
+        <table class="item-form">
+          <thead><tr><th style="width:38%">Pilih Item / SKU</th><th style="width:22%">Lot (Opsional)</th><th style="width:18%">Qty Diminta</th><th style="width:8%"></th></tr></thead>
+          <tbody id="formRows"><tr><td><select class="rowItem"><option value="ONT Huawei HG8245H5">ONT Huawei HG8245H5 (Unit)</option><option value="ONT ZTE F609">ONT ZTE F609 (Unit)</option><option value="Dropcore 1 Core 1000M">Dropcore 1 Core 1000M (Meter)</option><option value="RJ45 Cat5e (Pack)">RJ45 Cat5e (Pack) (Pack)</option><option value="Patchcord SC-UPC 3M">Patchcord SC-UPC 3M (Pcs)</option><option value="Switch 8 Port TP-Link">Switch 8 Port TP-Link (Unit)</option></select></td><td><input type="text" class="rowLot" placeholder="mis. LOT-002"></td><td><input type="number" class="rowQty" min="1" value="1"></td><td><button type="button" class="rm-row-btn" title="Hapus baris">🗑️</button></td></tr></tbody>
+        </table>
+        <button class="add-row-btn" id="addRowBtn" type="button">+ Tambah Baris Barang Lain</button>
+      </div>
+
+      <div class="form-actions">
+        <button class="ghost-btn" id="cancelFormBtn" type="button">Batal</button>
+        <button class="primary-btn" id="submitFormBtn" type="button">🚀 Kirim Permintaan ke Gudang Pusat</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LAYAR 3 : DETAIL ============ -->
+  <section class="view" id="viewDetail" hidden="">
+    <button class="back-link" id="backFromDetail">← Kembali ke Antrean</button>
+    <div class="page-head">
+      <div>
+        <h2 id="detailTitle">Detail Permintaan #PST-20260902-000009</h2>
+        <div class="sub" id="detailMeta">Pengaju: <strong>Agus (Admin)</strong> (Cabang Siman) — Diajukan 02 Sep 2026, 10:05</div>
+      </div>
+      <span class="status-badge fulfilled" id="detailStatusBadge"><span class="dot"></span>Fulfilled</span>
+    </div>
+
+    <div class="detail-grid">
+      <div class="panel">
+        <div>
+          <div class="sec-label" style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px;">Rincian Barang (Diminta vs Terkirim)</div>
+          <div class="item-detail" id="detailItems"><div class="item-detail-row"><div class="item-detail-head"><span class="name">RJ45 Cat5e (Pack)</span><span class="qty num">20 / 20 Pack</span></div><div class="bar-track"><div class="bar-fill" style="width: 100%;"></div></div></div></div>
+        </div>
+        <div id="rejectReasonBox"></div>
+        <div id="fulfillLogWrap" style="">
+          <div class="sec-label" style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin:6px 0 8px;">Riwayat Pemenuhan (Transfer)</div>
+          <div class="fulfill-log" id="fulfillLog"><div class="fulfill-log-row"><span class="ref mono">TRF-20260902-000008</span><span>20 Pack · 02 Sep 2026, 13:20</span></div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="note-box" id="detailNote"><strong>Catatan Pengaju:</strong><br>Restock rutin aksesoris bulanan.</div>
+        <div>
+          <div class="sec-label" style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px;">Aksi Tindakan</div>
+          <div class="action-list" id="detailActions"><button class="danger-btn" disabled="">⛔ Batalkan Permintaan</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop" hidden="">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">Judul</h3>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var CABANG = {
+    siman:   {label:"Cabang Siman", pengaju:"Agus (Admin)"},
+    babadan: {label:"Cabang Babadan", pengaju:"Rian (Gudang)"},
+    kauman:  {label:"Cabang Kauman", pengaju:"Doni (Admin)"}
+  };
+  var ITEM_CATALOG = [
+    {name:"ONT Huawei HG8245H5", unit:"Unit"},
+    {name:"ONT ZTE F609", unit:"Unit"},
+    {name:"Dropcore 1 Core 1000M", unit:"Meter"},
+    {name:"RJ45 Cat5e (Pack)", unit:"Pack"},
+    {name:"Patchcord SC-UPC 3M", unit:"Pcs"},
+    {name:"Switch 8 Port TP-Link", unit:"Unit"}
+  ];
+
+  var STATUS_LABEL = {pending:"Pending", partial:"Partial", fulfilled:"Fulfilled", rejected:"Rejected", cancelled:"Cancelled"};
+
+  var REQUESTS = [
+    {no:"PST-20260905-000012", cabang:"siman", pengaju:"Agus (Admin)", waktu:"05 Sep 2026, 09:30",
+      catatan:"Restock kabel & ONT menipis di Cabang Siman untuk pasang baru minggu ini.",
+      status:"pending",
+      items:[{name:"ONT Huawei HG8245H5", unit:"Unit", requested:10, delivered:0},
+             {name:"Dropcore 1 Core 1000M", unit:"Meter", requested:1000, delivered:0}],
+      fulfillments:[]},
+    {no:"PST-20260904-000011", cabang:"babadan", pengaju:"Rian (Gudang)", waktu:"04 Sep 2026, 14:15",
+      catatan:"Patchcord sisa tinggal sedikit, butuh buat stok teknisi minggu ini.",
+      status:"partial",
+      items:[{name:"Patchcord SC-UPC 3M", unit:"Pcs", requested:50, delivered:30}],
+      fulfillments:[{ref:"TRF-20260904-000010", qty:"30 Pcs", waktu:"04 Sep 2026, 15:00"}]},
+    {no:"PST-20260903-000010", cabang:"kauman", pengaju:"Doni (Admin)", waktu:"03 Sep 2026, 11:00",
+      catatan:"Butuh switch tambahan buat proyek FTTH RT03.",
+      status:"rejected", rejectReason:"Stok Pusat kosong, retur distributor masih diproses (estimasi 2 minggu).",
+      items:[{name:"Switch 8 Port TP-Link", unit:"Unit", requested:5, delivered:0}],
+      fulfillments:[]},
+    {no:"PST-20260902-000009", cabang:"siman", pengaju:"Agus (Admin)", waktu:"02 Sep 2026, 10:05",
+      catatan:"Restock rutin aksesoris bulanan.",
+      status:"fulfilled",
+      items:[{name:"RJ45 Cat5e (Pack)", unit:"Pack", requested:20, delivered:20}],
+      fulfillments:[{ref:"TRF-20260902-000008", qty:"20 Pack", waktu:"02 Sep 2026, 13:20"}]},
+    {no:"PST-20260901-000008", cabang:"babadan", pengaju:"Doni (Admin)", waktu:"01 Sep 2026, 08:40",
+      catatan:"Salah hitung kebutuhan, ternyata stok existing masih cukup.",
+      status:"cancelled",
+      items:[{name:"ONT ZTE F609", unit:"Unit", requested:5, delivered:0}],
+      fulfillments:[]}
+  ];
+  var seq = 15;
+
+  function el(tag, cls, html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!==undefined) e.innerHTML=html; return e; }
+  function fmt(n){ return n.toLocaleString("id-ID"); }
+
+  var state = {role:"siman", view:"list", detailNo:null, status:"all", cabang:"all", search:""};
+
+  // ---------- Views ----------
+  var views = {list: document.getElementById("viewList"), form: document.getElementById("viewForm"), detail: document.getElementById("viewDetail")};
+  function showView(name){
+    Object.keys(views).forEach(function(k){ views[k].hidden = k !== name; });
+    state.view = name;
+    window.scrollTo(0,0);
+  }
+
+  // ---------- Role ----------
+  var roleSelect = document.getElementById("roleSelect");
+  var fltCabang = document.getElementById("fltCabang");
+  var listSub = document.getElementById("listSub");
+  var btnNewRequest = document.getElementById("btnNewRequest");
+
+  function isCabangRole(){ return state.role !== "pusat"; }
+
+  function renderRoleUI(){
+    if(isCabangRole()){
+      listSub.textContent = "Riwayat permintaan stok yang diajukan " + CABANG[state.role].label + " ke Gudang Pusat.";
+      btnNewRequest.hidden = false;
+      fltCabang.innerHTML = "";
+      var lockedOpt = el("option", "", CABANG[state.role].label + " (terkunci scope)");
+      lockedOpt.value = state.role;
+      fltCabang.appendChild(lockedOpt);
+      fltCabang.disabled = true;
+      state.cabang = state.role;
+    } else {
+      listSub.textContent = "Antrean permintaan barang dari Gudang Cabang untuk diproses Gudang Pusat.";
+      btnNewRequest.hidden = true;
+      fltCabang.disabled = false;
+      fltCabang.innerHTML = "";
+      fltCabang.appendChild((function(){ var o=el("option","","Semua Gudang Cabang"); o.value="all"; return o; })());
+      Object.keys(CABANG).forEach(function(k){ var o=el("option","",CABANG[k].label); o.value=k; fltCabang.appendChild(o); });
+      state.cabang = "all";
+      fltCabang.value = "all";
+    }
+  }
+
+  // ---------- List ----------
+  var listBody = document.getElementById("listBody");
+  var listCount = document.getElementById("listCount");
+
+  function computeStatus(req){
+    if(req.status === "rejected" || req.status === "cancelled") return req.status;
+    var allDone = req.items.every(function(i){ return i.delivered >= i.requested; });
+    var anyDelivered = req.items.some(function(i){ return i.delivered > 0; });
+    if(allDone) return "fulfilled";
+    if(anyDelivered) return "partial";
+    return "pending";
+  }
+
+  function renderList(){
+    var rows = REQUESTS.filter(function(r){
+      r.status = computeStatus(r);
+      if(state.cabang !== "all" && r.cabang !== state.cabang) return false;
+      if(state.status !== "all" && r.status !== state.status) return false;
+      if(state.search){
+        var q = state.search.toLowerCase();
+        var hay = (r.no + " " + r.items.map(function(i){return i.name;}).join(" ")).toLowerCase();
+        if(hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+
+    listBody.innerHTML = "";
+    if(rows.length === 0){
+      var tr = el("tr"); var td = el("td", "empty-state", "Tidak ada permintaan yang cocok filter ini."); td.colSpan = 6; tr.appendChild(td); listBody.appendChild(tr);
+    } else {
+      rows.forEach(function(r){
+        var tr = el("tr");
+        tr.addEventListener("click", function(){ openDetail(r.no); });
+        tr.appendChild(el("td", "req-no mono", r.no));
+        tr.appendChild(el("td", "", CABANG[r.cabang].label));
+        tr.appendChild(el("td", "", r.pengaju));
+        var itemsTd = el("td");
+        r.items.forEach(function(i){
+          itemsTd.appendChild(el("div", "item-line", "• " + fmt(i.requested) + " " + i.unit + " " + i.name +
+            (i.delivered > 0 ? " <span class='prog num'>(" + fmt(i.delivered) + "/" + fmt(i.requested) + " terkirim)</span>" : "")));
+        });
+        tr.appendChild(itemsTd);
+        var statusTd = el("td");
+        statusTd.appendChild(el("span", "status-badge " + r.status, "<span class='dot'></span>" + STATUS_LABEL[r.status]));
+        tr.appendChild(statusTd);
+        tr.appendChild(el("td", "mono", r.waktu));
+        listBody.appendChild(tr);
+      });
+    }
+    listCount.textContent = "Menampilkan " + rows.length + " dari " + REQUESTS.length + " Permintaan";
+  }
+
+  document.getElementById("fltStatus").addEventListener("change", function(e){ state.status = e.target.value; renderList(); });
+  fltCabang.addEventListener("change", function(e){ state.cabang = e.target.value; renderList(); });
+  document.getElementById("fltSearch").addEventListener("input", function(e){ state.search = e.target.value; renderList(); });
+
+  // ---------- Form (Layar 2) ----------
+  var formRows = document.getElementById("formRows");
+  var formCatatan = document.getElementById("formCatatan");
+  var formCabangLabel = document.getElementById("formCabangLabel");
+
+  function itemOptionsHtml(selected){
+    return ITEM_CATALOG.map(function(it){
+      return "<option value='" + it.name + "'" + (it.name===selected?" selected":"") + ">" + it.name + " (" + it.unit + ")</option>";
+    }).join("");
+  }
+
+  function addFormRow(){
+    var tr = el("tr");
+    tr.innerHTML =
+      "<td><select class='rowItem'>" + itemOptionsHtml() + "</select></td>" +
+      "<td><input type='text' class='rowLot' placeholder='mis. LOT-002'></td>" +
+      "<td><input type='number' class='rowQty' min='1' value='1'></td>" +
+      "<td><button type='button' class='rm-row-btn' title='Hapus baris'>🗑️</button></td>";
+    tr.querySelector(".rm-row-btn").addEventListener("click", function(){
+      if(formRows.children.length > 1) tr.remove();
+    });
+    formRows.appendChild(tr);
+  }
+
+  document.getElementById("addRowBtn").addEventListener("click", addFormRow);
+
+  function openForm(){
+    formCabangLabel.textContent = CABANG[state.role].label;
+    formCatatan.value = "";
+    formRows.innerHTML = "";
+    addFormRow();
+    showView("form");
+  }
+
+  btnNewRequest.addEventListener("click", openForm);
+  document.getElementById("backFromForm").addEventListener("click", function(){ showView("list"); });
+  document.getElementById("cancelFormBtn").addEventListener("click", function(){ showView("list"); });
+
+  document.getElementById("submitFormBtn").addEventListener("click", function(){
+    var items = [];
+    formRows.querySelectorAll("tr").forEach(function(tr){
+      var name = tr.querySelector(".rowItem").value;
+      var qty = parseInt(tr.querySelector(".rowQty").value, 10) || 0;
+      var cat = ITEM_CATALOG.find(function(c){ return c.name === name; });
+      if(qty > 0) items.push({name:name, unit:cat.unit, requested:qty, delivered:0});
+    });
+    if(items.length === 0){ return; }
+    seq++;
+    var no = "PST-20260907-" + String(seq).padStart(6, "0");
+    var newReq = {
+      no:no, cabang:state.role, pengaju:CABANG[state.role].pengaju, waktu:"07 Sep 2026, sekarang",
+      catatan: formCatatan.value || "(tanpa catatan tambahan)",
+      status:"pending", items:items, fulfillments:[]
+    };
+    REQUESTS.unshift(newReq);
+    renderList();
+    openDetail(no); // PRG: redirect ke halaman Detail setelah create, bukan balik ke list
+  });
+
+  // ---------- Detail (Layar 3) ----------
+  var detailTitle = document.getElementById("detailTitle");
+  var detailMeta = document.getElementById("detailMeta");
+  var detailStatusBadge = document.getElementById("detailStatusBadge");
+  var detailItems = document.getElementById("detailItems");
+  var detailNote = document.getElementById("detailNote");
+  var detailActions = document.getElementById("detailActions");
+  var rejectReasonBox = document.getElementById("rejectReasonBox");
+  var fulfillLogWrap = document.getElementById("fulfillLogWrap");
+  var fulfillLog = document.getElementById("fulfillLog");
+
+  function findReq(no){ return REQUESTS.find(function(r){ return r.no === no; }); }
+
+  function openDetail(no){
+    state.detailNo = no;
+    renderDetail();
+    showView("detail");
+  }
+
+  function renderDetail(){
+    var r = findReq(state.detailNo);
+    if(!r) return;
+    r.status = computeStatus(r);
+
+    detailTitle.textContent = "Detail Permintaan #" + r.no;
+    detailMeta.innerHTML = "Pengaju: <strong>" + r.pengaju + "</strong> (" + CABANG[r.cabang].label + ") — Diajukan " + r.waktu;
+    detailStatusBadge.className = "status-badge " + r.status;
+    detailStatusBadge.innerHTML = "<span class='dot'></span>" + STATUS_LABEL[r.status];
+
+    detailItems.innerHTML = "";
+    r.items.forEach(function(i){
+      var pct = Math.min(100, Math.round((i.delivered / i.requested) * 100));
+      var row = el("div", "item-detail-row");
+      var head = el("div", "item-detail-head");
+      head.appendChild(el("span", "name", i.name));
+      head.appendChild(el("span", "qty num", fmt(i.delivered) + " / " + fmt(i.requested) + " " + i.unit));
+      row.appendChild(head);
+      var track = el("div", "bar-track");
+      var fill = el("div", "bar-fill" + (pct < 100 ? " partial" : ""));
+      fill.style.width = pct + "%";
+      track.appendChild(fill);
+      row.appendChild(track);
+      detailItems.appendChild(row);
+    });
+
+    detailNote.innerHTML = "<strong>Catatan Pengaju:</strong><br>" + r.catatan;
+
+    rejectReasonBox.innerHTML = r.status === "rejected"
+      ? "<div class='reject-reason'><strong>Alasan penolakan:</strong> " + r.rejectReason + "</div>" : "";
+
+    if(r.fulfillments.length > 0){
+      fulfillLogWrap.style.display = "";
+      fulfillLog.innerHTML = "";
+      r.fulfillments.forEach(function(f){
+        var row = el("div", "fulfill-log-row");
+        row.innerHTML = "<span class='ref mono'>" + f.ref + "</span><span>" + f.qty + " · " + f.waktu + "</span>";
+        fulfillLog.appendChild(row);
+      });
+    } else {
+      fulfillLogWrap.style.display = "none";
+    }
+
+    renderDetailActions(r);
+  }
+
+  function renderDetailActions(r){
+    detailActions.innerHTML = "";
+    var isOwnerCabang = isCabangRole() && r.cabang === state.role;
+    var isPusatAdmin = !isCabangRole();
+
+    if(isPusatAdmin){
+      var btnTransfer = el("button", "primary-btn", "🚚 Buat Transfer Pengiriman");
+      btnTransfer.disabled = (r.status === "rejected" || r.status === "cancelled" || r.status === "fulfilled");
+      btnTransfer.addEventListener("click", function(){ openTransferModal(r); });
+      detailActions.appendChild(btnTransfer);
+
+      var btnDone = el("button", "ghost-btn", "✅ Tandai Cukup / Selesai");
+      btnDone.disabled = (r.status === "rejected" || r.status === "cancelled" || r.status === "pending" || r.status === "fulfilled");
+      btnDone.title = r.status === "pending" ? "Kirim minimal sebagian dulu sebelum menutup tiket" : "";
+      btnDone.addEventListener("click", function(){
+        r.items.forEach(function(i){ i.delivered = i.requested; });
+        r.status = "fulfilled";
+        renderDetail(); renderList();
+      });
+      detailActions.appendChild(btnDone);
+
+      var btnReject = el("button", "danger-btn", "❌ Tolak Permintaan");
+      btnReject.disabled = r.status !== "pending";
+      btnReject.addEventListener("click", function(){ openRejectModal(r); });
+      detailActions.appendChild(btnReject);
+    }
+
+    if(isOwnerCabang){
+      var btnCancel = el("button", "danger-btn", "⛔ Batalkan Permintaan");
+      btnCancel.disabled = r.status !== "pending";
+      btnCancel.addEventListener("click", function(){
+        r.status = "cancelled";
+        renderDetail(); renderList();
+      });
+      detailActions.appendChild(btnCancel);
+    }
+
+    if(!isPusatAdmin && !isOwnerCabang){
+      detailActions.appendChild(el("div", "sub", "Permintaan ini milik cabang lain — tidak ada aksi tersedia untuk peran Anda."));
+    }
+  }
+
+  document.getElementById("backFromDetail").addEventListener("click", function(){ showView("list"); });
+
+  // ---------- Modals ----------
+  var backdrop = document.getElementById("modalBackdrop");
+  var modalTitle = document.getElementById("modalTitle");
+  var modalBody = document.getElementById("modalBody");
+  function closeModal(){ backdrop.hidden = true; }
+
+  function openTransferModal(r){
+    modalTitle.textContent = "Buat Transfer Pengiriman — " + r.no;
+    var rowsHtml = r.items.map(function(i, idx){
+      var sisa = i.requested - i.delivered;
+      return "<div class='modal-row'><span>" + i.name + "<br><span style='color:var(--text-faint); font-size:11.5px;'>sisa " + fmt(sisa) + " " + i.unit + "</span></span>" +
+        "<input type='number' class='mtQty' data-idx='" + idx + "' min='0' max='" + sisa + "' value='" + sisa + "'></div>";
+    }).join("");
+    modalBody.innerHTML =
+      "<p>Isi jumlah yang bisa dikirim <strong>sekarang</strong>. Kalau kurang dari sisa, tiket otomatis jadi <span class='mono'>PARTIAL</span> — form ini otomatis mengisi <code>/warehouse/transfers/create</code>.</p>" +
+      rowsHtml +
+      "<div class='modal-actions'><button class='ghost-btn' id='mtCancel'>Batal</button><button class='primary-btn' id='mtSubmit'>Kirim Transfer</button></div>";
+    backdrop.hidden = false;
+    document.getElementById("mtCancel").addEventListener("click", closeModal);
+    document.getElementById("mtSubmit").addEventListener("click", function(){
+      var qtys = modalBody.querySelectorAll(".mtQty");
+      var anySent = false;
+      qtys.forEach(function(inp){
+        var idx = parseInt(inp.dataset.idx, 10);
+        var val = Math.max(0, Math.min(parseInt(inp.value,10)||0, r.items[idx].requested - r.items[idx].delivered));
+        if(val > 0){ r.items[idx].delivered += val; anySent = true; }
+      });
+      if(anySent){
+        seq++;
+        r.fulfillments.push({ref:"TRF-20260907-" + String(seq).padStart(6,"0"), qty:qtys.length===1?(qtys[0].value+" "+r.items[0].unit):"multi-item", waktu:"07 Sep 2026, sekarang"});
+      }
+      closeModal();
+      renderDetail(); renderList();
+    });
+  }
+
+  function openRejectModal(r){
+    modalTitle.textContent = "Tolak Permintaan — " + r.no;
+    modalBody.innerHTML =
+      "<p>Alasan penolakan wajib diisi dan akan tampil ke cabang pengaju.</p>" +
+      "<textarea id='rejectReasonInput' placeholder='Contoh: Stok Pusat kosong, retur distributor masih diproses.'></textarea>" +
+      "<div class='modal-actions'><button class='ghost-btn' id='rjCancel'>Batal</button><button class='danger-btn' id='rjSubmit'>Tolak Permintaan</button></div>";
+    backdrop.hidden = false;
+    document.getElementById("rjCancel").addEventListener("click", closeModal);
+    document.getElementById("rjSubmit").addEventListener("click", function(){
+      var reason = document.getElementById("rejectReasonInput").value.trim();
+      if(!reason) return;
+      r.status = "rejected";
+      r.rejectReason = reason;
+      closeModal();
+      renderDetail(); renderList();
+    });
+  }
+
+  document.addEventListener("click", function(e){ if(e.target === backdrop) closeModal(); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeModal(); });
+
+  // ---------- Init ----------
+  roleSelect.addEventListener("change", function(e){
+    state.role = e.target.value;
+    renderRoleUI();
+    renderList();
+    if(state.view === "detail") renderDetail();
+  });
+
+  renderRoleUI();
+  renderList();
+  showView("list");
+})();
+</script>
+
+</body></html>

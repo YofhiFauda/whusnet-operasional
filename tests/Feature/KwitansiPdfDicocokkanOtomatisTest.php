@@ -25,7 +25,7 @@ use Tests\TestCase;
  * Halaman cetak kwitansi mengembalikan View HTML, jadi alur paling wajar bagi
  * admin adalah Print → "Save as PDF". Dulu QrReceiptNumberReader melewatkan
  * semua non-gambar dengan alasan "jalur berikutnya yang menangani" — padahal
- * jalur berikutnya (OCR Gemini) mati tanpa API key. Akibatnya SETIAP kwitansi
+ * tak ada jalur otomatis berikutnya. Akibatnya SETIAP kwitansi
  * PDF berakhir FAILED dan menunggu kerja manual, walau QR-nya utuh.
  *
  * Fixture `tests/Fixtures/kwitansi-qr.pdf` meniru hasil cetak itu: satu QR

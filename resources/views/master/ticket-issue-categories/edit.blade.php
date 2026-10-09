@@ -81,6 +81,21 @@
             </div>
         </div>
 
+        <!-- Batch -->
+        <div class="pt-2">
+            <label class="flex items-start gap-2.5 cursor-pointer">
+                <input type="checkbox" name="is_batch" value="1" {{ old('is_batch', $category->is_batch) ? 'checked' : '' }}
+                       class="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                <span>
+                    <span class="block text-xs font-bold text-slate-700 dark:text-slate-300">Support Batch (Parent/Child)</span>
+                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Centang kalau kategori ini bisa berdampak ke banyak pelanggan sekaligus (mis. ODP LOS) — tiket di Worksheet Helpdesk boleh gak nunjuk satu pelanggan (Search Customer Data jadi label bebas + POP dipilih manual), lalu pelanggan terdampak dicatat satu-satu lewat tombol "Tambah" di List Task.</span>
+                </span>
+            </label>
+            @error('is_batch')
+                <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+            @enderror
+        </div>
+
         <!-- Submit Actions -->
         <div class="flex items-center gap-3 justify-end pt-5 border-t border-slate-100 dark:border-slate-700/50 mt-5">
             <a href="{{ route('master.ticket-issue-categories.index') }}" class="inline-flex items-center justify-center px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 transition-colors focus:outline-none cursor-pointer">

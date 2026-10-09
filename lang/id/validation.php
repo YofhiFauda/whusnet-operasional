@@ -95,6 +95,10 @@ return [
     'numeric' => ':attribute harus berupa angka.',
     'password' => 'Kata sandi salah.',
     'present' => 'Field :attribute wajib ada.',
+    'prohibited' => 'Bidang :attribute tidak boleh diisi.',
+    'prohibited_if' => 'Bidang :attribute tidak boleh diisi bila :other adalah :value.',
+    'prohibited_unless' => 'Bidang :attribute tidak boleh diisi kecuali :other memiliki nilai :values.',
+    'prohibits' => 'Bidang :attribute melarang :other untuk diisi.',
     'regex' => 'Format :attribute tidak valid.',
     'required' => 'Bidang :attribute wajib diisi.',
     'required_if' => 'Bidang :attribute wajib diisi bila :other adalah :value.',
@@ -155,6 +159,12 @@ return [
         'house_photo' => 'Foto Rumah Pelanggan',
         'survey_note' => 'Catatan Teknis',
         'difficulty_level' => 'Tingkat Kesulitan',
+        'tracking_type' => 'Cara Lacak Stok',
+        'ownership_mode' => 'Kepemilikan',
+        'auto_generate_serial' => 'Sumber Serial Number',
+        'meter_per_roll' => 'Panjang per Roll',
+        'minimum_length' => 'Ambang Sisa Kecil',
+        'item_category_id' => 'Kategori',
     ],
 
 ];

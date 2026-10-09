@@ -27,6 +27,17 @@
     atas backdrop malah menggeser tabel di belakangnya, dan waktu drawer ditutup
     posisi baris yang tadi diklik udah pindah. Pola sama dengan components/ui/drawer.
 
+    `body.overflow-hidden` doang CUKUP di desktop (mouse wheel scroll body),
+    tapi TIDAK di real device (touch): browser mobile scroll `<body>` lewat
+    touch-drag walau `overflow:hidden` — itu cuma matiin scrollbar/scroll
+    programatik body, bukan gesture touch di atasnya. Efeknya: list di
+    belakang backdrop kebawa scroll pas jari geser drawer, bikin drawer
+    "loncat"/misalign secara visual. Fix baku: kunci beneran pakai
+    `position:fixed` di body sambil nyimpen `scrollY`, baru dibalikin lewat
+    `window.scrollTo` pas ditutup — teknik ini yang bikin touch-drag gak
+    tembus ke document di belakang (Android Chrome & iOS Safari sama-sama
+    butuh ini, gak cukup overflow-hidden doang).
+
     Sekalian dispatch 'ticket-drawer-shown'/'ticket-drawer-hidden' tiap `shown`
     beneran berubah — SATU-SATUNYA sinyal yang bisa dipercaya halaman pemanggil
     buat tahu drawer lagi kebuka/ketutup. `close-ticket-drawer` (event di bawah)
@@ -41,7 +52,7 @@
 <div x-data="ticketDetailDrawer()" x-on:open-ticket-drawer.window="open($event.detail.id)"
      x-on:close-ticket-drawer.window="close()"
      x-on:keydown.escape.window="close()"
-     x-effect="document.body.classList.toggle('overflow-hidden', shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
+     x-effect="lockBodyScroll(shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
 
     {{--
         Backdrop mulai di bawah navbar (top-16 = tinggi header layout) supaya
@@ -57,12 +68,19 @@
     <div x-show="shown" x-transition.opacity @click="close()"
          class="fixed inset-0 top-16 bg-slate-950/60 backdrop-blur-sm z-[60]" x-cloak></div>
 
-    {{-- Panel kanan --}}
+    {{--
+        Panel kanan — masuk dari kanan ke kiri (translate-x-full → 0), keluar
+        kiri ke kanan (0 → translate-x-full). Durasi & easing (320ms,
+        cubic-bezier(0.4,0,0.2,1)) SAMA persis dengan `.panel-motion` yang
+        dipakai panel "Buat Tiket Baru" (resources/css/app.css) — dua drawer
+        ini kebuka gantian di halaman yang sama, jadi bahasa geraknya harus
+        satu, bukan dua kurva/durasi beda yang kerasa gak nyambung.
+    --}}
     <div x-show="shown" x-cloak
-         x-transition:enter="transform transition ease-in-out duration-300"
+         x-transition:enter="transform transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
          x-transition:enter-start="translate-x-full"
          x-transition:enter-end="translate-x-0"
-         x-transition:leave="transform transition ease-in-out duration-200"
+         x-transition:leave="transform transition-transform duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
          {{-- dvh (bukan vh): di mobile, address bar yang muncul-hilang bikin 100vh
@@ -241,58 +259,117 @@
                         </p>
                     </div>
 
-                    {{-- Snapshot pelanggan — nilai saat tiket dibuat, bukan data terkini --}}
-                    <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">
-                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border-b border-border pb-2">
-                            Snapshot Pelanggan
-                        </h3>
+                    {{--
+                        Snapshot Pelanggan vs Roster Pelanggan Terdampak (Batch)
+                    --}}
+                    <template x-if="ticket.is_batch">
+                        <div class="rounded-xl border border-violet-300 dark:border-violet-800/80 bg-violet-50/40 dark:bg-violet-950/20 p-4 space-y-3">
+                            <div class="flex items-center justify-between border-b border-violet-200 dark:border-violet-800/60 pb-2.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-violet-500 animate-pulse"></span>
+                                    <h3 class="text-[11px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300">
+                                        Pelanggan Terdampak (Batch)
+                                    </h3>
+                                </div>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700"
+                                      x-text="ticket.batch_members_count + ' Pelanggan'"></span>
+                            </div>
 
-                        <div class="rounded-lg border border-border bg-surface overflow-hidden">
-                            <div class="grid grid-cols-2 border-b border-border">
-                                <div class="p-2.5 border-r border-border">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">Nama</span>
-                                    <span class="font-semibold text-text-main" x-text="ticket.customer.name ?? '—'"></span>
-                                </div>
-                                <div class="p-2.5">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">CID</span>
-                                    <span class="font-bold font-mono text-sky-600 dark:text-sky-400" x-text="ticket.customer.cid ?? '—'"></span>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 border-b border-border">
-                                <div class="p-2.5 border-r border-border">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">No HP</span>
-                                    <template x-if="ticket.customer.phone">
-                                        <a :href="'https://wa.me/' + ticket.customer.phone" target="_blank" rel="noopener"
-                                           class="font-mono text-emerald-600 dark:text-emerald-400 hover:underline" x-text="ticket.customer.phone"></a>
-                                    </template>
-                                    <span x-show="!ticket.customer.phone" class="text-text-muted">—</span>
-                                </div>
-                                <div class="p-2.5">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">Paket</span>
-                                    <span class="font-semibold text-text-secondary" x-text="ticket.customer.package ?? '—'"></span>
-                                </div>
-                            </div>
-                            <div class="p-2.5 border-b border-border">
-                                <span class="block text-[10px] font-bold uppercase text-text-muted">Alamat / Desa</span>
-                                <span class="text-text-secondary" x-text="[ticket.customer.address, ticket.customer.village].filter(Boolean).join(' — ') || '—'"></span>
-                                <template x-if="ticket.customer.maps_url">
-                                    <a :href="ticket.customer.maps_url" target="_blank" rel="noopener"
-                                       class="block mt-1 font-bold text-sky-600 dark:text-sky-400 hover:underline">Buka di Google Maps</a>
+                            <p class="text-[11px] text-text-muted">
+                                Insiden jaringan di POP <strong class="text-text-main" x-text="ticket.customer.pop || '—'"></strong> berdampak pada pelanggan berikut:
+                            </p>
+
+                            <div class="space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                                <template x-for="(m, i) in ticket.batch_members" :key="m.id">
+                                    <div class="p-2 rounded-xl border border-border bg-surface hover:bg-surface-muted/50 transition-colors flex items-center justify-between gap-2 shadow-2xs">
+                                        <div class="min-w-0 flex items-center gap-2">
+                                            <span class="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-900 shrink-0"
+                                                  x-text="m.cid"></span>
+                                            <span class="font-bold text-text-main text-xs truncate" :title="m.customer_name" x-text="m.customer_name"></span>
+                                        </div>
+
+                                        <div class="shrink-0 flex items-center gap-1.5">
+                                            <template x-if="m.phone && m.phone !== '—'">
+                                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 text-[10px] font-mono font-bold"
+                                                      title="Nomor WhatsApp">
+                                                    <svg class="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+                                                    </svg>
+                                                    <span x-text="m.phone"></span>
+                                                </span>
+                                            </template>
+                                            <template x-if="!m.phone || m.phone === '—'">
+                                                <span class="text-text-muted italic text-[10px]">—</span>
+                                            </template>
+                                        </div>
+                                    </div>
                                 </template>
+                                <p x-show="ticket.batch_members.length === 0" class="text-[11px] text-text-muted italic text-center py-2">
+                                    Belum ada pelanggan terdampak yang dicatat.
+                                </p>
                             </div>
-                            <div class="grid grid-cols-2">
-                                <div class="p-2.5 border-r border-border">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">POP / ODP</span>
-                                    <span class="text-text-secondary"
-                                          x-text="(ticket.customer.pop ?? '—') + ' / ' + (ticket.customer.odp ?? '—')"></span>
+                        </div>
+                    </template>
+
+                    {{-- Snapshot pelanggan (Non-Batch) — nilai saat tiket dibuat --}}
+                    <template x-if="!ticket.is_batch">
+                        <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">
+                            <h3 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border-b border-border pb-2">
+                                Snapshot Pelanggan
+                            </h3>
+
+                            <div class="rounded-lg border border-border bg-surface overflow-hidden">
+                                <div class="grid grid-cols-2 border-b border-border">
+                                    <div class="p-2.5 border-r border-border">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">Nama</span>
+                                        <span class="font-semibold text-text-main" x-text="ticket.customer.name ?? '—'"></span>
+                                    </div>
+                                    <div class="p-2.5">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">CID</span>
+                                        <span class="font-bold font-mono text-sky-600 dark:text-sky-400" x-text="ticket.customer.cid ?? '—'"></span>
+                                    </div>
                                 </div>
-                                <div class="p-2.5">
-                                    <span class="block text-[10px] font-bold uppercase text-text-muted">Perangkat</span>
-                                    <span class="font-mono text-text-secondary" x-text="ticket.customer.device ?? '—'"></span>
+                                <div class="grid grid-cols-2 border-b border-border">
+                                    <div class="p-2.5 border-r border-border">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">No HP</span>
+                                        <template x-if="ticket.customer.phone">
+                                            <span class="inline-flex items-center gap-1.5 font-mono text-emerald-600 dark:text-emerald-400 font-semibold text-xs"
+                                                  title="Nomor WhatsApp">
+                                                <svg class="h-3.5 w-3.5 fill-current text-emerald-600 dark:text-emerald-400 shrink-0" viewBox="0 0 24 24">
+                                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+                                                </svg>
+                                                <span x-text="ticket.customer.phone"></span>
+                                            </span>
+                                        </template>
+                                        <span x-show="!ticket.customer.phone" class="text-text-muted">—</span>
+                                    </div>
+                                    <div class="p-2.5">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">Paket</span>
+                                        <span class="font-semibold text-text-secondary" x-text="ticket.customer.package ?? '—'"></span>
+                                    </div>
+                                </div>
+                                <div class="p-2.5 border-b border-border">
+                                    <span class="block text-[10px] font-bold uppercase text-text-muted">Alamat / Desa</span>
+                                    <span class="text-text-secondary" x-text="[ticket.customer.address, ticket.customer.village].filter(Boolean).join(' — ') || '—'"></span>
+                                    <template x-if="ticket.customer.maps_url">
+                                        <a :href="ticket.customer.maps_url" target="_blank" rel="noopener"
+                                           class="block mt-1 font-bold text-sky-600 dark:text-sky-400 hover:underline">Buka di Google Maps</a>
+                                    </template>
+                                </div>
+                                <div class="grid grid-cols-2">
+                                    <div class="p-2.5 border-r border-border">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">POP / ODP</span>
+                                        <span class="text-text-secondary"
+                                              x-text="(ticket.customer.pop ?? '—') + ' / ' + (ticket.customer.odp ?? '—')"></span>
+                                    </div>
+                                    <div class="p-2.5">
+                                        <span class="block text-[10px] font-bold uppercase text-text-muted">Perangkat</span>
+                                        <span class="font-mono text-text-secondary" x-text="ticket.customer.device ?? '—'"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </template>
 
                     {{-- Keluhan & catatan teknis --}}
                     <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">
@@ -393,6 +470,43 @@
             loading: false,
             failed: false,
             ticket: null,
+            _scrollY: 0,
+
+            /**
+             * `overflow-hidden` di body doang gak nahan touch-drag di HP —
+             * lihat komentar x-effect di atas. `position:fixed` beneran
+             * ngunci viewport; scrollY disimpen manual soalnya browser
+             * reset posisi scroll begitu body jadi fixed.
+             */
+            lockBodyScroll(shown) {
+                const body = document.body;
+
+                if (shown) {
+                    if (body.style.position === 'fixed') {
+                        return;
+                    }
+
+                    this._scrollY = window.scrollY;
+                    body.style.position = 'fixed';
+                    body.style.top = `-${this._scrollY}px`;
+                    body.style.left = '0';
+                    body.style.right = '0';
+                    body.classList.add('overflow-hidden');
+
+                    return;
+                }
+
+                if (body.style.position !== 'fixed') {
+                    return;
+                }
+
+                body.style.position = '';
+                body.style.top = '';
+                body.style.left = '';
+                body.style.right = '';
+                body.classList.remove('overflow-hidden');
+                window.scrollTo(0, this._scrollY);
+            },
 
             get hasAnyAction() {
                 const a = this.ticket?.actions ?? {};

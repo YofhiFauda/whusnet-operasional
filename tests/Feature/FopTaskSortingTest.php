@@ -125,12 +125,50 @@ class FopTaskSortingTest extends TestCase
         $this->assertLessThan($posLow, $posToday, 'Task dengan client_request_date hari ini harus ikut sorting normal (Urgent di atas low priority), bukan ke-sink ke bawah.');
     }
 
-    public function test_priority_sorting_regression_unaffected(): void
+    /**
+     * Tanggal kerja (`task_date`) DULUAN, prioritas cuma tie-breaker dalam
+     * tanggal yang SAMA — keputusan eksplisit user (2026-09-10), membalik
+     * urutan lama (prioritas dulu baru tanggal, lihat flowchart.md §8/
+     * user-flow.md — dokumen itu SENGAJA belum diupdate sinkron di komit
+     * yang sama, lihat catatan di FopTaskController::index()). Task Low
+     * priority yang tanggal kerjanya lebih dekat WAJIB di atas Task Urgent
+     * yang jadwalnya lebih jauh — ini pembeda utama dari perilaku lama,
+     * jangan disederhanakan balik jadi cuma cek priority doang.
+     */
+    public function test_earlier_task_date_beats_higher_priority(): void
     {
-        $urgent = $this->makeFopTask(['priority' => 'Urgent']);
-        $high = $this->makeFopTask(['priority' => 'High']);
-        $medium = $this->makeFopTask(['priority' => 'Medium']);
-        $low = $this->makeFopTask(['priority' => 'low']);
+        $urgentButLater = $this->makeFopTask([
+            'priority' => 'Urgent',
+            'task_date' => now()->addDays(5),
+        ]);
+        $lowButSooner = $this->makeFopTask([
+            'priority' => 'low',
+            'task_date' => now()->addDay(),
+        ]);
+
+        $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+        $response->assertOk();
+
+        $content = $response->getContent();
+        $posSooner = strpos($content, $lowButSooner->task_number);
+        $posLater = strpos($content, $urgentButLater->task_number);
+
+        $this->assertNotFalse($posSooner);
+        $this->assertNotFalse($posLater);
+        $this->assertLessThan($posLater, $posSooner, 'Task_date lebih dekat harus di atas walau prioritasnya kalah — tanggal menang atas prioritas.');
+    }
+
+    /**
+     * Prioritas cuma nentuin urutan kalau `task_date`-nya PERSIS SAMA.
+     */
+    public function test_priority_breaks_ties_within_same_task_date(): void
+    {
+        $sameDate = now()->addDays(2);
+
+        $urgent = $this->makeFopTask(['priority' => 'Urgent', 'task_date' => $sameDate]);
+        $high = $this->makeFopTask(['priority' => 'High', 'task_date' => $sameDate]);
+        $medium = $this->makeFopTask(['priority' => 'Medium', 'task_date' => $sameDate]);
+        $low = $this->makeFopTask(['priority' => 'low', 'task_date' => $sameDate]);
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
         $response->assertOk();
@@ -148,29 +186,33 @@ class FopTaskSortingTest extends TestCase
         $this->assertLessThan($positions['low'], $positions['Medium']);
     }
 
-    public function test_category_survey_psb_created_at_ascending_regression_unaffected(): void
+    /**
+     * Tie-breaker terakhir kalau `task_date` DAN prioritas sama-sama sama:
+     * urutan masuk (`created_at` ASC) — stabil, gak acak antar-request.
+     * `category` SUDAH TIDAK lagi menentukan arah ASC/DESC (perilaku lama
+     * Task 8 — Survey/PSB oldest-first, tipe lain newest-first — dicabut
+     * bareng flip ke date-first; satu arah ASC seragam buat semua kategori).
+     */
+    public function test_created_at_breaks_ties_within_same_task_date_and_priority(): void
     {
-        // Pakai category 'PSB' (bukan 'SURVEY') karena literal CASE existing di controller
-        // ('Survey', 'PSB') persis match sama nilai backing enum TaskType::PEMASANGAN ('PSB'),
-        // sementara TaskType::SURVEY backing value-nya 'SURVEY' (uppercase) — mismatch case
-        // sama literal 'Survey' di CASE existing itu bug pre-existing di luar scope Task 8,
-        // jangan disentuh di sini. Pakai 'PSB' biar regresi CASE existing ini teruji akurat.
-        $olderSurvey = $this->makeFopTask(['category' => 'PSB']);
-        $olderSurvey->created_at = now()->subMinutes(10);
-        $olderSurvey->save();
+        $sameDate = now()->addDays(3);
 
-        $newerSurvey = $this->makeFopTask(['category' => 'PSB']);
-        $newerSurvey->created_at = now();
-        $newerSurvey->save();
+        $older = $this->makeFopTask(['category' => 'MTN', 'priority' => 'low', 'task_date' => $sameDate]);
+        $older->created_at = now()->subMinutes(10);
+        $older->save();
+
+        $newer = $this->makeFopTask(['category' => 'MTN', 'priority' => 'low', 'task_date' => $sameDate]);
+        $newer->created_at = now();
+        $newer->save();
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
         $response->assertOk();
 
         $content = $response->getContent();
-        $posOlder = strpos($content, $olderSurvey->task_number);
-        $posNewer = strpos($content, $newerSurvey->task_number);
+        $posOlder = strpos($content, $older->task_number);
+        $posNewer = strpos($content, $newer->task_number);
 
-        $this->assertLessThan($posNewer, $posOlder, 'Category Survey/PSB harus tetap ASC by created_at (yang lama duluan).');
+        $this->assertLessThan($posNewer, $posOlder, 'Tie-breaker terakhir: yang lebih dulu masuk (created_at ASC) tampil duluan.');
     }
 
     public function test_badge_jadwal_hari_ini_shown_when_client_request_date_is_today_or_past(): void

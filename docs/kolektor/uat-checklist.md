@@ -19,8 +19,7 @@ Periksa dulu, karena hasilnya menentukan apa yang wajar terjadi:
 docker exec whusnet-app php artisan tinker --execute='
   echo "queue="   .config("queue.default")
      ." | disk="  .config("filesystems.default")
-     ." | window=".config("billing.collector_due_window_days")
-     ." | gemini=".(config("services.gemini.key") ? "aktif" : "kosong");
+     ." | window=".config("billing.collector_due_window_days");
 '
 ```
 
@@ -28,7 +27,6 @@ docker exec whusnet-app php artisan tinker --execute='
 |---|---|
 | `queue=sync` | Pembacaan kwitansi jalan **seketika** saat upload — tak perlu menunggu worker |
 | `queue=redis` | Butuh Horizon hidup (`docker ps` → `whusnet-horizon`), status kwitansi berubah beberapa detik setelah upload |
-| `gemini=kosong` | **Benar & disengaja.** OCR mati; QR tetap jalan, yang gagal jatuh ke pencocokan manual |
 | `window=7` | Tagihan muncul di Worklist bila `due_date ≤ hari ini + 7` |
 
 
@@ -114,7 +112,7 @@ Login sebagai kolektor otomatis diarahkan ke `/collector-worklist`.
 
 ---
 
-## 5. Fase 4 — Kwitansi (QR & OCR)
+## 5. Fase 4 — Kwitansi (Teks PDF & QR)
 
 ### 5a. Mendapatkan QR untuk diuji
 
@@ -246,7 +244,6 @@ Jangan dilaporkan sebagai bug:
 | "Kunjungan hari itu sudah tercatat sebagai Bayar" | Batalkan pembayarannya kalau memang keliru |
 | Upload PDF berakhir "Gagal Dibaca" | Decoder QR hanya membaca gambar; lanjutkan dengan pencocokan manual |
 | Kwitansi tidak sampai ke pelanggan saat penagihan | Disengaja — nomor baru ada setelah pembayaran tersimpan, jadi ini arsip internal ([business-logic §12](business-logic.md#12-kwitansi--sumbu-dokumen)) |
-| OCR tidak pernah jalan | `GEMINI_API_KEY` kosong = mati by design |
 
 ---
 

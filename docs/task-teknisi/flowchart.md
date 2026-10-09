@@ -240,3 +240,55 @@ Submit → TaskMaintenance::create() + TaskService::complete() — 1 aksi
         ▼
 Task langsung selesai, fop_review_status=pending (sama seperti alur complete biasa)
 ```
+
+## 8b. Laporan C-REQ + Verifikasi Biaya (2026-09-26)
+
+```
+Teknisi buka /tasks/{task}/maintenance-report (task_type=CREQ)
+        │
+        ▼
+Isi form sama seperti §8 + field khusus:
+  creq_category = pindah_lokasi|pindah_kabel|tambah_modem|lainnya
+  pindah_lokasi/pindah_kabel → tikor lama+baru WAJIB
+  tambah_modem               → selected_inventory_serial_id WAJIB (custody tim)
+  lainnya                    → creq_category_custom_name WAJIB
+  creq_is_billable dicentang → creq_billing_note WAJIB
+        │
+        ▼
+Submit → TaskMaintenance::create() + TaskCreqDetail::create() + TaskService::complete() — 1 aksi
+        │
+        ▼
+Task selesai. is_billable=true? ──tidak──▶ selesai, tidak masuk antrean verifikasi
+        │ ya
+        ▼
+TaskCreqDetail.verification_status = pending
+        │
+        ▼
+CS (helpdesk) buka /tasks-creq-billing/{task} — laporan teknisi lengkap
+(kendala, Jenis Permintaan, tikor, SN, material+roll, alat kerja, foto)
+        │
+   ┌────┴────┐
+   ▼         ▼
+approve()   reject() — wajib alasan
+(nominal +  │
+deskripsi   │
+wajib)      │
+   │         │
+   ▼         ▼
+lockForUpdate() dalam DB::transaction — cek ulang status=pending
+   │         │
+   ▼         ▼
+ManualCategoryInvoiceService::issue()  verification_status=rejected
+  jenis = CReqCategory::               verified_by/verified_at/rejection_reason diisi
+  toManualInvoiceCategory()            AuditLog (action reject)
+verification_status=verified              │
+invoice_id = tagihan yang terbit          ▼
+AuditLog (action approve,              redirect /tasks-creq-billing
+  + invoice_number)                    (filter status "Ditolak")
+   │
+   ▼
+redirect /tasks-creq-billing/{task} — tagihan tampil di halaman ini
+(gagal di titik mana pun = rollback total, tidak ada tagihan setengah jadi)
+```
+
+Approve/reject kedua kali pada task yang sama (`verification_status` sudah bukan `pending`) ditolak **422**.

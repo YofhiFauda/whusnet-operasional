@@ -6,7 +6,7 @@ use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['code', 'name', 'guard_name', 'description', 'is_system'])]
+#[Fillable(['code', 'name', 'guard_name', 'description', 'is_system', 'is_package_restricted'])]
 class Role extends Model
 {
     use RecordsAuditLogs;
@@ -15,6 +15,27 @@ class Role extends Model
 
     protected array $auditEvents = ['created', 'updated', 'deleted'];
 
+    protected function casts(): array
+    {
+        return [
+            'is_system' => 'boolean',
+            'is_package_restricted' => 'boolean',
+        ];
+    }
+
+    /**
+     * Role code yang dihitung sebagai TEKNISI LAPANGAN — muncul di dropdown
+     * assign task, dihitung beban kerjanya, boleh menerima custody barang, dan
+     * dibatasi ke antrean survey/pemasangan miliknya sendiri.
+     *
+     * SATU-SATUNYA sumber jawaban "apakah role ini teknisi?". Jangan tulis
+     * `where('code', 'teknisi')` baru di mana pun — pakai konstanta ini atau
+     * `isTechnicianRole()`/`User::isTechnician()`/`User::scopeTechnicians()`.
+     * Role baru yang juga turun ke lapangan cukup ditambah di sini. Lihat
+     * docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md.
+     */
+    public const TECHNICIAN_CODES = ['teknisi', 'pic_gudang'];
+
     public function isFullAccessRole(): bool
     {
         return in_array($this->name, ['Owner', 'Admin', 'Admin Pusat'], true);
@@ -22,7 +43,7 @@ class Role extends Model
 
     public function isTechnicianRole(): bool
     {
-        return $this->name === 'Teknisi';
+        return in_array($this->code, self::TECHNICIAN_CODES, true);
     }
 
     /**

@@ -6,6 +6,8 @@ use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\Distribution;
 use App\Models\Pop;
+use App\Services\CustomerCidService;
+use App\Services\NetworkAssignmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,7 +36,7 @@ class CustomerNetworkAssignmentController extends Controller
             'customer_cid' => $customer->cid,
             'pop_name' => $customer->pop->name ?? '-',
             'pop_code' => $customer->pop->pop_code ?? '',
-            'editable' => ! in_array($customer->status, self::BLOCKED_STATUSES, true),
+            'editable' => ! in_array($customer->status, NetworkAssignmentService::BLOCKED_STATUSES, true),
             'mini_pops' => $miniPops,
             'distributions' => $distributions,
             'current' => [
@@ -43,20 +45,6 @@ class CustomerNetworkAssignmentController extends Controller
             ],
         ]);
     }
-
-    /**
-     * Status yang belum boleh di-assign Mini POP/Distribusi — pemasangan
-     * belum mulai, jadi belum ada dasar teknis buat nentuin OLT/Distribusi mana.
-     */
-    private const BLOCKED_STATUSES = [
-        'registered',
-        'waiting_survey',
-        'survey_in_progress',
-        'surveyed',
-        'waiting_acc',
-        'waiting_installation',
-        'rejected',
-    ];
 
     /**
      * Assign/ganti Mini POP (OLT) + Distribusi pelanggan — dipakai lewat modal
@@ -68,7 +56,7 @@ class CustomerNetworkAssignmentController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
 
-        if (in_array($customer->status, self::BLOCKED_STATUSES, true)) {
+        if (in_array($customer->status, NetworkAssignmentService::BLOCKED_STATUSES, true)) {
             return back()->with('error', 'Mini POP & Distribusi cuma bisa di-assign setelah proses pemasangan dimulai.');
         }
 
@@ -80,25 +68,12 @@ class CustomerNetworkAssignmentController extends Controller
         $miniPopId = $validated['mini_pop_id'] ?? null;
         $distributionId = $validated['distribution_id'] ?? null;
 
-        if ($miniPopId) {
-            $miniPop = Pop::where('id', $miniPopId)
-                ->where('type', 'mini_pop')
-                ->where('parent_id', $customer->pop_id)
-                ->first();
-
-            if (! $miniPop) {
-                return back()->with('error', 'Mini POP yang dipilih tidak valid untuk Cabang POP pelanggan ini.');
-            }
+        if ($miniPopId && ! NetworkAssignmentService::miniPopBelongsToPop($miniPopId, $customer->pop_id)) {
+            return back()->with('error', 'Mini POP yang dipilih tidak valid untuk Cabang POP pelanggan ini.');
         }
 
-        if ($distributionId) {
-            $distribution = Distribution::where('id', $distributionId)
-                ->where('pop_id', $miniPopId)
-                ->first();
-
-            if (! $distribution) {
-                return back()->with('error', 'Distribusi yang dipilih tidak sesuai dengan Mini POP yang dipilih.');
-            }
+        if ($distributionId && ! NetworkAssignmentService::distributionBelongsToMiniPop($distributionId, $miniPopId)) {
+            return back()->with('error', 'Distribusi yang dipilih tidak sesuai dengan Mini POP yang dipilih.');
         }
 
         $oldValues = [
@@ -107,17 +82,15 @@ class CustomerNetworkAssignmentController extends Controller
             'cid' => $customer->cid,
         ];
 
+        // CID lewat rumus satu pintu (CustomerCidService, ADHOC-107 R3) — sama
+        // dengan Edit, API, dan aktivasi. Dulu tiap jalur menghitung sendiri
+        // dan hasilnya beda (Edit `C00RQ…` vs modal `C10RQ…`). sync()
+        // dipanggil eksplisit (bukan cuma lewat observer) supaya simpan ulang
+        // tanpa perubahan pilihan tetap membetulkan CID yang terlanjur
+        // campuran — jalur perbaikan manual data lama.
         $customer->mini_pop_id = $miniPopId;
         $customer->distribution_id = $distributionId;
-
-        // Kalau pelanggan udah aktif/suspended (udah punya CID final), regenerate
-        // CID sesuai Mini POP/Distribusi baru — CID gak auto-update sendiri karena
-        // tersimpan statis di kolom customer.cid, bukan dihitung ulang tiap saat.
-        if (in_array($customer->status, ['active', 'suspended'], true) && $customer->pop) {
-            $customer->load('distribution');
-            $customer->cid = $customer->pop->generateComplexCid($customer, $customer->distribution);
-        }
-
+        CustomerCidService::sync($customer);
         $customer->save();
 
         AuditLog::create([

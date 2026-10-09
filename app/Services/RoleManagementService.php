@@ -11,9 +11,15 @@ use Illuminate\Support\Facades\DB;
 class RoleManagementService
 {
     /**
-     * Sync permissions to a role and record audit log.
+     * Daftar id izin yang AKAN tersimpan: input + `.view` induk yang di-auto-grant.
+     * Dipublikasikan supaya guard akses (RolePermissionController) memeriksa set
+     * yang sama dengan yang disimpan — dulu guard hanya melihat input, jadi `.view`
+     * tambahan lolos tanpa dicek.
+     *
+     * @param  array<int|string>  $permissions
+     * @return list<int>
      */
-    public function syncPermissions(Role $role, array $permissions): void
+    public function withAutoViewGrants(array $permissions): array
     {
         // Sanitize to unique integers to avoid duplicate inserts and exceptions
         $sanitizedPermissions = array_values(array_unique(array_map('intval', $permissions)));
@@ -90,6 +96,16 @@ class RoleManagementService
                 $sanitizedPermissions = array_values(array_unique(array_merge($sanitizedPermissions, $addedIds)));
             }
         }
+
+        return $sanitizedPermissions;
+    }
+
+    /**
+     * Sync permissions to a role and record audit log.
+     */
+    public function syncPermissions(Role $role, array $permissions): void
+    {
+        $sanitizedPermissions = $this->withAutoViewGrants($permissions);
 
         DB::transaction(function () use ($role, $sanitizedPermissions, $permissions) {
             // Lock row Role — cegah race condition kalau ada 2 request PUT matrix

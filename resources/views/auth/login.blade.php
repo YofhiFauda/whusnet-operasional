@@ -58,17 +58,32 @@
                 </div>
 
                 <!-- Password Input -->
-                <div class="space-y-1.5">
+                <div class="space-y-1.5" x-data="{ showPassword: false }">
                     <label for="password" class="block text-sm font-medium text-text-main">Kata Sandi</label>
-                    <x-ui.input 
-                        name="password" 
-                        id="password" 
-                        type="password" 
-                        required
-                        placeholder="••••••••"
-                        :error="$errors->has('password')"
-                        class="h-10"
-                    />
+                    <div class="relative">
+                        <x-ui.input 
+                            name="password" 
+                            id="password" 
+                            x-bind:type="showPassword ? 'text' : 'password'" 
+                            required
+                            placeholder="••••••••"
+                            :error="$errors->has('password')"
+                            class="h-10 pr-10"
+                        />
+                        <button type="button"
+                                @click="showPassword = !showPassword"
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
+                                tabindex="-1"
+                                title="Tampilkan / sembunyikan kata sandi">
+                            <svg x-show="!showPassword" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <svg x-show="showPassword" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                            </svg>
+                        </button>
+                    </div>
                     @error('password')
                         <p class="text-xs text-error mt-1">{{ $message }}</p>
                     @enderror

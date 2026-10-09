@@ -8,11 +8,15 @@ use App\Models\Task;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class TaskStarted implements ShouldBroadcast
+/**
+ * `ShouldBroadcastNow` — dipicu tombol "Mulai" teknisi, payload ringkas.
+ * Lihat catatan `InstallationCompleted`/`FopTaskUpdated`, alasan sama.
+ */
+class TaskStarted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

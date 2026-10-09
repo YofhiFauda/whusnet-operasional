@@ -2,10 +2,15 @@
 
 namespace App\Services;
 
+use App\Enums\BalanceMutationSource;
+use App\Enums\CollectorRole;
+use App\Enums\InvoiceType;
 use App\Enums\NotificationType;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\ScopeType;
 use App\Events\CollectorActivityUpdated;
+use App\Models\BankAccount;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentBatch;
@@ -40,7 +45,10 @@ use Illuminate\Support\Facades\DB;
  */
 class CollectorPaymentService
 {
-    public function __construct(private readonly CollectorVisitService $visits) {}
+    public function __construct(
+        private readonly CollectorVisitService $visits,
+        private readonly CustomerBalanceService $balances,
+    ) {}
 
     /**
      * Validasi cepat tanpa lock — supaya pesan gagal per baris bisa
@@ -56,12 +64,16 @@ class CollectorPaymentService
      * cuma karena batas harinya lewat tengah malam saat form masih terbuka.
      * Otorisasi yang sesungguhnya = kepemilikan pelanggan, dicek di bawah.
      *
-     * @param  array<int, array{invoice_id: int, amount: float|string, payment_method: string, collected_date: string}>  $rows
+     * @param  array<int, array{invoice_id: int, amount: float|string, payment_method: string, collected_date: string, note?: string}>  $rows
      * @return array<int, array{invoice_id?: mixed, reason: string}>
      */
-    public function validateRows(User $collector, array $rows, User $viewer): array
+    public function validateRows(User $collector, array $rows, User $viewer, CollectorRole $source = CollectorRole::KOLEKTOR): array
     {
         $failures = [];
+        // Saldo yang sudah dialokasikan ke tiap pelanggan oleh baris-baris sebelumnya.
+        $balanceUsedByCustomer = [];
+        // Total tunai + saldo yang sudah dialokasikan ke tiap tagihan oleh baris-baris sebelumnya.
+        $appliedByInvoice = [];
 
         $invoices = Invoice::query()
             ->applyUserScope($viewer)
@@ -71,6 +83,10 @@ class CollectorPaymentService
             ->keyBy('id');
 
         foreach ($rows as $row) {
+            // Akumulasi kuota hanya dicatat kalau baris ini lolos semua cek (lihat
+            // di akhir loop). Baris yang gagal tidak boleh ikut memakan sisa tagihan
+            // atau saldo milik baris berikutnya.
+            $failuresBeforeRow = count($failures);
             $invoice = $invoices->get($row['invoice_id']);
 
             if (! $invoice) {
@@ -82,7 +98,20 @@ class CollectorPaymentService
                 continue;
             }
 
-            if (! $invoice->customer || (int) $invoice->customer->collector_id !== $collector->id) {
+            // Kepemilikan pelanggan hanya berlaku untuk kolektor (penugasan
+            // admin). Teknisi mencatat pelanggan mana pun dalam POP scope-nya
+            // (rancangan-pembayaran-teknisi §5) — POP scope tetap dicek di
+            // `applyUserScope($viewer)` di atas.
+            if (! $invoice->customer) {
+                $failures[] = [
+                    'invoice_id' => $row['invoice_id'],
+                    'reason' => "{$invoice->invoice_number}: pelanggan tidak ditemukan.",
+                ];
+
+                continue;
+            }
+
+            if ($source === CollectorRole::KOLEKTOR && (int) $invoice->customer->collector_id !== $collector->id) {
                 $failures[] = [
                     'invoice_id' => $row['invoice_id'],
                     'reason' => "{$invoice->invoice_number}: pelanggan ini bukan milik kolektor {$collector->name}.",
@@ -91,7 +120,7 @@ class CollectorPaymentService
                 continue;
             }
 
-            if (in_array($invoice->invoice_status->value, ['lunas', 'batal'], true)) {
+            if (in_array($invoice->invoice_status->value, ['lunas', 'batal', 'tak_tertagih'], true)) {
                 $failures[] = [
                     'invoice_id' => $row['invoice_id'],
                     'reason' => "{$invoice->invoice_number}: sudah {$invoice->invoice_status->label()}.",
@@ -100,21 +129,103 @@ class CollectorPaymentService
                 continue;
             }
 
-            $amount = Money::of($row['amount']);
-            if ($amount <= 0) {
+            // Tagihan periode mendatang belum boleh ditagih lewat jalur mana pun
+            // (worklist kolektor & pencarian teknisi juga tidak menampilkannya).
+            // Ditegakkan di sini supaya jalur web, kolektor, dan teknisi ikut kena,
+            // bukan hanya Portal.
+            if ((string) $invoice->billing_period > now()->format('Y-m')) {
                 $failures[] = [
                     'invoice_id' => $row['invoice_id'],
-                    'reason' => "{$invoice->invoice_number}: nominal harus lebih dari nol.",
+                    'reason' => "{$invoice->invoice_number}: periode tagihan belum berjalan.",
                 ];
 
                 continue;
             }
 
-            if (Money::greaterThan($amount, $invoice->remaining_amount)) {
+            $amount = Money::of($row['amount']);
+            $useBalance = Money::of($row['use_balance_amount'] ?? 0);
+
+            if (Money::lessThan(Money::add($amount, $useBalance), 1)) {
                 $failures[] = [
                     'invoice_id' => $row['invoice_id'],
-                    'reason' => "{$invoice->invoice_number}: nominal Rp".number_format($amount, 0, ',', '.').' melebihi sisa Rp'.number_format((float) $invoice->remaining_amount, 0, ',', '.').'.',
+                    'reason' => "{$invoice->invoice_number}: nominal harus lebih dari nol atau pakai Saldo Pelanggan.",
                 ];
+
+                continue;
+            }
+
+            // Batch TIDAK menerima lebih bayar (keputusan user 2026-10-05): tunai +
+            // saldo per tagihan tidak boleh melebihi sisanya. Kelebihan uang harus
+            // diinput lewat form Tagihan admin, bukan dari kolektor/teknisi/portal.
+            // Dijumlahkan per invoice, bukan per baris: dua baris untuk tagihan
+            // yang sama masing-masing "muat" tapi totalnya tetap lebih bayar.
+            $invoiceId = (int) $invoice->id;
+            $alreadyAppliedToInvoice = $appliedByInvoice[$invoiceId] ?? 0;
+            $totalForInvoice = Money::add(Money::add($amount, $useBalance), $alreadyAppliedToInvoice);
+
+            if (Money::greaterThan($totalForInvoice, $invoice->remaining_amount)) {
+                $failures[] = [
+                    'invoice_id' => $row['invoice_id'],
+                    'reason' => "{$invoice->invoice_number}: nominal tunai ditambah saldo melebihi sisa tagihan. Kelebihan hanya bisa dicatat lewat Tagihan admin.",
+                ];
+
+                continue;
+            }
+
+            // Satu pelanggan bisa punya beberapa tagihan dalam satu batch, dan
+            // saldonya SATU. Dijumlahkan per pelanggan, bukan dicek per baris,
+            // supaya tidak ada dua baris yang sama-sama "merasa" saldonya cukup.
+            if (Money::greaterThan($useBalance, 0)) {
+                $customerId = (int) $invoice->customer_id;
+                $alreadyUsed = $balanceUsedByCustomer[$customerId] ?? 0;
+                $available = Money::sub($this->balances->balance($invoice->customer), $alreadyUsed);
+
+                if (Money::greaterThan($useBalance, $available)) {
+                    $failures[] = [
+                        'invoice_id' => $row['invoice_id'],
+                        'reason' => "{$invoice->invoice_number}: Saldo pelanggan tidak cukup. Saldo tersedia: Rp ".number_format(max($available, 0), 0, ',', '.').'.',
+                    ];
+
+                    continue;
+                }
+
+            }
+
+            // Transfer wajib rekening tujuan yang masih aktif — sama dengan
+            // PaymentService::resolveActiveBankAccount() di jalur admin.
+            if (($row['payment_method'] ?? null) === 'transfer') {
+                $bankAccount = ! empty($row['bank_account_id']) ? BankAccount::find($row['bank_account_id']) : null;
+
+                if (! $bankAccount || ! $bankAccount->is_active) {
+                    $failures[] = [
+                        'invoice_id' => $row['invoice_id'],
+                        'reason' => "{$invoice->invoice_number}: pilih rekening tujuan yang aktif untuk metode Transfer.",
+                    ];
+
+                    continue;
+                }
+            }
+
+            // Lebih bayar TIDAK diterima dari batch (lihat cek totalForInvoice di
+            // atas). Kelebihan hanya bisa dicatat lewat form Tagihan admin.
+
+            // Metode Lainnya wajib menjelaskan metode apa persisnya —
+            // PaymentMethod::requiresDescription().
+            if (($row['payment_method'] ?? null) === 'lainnya' && trim((string) ($row['note'] ?? '')) === '') {
+                $failures[] = [
+                    'invoice_id' => $row['invoice_id'],
+                    'reason' => "{$invoice->invoice_number}: metode Lainnya wajib diisi keterangannya.",
+                ];
+            }
+
+            // Baris lolos semua cek → baru dicatat ke akumulasi.
+            if (count($failures) === $failuresBeforeRow) {
+                $appliedByInvoice[$invoiceId] = $totalForInvoice;
+
+                if (Money::greaterThan($useBalance, 0)) {
+                    $customerId = (int) $invoice->customer_id;
+                    $balanceUsedByCustomer[$customerId] = Money::add($balanceUsedByCustomer[$customerId] ?? 0, $useBalance);
+                }
             }
         }
 
@@ -139,10 +250,10 @@ class CollectorPaymentService
      * Simpan satu batch. Melempar \RuntimeException kalau ada baris yang gagal
      * di dalam transaksi — pemanggil menerjemahkannya jadi response 422.
      *
-     * @param  array<int, array{invoice_id: int, amount: float|string, payment_method: string, collected_date: string}>  $rows
+     * @param  array<int, array{invoice_id: int, amount: float|string, payment_method: string, collected_date: string, note?: string}>  $rows
      * @return array{already_processed: bool, batch_id: int, processed: int, results: array<int, array<string, mixed>>}
      */
-    public function record(User $collector, User $actor, string $idempotencyKey, array $rows): array
+    public function record(User $collector, User $actor, string $idempotencyKey, array $rows, CollectorRole $source = CollectorRole::KOLEKTOR): array
     {
         // Jaring pengaman terakhir kalau pemanggil lupa findProcessedBatch():
         // submit ulang dgn key sama = diabaikan, bukan dobel-simpan.
@@ -156,7 +267,7 @@ class CollectorPaymentService
             ];
         }
 
-        [$batchId, $results] = DB::transaction(function () use ($collector, $actor, $rows, $idempotencyKey) {
+        [$batchId, $results] = DB::transaction(function () use ($collector, $actor, $rows, $idempotencyKey, $source) {
             $batch = PaymentBatch::create([
                 'idempotency_key' => $idempotencyKey,
                 'submitted_by' => $actor->id,
@@ -185,30 +296,102 @@ class CollectorPaymentService
                 // membatalkan invoice di antara dua fase, payment tetap
                 // tersimpan, invoice tetap `batal`, dan uangnya masuk saldo
                 // kolektor menempel pada tagihan yang sudah mati.
-                if (in_array($lockedInvoice->invoice_status->value, ['lunas', 'batal'], true)) {
+                if (in_array($lockedInvoice->invoice_status->value, ['lunas', 'batal', 'tak_tertagih'], true)) {
                     throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: sudah {$lockedInvoice->invoice_status->label()} (berubah sejak form dibuka).");
                 }
 
-                $amount = Money::of($row['amount']);
-                if (Money::greaterThan($amount, $lockedInvoice->remaining_amount)) {
-                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: nominal melebihi sisa tagihan (kemungkinan berubah sejak form dibuka).");
+                // Auto-split: bagian yang menutup tagihan dulu, sisanya (kalau
+                // ada) jadi overpay_amount — pola sama persis
+                // PaymentService::record() jalur admin (ADHOC-84 §2.5, §4.4).
+                // Dipisah di ranah sen (lihat Money::class) supaya "bayar pas"
+                // tak melahirkan lebih bayar Rp0,000001 hantu.
+                // Uang TUNAI yang diserahkan (di luar saldo). Dipakai juga
+                // untuk notifikasi & total setoran — saldo bukan uang fisik.
+                $cashReceived = Money::of($row['amount']);
+                $useBalance = Money::of($row['use_balance_amount'] ?? 0);
+                $totalReceived = Money::add($cashReceived, $useBalance);
+                $appliedAmount = Money::min($totalReceived, $lockedInvoice->remaining_amount);
+                $overpayAmount = Money::sub($totalReceived, $appliedAmount);
+
+                // Batch tidak boleh menghasilkan lebih bayar sama sekali. validateRows()
+                // sudah menolaknya, tapi di sini yang otoritatif: kalau sisa tagihan
+                // berubah sejak form dibuka (dibayar jalur lain), jangan diam-diam
+                // masuk saldo — gagalkan seluruh batch.
+                if (Money::greaterThan($overpayAmount, 0)) {
+                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: nominal melebihi sisa tagihan. Batch tidak menerima lebih bayar — kelebihan hanya bisa dicatat lewat Tagihan admin.");
+                }
+
+                $description = trim((string) ($row['note'] ?? ''));
+                if ($row['payment_method'] === 'lainnya' && $description === '') {
+                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: metode Lainnya wajib diisi keterangannya.");
+                }
+
+                // Sama dengan PaymentService::record(): tanpa uang tunai tapi
+                // saldo menutup, pembayaran tercatat sebagai metode Saldo.
+                $isFullSaldo = Money::isZero($cashReceived) && Money::greaterThan($useBalance, 0);
+                $method = $isFullSaldo ? PaymentMethod::SALDO : PaymentMethod::from($row['payment_method']);
+
+                // Snapshot rekening dari master, bukan dari input — sama dengan
+                // jalur admin (ADHOC-95).
+                $bankAccount = $method->requiresBankDetails() ? BankAccount::find($row['bank_account_id']) : null;
+
+                // 'Batch kolektor: ...' dipertahankan sebagai penanda sumber
+                // (dipakai pembaca lain yang mengharap format ini) — keterangan
+                // Lainnya ditambahkan sesudahnya, bukan menggantikannya.
+                $note = 'Batch '.strtolower($source->label()).': '.$collector->name;
+                if ($description !== '') {
+                    $note .= ' — '.$description;
+                }
+
+                if ($method->requiresBankDetails() && ! $bankAccount) {
+                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: pilih rekening tujuan untuk metode Transfer.");
                 }
 
                 $payment = Payment::create([
-                    'payment_number' => Payment::generatePaymentNumber(now()->format('Y-m-d')),
+                    'payment_number' => Payment::generatePaymentNumber($lockedInvoice, $appliedAmount),
                     'invoice_id' => $lockedInvoice->id,
                     'payment_batch_id' => $batch->id,
                     'customer_id' => $lockedInvoice->customer_id,
                     'pop_id' => $lockedInvoice->pop_id,
                     'payment_date' => now()->format('Y-m-d'),
                     'collected_date' => $row['collected_date'],
-                    'payment_method' => $row['payment_method'],
-                    'amount' => $amount,
+                    'payment_method' => $method->value,
+                    // Snapshot dari master (bukan input), sama seperti PaymentService.
+                    'bank_account_id' => $bankAccount?->id,
+                    'bank_name' => $bankAccount?->bank_name,
+                    'account_number' => $bankAccount?->account_number,
+                    'sender_name' => $method->requiresSenderName() ? $this->nullIfBlank($row['sender_name'] ?? null) : null,
+                    'amount' => $appliedAmount,
+                    'balance_used_amount' => $useBalance,
+                    'overpay_amount' => Money::isZero($overpayAmount) ? null : $overpayAmount,
                     'received_by' => $actor->id,
                     'collected_by' => $collector->id,
+                    'collected_by_role' => $source->value,
                     'payment_status' => PaymentStatus::VALID->value,
-                    'note' => 'Batch kolektor: '.$collector->name,
+                    'note' => $note,
                 ]);
+
+                // Saldo didebit SETELAH payment ada (debit() butuh $payment
+                // sebagai sumber mutasi). Saldo tak cukup → InvalidArgumentException
+                // → transaksi batch rollback total (record() → recordBatch() → 422).
+                if (Money::greaterThan($useBalance, 0)) {
+                    $this->balances->debit(
+                        $lockedInvoice->customer,
+                        $useBalance,
+                        $payment,
+                        source: BalanceMutationSource::PAKAI_MANUAL,
+                    );
+                }
+
+                if (Money::greaterThan($overpayAmount, 0)) {
+                    // Sumber kredit mengikuti PaymentService::record() — overpay
+                    // di invoice AWAL = titip saldo di muka (ADHOC-92).
+                    $creditSource = $lockedInvoice->invoice_type === InvoiceType::AWAL
+                        ? BalanceMutationSource::BAYAR_DI_MUKA
+                        : BalanceMutationSource::KELEBIHAN_BAYAR;
+
+                    $this->balances->credit($lockedInvoice->customer, $overpayAmount, $payment, source: $creditSource);
+                }
 
                 $lockedInvoice->recalculateFromPayments();
 
@@ -217,12 +400,17 @@ class CollectorPaymentService
                 // dalam transaksi yang sama supaya mustahil ada payment tanpa
                 // jejak kunjungan — kalau dua-duanya bisa gagal terpisah,
                 // laporan aging bohong tepat di baris yang paling penting.
-                $this->visits->recordPaid(
-                    $collector,
-                    (int) $lockedInvoice->customer_id,
-                    $payment->id,
-                    $row['collected_date'],
-                );
+                // Log kunjungan HANYA untuk kolektor: buku kunjungan adalah
+                // daftar kerja penagihan (aging) miliknya. Teknisi tidak
+                // punya daftar itu — pembayarannya cukup tercatat di payment.
+                if ($source === CollectorRole::KOLEKTOR) {
+                    $this->visits->recordPaid(
+                        $collector,
+                        (int) $lockedInvoice->customer_id,
+                        $payment->id,
+                        $row['collected_date'],
+                    );
+                }
 
                 $results[] = [
                     'invoice_id' => $lockedInvoice->id,
@@ -231,7 +419,10 @@ class CollectorPaymentService
                     'invoice_status' => $lockedInvoice->invoice_status->value,
                     'remaining_amount' => (float) $lockedInvoice->remaining_amount,
                     'pop_id' => $lockedInvoice->pop_id,
-                    'amount' => $amount,
+                    // Total uang DITERIMA (applied + overpay) — bukan cuma
+                    // bagian yang menutup invoice, supaya notifikasi/setoran
+                    // admin menghitung uang fisik yang benar-benar masuk.
+                    'amount' => $cashReceived,
                 ];
             }
 
@@ -255,6 +446,17 @@ class CollectorPaymentService
             'processed' => count($rows),
             'results' => $results,
         ];
+    }
+
+    /**
+     * Sama dengan PaymentService::nullIfBlank() — string kosong dari form
+     * disimpan sebagai NULL, bukan "" yang mengotori laporan nama pengirim.
+     */
+    private function nullIfBlank(?string $value): ?string
+    {
+        $value = $value === null ? null : trim($value);
+
+        return $value === '' ? null : $value;
     }
 
     /**

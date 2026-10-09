@@ -154,6 +154,7 @@ return [
         'customers.detail.packages' => [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
+            ActionCode::CHANGE->value,
         ],
 
         'customers.detail.survey' => [
@@ -239,6 +240,9 @@ return [
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
             ActionCode::PRINT->value,
+            // Hapus buku piutang → Tak Tertagih (ADHOC-90). Mengubah angka
+            // Laporan Bulanan Admin Collector, jadi bukan bagian `update`.
+            ActionCode::APPROVE->value,
         ],
 
         'payments' => [
@@ -299,6 +303,14 @@ return [
             // kwitansi tak otomatis berwenang menutup setoran, dan sebaliknya.
             ActionCode::PRINT->value,
             ActionCode::UPLOAD->value,
+            // Admin menyetorkan SELURUH saldo kolektor ke dirinya sendiri —
+            // khusus kolektor yang tak bisa mengakses Worklist-nya sendiri
+            // (HP rusak, cuti mendadak). Pakai action DEPOSIT yang sudah ada
+            // (`kolektor.deposit`), konsisten artinya: "menyerahkan hasil
+            // tagihan", cuma pelakunya berbeda. Permission SENDIRI, terpisah
+            // dari VALIDATE — supaya hak "setor atas nama" bisa dicabut tanpa
+            // ikut mencabut hak cross check & verifikasi setoran.
+            ActionCode::DEPOSIT->value,
         ],
 
         // Setoran Kas Admin — uang kolektor yang sudah diverifikasi + tunai
@@ -323,6 +335,20 @@ return [
             ActionCode::VIEW->value,
             ActionCode::EXPORT->value,
             ActionCode::PRINT->value,
+        ],
+
+        // Laporan Bulanan Admin Collector (ADHOC-90). Tidak ada APPROVE/CANCEL
+        // lagi: tutup buku otomatis saat bulan berganti & kuncinya permanen
+        // (`billing:close-period`, App\Support\BookPeriod).
+        'collector_report' => [
+            ActionCode::VIEW->value,
+            ActionCode::EXPORT->value,
+        ],
+
+        // Laporan Bayar Kolektor — daftar transaksi per kolektor (ADHOC-90).
+        'collector_payment_report' => [
+            ActionCode::VIEW->value,
+            ActionCode::EXPORT->value,
         ],
 
         'audit_logs' => [
@@ -389,18 +415,17 @@ return [
             ActionCode::VIEW->value,
         ],
 
-        // Dua permission tab lama DIPENSIUNKAN (ADHOC-06) — sengaja tetap
-        // digenerate biar role yang terlanjur punya gak error waktu resolusi
-        // permission, tapi sudah tidak menggerbangi route mana pun.
-        'noc_worksheet.masuk' => [
-            ActionCode::VIEW->value,
-        ],
-
-        'noc_worksheet.diproses' => [
-            ActionCode::VIEW->value,
-        ],
-
         'noc_dashboard' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Leaderboard performa individu (siapa nutup/eskalasi berapa tiket,
+        // rata-rata solving time, SLA breach per orang) — sub-feature
+        // TERPISAH dari `noc_dashboard.view`, sengaja bukan numpang: data
+        // performa personal dianggap lebih sensitif dari sekadar monitoring
+        // antrean, jadi harus bisa dimatikan independen lewat Role Matrix.
+        // docs/plan/noc-dashboard-analysis.md §2.
+        'noc_dashboard.performance' => [
             ActionCode::VIEW->value,
         ],
 
@@ -446,6 +471,224 @@ return [
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
         ],
+
+        // Master Rekening Bank (ADHOC-95). SENGAJA tanpa DELETE: payment
+        // menunjuk rekening lewat FK, yang tak dipakai lagi dinonaktifkan
+        // (toggle = `.update`). Assignment role diatur di Role Matrix.
+        'master_rekening' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+        ],
+
+        // Saldo Pelanggan (ADHOC-92) — cuma VIEW, penyesuaian saldo manual
+        // di luar scope rancangan §4.3.
+        'customer_balance' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Master Alasan Putus Langganan (ADHOC-69) — TERPISAH dari
+        // `customers.deactivate` (dokumen §4.2): role yang cuma bisa
+        // memproses form putus langganan (butuh `.view` buat isi dropdown)
+        // belum tentu boleh CRUD master-nya sendiri. Punya DELETE (beda dari
+        // `ticket_issue_categories`/`items` yang toggle-only) karena dijaga
+        // `restrictOnDelete()` — alasan yang masih dipakai tidak bisa hapus.
+        'termination_reasons' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+        ],
+
+        // Pembebasan Tagihan Periode (ADHOC-87) — Request Putus Langganan +
+        // Cuti Berlangganan. TERPISAH dari `customers.deactivate` dan
+        // `customers.update` (G5 rancangan): membatalkan tagihan lebih berat
+        // dari sekadar mengubah data pelanggan. CREATE = ajukan pembebasan
+        // (waive), DELETE = cabut. Tidak ada halaman list tersendiri — muncul
+        // inline di tab Tagihan Detail Pelanggan — jadi tidak perlu VIEW.
+        'billing_waivers' => [
+            ActionCode::CREATE->value,
+            ActionCode::DELETE->value,
+        ],
+
+        // Modul Customer Acquisition (dipakai tim Busdev) — "Pelanggan
+        // Aktif < 30 Hari Diverifikasi". CUMA VIEW di root: baris kebentuk
+        // otomatis oleh CustomerObserver saat pelanggan diverifikasi admin,
+        // dan "Harga Dikurangi PPN" dihitung live dari Biaya Langganan
+        // (lihat CustomerAcquisition::getHargaDikurangiPpnAttribute()).
+        'customer_acquisitions' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Sub-feature TERPISAH — bukan numpang wildcard `.update` generik:
+        // ini permission yang bakal DIPILIH admin di field
+        // `package_categories.installation_fee_approval_permission` (Master
+        // Kategori Paket), jadi kodenya harus jelas & spesifik ("siapa yang
+        // boleh isi Biaya Instalasi"), bukan permission update serbaguna.
+        'customer_acquisitions.installation_fee' => [
+            ActionCode::UPDATE->value,
+        ],
+
+        // Antrean "Menunggu Verifikasi BD" (pelanggan kategori Bisnis
+        // sebelum resmi ACTIVE) — CUMA VIEW, gerbang akses ke halaman.
+        // Aksi tulis ("Verifikasi & Aktifkan") gerbangnya dinamis per
+        // pelanggan (role dari Master Kategori Paket), bukan permission
+        // statis kedua — lihat BusinessDevelopmentVerificationController.
+        'business_development_verification' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Antrean "Verifikasi Registrasi" — pelanggan hasil Registrasi
+        // (non-Skip-Survey) menunggu disetujui Admin/CS sebelum Task+FopTask
+        // Survey kebentuk (ADHOC-73). Beda dari business_development_verification
+        // di atas: approve/reject di sini DUA aksi independen yang wajar
+        // dipisah PIC-nya, jadi permission-nya statis 3 biji, bukan
+        // gerbang-view + logic dinamis. Lihat
+        // docs/plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md §3.4.
+        'customer_registration_verification' => [
+            ActionCode::VIEW->value,
+            ActionCode::APPROVE->value,
+            ActionCode::REJECT->value,
+        ],
+
+        // Modul Gudang/Inventory (ADHOC-54) — docs/plan/warehouse/rancangan-ui.md §1.2.
+        // `warehouse` root cuma VIEW (dashboard + ledger — §2.1/§2.9). Empat
+        // sub-feature action-nya SENGAJA sempit (bukan CRUD generik) —
+        // masing-masing satu aksi bisnis nyata, bukan create/update/delete
+        // resource biasa.
+        'warehouse' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'warehouse_transfer' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value, // Pusat kirim (§2.2)
+            ActionCode::RECEIVE->value, // Cabang konfirmasi terima (§2.3)
+        ],
+
+        // Cetak Invoice Transfer (rancangan-invoice-surat-jalan-transfer.md,
+        // §7 keputusan #5) — root TERPISAH dari `warehouse_transfer`, BUKAN
+        // action baru di root itu. Invoice py harga satuan tiap barang;
+        // `warehouse_transfer.view` juga dipegang pop_admin cabang (buat
+        // liat Surat Jalan-nya sendiri) — kalau invoice numpang action di
+        // root yang sama, cabang otomatis ikut liat harga barang Pusat.
+        // Surat Jalan SENGAJA TIDAK dapat root sendiri — dia reuse
+        // `warehouse_transfer.view` apa adanya (gak ada data sensitif buat
+        // disembunyikan dari sisi manapun).
+        'warehouse_transfer_invoice' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'warehouse_issue' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value, // Cabang → Teknisi (§2.4)
+        ],
+
+        // SENGAJA cuma satu action (VIEW) — "lihat custody sendiri" TIDAK
+        // butuh permission terpisah sama sekali (embedded di halaman Task
+        // teknisi existing, discope `custodian=auth()->id()` di query, bukan
+        // digerbangi permission). §1.2/§3 rancangan-ui.md — jangan tambah
+        // action `view_own` ke sini, itu koreksi eksplisit yang sudah
+        // diputuskan (beda dari `task.view.own` yang exception, bukan pola
+        // reusable — lihat app/Enums/ActionCode.php).
+        'warehouse_custody' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'warehouse_traceability' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Ketahuan kelewat pas nutup Fase 8 UI — InventoryAdjustmentService/
+        // InventoryReassignService udah jadi sejak Fase 6, tapi belum py
+        // permission (baru kepikiran begitu nulis controller/view-nya).
+        // Cuma CREATE — kontrol-anti-manipulasi.md §1 (revisi): TANPA gerbang
+        // approval berjenjang, monitoring berbasis status barang di ledger.
+        'warehouse_adjustment' => [
+            ActionCode::CREATE->value,
+        ],
+
+        'warehouse_reassign' => [
+            ActionCode::CREATE->value,
+        ],
+
+        // Fase 2 P2 (2026-09-03, fase-2-adaptasi-wms.md) — laporan agregat
+        // periodik (movement + kerugian per gudang/cabang). Cuma VIEW,
+        // read-only murni — data mentahnya udah tercatat di ledger, ini
+        // cuma nyusun ulang jadi angka per periode.
+        'warehouse_report' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Permintaan Stok Cabang→Pusat (2026-09-03) — jawaban gap "cabang
+        // habis stok, Pusat gak sadar". APPROVE/REJECT dipegang sisi Pusat
+        // (fulfill/tolak), CANCEL dipegang pengaju sendiri (dicek scope
+        // "punya sendiri" di Controller, bukan permission terpisah — pola
+        // sama kolektor.pay).
+        'warehouse_stock_request' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::APPROVE->value,
+            ActionCode::REJECT->value,
+            ActionCode::CANCEL->value,
+        ],
+
+        // Dashboard Analitik FOP (docs/plan/analisa-dashboard-analitik-fop.md)
+        // — pola & performa lintas periode (alat kerja, wilayah, beban/solving
+        // teknisi, backlog, durasi terlama). Feature SENDIRI, bukan numpang
+        // `task.view.all` (dashboard operasional harian `/fop`) — audiens
+        // beda (dibuka mingguan/bulanan buat evaluasi, bukan tiap shift) dan
+        // harus bisa dimatikan per-role independen. Cuma VIEW, read-only murni.
+        'fop_analytics' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Master Agent (Skema 3, 2026-09-12) — mitra akuisisi pelanggan,
+        // BUKAN akun login. Dikelola Business Development, dipakai sebagai
+        // dropdown saat mendaftarkan pelanggan atas nama Agent.
+        'agents' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+        ],
+
+        // Restriksi Paket per Role (Skema 1, 2026-09-12) — halaman kelola
+        // daftar paket global yang boleh dipilih role ber-
+        // `is_package_restricted` (mis. Sales, Teknisi). Toggle role mana
+        // yang kena restriksi tetap lewat Role Management (roles.update)
+        // yang sudah ada, BUKAN lewat sini.
+        'package_restrictions' => [
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
+        ],
+
+        // Dashboard Omset Sales (Skema 2, 2026-09-12) — Business Development
+        // memantau omset (Biaya Langganan - PPN 11%) per Sales, per periode.
+        // Cuma VIEW: murni agregasi dari CustomerAcquisition, gak ada input
+        // manual sama sekali.
+        'sales_omset_dashboard' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // List Pelanggan Bisnis — daftar pelanggan kategori paket Bisnis
+        // (harga, alat ditinggalkan, biaya instalasi, tgl aktivasi). Cuma
+        // VIEW: murni turunan data pelanggan/paket/gudang, tanpa input manual.
+        'business_customers' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Antrean "Verifikasi Biaya C-REQ" — task C-REQ yang ditandai
+        // berbayar oleh teknisi (`TaskCreqDetail::is_billable`) menunggu
+        // disetujui/ditolak CS sebelum boleh diteruskan ke Tagihan Manual.
+        // Pola SAMA PERSIS `customer_registration_verification`: approve &
+        // reject permission STATIS terpisah dari view, bukan gerbang view +
+        // logic dinamis, karena dua aksi ini wajar dipisah PIC-nya.
+        // docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md §6.
+        'creq_billing_verification' => [
+            ActionCode::VIEW->value,
+            ActionCode::APPROVE->value,
+            ActionCode::REJECT->value,
+        ],
     ],
 
     /*
@@ -488,9 +731,27 @@ return [
     | admin pandangan yang justru sengaja dipisahkan darinya.
     |
     | docs/plan/kolektor/analisa-setoran-kas-admin.md §10.
+    |
+    | `customers` (bug 2026-09-29): `customers.view` = halaman List Data
+    | Pelanggan (lintas status, dalam scope) — BUKAN syarat aksi lain. Tambah
+    | (`customers.create`), Edit, Putus Langganan, Hapus punya route +
+    | permission sendiri, dan setelah simpan diarahkan lewat
+    | CustomerController::redirectToCustomer() yang sudah menangani user tanpa
+    | akses List/Detail. Dulu role Teknisi yang cuma dicentang "Tambah/Buat"
+    | diam-diam ikut dapat List Data Pelanggan begitu matrix disimpan.
+    | Sub-fitur (Import, Detail) tetap dirantai di UI matrix seperti biasa;
+    | pengecualian ini cuma menghentikan server menambah `customers.view`
+    | tanpa dicentang admin.
     */
     'view_autogrant_exempt' => [
         'cash_deposit',
+        'customers',
+        // Bug 2026-10: mencentang kolektor.pay / kolektor.deposit / kolektor.visit
+        // dulu diam-diam mencentang kolektor.view (Worklist). Akibatnya, admin
+        // yang sengaja mencabut "Buka Worklist" untuk teknisi melihatnya kembali
+        // tercentang setelah disimpan. Worklist = halaman berbasis assignment,
+        // bukan hak yang otomatis ikut hak bayar.
+        'kolektor',
     ],
 
     /*
@@ -517,11 +778,28 @@ return [
     | ITU SENDIRI lalu tetap naik ke induknya. Daftar ini menghentikan
     | rantai TOTAL begitu ketemu kode fiturnya: tidak menambah `.view`
     | fitur ini MAUPUN fitur induk mana pun di atasnya.
+    |
+    | Daftar ini juga dibaca UI Role Matrix (roles/matrix.blade.php →
+    | `data-independent-channel`): checkbox fitur di sini TIDAK dikunci
+    | menunggu "Lihat Data" induknya dan tidak memaksa-centang induknya.
+    | Satu daftar untuk server & UI — dulu UI menebak sendiri lewat akhiran
+    | `.qr`, jadi fitur independen non-QR tetap terkunci di layar.
+    |
+    | `customers.terminated` / `customers.failed` / `customers.registration`
+    | (bug 2026-09-29): cuma menumpang tree `customers` supaya rapi di
+    | matrix. List Putus & List Gagal punya route + controller + permission
+    | sendiri (routes/web.php), Skip Survey cuma kemampuan di form Registrasi
+    | (digerbangi `customers.create` + `customers.registration.skip_survey`).
+    | Tanpa batas ini, role yang cuma boleh buka List Putus terpaksa ikut
+    | dapat `customers.view` = List Data Pelanggan aktif lintas status.
     */
     'view_autogrant_chain_boundary' => [
         'customers.qr',
         'tickets.qr',
         'kolektor.qr',
+        'customers.terminated',
+        'customers.failed',
+        'customers.registration',
     ],
 
     /*
@@ -574,9 +852,8 @@ return [
         'tickets.history.view' => 'Lihat Halaman History Ticketing (semua tiket)',
         'tickets.history.export' => 'Ekspor History Ticketing ke Excel',
         'noc_worksheet.view' => 'Akses Modul Worksheet NOC',
-        'noc_worksheet.masuk.view' => '[Nonaktif] Tab Ticket Masuk — dilebur ke Worksheet NOC',
-        'noc_worksheet.diproses.view' => '[Nonaktif] Tab Ticket Diproses — dilebur ke Worksheet NOC',
         'noc_dashboard.view' => 'Lihat Halaman Dashboard NOC',
+        'noc_dashboard.performance.view' => 'Lihat Leaderboard Performa Individu (Helpdesk/NOC)',
 
         // Modul Kolektor — dua halaman, dua audiens (analisa-alur-kolektor-2.0
         // §9). Labelnya nyebut halamannya biar di Role Matrix kelihatan mana
@@ -591,9 +868,31 @@ return [
         'collector_worksheet.approve' => 'Hapus Buku Selisih Setoran (kerugian diakui)',
         'collector_worksheet.print' => 'Cetak Kwitansi Pembayaran (ber-QR)',
         'collector_worksheet.upload' => 'Upload & Cocokkan Kwitansi',
+        'collector_worksheet.deposit' => 'Setor Atas Nama Kolektor (kolektor tidak bisa akses)',
         'cash_deposit.view' => 'Akses Halaman Setoran Kas (Admin)',
         'cash_deposit.create' => 'Menyetorkan Kas ke Owner / Bank',
         'cash_deposit.validate' => 'Periksa & Tutup Setoran Kas Admin',
         'cash_deposit.approve' => 'Tutup Selisih Setoran Kas (kerugian/kelebihan diakui)',
+
+        'invoices.approve' => 'Hapus Buku Piutang (Tak Tertagih)',
+        'collector_report.view' => 'Lihat Laporan Bulanan Admin',
+        'collector_report.export' => 'Ekspor Laporan Bulanan Admin ke Excel',
+        'collector_payment_report.view' => 'Lihat Laporan Bayar Kolektor (tabel bayar per kolektor)',
+        'collector_payment_report.export' => 'Ekspor Laporan Bayar Kolektor ke Excel',
+
+        // Skema 1-3 Business Development (2026-09-12)
+        'agents.view' => 'Lihat Master Agent',
+        'agents.create' => 'Tambah Agent',
+        'agents.update' => 'Ubah Agent',
+        'package_restrictions.view' => 'Lihat Restriksi Paket per Role',
+        'package_restrictions.update' => 'Atur Daftar Paket Restriksi',
+        'sales_omset_dashboard.view' => 'Lihat Dashboard Omset Sales',
+        'business_customers.view' => 'Lihat List Pelanggan Bisnis',
+        'customer_balance.view' => 'Lihat Saldo Pelanggan',
+
+        // Verifikasi Biaya C-REQ (docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)
+        'creq_billing_verification.view' => 'Lihat Antrean Verifikasi Biaya C-REQ',
+        'creq_billing_verification.approve' => 'Setujui Biaya C-REQ (lanjut ke Tagihan Manual)',
+        'creq_billing_verification.reject' => 'Tolak Biaya C-REQ',
     ],
 ];

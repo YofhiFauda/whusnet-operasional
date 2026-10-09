@@ -58,4 +58,23 @@ enum ActionCode: string
      * karena membuka tahap workflow, bukan cuma isi field pelanggan.
      */
     case SKIP_SURVEY = 'skip_survey';
+
+    /**
+     * Konfirmasi FISIK "barang sudah nyampe" (Transfer Pusat→Cabang). SENGAJA
+     * bukan APPROVE: itu keputusan setuju/tolak berbasis kebijakan, ini
+     * pengakuan kejadian fisik oleh penerima sendiri (acknowledgment digital
+     * — docs/plan/warehouse/kontrol-anti-manipulasi.md §4), gak ada opsi
+     * "tolak seluruhnya", cuma partial-match kalau SN gak cocok.
+     */
+    case RECEIVE = 'receive';
+
+    /**
+     * Ganti paket internet pelanggan aktif (Paket A → Paket B). SENGAJA
+     * bukan UPDATE: `customers.detail.packages.update` sudah dipakai form
+     * edit pelanggan umum (bisa ubah field paket bareng identitas/alamat
+     * dalam satu submit). Ganti paket itu aksi billing tersendiri — efeknya
+     * baru kepakai tagihan periode berikutnya — jadi digerbangi permission
+     * terpisah, bukan numpang wildcard `.update` yang lebih longgar.
+     */
+    case CHANGE = 'change';
 }

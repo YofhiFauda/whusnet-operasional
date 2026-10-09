@@ -661,6 +661,26 @@ QR statis **bisa difoto** — teknisi bisa menyimpan foto QR semua pelanggannya 
 - Tidak menduplikasi logika start di controller. `TaskService::start()` tetap satu-satunya penulis transisi.
 - Tidak menghapus tombol "Mulai Task" manual.
 
+**Status implementasi (2026-10-05):** dibangun. Penyimpangan dari rancangan di atas, disengaja:
+- `tasks.started_via` NULL = mulai manual (tidak diisi `'manual'` supaya jalur lama tidak disentuh). `'qr_scan'` = via absen.
+- Task hari ini lebih dari satu → ditolak dengan pesan, bukan halaman pilihan. Teknisi mulai manual dari halaman Task.
+- GPS ditolak/timeout → tetap dikirim tanpa koordinat (`tanpa_koordinat`), tidak diblokir.
+- Radius di `config/qr.php` (`attendance_radius_meters` 150, `attendance_hard_limit_meters` 500), bisa diatur lewat env.
+- Dispatch: cabang absen ada di paling depan, hanya untuk user yang benar-benar anggota tim task hari ini (owner tanpa penugasan tidak terkena).
+- Kode: `QrAttendanceService`, `QrAttendanceController`, route `qr.attendance.show|store`, view `qr/attendance.blade.php`, test `tests/Feature/QrCode/QrAttendanceTest.php` (13 test hijau).
+
+**Analisa kelayakan tanpa peta (2026-10-05):**
+
+Absen QR **bisa diimplementasi tanpa fitur map**. Map hanya untuk tampilan; guard radius cuma butuh angka koordinat.
+
+- **Koordinat pelanggan:** `customers.latitude` / `customers.longitude` sudah ada (§4.4). Guard radius bergantung pada coverage kolom ini — kalau banyak null, guard tidak pernah aktif. Audit coverage jadi prasyarat Fase 3.
+- **Koordinat teknisi:** GPS dari browser saat scan. Butuh izin lokasi user dan HTTPS. Browser yang menolak izin → tidak ada koordinat → perlakuan sama seperti `tanpa_koordinat` di atas, bukan blokir total.
+- **Jarak:** haversine di service (`app/Services/`), tanpa library peta. Hitungan murni, mudah diuji unit.
+- **Cek penugasan & jadwal:** lewat `Task` + tim FOP (`FopTaskTeamService`), tidak lewat peta.
+- **Di luar cakupan Fase 3:** halaman peta, pin pelanggan, pelacakan rute. Itu rencana terpisah di `docs/plan/maps/`; tidak menjadi syarat absen.
+
+Risiko yang diterima: akurasi GPS HP 50–100 m di area padat; tanpa sinyal absen mati dan fallback manual dipakai; QR difoto tetap tidak membuktikan kehadiran (yang membuktikan: GPS + penugasan + jadwal).
+
 **Deteksi anomali (halaman `qr_scan_logs.view`):**
 - Teknisi dengan rasio `started_via='manual'` tinggi
 - Scan sukses dengan `distance_meters > 150`

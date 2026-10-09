@@ -1109,6 +1109,9 @@ diuji bersih dua arah). 34 index `_idx` terpasang.
 - [x] **3.2** P1: composite `customers` / `invoices` / `payments` → diukur
 - [x] **3.3** Drop 4 index redundan `tasks` (`status`, `pop_id`, `pop_status`, `customer_id`) → 0 tersisa
 - [x] **3.4** P2: index operasional (`tasks`, `fop_tasks`, `notifications`, `customer_status_logs`, `customer_services`) → diukur
+- [x] **3.5** P2: `invoices_customer_issue_date_index` `(customer_id, issue_date)` — migration `2026_10_05_100000_add_customer_issue_date_index_to_invoices_table` (dibuat 2026-10-05). Untuk `ORDER BY issue_date DESC` di list tagihan Portal. Payments sengaja tidak ditambah: `payments_customer_date_idx` (3.2) sudah menutupinya.
+  - **Catatan eksekusi 2026-10-05:** `migrate` pertama gagal `1061 Duplicate key name` karena index sudah ada di database lokal (sisa percobaan sebelumnya yang gagal di tengah; DDL MySQL tidak transaksional). Migration dibuat idempoten: cek `SHOW INDEX FROM invoices WHERE Key_name = 'invoices_customer_issue_date_index'` dulu, baru `add index` bila belum ada. `down()` juga cek dulu sebelum drop.
+  - Jangan drop manual index itu sebelum migration tercatat, supaya `migrate` ulang tetap aman.
 
 ### Fase 4 — Skema (destruktif, `migrate:fresh`)
 - [x] **4.1** Persempit `customers.cid`, `audit_logs.auditable_type`, kolom status

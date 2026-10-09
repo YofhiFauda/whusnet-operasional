@@ -18,7 +18,7 @@
                 <span class="text-sky-600 dark:text-sky-400 font-semibold">Worksheet Admin</span>
             </div>
             <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Worksheet Admin — Kolektor</h1>
-            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola penugasan kolektor, distribusikan pelanggan belum ber-kolektor, dan awasi tunggakan rute.</p>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola penugasan kolektor, distribusikan pelanggan belum ber-kolektor, dan awasi tagihan belum dibayar di rute.</p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
             <a href="{{ route('invoices.index') }}" class="inline-flex items-center gap-2 px-3.5 py-2 border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 rounded-xl transition-all text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20">
@@ -108,10 +108,10 @@
             </div>
         </div>
 
-        {{-- Total Tunggakan Kolektor --}}
+        {{-- Total Belum Dibayar Kolektor (semua tagihan belum lunas, termasuk bulan berjalan — bukan piutang) --}}
         <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-xs relative overflow-hidden">
             <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tunggakan Kolektor</span>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Belum Dibayar Kolektor</span>
                 <div class="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
@@ -140,6 +140,46 @@
                 Sudah memiliki kolektor
             </div>
         </div>
+    </div>
+
+    {{-- Teknisi pemegang uang pembayaran lapangan (ADHOC-122). Peringatan saja. --}}
+    <div class="rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-white dark:bg-slate-800 p-4 space-y-3">
+        <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Teknisi — Saldo Belum Disetor</div>
+            <span class="text-[11px] text-slate-500">Peringatan tutup hari: {{ config('billing.technician_close_time') }}</span>
+        </div>
+        @if($technicianStatus->isEmpty())
+            <p class="text-xs text-slate-500">Tidak ada teknisi yang memegang saldo.</p>
+        @else
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="text-[11px] uppercase text-slate-500">
+                        <tr>
+                            <th class="px-3 py-2 text-left">Teknisi</th>
+                            <th class="px-3 py-2 text-right">Saldo</th>
+                            <th class="px-3 py-2 text-left">Tertua dari</th>
+                            <th class="px-3 py-2 text-left">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @foreach($technicianStatus as $row)
+                            <tr>
+                                <td class="px-3 py-2 font-semibold">{{ $row['user']->name }}</td>
+                                <td class="px-3 py-2 text-right font-mono">Rp {{ number_format($row['balance'], 0, ',', '.') }}</td>
+                                <td class="px-3 py-2">{{ $row['oldest_collected_date'] ? \Carbon\Carbon::parse($row['oldest_collected_date'])->translatedFormat('d M Y') : '-' }}</td>
+                                <td class="px-3 py-2">
+                                    @if($row['overdue'])
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Belum setor</span>
+                                    @else
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Berjalan</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
     </div>
 
     {{-- Main Worksheet Layout (Mobile Tabs + Desktop 2 Columns) --}}
@@ -227,9 +267,9 @@
                                     </div>
                                 </div>
 
-                                {{-- Tunggakan --}}
+                                {{-- Belum dibayar --}}
                                 <div class="text-right shrink-0">
-                                    <div class="text-[10px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-500">Tunggakan</div>
+                                    <div class="text-[10px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-500">Belum Dibayar</div>
                                     <div class="font-bold text-sm text-amber-700 dark:text-amber-400 font-mono">
                                         Rp {{ number_format($collector->unpaid_total, 0, ',', '.') }}
                                     </div>

@@ -328,13 +328,17 @@ CID dibuat saat admin melakukan aktivasi layanan.
 
 Untuk MVP, pelanggan tidak disarankan pindah POP secara bebas.
 
-Jika pelanggan pindah POP:
+Jika pelanggan pindah POP (keputusan user 2026-09-26 & 2026-09-28 — ADHOC-104, ADHOC-107; rancangan lengkap `docs/plan/rancangan-pindah-pop-lanjutan.md`):
 
-1. `registration_number` lama tetap disimpan.
-2. CID lama tetap disimpan jika sudah aktif.
-3. Perubahan POP harus masuk audit log.
-4. Jika bisnis ingin ID berubah mengikuti POP baru, harus dibuat aturan migrasi khusus.
-5. Default MVP: ID tidak berubah saat pindah POP.
+1. **REQ ID (`customer_code`, mis. `RQ002231`) permanen** — tidak berubah saat pindah POP. Pindah ditolak kalau REQ ID yang sama sudah dipakai pelanggan lain di POP tujuan (unik per `pop_id, customer_code`).
+2. **CID boleh berubah.** CID = POP + Mini POP + Kode Distribusi, dibuat ulang otomatis oleh `CustomerObserver::updating()` begitu POP/Mini POP/Distribusi berganti (pelanggan `active`/`suspended`), dari jalur mana pun. Rumusnya satu (`CustomerCidService` → `Pop::generateComplexCid()`): segmen Mini POP/Distribusi yang kosong = `0`; fallback `pop_code` Cabang & `olt_number` teknisi sudah dihapus. CID lama tercatat di audit log.
+3. Mini POP & Distribusi milik POP lama **dilepas**, tidak ditebak penggantinya. Yang baru dipilih lewat dropdown Edit Pelanggan (hanya saat pindah Cabang, pasca-pemasangan, dan oleh pemegang `customers.detail.installation.validate`) atau modal "Atur Mini POP & Distribusi".
+4. **Piutang wajib lunas dulu.** Pindah ditolak selama ada tunggakan periode sebelum bulan berjalan (`Invoice::scopePiutang()`) atau tagihan yang sudah dicicil sebagian. Tagihan periode lalu tidak pernah dipindah — laporan pembayaran & piutang tetap milik cabang lama. Tagihan **bulan berjalan yang belum dibayar sama sekali** ikut pindah, sehingga pembayarannya masuk cabang baru. Tagihan bulan berikutnya terbit di cabang baru.
+5. **Kolektor selalu dilepas**, termasuk kolektor yang punya akses ke cabang baru; kolektor baru di-assign lewat Worksheet Kolektor.
+6. Saldo lebih bayar pelanggan terbawa dan dipakai untuk tagihan cabang baru (ledger saldo mencatat POP per baris).
+7. POP tujuan wajib berada dalam scope user yang memindahkan.
+8. Username PPPoE **tidak** diubah otomatis (harus sama dengan akun Mikrotik); tampil peringatan kalau tidak lagi diawali CID baru.
+9. Perubahan POP, Mini POP, Distribusi, kolektor, CID & POP tagihan masuk audit log.
 
 ---
 
@@ -513,3 +517,39 @@ Fitur ID numbering dianggap selesai jika:
 * [ ] CID tidak dibuat sebelum pelanggan siap billing/aktif.
 * [ ] Sistem aman dari duplikasi saat dua admin input bersamaan.
 * [ ] Perubahan POP/CID masuk audit log jika relevan.
+
+---
+
+# 16. Nomor Tagihan (Invoice) dan Pembayaran (Payment) — BUG 13
+
+Rancangan lengkap & riwayat keputusan: `docs/plan/billing/rancangan-prefix-nomor-invoice.md`.
+
+## 16.1 Tagihan — `{PREFIX}-{YYYYMMDD}-{NNNNNN}`
+
+| Jenis Tagihan | Prefix | Sumber (`invoice_type` + `manual_category`) |
+|---|---|---|
+| Aktivasi | `ACT` | `awal` |
+| Bulanan | `TAG` | `bulanan` |
+| Perbaikan | `MTN` | `manual` + `perbaikan` |
+| Lainnya (termasuk Biaya Instalasi Bisnis & Denda Putus Langganan) | `OTH` | `manual` + `lainnya` |
+| Pindah Lokasi | `REL` | `manual` + `pindah_lokasi` |
+
+- `YYYYMMDD` = tanggal terbit (`issue_date`), zona waktu `Asia/Jakarta`.
+- `NNNNNN` = urutan per kombinasi prefix + tanggal, reset tiap hari, 6 digit (lewat 999999 tetap sah, tidak dipotong).
+- Pemetaan prefix hanya ada di `InvoiceNumberGenerator::resolvePrefix()`. Penomoran wajib lewat `InvoiceNumberGenerator::nextFor()` dalam transaksi (`lockForUpdate()`).
+- `manual` tanpa `manual_category` (jalur ADHOC-60, `ManualInvoiceService`) dipetakan ke `ACT`.
+- Tagihan lama berformat `INV-{YYYYMM}-{NNNN}` belum di-backfill (lihat rancangan §7.2) dan tetap valid apa adanya.
+
+## 16.2 Pembayaran — `PAY-{invoice_number}` / `PAY-{invoice_number}-{NN}`
+
+- `invoice_number` tagihan DITEMPEL APA ADANYA (tidak dipetakan ulang), sehingga pembayaran dan tagihan langsung terlihat berpasangan.
+- Lunas sekali bayar (pembayaran pertama yang langsung menutup sisa tagihan): tanpa suffix. Contoh: `PAY-TAG-20260919-000012`.
+- Cicilan: `NN` = urutan pembayaran ke-berapa pada tagihan itu, 2 digit. Suffix muncul begitu pembayaran bukan yang pertama, atau pembayaran pertama belum menutup sisa. Contoh: `PAY-TAG-20260919-000012-01` (cicilan ke-1), `PAY-TAG-20260919-000012-02` (cicilan ke-2 / pelunasan sisa).
+- Urutan dihitung dari counter `number_sequences` (key `PAY:{invoice_id}`) — dihitung dari semua pembayaran (termasuk yang ditolak), dan TIDAK turun walau baris di-hard delete.
+- Beda dengan "Cicilan Ke-N" di UI (`Payment::installmentContext()`), yang hanya menghitung pembayaran VALID dan bisa bergeser. Nomor = identitas historis (beku), badge = status terkini.
+- Dibuat via `Payment::generatePaymentNumber(Invoice $invoice, $appliedAmount)`, dengan urutan dari `NumberSequenceService::paymentOrdinal()`. Wajib dipanggil dalam transaksi yang sama dengan `Payment::create()`.
+- Tabel `payment_number_sequences` (legacy) TIDAK dipakai lagi. Counter aktif ada di `number_sequences`.
+
+## 16.3 Gerbang pencocokan kwitansi (OCR / QR)
+
+Pola pencarian `PAY-[A-Z0-9-]{5,40}` (`ReceiptNumberExtractor::normalize()`, `PdfTextNumberReader::read()`). Pola sengaja longgar karena badan nomor mengikuti bentuk invoice. Gerbang sebenarnya tetap pencarian di DB: nomor yang tidak ada di `payments` berakhir `MISMATCH`, tidak pernah dicocokkan asal.

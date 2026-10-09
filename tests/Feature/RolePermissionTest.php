@@ -150,8 +150,11 @@ class RolePermissionTest extends TestCase
         $adminRole = Role::where('name', 'Admin')->firstOrFail();
         $adminPermissions = $adminRole->permissions->pluck('code')->toArray();
 
-        $this->assertContains('pops.create', $adminPermissions);
-        $this->assertContains('users.create', $adminPermissions);
+        // Sejak seeder menyalin Role Matrix UI (2026-09-29), Admin cuma
+        // update/view POP dan tidak lagi kelola user.
+        $this->assertContains('pops.update', $adminPermissions);
+        $this->assertNotContains('pops.create', $adminPermissions);
+        $this->assertNotContains('users.create', $adminPermissions);
         $this->assertContains('payments.create', $adminPermissions);
     }
 

@@ -57,6 +57,58 @@ class Pop extends Model
     }
 
     /**
+     * Kode `type` yang boleh punya Anak Gudang (ADHOC-54). `mini_pop`
+     * SENGAJA gak masuk — itu titik distribusi fisik (klaster ODC), bukan
+     * kantor cabang berstaf yang butuh gudang+admin gudang sendiri. Lihat
+     * docs/plan/warehouse/warehouse_inventory_asset_traceability_analysis.md §29.1.
+     *
+     * @var list<string>
+     */
+    public const WAREHOUSE_TYPES = ['pusat', 'cabang'];
+
+    /**
+     * Konstanta dulu, bukan query — dipakai Service pas nulis
+     * `inventory_balances`/`inventory_transfers` buat MENOLAK mini_pop
+     * sebagai gudang sebelum baris kesimpan, bukan sesudahnya.
+     */
+    public function isWarehouse(): bool
+    {
+        return in_array($this->type, self::WAREHOUSE_TYPES, true);
+    }
+
+    /**
+     * `isPusat()`/`isCabang()` — dua dari `WAREHOUSE_TYPES` di atas, dipakai
+     * titik yang butuh cek SATU sisi spesifik (mis. RECEIVE cuma boleh di
+     * Pusat, ISSUE cuma boleh dari Cabang), beda dari `isWarehouse()` yang
+     * cek "salah satu dari dua-duanya". Ditambah karena 3 Service (`InventoryReceiveService`,
+     * `InventoryTransferService`, `InventoryIssueService`) sebelumnya
+     * masing-masing nulis `$pop->type !== 'pusat'`/`'cabang'` sendiri-sendiri
+     * — string literal gampang divergen/typo (ketauan audit 2026-09-02).
+     */
+    public function isPusat(): bool
+    {
+        return $this->type === 'pusat';
+    }
+
+    public function isCabang(): bool
+    {
+        return $this->type === 'cabang';
+    }
+
+    public function scopeWarehouse($query)
+    {
+        return $query->whereIn('type', self::WAREHOUSE_TYPES);
+    }
+
+    /**
+     * @return HasMany<InventoryBalance, $this>
+     */
+    public function inventoryBalances(): HasMany
+    {
+        return $this->hasMany(InventoryBalance::class);
+    }
+
+    /**
      * Get the parent POP.
      *
      * @return BelongsTo<Pop, $this>
@@ -109,6 +161,34 @@ class Pop extends Model
     public function users()
     {
         return $this->belongsToMany(User::class, 'user_pops');
+    }
+
+    /**
+     * User yang ditunjuk jadi PIC Gudang cabang ini (role `pic_gudang`,
+     * `status = active`). SENGAJA bersumber dari tabel `warehouse_pop_pics`,
+     * BUKAN dari scope POP user (`user_role_scopes`) — scope cuma menjawab
+     * "data mana yang boleh dia lihat", sedangkan penunjukan PIC menjawab
+     * "gudang mana yang dia urus". Teknisi keliling (scope `all_pop`) bisa
+     * saja cuma PIC di 1 cabang; menyimpulkan dari scope akan salah.
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function gudangPics(): BelongsToMany
+    {
+        // withPivot('id') — view "Kelola PIC Gudang per Cabang" butuh id
+        // baris pivot buat tombol cabut penunjukan (WarehousePopPicController::destroy()).
+        return $this->belongsToMany(User::class, 'warehouse_pop_pics')->withPivot('id')->where('status', 'active');
+    }
+
+    /**
+     * Satu-satunya definisi "apakah cabang ini sudah punya PIC Gudang aktif?"
+     * — dipakai buat membedakan hak POP Admin cabang ber-PIC vs cabang
+     * belum ber-PIC (docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md §7.2).
+     * Jangan ditulis ulang di controller/service lain.
+     */
+    public function hasActivePicGudang(): bool
+    {
+        return $this->gudangPics()->exists();
     }
 
     /**
@@ -288,19 +368,20 @@ class Pop extends Model
     }
 
     /**
-     * Generate a complex CID based on customer and distribution details.
+     * Rumus CID — SATU-SATUNYA (ADHOC-107 K3). Jangan dipanggil langsung dari
+     * controller; pakai CustomerCidService::resolve(), yang juga menegakkan
+     * kapan CID boleh ada (status active/suspended).
      *
-     * Format: {cid_prefix}{olt_number}{dist_code}{customer_code}_{DESA}_{NAMA}
-     * Example: C1X1ARQ000001_MANGKUJAYAN_DYAHPURBA
-     *
-     * The CID prepends the real olt_number and
-     * inserts the distribution code to the base RQ id, producing the final activated identity.
+     * Format: {cid_prefix Cabang}{segmen Mini POP}{kode Distribusi}{REQ ID}
+     *   - segmen Mini POP  = pop_code Mini POP dikurangi cid_prefix-nya; '0' kalau belum ada
+     *   - kode Distribusi  = distribution.code; '0' kalau belum ada
+     * Contoh: tanpa Mini POP & Distribusi `C00RQ000631`, Mini POP C1 saja
+     * `C10RQ000631`, Mini POP C1 + Distribusi 4A `C14ARQ000631`.
      */
     public function generateComplexCid(Customer $customer, ?Distribution $distribution = null): string
     {
         $prefix = $this->cid_prefix;
-        $tech = $customer->customerTechnicalDetail;
-        $oltNumber = $this->resolveMiniPopSegment($customer, $tech?->olt_number);
+        $oltNumber = $this->resolveMiniPopSegment($customer);
         // Default distribusi = "0" (belum di-assign distribusi manapun),
         // sesuai skema Skema 2/3 di ID_NUMBERING_RULES.md. Dulu "XX" —
         // diganti karena "XX" bukan bagian dari skema penomoran resmi,
@@ -327,12 +408,28 @@ class Pop extends Model
         return sprintf('%s_%s_%s', $cid, $villageName, $customerName);
     }
 
-    private function resolveMiniPopSegment(Customer $customer, ?string $fallback = null): string
+    /**
+     * Segmen Mini POP untuk CID — cuma dari Mini POP yang di-assign ke
+     * pelanggan (`customers.mini_pop_id`), '0' kalau belum ada.
+     *
+     * Fallback lama (pop_code Cabang, lalu `customer_technical_details.
+     * olt_number`) DIHAPUS (ADHOC-107 K3, keputusan user 2026-09-28):
+     * `olt_number` teks bebas dari laporan teknisi, tidak ikut dilepas saat
+     * pindah POP, dan jadi sumber CID campuran (prefix cabang baru + nomor
+     * OLT cabang lama). Default '0', bukan '1': "1" itu kode Mini POP
+     * sungguhan di Master POP (mis. "C1"/"D1").
+     *
+     * Dibaca lewat query by id, BUKAN relasi `$customer->miniPop`: dipanggil
+     * dari CustomerObserver::updating() tepat saat mini_pop_id baru di-set
+     * (relasi bisa basi), dan relasi lazy melempar LazyLoadingViolation
+     * kalau pelanggannya bagian dari koleksi (preventLazyLoading di dev/test).
+     */
+    private function resolveMiniPopSegment(Customer $customer): string
     {
-        // 1. Prioritas utama: Mini POP yang di-assign eksplisit ke customer
-        // (lewat modal assignment pasca pemasangan/aktivasi). Ini satu-satunya
-        // sumber yang bisa beda per-customer walau mereka 1 Cabang POP yang sama.
-        $miniPop = $customer->miniPop;
+        $miniPop = $customer->mini_pop_id
+            ? self::query()->whereKey($customer->mini_pop_id)->first(['pop_code', 'cid_prefix'])
+            : null;
+
         if ($miniPop) {
             $miniPopCode = trim((string) $miniPop->pop_code);
             $miniCidPrefix = trim((string) ($miniPop->cid_prefix ?? $this->cid_prefix ?? ''));
@@ -345,34 +442,6 @@ class Pop extends Model
             }
         }
 
-        // 2. Legacy fallback: pop_code milik Cabang POP customer sendiri. Catatan:
-        // ini NILAINYA SAMA untuk semua customer di Cabang yang sama (bukan per-OLT),
-        // dipertahankan cuma buat customer lama yang belum di-assign mini_pop_id.
-        $popCode = trim((string) ($customer->pop?->pop_code ?? ''));
-        $cidPrefix = trim((string) ($customer->pop?->cid_prefix ?? $this->cid_prefix ?? ''));
-
-        if ($popCode !== '' && $cidPrefix !== '' && str_starts_with($popCode, $cidPrefix)) {
-            $miniSegment = substr($popCode, strlen($cidPrefix));
-            $miniSegment = preg_replace('/[^A-Z0-9]/i', '', $miniSegment) ?: '';
-
-            if ($miniSegment !== '') {
-                return $miniSegment;
-            }
-        }
-
-        // 3. Fallback terakhir: olt_number free-text dari laporan teknis instalasi.
-        if (! empty($fallback)) {
-            $fallback = preg_replace('/[^A-Z0-9]/i', '', (string) $fallback) ?: '';
-            if ($fallback !== '') {
-                return $fallback;
-            }
-        }
-
-        // Default mini POP = "0" (belum di-assign mini POP manapun), sesuai
-        // skema Skema 3 di ID_NUMBERING_RULES.md. Dulu "1" — salah, karena
-        // "1" itu kode mini POP SUNGGUHAN di Master POP (mis. "C1"/"D1"),
-        // bukan default. Memakainya sebagai fallback bikin pelanggan yang
-        // belum di-assign kelihatan seperti sudah masuk mini POP 1.
         return '0';
     }
 

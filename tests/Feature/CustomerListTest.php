@@ -180,6 +180,7 @@ class CustomerListTest extends TestCase
         $c1 = Customer::create([
             'customer_code' => 'C-PON-000001',
             'old_customer_id' => 'PE-LEGACY-0001',
+            'cid' => 'C1X4ARQ000004',
             'full_name' => 'Ahmad Subarjo',
             'primary_phone' => '08111111111',
             'registration_date' => '2026-06-11',
@@ -221,6 +222,21 @@ class CustomerListTest extends TestCase
 
         // Search by legacy customer ID
         $response = $this->get('/customers?search=PE-LEGACY-0001&status=');
+        $response->assertSee('Ahmad Subarjo');
+        $response->assertDontSee('Bambang Tri');
+
+        // Search by CID suffix (nomor urut buntut, bukan prefix cabang)
+        $response = $this->get('/customers?search=0004&status=');
+        $response->assertSee('Ahmad Subarjo');
+        $response->assertDontSee('Bambang Tri');
+
+        // Search by phone suffix
+        $response = $this->get('/customers?search=1111&status=');
+        $response->assertSee('Ahmad Subarjo');
+        $response->assertDontSee('Bambang Tri');
+
+        // Search by NIK suffix
+        $response = $this->get('/customers?search=9999&status=');
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
     }

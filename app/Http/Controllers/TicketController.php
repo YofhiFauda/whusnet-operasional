@@ -54,15 +54,41 @@ class TicketController extends Controller
         $issueCategories = TicketIssueCategory::query()
             ->active()
             ->orderBy('name')
-            ->get(['id', 'name', 'default_priority', 'sla_source'])
+            ->get(['id', 'name', 'default_priority', 'sla_source', 'is_batch'])
             ->map(fn (TicketIssueCategory $c) => [
                 'id' => $c->id,
                 'name' => $c->name,
                 'default_priority' => $c->default_priority->value,
                 'sla_source' => $c->sla_source,
+                'is_batch' => $c->is_batch,
             ])
             ->values()
             ->all();
+
+        $allowedPops = Pop::forUser(auth()->user())
+            ->where(function ($q) {
+                $q->where('status', 'active')->orWhereNull('status');
+            })
+            ->with('parent:id,name,type,code,pop_code')
+            ->orderByRaw("CASE WHEN type = 'pusat' THEN 1 WHEN type = 'cabang' THEN 2 ELSE 3 END")
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'pop_code', 'type', 'parent_id', 'status'])
+            ->map(fn (Pop $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'code' => $p->code ?? $p->pop_code,
+                'type' => $p->type ?? 'cabang',
+                'type_label' => match ($p->type) {
+                    'pusat' => 'Pusat',
+                    'cabang' => 'Cabang',
+                    'mini_pop' => 'Mini POP',
+                    default => ucfirst(str_replace('_', ' ', (string) $p->type)),
+                },
+                'parent_id' => $p->parent_id,
+                'parent_name' => $p->parent?->name,
+                'parent_code' => $p->parent?->code ?? $p->parent?->pop_code,
+            ])
+            ->values();
 
         return view('tickets.create', [
             'typeOptions' => TaskType::ticketOptions(),
@@ -70,7 +96,9 @@ class TicketController extends Controller
             'issueCategories' => $issueCategories,
             'initialTasks' => $this->worksheetTasks(),
             'worksheetTotalCount' => $this->worksheetTotalActiveCount(),
-            'allowedPopIds' => Pop::forUser(auth()->user())->pluck('id'),
+            'allowedPopIds' => $allowedPops->pluck('id'),
+            // Selector POP manual hirarki — mendukung Pusat, Cabang, & Mini POP
+            'allowedPops' => $allowedPops,
             'prefillCustomer' => $this->resolvePrefillCustomer($request),
         ]);
     }
@@ -137,10 +165,16 @@ class TicketController extends Controller
                 // null dan diam-diam jatuh ke snapshot tiket.
                 'customer:id,full_name,cid,customer_code,pop_id,status,distribution_id,primary_phone,address,odp_code',
                 'customer.pop:id,name,cid_prefix',
-                'issueCategory:id,name',
+                // 'pop' (bukan cuma 'customer.pop') — tiket batch gak punya
+                // customer, POP-nya dipilih manual langsung di kolom pop_id.
+                'pop:id,name',
+                'issueCategory:id,name,is_batch',
                 'fopTask:id,task_number,status',
                 'creator:id,name',
                 'histories.actor:id,name',
+                'batchMembers.customer.internetPackage',
+                'batchMembers.customer.village',
+                'batchMembers.addedBy',
             ])
             ->latest('created_at')
             ->limit(self::WORKSHEET_DISPLAY_LIMIT)
@@ -183,14 +217,33 @@ class TicketController extends Controller
             'time_at' => $ticket->created_at->format('H:i:s'),
             'cid' => $customer?->display_id ?: ($customer?->cid ?: $customer?->customer_code) ?: '—',
             'customer_name' => $customer?->full_name ?? $ticket->customer_name ?? '—',
-            'customer_phone' => $customer?->primary_phone ?? $ticket->customer_phone ?? '—',
+            // No. HP Pelapor (revisi Worksheet Helpdesk poin 3) — diisi staf
+            // → itu yang tampil; kosong → fallback HP pelanggan (Ticket::contactPhone()).
+            'customer_phone' => $ticket->contactPhone() ?? '—',
             // Kolom "Lokasi / POP / ODP" di tabel worksheet. Snapshot tiket
             // didahulukan (customer_odp/customer_address) — itu kondisi saat
             // tiket dibuat; data pelanggan bisa udah berubah sejak itu.
-            'pop' => $customer?->pop?->name ?: '—',
+            'pop' => $ticket->pop?->name ?: ($customer?->pop?->name ?: '—'),
             'odp' => $ticket->customer_odp ?: ($customer?->odp_code ?: '—'),
             'address' => $ticket->customer_address ?: ($customer?->address ?: '—'),
             'issue_category' => $ticket->issueCategory?->name,
+            // Batch (revisi poin 4) — Parent/Child di List Task. `is_batch`
+            // gerbang tombol "Tambah" + expand/collapse; `batch_members`
+            // render baris child (CID/Nama/HP), lihat Ticket::batchMembers().
+            // `batch_members_store_url` dirender SERVER-SIDE (route()) — klien
+            // TIDAK boleh merakit path `/api/tickets/${id}/batch-members`
+            // sendiri (lihat CLAUDE.md § Konvensi Kode, ADHOC-20).
+            'is_batch' => $ticket->isBatch(),
+            'batch_members_store_url' => route('tickets.batch-members.store', $ticket),
+            'batch_members' => ($ticket->relationLoaded('batchMembers') || $ticket->batchMembers) ? $ticket->batchMembers->map(fn ($m) => [
+                'id' => $m->id,
+                'cid' => $m->cid ?: ($m->relationLoaded('customer') ? ($m->customer?->display_id ?: ($m->customer?->cid ?: ($m->customer?->customer_code ?: '—'))) : '—'),
+                'customer_name' => $m->customer_name ?: ($m->relationLoaded('customer') ? ($m->customer?->full_name ?? '—') : '—'),
+                'phone' => $m->phone ?: ($m->relationLoaded('customer') ? ($m->customer?->primary_phone ?? '—') : '—'),
+                'package' => $m->relationLoaded('customer') && $m->customer?->relationLoaded('internetPackage') ? ($m->customer?->internetPackage?->name ?? '—') : '—',
+                'address' => $m->relationLoaded('customer') ? ($m->customer?->address ?? ($m->customer?->relationLoaded('village') ? ($m->customer?->village?->name ?? '—') : '—')) : '—',
+                'added_by' => $m->relationLoaded('addedBy') ? ($m->addedBy?->name ?? 'Sistem') : 'Sistem',
+            ])->values()->all() : [],
             'status_label' => $ticket->statusLabel(),
             // Target SLA — worksheet cuma butuh label statis (precomputed,
             // ngikut refresh halaman/broadcast), bukan countdown live per
@@ -239,6 +292,9 @@ class TicketController extends Controller
             'fopTask.statusHistories.changedByUser',
             'attachments.uploader',
             'histories.actor',
+            'batchMembers.customer.internetPackage',
+            'batchMembers.customer.pop',
+            'batchMembers.addedBy',
         ]);
 
         $customer = $ticket->customer;
@@ -285,6 +341,19 @@ class TicketController extends Controller
                 ])->all(),
             ] : null,
             'issue_category' => $ticket->issueCategory?->name,
+            'is_batch' => $ticket->isBatch(),
+            'batch_members_count' => $ticket->batchMembers->count(),
+            'batch_members_store_url' => route('tickets.batch-members.store', $ticket),
+            'batch_members' => $ticket->batchMembers->map(fn ($m) => [
+                'id' => $m->id,
+                'cid' => $m->cid ?: ($m->customer?->display_id ?: ($m->customer?->cid ?: '—')),
+                'customer_name' => $m->customer_name ?: ($m->customer?->full_name ?? '—'),
+                'phone' => $m->phone ?: ($m->customer?->primary_phone ?? '—'),
+                'package' => $m->customer?->internetPackage?->name ?? '—',
+                'address' => $m->customer?->address ?? '—',
+                'added_by' => $m->addedBy?->name ?? 'Sistem',
+                'created_at' => IndonesianDate::dateTime($m->created_at),
+            ])->values()->all(),
             'customer' => [
                 'name' => $customer?->full_name ?? $ticket->customer_name,
                 'cid' => $customer?->display_id ?: ($customer?->cid ?: $customer?->customer_code),
@@ -325,17 +394,21 @@ class TicketController extends Controller
         $ticket->load([
             'customer.pop',
             'customer.village',
+            'customer.district',
+            'customer.city',
             'customer.internetPackage',
             'customer.customerDevice',
             'creator',
+            'pop',
             'fopTask.technicians',
             'fopTask.statusHistories.changedByUser',
             'attachments.uploader',
             'histories.actor',
-            // Kategori Issue (Master Issue) — sama kayak fop_tasks.history_detail,
-            // belum pernah dieager-load/ditampilkan di halaman Detail Ticket ini
-            // sama sekali sebelumnya.
-            'issueCategory:id,name',
+            'issueCategory',
+            'batchMembers.customer.internetPackage',
+            'batchMembers.customer.pop',
+            'batchMembers.customer.village',
+            'batchMembers.addedBy',
         ]);
 
         return view('tickets.show', ['ticket' => $ticket]);
@@ -345,9 +418,28 @@ class TicketController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('tickets.create'), 403);
 
+        // Mode batch (revisi Worksheet Helpdesk poin 1-2/4) ditentukan dari
+        // KATEGORI, bukan dari ada/tidaknya customer_id di request — dicek
+        // MENTAH sebelum validate() karena required/nullable customer_id vs
+        // pop_id/search_label saling silang tergantung ini. Aman dibaca
+        // sebelum divalidasi: cuma dipakai buat cabang rule, exists check
+        // formal tetap ada di rule issue_category_id di bawah.
+        $rawCategoryId = $request->input('issue_category_id');
+        $hasCategory = $rawCategoryId && $rawCategoryId !== 'lainnya';
+        $categoryIsBatch = $hasCategory && TicketIssueCategory::whereKey($rawCategoryId)->value('is_batch');
+        $isBatch = $categoryIsBatch || (! $request->filled('customer_id') && $request->filled('pop_id'));
+
         $validated = $request->validate([
             'type' => ['required', 'string', Rule::in(TaskType::ticketValues())],
-            'customer_id' => ['required', 'exists:customers,id'],
+            'customer_id' => [Rule::requiredIf(! $isBatch), 'nullable', 'exists:customers,id'],
+            // Search Customer Data dipakai sebagai label bebas (mis. "ODP JTS
+            // 13 LOS") kalau kategorinya batch & gak match pelanggan manapun.
+            'search_label' => [Rule::requiredIf($isBatch), 'nullable', 'string', 'max:255'],
+            // POP manual (revisi poin 2) — wajib diisi kalau customer_id gak
+            // ada yang dijadiin acuan.
+            'pop_id' => [Rule::requiredIf($isBatch), 'nullable', 'exists:pops,id'],
+            // No. HP Pelapor (revisi poin 3) — opsional di kedua mode.
+            'reporter_phone' => ['nullable', 'string', 'max:30'],
             // Nullable — dropdown boleh "Lainnya (isi manual)", detail_keluhan
             // tetap satu-satunya sumber klasifikasi buat kasus itu (rancangan
             // bagian C RANCANGAN_MASTER_ISSUE_TICKETING.md).
@@ -409,7 +501,7 @@ class TicketController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'ticket' => $this->worksheetCardPayload($ticket->fresh([
-                    'customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor',
+                    'customer.pop', 'pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor', 'batchMembers',
                 ])) + ['fop_task_number' => $ticket->fopTask?->task_number],
             ], 201);
         }
@@ -457,7 +549,7 @@ class TicketController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'message' => $message,
-                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor', 'batchMembers.customer.internetPackage', 'batchMembers.customer.village', 'batchMembers.addedBy'])),
             ]);
         }
 
@@ -493,7 +585,7 @@ class TicketController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'message' => $message,
-                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor', 'batchMembers.customer.internetPackage', 'batchMembers.customer.village', 'batchMembers.addedBy'])),
             ]);
         }
 
@@ -524,7 +616,7 @@ class TicketController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'message' => $message,
-                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor', 'batchMembers.customer.internetPackage', 'batchMembers.customer.village', 'batchMembers.addedBy'])),
             ]);
         }
 
@@ -558,11 +650,50 @@ class TicketController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'message' => $message,
-                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor', 'batchMembers.customer.internetPackage', 'batchMembers.customer.village', 'batchMembers.addedBy'])),
             ]);
         }
 
         return redirect()->route('tickets.show', $ticket)->with('success', $message);
+    }
+
+    /**
+     * Tambah satu pelanggan terdampak ke tiket batch — tombol "Tambah" di
+     * List Task (revisi Worksheet Helpdesk poin 4). Modal AJAX, BUKAN pola
+     * halaman create (override sadar — lihat catatan di
+     * docs/ticketing/business-logic.md): validasi gagal balik JSON 422 yang
+     * dibaca modal langsung, gak numpang back()->withErrors() yang bisa
+     * nutup modal & nampilin List kosong tanpa pesan (ADHOC-20).
+     */
+    public function storeBatchMember(Request $request, Ticket $ticket): JsonResponse
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.create'), 403);
+        $this->authorizeTicketScope($ticket);
+
+        $validated = $request->validate([
+            'customer_id' => ['nullable', 'exists:customers,id'],
+            // Wajib kalau customer_id gak dipilih dari lookup (input manual).
+            'customer_name' => [Rule::requiredIf(empty($request->input('customer_id'))), 'nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+        ]);
+
+        try {
+            $member = $this->ticketService->addBatchMember($ticket, $validated, auth()->user());
+        } catch (ValidationException $e) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+        }
+
+        return response()->json([
+            'member' => [
+                'id' => $member->id,
+                'cid' => $member->cid ?: ($member->customer?->display_id ?: ($member->customer?->cid ?: ($member->customer?->customer_code ?: '—'))),
+                'customer_name' => $member->customer_name ?: ($member->customer?->full_name ?? '—'),
+                'phone' => $member->phone ?: ($member->customer?->primary_phone ?? '—'),
+                'package' => $member->customer?->internetPackage?->name ?? '—',
+                'address' => $member->customer?->address ?? ($member->customer?->village?->name ?? '—'),
+                'added_by' => $member->addedBy?->name ?? 'Sistem',
+            ],
+        ], 201);
     }
 
     private function respondToTicketActionError(Request $request, ValidationException $e): RedirectResponse|JsonResponse

@@ -2,14 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InventoryTransactionType;
+use App\Enums\MaterialKind;
+use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\FopTaskTeam;
+use App\Models\InventorySerial;
+use App\Models\InventoryTransaction;
 use App\Models\Pop;
 use App\Models\Task;
+use App\Models\TaskMaterial;
+use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskTeamService;
@@ -52,9 +59,11 @@ class FopDashboardController extends Controller
 
         // ── Antrean survey: pelanggan yang belum disurvey ───────────
         // Countdown Survey: (customers.created_at + 1 hari) - sekarang
+        // `registered` (Verifikasi Registrasi) tidak dihitung — belum diverifikasi
+        // CS, jadi belum masuk antrean survey/Task FOP.
         $surveyQueue = Customer::with(['pop'])
             ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-            ->whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
+            ->whereIn('status', ['calon_pelanggan', 'waiting_survey'])
             ->orderBy('created_at', 'asc') // terlama di atas — paling prioritas
             ->limit(50)
             ->get()
@@ -96,7 +105,7 @@ class FopDashboardController extends Controller
             $statsCacheKey,
             30,
             function () use ($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday, $user) {
-                $surveyStatuses = ['calon_pelanggan', 'waiting_survey', 'registered'];
+                $surveyStatuses = ['calon_pelanggan', 'waiting_survey'];
 
                 return [
                     'antrian_survey' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
@@ -113,8 +122,11 @@ class FopDashboardController extends Controller
                         ->where('status', TaskStatus::SELESAI->value)
                         ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
                         ->count(),
+                    // Lapor Nanti ikut dihitung: task hari ini yang kerjanya
+                    // beres tapi laporannya menyusul tetap beban kerja hari
+                    // ini — dulu (pending + flag) ia hilang dari total.
                     'total_hari_ini' => Task::applyUserScope($user)
-                        ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::SELESAI->value])
+                        ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::LAPOR_NANTI->value, TaskStatus::SELESAI->value])
                         ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
                         ->count(),
                     // Overdue Survey: created_at + 1 hari < sekarang (SLA 1×24 jam)
@@ -131,6 +143,52 @@ class FopDashboardController extends Controller
                                 ->where('completed_at', '<', now()->subDays(3));
                         })
                         ->count(),
+                ];
+            }
+        );
+
+        // ── Pemakaian Alat Gudang (ADHOC, 2026-09-10) ───────────────
+        // Backend link Gudang↔Task material udah ada sejak ADHOC-54
+        // (InventoryService::consumeFromCustody()/installSerial()) — ini
+        // cuma nampilinnya di papan FOP biar keluar/terpakai/sisa kelihatan
+        // tanpa buka modul Gudang terpisah. Cache 30 detik, pola sama $stats
+        // di atas (angka skalar, aman di-cache).
+        $gudangCacheKey = sprintf('dashboard:fop:gudang:%d:%s', $user->id, $today->toDateString());
+
+        $gudangStats = Cache::remember(
+            $gudangCacheKey,
+            30,
+            function () use ($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday) {
+                return [
+                    // Keluar dari gudang ke teknisi hari ini — scope dari gudang asal.
+                    'keluar' => (float) InventoryTransaction::where('type', InventoryTransactionType::ISSUE->value)
+                        ->whereBetween('created_at', [$startOfToday, $endOfToday])
+                        ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('from_pop_id', $allowedPopIds))
+                        ->sum('qty'),
+                    // Terpakai (dipasang/dihabiskan) di laporan teknisi hari ini —
+                    // gabungan material pasif (TaskMaterial) dan perangkat aktif (InventoryTransaction type INSTALL)
+                    'terpakai' => (float) TaskMaterial::where('kind', MaterialKind::TERPAKAI->value)
+                        ->whereBetween('task_materials.created_at', [$startOfToday, $endOfToday])
+                        ->whereHas('fopTask', fn ($q) => $q->when(
+                            ! $hasAllPopAccess,
+                            fn ($qq) => $qq->whereIn('pop_id', $allowedPopIds)
+                        ))
+                        ->sum('qty')
+                        + (float) InventoryTransaction::where('type', InventoryTransactionType::INSTALL->value)
+                            ->whereBetween('created_at', [$startOfToday, $endOfToday])
+                            ->whereHas('fopTask', fn ($q) => $q->when(
+                                ! $hasAllPopAccess,
+                                fn ($qq) => $qq->whereIn('pop_id', $allowedPopIds)
+                            ))
+                            ->sum('qty'),
+                    // Masih di tangan teknisi (belum dipakai/dikembalikan) —
+                    // snapshot posisi sekarang gabungan barang pasif (TechnicianCustody) & serial (InventorySerial ISSUED).
+                    'sisa_di_teknisi' => (float) TechnicianCustody::active()
+                        ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('issued_from_pop_id', $allowedPopIds))
+                        ->sum('qty_remaining')
+                        + (float) InventorySerial::status(SerialStatus::ISSUED)
+                            ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('issued_from_pop_id', $allowedPopIds))
+                            ->count(),
                 ];
             }
         );
@@ -191,6 +249,13 @@ class FopDashboardController extends Controller
         // berubah jadi arsip.
         $boardFloor = $today->copy()->subDays(self::BOARD_MAX_PAST_DAYS)->startOfDay();
 
+        $inScope = fn (FopTask $t): bool => $hasAllPopAccess || in_array($t->pop_id, $allowedPopIds);
+        $isClosed = fn (FopTask $t): bool => in_array(
+            $t->status,
+            [TaskStatus::SELESAI, TaskStatus::DIBATALKAN],
+            true
+        );
+
         $activeFopTeams = FopTaskTeam::with([
             'members',
             'fopTasks.technicians',
@@ -222,35 +287,44 @@ class FopDashboardController extends Controller
             // isActive() memanggil relasi fopTasks() lewat query baru, jadi
             // eager load di atas terbuang dan lahir 1 query per team.
             // Pola ini menyalin FopTaskController:153-156 yang sudah benar.
+            //
+            // Syarat tampil = punya task AKTIF yang DALAM SCOPE — dua syarat itu
+            // wajib dicek pada task yang sama. Dulu dicek terpisah ("ada task
+            // aktif" + "ada task di POP saya"), jadi tim kemarin dengan task
+            // JETIS yang sudah selesai + task SANDYA yang masih terjadwal lolos
+            // untuk pop_admin JETIS, lalu kartunya cuma berisi task SANDYA —
+            // bocor lintas cabang (CLAUDE.md larangan #3).
             ->filter(fn (FopTaskTeam $team) => $team->fopTasks->contains(
-                fn (FopTask $t) => ! in_array(
-                    $t->status->value,
-                    [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value],
-                    true
-                )
+                fn (FopTask $t) => $inScope($t) && ! $isClosed($t)
             ))
-            ->when(! $hasAllPopAccess, fn ($teams) => $teams->filter(
-                fn (FopTaskTeam $team) => $team->fopTasks->contains(
-                    fn (FopTask $t) => in_array($t->pop_id, $allowedPopIds)
-                )
-            ))
-            ->map(function (FopTaskTeam $team) {
-                $mappedTasks = $team->fopTasks->map(function (FopTask $t) {
+            ->map(function (FopTaskTeam $team) use ($startOfToday, $inScope, $isClosed) {
+                // Task POP lain tidak pernah dirender, walau satu tim dengan
+                // task yang dalam scope user.
+                $scopedTasks = $team->fopTasks->filter($inScope);
+
+                // Tim tanggal lampau tampil di papan HANYA karena masih punya
+                // task aktif — task selesai/batal miliknya sudah jadi arsip di
+                // Riwayat Task FOP (/fop-tasks/history), jadi ikut ditampilkan di
+                // sini cuma bikin papan kerja harian penuh task kemarin yang sudah
+                // beres. Tim hari ini tetap menampilkan semuanya.
+                $tasks = $team->work_date->lt($startOfToday)
+                    ? $scopedTasks->reject($isClosed)
+                    : $scopedTasks;
+
+                $mappedTasks = $tasks->map(function (FopTask $t) {
                     // FopTask.status share vocab persis TaskStatus (unifikasi 2026-07-20)
-                    // — kalau ada Task eksekusi terhubung, pakai itu buat label/style
-                    // (bawa nuansa report_deferred "Lapor Nanti"); FopTask standalone
-                    // (task_id null, masih 'draft') pakai displayLabel() punya sendiri.
+                    // — kalau ada Task eksekusi terhubung, pakai itu buat label/style;
+                    // FopTask standalone (task_id null, masih 'draft') pakai punya sendiri.
                     $refStatus = $t->task?->status ?? $t->status;
-                    $reportDeferred = $t->task?->report_deferred ?? false;
                     $statusValue = $refStatus->value;
-                    $status = $refStatus->displayLabel($reportDeferred);
+                    $status = $refStatus->label();
 
                     $statusStyle = match (true) {
                         $statusValue === 'terjadwal' => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
                         $statusValue === 'in_progress' => 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
                         $statusValue === 'selesai' => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
                         $statusValue === 'dibatalkan' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
-                        $statusValue === 'pending' && $reportDeferred => 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
+                        $statusValue === TaskStatus::LAPOR_NANTI->value => 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
                         $statusValue === 'pending' => 'background:#fefce8; color:#a16207; border-color:#fde68a',
                         default => 'background:var(--color-surface-muted); color:var(--color-text-main); border-color:var(--color-border)',
                     };
@@ -263,7 +337,8 @@ class FopDashboardController extends Controller
                         'status' => $status,
                         'status_value' => $statusValue,
                         'status_style' => $statusStyle,
-                        'draggable' => ! in_array($statusValue, ['selesai', 'dibatalkan', 'in_progress'], true),
+                        // Lapor Nanti terkunci ke teknisi — gak boleh digeser ke team lain.
+                        'draggable' => ! in_array($statusValue, ['selesai', 'dibatalkan', 'in_progress', TaskStatus::LAPOR_NANTI->value], true),
                         'category_label' => $t->category->value,
                         'badge_classes' => $t->category->badgeClasses(),
                         'customer_name' => $t->customer?->full_name ?? '—',
@@ -272,8 +347,14 @@ class FopDashboardController extends Controller
                     ];
                 })->values();
 
-                $totalTasks = $mappedTasks->count();
-                $completedTasks = $mappedTasks->filter(fn ($t) => $t['status_value'] === 'selesai')->count();
+                // Progres dihitung dari SEMUA task tim (dalam scope), bukan dari
+                // yang tampil di kartu — tim kemarin yang tinggal 1 dari 5 task
+                // harus terbaca "4/5 Selesai", bukan "0/1" hanya karena 4 task
+                // selesainya sudah pindah ke Riwayat.
+                $totalTasks = $scopedTasks->count();
+                $completedTasks = $scopedTasks->filter(
+                    fn (FopTask $t) => ($t->task?->status ?? $t->status) === TaskStatus::SELESAI
+                )->count();
 
                 return [
                     'id' => $team->id,
@@ -295,6 +376,7 @@ class FopDashboardController extends Controller
         return view('fop.dashboard', compact(
             'surveyQueue',
             'stats',
+            'gudangStats',
             'teknisiList',
             'activeTeams',
             'activeFopTeams',
@@ -333,6 +415,10 @@ class FopDashboardController extends Controller
 
         if (in_array($fopTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN], true)) {
             return $this->switchTeamError($request, 'fop_task_id', "Task {$fopTask->task_number} berstatus {$fopTask->status->value}, tidak bisa dipindah team.");
+        }
+
+        if ($fopTask->status->isLockedFromFop() || $fopTask->task?->status->isLockedFromFop()) {
+            return $this->switchTeamError($request, 'fop_task_id', "Task {$fopTask->task_number} berstatus Lapor Nanti — terkunci sampai teknisi mengirim laporan.");
         }
 
         if ($fopTask->task && $fopTask->task->status->value === TaskStatus::IN_PROGRESS->value) {

@@ -288,6 +288,40 @@ Angka 35.484 adalah acuan verifikasi rumus. Kalau perhitungan sistem mendarat di
 keputusan bisnis. Kalau mendarat di 35.483, pembulatannya berubah dari `round`
 jadi `floor`.
 
+### 6.3 Bug: `customer_services.total_monthly_bill` sempat ikut memasukkan `other_fee` (diperbaiki 2026-09-14)
+
+Rule #4/#5 di §6.1 sudah lama menyatakan "Berlaku" — tapi itu status untuk sisi
+`InitialInvoiceService`/`invoices.other_fee` (Tagihan Awal). Ternyata sisi
+`customer_services.other_fee` **melanggar** rule yang sama: formula di
+`CustomerController::store()` (Registrasi) DAN `update()` (Edit Pelanggan)
+sama-sama menghitung
+
+```
+total_monthly_bill = discountedPrice * (1 + ppn/100) + other_fee   // SALAH
+```
+
+padahal `GenerateMonthlyInvoicesCommand` (generator Tagihan Bulanan sungguhan)
+tidak pernah baca `other_fee` sama sekali (§3.2/6.1#5) — jadi
+`total_monthly_bill` yang tersimpan **berbohong** soal nominal tagihan bulanan
+asli begitu `other_fee > 0`. Ketemu dari data nyata: pelanggan **CID
+C1X4ARQ000004 (Ardiyanto Cahyo Nugroho)** — `other_fee=11.000`,
+`total_monthly_bill` tersimpan `165.000` (kebetulan `ppn=0` di baris itu, jadi
+selisihnya gak kelihatan sampai dicek manual) tapi formula lama tetap salah
+untuk kasus `other_fee>0` & `ppn>0` manapun.
+
+**Fix:** formula di kedua tempat jadi murni `discountedPrice * (1 + ppn/100)`
+— `other_fee` tetap tersimpan di kolomnya sendiri (dipakai halaman lain), cuma
+gak lagi ditambahkan ke total. `resources/views/customers/show.blade.php`
+(Detail Pelanggan, breakdown "Total Biaya Per Bulan") dan
+`resources/views/customers/edit.blade.php` (preview live "Total Tagihan
+Bulanan") ikut disamakan — keduanya sekarang menampilkan `other_fee` di baris
+**terpisah**, berlabel "sekali, Tagihan Registrasi", bukan digabung ke total
+bulanan. Regresi: `CustomerEditTest::test_customer_edit_total_monthly_bill_excludes_other_fee`.
+
+**Kalau nanti nemu format `total_monthly_bill` yang beda dari
+`monthly_price − discount, lalu +PPN%` tanpa `other_fee` — itu data lama dari
+sebelum fix ini, bukan bug baru.** Backfill data lama belum dikerjakan.
+
 ---
 
 ## Referensi

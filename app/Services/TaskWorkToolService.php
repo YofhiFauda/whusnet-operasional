@@ -192,7 +192,7 @@ class TaskWorkToolService
         $fopTask = $this->resolveTaskFor($task);
 
         if ($fopTask && $fopTask->workTools()->exists()) {
-            return $fopTask->workTools()->orderBy('id')->get();
+            return $fopTask->workTools()->with('workTool')->orderBy('id')->get();
         }
 
         // Task PSB umumnya belum punya checklist sendiri sampai laporannya
@@ -203,7 +203,7 @@ class TaskWorkToolService
             $surveyTask = $this->resolveTaskForCustomer($task->customer, TaskType::SURVEY);
 
             if ($surveyTask) {
-                return $surveyTask->workTools()->orderBy('id')->get();
+                return $surveyTask->workTools()->with('workTool')->orderBy('id')->get();
             }
         }
 

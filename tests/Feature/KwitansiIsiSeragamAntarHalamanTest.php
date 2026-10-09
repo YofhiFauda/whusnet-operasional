@@ -50,13 +50,12 @@ class KwitansiIsiSeragamAntarHalamanTest extends TestCase
         $a4->assertOk();
 
         // Identitas, tagihan, dan nominal — dulu tersebar tidak merata antara
-        // kedua halaman.
+        // kedua halaman. Sekarang keduanya @include partial yang sama
+        // (payments.partials.kwitansi, ADHOC-94).
         $wajib = [
             'Pelanggan Kwitansi Seragam',   // nama
-            'Jl. Kwitansi Seragam No. 7',   // alamat — dulu cuma di A4
-            '081200000822',                 // no. HP — dulu cuma di A4
-            'INV-202608-0822',
-            '2026-08',                      // periode — dulu cuma di thermal
+            'Jl. Kwitansi Seragam No. 7',   // alamat, satu baris utuh
+            'Agustus',                       // bulan periode (billing_period 2026-08)
             'Rp 75.000',                    // dibayar
         ];
 
@@ -70,7 +69,12 @@ class KwitansiIsiSeragamAntarHalamanTest extends TestCase
         $a4->assertSee($this->package->name, false);
     }
 
-    public function test_pembayaran_ditolak_tidak_dicetak_hijau_di_lembar_a4(): void
+    /**
+     * Keputusan final ADHOC-94: status badge berwarna DIBUANG total dari
+     * kwitansi cetak (bukan cuma diwarnai ulang) — kwitansi bukan lagi
+     * tempat menampilkan status internal pembayaran.
+     */
+    public function test_status_pembayaran_tidak_lagi_dicetak_di_lembar_kwitansi(): void
     {
         $this->loginAsAdmin();
         $payment = $this->buatPembayaran(['payment_status' => 'ditolak']);
@@ -78,25 +82,24 @@ class KwitansiIsiSeragamAntarHalamanTest extends TestCase
         $response = $this->get(route('payments.show', $payment->id));
 
         $response->assertOk();
-        // Blok status pada lembar cetak: warnanya harus ikut status, bukan
-        // emerald tanpa syarat. Kwitansi "resmi" yang mencetak pembayaran
-        // ditolak dengan bullet hijau adalah bukti yang menyesatkan.
-        $response->assertSee('text-rose-700">● Ditolak', false);
+        $response->assertDontSee('text-rose-700">● Ditolak', false);
         $response->assertDontSee('text-emerald-700">● Ditolak', false);
     }
 
-    public function test_catatan_kosong_tidak_dikarang_sistem(): void
+    /**
+     * Keputusan final ADHOC-94: baris "Catatan" (data internal petugas)
+     * DIBUANG total dari kwitansi cetak — bukan cuma disembunyikan saat
+     * kosong.
+     */
+    public function test_catatan_tidak_lagi_dicetak_di_lembar_kwitansi(): void
     {
         $this->loginAsAdmin();
-        $payment = $this->buatPembayaran(['note' => null]);
+        $payment = $this->buatPembayaran(['note' => 'catatan kasir rahasia']);
 
-        $response = $this->get(route('payments.show', $payment->id));
+        $response = $this->get(route('payments.receipt', $payment->id));
 
         $response->assertOk();
-        // Kalimat ini dulu muncul sebagai fallback dan terbaca seperti catatan
-        // petugas, padahal tidak pernah ada yang menulisnya.
-        $response->assertDontSee('Tagihan Bulanan. Struk ini adalah bukti pembayaran sah', false);
-        $response->assertSee('Tanpa catatan.', false);
+        $response->assertDontSee('catatan kasir rahasia', false);
     }
 
     public function test_cicilan_sebagian_tidak_tercetak_sebagai_pelunasan(): void
@@ -113,7 +116,12 @@ class KwitansiIsiSeragamAntarHalamanTest extends TestCase
         $thermal->assertSee('Cicilan Ke-1', false);
     }
 
-    public function test_alamat_panjang_dipenggal_di_kecamatan(): void
+    /**
+     * Keputusan final ADHOC-94: alamat kwitansi cetak SATU baris utuh —
+     * pemenggalan dua baris di titik "Kec." itu peninggalan struk thermal
+     * 80mm sempit, tidak relevan lagi setelah thermal dihapus.
+     */
+    public function test_alamat_tidak_lagi_dipenggal_dua_baris(): void
     {
         $this->loginAsAdmin();
         $payment = $this->buatPembayaran([], [
@@ -123,25 +131,11 @@ class KwitansiIsiSeragamAntarHalamanTest extends TestCase
         $response = $this->get(route('payments.receipt', $payment->id));
 
         $response->assertOk();
-        // Dua baris, dipisah <br> — bukan satu baris panjang yang melipat di
-        // tempat acak pada kolom sempit.
         $response->assertSee(
-            'Jl. Veteran Dkh. Joresan III RT. 002/RW. 002, Joresan<br>Kec. Mlarak, Kabupaten Ponorogo',
+            'Jl. Veteran Dkh. Joresan III RT. 002/RW. 002, Joresan, Kec. Mlarak, Kabupaten Ponorogo',
             false
         );
-    }
-
-    public function test_alamat_tanpa_penanda_kecamatan_tidak_dipecah(): void
-    {
-        $this->loginAsAdmin();
-        $payment = $this->buatPembayaran([], ['address' => 'Jl. Melati No. 12, Ponorogo']);
-
-        $response = $this->get(route('payments.receipt', $payment->id));
-
-        $response->assertOk();
-        // Membelah di koma sembarang bisa memisahkan nama jalan dari nomornya.
-        $response->assertSee('Jl. Melati No. 12, Ponorogo', false);
-        $response->assertDontSee('Jl. Melati No. 12<br>', false);
+        $response->assertDontSee('Joresan<br>Kec. Mlarak', false);
     }
 
     /**

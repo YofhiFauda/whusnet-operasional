@@ -6,6 +6,7 @@ use App\Enums\DepositStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ScopeType;
 use App\Enums\UserStatus;
+use App\Models\AuditLog;
 use App\Models\CollectorDeposit;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
@@ -255,6 +256,183 @@ class CollectorDepositTest extends TestCase
         $this->actingAs($this->kolektor)->post(route('collector-worklist.deposit'), $payload);
 
         $this->assertDatabaseCount('collector_deposits', 1);
+    }
+
+    // ================= LIST SUDAH BAYAR (SEBELUM SETOR) =================
+
+    /**
+     * Tab "Sudah Bayar" di Worklist Kolektor — kolektor cross check siapa
+     * saja & berapa nominalnya SEBELUM menekan "Setor ke Admin", bukan cuma
+     * percaya angka total saldo.
+     */
+    public function test_worklist_tab_bayar_lists_unsettled_payments_with_customer_and_amount(): void
+    {
+        $this->collect('C-DEP-LIST-A', 100000);
+        $this->collect('C-DEP-LIST-B', 250000);
+
+        $response = $this->actingAs($this->kolektor)
+            ->get(route('collector-worklist.index', ['tab' => 'bayar']));
+
+        $response->assertOk();
+        $response->assertSee('Pelanggan C-DEP-LIST-A');
+        $response->assertSee('Pelanggan C-DEP-LIST-B');
+        $response->assertSee('100.000');
+        $response->assertSee('250.000');
+        // Tagihan `createInvoice()` selalu berperiode 2026-06, ditagih
+        // `collect()` dengan `collected_date` 2026-08-05 — nombokin bulan
+        // lalu, jadi badge Keterangan-nya wajib "Piutang".
+        $response->assertSee('Piutang');
+    }
+
+    /** Tab default (`tagihan`) tidak menampilkan pelanggan yang sudah lunas dibayar. */
+    public function test_worklist_default_tab_still_shows_invoices_not_paid_customers(): void
+    {
+        $this->collect('C-DEP-LIST-C', 150000);
+
+        $response = $this->actingAs($this->kolektor)->get(route('collector-worklist.index'));
+
+        $response->assertOk();
+        $response->assertDontSee('Pelanggan C-DEP-LIST-C');
+    }
+
+    /**
+     * Rincian yang sama di Worksheet Admin, tab Pembayaran — persis isi
+     * setoran yang akan terbentuk kalau admin menekan "Setor Atas Nama
+     * Kolektor" sekarang.
+     */
+    public function test_worksheet_sudah_bayar_tab_lists_unsettled_payments_for_admin(): void
+    {
+        $this->collect('C-DEP-LIST-D', 175000);
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('collector-worksheet.show', ['collector' => $this->kolektor->id, 'tab' => 'sudah_bayar']));
+
+        $response->assertOk();
+        $response->assertSee('Pelanggan C-DEP-LIST-D');
+        $response->assertSee('175.000');
+        $response->assertSee('Piutang');
+    }
+
+    /**
+     * Tab Pembayaran (tagihan BELUM dibayar) dan tab Sudah Bayar (sudah
+     * ditagih, belum disetor) sengaja dipisah — satu pelanggan yang sudah
+     * lunas tidak boleh numpuk lagi di tab tagihan.
+     */
+    public function test_worksheet_pembayaran_tab_does_not_show_already_paid_customers(): void
+    {
+        $this->collect('C-DEP-LIST-E', 120000);
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('collector-worksheet.show', ['collector' => $this->kolektor->id, 'tab' => 'pembayaran']));
+
+        $response->assertOk();
+        $response->assertDontSee('Pelanggan C-DEP-LIST-E');
+    }
+
+    // ================= ADMIN SETOR ATAS NAMA KOLEKTOR =================
+
+    /**
+     * Kolektor yang tak bisa akses aplikasinya sendiri (HP rusak, dst) —
+     * admin bantu setor dari Worksheet Admin. Saldo yang nol tetap saldo
+     * KOLEKTOR (bukan admin), dan audit log tetap jujur soal siapa yang
+     * benar-benar menekan tombol.
+     */
+    public function test_admin_can_deposit_on_behalf_of_collector_who_cannot_access_the_app(): void
+    {
+        $this->collect('C-DEP-BEHALF-A', 100000);
+        $this->collect('C-DEP-BEHALF-B', 250000);
+
+        $this->actingAs($this->admin)
+            ->post(route('collector-worksheet.deposit', $this->kolektor->id))
+            ->assertRedirect(route('collector-worksheet.show', ['collector' => $this->kolektor->id, 'tab' => 'setoran']));
+
+        $deposit = CollectorDeposit::query()->firstOrFail();
+        $this->assertSame($this->kolektor->id, $deposit->collector_id);
+        $this->assertSame(DepositStatus::MENUNGGU_VERIFIKASI, $deposit->status);
+        $this->assertSame(350000.0, $deposit->computedAmount());
+        $this->assertSame(0.0, $this->balance());
+
+        $audit = AuditLog::where('auditable_type', CollectorDeposit::class)
+            ->where('auditable_id', $deposit->id)
+            ->where('action', 'disetorkan')
+            ->firstOrFail();
+        // Aktornya WAJIB admin, bukan kolektor — kalau tercatat kolektor,
+        // jejaknya berbohong seolah dia menyetor sendiri padahal sedang
+        // tidak bisa berbuat apa-apa.
+        $this->assertSame($this->admin->id, $audit->user_id);
+        $this->assertSame($this->kolektor->name, $audit->new_values['disetorkan_oleh_admin_untuk']);
+    }
+
+    /**
+     * Admin yang sama boleh MENYETOR atas nama kolektor lalu MEMVERIFIKASI
+     * setoran itu sendiri — relaksasi yang disengaja untuk kasus kolektor
+     * lumpuh akses (`assertVerifierIsNotDepositor` cuma membandingkan
+     * verifier dengan pemilik saldo/`collector_id`, bukan dengan siapa yang
+     * menyetor).
+     */
+    public function test_admin_who_deposited_on_behalf_can_also_verify_it(): void
+    {
+        $this->collect('C-DEP-BEHALF-C', 200000);
+        $this->actingAs($this->admin)->post(route('collector-worksheet.deposit', $this->kolektor->id));
+        $deposit = CollectorDeposit::query()->firstOrFail();
+
+        $this->actingAs($this->admin)->post(route('collector-deposits.verify', $deposit->id), [
+            'declared_amount' => 200000,
+        ])->assertRedirect();
+
+        $this->assertSame(DepositStatus::TERVERIFIKASI, $deposit->refresh()->status);
+    }
+
+    public function test_deposit_on_behalf_rejected_when_balance_is_empty(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('collector-worksheet.deposit', $this->kolektor->id))
+            ->assertSessionHasErrors('deposit');
+
+        $this->assertDatabaseCount('collector_deposits', 0);
+    }
+
+    public function test_deposit_on_behalf_requires_target_to_be_a_kolektor(): void
+    {
+        $this->collect('C-DEP-BEHALF-D', 100000);
+        $notAKolektor = $this->createUser('pop_admin', $this->pop);
+
+        $this->actingAs($this->admin)
+            ->post(route('collector-worksheet.deposit', $notAKolektor->id))
+            ->assertNotFound();
+    }
+
+    /**
+     * Guard POP sama persis dengan yang menggerbang halaman Worksheet-nya —
+     * admin cabang lain tak boleh diam-diam menghabiskan saldo kolektor di
+     * luar scope-nya.
+     */
+    public function test_deposit_on_behalf_rejected_when_collector_pop_is_out_of_scope(): void
+    {
+        $this->collect('C-DEP-BEHALF-E', 100000);
+
+        $otherPop = $this->createPop('DEP2');
+        $outsideAdmin = $this->createUser('pop_admin', $otherPop);
+
+        $this->actingAs($outsideAdmin)
+            ->post(route('collector-worksheet.deposit', $this->kolektor->id))
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('collector_deposits', 0);
+    }
+
+    /**
+     * Kolektor sendiri, biar pun sedang bisa akses aplikasi, tetap tidak
+     * berwenang lewat rute admin ini — dia punya rute sendiri
+     * (`collector-worklist.deposit`), permission-nya beda.
+     */
+    public function test_deposit_on_behalf_route_is_not_granted_to_kolektor_role(): void
+    {
+        $this->collect('C-DEP-BEHALF-F', 100000);
+
+        $this->actingAs($this->kolektor)
+            ->post(route('collector-worksheet.deposit', $this->kolektor->id))
+            ->assertForbidden();
     }
 
     // ================= VERIFIKASI =================

@@ -231,6 +231,41 @@
                 </a>
 
                 
+                <?php if($ticket->isBatch() && $ticket->batchMembers->isNotEmpty()): ?>
+                <div class="px-4 pb-3 pl-[4.4rem]">
+                    <div class="pl-4 border-l-2 border-violet-400 dark:border-violet-700 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+                                Pelanggan Terdampak
+                            </span>
+                            <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold font-mono bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800">
+                                <?php echo e($ticket->batchMembers->count()); ?> Orang
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <?php $__currentLoopData = $ticket->batchMembers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <div class="p-2 rounded-lg border border-border bg-surface flex items-center justify-between gap-2 shadow-2xs">
+                                <div class="min-w-0">
+                                    <div class="font-bold text-text-main text-xs truncate"><?php echo e($member->customer_name); ?></div>
+                                    <div class="text-[10px] font-mono text-sky-600 dark:text-sky-400"><?php echo e($member->cid ?: '—'); ?></div>
+                                </div>
+                                <?php if($member->phone): ?>
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                                          title="Nomor WhatsApp">
+                                        <svg class="h-2.5 w-2.5 fill-current shrink-0" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+                                        <?php echo e($member->phone); ?>
+
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                
                 <?php if($hasActions): ?>
                 <div class="flex items-center gap-2 px-4 pb-3 pl-[4.4rem]">
                     <?php if($ticketActions['can_close']): ?>

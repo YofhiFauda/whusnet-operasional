@@ -400,7 +400,7 @@ Task dashboard dianggap selesai jika:
 * [ ] Dashboard menampilkan total tagihan bulan ini.
 * [ ] Dashboard menampilkan total pembayaran bulan ini.
 * [ ] Dashboard menampilkan total tunggakan.
-* [ ] Dashboard menampilkan tagihan jatuh tempo.
+* [ ] Dashboard menampilkan piutang tagihan (belum lunas dari periode sebelum bulan berjalan — bukan sekadar lewat tanggal jatuh tempo).
 * [ ] Dashboard menampilkan pelanggan yang perlu dilengkapi.
 * [ ] Owner melihat semua data.
 * [ ] Admin Pusat melihat semua cabang.

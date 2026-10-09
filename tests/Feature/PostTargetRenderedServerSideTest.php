@@ -108,6 +108,10 @@ class PostTargetRenderedServerSideTest extends TestCase
             'verification queue — reject' => ['resources/views/verifications/queue.blade.php', '/reject`'],
             'notification dropdown — mark read' => ['resources/views/components/notification-dropdown.blade.php', '/notifications/${'],
             'notification list — toggle read' => ['resources/views/notifications/index.blade.php', '/notifications/${'],
+            // Modal "Tambah Pelanggan Terdampak" (tiket batch, revisi Worksheet
+            // Helpdesk) — URL dirender server-side (batch_members_store_url di
+            // worksheetCardPayload), bukan dirakit dari ticket.id di klien.
+            'ticket worksheet — batch member store' => ['resources/views/tickets/create.blade.php', '/batch-members`'],
         ];
     }
 

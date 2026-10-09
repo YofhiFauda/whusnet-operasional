@@ -2,19 +2,28 @@
 
 namespace App\Providers;
 
+use App\Enums\CReqVerificationStatus;
+use App\Enums\TaskType;
+use App\Enums\WorkflowTransition;
 use App\Models\Customer;
+use App\Models\CustomerBalanceMutation;
 use App\Models\CustomerQrToken;
 use App\Models\FopTask;
+use App\Models\InventoryTransaction;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Pop;
 use App\Models\Task;
+use App\Observers\CustomerBalanceMutationObserver;
 use App\Observers\CustomerObserver;
 use App\Observers\CustomerQrTokenObserver;
 use App\Observers\FopTaskObserver;
+use App\Observers\InventoryTransactionObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TaskObserver;
 use App\Policies\TaskPolicy;
+use App\Services\EffectiveAccessService;
 use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -110,6 +119,17 @@ class AppServiceProvider extends ServiceProvider
         // Ticketing — tulis riwayat sisi Ticket saat Task FOP-nya dibatalkan,
         // dari jalur cancel mana pun.
         FopTask::observe(FopTaskObserver::class);
+
+        // Gudang/Inventory (ADHOC-54) — ledger append-only. Salah catat
+        // dilawan baris ADJUSTMENT baru, bukan edit/hapus baris lama, dari
+        // jalur mana pun (Service, artisan, tinker). Lihat docblock
+        // InventoryTransactionObserver buat batasan jalur yang TIDAK
+        // ketangkep (bulk update query builder/raw SQL).
+        InventoryTransaction::observe(InventoryTransactionObserver::class);
+
+        // Saldo Pelanggan (ADHOC-92) — ledger append-only sama alasannya
+        // dengan InventoryTransaction di atas (G8).
+        CustomerBalanceMutation::observe(CustomerBalanceMutationObserver::class);
 
         // Register Blade Directives for formatting
         Blade::directive('rupiah', function ($expression) {
@@ -260,12 +280,112 @@ class AppServiceProvider extends ServiceProvider
         // dihidupkan lagi tanpa controller yang makainya.
 
         // View Composer for Sidebar Badges
-        View::composer('layouts.app', function ($view) {
-            $surveyCount = Customer::whereIn('status', ['waiting_survey', 'survey_in_progress'])->count();
-            $verificationCount = Customer::whereIn('status', ['surveyed', 'waiting_acc', 'waiting_installation', 'installation_in_progress', 'installed', 'verification_admin'])->count();
+        View::composer(['layouts.app', 'components.layout.sidebar', 'components.layout.app-shell'], function ($view) {
+            $surveyCount = 0;
+            $verificationCount = 0;
+            $registrationVerificationCount = 0;
+            $creqBillingVerificationCount = 0;
+
+            if (auth()->check()) {
+                $user = auth()->user();
+
+                // Antrean "Verifikasi Registrasi" (ADHOC-73) — pelanggan yang
+                // baru diregistrasi (non-Skip-Survey), belum disetujui Admin/CS.
+                if ($user->hasPermission('customer_registration_verification.view')) {
+                    $registrationVerificationCount = Customer::applyUserScope($user)
+                        ->where('status', WorkflowTransition::REGISTERED->value)
+                        ->count();
+                }
+
+                // Antrean "Verifikasi Biaya C-REQ" — task C-REQ berbayar yang
+                // menunggu disetujui/ditolak CS (docs/plan/task-teknisi/
+                // rancangan-biaya-creq-verifikasi-cs.md).
+                if ($user->hasPermission('creq_billing_verification.view')) {
+                    $creqBillingVerificationCount = Task::applyUserScope($user)
+                        ->where('task_type', TaskType::CREQ->value)
+                        ->whereHas('creqDetail', function ($q) {
+                            $q->where('is_billable', true)
+                                ->where('verification_status', CReqVerificationStatus::PENDING->value);
+                        })
+                        ->count();
+                }
+
+                if ($user->hasPermission('customers.detail.survey.view')) {
+                    $surveyQuery = Customer::applyUserScope($user)
+                        ->where(function ($q) {
+                            $q->where('status', 'waiting_survey')->orWhere('status', 'survey_in_progress');
+                        });
+
+                    if (! $user->hasFullAccess() && $user->isTechnician()) {
+                        $surveyQuery->whereHas('tasks', function ($q) use ($user) {
+                            $q->where('task_type', TaskType::SURVEY->value)
+                                ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id));
+                        });
+                    }
+
+                    $surveyCount = $surveyQuery->count();
+                }
+
+                if ($user->hasPermission('customers.detail.installation.view')) {
+                    $statuses = [
+                        'waiting_acc',
+                        'surveyed',
+                        'waiting_installation',
+                        'installation_in_progress',
+                        'revision_installation',
+                        'installed',
+                        'verification_admin',
+                    ];
+
+                    $verificationQuery = Customer::applyUserScope($user)
+                        ->whereIn('status', $statuses);
+
+                    if (! $user->hasFullAccess() && $user->isTechnician()) {
+                        $verificationQuery->whereHas('tasks', function ($q) use ($user) {
+                            $q->where('task_type', TaskType::PEMASANGAN->value)
+                                ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id));
+                        });
+                    }
+
+                    $verificationCount = $verificationQuery->count();
+                }
+            }
 
             $view->with('badge_survey_count', $surveyCount)
-                ->with('badge_verification_count', $verificationCount);
+                ->with('badge_verification_count', $verificationCount)
+                ->with('badge_registration_verification_count', $registrationVerificationCount)
+                ->with('badge_creq_billing_verification_count', $creqBillingVerificationCount);
+        });
+
+        // Konteks cabang global gudang (analisa-ui-ux-warehouse.md §S1) — chip
+        // switcher + badge "Menampilkan: Cabang X" di header SATU-SATUNYA
+        // (`x-warehouse.header`), dipasok lewat composer biar SEMUA halaman
+        // gudang (bukan cuma yang listing) otomatis dapat tanpa controller-nya
+        // masing-masing diubah. Pilihan aktif dibaca dari session yang ditulis
+        // `WarehouseSwitchPopController` — composer ini CUMA baca, gak nulis.
+        View::composer('components.warehouse.header', function ($view) {
+            $pops = collect();
+            $selectedPopId = null;
+
+            if (auth()->check()) {
+                $user = auth()->user();
+                $access = app(EffectiveAccessService::class);
+
+                $pops = Pop::query()
+                    ->warehouse()
+                    ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
+                    ->orderBy('type')->orderBy('name')
+                    ->get();
+
+                $sessionPopId = session('warehouse.pop_id');
+                if ($sessionPopId !== null
+                    && ($access->hasAllPopAccess($user) || in_array((int) $sessionPopId, $access->getAllowedPopIds($user), true))) {
+                    $selectedPopId = (int) $sessionPopId;
+                }
+            }
+
+            $view->with('warehousePops', $pops)
+                ->with('warehouseSelectedPopId', $selectedPopId);
         });
     }
 }

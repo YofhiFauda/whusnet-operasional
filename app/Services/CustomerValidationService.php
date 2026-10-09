@@ -58,8 +58,6 @@ class CustomerValidationService
         'email' => 'Alamat Email',
         'latitude' => 'Koordinat Latitude',
         'longitude' => 'Koordinat Longitude',
-        'sales_code' => 'Kode Sales',
-        'agent_code' => 'Kode Agent',
         'ont_sn' => 'ONT Serial Number',
         'odp_code' => 'Kode ODP',
         'olt_code' => 'Kode OLT',
@@ -78,15 +76,19 @@ class CustomerValidationService
      *   - is_ready_billing  (bool)   : true if all required fields are filled
      *   - completeness_status (string): derived status string
      *
-     * @param  Customer  $customer  Must have customerService relation loaded
+     * @param  Customer  $customer  Must have relations available
      * @return array<string, mixed>
      */
     public function validate(Customer $customer): array
     {
-        // Ensure relation is available (cheap if already loaded)
-        if (! $customer->relationLoaded('customerService')) {
-            $customer->load('customerService');
-        }
+        // Ensure relations are available (cheap if already loaded)
+        $customer->loadMissing([
+            'customerService',
+            'customerAddress',
+            'customerDevice',
+            'customerTechnicalDetail',
+            'person',
+        ]);
 
         $service = $customer->customerService;
 
@@ -169,7 +171,13 @@ class CustomerValidationService
         // loadMissing(), bukan load(): dataCompleteness() dipanggil PER BARIS di
         // daftar pelanggan (customers/index.blade.php:332) yang sudah meng-eager-load
         // customerService, dan load() tetap menembak DB walau relasinya sudah ada.
-        $customer->loadMissing('customerService');
+        $customer->loadMissing([
+            'customerService',
+            'customerAddress',
+            'customerDevice',
+            'customerTechnicalDetail',
+            'person',
+        ]);
         $service = $customer->customerService;
         foreach (self::OPTIONAL_FIELDS as $key => $label) {
             if (! $this->isFieldFilled($customer, $service, $key)) {
@@ -186,10 +194,8 @@ class CustomerValidationService
      *
      * Service-level fields are prefixed with "service_" and are
      * looked up on the related customerService model.
-     *
-     * @param  CustomerService|null  $service
      */
-    private function isFieldFilled(Customer $customer, $service, string $key): bool
+    private function isFieldFilled(Customer $customer, ?CustomerService $service, string $key): bool
     {
         // Fields sourced from customerService relation
         if (str_starts_with($key, 'service_')) {
@@ -199,7 +205,24 @@ class CustomerValidationService
             }
             $value = $service->{$serviceField} ?? null;
         } else {
-            $value = $customer->{$key} ?? null;
+            $value = match ($key) {
+                'primary_phone' => $customer->primary_phone ?: ($customer->phone ?: null),
+                'address' => $customer->address ?: ($customer->customerAddress?->full_address ?: null),
+                'village_id' => $customer->village_id ?: ($customer->customerAddress?->village_id ?: null),
+                'district_id' => $customer->district_id ?: ($customer->customerAddress?->district_id ?: null),
+                'city_id' => $customer->city_id ?: ($customer->customerAddress?->city_id ?: null),
+                'internet_package_id' => $customer->internet_package_id ?: ($service?->internet_package_id ?: null),
+                'identity_number' => $customer->identity_number ?: ($customer->person?->identity_number ?: null),
+                'gender' => $customer->gender ?: ($customer->person?->gender ?: null),
+                'email' => $customer->email ?: ($customer->person?->email ?: null),
+                'latitude' => $customer->latitude ?: ($customer->customerAddress?->latitude ?: null),
+                'longitude' => $customer->longitude ?: ($customer->customerAddress?->longitude ?: null),
+                'ont_sn' => $customer->ont_sn ?: ($customer->customerDevice?->serial_number ?: ($customer->customerTechnicalDetail?->router_or_ont_serial ?: null)),
+                'odp_code' => $customer->odp_code ?: ($customer->customerDevice?->odp ?: ($customer->customerTechnicalDetail?->odp_number ?: null)),
+                'olt_code' => $customer->olt_code ?: ($customer->customerTechnicalDetail?->olt_number ?: null),
+                'vlan_id' => $customer->vlan_id ?: ($customer->customerDevice?->vlan_id ?: ($customer->customerTechnicalDetail?->vlan ?: null)),
+                default => $customer->{$key} ?? null,
+            };
         }
 
         if ($value === null) {

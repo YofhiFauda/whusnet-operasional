@@ -3,69 +3,66 @@
 namespace App\Http\Controllers;
 
 use App\Enums\NotificationType;
-use App\Models\AuditLog;
+use App\Enums\WorkflowTransition;
 use App\Models\Customer;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Services\CustomerTerminationService;
+use App\Support\RupiahInput;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class CustomerTerminationController extends Controller
 {
     /**
-     * Terminate customer service.
+     * "Request Putus Langganan" (ADHOC-69, label ADHOC-87 — cuma label,
+     * tanpa persetujuan bertingkat) — invoice denda (kalau eligible) terbit
+     * otomatis. Pembebasan tagihan periode (kalau perlu) SENGAJA bukan
+     * urusan form ini (disederhanakan 2026-09-24) — pakai aksi terpisah
+     * "Bebaskan Tagihan Periode" di Detail Pelanggan, sebelum atau sesudah
+     * putus. Lihat CustomerTerminationService.
      */
-    public function __invoke(Request $request, Customer $customer)
+    public function __invoke(Request $request, Customer $customer, CustomerTerminationService $service)
     {
-        // Sebelumnya gak ada guard permission sama sekali di sini — cuma
-        // numpang middleware `customers.update` di routes/web.php, jadi role
-        // mana pun yang bisa edit field pelanggan biasa (Helpdesk/Sales) juga
-        // otomatis bisa putus langganan. Aksi destruktif/service-impacting,
-        // wajib permission sendiri (customers.deactivate).
+        // Aksi destruktif/service-impacting, wajib permission sendiri
+        // (customers.deactivate) — bukan numpang customers.update.
         abort_unless(auth()->user()->hasPermission('customers.deactivate'), 403);
 
-        $request->validate([
-            'reason' => 'required|string|max:500',
+        $request->merge(RupiahInput::parseKeys(
+            $request->only(['penalty_amount']),
+            'penalty_amount',
+        ));
+
+        $validated = $request->validate([
+            'termination_reason_id' => 'required|exists:customer_termination_reasons,id',
+            'termination_note' => 'nullable|string|max:1000',
+            // Server yang menentukan wajib/tidaknya (masa <=1 tahun) —
+            // §3.1 rancangan. Di sini cuma dibatasi rentang wajar; guard
+            // eligibilitas ada di Service.
+            'penalty_amount' => 'nullable|numeric|min:0|max:99999999.99',
         ]);
 
-        DB::transaction(function () use ($customer, $request) {
-            // Update customer status. terminated_at (Fase 5.1) diisi supaya tab
-            // "Putus Langganan" bisa ORDER BY kolom, bukan subquery JSON audit.
-            $customer->update([
-                'status' => 'terminated',
-                'terminated_at' => now(),
-            ]);
+        // Guard state machine. POST manual tidak boleh memutus pelanggan yang
+        // masih waiting_survey/rejected, atau memutus ulang yang sudah
+        // terminated (menimpa terminated_at & menambah baris audit).
+        $oldStatus = (string) $customer->status;
 
-            // Update service status if it exists
-            if ($customer->customerService) {
-                $customer->customerService->update([
-                    'service_status' => 'berhenti',
-                ]);
-            }
+        if (! WorkflowTransition::tryFrom($oldStatus)?->canTransitionTo(WorkflowTransition::TERMINATED)) {
+            return redirect()->back()->with('error', "Pelanggan berstatus '{$oldStatus}' tidak bisa diputus langganan. Hanya pelanggan aktif atau terisolir.");
+        }
 
-            // Log activity
-            AuditLog::create([
-                'user_id' => auth()->id(),
-                'module' => 'customers',
-                'action' => 'terminate',
-                'auditable_type' => Customer::class,
-                'auditable_id' => $customer->id,
-                'old_values' => ['status' => 'active'],
-                'new_values' => ['status' => 'terminated', 'reason' => $request->reason],
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'created_at' => now(),
-            ]);
-        });
+        $invoice = $service->terminate($customer, $validated, auth()->id());
 
         // Customer Lifecycle: pendaftar asli dikasih tau pelanggannya
-        // diterminasi — sebelumnya nol notif buat transisi besar status
-        // pelanggan (docs/plan/analisa-status-implementasi-notifikasi.md §5).
+        // diterminasi.
         $creator = $customer->creator ?? ($customer->created_by ? User::find($customer->created_by) : null);
         if ($creator && $creator->id !== auth()->id()) {
+            $penaltyMessage = $invoice
+                ? 'Denda putus langganan '.format_rupiah($invoice->total_amount).' diterbitkan ('.$invoice->invoice_number.').'
+                : 'Tidak ada denda putus langganan.';
+
             $creator->notify(new AppNotification(
                 title: 'Pelanggan Diterminasi: '.$customer->full_name,
-                message: "Layanan pelanggan {$customer->full_name} dihentikan oleh ".auth()->user()->name.". Alasan: {$request->reason}",
+                message: "Layanan pelanggan {$customer->full_name} dihentikan oleh ".auth()->user()->name.". {$penaltyMessage}",
                 actionUrl: route('customers.show', $customer->id),
                 type: NotificationType::ERROR
             ));

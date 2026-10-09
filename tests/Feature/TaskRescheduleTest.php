@@ -187,7 +187,7 @@ class TaskRescheduleTest extends TestCase
      * Sejak 2026-07-15 (docs/project_status_label_unifikasi.md), `RESCHEDULE`
      * dileburin jadi `pending` biasa — entry histori-nya sekarang `pending_fop`
      * (sama kayak FOP "Set Pending" manual), BUKAN `pending_reschedule` lagi.
-     * Beda dari `lapor_nanti` (Task 6, report_deferred=true) yang TETAP kondisi
+     * Beda dari `lapor_nanti` (status sendiri sejak 2026-09-26) yang TETAP kondisi
      * tersendiri.
      */
     public function test_reschedule_writes_dedicated_status_history_row(): void

@@ -66,10 +66,13 @@ class PdfTextNumberReader
             return [];
         }
 
-        // Pola yang SAMA dengan ReceiptNumberExtractor::normalize(). Lapisan
+        // Pola yang SAMA dengan ReceiptNumberExtractor::normalize() (BUG 13,
+        // 2026-10-01: dilonggarkan jadi "PAY-" + rentetan alnum/dash, karena
+        // badan nomornya sekarang menempelkan invoice_number apa adanya —
+        // bentuknya ikut bervariasi, lihat alasan lengkap di sana). Lapisan
         // teks memuat seluruh isi kwitansi (nama, alamat, nominal), jadi pola
         // inilah yang memisahkan nomor pembayaran dari teks lain.
-        if (preg_match_all('/PAY-\d{6}-\d+/i', $process->getOutput(), $matches) === false || $matches[0] === []) {
+        if (preg_match_all('/PAY-[A-Z0-9-]{5,40}/i', $process->getOutput(), $matches) === false || $matches[0] === []) {
             return [];
         }
 

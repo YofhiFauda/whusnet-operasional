@@ -6,6 +6,7 @@ use App\Enums\TaskType;
 use App\Enums\TicketBucket;
 use App\Models\Pop;
 use App\Models\Ticket;
+use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 
 /**
@@ -62,14 +63,19 @@ abstract class TicketArchiveController extends Controller
                 'creator:id,name',
                 'pop:id,name',
                 'fopTask:id,task_number,status',
-                'issueCategory:id,name',
+                'issueCategory:id,name,is_batch',
                 // Atribusi (siapa buat/selesaikan/kirim ke NOC/kirim ke FOP) —
                 // lihat Ticket::closedBy()/escalatedToNocBy()/escalatedToFopBy().
                 'histories.actor:id,name',
+                // Pelanggan terdampak (tiket batch) — Parent DAN Child sama-sama
+                // wajib kebaca di arsip (Ticket Selesai/Dibatalkan), beda dari
+                // Worksheet Helpdesk yang cuma nge-tampilin ke FOP/NOC Parent-nya
+                // doang (lihat Ticket::isBatch()/batchMembers()).
+                'batchMembers',
             ])
             ->withCount('attachments');
 
-        if ($search = $request->query('q')) {
+        if ($search = LikeSearch::sanitize((string) $request->query('q', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
                     ->orWhere('detail_keluhan', 'like', "%{$search}%")

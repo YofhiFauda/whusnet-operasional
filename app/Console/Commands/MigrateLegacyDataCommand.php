@@ -20,6 +20,13 @@ class MigrateLegacyDataCommand extends Command
     use ParsesLegacySqlDump;
 
     /**
+     * Pop type=pusat tujuan (dari --pusat-code), di-resolve sekali di awal
+     * handle() lalu dipakai sebagai parent_id tiap Cabang dibuat — termasuk
+     * jalur fallback UNASSIGNED yang gak lewat createLegacyPopMap().
+     */
+    private ?Pop $pusatPop = null;
+
+    /**
      * The name and signature of the console command.
      *
      * @var string
@@ -42,11 +49,19 @@ class MigrateLegacyDataCommand extends Command
      * secara fisik harus jadi Mini POP D6, bukan D1 — karena D1..D5 sudah
      * dipakai OLT lain di Cabang D yang sama):
      * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --mini-pop-map=1:6
+     *
+     * WAJIB SELALU SERTAKAN --pusat-code (pop_code dari Pop type=pusat yang
+     * SUDAH ADA, dibuat manual lewat Master POP). Cabang baru dari command
+     * ini nempel jadi anak Pusat itu (parent_id). Tanpa ini command akan
+     * berhenti dengan error — daripada diam-diam bikin Cabang orphan tanpa
+     * parent, yang bikin hierarki Pusat > Cabang > Mini POP pecah:
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --pusat-code=WHUSNET
      *  */
     protected $signature = 'app:import-legacy-sql
                         {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql}
                         {--branch-code= : Tentukan Kode Cabang POP target (contoh: C, D)}
                         {--branch-name= : Tentukan Nama Cabang POP target (contoh: Jetis, Siman)}
+                        {--pusat-code= : WAJIB. pop_code dari Pop type=pusat yang sudah ada (dibuat manual di Master POP) — Cabang baru dari command ini jadi anak Pusat tsb}
                         {--without-billing : Impor pelanggan/layanan/data teknis saja, tanpa tagihan & pembayaran legacy}
                         {--mini-pop-map= : Peta ulang nomor kategori_perangkat_jaringan LEGACY (khusus per-dump) ke segmen Mini POP SUNGGUHAN di Master POP, format "1:6,2:7". Wajib dipakai kalau dump berasal dari instalasi/cabang lama yang penomoran OLT-nya sendiri (mis. selalu mulai dari 1) tidak sama dengan penomoran Mini POP nyata di bawah Cabang tujuan (mis. dump ini semuanya harus jadi Mini POP D6, bukan D1). Kategori yang tidak disebut di peta ini tetap dipakai apa adanya.}';
 
@@ -236,10 +251,31 @@ class MigrateLegacyDataCommand extends Command
         $overrideName = $this->option('branch-name');
         $miniPopSegmentMap = $this->parseMiniPopSegmentMap($this->option('mini-pop-map'));
 
+        // Cabang baru wajib nempel ke Pusat yang sudah ada (dibuat manual di
+        // Master POP) — kalau tidak diwajibkan, firstOrCreate('cabang') di
+        // bawah bikin Cabang dengan parent_id null (orphan, jadi "root"
+        // sendiri), bukan anak dari Pusat, dan hierarki Pusat > Cabang >
+        // Mini POP jadi pecah tanpa ada yang sadar.
+        $pusatCode = $this->option('pusat-code');
+        if (! $pusatCode) {
+            $this->error('Wajib isi --pusat-code (pop_code dari Pop type=pusat yang sudah ada di Master POP). Tanpa ini Cabang baru akan jadi orphan, gak nempel ke Pusat manapun.');
+
+            return \Symfony\Component\Console\Command\Command::FAILURE;
+        }
+
+        $pusatPop = Pop::where('type', 'pusat')->where('pop_code', strtoupper(trim($pusatCode)))->first();
+        if (! $pusatPop) {
+            $this->error("Pop type=pusat dengan pop_code '{$pusatCode}' tidak ditemukan. Buat dulu lewat Master POP sebelum import.");
+
+            return \Symfony\Component\Console\Command\Command::FAILURE;
+        }
+
+        $this->pusatPop = $pusatPop;
+
         // Create POPs from the legacy cabang table so this command can migrate
         // multiple branches from any dump with the same schema.
         // Kirimkan override ke pembuatan Map POP
-        $legacyPopMap = $this->createLegacyPopMap($cabangRows, $overrideCode, $overrideName);
+        $legacyPopMap = $this->createLegacyPopMap($cabangRows, $overrideCode, $overrideName, $pusatPop);
 
         if ($legacyPopMap === []) {
             // Fallback jika tabel cabang kosong
@@ -252,6 +288,7 @@ class MigrateLegacyDataCommand extends Command
                     'code' => $defaultCode,
                     'name' => $defaultName,
                     'type' => 'cabang',
+                    'parent_id' => $pusatPop->id,
                     'status' => 'active',
                     'registration_prefix' => 'RQ',
                     'cid_prefix' => $defaultCode,
@@ -1656,7 +1693,7 @@ class MigrateLegacyDataCommand extends Command
      *
      * @return array<string, array{pop_code: string, pop_name: string, pop_model: Pop}>
      */
-    private function createLegacyPopMap(array $cabangRows, ?string $overrideCode = null, ?string $overrideName = null): array
+    private function createLegacyPopMap(array $cabangRows, ?string $overrideCode = null, ?string $overrideName = null, ?Pop $pusatPop = null): array
     {
         $map = [];
 
@@ -1687,6 +1724,7 @@ class MigrateLegacyDataCommand extends Command
                     'code' => $popCode,
                     'name' => $popName,
                     'type' => 'cabang',
+                    'parent_id' => $pusatPop?->id,
                     'status' => 'active',
                     'registration_prefix' => 'RQ',
                     'cid_prefix' => $popCode, // Otomatis diset sesuai kode cabang yang dipilih (C atau D)
@@ -1748,6 +1786,7 @@ class MigrateLegacyDataCommand extends Command
                 'code' => 'UNASSIGNED',
                 'name' => 'Belum Dialokasikan',
                 'type' => 'cabang',
+                'parent_id' => $this->pusatPop?->id,
                 'status' => 'active',
                 'registration_prefix' => 'RQ',
                 'cid_prefix' => 'C',

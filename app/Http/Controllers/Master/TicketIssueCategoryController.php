@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Master;
 use App\Enums\FopTaskPriority;
 use App\Http\Controllers\Controller;
 use App\Models\TicketIssueCategory;
+use App\Services\MasterRecordRemovalService;
+use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,7 +17,7 @@ class TicketIssueCategoryController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
         $status = $request->query('status');
 
         $categories = TicketIssueCategory::query()
@@ -76,12 +78,24 @@ class TicketIssueCategoryController extends Controller
         return back()->with('success', "Kategori issue \"{$category->name}\" berhasil {$statusText}.");
     }
 
+    public function destroy(TicketIssueCategory $category, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        $deleted = $removal->remove($category, ['is_active' => false]);
+
+        return back()->with(
+            $deleted ? 'success' : 'warning',
+            $deleted
+                ? "Kategori issue \"{$category->name}\" berhasil dihapus."
+                : "Kategori issue \"{$category->name}\" masih dipakai tiket, jadi hanya dinonaktifkan."
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */
     private function validateCategory(Request $request, ?TicketIssueCategory $category = null): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => [
                 'required',
                 'string',
@@ -91,6 +105,18 @@ class TicketIssueCategoryController extends Controller
             'default_priority' => ['required', new Enum(FopTaskPriority::class)],
             'sla_source' => ['required', Rule::in(['paket', 'prioritas'])],
             'is_active' => 'required|boolean',
+            // Checkbox HTML gak ngirim apa pun kalau gak dicentang — nullable
+            // di rule, dinormalisasi eksplisit ke bool di bawah lewat
+            // $request->boolean() (BUKAN 'required|boolean', checkbox
+            // "unchecked" gak lolos required; BUKAN dibiarkan absen dari
+            // $validated juga — update() dengan key absen gak mereset
+            // is_batch=true balik ke false waktu checkbox-nya dicentang lalu
+            // di-uncheck lagi).
+            'is_batch' => ['nullable', 'boolean'],
         ]);
+
+        $validated['is_batch'] = $request->boolean('is_batch');
+
+        return $validated;
     }
 }

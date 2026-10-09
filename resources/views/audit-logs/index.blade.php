@@ -83,6 +83,16 @@
                             <div class="font-mono text-xs text-slate-700 dark:text-slate-300">{{ class_basename($auditLog->auditable_type) ?: '-' }}</div>
                             <div class="text-xs text-slate-500 dark:text-slate-400">ID: {{ $auditLog->auditable_id ?? '-' }}</div>
                             <div class="text-xs text-slate-500 dark:text-slate-400">IP: {{ $auditLog->ip_address ?? '-' }}</div>
+                            {{-- Klasifikasi payment (ADHOC-84 §8.1/§8.2) — cuma tampil
+                                 kalau payment-nya masih ada; entri lama yang paymentnya
+                                 sudah tak ada dilewati, bukan error. --}}
+                            @if($auditLog->auditable_type === \App\Models\Payment::class && $paymentsForAuditRows->has($auditLog->auditable_id))
+                                <div class="mt-1.5 flex flex-wrap gap-1">
+                                    @foreach($paymentsForAuditRows->get($auditLog->auditable_id)->classification() as $label)
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $label->badgeClass() }}">{{ $label->label() }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
                         </td>
                         <td class="px-6 py-4 min-w-[24rem]">
                             <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
