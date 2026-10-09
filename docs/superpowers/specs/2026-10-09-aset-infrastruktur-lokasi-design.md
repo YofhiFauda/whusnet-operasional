@@ -187,16 +187,25 @@ Mini POP yang sebenarnya bukan stok.
 
 Kedua tipe baru ini **mengikuti pola yang sama persis** dengan
 `issue`/`return`/`install` yang sudah ada — ledger append-only, row locking,
-reference number per pola `generateReferenceNumber()`. Satu ledger, dua
-pembaca proyeksi tergantung `tracking_type` item:
-- **SERIALIZED** → proyeksi dibaca dari `inventory_serials.status/current_pop_id/current_odp_id`
-  (SATU baris = SATU unit, gak butuh tabel saldo — sama seperti `install` sekarang).
-- **QUANTITY** → proyeksi ditulis ke `infrastructure_balances` (§3.5), **bukan**
-  `inventory_balances` — `to_pop_id`/`to_odp_id` baris `deploy` dan
-  `from_pop_id`/`from_odp_id` baris `retrieve_infra` dibaca Service yang
-  meng-update `infrastructure_balances`, mirror cara `inventory_balances`
-  diupdate di `issue`/`transfer` sekarang (increment/decrement langsung di
-  Service yang sama dengan penulisan ledger, satu transaction).
+reference number per pola `generateReferenceNumber()`. Satu ledger, tiga
+pembaca proyeksi tergantung `tracking_type` item (**koreksi data 2026-10-09**:
+splitter/ODP box = SERIALIZED, kabel = ROLL — bukan QUANTITY, lihat
+`docs/superpowers/plans/2026-10-09-aset-infrastruktur-lokasi.md` Task 2a):
+- **SERIALIZED** (splitter, ODP box, OLT, switch) → proyeksi dibaca dari
+  `inventory_serials.status/current_pop_id/current_odp_id` (SATU baris = SATU
+  unit, gak butuh tabel saldo — sama seperti `install` sekarang).
+- **QUANTITY** (aksesoris pasang, bukan splitter/kabel) → proyeksi ditulis ke
+  `infrastructure_balances` (§3.5) dengan `lot_no=''`, **bukan** `inventory_balances`.
+- **ROLL** (kabel dropcore/fiber) → **tidak** lewat `TechnicianCustody`
+  (roll dipegang langsung, bukan custody agregat — Gudang business-logic §1).
+  Proyeksi ditulis ke `infrastructure_balances` juga, tapi `lot_no=roll_code`
+  (bukan sentinel kosong) supaya meter dari roll berbeda tetap tertelusur per-roll.
+
+Untuk QUANTITY & ROLL, `to_pop_id`/`to_odp_id` baris `deploy` dan
+`from_pop_id`/`from_odp_id` baris `retrieve_infra` dibaca Service yang
+meng-update `infrastructure_balances`, mirror cara `inventory_balances`
+diupdate di `issue`/`transfer` sekarang (increment/decrement langsung di
+Service yang sama dengan penulisan ledger, satu transaction).
 
 ## 4. Alur Pasang/Ganti Aset lewat O-REQ/INFR-REQ
 
@@ -207,11 +216,17 @@ Mengikuti pola **integrasi Task Teknisi ↔ Gudang** yang sudah ada
 1. Teknisi Issue dari Gudang Cabang (pola sama: InventoryIssueService)
    → custody teknisi (QUANTITY) atau SN status=ISSUED (SERIALIZED)
 
-2. Teknisi kerjakan task O-REQ/INFR REQ, submit Laporan
-   (form baru, pola sama "Laporan Pemasangan"/"Laporan Device Retrieval")
+2. Teknisi kerjakan task O-REQ/INFR REQ, submit Laporan — **BUKAN form baru**,
+   O-REQ & INFR REQ **sudah** lewat `TaskMaintenanceController::report()`/`store()`
+   yang sama dengan MTN/C-REQ (satu controller, satu view
+   `tasks/maintenance-report.blade.php`, one-shot `sync()+complete()` dalam
+   satu request). Cukup tambah **seksi baru** "Pasang/Ganti Infrastruktur" di
+   form itu, tampil kondisional cuma untuk `task_type ∈ {OREQ, INFR}`:
    → pilih target lokasi: Mini POP / ODP (dropdown berjenjang
      Cabang → Mini POP → ODP, pola sama modal "Atur Mini POP & Distribusi")
-   → pilih SN yang dipasang (SERIALIZED) dan/atau qty dari custody (QUANTITY)
+   → pilih SN yang dipasang (SERIALIZED, dari custody tim — sumber sama
+     `eligibleSerialsForTeam()`, filter `ownership_mode=INFRASTRUCTURE_ASSET`
+     bukan `INSTALLABLE`) dan/atau qty dari custody (QUANTITY)
 
 3. InventoryService::deployToLocation() (method baru, sejajar installSerial())
    - SERIALIZED: SN → status=DEPLOYED, current_pop_id ATAU current_odp_id diisi

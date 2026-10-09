@@ -9,12 +9,21 @@ Lacak Barang) dan per-lokasi (baru, halaman Aset per Lokasi).
 
 **Architecture:** Tambah node master `odps` (anak Mini POP). Perluas ledger
 Gudang yang ada (`inventory_transactions`, tipe baru `deploy`/`retrieve_infra`)
-alih-alih bikin ledger baru. SERIALIZED pakai ulang `inventory_serials`
-(status baru `DEPLOYED` + kolom `current_odp_id`). QUANTITY **TIDAK** numpang
-`inventory_balances` (kolom itu sengaja dibatasi Pusat/Cabang, `Pop::WAREHOUSE_TYPES`)
-— proyeksi saldo-nya ditaruh di tabel baru `infrastructure_balances`. Jalur
-masuk teknisi reuse `TaskMaintenanceController` yang sudah menangani O-REQ/INFR
-REQ (seksi form baru, bukan controller baru).
+alih-alih bikin ledger baru. SERIALIZED (splitter/ODP box/OLT/switch) pakai
+ulang `inventory_serials` (status baru `DEPLOYED` + kolom `current_odp_id`).
+QUANTITY (aksesoris pasang) **TIDAK** numpang `inventory_balances` (kolom itu
+sengaja dibatasi Pusat/Cabang, `Pop::WAREHOUSE_TYPES`) — proyeksi saldo-nya
+ditaruh di tabel baru `infrastructure_balances`, yang juga menampung sisa
+meter kabel ROLL yang terpasang netap (`lot_no` = kode roll, ADHOC lama:
+`consumeFromCustody()` cuma QUANTITY, `inventory_rolls` jalur sendiri buat
+ROLL — dua mekanisme beda, dua method deploy beda, satu tabel proyeksi).
+**Koreksi data seeder (ditemukan 2026-10-09, lihat Task 2a):** kategori
+`splitter_odp`/ODP box saat ini salah ter-seed `tracking_type=quantity`
+(seharusnya `serialized`+`auto_generate_serial=true` — sudah terdokumentasi
+`docs/warehouse/business-logic.md` §1 tapi `ItemSeeder` belum pernah
+diperbaiki ikut itu), demikian juga `kabel_dropcore` (seharusnya `roll`,
+bukan `quantity`). Jalur masuk teknisi reuse `TaskMaintenanceController` yang
+sudah menangani O-REQ/INFR REQ (seksi form baru, bukan controller baru).
 
 **Tech Stack:** Laravel 13, PHPUnit 12, Blade + Alpine.js (Vite), sqlite `:memory:` test.
 
@@ -61,6 +70,7 @@ REQ (seksi form baru, bukan controller baru).
 | File | Tanggung jawab |
 |---|---|
 | `database/migrations/2026_10_09_100000_create_odps_table.php` | Tabel master ODP |
+| `database/seeders/ItemSeeder.php` | Koreksi `tracking_type` splitter/ODP (serialized) & kabel (roll) |
 | `database/migrations/2026_10_09_100001_add_current_odp_id_to_inventory_serials_table.php` | Kolom lokasi ODP di SN |
 | `database/migrations/2026_10_09_100002_add_odp_columns_to_inventory_transactions_table.php` | Kolom ledger `to_odp_id`/`from_odp_id` |
 | `database/migrations/2026_10_09_100003_create_infrastructure_balances_table.php` | Proyeksi saldo QUANTITY yang di-deploy |
@@ -72,7 +82,7 @@ REQ (seksi form baru, bukan controller baru).
 | `app/Models/InventorySerial.php` | + relasi `currentOdp()` |
 | `app/Models/InventoryTransaction.php` | + relasi `toOdp()`/`fromOdp()` |
 | `app/Http/Controllers/Warehouse/Concerns/AuthorizesWarehousePop.php` | + `assertOdpInScope()` |
-| `app/Services/InventoryService.php` | + `deploySerial()`, `deployQuantity()`, `retrieveSerialFromLocation()` |
+| `app/Services/InventoryService.php` | + `deploySerial()`, `deployQuantity()`, `deployRoll()`, `retrieveSerialFromLocation()` |
 | `app/Services/InventoryAdjustmentService.php` | `adjustSerialStatus()` — kosongkan `current_pop_id`/`current_odp_id` saat SN `DEPLOYED` diadjust |
 | `app/Http/Controllers/Master/OdpController.php` | CRUD Master ODP |
 | `resources/views/master/odp/{index,create,edit}.blade.php` | View Master ODP |
@@ -295,6 +305,94 @@ git commit -m "feat: tambah master ODP (anak Mini POP) dengan CRUD + permission 
 
 ---
 
+### Task 2a: Koreksi `ItemSeeder` — Splitter/ODP jadi SERIALIZED, Kabel jadi ROLL
+
+**Ditemukan 2026-10-09** (review plan sebelum eksekusi, bukan bagian desain
+awal): kategori `splitter_odp` (SPL-1X2…SPL-1X32, ODP-8, ODP-16, ODC-24) dan
+`kabel_dropcore` (DC-1C, DC-2C, KBL-FEEDER-12C) di `database/seeders/ItemSeeder.php`
+tidak mengisi `tracking_type` override, jatuh ke default `'quantity'`
+(`ItemSeeder.php:165`). **Seharusnya** `splitter_odp`/ODP box = `serialized`
++ `auto_generate_serial=true` (barang tanpa SN vendor, sudah terdokumentasi
+`docs/warehouse/business-logic.md` §1 tapi seeder belum pernah disamakan), dan
+`kabel_dropcore` = `roll`. Task 5 (`deploySerial()`/`deployRoll()`) butuh data
+ini benar — splitter/ODP dan kabel TIDAK lewat `deployQuantity()`.
+
+**Files:**
+- Modify: `database/seeders/ItemSeeder.php`
+- Test: `tests/Unit/ItemSeederTrackingTypeTest.php`
+
+**Interfaces:**
+- Produces: tidak ada interface baru — cuma data seed yang benar, dikonsumsi
+  Task 5/7 (contoh test pakai item kategori `splitter_odp`/`kabel_dropcore`
+  yang sekarang `tracking_type` benar).
+
+- [ ] **Step 1: Write failing test**
+
+```php
+#[Test]
+public function splitter_dan_odp_ter_seed_sebagai_serialized_auto_generate(): void
+{
+    $this->seed(ItemSeeder::class);
+
+    $splitter = Item::where('code', 'SPL-1X8')->first();
+    $this->assertSame(TrackingType::SERIALIZED, $splitter->tracking_type);
+    $this->assertTrue($splitter->auto_generate_serial);
+
+    $odp8 = Item::where('code', 'ODP-8')->first();
+    $this->assertSame(TrackingType::SERIALIZED, $odp8->tracking_type);
+    $this->assertTrue($odp8->auto_generate_serial);
+}
+
+#[Test]
+public function kabel_dropcore_ter_seed_sebagai_roll(): void
+{
+    $this->seed(ItemSeeder::class);
+
+    $kabel = Item::where('code', 'DC-1C')->first();
+    $this->assertSame(TrackingType::ROLL, $kabel->tracking_type);
+}
+```
+
+- [ ] **Step 2: Run test, verify fails**
+
+Run: `php artisan test --compact tests/Unit/ItemSeederTrackingTypeTest.php`
+Expected: FAIL — `tracking_type` masih `quantity`.
+
+- [ ] **Step 3: Implement**
+
+Di `ItemSeeder.php`, tambah `'tracking_type' => 'serialized', 'auto_generate_serial' => true`
+ke tiap baris kategori `splitter_odp` (SPL-1X2, SPL-1X4, SPL-1X8, SPL-1X16,
+SPL-1X32, ODP-8, ODP-16, ODC-24), dan `'tracking_type' => 'roll'` ke tiap
+baris kategori `kabel_dropcore` (DC-1C, DC-2C, KBL-FEEDER-12C) — pola persis
+kolom yang sudah dipakai baris `modem_ont`/`olt_module` di seeder yang sama
+(`'tracking_type' => 'serialized'`).
+
+**Data existing yang sudah ter-seed salah** (lingkungan dev/staging yang
+sudah pernah jalanin `ItemSeeder` sebelum perbaikan ini) — `updateOrCreate`
+yang sudah ada di seeder otomatis memperbaiki baris lama begitu
+`db:seed --class=ItemSeeder` dijalankan ulang, **TAPI** kalau sudah ada
+`inventory_balances`/`inventory_serials` ter-isi untuk kode-kode ini dengan
+`tracking_type` lama, itu **data migrasi terpisah** — di luar scope plan ini
+(dicatat, bukan ditangani otomatis; ikuti prinsip CLAUDE.md "jangan berasumsi
+tanpa konfirmasi" kalau DB dev/staging ternyata sudah punya transaksi nyata
+untuk kode-kode ini).
+
+- [ ] **Step 4: Run test, verify passes**
+
+Run: `php artisan test --compact tests/Unit/ItemSeederTrackingTypeTest.php`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+vendor/bin/pint --dirty --format agent
+php artisan db:seed --class=ItemSeeder
+git add database/seeders/ItemSeeder.php tests/Unit/ItemSeederTrackingTypeTest.php
+git commit -m "fix: ItemSeeder — splitter/ODP jadi SERIALIZED auto-generate, kabel dropcore jadi ROLL"
+```
+
+---
+
 ### Task 3: Kolom lokasi ODP di ledger & SN + model `InfrastructureBalance`
 
 **Files:**
@@ -502,21 +600,22 @@ git commit -m "feat: assertOdpInScope() — scope ODP ikut Mini POP induknya"
 
 ---
 
-### Task 5: `InventoryService` — `deploySerial()`, `deployQuantity()`, `retrieveSerialFromLocation()`
+### Task 5: `InventoryService` — `deploySerial()`, `deployQuantity()`, `deployRoll()`, `retrieveSerialFromLocation()`
 
 **Files:**
 - Modify: `app/Services/InventoryService.php`
 - Test: `tests/Feature/Warehouse/InventoryServiceDeployTest.php`
 
 **Interfaces:**
-- Consumes: `InfrastructureBalance` (Task 3), `TechnicianCustody` (sudah ada),
-  `InventoryTransactionType::DEPLOY`/`RETRIEVE_INFRA` (Task 1).
+- Consumes: `InfrastructureBalance` (Task 3), `TechnicianCustody`/`InventoryRoll`
+  (sudah ada), `InventoryTransactionType::DEPLOY`/`RETRIEVE_INFRA` (Task 1).
 - Produces:
   - `deploySerial(InventorySerial $serial, ?Pop $pop, ?Odp $odp, FopTask $fopTask, iterable $technicians, User $actor): InventoryTransaction`
-  - `deployQuantity(iterable $technicians, Item $item, float $qtyUsed, ?Pop $pop, ?Odp $odp, FopTask $fopTask, User $actor): array` (return shape sama `consumeFromCustody()`: `list<array{custody_id:int, lot_no:?string, qty:float}>`)
+  - `deployQuantity(iterable $technicians, Item $item, float $qtyUsed, ?Pop $pop, ?Odp $odp, FopTask $fopTask, User $actor): array` (return shape sama `consumeFromCustody()`: `list<array{custody_id:int, lot_no:?string, qty:float}>`) — **cuma** untuk item `tracking_type=QUANTITY` (bukan kabel/ROLL — lihat `deployRoll()`).
+  - `deployRoll(InventoryRoll $roll, float $metersUsed, ?Pop $pop, ?Odp $odp, iterable $technicians, FopTask $fopTask, User $actor): InventoryTransaction` — kabel ROLL (`tracking_type=ROLL`, mis. kode `DC-1C`), **tidak** lewat `TechnicianCustody` (roll dipegang langsung via `inventory_rolls.current_technician_id`, bukan custody agregat — lihat Gudang business-logic §1 ROLL).
   - `retrieveSerialFromLocation(InventorySerial $serial, FopTask $fopTask, User $actor): InventoryTransaction`
 
-  Dipakai Task 6 (`TaskMaintenanceController`).
+  Dipakai Task 7 (`TaskMaintenanceController`).
 
 - [ ] **Step 1: Write failing tests**
 
@@ -584,6 +683,33 @@ public function deploy_quantity_menolak_kalau_custody_tim_kurang(): void
 }
 
 #[Test]
+public function deploy_roll_memotong_meter_dan_menambah_infrastructure_balance(): void
+{
+    $miniPop = Pop::factory()->create(['type' => 'mini_pop']);
+    $item = Item::factory()->create(['tracking_type' => TrackingType::ROLL, 'ownership_mode' => OwnershipMode::INFRASTRUCTURE_ASSET]);
+    $technician = User::factory()->create();
+    $roll = InventoryRoll::factory()->create([
+        'item_id' => $item->id,
+        'roll_code' => 'DC1C-20261009-000001',
+        'status' => RollStatus::ISSUED,
+        'current_technician_id' => $technician->id,
+        'length_remaining' => 50,
+    ]);
+
+    app(InventoryService::class)->deployRoll($roll, 20, $miniPop, null, [$technician], FopTask::factory()->create(), $technician);
+
+    $roll->refresh();
+    $this->assertSame(30.0, (float) $roll->length_remaining);
+    $this->assertSame(RollStatus::IN_USE, $roll->status);
+    $this->assertDatabaseHas('infrastructure_balances', [
+        'item_id' => $item->id,
+        'pop_id' => $miniPop->id,
+        'lot_no' => 'DC1C-20261009-000001',
+        'qty' => 20,
+    ]);
+}
+
+#[Test]
 public function retrieve_serial_from_location_mengembalikan_sn_ke_custody_aktor(): void
 {
     $odp = Odp::factory()->create();
@@ -629,6 +755,21 @@ exactly-one `$pop`/`$odp` sama seperti `deploySerial()`. Lempar
 `InsufficientCustodyException` kalau custody kurang (reuse exception yang
 sudah ada).
 
+`deployRoll()` — pola re-fetch+`lockForUpdate()` sama `consumeFromRoll()`
+(sudah ada): validasi `status ∈ {ISSUED, IN_USE}`, `current_technician_id`
+ada di `$technicians`, `item->ownership_mode===OwnershipMode::INFRASTRUCTURE_ASSET`,
+`$metersUsed <= length_remaining`. Validasi exactly-one `$pop`/`$odp` sama
+seperti `deploySerial()`. Kurangi `length_remaining`, set
+`status = (sisa <= 0) ? DEPLETED : IN_USE` (**roll TIDAK pindah custody** —
+sama seperti `consumeFromRoll()`, roll tetap di tangan teknisi sampai
+`DEPLETED`, hanya meter yang "menetap" di lokasi yang bertambah). Buat
+`InventoryTransaction` tipe `DEPLOY`, `from_technician_id` = pemegang roll,
+`to_pop_id`/`to_odp_id` sesuai target, `qty=$metersUsed`,
+`unit_price_snapshot` disalin dari roll. Lalu
+`InfrastructureBalance::lockForUpdate()->firstOrCreate(['item_id'=>$roll->item_id,'pop_id'=>...,'odp_id'=>...,'lot_no'=>$roll->roll_code])->increment('qty', $metersUsed)`
+— `lot_no` = `roll_code` (BUKAN sentinel `''` seperti QUANTITY) supaya meter
+dari roll yang berbeda-beda di lokasi yang sama tetap bisa ditelusuri per-roll.
+
 `retrieveSerialFromLocation()` — re-fetch+lock, validasi `status===DEPLOYED`.
 Simpan `$fromPopId`/`$fromOdpId` dari nilai SEBELUM dikosongkan. Update SN:
 `status=ISSUED`, `current_technician_id=$actor->id`, `current_pop_id=null`,
@@ -645,7 +786,7 @@ Expected: PASS
 ```bash
 vendor/bin/pint --dirty --format agent
 git add app/Services/InventoryService.php tests/Feature/Warehouse/InventoryServiceDeployTest.php
-git commit -m "feat: InventoryService::deploySerial/deployQuantity/retrieveSerialFromLocation"
+git commit -m "feat: InventoryService::deploySerial/deployQuantity/deployRoll/retrieveSerialFromLocation"
 ```
 
 ---
@@ -720,7 +861,7 @@ git commit -m "fix: adjustSerialStatus() kosongkan current_pop_id/current_odp_id
 - Test: `tests/Feature/TaskInfrastructureDeployReportTest.php`
 
 **Interfaces:**
-- Consumes: `InventoryService::deploySerial()`/`deployQuantity()`/`retrieveSerialFromLocation()` (Task 5),
+- Consumes: `InventoryService::deploySerial()`/`deployQuantity()`/`deployRoll()`/`retrieveSerialFromLocation()` (Task 5),
   `Odp` (Task 2), `OwnershipMode::INFRASTRUCTURE_ASSET` (Task 1).
 - Produces: tidak ada interface baru untuk task lain — ini titik akhir alur user-facing.
 
@@ -748,6 +889,29 @@ public function teknisi_bisa_deploy_sn_infrastruktur_lewat_laporan_infr_req(): v
     $serial->refresh();
     $this->assertSame(SerialStatus::DEPLOYED, $serial->status);
     $this->assertSame($miniPop->id, $serial->current_pop_id);
+}
+
+#[Test]
+public function teknisi_bisa_deploy_kabel_roll_ke_odp_lewat_laporan_o_req(): void
+{
+    $cabang = Pop::factory()->create(['type' => 'cabang']);
+    $miniPop = Pop::factory()->create(['type' => 'mini_pop', 'parent_id' => $cabang->id]);
+    $odp = Odp::factory()->create(['pop_id' => $miniPop->id]);
+    $technician = $this->loginAsTechnicianInPop($cabang);
+    $task = Task::factory()->create(['task_type' => TaskType::OREQ, 'pop_id' => $cabang->id]);
+    TaskTeamMember::factory()->create(['task_id' => $task->id, 'user_id' => $technician->id]);
+    $item = Item::factory()->create(['tracking_type' => TrackingType::ROLL, 'ownership_mode' => OwnershipMode::INFRASTRUCTURE_ASSET]);
+    $roll = InventoryRoll::factory()->create(['item_id' => $item->id, 'status' => RollStatus::ISSUED, 'current_technician_id' => $technician->id, 'length_remaining' => 50]);
+
+    $response = $this->post(route('tasks.maintenance.store', $task), [
+        'kendala_teknis' => 'Tarik kabel ke ODP baru',
+        'infra_target_odp_id' => $odp->id,
+        'infra_selected_roll_id' => $roll->id,
+        'infra_roll_meters_used' => 15,
+    ]);
+
+    $response->assertRedirect(route('tasks.show', $task));
+    $this->assertDatabaseHas('infrastructure_balances', ['item_id' => $item->id, 'odp_id' => $odp->id, 'qty' => 15]);
 }
 
 #[Test]
@@ -791,7 +955,11 @@ Di `report()`: tambah `$eligibleInfraSerials = $this->eligibleInfrastructureSeri
 (method baru, copy `eligibleSerialsForTeam()` tapi filter
 `ownership_mode=OwnershipMode::INFRASTRUCTURE_ASSET`), `$eligibleInfraCustody`
 (copy `eligiblePassiveCustodyForTeam()` tapi filter item `ownership_mode=INFRASTRUCTURE_ASSET`
-bukan `effective_equipment_class=PASIF`), dan dropdown lokasi: Mini POP
+bukan `effective_equipment_class=PASIF` — ini cuma untuk `tracking_type=QUANTITY`,
+query yang sama sudah exclude SERIALIZED/ROLL), `$eligibleInfraRolls` (copy
+`eligibleRollsForTeam()` tapi filter `whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INFRASTRUCTURE_ASSET->value))`
+— kabel dropcore/fiber yang statusnya ISSUED/IN_USE di custody tim), dan
+dropdown lokasi: Mini POP
 (`Pop::where('type','mini_pop')->where('parent_id', $task->pop_id)`) + ODP
 (`Odp::whereIn('pop_id', $miniPopIdsTadi)`), dioper ke view. **Seksi ini
 cuma tampil untuk `$task->task_type ∈ [TaskType::OREQ, TaskType::INFR]`.**
@@ -806,6 +974,8 @@ Material Terpakai):
 'infra_retrieve_old_serial_id' => ['nullable', 'integer'],
 'infra_quantity_item_id' => ['nullable', 'integer', 'exists:items,id'],
 'infra_quantity_qty' => ['nullable', 'numeric', 'min:0.01', 'required_with:infra_quantity_item_id'],
+'infra_selected_roll_id' => ['nullable', 'integer', Rule::in($eligibleInfraRollIds)],
+'infra_roll_meters_used' => ['nullable', 'numeric', 'min:0.01', 'required_with:infra_selected_roll_id'],
 ```
 
 Plus validasi custom (closure/`Validator::after`): **tolak kalau
@@ -837,6 +1007,11 @@ if (!empty($validated['infra_target_mini_pop_id']) || !empty($validated['infra_t
         $item = Item::findOrFail($validated['infra_quantity_item_id']);
         app(InventoryService::class)->deployQuantity($teamTechnicians, $item, (float) $validated['infra_quantity_qty'], $pop, $odp, $fopTask, auth()->user());
     }
+
+    if (!empty($validated['infra_selected_roll_id'])) {
+        $roll = InventoryRoll::findOrFail($validated['infra_selected_roll_id']);
+        app(InventoryService::class)->deployRoll($roll, (float) $validated['infra_roll_meters_used'], $pop, $odp, $teamTechnicians, $fopTask, auth()->user());
+    }
 }
 ```
 
@@ -848,7 +1023,10 @@ seksi Material Terpakai yang sudah kondisional) — dropdown berjenjang Cabang
 (fixed dari task) → Mini POP → ODP (JS filter opsi `<select>` ODP berdasar
 Mini POP terpilih, pola sama dropdown berjenjang modal "Atur Mini POP &
 Distribusi"), dropdown SN dari `$eligibleInfraSerials`, dropdown qty item dari
-`$eligibleInfraCustody`, dan dropdown opsional "SN lama yang dicabut" (daftar
+`$eligibleInfraCustody`, dropdown roll kabel + input meter dari
+`$eligibleInfraRolls` (pola sama input "Roll Kabel" yang sudah ada di seksi
+Material Terpakai existing, `selected_inventory_roll_id`/`roll_meters_used`),
+dan dropdown opsional "SN lama yang dicabut" (daftar
 SN `status=DEPLOYED` di lokasi yang sama, query ringan di controller atau lazy
 lewat endpoint AJAX kalau datanya besar — pilih yang lebih sederhana sesuai
 pola endpoint `availableStock()` yang sudah ada di modul Gudang).
@@ -864,7 +1042,7 @@ Expected: PASS
 vendor/bin/pint --dirty --format agent
 npm run build
 git add app/Http/Controllers/TaskMaintenanceController.php resources/views/tasks/maintenance-report.blade.php tests/Feature/TaskInfrastructureDeployReportTest.php
-git commit -m "feat: seksi Pasang/Ganti Infrastruktur di Laporan O-REQ/INFR REQ"
+git commit -m "feat: seksi Pasang/Ganti Infrastruktur (SN + qty + roll kabel) di Laporan O-REQ/INFR REQ"
 ```
 
 ---
@@ -931,9 +1109,11 @@ menyempit). Resolusi:
 
 View — tabel SN (serial_number, nama item, `deployed_at` dari
 `InventoryTransaction::where('serial_id',$id)->where('type','deploy')->latest()->value('created_at')`,
-link ke `warehouse.traceability.index` dengan query SN) + tabel saldo
-QUANTITY dari `InfrastructureBalance`. Dropdown Cabang/Mini POP/ODP
-berjenjang, scope `Pop::forUser()`.
+link ke `warehouse.traceability.index` dengan query SN) + tabel saldo dari
+`InfrastructureBalance` (QUANTITY, `lot_no=''`, **dan** ROLL kabel,
+`lot_no=roll_code` — satu tabel, baris ROLL ditandai kolom "Asal Roll" diisi
+`lot_no` kalau tidak kosong, kolom "Satuan" ikut `item->unit`). Dropdown
+Cabang/Mini POP/ODP berjenjang, scope `Pop::forUser()`.
 
 `config/rbac.php` — `'warehouse_location_asset' => [ActionCode::VIEW->value]`.
 `WarehouseLocationAssetFeatureSeeder` — pola `ItemFeatureSeeder`.
@@ -958,5 +1138,6 @@ git commit -m "feat: halaman Aset per Lokasi (lokasi-centric) — audit infrastr
 
 ## Urutan Eksekusi
 
-Task 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 (linear — tiap task konsumsi hasil task
-sebelumnya; tidak ada task yang bisa dikerjakan paralel tanpa konflik migrasi/model).
+Task 1 → 2 → 2a → 3 → 4 → 5 → 6 → 7 → 8 (linear — tiap task konsumsi hasil
+task sebelumnya; tidak ada task yang bisa dikerjakan paralel tanpa konflik
+migrasi/model).
