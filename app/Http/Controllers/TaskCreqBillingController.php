@@ -45,15 +45,23 @@ class TaskCreqBillingController extends Controller
 
         $search = LikeSearch::sanitize((string) $request->query('q'));
 
-        $baseQuery = Task::query()
-            ->applyUserScope()
-            ->where('task_type', TaskType::CREQ->value)
-            ->whereHas('creqDetail', function ($q) {
-                $q->where('is_billable', true);
-            });
+        // OR dua tipe task berbayar — C-REQ (task_creq_details) & MTN polos
+        // (task_maintenance_billing_details). Dua tabel detail BEDA, jadi
+        // tiap cabang OR wajib cek task_type DULU sebelum whereHas ke
+        // relasi tipe itu sendiri — whereHas tunggal lintas tipe akan salah
+        // sasaran (riwayat bug sejenis: ADHOC-144, join status ambigu).
+        $baseQuery = Task::query()->applyUserScope()->where(function ($q) {
+            $q->where(fn ($cq) => $cq->where('task_type', TaskType::CREQ->value)->whereHas('creqDetail', fn ($sq) => $sq->where('is_billable', true)))
+                ->orWhere(fn ($mq) => $mq->where('task_type', TaskType::MAINTENANCE->value)->whereHas('maintenanceBillingDetail', fn ($sq) => $sq->where('is_billable', true)));
+        });
 
-        // Summary Counts per status
-        $statusCounts = (clone $baseQuery)
+        // Summary Counts per status — DUA count query terpisah (satu per
+        // tabel detail, tidak bisa lagi satu join tunggal sejak ada dua
+        // tabel) lalu di-SUM di PHP. Bentuk return TETAP objek 4 properti
+        // (pending_count/verified_count/rejected_count/total_count) — view
+        // index.blade.php baca langsung properti itu, kontraknya tidak berubah.
+        $creqCounts = (clone $baseQuery)
+            ->where('task_type', TaskType::CREQ->value)
             ->join('task_creq_details', 'tasks.id', '=', 'task_creq_details.task_id')
             ->selectRaw("
                 COUNT(CASE WHEN task_creq_details.verification_status = 'pending' THEN 1 END) as pending_count,
@@ -63,10 +71,33 @@ class TaskCreqBillingController extends Controller
             ")
             ->first();
 
+        $mtnCounts = (clone $baseQuery)
+            ->where('task_type', TaskType::MAINTENANCE->value)
+            ->join('task_maintenance_billing_details', 'tasks.id', '=', 'task_maintenance_billing_details.task_id')
+            ->selectRaw("
+                COUNT(CASE WHEN task_maintenance_billing_details.verification_status = 'pending' THEN 1 END) as pending_count,
+                COUNT(CASE WHEN task_maintenance_billing_details.verification_status = 'verified' THEN 1 END) as verified_count,
+                COUNT(CASE WHEN task_maintenance_billing_details.verification_status = 'rejected' THEN 1 END) as rejected_count,
+                COUNT(*) as total_count
+            ")
+            ->first();
+
+        $statusCounts = (object) [
+            'pending_count' => (int) $creqCounts->pending_count + (int) $mtnCounts->pending_count,
+            'verified_count' => (int) $creqCounts->verified_count + (int) $mtnCounts->verified_count,
+            'rejected_count' => (int) $creqCounts->rejected_count + (int) $mtnCounts->rejected_count,
+            'total_count' => (int) $creqCounts->total_count + (int) $mtnCounts->total_count,
+        ];
+
         $query = $baseQuery
             ->when($statusFilter !== 'all', function ($q) use ($statusFilter) {
-                $q->whereHas('creqDetail', function ($sq) use ($statusFilter) {
-                    $sq->where('verification_status', $statusFilter);
+                // Status dicek ke RELASI MILIK TIPE itu sendiri, bukan
+                // whereHas tunggal — supaya task C-REQ pending tidak ikut
+                // nyangkut lolos filter `status=verified` cuma karena ada
+                // task MTN verified lain yang whereHas-nya kebetulan match.
+                $q->where(function ($sq) use ($statusFilter) {
+                    $sq->where(fn ($cq) => $cq->where('task_type', TaskType::CREQ->value)->whereHas('creqDetail', fn ($ssq) => $ssq->where('verification_status', $statusFilter)))
+                        ->orWhere(fn ($mq) => $mq->where('task_type', TaskType::MAINTENANCE->value)->whereHas('maintenanceBillingDetail', fn ($ssq) => $ssq->where('verification_status', $statusFilter)));
                 });
             })
             ->when($search !== '', function ($q) use ($search) {
@@ -81,7 +112,7 @@ class TaskCreqBillingController extends Controller
                         });
                 });
             })
-            ->with(['customer', 'pop', 'creqDetail.verifier', 'creqDetail.invoice'])
+            ->with(['customer', 'pop', 'creqDetail.verifier', 'creqDetail.invoice', 'maintenanceBillingDetail.verifier', 'maintenanceBillingDetail.invoice'])
             ->latest('completed_at');
 
         $tasks = $query->paginate(15)->withQueryString();
@@ -290,20 +321,26 @@ class TaskCreqBillingController extends Controller
     }
 
     /**
-     * Task harus C-REQ berbayar (bukan sekadar C-REQ apa pun) & di dalam POP
-     * scope aktor — sama pagar yang dipakai `index()` di atas, tapi wajib
-     * dicek ulang di sini karena route model binding tidak lewat query yang
-     * sudah `applyUserScope()`.
+     * Task harus C-REQ ATAU MTN berbayar (bukan sekadar task tipe itu apa
+     * pun) & di dalam POP scope aktor — sama pagar yang dipakai `index()` di
+     * atas, tapi wajib dicek ulang di sini karena route model binding tidak
+     * lewat query yang sudah `applyUserScope()`.
      */
     private function authorizeBillable(Request $request, Task $task): void
     {
-        $task->loadMissing('creqDetail');
+        $task->loadMissing(['creqDetail', 'maintenanceBillingDetail']);
 
-        abort_unless(
-            $task->task_type === TaskType::CREQ && $task->creqDetail?->is_billable,
-            404,
-            'Task ini bukan C-REQ berbayar yang menunggu verifikasi.'
-        );
+        // `task_type` dicast ke enum `TaskType` (lihat Task::$casts) — match
+        // dicocokkan ke `->value` (string), bukan ke instance enum langsung,
+        // supaya tidak diam-diam selalu jatuh ke `default` (enum !== string
+        // di bawah strict comparison yang dipakai `match`).
+        $isBillable = match ($task->task_type->value) {
+            TaskType::CREQ->value => (bool) $task->creqDetail?->is_billable,
+            TaskType::MAINTENANCE->value => (bool) $task->maintenanceBillingDetail?->is_billable,
+            default => false,
+        };
+
+        abort_unless($isBillable, 404, 'Task ini bukan task berbayar yang menunggu verifikasi.');
 
         $access = app(EffectiveAccessService::class);
         $user = $request->user();
