@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Enums\CReqVerificationStatus;
 use App\Enums\TaskType;
+use App\Helpers\FormatHelper;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\InventorySerialSale;
 use App\Models\Task;
 use App\Models\TaskCreqDetail;
 use App\Services\EffectiveAccessService;
 use App\Services\ManualCategoryInvoiceService;
+use App\Services\TaskWorkToolService;
 use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
@@ -112,27 +115,71 @@ class TaskCreqBillingController extends Controller
     {
         $this->authorizeBillable($request, $task);
 
-        $request->merge(RupiahInput::parseKeys($request->only(['amount']), 'amount'));
-
         $manualCategory = $task->creqDetail->category->toManualInvoiceCategory();
 
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:1|max:99999999.99',
-            'description' => 'required|string|max:1000',
-            'manual_subtype_name' => [
-                Rule::requiredIf($manualCategory->requiresSubtypeName()),
-                'nullable',
-                'string',
-                'max:150',
-            ],
-        ]);
+        // Breakdown Harga Modem + Jasa (ownership modem sewa/beli, Task 6,
+        // 2026-10-09): kalau laporan teknisi "Beli dari Gudang" sudah
+        // menulis InventorySerialSale buat task ini (Task 1-3), CS mengisi
+        // dua komponen nominal terpisah (harga modem + jasa) — bukan satu
+        // `amount` tunggal — supaya tagihan menunjukkan rincian ke
+        // pelanggan. Rantainya: Task::fopTask() (hasOne, FK fop_tasks.task_id)
+        // -> FopTask -> InventorySerialSale.fop_task_id. Dipakai
+        // resolveTaskFor() (sama persis yang dipakai show.blade.php buat
+        // anchor material/SN) karena itu SATU-SATUNYA jalur Task->FopTask
+        // yang sudah tahan kalau suatu saat ada >1 FopTask menunjuk task
+        // yang sama (hasOne Eloquent diam-diam ambil salah satu; query
+        // langsung + latest('id') di sana eksplisit).
+        //
+        // TANPA sale row (mayoritas kategori C-REQ lain) flow `amount`
+        // tunggal lama berjalan APA ADANYA — tidak ada validasi/variable
+        // baru yang disentuh di cabang itu.
+        $fopTask = app(TaskWorkToolService::class)->resolveTaskFor($task);
+        $sale = $fopTask ? InventorySerialSale::where('fop_task_id', $fopTask->id)->first() : null;
+
+        if ($sale) {
+            $request->merge(RupiahInput::parseKeys($request->only(['modem_price', 'service_fee']), 'modem_price', 'service_fee'));
+
+            $validated = $request->validate([
+                'modem_price' => 'required|numeric|min:0|max:99999999.99',
+                'service_fee' => 'required|numeric|min:0|max:99999999.99',
+                'manual_subtype_name' => [
+                    Rule::requiredIf($manualCategory->requiresSubtypeName()),
+                    'nullable',
+                    'string',
+                    'max:150',
+                ],
+            ]);
+
+            $amount = (float) $validated['modem_price'] + (float) $validated['service_fee'];
+            $description = sprintf(
+                'Jasa: Rp%s + Jual Modem: Rp%s',
+                FormatHelper::rupiahInput($validated['service_fee']),
+                FormatHelper::rupiahInput($validated['modem_price']),
+            );
+        } else {
+            $request->merge(RupiahInput::parseKeys($request->only(['amount']), 'amount'));
+
+            $validated = $request->validate([
+                'amount' => 'required|numeric|min:1|max:99999999.99',
+                'description' => 'required|string|max:1000',
+                'manual_subtype_name' => [
+                    Rule::requiredIf($manualCategory->requiresSubtypeName()),
+                    'nullable',
+                    'string',
+                    'max:150',
+                ],
+            ]);
+
+            $amount = $validated['amount'];
+            $description = $validated['description'];
+        }
 
         // Scope pelanggan (bukan cuma pop_id task) — sama dengan
         // InvoiceController::store(): tagihan terbit di POP pelanggan saat ini.
         $customer = Customer::query()->applyUserScope()->with('customerService')->find($task->customer_id);
         abort_unless($customer, 403, 'Anda tidak memiliki akses ke pelanggan task ini.');
 
-        $invoice = DB::transaction(function () use ($task, $request, $customer, $manualCategory, $validated) {
+        $invoice = DB::transaction(function () use ($task, $request, $customer, $manualCategory, $validated, $amount, $description, $sale) {
             // lockForUpdate() DI DALAM transaksi — menutup celah TOCTOU dua
             // request approve/reject bersamaan (baca PENDING, dua-duanya
             // lolos abort_unless, lalu saling timpa / tagihan terbit dua kali).
@@ -140,12 +187,21 @@ class TaskCreqBillingController extends Controller
 
             abort_unless($detail->verification_status === CReqVerificationStatus::PENDING, 422, 'Verifikasi biaya C-REQ ini sudah diproses.');
 
+            // Harga modem final (CS boleh koreksi nilai yang dicatat teknisi)
+            // ditulis balik ke InventorySerialSale::price DI DALAM transaksi
+            // yang sama dengan penerbitan Invoice — kalau salah satu gagal,
+            // keduanya ikut batal (sale TIDAK boleh berubah tanpa tagihan
+            // yang terbit, dan sebaliknya).
+            if ($sale) {
+                $sale->update(['price' => $validated['modem_price']]);
+            }
+
             $invoice = app(ManualCategoryInvoiceService::class)->issue(
                 $customer,
                 $manualCategory,
                 $validated['manual_subtype_name'] ?? null,
-                $validated['description'],
-                $validated['amount'],
+                $description,
+                $amount,
                 auth()->id(),
             );
 
