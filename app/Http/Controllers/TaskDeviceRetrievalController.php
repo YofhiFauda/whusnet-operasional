@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DeviceOwnership;
 use App\Enums\DeviceRetrievalOutcome;
 use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
@@ -47,19 +48,29 @@ class TaskDeviceRetrievalController extends Controller
 
         // Petunjuk SN buat teknisi: SN yang tercatat terpasang di pelanggan ini
         // (jalur normal) dan SN dari data lama pelanggan (modem legacy).
+        // SN `ownership=customer` (sudah dijual — Beli dari Gudang/Beli Sendiri)
+        // DIKECUALIKAN: itu bukan aset perusahaan lagi, tidak boleh ditagih balik.
         $installedSerials = InventorySerial::query()
             ->where('customer_id', $task->customer_id)
             ->where('status', SerialStatus::INSTALLED->value)
+            ->where('ownership', DeviceOwnership::COMPANY->value)
             ->with('item')
             ->get();
         $legacyHint = $hints->forCustomer($task->customer);
         $legacySerial = (string) $legacyHint['serial'];
 
+        // Banner "tidak perlu ditarik" HANYA kalau pelanggan ini punya SN
+        // terpasang tapi semuanya sudah milik pelanggan (installedSerials jadi
+        // kosong SETELAH difilter company). Kalau campuran (ada company +
+        // customer), SN company tetap wajib ditarik — jangan tampilkan banner.
+        $showOwnershipSkipBanner = $installedSerials->isEmpty()
+            && $task->customer->inventorySerials()->where('status', SerialStatus::INSTALLED->value)->exists();
+
         $items = $this->serialItems();
         $accessoryOptions = TaskDeviceRetrieval::ACCESSORY_OPTIONS;
         $outcomes = DeviceRetrievalOutcome::cases();
 
-        return view('tasks.device-retrieval-report', compact('task', 'installedSerials', 'legacySerial', 'legacyHint', 'items', 'accessoryOptions', 'outcomes'));
+        return view('tasks.device-retrieval-report', compact('task', 'installedSerials', 'legacySerial', 'legacyHint', 'items', 'accessoryOptions', 'outcomes', 'showOwnershipSkipBanner'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService, InventoryReassignService $inventory): RedirectResponse
@@ -80,9 +91,23 @@ class TaskDeviceRetrievalController extends Controller
                 ->all(),
         ]);
 
+        // Sama seperti report(): kalau SEMUA SN terpasang pelanggan ini
+        // sudah ownership=customer, tidak ada yang bisa ditarik — longgarkan
+        // guard `serials` khusus kondisi ini (lihat report() untuk alasan
+        // lengkap kenapa campuran company+customer TIDAK masuk sini).
+        $allCustomerOwned = ! InventorySerial::query()
+            ->where('customer_id', $task->customer_id)
+            ->where('status', SerialStatus::INSTALLED->value)
+            ->where('ownership', DeviceOwnership::COMPANY->value)
+            ->exists()
+            && $task->customer->inventorySerials()->where('status', SerialStatus::INSTALLED->value)->exists();
+
         $validated = $request->validate([
             'outcome' => ['required', Rule::enum(DeviceRetrievalOutcome::class)],
-            'serials' => ['required_if:outcome,'.DeviceRetrievalOutcome::DIAMBIL->value, 'nullable', 'array'],
+            'serials' => [
+                Rule::requiredIf(fn () => $request->input('outcome') === DeviceRetrievalOutcome::DIAMBIL->value && ! $allCustomerOwned),
+                'nullable', 'array',
+            ],
             'serials.*.serial_number' => ['required', 'string', 'max:100'],
             'serials.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
             'condition_photo' => ['required_if:outcome,'.DeviceRetrievalOutcome::DIAMBIL->value, 'nullable', 'image', 'max:2048'],
@@ -97,7 +122,7 @@ class TaskDeviceRetrievalController extends Controller
                 Rule::requiredIf(fn () => $request->input('outcome') !== DeviceRetrievalOutcome::DIAMBIL->value),
             ],
         ], [
-            'serials.required_if' => 'Isi minimal satu nomor seri (SN) modem yang dibawa.',
+            'serials.required' => 'Isi minimal satu nomor seri (SN) modem yang dibawa.',
             'condition_photo.required_if' => 'Foto kondisi alat wajib diunggah kalau alat berhasil diambil.',
             'notes.required' => 'Alasan wajib diisi kalau alat tidak berhasil diambil.',
         ]);
@@ -108,6 +133,13 @@ class TaskDeviceRetrievalController extends Controller
         $duplicate = collect($rows)->map(fn ($row) => mb_strtolower(trim($row['serial_number'])))->duplicates()->first();
         if ($duplicate !== null) {
             throw ValidationException::withMessages(['serials' => "SN {$duplicate} diisi lebih dari sekali."]);
+        }
+
+        // Semua SN pelanggan ini sudah milik pelanggan (bukan aset
+        // perusahaan) → catatan auto, jangan andalkan input user yang
+        // mungkin kosong atau tidak relevan di kondisi ini.
+        if ($allCustomerOwned && $outcome->isRetrieved() && empty($rows)) {
+            $validated['notes'] = 'Modem milik pelanggan, tidak perlu ditarik';
         }
 
         $technician = $request->user();
