@@ -50,6 +50,11 @@ NAHHH kita meang harus membedakan karena untuk tambah modem itu, pelanggan beli 
 
 ---
 
+> **Gap 2 — SELESAI, lihat rancangan+plan 2026-10-10.** Rancangan solving di bawah sudah dieksekusi penuh
+> (5 task, subagent-driven). Spec teknis & keputusan desain: `docs/plan/task-teknisi/rancangan-verifikasi-biaya-creq-mtn.md`.
+> Plan eksekusi per-task: `docs/superpowers/plans/2026-10-10-verifikasi-biaya-creq-mtn-breakdown.md`.
+> Isi Q&A Gap 2 di bawah ini TETAP dipertahankan sebagai jejak keputusan — jangan dihapus/ditulis ulang.
+
 ## Gap 2 — Verifikasi Biaya C-REQ cuma 1 field nominal, gak ada rincian per-item terstruktur
 
 **Kondisi sekarang:**

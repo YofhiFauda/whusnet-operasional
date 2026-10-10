@@ -1,6 +1,6 @@
 # Rancangan: Breakdown Per-Item Verifikasi Biaya + Buka Jalur Billing MTN
 
-Status: **rancangan — belum ada perubahan kode.**
+Status: **SELESAI dikerjakan — 2026-10-10.**
 Terkait: `docs/plan/task-teknisi/analisa-gap-ownership-modem-dan-rincian-billing-creq.md` (Gap 2), `docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md`, `docs/plan/task-teknisi/rancangan-ownership-modem-sewa-beli.md` (Task 6 — breakdown Harga Modem+Jasa yang DIGANTI rancangan ini).
 
 ## 1. Latar Belakang
