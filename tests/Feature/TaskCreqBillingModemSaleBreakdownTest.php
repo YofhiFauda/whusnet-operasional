@@ -232,6 +232,38 @@ class TaskCreqBillingModemSaleBreakdownTest extends TestCase
     }
 
     #[Test]
+    public function approve_dengan_harga_modem_nol_ditolak_tapi_biaya_jasa_nol_boleh(): void
+    {
+        $this->beriLayanan();
+        $sale = $this->buatSaleUntukTask(100000);
+
+        // Modem yang sudah terjual tidak boleh dikoreksi jadi Rp0 — invarian
+        // sama dengan InventoryService::recordSerialSale() (harga > 0).
+        $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), [
+                'modem_price' => '0',
+                'service_fee' => '50.000',
+            ])
+            ->assertSessionHasErrors('modem_price');
+
+        $this->detail->refresh();
+        $this->assertSame(CReqVerificationStatus::PENDING, $this->detail->verification_status);
+        $sale->refresh();
+        $this->assertEquals(100000.0, (float) $sale->price);
+
+        // Biaya jasa 0 tetap sah (layanan bisa gratis).
+        $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), [
+                'modem_price' => '150.000',
+                'service_fee' => '0',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->detail->refresh();
+        $this->assertSame(CReqVerificationStatus::VERIFIED, $this->detail->verification_status);
+    }
+
+    #[Test]
     public function approve_tanpa_sale_row_flow_lama_tidak_berubah(): void
     {
         $this->beriLayanan();

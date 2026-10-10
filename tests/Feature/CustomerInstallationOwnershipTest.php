@@ -461,6 +461,99 @@ class CustomerInstallationOwnershipTest extends TestCase
         InventorySerialSale::where('inventory_serial_id', $serial->id)->firstOrFail();
     }
 
+    /**
+     * Combobox SN cuma disembunyikan x-show saat 'Beli Sendiri' dipilih —
+     * nilai lama tetap ter-POST. Kalau lolos, SN ke-install sebagai Sewa
+     * SEKALIGUS customer_devices ditimpa BELI_SENDIRI (dua flag bertentangan).
+     */
+    #[Test]
+    public function beli_sendiri_dengan_sn_sisa_draft_ditolak(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInstallingCustomer('beli');
+        $serial = $this->issueSerialToTechnician($pusat, $cabang, $technician, 'SN-OWN-STALE-001');
+
+        $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePemasanganPayload($technician, $cabang) + [
+            'modem_acquisition_choice' => 'beli_sendiri',
+            'manual_device_brand' => 'TP-Link',
+            'manual_device_model' => 'Archer C6',
+            'manual_device_serial_number' => 'MANUAL-STALE-001',
+            'selected_inventory_serial_id' => $serial->id,
+        ]);
+
+        $response->assertSessionHasErrors('selected_inventory_serial_id');
+        $this->assertNull($customer->installations()->latest()->first()->modem_acquisition_choice);
+    }
+
+    #[Test]
+    public function draft_beli_gudang_lalu_pindah_beli_sendiri_mengosongkan_pointer_sn_dan_sn_tidak_terinstall(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInstallingCustomer('beli');
+        $serial = $this->issueSerialToTechnician($pusat, $cabang, $technician, 'SN-OWN-SWITCH-001');
+
+        $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePemasanganPayload($technician, $cabang) + [
+            'selected_inventory_serial_id' => $serial->id,
+            'modem_acquisition_choice' => 'beli_gudang',
+            'modem_sale_price' => 150000,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame($serial->id, $customer->installations()->latest()->first()->selected_inventory_serial_id);
+
+        $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePemasanganPayload($technician, $cabang) + [
+            'modem_acquisition_choice' => 'beli_sendiri',
+            'manual_device_brand' => 'TP-Link',
+            'manual_device_model' => 'Archer C6',
+            'manual_device_serial_number' => 'MANUAL-SWITCH-001',
+        ])->assertSessionHasNoErrors();
+
+        $installation = $customer->installations()->latest()->first();
+        $this->assertNull($installation->selected_inventory_serial_id, 'Draft SN lama wajib dikosongkan begitu pindah ke Beli Sendiri.');
+
+        $this->actingAs($technician)->post(route('customers.installation.speedtest', $customer->id), $this->baseSpeedtestPayload())
+            ->assertSessionHasNoErrors();
+
+        $serial->refresh();
+        $this->assertEquals(SerialStatus::ISSUED, $serial->status, 'SN draft lama tidak boleh ikut ter-install.');
+        $this->assertSame(0, InventorySerialSale::count());
+        $this->assertEquals(DeviceAcquisitionSource::BELI_SENDIRI, $customer->customerDevice()->first()->acquisition_source);
+    }
+
+    #[Test]
+    public function beli_gudang_tanpa_sn_ditolak(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInstallingCustomer('beli');
+        $this->issueSerialToTechnician($pusat, $cabang, $technician, 'SN-OWN-NOSN-001');
+
+        $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePemasanganPayload($technician, $cabang) + [
+            'modem_acquisition_choice' => 'beli_gudang',
+            'modem_sale_price' => 150000,
+        ])->assertSessionHasErrors('selected_inventory_serial_id');
+    }
+
+    /**
+     * Pelanggan kontrak Sewa tidak pernah dirender radio-nya — POST rakitan
+     * 'beli_gudang' tidak boleh bikin SN-nya terjual.
+     */
+    #[Test]
+    public function contract_type_sewa_kirim_modem_acquisition_choice_rakitan_ditolak(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInstallingCustomer('sewa');
+        $serial = $this->issueSerialToTechnician($pusat, $cabang, $technician, 'SN-OWN-CRAFT-001');
+
+        $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePemasanganPayload($technician, $cabang) + [
+            'selected_inventory_serial_id' => $serial->id,
+            'modem_acquisition_choice' => 'beli_gudang',
+            'modem_sale_price' => 150000,
+        ])->assertSessionHasErrors('modem_acquisition_choice');
+
+        $installation = $customer->installations()->latest()->first();
+        $this->assertNull($installation->modem_acquisition_choice);
+        $this->assertNull($installation->selected_inventory_serial_id);
+    }
+
     private function finalVerifyAsAdmin(Customer $customer): void
     {
         $admin = $this->loginAsAdmin();

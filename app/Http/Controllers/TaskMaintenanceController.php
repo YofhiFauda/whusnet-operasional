@@ -216,6 +216,15 @@ class TaskMaintenanceController extends Controller
         $isCreq = $task->task_type === TaskType::CREQ;
         $creqCategory = $isCreq ? CReqCategory::tryFrom((string) $request->input('creq_category')) : null;
 
+        // SN custody cuma boleh ikut kalau pilihan ownership-nya memang
+        // memasang modem dari gudang. Combobox SN cuma disembunyikan x-show —
+        // nilai lama tetap ter-POST walau radio sudah dipindah ke 'Tidak
+        // Ganti'/'Beli Sendiri'; kalau lolos, installSerial() tetap jalan
+        // (Sewa/COMPANY) di atas pilihan yang bilang "tidak ada SN gudang".
+        $modemOwnershipChoiceInput = $request->input('modem_ownership_choice');
+        $serialProhibited = in_array($modemOwnershipChoiceInput, ['tidak_ganti', 'beli_sendiri'], true);
+        $serialRequired = in_array($modemOwnershipChoiceInput, ['sewa_gudang', 'beli_gudang'], true);
+
         $task->loadMissing('customer');
         $currentPopId = $task->customer?->pop_id;
 
@@ -238,7 +247,13 @@ class TaskMaintenanceController extends Controller
             // gak bawa/ganti, dibiarkan kosong dan gak nyentuh SN sama
             // sekali. Kalau diisi, wajib dari custody tim ini (Rule::in) —
             // SATU-SATUNYA sumber, gak ada teks manual (pola sama ADHOC-54).
-            'selected_inventory_serial_id' => ['nullable', 'integer', Rule::in($eligibleSerialIds)],
+            'selected_inventory_serial_id' => [
+                Rule::requiredIf($serialRequired),
+                Rule::prohibitedIf($serialProhibited),
+                'nullable',
+                'integer',
+                Rule::in($eligibleSerialIds),
+            ],
             // Ownership modem (rancangan ownership modem sewa/beli, 2026-10-09)
             // — radio di atas combobox SN existing. `required_with` (bukan
             // `required` polos): wajib begitu teknisi benar-benar pilih SN
@@ -289,6 +304,8 @@ class TaskMaintenanceController extends Controller
             'manual_device_model.required_if' => 'Model modem wajib diisi untuk Beli Sendiri.',
             'manual_device_serial_number.required_if' => 'Serial number modem wajib diisi untuk Beli Sendiri.',
             'modem_sale_price.required_if' => 'Harga jual modem wajib diisi untuk Beli dari Gudang.',
+            'selected_inventory_serial_id.required' => 'Pilih SN modem dari custody tim untuk Sewa Gudang/Beli dari Gudang.',
+            'selected_inventory_serial_id.prohibited' => 'SN custody hanya boleh dipilih untuk Sewa Gudang/Beli dari Gudang — kosongkan pilihan SN.',
         ];
 
         if ($isCreq) {
@@ -321,7 +338,7 @@ class TaskMaintenanceController extends Controller
             // opsional (Maintenance biasa boleh gak ganti modem) — kategori
             // ini WAJIB pilih dari custody tim, gak ada "Tidak ganti modem".
             if ($creqCategory?->requiresModem()) {
-                $rules['selected_inventory_serial_id'] = ['required', 'integer', Rule::in($eligibleSerialIds)];
+                $rules['selected_inventory_serial_id'] = ['required', Rule::prohibitedIf($serialProhibited), 'integer', Rule::in($eligibleSerialIds)];
             }
 
             $messages['creq_category_custom_name.required'] = 'Nama kategori wajib diisi untuk kategori Lainnya.';

@@ -273,6 +273,114 @@ class TaskMaintenanceOwnershipRadioTest extends TestCase
         $this->assertEquals(DeviceAcquisitionSource::SEWA, $device->acquisition_source);
     }
 
+    private function issuedSerial(string $serialNumber): InventorySerial
+    {
+        return InventorySerial::create([
+            'item_id' => $this->modem->id,
+            'serial_number' => $serialNumber,
+            'status' => SerialStatus::ISSUED->value,
+            'current_technician_id' => $this->technician->id,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+    }
+
+    /**
+     * Combobox SN cuma disembunyikan x-show — SN sisa pilihan sebelumnya tetap
+     * ter-POST walau radio sudah pindah ke "Tidak Ganti Modem".
+     */
+    #[Test]
+    public function tidak_ganti_dengan_sn_sisa_ditolak_dan_sn_tidak_terinstall(): void
+    {
+        $serial = $this->issuedSerial('SN-OWN-STALE-TG');
+
+        $response = $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), $this->basePayload() + [
+            'modem_ownership_choice' => 'tidak_ganti',
+            'selected_inventory_serial_id' => $serial->id,
+        ]);
+
+        $response->assertSessionHasErrors('selected_inventory_serial_id');
+        $this->assertEquals(SerialStatus::ISSUED, $serial->refresh()->status);
+        $this->assertNotEquals(TaskStatus::SELESAI, $this->task->refresh()->status);
+    }
+
+    #[Test]
+    public function beli_sendiri_dengan_sn_sisa_ditolak(): void
+    {
+        $serial = $this->issuedSerial('SN-OWN-STALE-BS');
+
+        $response = $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), $this->basePayload() + [
+            'modem_ownership_choice' => 'beli_sendiri',
+            'manual_device_brand' => 'TP-Link',
+            'manual_device_model' => 'Archer C6',
+            'manual_device_serial_number' => 'MANUAL-STALE-BS',
+            'selected_inventory_serial_id' => $serial->id,
+        ]);
+
+        $response->assertSessionHasErrors('selected_inventory_serial_id');
+        $this->assertEquals(SerialStatus::ISSUED, $serial->refresh()->status);
+        $this->assertNull($this->customer->customerDevice()->first());
+    }
+
+    #[Test]
+    public function sewa_gudang_atau_beli_gudang_tanpa_sn_ditolak(): void
+    {
+        $this->issuedSerial('SN-OWN-NOSN');
+
+        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), $this->basePayload() + [
+            'modem_ownership_choice' => 'sewa_gudang',
+        ])->assertSessionHasErrors('selected_inventory_serial_id');
+
+        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), $this->basePayload() + [
+            'modem_ownership_choice' => 'beli_gudang',
+            'modem_sale_price' => 150000,
+        ])->assertSessionHasErrors('selected_inventory_serial_id');
+
+        $this->assertNotEquals(TaskStatus::SELESAI, $this->task->refresh()->status);
+    }
+
+    /**
+     * Modem milik pelanggan (Beli dari Gudang di kunjungan sebelumnya) tidak
+     * boleh ikut diretur oleh tukar modem Sewa Gudang berikutnya — SN-nya masih
+     * tercatat terjual di `inventory_serial_sales`. SN sewa (COMPANY) tetap
+     * diretur seperti biasa.
+     */
+    #[Test]
+    public function tukar_modem_sewa_gudang_tidak_meretur_modem_milik_pelanggan(): void
+    {
+        $customerOwned = InventorySerial::create([
+            'item_id' => $this->modem->id,
+            'serial_number' => 'SN-OWN-MILIK-PLG',
+            'status' => SerialStatus::INSTALLED->value,
+            'customer_id' => $this->customer->id,
+            'ownership' => DeviceOwnership::CUSTOMER,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+        $companyOwned = InventorySerial::create([
+            'item_id' => $this->modem->id,
+            'serial_number' => 'SN-OWN-SEWA-LAMA',
+            'status' => SerialStatus::INSTALLED->value,
+            'customer_id' => $this->customer->id,
+            'ownership' => DeviceOwnership::COMPANY,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+        $replacement = $this->issuedSerial('SN-OWN-PENGGANTI');
+
+        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), $this->basePayload() + [
+            'modem_ownership_choice' => 'sewa_gudang',
+            'selected_inventory_serial_id' => $replacement->id,
+        ])->assertSessionHasNoErrors();
+
+        $customerOwned->refresh();
+        $this->assertEquals(SerialStatus::INSTALLED, $customerOwned->status, 'Modem milik pelanggan tidak boleh diretur oleh tukar modem.');
+        $this->assertEquals($this->customer->id, $customerOwned->customer_id);
+        $this->assertEquals(DeviceOwnership::CUSTOMER, $customerOwned->ownership);
+
+        $companyOwned->refresh();
+        $this->assertEquals(SerialStatus::RETURNED, $companyOwned->status, 'Modem sewa lama tetap diretur seperti biasa.');
+
+        $this->assertEquals(SerialStatus::INSTALLED, $replacement->refresh()->status);
+    }
+
     /**
      * CReqCategory::TAMBAH_MODEM (returnExistingSerial=false) tetap mencatat
      * ownership di SN KEDUA walau `customer_devices` cuma hasOne (tetap

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CustodyStatus;
+use App\Enums\DeviceOwnership;
 use App\Enums\DeviceRetrievalSource;
 use App\Enums\InventoryTransactionType;
 use App\Enums\ItemCondition;
@@ -252,6 +253,14 @@ class InventoryReassignService
 
             if ($existing && $existing->status === SerialStatus::RETURNED && $existing->customer_id === $customer->id) {
                 return $existing;
+            }
+
+            // Penjaga jalur tulis, bukan cuma filter daftar hint di form DEAC:
+            // SN yang diketik manual tetap harus ditolak kalau modem itu sudah
+            // dibeli pelanggan (Beli dari Gudang) — perusahaan tidak berhak
+            // "mengambil" barang milik pelanggan saat putus langganan.
+            if ($existing && $existing->ownership === DeviceOwnership::CUSTOMER) {
+                throw new InvalidArgumentException("SN {$serialNumber} adalah modem milik pelanggan (dibeli dari gudang) — tidak boleh diambil saat putus langganan.");
             }
 
             [$serial, $isLegacy] = $this->claimSerialFromCustomer($serialNumber, $existing, $item, $customer, [

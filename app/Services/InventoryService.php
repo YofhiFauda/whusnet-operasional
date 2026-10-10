@@ -211,6 +211,11 @@ class InventoryService
                     ->where('customer_id', $customer->id)
                     ->where('id', '!=', $serial->id)
                     ->where('status', SerialStatus::INSTALLED->value)
+                    // Modem milik pelanggan (Beli dari Gudang) BUKAN hak perusahaan
+                    // untuk ditarik lewat tukar modem yang tak berhubungan — kalau
+                    // ikut diretur, SN-nya balik ke stok padahal `InventorySerialSale`
+                    // masih mencatatnya terjual ke pelanggan ini.
+                    ->where('ownership', '!=', DeviceOwnership::CUSTOMER->value)
                     ->lockForUpdate()
                     ->get()
                 : collect();

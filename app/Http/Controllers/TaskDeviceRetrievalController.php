@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DeviceAcquisitionSource;
 use App\Enums\DeviceOwnership;
 use App\Enums\DeviceRetrievalOutcome;
 use App\Enums\OwnershipMode;
@@ -59,12 +60,8 @@ class TaskDeviceRetrievalController extends Controller
         $legacyHint = $hints->forCustomer($task->customer);
         $legacySerial = (string) $legacyHint['serial'];
 
-        // Banner "tidak perlu ditarik" HANYA kalau pelanggan ini punya SN
-        // terpasang tapi semuanya sudah milik pelanggan (installedSerials jadi
-        // kosong SETELAH difilter company). Kalau campuran (ada company +
-        // customer), SN company tetap wajib ditarik — jangan tampilkan banner.
-        $showOwnershipSkipBanner = $installedSerials->isEmpty()
-            && $task->customer->inventorySerials()->where('status', SerialStatus::INSTALLED->value)->exists();
+        // Banner "tidak perlu ditarik" — kondisinya lihat nothingToRetrieve().
+        $showOwnershipSkipBanner = $this->nothingToRetrieve($task);
 
         $items = $this->serialItems();
         $accessoryOptions = TaskDeviceRetrieval::ACCESSORY_OPTIONS;
@@ -91,16 +88,11 @@ class TaskDeviceRetrievalController extends Controller
                 ->all(),
         ]);
 
-        // Sama seperti report(): kalau SEMUA SN terpasang pelanggan ini
-        // sudah ownership=customer, tidak ada yang bisa ditarik — longgarkan
-        // guard `serials` khusus kondisi ini (lihat report() untuk alasan
-        // lengkap kenapa campuran company+customer TIDAK masuk sini).
-        $allCustomerOwned = ! InventorySerial::query()
-            ->where('customer_id', $task->customer_id)
-            ->where('status', SerialStatus::INSTALLED->value)
-            ->where('ownership', DeviceOwnership::COMPANY->value)
-            ->exists()
-            && $task->customer->inventorySerials()->where('status', SerialStatus::INSTALLED->value)->exists();
+        // Sama seperti report(): kalau tidak ada modem perusahaan yang bisa
+        // ditarik, longgarkan guard `serials` khusus kondisi ini (lihat
+        // nothingToRetrieve() untuk alasan lengkap kenapa campuran
+        // company+customer TIDAK masuk sini).
+        $allCustomerOwned = $this->nothingToRetrieve($task);
 
         $validated = $request->validate([
             'outcome' => ['required', Rule::enum(DeviceRetrievalOutcome::class)],
@@ -183,6 +175,42 @@ class TaskDeviceRetrievalController extends Controller
     /**
      * Form ini khusus DEAC dan hanya untuk task yang sedang dikerjakan.
      */
+    /**
+     * "Tidak ada modem perusahaan yang perlu ditarik dari pelanggan ini" —
+     * satu sumber untuk banner di report() dan pelonggaran guard di store().
+     *
+     * Dua kondisi (rancangan ownership modem §6):
+     *  (a) Pelanggan punya SN terpasang tapi SEMUANYA `ownership=customer`.
+     *      Kalau campuran (ada company + customer), SN company tetap wajib
+     *      ditarik — TIDAK masuk sini.
+     *  (b) Pelanggan tidak pernah punya baris `inventory_serials` sama sekali
+     *      DAN modemnya tercatat `acquisition_source=beli_sendiri` — modem
+     *      dibeli di luar gudang, memang tidak ada yang bisa ditarik. Tanpa
+     *      cabang ini teknisi dipaksa lewat jalur "tidak berhasil diambil +
+     *      alasan" padahal tidak ada yang gagal.
+     */
+    private function nothingToRetrieve(Task $task): bool
+    {
+        $customer = $task->customer;
+
+        $hasCompanyInstalled = InventorySerial::query()
+            ->where('customer_id', $task->customer_id)
+            ->where('status', SerialStatus::INSTALLED->value)
+            ->where('ownership', DeviceOwnership::COMPANY->value)
+            ->exists();
+
+        if ($hasCompanyInstalled) {
+            return false;
+        }
+
+        if ($customer->inventorySerials()->where('status', SerialStatus::INSTALLED->value)->exists()) {
+            return true;
+        }
+
+        return ! $customer->inventorySerials()->exists()
+            && $customer->customerDevice?->acquisition_source === DeviceAcquisitionSource::BELI_SENDIRI;
+    }
+
     private function guardTask(Task $task): ?RedirectResponse
     {
         if ($task->task_type !== TaskType::AMBIL_MODEM) {

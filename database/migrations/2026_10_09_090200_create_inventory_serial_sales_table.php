@@ -11,7 +11,11 @@ return new class extends Migration
      * untuk `acquisition_source=beli_gudang`, jadi tabel ini sumber tunggal buat
      * breakdown tagihan dan Laporan Barang Terjual.
      *
-     * `fop_task_id` nullable: null = penjualan dari PSB yang tidak lewat task.
+     * `fop_task_id` nullable cuma sebagai jaring pengaman skema — dalam praktik
+     * SEMUA jalur penjual (PSB lewat `storeSpeedtest()`, MTN/C-REQ lewat
+     * `TaskMaintenanceController::store()`) selalu mengisinya dengan FopTask
+     * pekerjaan itu, termasuk PSB. Jangan pakai `fop_task_id IS NULL` untuk
+     * membedakan PSB dari C-REQ/MTN.
      * Semua FK `restrictOnDelete` karena ini catatan keuangan — jangan sampai
      * menghapus SN/pelanggan/task menyapu riwayat penjualannya.
      */

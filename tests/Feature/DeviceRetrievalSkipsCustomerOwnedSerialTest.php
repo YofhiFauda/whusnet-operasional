@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\DeviceAcquisitionSource;
 use App\Enums\DeviceOwnership;
 use App\Enums\DeviceRetrievalOutcome;
 use App\Enums\ScopeType;
@@ -168,6 +169,92 @@ class DeviceRetrievalSkipsCustomerOwnedSerialTest extends TestCase
         $this->assertEquals(TaskStatus::SELESAI, $task->refresh()->status);
         $this->assertEquals(DeviceRetrievalOutcome::DIAMBIL, $task->deviceRetrieval->outcome);
         $this->assertEquals('Modem milik pelanggan, tidak perlu ditarik', $task->deviceRetrieval->notes);
+    }
+
+    /**
+     * Filter daftar hint saja tidak cukup — SN milik pelanggan yang DIKETIK
+     * manual tetap harus ditolak di jalur tulis (pickupSerialFromCustomer()).
+     */
+    #[Test]
+    public function sn_milik_pelanggan_diketik_manual_ditolak_dan_tidak_berubah(): void
+    {
+        $customerOwnedSerial = $this->makeInstalledSerial('OWN-CUST-TYPED', DeviceOwnership::CUSTOMER);
+        $task = $this->makeTask();
+
+        $response = $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $task), [
+            'outcome' => DeviceRetrievalOutcome::DIAMBIL->value,
+            'serials' => [['serial_number' => 'OWN-CUST-TYPED']],
+            'condition_photo' => UploadedFile::fake()->image('kondisi.jpg'),
+        ]);
+
+        $response->assertSessionHasErrors('serials');
+        $this->assertStringContainsString('milik pelanggan', session('errors')->first('serials'));
+
+        $customerOwnedSerial->refresh();
+        $this->assertEquals(SerialStatus::INSTALLED, $customerOwnedSerial->status);
+        $this->assertEquals($this->customer->id, $customerOwnedSerial->customer_id);
+        $this->assertEquals(TaskStatus::IN_PROGRESS, $task->refresh()->status);
+    }
+
+    /**
+     * Pelanggan "Beli Sendiri" yang TIDAK PERNAH punya baris inventory_serials
+     * sama sekali (rancangan §6) — tidak ada yang bisa ditarik, jadi jalurnya
+     * konfirmasi, bukan "gagal diambil + alasan".
+     */
+    #[Test]
+    public function pelanggan_beli_sendiri_tanpa_sn_sama_sekali_tampilkan_banner_dan_boleh_submit_tanpa_serial(): void
+    {
+        $this->customer->customerDevice()->create([
+            'device_type' => 'modem',
+            'brand' => 'TP-Link',
+            'model' => 'Archer C6',
+            'serial_number' => 'MANUAL-BS-001',
+            'acquisition_source' => DeviceAcquisitionSource::BELI_SENDIRI,
+        ]);
+        $task = $this->makeTask();
+
+        $this->assertSame(0, InventorySerial::where('customer_id', $this->customer->id)->count());
+
+        $this->actingAs($this->teknisi)->get(route('tasks.device-retrieval.report', $task))
+            ->assertOk()
+            ->assertViewHas('showOwnershipSkipBanner', true);
+
+        $storeResponse = $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $task), [
+            'outcome' => DeviceRetrievalOutcome::DIAMBIL->value,
+            'serials' => [],
+            'condition_photo' => UploadedFile::fake()->image('kondisi.jpg'),
+        ]);
+
+        $storeResponse->assertSessionHasNoErrors();
+        $this->assertEquals(TaskStatus::SELESAI, $task->refresh()->status);
+        $this->assertEquals('Modem milik pelanggan, tidak perlu ditarik', $task->deviceRetrieval->notes);
+    }
+
+    /**
+     * Pelanggan tanpa SN dan tanpa catatan Beli Sendiri (mis. Sewa legacy yang
+     * SN-nya belum tercatat) TIDAK dilonggarkan — tetap wajib isi SN.
+     */
+    #[Test]
+    public function pelanggan_sewa_tanpa_sn_tercatat_tetap_tanpa_banner(): void
+    {
+        $this->customer->customerDevice()->create([
+            'device_type' => 'modem',
+            'brand' => 'ZTE',
+            'model' => 'F609',
+            'serial_number' => 'LEGACY-SEWA-001',
+            'acquisition_source' => DeviceAcquisitionSource::SEWA,
+        ]);
+        $task = $this->makeTask();
+
+        $this->actingAs($this->teknisi)->get(route('tasks.device-retrieval.report', $task))
+            ->assertOk()
+            ->assertViewHas('showOwnershipSkipBanner', false);
+
+        $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $task), [
+            'outcome' => DeviceRetrievalOutcome::DIAMBIL->value,
+            'serials' => [],
+            'condition_photo' => UploadedFile::fake()->image('kondisi.jpg'),
+        ])->assertSessionHasErrors('serials');
     }
 
     #[Test]

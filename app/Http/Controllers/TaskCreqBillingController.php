@@ -140,7 +140,11 @@ class TaskCreqBillingController extends Controller
             $request->merge(RupiahInput::parseKeys($request->only(['modem_price', 'service_fee']), 'modem_price', 'service_fee'));
 
             $validated = $request->validate([
-                'modem_price' => 'required|numeric|min:0|max:99999999.99',
+                // min:0.01, bukan min:0 — samakan dengan invarian
+                // `InventoryService::recordSerialSale()` (harga > 0): modem yang
+                // sudah terjual tidak boleh "dikoreksi" jadi Rp0 di sini. Biaya
+                // jasa boleh 0 (layanan memang bisa gratis).
+                'modem_price' => 'required|numeric|min:0.01|max:99999999.99',
                 'service_fee' => 'required|numeric|min:0|max:99999999.99',
                 'manual_subtype_name' => [
                     Rule::requiredIf($manualCategory->requiresSubtypeName()),

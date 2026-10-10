@@ -1069,7 +1069,21 @@ class CustomerInstallationController extends Controller
             // pelanggan sendiri, gak pernah lewat gudang, jadi gak ada SN
             // custody buat dipilih sama sekali. Semua pilihan lain (null/
             // 'beli_gudang') tetap wajib SN seperti perilaku lama.
-            'selected_inventory_serial_id' => [Rule::requiredIf($modemAcquisitionChoiceInput !== 'beli_sendiri'), 'integer', Rule::in($eligibleSerialIds)],
+            //
+            // Sebaliknya 'beli_sendiri' + SN terisi DITOLAK (prohibited), bukan
+            // diabaikan: combobox SN cuma disembunyikan x-show, nilai lamanya
+            // (mis. dari draft 'beli_gudang' sebelumnya) tetap ikut ter-POST.
+            // Kalau lolos, storeSpeedtest() meng-install SN itu sebagai Sewa
+            // (COMPANY) SEKALIGUS recordCustomerOwnedDevice() menimpa
+            // customer_devices jadi BELI_SENDIRI — flag SN & flag perangkat
+            // saling bertentangan.
+            'selected_inventory_serial_id' => [
+                Rule::requiredIf($modemAcquisitionChoiceInput !== 'beli_sendiri'),
+                Rule::prohibitedIf($modemAcquisitionChoiceInput === 'beli_sendiri'),
+                'nullable',
+                'integer',
+                Rule::in($eligibleSerialIds),
+            ],
 
             // OPSIONAL — sama pola draft pointer di atas (dibatasi custody
             // tim ini), aksi potong-meter sungguhan (consumeFromRoll()) baru
@@ -1082,7 +1096,17 @@ class CustomerInstallationController extends Controller
             // pernah mengirim field ini (radio-nya gak dirender di view),
             // jadi draft pointer-nya selamanya null untuk mereka — identik
             // perilaku sebelum task ini.
-            'modem_acquisition_choice' => ['nullable', Rule::requiredIf($contractType === 'beli'), Rule::in(['beli_sendiri', 'beli_gudang'])],
+            // Sebaliknya pelanggan NON-'beli' (sewa/legacy) DILARANG mengirim
+            // field ini sama sekali — radio-nya memang tidak dirender, jadi
+            // nilai apa pun di sini datang dari POST rakitan. Tanpa penjaga ini
+            // pelanggan kontrak Sewa bisa "membeli" modem dari gudang (SN jadi
+            // ownership CUSTOMER + baris Jual Modem) lewat request tangan.
+            'modem_acquisition_choice' => [
+                'nullable',
+                Rule::requiredIf($contractType === 'beli'),
+                Rule::prohibitedIf($contractType !== 'beli'),
+                Rule::in(['beli_sendiri', 'beli_gudang']),
+            ],
             // 'Beli Sendiri' — modem milik pelanggan sendiri, TIDAK PERNAH
             // lewat gudang (§DeviceOwnership, sama pola Task 3). Field manual
             // ini (bukan brand/model/serial_number di atas — serial_number
@@ -1140,6 +1164,8 @@ class CustomerInstallationController extends Controller
             'manual_device_model.required_if' => 'Model modem wajib diisi untuk Beli Sendiri.',
             'manual_device_serial_number.required_if' => 'Serial number modem wajib diisi untuk Beli Sendiri.',
             'modem_sale_price.required_if' => 'Harga jual modem wajib diisi untuk Beli dari Gudang.',
+            'selected_inventory_serial_id.prohibited' => 'Beli Sendiri tidak memakai SN dari Gudang — kosongkan pilihan SN custody.',
+            'modem_acquisition_choice.prohibited' => 'Cara pemilikan modem hanya untuk pelanggan kontrak Beli.',
         ]);
 
         // selected_inventory_serial_id sudah divalidasi wajib & anggota
@@ -1220,7 +1246,14 @@ class CustomerInstallationController extends Controller
             $installation->installation_note = $validated['installation_note'] ?? null;
             // Draft pointer doang — resubmit-safe, gak ada side effect ke
             // inventory_serials di sini (cuma nunjuk, belum diinstall).
-            $installation->selected_inventory_serial_id = $validated['selected_inventory_serial_id'] ?? null;
+            //
+            // 'beli_sendiri' → SN draft DIKOSONGKAN eksplisit, bukan sekadar
+            // "apa pun yang tervalidasi": draft lama (mis. 'beli_gudang' + SN X)
+            // tidak boleh tertinggal, karena storeSpeedtest() meng-install apa
+            // pun yang ada di pointer ini.
+            $installation->selected_inventory_serial_id = ($validated['modem_acquisition_choice'] ?? null) === 'beli_sendiri'
+                ? null
+                : ($validated['selected_inventory_serial_id'] ?? null);
             // Roll kabel — draft pointer sama, konsumsi sungguhan (potong
             // meter) baru jalan di storeSpeedtest().
             $installation->selected_inventory_roll_id = $validated['selected_inventory_roll_id'] ?? null;

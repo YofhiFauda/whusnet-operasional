@@ -748,6 +748,10 @@
                                          Default (belum pilih radio apa pun, termasuk semua pelanggan
                                          'sewa') tetap tampil seperti biasa. --}}
                                     <div class="sm:col-span-2" x-show="modemAcquisition !== 'beli_sendiri'" x-cloak>
+                                        {{-- fieldset :disabled — x-show cuma menyembunyikan; tanpa ini SN
+                                             dari draft sebelumnya tetap ter-POST saat 'Beli Sendiri' dipilih,
+                                             dan server (storePemasangan) menolaknya. --}}
+                                        <fieldset class="min-w-0" :disabled="modemAcquisition === 'beli_sendiri'">
                                         <label for="selected_inventory_serial_id-search" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Serial Number (SN) — Custody Gudang <span class="text-rose-500">*</span></label>
                                         <div class="mb-2"><x-estimasi-patokan :rows="$estimasiPerangkatAktif" title="Estimasi Perangkat Aktif" /></div>
                                         @if($eligibleSerials->isNotEmpty())
@@ -765,6 +769,7 @@
                                             <input type="number" step="0.01" min="0.01" name="modem_sale_price" id="modem_sale_price" value="{{ old('modem_sale_price', $installation->modem_sale_price ?? '') }}" placeholder="Contoh: 150000" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-sm">
                                             <p class="text-[10px] mt-1 leading-relaxed text-slate-500 dark:text-slate-400">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, ditagihkan di tagihan AWAL.</p>
                                         </div>
+                                        </fieldset>
                                     </div>
 
                                     {{-- Beli Sendiri — modem milik pelanggan sendiri, gak pernah lewat

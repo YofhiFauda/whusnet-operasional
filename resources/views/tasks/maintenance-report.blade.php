@@ -254,7 +254,11 @@
                     @endforeach
                 </div>
 
+                {{-- fieldset :disabled — x-show cuma menyembunyikan; tanpa ini SN
+                     yang sempat dipilih tetap ter-POST walau radio sudah pindah,
+                     dan server (TaskMaintenanceController::store) menolaknya. --}}
                 <div x-show="modemOwnership === 'sewa_gudang' || modemOwnership === 'beli_gudang'" x-cloak>
+                    <fieldset class="min-w-0" :disabled="!(modemOwnership === 'sewa_gudang' || modemOwnership === 'beli_gudang')">
                     @if($eligibleSerials->isNotEmpty())
                         @php
                             // Sisa stok Perangkat Aktif per jenis barang (koreksi lanjutan
@@ -293,6 +297,7 @@
                                style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
                         <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, bukan sewa.</p>
                     </div>
+                    </fieldset>
                 </div>
 
                 {{-- Beli Sendiri — modem milik pelanggan sendiri, gak pernah lewat
