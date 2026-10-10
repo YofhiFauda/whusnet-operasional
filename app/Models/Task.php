@@ -129,6 +129,23 @@ class Task extends Model
         return $this->hasOne(TaskCreqDetail::class);
     }
 
+    /**
+     * Antrean verifikasi biaya untuk task MTN polos — hanya terisi kalau
+     * laporan MTN ditandai berbayar. Lihat TaskMaintenanceBillingDetail.
+     */
+    public function maintenanceBillingDetail(): HasOne
+    {
+        return $this->hasOne(TaskMaintenanceBillingDetail::class);
+    }
+
+    /**
+     * Baris breakdown biaya yang sudah diverifikasi CS (C-REQ & MTN).
+     */
+    public function billingItems(): HasMany
+    {
+        return $this->hasMany(TaskBillingItem::class);
+    }
+
     public function report(): HasOne
     {
         return $this->hasOne(TaskReport::class);
