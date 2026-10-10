@@ -58,9 +58,38 @@
         ? \App\Models\InventorySerialSale::where('fop_task_id', $reportFopTask->id)->first()
         : null;
 
-    $approveHasErrors = $modemSale
-        ? $errors->hasAny(['modem_price', 'service_fee', 'manual_subtype_name', 'customer_id'])
-        : $errors->hasAny(['amount', 'description', 'manual_subtype_name', 'customer_id']);
+    // Breakdown per-item generik (Task 4, 2026-10-10) — bukan lagi satu
+    // `amount`/`description` tunggal atau pasangan `modem_price`/`service_fee`
+    // (Task 6 lama). State awal Alpine `items`: kalau request gagal validasi
+    // `old('items')` dipakai lagi (termasuk baris yang user tambah/hapus
+    // sendiri sebelum submit); kalau belum pernah submit, di-seed baris
+    // modem terkunci (kalau $modemSale ada) atau satu baris kosong.
+    $oldItems = old('items');
+    if (is_array($oldItems) && count($oldItems) > 0) {
+        $initialItems = collect($oldItems)->values()->map(fn ($item) => [
+            'name' => $item['name'] ?? '',
+            'amount' => $item['amount'] ?? '',
+            'inventory_serial_sale_id' => $item['inventory_serial_sale_id'] ?? null,
+            'locked' => $modemSale && (string) ($item['inventory_serial_sale_id'] ?? '') === (string) $modemSale->id,
+        ])->all();
+    } elseif ($modemSale) {
+        $initialItems = [[
+            'name' => 'Jual Modem',
+            'amount' => (string) $modemSale->price,
+            'inventory_serial_sale_id' => $modemSale->id,
+            'locked' => true,
+        ]];
+    } else {
+        $initialItems = [[
+            'name' => '',
+            'amount' => '',
+            'inventory_serial_sale_id' => null,
+            'locked' => false,
+        ]];
+    }
+
+    $approveHasErrors = $errors->hasAny(['manual_subtype_name', 'customer_id'])
+        || collect($errors->keys())->contains(fn ($key) => $key === 'items' || str_starts_with($key, 'items.'));
     $rejectHasErrors = $errors->has('reason');
 @endphp
 
@@ -645,88 +674,103 @@
                             </div>
                             @endif
 
+                            {{-- Breakdown per-item generik (Task 4, 2026-10-10) — ganti satu
+                                 `amount`/`description` tunggal (flow lama) DAN pasangan
+                                 `modem_price`/`service_fee` (Task 6 lama). CS merinci tagihan
+                                 jadi N baris {nama, nominal}; kalau task ini punya penjualan
+                                 modem (Beli dari Gudang), baris pertama "Jual Modem" SELALU ada,
+                                 terkunci (nama tidak bisa diubah/dihapus) — server menolak
+                                 breakdown yang tidak menyertakan baris itu (lihat approve()). --}}
+                            <div x-data="{
+                                    items: @js($initialItems),
+                                    addItem() {
+                                        this.items.push({ name: '', amount: '', inventory_serial_sale_id: null, locked: false });
+                                    },
+                                    removeItem(index) {
+                                        this.items.splice(index, 1);
+                                    },
+                                    parsedAmount(value) {
+                                        const bersih = String(value ?? '').trim().replace(/Rp|rp/gi, '').trim();
+                                        if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(bersih)) {
+                                            return parseFloat(bersih.replace(/\./g, '').replace(',', '.')) || 0;
+                                        }
+                                        if (/^-?\d+,\d+$/.test(bersih)) {
+                                            return parseFloat(bersih.replace(',', '.')) || 0;
+                                        }
+                                        return parseFloat(bersih) || 0;
+                                    },
+                                    get total() {
+                                        return this.items.reduce((sum, item) => sum + this.parsedAmount(item.amount), 0);
+                                    },
+                                    formatTotal() {
+                                        return 'Rp' + this.total.toLocaleString('id-ID');
+                                    },
+                                 }" class="space-y-2.5">
+
+                                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Rincian Tagihan <span class="text-rose-500">*</span>
+                                </label>
+
+                                <template x-for="(item, index) in items" :key="index">
+                                    <div class="flex items-start gap-2 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5">
+                                        <div class="flex-1 min-w-0">
+                                            <template x-if="item.locked">
+                                                <div>
+                                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-100 py-2" x-text="item.name"></span>
+                                                    <input type="hidden" :name="`items[${index}][name]`" :value="item.name">
+                                                    <input type="hidden" :name="`items[${index}][inventory_serial_sale_id]`" :value="item.inventory_serial_sale_id">
+                                                </div>
+                                            </template>
+                                            <template x-if="!item.locked">
+                                                <input type="text" :name="`items[${index}][name]`" x-model="item.name" maxlength="150"
+                                                       placeholder="Nama biaya, mis. Ongkos Jasa"
+                                                       class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors">
+                                            </template>
+                                        </div>
+                                        <div class="w-32 sm:w-36 shrink-0">
+                                            <div class="relative">
+                                                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-mono text-[11px] font-bold">Rp</div>
+                                                <input type="text" inputmode="numeric" data-rupiah :name="`items[${index}][amount]`" x-model="item.amount"
+                                                       placeholder="0"
+                                                       class="w-full pl-7 pr-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors">
+                                            </div>
+                                        </div>
+                                        <button type="button" x-show="!item.locked" @click="removeItem(index)"
+                                                class="text-rose-500 hover:text-rose-700 dark:hover:text-rose-400 p-1.5 rounded hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors shrink-0 cursor-pointer"
+                                                title="Hapus baris">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+
+                                <button type="button" @click="addItem()"
+                                        class="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/50 px-3 py-1.5 rounded-md transition-colors cursor-pointer">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Tambah Baris
+                                </button>
+
+                                <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Tagihan (Preview)</span>
+                                    <span class="text-sm font-extrabold font-mono text-slate-900 dark:text-slate-100" x-text="formatTotal()"></span>
+                                </div>
+
+                                @error('items')
+                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
+                                @enderror
+                                @foreach ($errors->get('items.*') as $fieldErrors)
+                                    @foreach ($fieldErrors as $fieldError)
+                                    <p class="text-[11px] text-rose-600 font-semibold">{{ $fieldError }}</p>
+                                    @endforeach
+                                @endforeach
+                            </div>
+
                             @if($modemSale)
-                            {{-- Breakdown Harga Modem + Jasa (ownership modem sewa/beli, Task 6) —
-                                 pelanggan "Beli dari Gudang" wajib liat rincian, bukan satu nominal
-                                 gelondongan. TIDAK ADA input `amount`/`description` di cabang ini —
-                                 controller approve() gak pernah baca field itu kalau sale row ada,
-                                 jadi inputnya juga tidak boleh dikirim (dua sumber nilai = rawan selisih). --}}
                             <div class="bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/80 dark:border-sky-900/60 rounded-lg p-3 text-[11px] text-sky-800 dark:text-sky-300">
-                                Task ini punya penjualan modem (Beli dari Gudang) — isi harga modem &amp; biaya jasa terpisah, tagihan otomatis dirinci.
-                            </div>
-
-                            {{-- Harga Modem (prefilled dari InventorySerialSale::price) --}}
-                            <div class="space-y-1">
-                                <label for="modem_price" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Harga Modem (Rupiah) <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs font-bold">
-                                        Rp
-                                    </div>
-                                    <input type="text" inputmode="numeric" name="modem_price" id="modem_price" data-rupiah
-                                           value="{{ old('modem_price', $modemSale->price) }}" required placeholder="0"
-                                           class="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs">
-                                </div>
-                                <p class="text-[10px] text-slate-400 dark:text-slate-500">Pra-terisi dari laporan teknisi &bull; dapat dikoreksi CS, ikut ditulis balik ke catatan penjualan modem.</p>
-                                @error('modem_price')
-                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            {{-- Biaya Jasa --}}
-                            <div class="space-y-1">
-                                <label for="service_fee" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Biaya Jasa (Rupiah) <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs font-bold">
-                                        Rp
-                                    </div>
-                                    <input type="text" inputmode="numeric" name="service_fee" id="service_fee" data-rupiah
-                                           value="{{ old('service_fee') }}" required placeholder="0"
-                                           class="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs">
-                                </div>
-                                <p class="text-[10px] text-slate-400 dark:text-slate-500">Wajib diinput CS sesuai tarif resmi (tidak otomatis dari teknisi).</p>
-                                @error('service_fee')
-                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
-                                @enderror
-                            </div>
-                            @else
-                            {{-- Description --}}
-                            <div class="space-y-1">
-                                <label for="description" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Deskripsi Tagihan <span class="text-rose-500">*</span>
-                                </label>
-                                <textarea name="description" id="description" rows="3" maxlength="1000" required
-                                          placeholder="Uraikan detail pekerjaan yang ditagihkan kepada pelanggan..."
-                                          class="w-full text-xs px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs leading-relaxed">{{ old('description', $detail->billing_note) }}</textarea>
-                                <div class="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
-                                    <span>Pra-terisi dari catatan teknisi &bull; dapat disunting</span>
-                                    <span>Maks. 1000 karakter</span>
-                                </div>
-                                @error('description')
-                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            {{-- Nominal Tagihan (Currency Input) --}}
-                            <div class="space-y-1">
-                                <label for="amount" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Nominal Tagihan (Rupiah) <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs font-bold">
-                                        Rp
-                                    </div>
-                                    <input type="text" inputmode="numeric" name="amount" id="amount" data-rupiah
-                                           value="{{ old('amount') }}" required placeholder="0"
-                                           class="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs">
-                                </div>
-                                <p class="text-[10px] text-slate-400 dark:text-slate-500">Wajib diinput CS sesuai tarif resmi (tidak otomatis dari teknisi).</p>
-                                @error('amount')
-                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
-                                @enderror
+                                Task ini punya penjualan modem (Beli dari Gudang) — baris "Jual Modem" wajib ada, nilainya ikut ditulis balik ke catatan penjualan modem.
                             </div>
                             @endif
 

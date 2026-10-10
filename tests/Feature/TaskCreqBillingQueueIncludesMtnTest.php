@@ -229,4 +229,33 @@ class TaskCreqBillingQueueIncludesMtnTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    #[Test]
+    public function index_task_mtn_verified_tampilkan_status_benar_bukan_label_creq(): void
+    {
+        // Sebelum perbaikan ini, index.blade.php selalu baca $task->creqDetail
+        // buat badge status & kolom kategori — task MTN (yang detailnya ada
+        // di tabel LAIN, task_maintenance_billing_details) ikut tampil
+        // "Menunggu Verifikasi" walau sudah verified, dan kategori "C-REQ"
+        // walau bukan C-REQ sama sekali.
+        $mtnTask = $this->buatTaskMtn('TASK-MTNBILL-0030', CReqVerificationStatus::VERIFIED);
+
+        $response = $this->actingAs($this->helpdesk)->get(route('tasks.creq-billing.index', ['status' => 'all']));
+
+        $response->assertOk();
+        $response->assertSee('Diverifikasi');
+
+        // Baris task ini sendiri harus TIDAK memuat status badge "Menunggu
+        // Verifikasi" — label itu boleh muncul di tempat lain di halaman
+        // (mis. judul kartu metrik statis), jadi assertDontSee() atas
+        // seluruh halaman akan selalu gagal dan bukan itu yang diuji di
+        // sini. Validasi langsung ke potongan HTML di sekitar task_number.
+        $content = $response->getContent();
+        $taskPos = strpos($content, $mtnTask->task_number);
+        $this->assertNotFalse($taskPos);
+        $rowSlice = substr($content, $taskPos, 6000);
+        $this->assertStringContainsString('Diverifikasi', $rowSlice);
+        $this->assertStringNotContainsString('Menunggu Verifikasi', $rowSlice);
+        $this->assertStringNotContainsString('>C-REQ<', $rowSlice);
+    }
 }

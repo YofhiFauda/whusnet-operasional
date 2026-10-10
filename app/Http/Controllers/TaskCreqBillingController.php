@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Enums\CReqVerificationStatus;
+use App\Enums\ManualInvoiceCategory;
 use App\Enums\TaskType;
 use App\Helpers\FormatHelper;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\InventorySerialSale;
 use App\Models\Task;
+use App\Models\TaskBillingItem;
 use App\Models\TaskCreqDetail;
+use App\Models\TaskMaintenanceBillingDetail;
 use App\Services\EffectiveAccessService;
 use App\Services\ManualCategoryInvoiceService;
 use App\Services\TaskWorkToolService;
@@ -20,6 +23,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -139,88 +143,99 @@ class TaskCreqBillingController extends Controller
      * Terverifikasi, nomor tagihan tersimpan di detail. Gagal di titik mana
      * pun (mis. pelanggan belum punya layanan) = tidak ada yang berubah.
      *
-     * Kategori tagihan diturunkan dari kategori C-REQ (bukan input klien);
-     * nominal WAJIB diketik CS — tidak pernah diambil dari catatan teknisi.
+     * Kategori tagihan diturunkan dari kategori C-REQ untuk task C-REQ;
+     * task MTN polos (tidak punya kategori C-REQ) selalu `PERBAIKAN` — satu
+     * nilai hardcode, bukan ditebak dari billing_note. Nominal WAJIB diketik
+     * CS lewat breakdown per-item `items[]` (Task 4, 2026-10-10) — tidak
+     * pernah diambil dari catatan teknisi.
      */
     public function approve(Request $request, Task $task): RedirectResponse
     {
         $this->authorizeBillable($request, $task);
 
-        $manualCategory = $task->creqDetail->category->toManualInvoiceCategory();
-
         // Breakdown Harga Modem + Jasa (ownership modem sewa/beli, Task 6,
         // 2026-10-09): kalau laporan teknisi "Beli dari Gudang" sudah
-        // menulis InventorySerialSale buat task ini (Task 1-3), CS mengisi
-        // dua komponen nominal terpisah (harga modem + jasa) — bukan satu
-        // `amount` tunggal — supaya tagihan menunjukkan rincian ke
-        // pelanggan. Rantainya: Task::fopTask() (hasOne, FK fop_tasks.task_id)
-        // -> FopTask -> InventorySerialSale.fop_task_id. Dipakai
-        // resolveTaskFor() (sama persis yang dipakai show.blade.php buat
-        // anchor material/SN) karena itu SATU-SATUNYA jalur Task->FopTask
-        // yang sudah tahan kalau suatu saat ada >1 FopTask menunjuk task
-        // yang sama (hasOne Eloquent diam-diam ambil salah satu; query
-        // langsung + latest('id') di sana eksplisit).
-        //
-        // TANPA sale row (mayoritas kategori C-REQ lain) flow `amount`
-        // tunggal lama berjalan APA ADANYA — tidak ada validasi/variable
-        // baru yang disentuh di cabang itu.
+        // menulis InventorySerialSale buat task ini (Task 1-3), breakdown
+        // `items[]` WAJIB menyertakan satu baris dengan
+        // `inventory_serial_sale_id` = $sale->id — lihat validasi di bawah.
+        // Rantainya: Task::fopTask() (hasOne, FK fop_tasks.task_id) ->
+        // FopTask -> InventorySerialSale.fop_task_id. Dipakai resolveTaskFor()
+        // (sama persis yang dipakai show.blade.php buat anchor material/SN)
+        // karena itu SATU-SATUNYA jalur Task->FopTask yang sudah tahan kalau
+        // suatu saat ada >1 FopTask menunjuk task yang sama (hasOne Eloquent
+        // diam-diam ambil salah satu; query langsung + latest('id') di sana
+        // eksplisit).
         $fopTask = app(TaskWorkToolService::class)->resolveTaskFor($task);
         $sale = $fopTask ? InventorySerialSale::where('fop_task_id', $fopTask->id)->first() : null;
 
-        if ($sale) {
-            $request->merge(RupiahInput::parseKeys($request->only(['modem_price', 'service_fee']), 'modem_price', 'service_fee'));
-
-            $validated = $request->validate([
-                // min:0.01, bukan min:0 — samakan dengan invarian
-                // `InventoryService::recordSerialSale()` (harga > 0): modem yang
-                // sudah terjual tidak boleh "dikoreksi" jadi Rp0 di sini. Biaya
-                // jasa boleh 0 (layanan memang bisa gratis).
-                'modem_price' => 'required|numeric|min:0.01|max:99999999.99',
-                'service_fee' => 'required|numeric|min:0|max:99999999.99',
-                'manual_subtype_name' => [
-                    Rule::requiredIf($manualCategory->requiresSubtypeName()),
-                    'nullable',
-                    'string',
-                    'max:150',
-                ],
-            ]);
-
-            $amount = (float) $validated['modem_price'] + (float) $validated['service_fee'];
-            $description = sprintf(
-                'Jasa: Rp%s + Jual Modem: Rp%s',
-                FormatHelper::rupiahInput($validated['service_fee']),
-                FormatHelper::rupiahInput($validated['modem_price']),
-            );
-        } else {
-            $request->merge(RupiahInput::parseKeys($request->only(['amount']), 'amount'));
-
-            $validated = $request->validate([
-                'amount' => 'required|numeric|min:1|max:99999999.99',
-                'description' => 'required|string|max:1000',
-                'manual_subtype_name' => [
-                    Rule::requiredIf($manualCategory->requiresSubtypeName()),
-                    'nullable',
-                    'string',
-                    'max:150',
-                ],
-            ]);
-
-            $amount = $validated['amount'];
-            $description = $validated['description'];
+        // Parse rupiah per baris SEBELUM validasi — array dinamis, jadi
+        // RupiahInput::parseKeys() (dibuat buat key flat) tidak cocok di
+        // sini, loop manual per index.
+        $items = $request->input('items', []);
+        foreach ($items as $i => $row) {
+            $items[$i]['amount'] = RupiahInput::parse($row['amount'] ?? null);
         }
+        $request->merge(['items' => $items]);
+
+        $manualCategory = $task->task_type === TaskType::CREQ
+            ? $task->creqDetail->category->toManualInvoiceCategory()
+            : ManualInvoiceCategory::PERBAIKAN;
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.name' => 'required|string|max:150',
+            // min:0.01, bukan min:0, untuk SEMUA baris termasuk baris modem
+            // auto-seed — samakan dengan invarian
+            // `InventoryService::recordSerialSale()` (harga > 0): modem yang
+            // sudah terjual tidak boleh "dikoreksi" jadi Rp0 di sini. Baris
+            // lain (jasa dll) boleh Rp0 asal bukan baris modemnya sendiri.
+            'items.*.amount' => 'required|numeric|min:0.01|max:99999999.99',
+            'items.*.inventory_serial_sale_id' => ['nullable', 'integer', Rule::in($sale ? [$sale->id] : [])],
+            'manual_subtype_name' => [
+                Rule::requiredIf($manualCategory->requiresSubtypeName()),
+                'nullable',
+                'string',
+                'max:150',
+            ],
+        ]);
+
+        // Guard SEBELUM transaksi dimulai — kalau sale row ada, breakdown
+        // wajib menyertakan baris modemnya. Dicek di sini (bukan di dalam
+        // DB::transaction()) supaya tidak ada tulisan apa pun ke DB
+        // (task_billing_items, invoice, InventorySerialSale::price) kalau
+        // baris modem hilang — CS yang lupa menyertakannya ditolak bersih,
+        // bukan rollback setengah jalan.
+        if ($sale && ! collect($validated['items'])->contains(fn ($item) => (int) ($item['inventory_serial_sale_id'] ?? 0) === $sale->id)) {
+            throw ValidationException::withMessages([
+                'items' => 'Baris "Jual Modem" wajib ada — task ini mencatat penjualan modem, breakdown tidak boleh menghilangkan barisnya.',
+            ]);
+        }
+
+        $amount = collect($validated['items'])->sum('amount');
+        $description = collect($validated['items'])
+            ->map(fn ($item) => "{$item['name']}: Rp".FormatHelper::rupiahInput($item['amount']))
+            ->implode(' + ');
 
         // Scope pelanggan (bukan cuma pop_id task) — sama dengan
         // InvoiceController::store(): tagihan terbit di POP pelanggan saat ini.
         $customer = Customer::query()->applyUserScope()->with('customerService')->find($task->customer_id);
         abort_unless($customer, 403, 'Anda tidak memiliki akses ke pelanggan task ini.');
 
-        $invoice = DB::transaction(function () use ($task, $request, $customer, $manualCategory, $validated, $amount, $description, $sale) {
+        // Model+ID detail yang dikunci & di-update beda per task_type — SATU
+        // tabel detail untuk C-REQ (task_creq_details), SATU lagi untuk MTN
+        // polos (task_maintenance_billing_details). Resolusinya di sini,
+        // SEKALI, dipakai lagi di dalam closure transaksi di bawah supaya
+        // tidak ada cabang if/else kedua yang bisa menyimpang dari ini.
+        $detailModelClass = $task->task_type === TaskType::CREQ ? TaskCreqDetail::class : TaskMaintenanceBillingDetail::class;
+        $detailId = $task->task_type === TaskType::CREQ ? $task->creqDetail->id : $task->maintenanceBillingDetail->id;
+
+        $invoice = DB::transaction(function () use ($task, $request, $customer, $manualCategory, $validated, $amount, $description, $sale, $detailModelClass, $detailId) {
             // lockForUpdate() DI DALAM transaksi — menutup celah TOCTOU dua
             // request approve/reject bersamaan (baca PENDING, dua-duanya
             // lolos abort_unless, lalu saling timpa / tagihan terbit dua kali).
-            $detail = TaskCreqDetail::whereKey($task->creqDetail->id)->lockForUpdate()->firstOrFail();
+            $detail = $detailModelClass::whereKey($detailId)->lockForUpdate()->firstOrFail();
 
-            abort_unless($detail->verification_status === CReqVerificationStatus::PENDING, 422, 'Verifikasi biaya C-REQ ini sudah diproses.');
+            abort_unless($detail->verification_status === CReqVerificationStatus::PENDING, 422, 'Verifikasi biaya ini sudah diproses.');
 
             // Harga modem final (CS boleh koreksi nilai yang dicatat teknisi)
             // ditulis balik ke InventorySerialSale::price DI DALAM transaksi
@@ -228,7 +243,8 @@ class TaskCreqBillingController extends Controller
             // keduanya ikut batal (sale TIDAK boleh berubah tanpa tagihan
             // yang terbit, dan sebaliknya).
             if ($sale) {
-                $sale->update(['price' => $validated['modem_price']]);
+                $modemItem = collect($validated['items'])->firstWhere('inventory_serial_sale_id', $sale->id);
+                $sale->update(['price' => $modemItem['amount']]);
             }
 
             $invoice = app(ManualCategoryInvoiceService::class)->issue(
@@ -239,6 +255,22 @@ class TaskCreqBillingController extends Controller
                 $amount,
                 auth()->id(),
             );
+
+            // Breakdown per-item (Task 4) — satu baris task_billing_items
+            // per item di request, SEMUA menunjuk invoice yang baru terbit.
+            // Ditulis SETELAH invoice ada (butuh invoice_id), masih di dalam
+            // transaksi yang sama (invoice tanpa rinciannya = cacat, harus
+            // ikut rollback bareng).
+            foreach ($validated['items'] as $item) {
+                TaskBillingItem::create([
+                    'task_id' => $task->id,
+                    'invoice_id' => $invoice->id,
+                    'name' => $item['name'],
+                    'amount' => $item['amount'],
+                    'inventory_serial_sale_id' => $item['inventory_serial_sale_id'] ?? null,
+                    'created_by' => auth()->id(),
+                ]);
+            }
 
             $oldStatus = $detail->verification_status->value;
 
@@ -254,7 +286,7 @@ class TaskCreqBillingController extends Controller
                 'user_id' => auth()->id(),
                 'module' => 'Verifikasi Biaya C-REQ',
                 'action' => 'approve',
-                'auditable_type' => TaskCreqDetail::class,
+                'auditable_type' => $detailModelClass,
                 'auditable_id' => $detail->id,
                 'old_values' => ['verification_status' => $oldStatus],
                 'new_values' => [
@@ -274,7 +306,7 @@ class TaskCreqBillingController extends Controller
         // ditampilkan di sana beserta tautannya.
         return redirect()
             ->route('tasks.creq-billing.show', $task)
-            ->with('success', "Biaya C-REQ task {$task->task_number} disetujui — Tagihan Manual {$invoice->invoice_number} terbit.");
+            ->with('success', "Biaya task {$task->task_number} disetujui — Tagihan Manual {$invoice->invoice_number} terbit.");
     }
 
     public function reject(Request $request, Task $task): RedirectResponse
@@ -285,12 +317,17 @@ class TaskCreqBillingController extends Controller
             'reason' => ReasonValidationRule::required(1000),
         ]);
 
-        DB::transaction(function () use ($task, $validated, $request) {
+        // Sama resolusi model+ID detail dengan approve() — lihat komentar di
+        // sana.
+        $detailModelClass = $task->task_type === TaskType::CREQ ? TaskCreqDetail::class : TaskMaintenanceBillingDetail::class;
+        $detailId = $task->task_type === TaskType::CREQ ? $task->creqDetail->id : $task->maintenanceBillingDetail->id;
+
+        DB::transaction(function () use ($task, $validated, $request, $detailModelClass, $detailId) {
             // Sama alasan lockForUpdate() di approve() — cegah reject
             // menimpa approve (atau sebaliknya) yang diproses bersamaan.
-            $detail = TaskCreqDetail::whereKey($task->creqDetail->id)->lockForUpdate()->firstOrFail();
+            $detail = $detailModelClass::whereKey($detailId)->lockForUpdate()->firstOrFail();
 
-            abort_unless($detail->verification_status === CReqVerificationStatus::PENDING, 422, 'Verifikasi biaya C-REQ ini sudah diproses.');
+            abort_unless($detail->verification_status === CReqVerificationStatus::PENDING, 422, 'Verifikasi biaya ini sudah diproses.');
 
             $oldStatus = $detail->verification_status->value;
 
@@ -305,7 +342,7 @@ class TaskCreqBillingController extends Controller
                 'user_id' => auth()->id(),
                 'module' => 'Verifikasi Biaya C-REQ',
                 'action' => 'reject',
-                'auditable_type' => TaskCreqDetail::class,
+                'auditable_type' => $detailModelClass,
                 'auditable_id' => $detail->id,
                 'old_values' => ['verification_status' => $oldStatus],
                 'new_values' => ['verification_status' => CReqVerificationStatus::REJECTED->value, 'reason' => $validated['reason']],
@@ -317,7 +354,7 @@ class TaskCreqBillingController extends Controller
 
         return redirect()
             ->route('tasks.creq-billing.index')
-            ->with('success', "Biaya C-REQ task {$task->task_number} ditolak.");
+            ->with('success', "Biaya task {$task->task_number} ditolak.");
     }
 
     /**

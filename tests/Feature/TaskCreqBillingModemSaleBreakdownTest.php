@@ -182,7 +182,7 @@ class TaskCreqBillingModemSaleBreakdownTest extends TestCase
     }
 
     #[Test]
-    public function approve_dengan_sale_row_sum_harga_modem_dan_jasa_jadi_satu_invoice(): void
+    public function approve_dengan_sale_row_items_termasuk_baris_modem_jadi_satu_invoice(): void
     {
         $this->beriLayanan();
         // Harga lama dari laporan teknisi — CS mengoreksinya jadi 150.000 di
@@ -192,8 +192,10 @@ class TaskCreqBillingModemSaleBreakdownTest extends TestCase
 
         $response = $this->actingAs($this->helpdesk)
             ->put(route('tasks.creq-billing.approve', $this->task), [
-                'modem_price' => '150.000',
-                'service_fee' => '50.000',
+                'items' => [
+                    ['name' => 'Jual Modem', 'amount' => '150.000', 'inventory_serial_sale_id' => $sale->id],
+                    ['name' => 'Biaya Jasa', 'amount' => '50.000'],
+                ],
             ]);
 
         $response->assertRedirect(route('tasks.creq-billing.show', $this->task));
@@ -205,57 +207,66 @@ class TaskCreqBillingModemSaleBreakdownTest extends TestCase
         $invoice = $this->detail->invoice;
         $this->assertNotNull($invoice);
         $this->assertEquals(200000.0, (float) $invoice->total_amount);
-        $this->assertStringContainsString('Jasa: Rp50.000', $invoice->description);
         $this->assertStringContainsString('Jual Modem: Rp150.000', $invoice->description);
+        $this->assertStringContainsString('Biaya Jasa: Rp50.000', $invoice->description);
+        $this->assertDatabaseCount('task_billing_items', 2);
 
         $sale->refresh();
         $this->assertEquals(150000.0, (float) $sale->price);
     }
 
     #[Test]
-    public function approve_tanpa_amount_saat_sale_row_ada_ditolak_dan_tidak_ada_yang_berubah(): void
+    public function approve_dengan_sale_row_tanpa_baris_modem_ditolak(): void
     {
         $this->beriLayanan();
         $sale = $this->buatSaleUntukTask(100000);
 
         $this->actingAs($this->helpdesk)
             ->put(route('tasks.creq-billing.approve', $this->task), [
-                'modem_price' => '',
-                'service_fee' => '50.000',
+                'items' => [['name' => 'Biaya Jasa', 'amount' => '50.000']],
             ])
-            ->assertSessionHasErrors('modem_price');
+            ->assertSessionHasErrors('items');
 
         $this->detail->refresh();
         $this->assertSame(CReqVerificationStatus::PENDING, $this->detail->verification_status);
+        $this->assertDatabaseCount('task_billing_items', 0);
         $sale->refresh();
+        $this->assertNotEquals(150000.0, (float) $sale->price); // tidak tersentuh
         $this->assertEquals(100000.0, (float) $sale->price);
     }
 
     #[Test]
-    public function approve_dengan_harga_modem_nol_ditolak_tapi_biaya_jasa_nol_boleh(): void
+    public function approve_dengan_harga_modem_nol_ditolak(): void
     {
         $this->beriLayanan();
         $sale = $this->buatSaleUntukTask(100000);
 
         // Modem yang sudah terjual tidak boleh dikoreksi jadi Rp0 — invarian
-        // sama dengan InventoryService::recordSerialSale() (harga > 0).
+        // sama dengan InventoryService::recordSerialSale() (harga > 0) DAN
+        // aturan umum items.*.amount min:0.01 (berlaku untuk SEMUA baris,
+        // termasuk baris modem yang auto-seed — tidak ada baris bebas Rp0 di
+        // breakdown generik ini, beda dari `service_fee` lama yang boleh nol).
         $this->actingAs($this->helpdesk)
             ->put(route('tasks.creq-billing.approve', $this->task), [
-                'modem_price' => '0',
-                'service_fee' => '50.000',
+                'items' => [
+                    ['name' => 'Jual Modem', 'amount' => '0', 'inventory_serial_sale_id' => $sale->id],
+                    ['name' => 'Biaya Jasa', 'amount' => '50.000'],
+                ],
             ])
-            ->assertSessionHasErrors('modem_price');
+            ->assertSessionHasErrors('items.0.amount');
 
         $this->detail->refresh();
         $this->assertSame(CReqVerificationStatus::PENDING, $this->detail->verification_status);
         $sale->refresh();
         $this->assertEquals(100000.0, (float) $sale->price);
 
-        // Biaya jasa 0 tetap sah (layanan bisa gratis).
+        // Begitu baris modemnya > 0, breakdown lolos.
         $this->actingAs($this->helpdesk)
             ->put(route('tasks.creq-billing.approve', $this->task), [
-                'modem_price' => '150.000',
-                'service_fee' => '0',
+                'items' => [
+                    ['name' => 'Jual Modem', 'amount' => '150.000', 'inventory_serial_sale_id' => $sale->id],
+                    ['name' => 'Biaya Jasa', 'amount' => '50.000'],
+                ],
             ])
             ->assertSessionHasNoErrors();
 
@@ -264,14 +275,15 @@ class TaskCreqBillingModemSaleBreakdownTest extends TestCase
     }
 
     #[Test]
-    public function approve_tanpa_sale_row_flow_lama_tidak_berubah(): void
+    public function approve_tanpa_sale_row_flow_items_generik_tetap_berjalan(): void
     {
         $this->beriLayanan();
 
         $response = $this->actingAs($this->helpdesk)
             ->put(route('tasks.creq-billing.approve', $this->task), [
-                'description' => 'Pasang modem tambahan, biaya sesuai tarif.',
-                'amount' => '150.000',
+                'items' => [
+                    ['name' => 'Pasang modem tambahan, biaya sesuai tarif.', 'amount' => '150.000'],
+                ],
             ]);
 
         $response->assertRedirect(route('tasks.creq-billing.show', $this->task));
@@ -283,6 +295,6 @@ class TaskCreqBillingModemSaleBreakdownTest extends TestCase
         $invoice = $this->detail->invoice;
         $this->assertNotNull($invoice);
         $this->assertEquals(150000.0, (float) $invoice->total_amount);
-        $this->assertSame('Pasang modem tambahan, biaya sesuai tarif.', $invoice->description);
+        $this->assertStringContainsString('Pasang modem tambahan, biaya sesuai tarif.: Rp150.000', $invoice->description);
     }
 }

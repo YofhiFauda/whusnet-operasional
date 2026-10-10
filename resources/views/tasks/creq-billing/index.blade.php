@@ -168,7 +168,11 @@
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60">
                     @forelse($tasks as $i => $task)
                         @php
-                            $detail = $task->creqDetail;
+                            // Dua tabel detail BEDA per task_type (C-REQ vs MTN polos, lihat
+                            // index() di controller) — baca relasi yang salah bikin task MTN
+                            // selalu nampil "Menunggu Verifikasi" + badge kategori "C-REQ"
+                            // yang literal salah, gak peduli status/kategori aslinya apa.
+                            $detail = $task->task_type === \App\Enums\TaskType::CREQ ? $task->creqDetail : $task->maintenanceBillingDetail;
                             $status = $detail?->verification_status?->value ?? 'pending';
                             $statusBadge = match($status) {
                                 'verified' => 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60',
@@ -220,7 +224,7 @@
                             {{-- Kategori C-REQ --}}
                             <td class="px-4 py-3.5">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
-                                    {{ $detail?->category?->label() ?? 'C-REQ' }}
+                                    {{ $detail?->category?->label() ?? $task->task_type->label() }}
                                 </span>
                                 @if($detail?->category_custom_name)
                                 <span class="block text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate" title="{{ $detail->category_custom_name }}">
