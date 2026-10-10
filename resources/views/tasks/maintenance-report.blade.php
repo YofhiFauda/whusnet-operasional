@@ -186,6 +186,33 @@
             </div>
             @endif
 
+            {{-- ── Section 1c: Task Berbayar (MTN/O-REQ/INFR REQ polos) ──
+                 Sama seperti checkbox "Task Berbayar" C-REQ di atas, tapi
+                 field & model beda (`mtn_is_billable`/`mtn_billing_note` →
+                 `TaskMaintenanceBillingDetail`, bukan `TaskCreqDetail`) —
+                 dua sumber kebenaran terpisah biar gak collide di satu
+                 form. DI LUAR blok Kategori C-REQ di atas, berlaku untuk
+                 semua task_type; backend tetap menjaga field ini cuma
+                 dieksekusi kalau `! $isCreq` (lihat TaskMaintenanceController). --}}
+            <div class="px-6 py-4" style="border-bottom:1px solid var(--color-border)">
+                <p class="mb-4" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
+                    Task Berbayar
+                </p>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="mtn_is_billable" id="mtn_is_billable" value="1" onchange="mtnToggleBillable()" @checked(old('mtn_is_billable'))>
+                    <span style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">Task ini berbayar (perlu verifikasi CS)</span>
+                </label>
+                <div id="mtn-billing-note-wrap" class="hidden mt-2">
+                    <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                        Catatan Biaya <span style="color:var(--color-error)">*</span>
+                    </label>
+                    <textarea name="mtn_billing_note" id="mtn_billing_note" rows="3" maxlength="1000"
+                              placeholder="Jelaskan pekerjaan berbayar ini untuk ditinjau CS..."
+                              class="w-full rounded-md text-sm"
+                              style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;resize:vertical;outline:none">{{ old('mtn_billing_note') }}</textarea>
+                </div>
+            </div>
+
             {{-- ── Section 2: Material Terpakai ────────────────────────
                  Menggantikan lima kolom teks lama (kabel/modem/patchcord/
                  sleeve/lainnya) — satu kolom per jenis barang, hardcode, tidak
@@ -566,6 +593,24 @@ document.getElementById('maintenance-form')?.addEventListener('submit', function
         btn.style.opacity = '0.75';
         btn.style.cursor = 'not-allowed';
     }
+});
+
+// Toggle catatan biaya untuk MTN/O-REQ/INFR REQ polos — di luar blok
+// @if CREQ karena render untuk semua task_type (lihat Section 1c di atas).
+// Nama fungsi beda dari creqToggleBillable() biar gak collision kalau
+// task_type-nya CREQ (dua blok sama-sama ter-render).
+function mtnToggleBillable() {
+    const checkbox = document.getElementById('mtn_is_billable');
+    const wrap = document.getElementById('mtn-billing-note-wrap');
+    const note = document.getElementById('mtn_billing_note');
+    if (!checkbox || !wrap) return;
+
+    wrap.classList.toggle('hidden', !checkbox.checked);
+    if (note) note.required = checkbox.checked;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    mtnToggleBillable();
 });
 
 @if($task->task_type === \App\Enums\TaskType::CREQ)

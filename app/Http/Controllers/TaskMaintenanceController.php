@@ -22,6 +22,7 @@ use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TaskCreqDetail;
+use App\Models\TaskMaintenanceBillingDetail;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
@@ -293,9 +294,18 @@ class TaskMaintenanceController extends Controller
             'work_tools_manual' => 'nullable|array',
             'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
             'work_tools_manual.*.note' => 'nullable|string|max:255',
+            // Task Berbayar untuk MTN/O-REQ/INFR REQ polos (bukan C-REQ, yang
+            // punya field `creq_is_billable`/`creq_billing_note` sendiri di
+            // dalam blok $isCreq di bawah). SELALU aktif — bukan dikondisikan
+            // ke $isCreq — supaya rule ini tetap diperiksa biarpun field ini
+            // kosong/tidak relevan untuk C-REQ (eksekusinya tetap dijaga
+            // `! $isCreq` di blok updateOrCreate, lihat di bawah).
+            'mtn_is_billable' => ['nullable', 'boolean'],
+            'mtn_billing_note' => ['nullable', 'string', 'max:1000', Rule::requiredIf($request->boolean('mtn_is_billable'))],
         ];
 
         $messages = [
+            'mtn_billing_note.required' => 'Catatan biaya wajib diisi kalau task ini ditandai berbayar.',
             'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
             'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
             'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
@@ -434,6 +444,23 @@ class TaskMaintenanceController extends Controller
                     'tikor_baru_lng' => $validated['creq_tikor_baru_lng'] ?? null,
                     'is_billable' => $request->boolean('creq_is_billable'),
                     'billing_note' => $validated['creq_billing_note'] ?? null,
+                    'verification_status' => CReqVerificationStatus::PENDING->value,
+                    'verified_by' => null,
+                    'verified_at' => null,
+                    'rejection_reason' => null,
+                ]);
+            }
+
+            // Antrean verifikasi biaya untuk MTN/O-REQ/INFR REQ polos (bukan
+            // C-REQ, yang sudah ditangani blok TaskCreqDetail di atas). Beda
+            // dari C-REQ yang SELALU updateOrCreate tiap submit — baris MTN
+            // cuma dibuat kalau benar-benar ditandai berbayar. MTN polos jauh
+            // lebih sering TIDAK berbayar, baris kosong is_billable=false
+            // tiap laporan cuma nambah data percuma di antrean verifikasi CS.
+            if (! $isCreq && $request->boolean('mtn_is_billable')) {
+                TaskMaintenanceBillingDetail::updateOrCreate(['task_id' => $task->id], [
+                    'is_billable' => true,
+                    'billing_note' => $validated['mtn_billing_note'],
                     'verification_status' => CReqVerificationStatus::PENDING->value,
                     'verified_by' => null,
                     'verified_at' => null,
