@@ -15,6 +15,7 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskMaintenanceBillingDetail;
 use App\Models\User;
+use App\Services\ManualCategoryInvoiceService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\CreqBillingVerificationFeatureSeeder;
 use Database\Seeders\FeatureSeeder;
@@ -171,5 +172,65 @@ class TaskMaintenanceBillingApprovalTest extends TestCase
         $this->detail->refresh();
         $this->assertSame(CReqVerificationStatus::REJECTED, $this->detail->verification_status);
         $this->assertSame('Biaya tidak sesuai tarif resmi.', $this->detail->rejection_reason);
+    }
+
+    /**
+     * Regresi Fix Round 1 — show.blade.php sebelumnya SELALU baca
+     * `$task->creqDetail` di top-level @php block (null untuk task MTN),
+     * jadi akses properti berikutnya ($detail->verification_status dst)
+     * fatal. approve()'s success redirect mengarah PERSIS ke halaman ini,
+     * jadi bug ini membuat seluruh alur approve MTN gagal di titik akhir
+     * walau datanya sendiri sudah benar tersimpan. Detail diset VERIFIED
+     * langsung lewat model (bukan lewat approve()) supaya test ini murni
+     * menguji rendering show(), terlepas dari approve() itu sendiri.
+     */
+    #[Test]
+    public function show_task_mtn_verified_render_sukses_bukan_fatal(): void
+    {
+        $customer = Customer::query()->with('customerService')->findOrFail($this->customer->id);
+
+        $invoice = app(ManualCategoryInvoiceService::class)->issue(
+            $customer,
+            ManualInvoiceCategory::PERBAIKAN,
+            null,
+            'Ganti Konektor: Rp25.000',
+            25000,
+            $this->helpdesk->id,
+        );
+
+        $this->detail->update([
+            'verification_status' => CReqVerificationStatus::VERIFIED->value,
+            'verified_by' => $this->helpdesk->id,
+            'verified_at' => now(),
+            'invoice_id' => $invoice->id,
+        ]);
+
+        $response = $this->actingAs($this->helpdesk)->get(route('tasks.creq-billing.show', $this->task));
+
+        $response->assertOk();
+        $response->assertSee('Diverifikasi');
+        $response->assertSee($invoice->invoice_number);
+        $response->assertSee('25.000', false);
+    }
+
+    /**
+     * Sama kasusnya tapi lewat jalur end-to-end asli — approve() beneran
+     * dipanggil, lalu redirect-nya diikuti. Ini persis skenario yang bocor
+     * sebelum Fix Round 1: approve() berhasil (DB benar), tapi halaman
+     * tujuan redirect-nya sendiri fatal.
+     */
+    #[Test]
+    public function approve_task_mtn_lalu_redirect_target_render_sukses(): void
+    {
+        $approveResponse = $this->actingAs($this->helpdesk)->put(route('tasks.creq-billing.approve', $this->task), [
+            'items' => [['name' => 'Ganti Konektor', 'amount' => '25.000']],
+        ]);
+
+        $approveResponse->assertRedirect(route('tasks.creq-billing.show', $this->task));
+
+        $showResponse = $this->actingAs($this->helpdesk)->get(route('tasks.creq-billing.show', $this->task));
+
+        $showResponse->assertOk();
+        $showResponse->assertSee('Diverifikasi');
     }
 }

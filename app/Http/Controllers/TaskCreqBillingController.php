@@ -128,7 +128,11 @@ class TaskCreqBillingController extends Controller
     {
         $this->authorizeBillable($request, $task);
 
-        $task->loadMissing(['customer.pop', 'customer.customerService', 'pop', 'creqDetail.verifier', 'creqDetail.invoice', 'maintenanceReport']);
+        // creqDetail.* DAN maintenanceBillingDetail.* dimuat sekaligus — show.blade.php
+        // membaca salah satunya tergantung task_type (lihat $isCreqTask di sana).
+        // Tanpa ini task MTN tetap benar (relasi lazy-load sendiri), tapi N+1
+        // query verifier/invoice tiap kali halaman ini dibuka untuk task MTN.
+        $task->loadMissing(['customer.pop', 'customer.customerService', 'pop', 'creqDetail.verifier', 'creqDetail.invoice', 'maintenanceBillingDetail.verifier', 'maintenanceBillingDetail.invoice', 'maintenanceReport']);
 
         return view('tasks.creq-billing.show', compact('task'));
     }

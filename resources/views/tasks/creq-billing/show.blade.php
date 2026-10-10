@@ -6,11 +6,24 @@
 @section('breadcrumb_parent_url', route('tasks.creq-billing.index'))
 
 @php
-    $detail = $task->creqDetail;
+    // Dua tabel detail BEDA per task_type (C-REQ vs MTN polos) — baca relasi
+    // yang salah bikin $detail null untuk task MTN (task MTN tidak punya
+    // TaskCreqDetail sama sekali), dan setiap akses properti di bawah
+    // ($detail->verification_status, dst) fatal. Sama perbaikan yang sudah
+    // diterapkan di index.blade.php, mirror logic authorizeBillable()/
+    // approve() di controller.
+    $isCreqTask = $task->task_type === \App\Enums\TaskType::CREQ;
+    $detail = $isCreqTask ? $task->creqDetail : $task->maintenanceBillingDetail;
     $customer = $task->customer;
     $service = $customer?->customerService;
     $maintenance = $task->maintenanceReport;
-    $manualCategory = $detail->category?->toManualInvoiceCategory();
+    // Task MTN polos tidak punya kategori C-REQ (TaskMaintenanceBillingDetail
+    // tidak punya kolom `category`) — kategori tagihannya SELALU PERBAIKAN,
+    // hardcode, sama persis logic approve() di controller. Jangan ditebak
+    // dari category null (toManualInvoiceCategory() hanya ada di CReqCategory).
+    $manualCategory = $isCreqTask
+        ? $detail->category?->toManualInvoiceCategory()
+        : \App\Enums\ManualInvoiceCategory::PERBAIKAN;
     $customerHasService = (bool) $service;
 
     // Formatting Status Badges
@@ -138,9 +151,10 @@
                     {{ $detail->verification_status->label() }}
                 </span>
 
-                {{-- Category Tag --}}
+                {{-- Category Tag — task MTN polos tidak punya kategori C-REQ,
+                     fallback ke label task_type (sama fallback dengan index.blade.php). --}}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
-                    {{ $detail->category?->label() }}
+                    {{ $detail->category?->label() ?? $task->task_type->label() }}
                 </span>
             </div>
 
@@ -237,11 +251,11 @@
 
             {{-- Col 3: Kategori Pekerjaan --}}
             <div class="p-3.5 sm:p-4 flex flex-col justify-between min-w-0">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">KATEGORI C-REQ</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">{{ $isCreqTask ? 'KATEGORI C-REQ' : 'KATEGORI TASK' }}</span>
                 <div class="mt-1">
-                    <span class="text-xs font-bold text-sky-700 dark:text-sky-400 truncate block">{{ $detail->category?->label() }}</span>
+                    <span class="text-xs font-bold text-sky-700 dark:text-sky-400 truncate block">{{ $detail->category?->label() ?? $task->task_type->label() }}</span>
                     <span class="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5 truncate">
-                        {{ $detail->category_custom_name ?: 'Standar C-REQ' }}
+                        {{ $isCreqTask ? ($detail->category_custom_name ?: 'Standar C-REQ') : 'Maintenance berbayar' }}
                     </span>
                 </div>
             </div>
@@ -318,13 +332,15 @@
                         </div>
                     </div>
 
-                    {{-- Kategori & Spesifikasi Perubahan --}}
+                    {{-- Kategori & Spesifikasi Perubahan — task MTN polos tidak punya
+                         kategori C-REQ (TaskMaintenanceBillingDetail tidak punya kolom
+                         `category`/`category_custom_name`), fallback ke label task_type. --}}
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         <div class="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3 border border-slate-200/80 dark:border-slate-700/80">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block select-none">Kategori Pekerjaan</span>
-                            <span class="font-bold text-slate-800 dark:text-slate-200 text-xs mt-1 block">{{ $detail->category?->label() }}</span>
+                            <span class="font-bold text-slate-800 dark:text-slate-200 text-xs mt-1 block">{{ $detail->category?->label() ?? $task->task_type->label() }}</span>
                         </div>
-                        @if($detail->category_custom_name)
+                        @if($isCreqTask && $detail->category_custom_name)
                         <div class="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3 border border-slate-200/80 dark:border-slate-700/80">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block select-none">Nama Kategori Kustom</span>
                             <span class="font-bold text-slate-800 dark:text-slate-200 text-xs mt-1 block">{{ $detail->category_custom_name }}</span>
@@ -332,8 +348,13 @@
                         @endif
                     </div>
 
-                    {{-- Titik Koordinat (Tikor Lama vs Baru jika ada) --}}
-                    @if($detail->tikor_lama_lat || $detail->tikor_baru_lat)
+                    {{-- Titik Koordinat (Tikor Lama vs Baru jika ada) — kolom ini cuma
+                         ada di TaskCreqDetail (tikor_lama_lat dst), TIDAK ada sama sekali
+                         di TaskMaintenanceBillingDetail. Eloquent mengembalikan null untuk
+                         atribut yang tidak dikenal (bukan fatal), tapi $isCreqTask dicek
+                         eksplisit di sini supaya niatnya jelas — section ini murni milik
+                         C-REQ, bukan "kebetulan selalu null" untuk MTN. --}}
+                    @if($isCreqTask && ($detail->tikor_lama_lat || $detail->tikor_baru_lat))
                     <div class="space-y-1.5 pt-1">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">TITIK KOORDINAT (GPS)</span>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -557,7 +578,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-slate-500">Kategori:</span>
-                                <span class="font-semibold text-slate-800 dark:text-slate-200">{{ $detail->invoice->manual_category?->label() ?? $detail->category?->label() }}</span>
+                                <span class="font-semibold text-slate-800 dark:text-slate-200">{{ $detail->invoice->manual_category?->label() ?? $detail->category?->label() ?? $task->task_type->label() }}</span>
                             </div>
                             @if($detail->invoice->manual_subtype_name)
                             <div class="flex items-center justify-between">
