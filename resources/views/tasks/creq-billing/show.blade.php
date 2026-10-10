@@ -655,22 +655,6 @@
                                 Task ini punya penjualan modem (Beli dari Gudang) — isi harga modem &amp; biaya jasa terpisah, tagihan otomatis dirinci.
                             </div>
 
-                            {{-- Subtype Name (if required) --}}
-                            @if($manualCategory->requiresSubtypeName())
-                            <div class="space-y-1">
-                                <label for="manual_subtype_name" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Nama Jenis Tagihan <span class="text-rose-500">*</span>
-                                </label>
-                                <input type="text" name="manual_subtype_name" id="manual_subtype_name" maxlength="150" required
-                                       value="{{ old('manual_subtype_name', $detail->category_custom_name) }}"
-                                       placeholder="Contoh: Pasang Kabel Ekstra / Repeater"
-                                       class="w-full text-xs px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs">
-                                @error('manual_subtype_name')
-                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
-                                @enderror
-                            </div>
-                            @endif
-
                             {{-- Harga Modem (prefilled dari InventorySerialSale::price) --}}
                             <div class="space-y-1">
                                 <label for="modem_price" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
