@@ -294,12 +294,20 @@ class TaskMaintenanceController extends Controller
             'work_tools_manual' => 'nullable|array',
             'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
             'work_tools_manual.*.note' => 'nullable|string|max:255',
-            // Task Berbayar untuk MTN/O-REQ/INFR REQ polos (bukan C-REQ, yang
-            // punya field `creq_is_billable`/`creq_billing_note` sendiri di
-            // dalam blok $isCreq di bawah). SELALU aktif — bukan dikondisikan
-            // ke $isCreq — supaya rule ini tetap diperiksa biarpun field ini
-            // kosong/tidak relevan untuk C-REQ (eksekusinya tetap dijaga
-            // `! $isCreq` di blok updateOrCreate, lihat di bawah).
+            // Task Berbayar untuk MTN polos (bukan C-REQ, yang punya field
+            // `creq_is_billable`/`creq_billing_note` sendiri di dalam blok
+            // $isCreq di bawah). Rule ini SENGAJA tetap permisif untuk SEMUA
+            // task_type (bukan dikondisikan ke task_type === MAINTENANCE) —
+            // yang menjaga kebenaran bukan validasi ini, tapi gerbang
+            // eksekusi di blok updateOrCreate di bawah, yang diperketat ke
+            // exact match `TaskType::MAINTENANCE` (final review 2026-10-10,
+            // finding #1: `! $isCreq` dulu juga true untuk O-REQ/INFR REQ,
+            // baris `TaskMaintenanceBillingDetail` kebentuk tapi permanen
+            // tak kelihatan di antrean Verifikasi Biaya — lihat komentar di
+            // sana). Checkbox sumber field ini juga sudah disembunyikan di
+            // view untuk task_type selain MAINTENANCE, jadi path ini aman
+            // dibiarkan permisif: tidak ada pengguna nyata yang bisa
+            // memicunya untuk O-REQ/INFR REQ lewat UI.
             'mtn_is_billable' => ['nullable', 'boolean'],
             'mtn_billing_note' => ['nullable', 'string', 'max:1000', Rule::requiredIf($request->boolean('mtn_is_billable'))],
         ];
@@ -451,13 +459,23 @@ class TaskMaintenanceController extends Controller
                 ]);
             }
 
-            // Antrean verifikasi biaya untuk MTN/O-REQ/INFR REQ polos (bukan
-            // C-REQ, yang sudah ditangani blok TaskCreqDetail di atas). Beda
-            // dari C-REQ yang SELALU updateOrCreate tiap submit — baris MTN
-            // cuma dibuat kalau benar-benar ditandai berbayar. MTN polos jauh
-            // lebih sering TIDAK berbayar, baris kosong is_billable=false
+            // Antrean verifikasi biaya untuk MTN polos SAJA (bukan C-REQ,
+            // yang sudah ditangani blok TaskCreqDetail di atas). Review akhir
+            // (2026-10-10, finding #1): SEMPAT dipakai juga untuk O-REQ/INFR
+            // REQ lewat guard `! $isCreq` (true untuk MAINTENANCE, OREQ,
+            // DAN INFR) — tapi antrean Verifikasi Biaya
+            // (`TaskCreqBillingController::index()`/`authorizeBillable()`)
+            // CUMA mengenali CREQ & MAINTENANCE, O-REQ/INFR jatuh ke
+            // `default => false`. Akibatnya baris `is_billable=true` buat
+            // O-REQ/INFR kebentuk tapi PERMANEN gak kelihatan di antrean CS —
+            // kebocoran uang senyap. Diperketat ke exact match MAINTENANCE;
+            // dropping O-REQ/INFR REQ di sini SENGAJA, bukan widening antrean
+            // (butuh keputusan produk soal kategori invoice yang belum ada).
+            // Beda dari C-REQ yang SELALU updateOrCreate tiap submit — baris
+            // MTN cuma dibuat kalau benar-benar ditandai berbayar. MTN polos
+            // jauh lebih sering TIDAK berbayar, baris kosong is_billable=false
             // tiap laporan cuma nambah data percuma di antrean verifikasi CS.
-            if (! $isCreq && $request->boolean('mtn_is_billable')) {
+            if ($task->task_type === TaskType::MAINTENANCE && $request->boolean('mtn_is_billable')) {
                 TaskMaintenanceBillingDetail::updateOrCreate(['task_id' => $task->id], [
                     'is_billable' => true,
                     'billing_note' => $validated['mtn_billing_note'],

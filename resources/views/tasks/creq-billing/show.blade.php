@@ -61,10 +61,14 @@
         : collect();
     $reportWorkTools = $reportFopTask ? $reportFopTask->workTools()->orderBy('id')->get() : collect();
 
-    // Breakdown Harga Modem + Jasa (ownership modem sewa/beli, Task 6,
-    // 2026-10-09) — kalau laporan "Beli dari Gudang" sudah menulis
-    // InventorySerialSale buat task ini, form approve menampilkan 2 input
-    // (Harga Modem + Biaya Jasa) sebagai pengganti satu input `amount`.
+    // Penjualan modem (ownership modem sewa/beli, 2026-10-09) — kalau
+    // laporan "Beli dari Gudang" sudah menulis InventorySerialSale buat
+    // task ini, breakdown per-item generik (Task 4, 2026-10-10, lihat
+    // $initialItems di bawah) SELALU menyisipkan baris "Jual Modem" terkunci
+    // di urutan pertama, nilainya di-seed dari `$modemSale->price`. Mekanisme
+    // 2-input terpisah "Harga Modem + Biaya Jasa" (Task 6 lama,
+    // `ownership-modem-sewa-beli`) SUDAH DIGANTI sepenuhnya oleh breakdown
+    // N-baris generik ini — jangan hidupkan lagi mekanisme 2-input itu.
     // $reportFopTask dipakai lagi (SAMA anchor dengan material/SN di atas)
     // biar gak ada dua cara berbeda nebak FopTask mana yang relevan.
     $modemSale = $reportFopTask
@@ -88,7 +92,19 @@
     } elseif ($modemSale) {
         $initialItems = [[
             'name' => 'Jual Modem',
-            'amount' => (string) $modemSale->price,
+            // FormatHelper::rupiahInput(), BUKAN (string) $modemSale->price
+            // mentah (final review 2026-10-10, finding #2) — kolom DB
+            // berbentuk desimal mesin (mis. "150000.00"), sementara mask
+            // `data-rupiah` & regex parsing di Alpine (lihat parsedAmount()
+            // di bawah) mengasumsikan bentuk TAMPILAN Indonesia
+            // ("150.000"). Men-seed bentuk mesin langsung ke item.amount
+            // membuat Alpine model & DOM (yang diformat ulang oleh mask
+            // saat halaman dimuat) mulai dari representasi yang BEDA —
+            // sumber potensi salah baca kalau baris ini sempat tersentuh
+            // sebelum mask & Alpine benar-benar selaras. rupiahInput()
+            // menghasilkan bentuk tampilan yang SAMA dengan yang akan
+            // ditulis mask, jadi item.amount konsisten sejak render awal.
+            'amount' => \App\Helpers\FormatHelper::rupiahInput($modemSale->price),
             'inventory_serial_sale_id' => $modemSale->id,
             'locked' => true,
         ]];
@@ -751,7 +767,21 @@
                                         <div class="w-32 sm:w-36 shrink-0">
                                             <div class="relative">
                                                 <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-mono text-[11px] font-bold">Rp</div>
-                                                <input type="text" inputmode="numeric" data-rupiah :name="`items[${index}][amount]`" x-model="item.amount"
+                                                {{-- :value + @input(nextTick), BUKAN x-model polos (final review
+                                                     2026-10-10, finding #2) — `data-rupiah` mask di layouts/app.blade.php
+                                                     adalah listener `input` di level DOCUMENT (bubble phase), sedangkan
+                                                     x-model memasang listener `input` di level ELEMENT ini sendiri.
+                                                     Listener element selalu lebih dulu jalan daripada listener document
+                                                     untuk event yang sama (bubbling), jadi x-model akan MENANGKAP nilai
+                                                     SEBELUM mask merapikannya — model Alpine selalu "satu ketikan
+                                                     ketinggalan" dari yang tampil di DOM, dan preview Total Tagihan jadi
+                                                     salah (lihat parsedAmount()/get total() di bawah). `$nextTick()`
+                                                     menunda pembacaan `$event.target.value` ke microtask SESUDAH mask
+                                                     document-level selesai jalan (keduanya tetap dalam siklus sinkron
+                                                     event yang sama), jadi item.amount yang disimpan SELALU nilai yang
+                                                     sudah bermasking, bukan nilai mentah sebelum mask. --}}
+                                                <input type="text" inputmode="numeric" data-rupiah :name="`items[${index}][amount]`" :value="item.amount"
+                                                       @input="$nextTick(() => { item.amount = $event.target.value })"
                                                        placeholder="0"
                                                        class="w-full pl-7 pr-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors">
                                             </div>

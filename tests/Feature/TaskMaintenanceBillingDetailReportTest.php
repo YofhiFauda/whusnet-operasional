@@ -86,6 +86,24 @@ class TaskMaintenanceBillingDetailReportTest extends TestCase
         return $task;
     }
 
+    private function makeTaskOfType(TaskType $taskType): Task
+    {
+        $task = Task::create([
+            'task_number' => 'TASK-'.$taskType->value.'-'.random_int(1000, 9999),
+            'customer_id' => $this->customer->id,
+            'pop_id' => $this->pop->id,
+            'task_type' => $taskType->value,
+            'title' => $taskType->value.' Test',
+            'status' => TaskStatus::IN_PROGRESS->value,
+            'started_at' => now(),
+            'created_by' => $this->technician->id,
+            'updated_by' => $this->technician->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $this->technician->id, 'role_in_task' => 'lead']);
+
+        return $task;
+    }
+
     private function basePayload(): array
     {
         return [
@@ -125,5 +143,58 @@ class TaskMaintenanceBillingDetailReportTest extends TestCase
 
         $response->assertSessionHasNoErrors();
         $this->assertNull($task->fresh()->maintenanceBillingDetail);
+    }
+
+    /**
+     * Review akhir (2026-10-10, finding #1) — checkbox "Task Berbayar" di
+     * `maintenance-report.blade.php` dulu digerbang `@unless(... === CREQ)`,
+     * yang juga TRUE untuk O-REQ & INFR REQ (bukan cuma MAINTENANCE).
+     * Checkbox tidak boleh tampil sama sekali untuk O-REQ/INFR REQ: antrean
+     * Verifikasi Biaya (`TaskCreqBillingController::index()`/
+     * `authorizeBillable()`) cuma mengenali CREQ & MAINTENANCE, jadi baris
+     * `TaskMaintenanceBillingDetail` untuk O-REQ/INFR REQ akan permanen
+     * tidak kelihatan di antrean CS — kebocoran uang senyap.
+     */
+    #[Test]
+    public function checkbox_task_berbayar_tidak_tampil_untuk_oreq_dan_infr(): void
+    {
+        $oreqTask = $this->makeTaskOfType(TaskType::OREQ);
+        $infrTask = $this->makeTaskOfType(TaskType::INFR);
+
+        // String "mtn_is_billable" juga muncul di JS (mtnToggleBillable(),
+        // dirender tanpa syarat — aman no-op kalau elemennya tidak ada),
+        // jadi assert menyasar elemen `<input ... id="mtn_is_billable">`
+        // itu sendiri, bukan sembarang kemunculan string.
+        $this->actingAs($this->technician)->get(route('tasks.maintenance.report', $oreqTask))
+            ->assertOk()
+            ->assertDontSee('id="mtn_is_billable"', false);
+
+        $this->actingAs($this->technician)->get(route('tasks.maintenance.report', $infrTask))
+            ->assertOk()
+            ->assertDontSee('id="mtn_is_billable"', false);
+    }
+
+    /**
+     * Sama finding #1 — bahkan kalau request dikerjai untuk langsung
+     * mengirim `mtn_is_billable=1` ke O-REQ/INFR REQ (melewati UI yang sudah
+     * tidak menampilkan checkbox-nya), server tidak boleh membuat baris
+     * `TaskMaintenanceBillingDetail`. Guard eksekusi diperketat ke exact
+     * match `TaskType::MAINTENANCE`, bukan `! $isCreq` (yang dulu juga lolos
+     * untuk O-REQ/INFR REQ).
+     */
+    #[Test]
+    public function mtn_is_billable_dikerjai_untuk_oreq_tidak_bikin_billing_detail(): void
+    {
+        $oreqTask = $this->makeTaskOfType(TaskType::OREQ);
+
+        $response = $this->actingAs($this->technician)
+            ->post(route('tasks.maintenance.store', $oreqTask), $this->basePayload() + [
+                'mtn_is_billable' => '1',
+                'mtn_billing_note' => 'Dikerjai: coba tandai O-REQ berbayar.',
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertNull($oreqTask->fresh()->maintenanceBillingDetail);
+        $this->assertDatabaseCount('task_maintenance_billing_details', 0);
     }
 }

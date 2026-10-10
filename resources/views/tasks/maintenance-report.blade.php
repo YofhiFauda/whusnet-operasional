@@ -186,19 +186,22 @@
             </div>
             @endif
 
-            @unless($task->task_type === \App\Enums\TaskType::CREQ)
-            {{-- ── Section 1c: Task Berbayar (MTN/O-REQ/INFR REQ polos) ──
+            @if($task->task_type === \App\Enums\TaskType::MAINTENANCE)
+            {{-- ── Section 1c: Task Berbayar (MTN polos) ──
                  Sama seperti checkbox "Task Berbayar" C-REQ di atas, tapi
                  field & model beda (`mtn_is_billable`/`mtn_billing_note` →
                  `TaskMaintenanceBillingDetail`, bukan `TaskCreqDetail`) —
                  dua sumber kebenaran terpisah biar gak collide di satu
-                 form. Khusus task_type NON-C-REQ — kalau $isCreq, checkbox
-                 "Task Berbayar" C-REQ di atas sudah cukup; nampilin dua
-                 checkbox "Task Berbayar" sekaligus di satu form cuma bikin
-                 teknisi bingung mana yang kepake (backend juga udah nolak
-                 `mtn_is_billable` buat C-REQ lewat guard `! $isCreq` di
-                 TaskMaintenanceController, jadi blok ini emang gak relevan
-                 buat C-REQ baik UI maupun eksekusi). --}}
+                 form. Review akhir (2026-10-10, finding #1): guard sempat
+                 `@unless(... === CREQ)`, yang juga lolos untuk O-REQ/INFR
+                 REQ — tapi antrean Verifikasi Biaya cuma mengenali CREQ &
+                 MAINTENANCE, jadi O-REQ/INFR yang ditandai berbayar lewat
+                 checkbox ini kebentuk tapi gak pernah kelihatan di antrean
+                 CS. Diperketat ke exact match MAINTENANCE (selaras dengan
+                 guard eksekusi di TaskMaintenanceController::store()) —
+                 kalau $isCreq, checkbox "Task Berbayar" C-REQ di atas sudah
+                 cukup; nampilin dua checkbox sekaligus di satu form cuma
+                 bikin teknisi bingung mana yang kepake. --}}
             <div class="px-6 py-4" style="border-bottom:1px solid var(--color-border)">
                 <p class="mb-4" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
                     Task Berbayar
@@ -217,7 +220,7 @@
                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;resize:vertical;outline:none">{{ old('mtn_billing_note') }}</textarea>
                 </div>
             </div>
-            @endunless
+            @endif
 
             {{-- ── Section 2: Material Terpakai ────────────────────────
                  Menggantikan lima kolom teks lama (kabel/modem/patchcord/
@@ -601,10 +604,14 @@ document.getElementById('maintenance-form')?.addEventListener('submit', function
     }
 });
 
-// Toggle catatan biaya untuk MTN/O-REQ/INFR REQ polos — di luar blok
-// if-CREQ karena render untuk semua task_type NON-C-REQ (lihat Section 1c di atas).
-// Nama fungsi beda dari creqToggleBillable() biar gak collision kalau
-// task_type-nya CREQ (dua blok sama-sama ter-render).
+// Toggle catatan biaya untuk MTN polos — fungsi ini SELALU dirender (di
+// luar @@if task_type) walau checkbox/elemen Section 1c di atas cuma ada
+// untuk task_type MAINTENANCE (final review 2026-10-10, finding #1:
+// diperketat dari `! $isCreq`/NON-C-REQ ke exact match MAINTENANCE).
+// Guard `if (!checkbox || !wrap) return;` bikin fungsi ini aman no-op
+// untuk task_type lain (elemennya tidak ada di DOM) — gak perlu gerbang
+// @@if tambahan di sini. Nama fungsi beda dari creqToggleBillable() biar
+// gak collision kalau task_type-nya CREQ (dua blok sama-sama ter-render).
 function mtnToggleBillable() {
     const checkbox = document.getElementById('mtn_is_billable');
     const wrap = document.getElementById('mtn-billing-note-wrap');

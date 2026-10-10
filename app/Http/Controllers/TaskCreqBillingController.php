@@ -157,29 +157,42 @@ class TaskCreqBillingController extends Controller
     {
         $this->authorizeBillable($request, $task);
 
-        // Breakdown Harga Modem + Jasa (ownership modem sewa/beli, Task 6,
-        // 2026-10-09): kalau laporan teknisi "Beli dari Gudang" sudah
-        // menulis InventorySerialSale buat task ini (Task 1-3), breakdown
-        // `items[]` WAJIB menyertakan satu baris dengan
-        // `inventory_serial_sale_id` = $sale->id — lihat validasi di bawah.
-        // Rantainya: Task::fopTask() (hasOne, FK fop_tasks.task_id) ->
-        // FopTask -> InventorySerialSale.fop_task_id. Dipakai resolveTaskFor()
-        // (sama persis yang dipakai show.blade.php buat anchor material/SN)
-        // karena itu SATU-SATUNYA jalur Task->FopTask yang sudah tahan kalau
-        // suatu saat ada >1 FopTask menunjuk task yang sama (hasOne Eloquent
-        // diam-diam ambil salah satu; query langsung + latest('id') di sana
-        // eksplisit).
+        // Breakdown per-item generik (Task 4, 2026-10-10) — GANTI total
+        // mekanisme "Harga Modem + Jasa" dua-input (Task 6 lama,
+        // `ownership-modem-sewa-beli`). Kalau laporan teknisi "Beli dari
+        // Gudang" sudah menulis InventorySerialSale buat task ini (Task
+        // 1-3), breakdown `items[]` WAJIB menyertakan SATU baris dengan
+        // `inventory_serial_sale_id` = $sale->id — lihat validasi &
+        // guard "exactly one" di bawah. Rantainya: Task::fopTask() (hasOne,
+        // FK fop_tasks.task_id) -> FopTask -> InventorySerialSale.fop_task_id.
+        // Dipakai resolveTaskFor() (sama persis yang dipakai show.blade.php
+        // buat anchor material/SN) karena itu SATU-SATUNYA jalur Task->FopTask
+        // yang sudah tahan kalau suatu saat ada >1 FopTask menunjuk task yang
+        // sama (hasOne Eloquent diam-diam ambil salah satu; query langsung +
+        // latest('id') di sana eksplisit).
         $fopTask = app(TaskWorkToolService::class)->resolveTaskFor($task);
         $sale = $fopTask ? InventorySerialSale::where('fop_task_id', $fopTask->id)->first() : null;
 
         // Parse rupiah per baris SEBELUM validasi — array dinamis, jadi
         // RupiahInput::parseKeys() (dibuat buat key flat) tidak cocok di
         // sini, loop manual per index.
+        //
+        // is_array() dobel (final review 2026-10-10, finding #6) — request
+        // yang dikerjai ('items' dikirim sebagai string, atau 'items[0]'
+        // sebagai skalar) bikin foreach/akses index di bawah lempar
+        // TypeError SEBELUM validate() sempat jalan, jatuh ke 500 alih-alih
+        // 422 yang bersih. Baris yang bukan array dibiarkan apa adanya —
+        // aturan 'items.*.name'/'items.*.amount' di validate() di bawah yang
+        // menolaknya dengan pesan yang benar.
         $items = $request->input('items', []);
-        foreach ($items as $i => $row) {
-            $items[$i]['amount'] = RupiahInput::parse($row['amount'] ?? null);
+        if (is_array($items)) {
+            foreach ($items as $i => $row) {
+                if (is_array($row)) {
+                    $items[$i]['amount'] = RupiahInput::parse($row['amount'] ?? null);
+                }
+            }
+            $request->merge(['items' => $items]);
         }
-        $request->merge(['items' => $items]);
 
         $manualCategory = $task->task_type === TaskType::CREQ
             ? $task->creqDetail->category->toManualInvoiceCategory()
@@ -188,11 +201,11 @@ class TaskCreqBillingController extends Controller
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.name' => 'required|string|max:150',
-            // min:0.01, bukan min:0, untuk SEMUA baris termasuk baris modem
-            // auto-seed — samakan dengan invarian
-            // `InventoryService::recordSerialSale()` (harga > 0): modem yang
-            // sudah terjual tidak boleh "dikoreksi" jadi Rp0 di sini. Baris
-            // lain (jasa dll) boleh Rp0 asal bukan baris modemnya sendiri.
+            // min:0.01 berlaku SERAGAM untuk SEMUA baris, termasuk baris
+            // modem auto-seed — bukan cuma baris modem (Global Constraint
+            // rancangan ini: tidak ada baris gratis/Rp0 sama sekali di
+            // mekanisme breakdown generik). Kalau satu layanan memang gratis,
+            // jangan ditambahkan sebagai baris — bukan ditulis Rp0.
             'items.*.amount' => 'required|numeric|min:0.01|max:99999999.99',
             'items.*.inventory_serial_sale_id' => ['nullable', 'integer', Rule::in($sale ? [$sale->id] : [])],
             'manual_subtype_name' => [
@@ -209,10 +222,31 @@ class TaskCreqBillingController extends Controller
         // (task_billing_items, invoice, InventorySerialSale::price) kalau
         // baris modem hilang — CS yang lupa menyertakannya ditolak bersih,
         // bukan rollback setengah jalan.
-        if ($sale && ! collect($validated['items'])->contains(fn ($item) => (int) ($item['inventory_serial_sale_id'] ?? 0) === $sale->id)) {
-            throw ValidationException::withMessages([
-                'items' => 'Baris "Jual Modem" wajib ada — task ini mencatat penjualan modem, breakdown tidak boleh menghilangkan barisnya.',
-            ]);
+        if ($sale) {
+            $modemRowCount = collect($validated['items'])
+                ->filter(fn ($item) => (int) ($item['inventory_serial_sale_id'] ?? 0) === $sale->id)
+                ->count();
+
+            if ($modemRowCount === 0) {
+                throw ValidationException::withMessages([
+                    'items' => 'Baris "Jual Modem" wajib ada — task ini mencatat penjualan modem, breakdown tidak boleh menghilangkan barisnya.',
+                ]);
+            }
+
+            // Exactly one, bukan "at least one" (final review 2026-10-10,
+            // finding #5) — request yang dikerjai bisa mengirim DUA baris
+            // sekaligus mengklaim `inventory_serial_sale_id` yang sama:
+            // modem kebayar dua kali (keduanya tetap ikut ke total invoice),
+            // dan firstWhere() di bawah cuma menulis SATU nominal baris itu
+            // balik ke InventorySerialSale::price — baris lainnya senyap
+            // dari write-back meski nominalnya tetap nyangkut di total
+            // tagihan. UI Alpine tidak bisa menghasilkan ini sendiri, tapi
+            // server tidak boleh percaya begitu saja.
+            if ($modemRowCount > 1) {
+                throw ValidationException::withMessages([
+                    'items' => 'Baris "Jual Modem" tidak boleh dobel — hanya satu baris yang boleh menunjuk penjualan modem task ini.',
+                ]);
+            }
         }
 
         $amount = collect($validated['items'])->sum('amount');

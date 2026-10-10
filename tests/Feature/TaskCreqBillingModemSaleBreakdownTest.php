@@ -274,6 +274,73 @@ class TaskCreqBillingModemSaleBreakdownTest extends TestCase
         $this->assertSame(CReqVerificationStatus::VERIFIED, $this->detail->verification_status);
     }
 
+    /**
+     * Review akhir (2026-10-10, finding #5) — guard modem-row-mandatory
+     * cuma mengecek "at least one" row dengan `inventory_serial_sale_id`
+     * yang sama. Request yang dikerjai bisa mengirim DUA baris sekaligus
+     * mengklaim sale yang sama: modem kebayar dua kali di total invoice,
+     * dan `firstWhere()` (write-back price) cuma menulis nominal SATU baris
+     * — baris lainnya senyap. Diperketat jadi "exactly one".
+     */
+    #[Test]
+    public function approve_dengan_dua_baris_modem_sale_id_sama_ditolak(): void
+    {
+        $this->beriLayanan();
+        $sale = $this->buatSaleUntukTask(100000);
+
+        $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), [
+                'items' => [
+                    ['name' => 'Jual Modem', 'amount' => '150.000', 'inventory_serial_sale_id' => $sale->id],
+                    ['name' => 'Jual Modem (dobel)', 'amount' => '150.000', 'inventory_serial_sale_id' => $sale->id],
+                ],
+            ])
+            ->assertSessionHasErrors('items');
+
+        $this->detail->refresh();
+        $this->assertSame(CReqVerificationStatus::PENDING, $this->detail->verification_status);
+        $this->assertDatabaseCount('task_billing_items', 0);
+        $sale->refresh();
+        $this->assertEquals(100000.0, (float) $sale->price); // tidak tersentuh
+    }
+
+    /**
+     * Review akhir (2026-10-10, finding #6) — loop parse rupiah per baris di
+     * approve() jalan SEBELUM validate(), dan dulu mengasumsikan `items`
+     * selalu array of array. Payload yang dikerjai (`items` berupa string,
+     * atau `items[0]` berupa skalar) harus ditolak 422/error session bersih,
+     * bukan 500 (TypeError lempar sebelum validator sempat jalan).
+     */
+    #[Test]
+    public function approve_items_malformed_string_ditolak_422_bukan_500(): void
+    {
+        $this->beriLayanan();
+
+        $response = $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), [
+                'items' => 'bukan-array',
+            ]);
+
+        $response->assertSessionHasErrors('items');
+        $this->assertNotEquals(500, $response->getStatusCode());
+        $this->assertDatabaseCount('task_billing_items', 0);
+    }
+
+    #[Test]
+    public function approve_items_baris_malformed_skalar_ditolak_422_bukan_500(): void
+    {
+        $this->beriLayanan();
+
+        $response = $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), [
+                'items' => ['bukan-baris-array'],
+            ]);
+
+        $response->assertSessionHasErrors();
+        $this->assertNotEquals(500, $response->getStatusCode());
+        $this->assertDatabaseCount('task_billing_items', 0);
+    }
+
     #[Test]
     public function approve_tanpa_sale_row_flow_items_generik_tetap_berjalan(): void
     {

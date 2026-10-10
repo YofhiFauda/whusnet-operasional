@@ -3,13 +3,20 @@
 namespace Tests\Feature;
 
 use App\Enums\CReqVerificationStatus;
+use App\Enums\FopTaskPriority;
 use App\Enums\ManualInvoiceCategory;
 use App\Enums\ScopeType;
+use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\CustomerService;
+use App\Models\FopTask;
 use App\Models\InternetPackage;
+use App\Models\InventorySerial;
+use App\Models\InventorySerialSale;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -232,5 +239,81 @@ class TaskMaintenanceBillingApprovalTest extends TestCase
 
         $showResponse->assertOk();
         $showResponse->assertSee('Diverifikasi');
+    }
+
+    /**
+     * Review akhir (2026-10-10, finding #7) — guard modem-row-mandatory di
+     * approve() (menolak breakdown yang menghilangkan baris "Jual Modem"
+     * kalau task punya InventorySerialSale) share method yang SAMA untuk
+     * C-REQ dan MTN polos (`$sale` diresolusi dari `$fopTask` yang sama,
+     * tidak dicabangkan per task_type). Sebelumnya cuma ditest untuk C-REQ
+     * (`TaskCreqBillingModemSaleBreakdownTest`) — test ini cuma memastikan
+     * perilaku yang sama berlaku juga untuk task MTN. Setup sale disalin
+     * dari `TaskCreqBillingModemSaleBreakdownTest::buatSaleUntukTask()`.
+     */
+    #[Test]
+    public function approve_task_mtn_dengan_sale_row_tanpa_baris_modem_ditolak(): void
+    {
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-MTNAPR-0001',
+            'task_date' => now(),
+            'category' => TaskType::MAINTENANCE->value,
+            'task_id' => $this->task->id,
+            'tugas' => 'TEST-MTNAPR-001_Pelanggan MTN Approval',
+            'pop_id' => $this->pop->id,
+            'customer_id' => $this->customer->id,
+            'issue' => 'Beli modem dari gudang',
+            'status' => TaskStatus::SELESAI->value,
+            'priority' => FopTaskPriority::MEDIUM->value,
+        ]);
+
+        $category = ItemCategory::create(['code' => 'modem_ont_mtnapr', 'name' => 'Modem/ONT Pelanggan', 'default_unit' => 'pcs']);
+        $item = Item::create([
+            'code' => 'ONT-MTNAPR-TEST', 'name' => 'Modem ONT Beli Gudang', 'unit' => 'pcs',
+            'item_category_id' => $category->id, 'tracking_type' => 'serialized', 'ownership_mode' => 'installable',
+        ]);
+        $serial = InventorySerial::create([
+            'item_id' => $item->id,
+            'serial_number' => 'SN-MTNAPR-001',
+            'status' => SerialStatus::INSTALLED->value,
+            'customer_id' => $this->customer->id,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+
+        $sale = InventorySerialSale::create([
+            'inventory_serial_id' => $serial->id,
+            'customer_id' => $this->customer->id,
+            'fop_task_id' => $fopTask->id,
+            'price' => 100000,
+            'created_by' => $this->helpdesk->id,
+        ]);
+
+        // Tanpa baris modem — ditolak, sama dengan C-REQ.
+        $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), [
+                'items' => [['name' => 'Ganti Konektor', 'amount' => '25.000']],
+            ])
+            ->assertSessionHasErrors('items');
+
+        $this->detail->refresh();
+        $this->assertSame(CReqVerificationStatus::PENDING, $this->detail->verification_status);
+        $this->assertDatabaseCount('task_billing_items', 0);
+        $sale->refresh();
+        $this->assertEquals(100000.0, (float) $sale->price);
+
+        // Dengan baris modem — lolos, dan price sale ditulis balik.
+        $this->actingAs($this->helpdesk)
+            ->put(route('tasks.creq-billing.approve', $this->task), [
+                'items' => [
+                    ['name' => 'Jual Modem', 'amount' => '150.000', 'inventory_serial_sale_id' => $sale->id],
+                    ['name' => 'Ganti Konektor', 'amount' => '25.000'],
+                ],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->detail->refresh();
+        $this->assertSame(CReqVerificationStatus::VERIFIED, $this->detail->verification_status);
+        $sale->refresh();
+        $this->assertEquals(150000.0, (float) $sale->price);
     }
 }
