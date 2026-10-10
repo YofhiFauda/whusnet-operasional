@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DeviceOwnership;
 use App\Enums\ItemCondition;
 use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
@@ -32,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'condition',
     'condition_checked_at',
     'condition_checked_by',
+    'ownership',
     'current_pop_id',
     'current_technician_id',
     'issued_from_pop_id',
@@ -49,6 +51,7 @@ class InventorySerial extends Model
         return [
             'status' => SerialStatus::class,
             'condition' => ItemCondition::class,
+            'ownership' => DeviceOwnership::class,
             'condition_checked_at' => 'datetime',
             'installed_at' => 'datetime',
         ];

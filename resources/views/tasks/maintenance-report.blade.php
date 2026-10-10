@@ -57,7 +57,8 @@
         <span id="client-error-text"></span>
     </div>
 
-    <form id="maintenance-form" action="{{ route('tasks.maintenance.store', $task) }}" method="POST" enctype="multipart/form-data" class="no-confirm">
+    <form id="maintenance-form" action="{{ route('tasks.maintenance.store', $task) }}" method="POST" enctype="multipart/form-data" class="no-confirm"
+          x-data="{ modemOwnership: @js(old('modem_ownership_choice', 'tidak_ganti')) }">
         @csrf
 
         {{-- ══ Main Form Panel — satu card utama ══════════════════════════ --}}
@@ -227,33 +228,107 @@
                 <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
                     Isi HANYA kalau teknisi membawa &amp; memasang modem/ONT pengganti dari Gudang. Kalau tidak bawa/ganti modem, biarkan kosong.
                 </p>
-                @if($eligibleSerials->isNotEmpty())
-                    @php
-                        // Sisa stok Perangkat Aktif per jenis barang (koreksi lanjutan
-                        // ADHOC-54, 2026-09-12) — sama pola installations/report.blade.php:
-                        // SERIALIZED gak punya qty, jadi dihitung dari JUMLAH SN yang masih
-                        // ISSUED di custody tim, dikelompokkan per nama barang.
-                        $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)
-                            ->map->count();
-                        // Combobox (components/combobox.blade.php): SN dicari lewat
-                        // ketikan, bukan scroll <select>. Opsi "Tidak ganti modem"
-                        // (value kosong) = default, jadi SN tidak tersimpan.
-                        $serialOptions = collect([['value' => '', 'label' => 'Tidak ganti modem', 'search' => 'tidak ganti modem']])
-                            ->concat($eligibleSerials->map(fn ($serial) => [
-                                'value' => $serial->id,
-                                'label' => 'SN ' . $serial->serial_number . ' — ' . $serial->item->name,
-                                'search' => $serial->serial_number . ' ' . $serial->item->name,
-                                'hint' => 'Sisa custody tim: ' . $serialCountsByItem[$serial->item->name] . ' unit',
-                            ]))->values();
-                    @endphp
-                    <x-combobox id="selected_inventory_serial_id" name="selected_inventory_serial_id" :options-expr="json_encode($serialOptions)" :value-expr="json_encode((string) old('selected_inventory_serial_id', ''))" placeholder="Ketik SN atau nama perangkat..." />
-                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Perangkat yang diambil lewat Gudang (custody Anda) — SN yang tersimpan otomatis sama persis dengan yang dipilih di sini.</p>
-                @else
-                    <select disabled class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-surface-muted);color:var(--color-text-muted);padding:10px 12px">
-                        <option>Tidak ada SN di custody Anda</option>
-                    </select>
-                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Anda belum mengambil modem dari Gudang — kalau maintenance ini gak perlu ganti modem, abaikan saja.</p>
-                @endif
+
+                {{-- Radio ownership modem (rancangan ownership modem sewa/beli,
+                     2026-10-09) — menentukan cara pemilikan modem yang
+                     dipasang: tetap aset perusahaan (Sewa Gudang), dijual ke
+                     pelanggan (Beli dari Gudang), atau milik pelanggan sendiri
+                     yang gak pernah lewat gudang sama sekali (Beli Sendiri).
+                     Default "Tidak Ganti Modem" — SN gak kesentuh (perilaku
+                     lama). --}}
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    @foreach([
+                        'tidak_ganti' => 'Tidak Ganti Modem',
+                        'sewa_gudang' => 'Sewa Gudang',
+                        'beli_sendiri' => 'Beli Sendiri',
+                        'beli_gudang' => 'Beli dari Gudang',
+                    ] as $value => $label)
+                    <label class="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer transition-colors"
+                           style="border:1px solid var(--color-border);background:var(--color-background)"
+                           :style="modemOwnership === '{{ $value }}' ? 'border-color:var(--color-primary);background:rgba(2,132,199,0.08)' : ''">
+                        <input type="radio" name="modem_ownership_choice" value="{{ $value }}" x-model="modemOwnership"
+                               @checked(old('modem_ownership_choice', 'tidak_ganti') === $value)
+                               class="h-3.5 w-3.5">
+                        <span style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">{{ $label }}</span>
+                    </label>
+                    @endforeach
+                </div>
+
+                {{-- fieldset :disabled — x-show cuma menyembunyikan; tanpa ini SN
+                     yang sempat dipilih tetap ter-POST walau radio sudah pindah,
+                     dan server (TaskMaintenanceController::store) menolaknya. --}}
+                <div x-show="modemOwnership === 'sewa_gudang' || modemOwnership === 'beli_gudang'" x-cloak>
+                    <fieldset class="min-w-0" :disabled="!(modemOwnership === 'sewa_gudang' || modemOwnership === 'beli_gudang')">
+                    @if($eligibleSerials->isNotEmpty())
+                        @php
+                            // Sisa stok Perangkat Aktif per jenis barang (koreksi lanjutan
+                            // ADHOC-54, 2026-09-12) — sama pola installations/report.blade.php:
+                            // SERIALIZED gak punya qty, jadi dihitung dari JUMLAH SN yang masih
+                            // ISSUED di custody tim, dikelompokkan per nama barang.
+                            $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)
+                                ->map->count();
+                            // Combobox (components/combobox.blade.php): SN dicari lewat
+                            // ketikan, bukan scroll <select>. Opsi "Tidak ganti modem"
+                            // (value kosong) = default, jadi SN tidak tersimpan.
+                            $serialOptions = collect([['value' => '', 'label' => 'Tidak ganti modem', 'search' => 'tidak ganti modem']])
+                                ->concat($eligibleSerials->map(fn ($serial) => [
+                                    'value' => $serial->id,
+                                    'label' => 'SN ' . $serial->serial_number . ' — ' . $serial->item->name,
+                                    'search' => $serial->serial_number . ' ' . $serial->item->name,
+                                    'hint' => 'Sisa custody tim: ' . $serialCountsByItem[$serial->item->name] . ' unit',
+                                ]))->values();
+                        @endphp
+                        <x-combobox id="selected_inventory_serial_id" name="selected_inventory_serial_id" :options-expr="json_encode($serialOptions)" :value-expr="json_encode((string) old('selected_inventory_serial_id', ''))" placeholder="Ketik SN atau nama perangkat..." />
+                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Perangkat yang diambil lewat Gudang (custody Anda) — SN yang tersimpan otomatis sama persis dengan yang dipilih di sini.</p>
+                    @else
+                        <select disabled class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-surface-muted);color:var(--color-text-muted);padding:10px 12px">
+                            <option>Tidak ada SN di custody Anda</option>
+                        </select>
+                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Anda belum mengambil modem dari Gudang — kalau maintenance ini gak perlu ganti modem, abaikan saja.</p>
+                    @endif
+
+                    {{-- Harga jual — wajib untuk "Beli dari Gudang" saja. --}}
+                    <div x-show="modemOwnership === 'beli_gudang'" x-cloak class="mt-3">
+                        <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                            Harga Jual Modem <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <input type="number" step="0.01" min="0.01" name="modem_sale_price" value="{{ old('modem_sale_price') }}" placeholder="Contoh: 150000"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, bukan sewa.</p>
+                    </div>
+                    </fieldset>
+                </div>
+
+                {{-- Beli Sendiri — modem milik pelanggan sendiri, gak pernah lewat
+                     gudang. Input manual, BUKAN dari custody/SN gudang. --}}
+                <div x-show="modemOwnership === 'beli_sendiri'" x-cloak class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                        <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">
+                            Brand <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <input type="text" name="manual_device_brand" value="{{ old('manual_device_brand') }}" maxlength="100" placeholder="mis. TP-Link"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                    </div>
+                    <div>
+                        <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">
+                            Model <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <input type="text" name="manual_device_model" value="{{ old('manual_device_model') }}" maxlength="100" placeholder="mis. Archer C6"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                    </div>
+                    <div>
+                        <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">
+                            Serial Number <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <input type="text" name="manual_device_serial_number" value="{{ old('manual_device_serial_number') }}" maxlength="100" placeholder="SN di stiker perangkat"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                    </div>
+                    <p class="col-span-1 sm:col-span-3 text-[10px] leading-relaxed" style="color:var(--color-text-muted)">Modem milik pelanggan sendiri — tidak lewat Gudang, tidak ada SN custody yang terpakai.</p>
+                </div>
             </div>
 
             {{-- ── Section 2c: Roll Kabel (Opsional) ─────────────────────

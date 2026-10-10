@@ -102,6 +102,7 @@ class RolePermissionSeeder extends Seeder
                 'warehouse.view',
                 'warehouse_custody.view',
                 'warehouse_issue.view',
+                'warehouse_report.sold_to_customer.view',
                 'warehouse_report.view',
                 'warehouse_stock_request.view',
                 'warehouse_traceability.view',
@@ -503,6 +504,7 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_traceability.view',
                 'warehouse_reassign.create',
                 'warehouse_report.view',
+                'warehouse_report.sold_to_customer.view',
                 'warehouse_stock_request.view',
                 'warehouse_stock_request.create',
                 'warehouse_stock_request.cancel',
@@ -526,6 +528,7 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_issue.create',
                 'warehouse_issue.view',
                 'warehouse_reassign.create',
+                'warehouse_report.sold_to_customer.view',
                 'warehouse_report.view',
                 'warehouse_stock_request.approve',
                 'warehouse_stock_request.cancel',
@@ -687,6 +690,7 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_issue.create',
                 'warehouse_issue.view',
                 'warehouse_reassign.create', // reassign custody teknisi resign/cuti cabangnya sendiri
+                'warehouse_report.sold_to_customer.view', // laporan barang terjual ke pelanggan, discope cabangnya sendiri
                 'warehouse_report.view', // laporan agregat, discope EffectiveAccessService ke cabangnya sendiri
                 'warehouse_stock_request.cancel',
                 'warehouse_stock_request.create',

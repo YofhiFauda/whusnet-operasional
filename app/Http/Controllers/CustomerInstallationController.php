@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DeviceOwnership;
 use App\Enums\EquipmentClass;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
@@ -1017,6 +1018,15 @@ class CustomerInstallationController extends Controller
         // submit tanpa pilih roll tetap harus jalan biasa.
         $eligibleRollIds = $this->eligibleRollsForTeam($assignmentTask)->pluck('id');
 
+        // Ownership modem (rancangan ownership modem sewa/beli, 2026-10-09,
+        // task 4) — radio 2 opsi (Beli Sendiri/Beli dari Gudang) CUMA relevan
+        // & wajib kalau `contract_type` pelanggan 'beli'. Pelanggan 'sewa'
+        // (default/legacy) tidak pernah mengirim field ini — perilakunya
+        // harus identik sebelum task ini (ownership COMPANY, lihat
+        // storeSpeedtest()).
+        $contractType = $customer->customerService?->contract_type;
+        $modemAcquisitionChoiceInput = $request->input('modem_acquisition_choice');
+
         $validated = $request->validate([
             // Informasi Perangkat Aktif + Nomor/Port ODP — SATU-SATUNYA syarat
             // wajib buat tombol Aktivasi (ADHOC). Nomor/Slot/Port OLT sengaja
@@ -1054,13 +1064,61 @@ class CustomerInstallationController extends Controller
             // pesan custom di bawah, bukan cuma "format salah". Draft
             // pointer doang — aksi INSTALL sungguhan baru jalan di
             // storeSpeedtest(), lihat komentar di sana.
-            'selected_inventory_serial_id' => ['required', 'integer', Rule::in($eligibleSerialIds)],
+            // 'beli_sendiri' DIKECUALIKAN dari wajib SN (rancangan ownership
+            // modem sewa/beli, 2026-10-09, task 4) — modem itu milik
+            // pelanggan sendiri, gak pernah lewat gudang, jadi gak ada SN
+            // custody buat dipilih sama sekali. Semua pilihan lain (null/
+            // 'beli_gudang') tetap wajib SN seperti perilaku lama.
+            //
+            // Sebaliknya 'beli_sendiri' + SN terisi DITOLAK (prohibited), bukan
+            // diabaikan: combobox SN cuma disembunyikan x-show, nilai lamanya
+            // (mis. dari draft 'beli_gudang' sebelumnya) tetap ikut ter-POST.
+            // Kalau lolos, storeSpeedtest() meng-install SN itu sebagai Sewa
+            // (COMPANY) SEKALIGUS recordCustomerOwnedDevice() menimpa
+            // customer_devices jadi BELI_SENDIRI — flag SN & flag perangkat
+            // saling bertentangan.
+            'selected_inventory_serial_id' => [
+                Rule::requiredIf($modemAcquisitionChoiceInput !== 'beli_sendiri'),
+                Rule::prohibitedIf($modemAcquisitionChoiceInput === 'beli_sendiri'),
+                'nullable',
+                'integer',
+                Rule::in($eligibleSerialIds),
+            ],
 
             // OPSIONAL — sama pola draft pointer di atas (dibatasi custody
             // tim ini), aksi potong-meter sungguhan (consumeFromRoll()) baru
             // jalan di storeSpeedtest().
             'selected_inventory_roll_id' => ['nullable', 'integer', Rule::in($eligibleRollIds)],
             'roll_meters_used' => ['nullable', 'numeric', 'min:0.01', 'required_with:selected_inventory_roll_id'],
+
+            // Cara pemilikan modem — WAJIB hanya kalau `contract_type`
+            // pelanggan 'beli' (gate utama task ini). Pelanggan 'sewa' tidak
+            // pernah mengirim field ini (radio-nya gak dirender di view),
+            // jadi draft pointer-nya selamanya null untuk mereka — identik
+            // perilaku sebelum task ini.
+            // Sebaliknya pelanggan NON-'beli' (sewa/legacy) DILARANG mengirim
+            // field ini sama sekali — radio-nya memang tidak dirender, jadi
+            // nilai apa pun di sini datang dari POST rakitan. Tanpa penjaga ini
+            // pelanggan kontrak Sewa bisa "membeli" modem dari gudang (SN jadi
+            // ownership CUSTOMER + baris Jual Modem) lewat request tangan.
+            'modem_acquisition_choice' => [
+                'nullable',
+                Rule::requiredIf($contractType === 'beli'),
+                Rule::prohibitedIf($contractType !== 'beli'),
+                Rule::in(['beli_sendiri', 'beli_gudang']),
+            ],
+            // 'Beli Sendiri' — modem milik pelanggan sendiri, TIDAK PERNAH
+            // lewat gudang (§DeviceOwnership, sama pola Task 3). Field manual
+            // ini (bukan brand/model/serial_number di atas — serial_number
+            // 'prohibited') yang dipakai `recordCustomerOwnedDevice()`.
+            'manual_device_brand' => ['nullable', 'string', 'max:100', 'required_if:modem_acquisition_choice,beli_sendiri'],
+            'manual_device_model' => ['nullable', 'string', 'max:100', 'required_if:modem_acquisition_choice,beli_sendiri'],
+            'manual_device_serial_number' => ['nullable', 'string', 'max:100', 'required_if:modem_acquisition_choice,beli_sendiri'],
+            // 'Beli dari Gudang' — SN custody dijual ke pelanggan, harga ini
+            // diteruskan ke `InitialInvoiceService` sebagai baris "Jual
+            // Modem" di tagihan AWAL (lihat storeSpeedtest() &
+            // CustomerVerificationController::finalVerify()).
+            'modem_sale_price' => ['nullable', 'numeric', 'min:0.01', 'required_if:modem_acquisition_choice,beli_gudang'],
 
             'installation_photo' => 'nullable|image|max:2048',
             'contract_photo' => 'nullable|image|max:2048',
@@ -1101,6 +1159,13 @@ class CustomerInstallationController extends Controller
             'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
             'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
             'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
+            'modem_acquisition_choice.required' => 'Pilih cara pemilikan modem (Beli Sendiri/Beli dari Gudang) — pelanggan ini kontraknya Beli.',
+            'manual_device_brand.required_if' => 'Brand modem wajib diisi untuk Beli Sendiri.',
+            'manual_device_model.required_if' => 'Model modem wajib diisi untuk Beli Sendiri.',
+            'manual_device_serial_number.required_if' => 'Serial number modem wajib diisi untuk Beli Sendiri.',
+            'modem_sale_price.required_if' => 'Harga jual modem wajib diisi untuk Beli dari Gudang.',
+            'selected_inventory_serial_id.prohibited' => 'Beli Sendiri tidak memakai SN dari Gudang — kosongkan pilihan SN custody.',
+            'modem_acquisition_choice.prohibited' => 'Cara pemilikan modem hanya untuk pelanggan kontrak Beli.',
         ]);
 
         // selected_inventory_serial_id sudah divalidasi wajib & anggota
@@ -1108,7 +1173,13 @@ class CustomerInstallationController extends Controller
         // gak ada lagi teks manual yang bisa menyimpang. Mencegah dua sumber
         // kebenaran: installSerial() di storeSpeedtest() jalan dari
         // selected_inventory_serial_id yang sama persis.
-        $validated['serial_number'] = InventorySerial::findOrFail($validated['selected_inventory_serial_id'])->serial_number;
+        //
+        // 'beli_sendiri' DIKECUALIKAN (rancangan ownership modem sewa/beli,
+        // 2026-10-09, task 4) — field itu sengaja kosong/tidak wajib karena
+        // modem gak lewat gudang sama sekali, jadi gak ada SN buat dicari.
+        if (! empty($validated['selected_inventory_serial_id'])) {
+            $validated['serial_number'] = InventorySerial::findOrFail($validated['selected_inventory_serial_id'])->serial_number;
+        }
 
         // Sisa custody Material Terpakai (koreksi lanjutan ADHOC-54,
         // 2026-09-12) — CUMA peringatan informasional di flash message, BUKAN
@@ -1175,11 +1246,27 @@ class CustomerInstallationController extends Controller
             $installation->installation_note = $validated['installation_note'] ?? null;
             // Draft pointer doang — resubmit-safe, gak ada side effect ke
             // inventory_serials di sini (cuma nunjuk, belum diinstall).
-            $installation->selected_inventory_serial_id = $validated['selected_inventory_serial_id'] ?? null;
+            //
+            // 'beli_sendiri' → SN draft DIKOSONGKAN eksplisit, bukan sekadar
+            // "apa pun yang tervalidasi": draft lama (mis. 'beli_gudang' + SN X)
+            // tidak boleh tertinggal, karena storeSpeedtest() meng-install apa
+            // pun yang ada di pointer ini.
+            $installation->selected_inventory_serial_id = ($validated['modem_acquisition_choice'] ?? null) === 'beli_sendiri'
+                ? null
+                : ($validated['selected_inventory_serial_id'] ?? null);
             // Roll kabel — draft pointer sama, konsumsi sungguhan (potong
             // meter) baru jalan di storeSpeedtest().
             $installation->selected_inventory_roll_id = $validated['selected_inventory_roll_id'] ?? null;
             $installation->roll_meters_used = $validated['roll_meters_used'] ?? null;
+
+            // Ownership modem — draft pointer sama pola di atas (resubmit-safe,
+            // eksekusi sungguhan installSerial()/recordCustomerOwnedDevice()/
+            // recordSerialSale() baru jalan di storeSpeedtest()).
+            $installation->modem_acquisition_choice = $validated['modem_acquisition_choice'] ?? null;
+            $installation->manual_device_brand = $validated['manual_device_brand'] ?? null;
+            $installation->manual_device_model = $validated['manual_device_model'] ?? null;
+            $installation->manual_device_serial_number = $validated['manual_device_serial_number'] ?? null;
+            $installation->modem_sale_price = $validated['modem_sale_price'] ?? null;
 
             // Status TETAP in_progress di sini — completed baru ditetapkan di
             // storeSpeedtest(), begitu Laporan Speedtest ikut tersimpan.
@@ -1496,7 +1583,26 @@ class CustomerInstallationController extends Controller
                 // ke-track Inventory, gak wajib diisi.
                 if ($installation->selected_inventory_serial_id) {
                     $serial = InventorySerial::findOrFail($installation->selected_inventory_serial_id);
-                    app(InventoryService::class)->installSerial($serial, $customer, $installFopTask, $teamTechnicians, auth()->user());
+
+                    // Ownership modem (rancangan ownership modem sewa/beli,
+                    // 2026-10-09, task 4) — 'beli_gudang' = SN dijual ke
+                    // pelanggan (ownership CUSTOMER di `inventory_serials`),
+                    // selain itu (null/'beli_gudang' tidak terpilih tapi SN
+                    // tetap dipilih, sama seperti 'sewa_gudang' Task 3) =
+                    // perilaku lama (ownership COMPANY) — ini JUGA berarti
+                    // `contract_type=sewa` byte-identik dengan sebelum task
+                    // ini, karena `modem_acquisition_choice` selamanya null.
+                    $ownership = $installation->modem_acquisition_choice === 'beli_gudang' ? DeviceOwnership::CUSTOMER : DeviceOwnership::COMPANY;
+
+                    app(InventoryService::class)->installSerial($serial, $customer, $installFopTask, $teamTechnicians, auth()->user(), true, $ownership);
+
+                    // Ledger penjualan — CUMA kalau beneran "Beli dari Gudang".
+                    // `modem_sale_price` sudah wajib diisi lewat validasi
+                    // (`required_if:modem_acquisition_choice,beli_gudang`)
+                    // begitu lolos ke sini (storePemasangan()).
+                    if ($installation->modem_acquisition_choice === 'beli_gudang') {
+                        app(InventoryService::class)->recordSerialSale($serial, $customer, $installFopTask, (float) $installation->modem_sale_price, auth()->user());
+                    }
                 }
 
                 // Roll kabel — draft pointer dari storePemasangan() dieksekusi
@@ -1506,6 +1612,20 @@ class CustomerInstallationController extends Controller
                     $roll = InventoryRoll::findOrFail($installation->selected_inventory_roll_id);
                     app(InventoryService::class)->consumeFromRoll($roll, (float) $installation->roll_meters_used, $teamTechnicians, $installFopTask, $customer, auth()->user());
                 }
+            }
+
+            // 'Beli Sendiri' (rancangan ownership modem sewa/beli, 2026-10-09,
+            // task 4) — modem milik pelanggan sendiri, TIDAK PERNAH lewat
+            // gudang: TIDAK gantung custody tim/FopTask (beda dari cabang
+            // SN-install di atas), jadi dieksekusi di luar blok
+            // `if ($task && $installFopTask && ...)`, sama pola Task 3
+            // (`TaskMaintenanceController::store()`).
+            if ($installation->modem_acquisition_choice === 'beli_sendiri') {
+                app(InventoryService::class)->recordCustomerOwnedDevice($customer, [
+                    'brand' => $installation->manual_device_brand,
+                    'model' => $installation->manual_device_model,
+                    'serial_number' => $installation->manual_device_serial_number,
+                ], auth()->user());
             }
 
             if ($task) {

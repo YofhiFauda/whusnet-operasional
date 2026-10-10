@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Warehouse;
 use App\Enums\InventoryTransactionType;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
+use App\Models\InventorySerialSale;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\Pop;
@@ -98,6 +99,41 @@ class WarehouseReportController extends Controller
         return view('warehouse.reports.index', compact(
             'pops', 'period', 'popFilter', 'movementRows', 'adjustmentRows', 'movementCounts', 'kpi', 'lossChartData'
         ));
+    }
+
+    /**
+     * Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli, Task 9,
+     * .superpowers/sdd/2026-10-09-ownership-modem-sewa-beli/). Read-only murni
+     * — baris `InventorySerialSale` sudah ditulis oleh `InventoryService::
+     * recordSerialSale()` (Task 1-6), laporan ini CUMA menyusun ulang buat
+     * tampilan, BUKAN sumber kebenaran baru.
+     *
+     * POP scope: SATU-SATUNYA cara data sale beda cabang bisa dibedakan di
+     * sini cuma lewat `customer->pop_id` (sale itu sendiri gak punya kolom
+     * pop_id) — pelanggan yang beli-nya menentukan cabang mana baris ini
+     * "milik". Pola scoping sama persis `index()` di atas: `hasAllPopAccess()`
+     * lolos tanpa filter, selain itu `whereIn('customer.pop_id', $allowedPopIds)`.
+     * Array kosong dari `getAllowedPopIds()` CUMA valid kalau `hasAllPopAccess()`
+     * juga true (ALL_POP) — kalau bukan, user itu scope SELECTED_POP tanpa
+     * target sama sekali, query HARUS tetap kosong (jangan diartikan "semua").
+     */
+    public function soldToCustomer(Request $request, EffectiveAccessService $access): View
+    {
+        $user = auth()->user();
+        $hasAllPopAccess = $access->hasAllPopAccess($user);
+        $allowedPopIds = $access->getAllowedPopIds($user);
+
+        $sales = InventorySerialSale::query()
+            ->with(['inventorySerial.item', 'customer.pop', 'fopTask', 'createdBy'])
+            ->whereHas('customer', function ($q) use ($hasAllPopAccess, $allowedPopIds) {
+                if (! $hasAllPopAccess) {
+                    $q->whereIn('pop_id', $allowedPopIds);
+                }
+            })
+            ->latest('id')
+            ->get();
+
+        return view('warehouse.reports.sold-to-customer', compact('sales'));
     }
 
     /**

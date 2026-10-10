@@ -33,6 +33,10 @@ use Illuminate\Database\Seeder;
  *   warehouse_report        — Laporan agregat periodik (movement & kerugian
  *                              per gudang/cabang) — Fase 2 P2 (2026-09-03,
  *                              fase-2-adaptasi-wms.md).
+ *     └─ warehouse_report.sold_to_customer — Laporan Barang Terjual ke
+ *                              Pelanggan (Ownership Modem Sewa/Beli, Task 9) —
+ *                              daftar `InventorySerialSale`, discope POP
+ *                              pelanggan sama seperti root-nya.
  *   warehouse_stock_request — Permintaan Stok Cabang→Pusat (2026-09-03) —
  *                              jawaban gap "cabang habis stok, Pusat gak
  *                              sadar" (sebelumnya cuma badge Stok Rendah
@@ -57,6 +61,8 @@ class WarehouseFeatureSeeder extends Seeder
 {
     public function run(): void
     {
+        $rootIds = [];
+
         $roots = [
             ['code' => 'warehouse', 'name' => 'Dashboard & Ledger Gudang', 'sort_order' => 13],
             ['code' => 'warehouse_transfer', 'name' => 'Transfer Antar Gudang', 'sort_order' => 14],
@@ -75,7 +81,7 @@ class WarehouseFeatureSeeder extends Seeder
         ];
 
         foreach ($roots as $root) {
-            Feature::updateOrCreate(
+            $rootIds[$root['code']] = Feature::updateOrCreate(
                 ['code' => $root['code']],
                 [
                     'name' => $root['name'],
@@ -84,11 +90,33 @@ class WarehouseFeatureSeeder extends Seeder
                     'is_active' => true,
                     'parent_id' => null,
                 ]
+            )->id;
+        }
+
+        // Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli,
+        // Task 9) — sub-feature di bawah `warehouse_report`, pola sama
+        // `tickets.selesai` di bawah `tickets` (TicketFeatureSeeder): halaman
+        // sendiri butuh permission sendiri biar bisa di-toggle terpisah dari
+        // `warehouse_report.view` di Role Matrix.
+        $subFeatures = [
+            ['parent' => 'warehouse_report', 'code' => 'warehouse_report.sold_to_customer', 'name' => 'Laporan Barang Terjual ke Pelanggan', 'sort_order' => 1],
+        ];
+
+        foreach ($subFeatures as $sf) {
+            Feature::updateOrCreate(
+                ['code' => $sf['code']],
+                [
+                    'name' => $sf['name'],
+                    'type' => FeatureType::SUB_FEATURE,
+                    'sort_order' => $sf['sort_order'],
+                    'is_active' => true,
+                    'parent_id' => $rootIds[$sf['parent']],
+                ]
             );
         }
 
         app(PermissionGeneratorService::class)->generate();
 
-        $this->command?->info('WarehouseFeatureSeeder: 10 feature gudang digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
+        $this->command?->info('WarehouseFeatureSeeder: 10 feature gudang + 1 sub-feature digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
     }
 }

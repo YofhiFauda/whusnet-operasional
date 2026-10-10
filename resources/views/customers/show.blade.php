@@ -175,6 +175,7 @@
                 {{ $customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang') }}
             </span>
             <span class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">Redaman: {{ $customer->customerTechnicalDetail->fiber_signal ?? ($customer->customerDevice->signal_power ?? '-') }}</span>
+            <x-warehouse.acquisition-badge :device="$customer->customerDevice" class="mt-1.5 self-start" />
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>

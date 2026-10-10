@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Enums\CustodyStatus;
+use App\Enums\DeviceAcquisitionSource;
+use App\Enums\DeviceOwnership;
 use App\Enums\DeviceRetrievalSource;
 use App\Enums\InventoryTransactionType;
 use App\Enums\ItemCondition;
@@ -13,10 +15,12 @@ use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Exceptions\InsufficientCustodyException;
 use App\Models\Customer;
+use App\Models\CustomerDevice;
 use App\Models\DeviceRetrievalLog;
 use App\Models\FopTask;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
+use App\Models\InventorySerialSale;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\TaskMaterial;
@@ -157,6 +161,12 @@ class InventoryService
      * aktif bersamaan, mis. repeater/ONT kedua), modem lama TIDAK BOLEH
      * ketarik. Caller (`TaskMaintenanceController`) yang nentuin — method
      * ini gak bisa nebak sendiri dari task_type/kategori.
+     *
+     * `$ownership` (rancangan ownership modem sewa/beli, 2026-10-09) — default
+     * `COMPANY` (Sewa, perilaku lama). `CUSTOMER` dipakai kalau SN ini dijual
+     * ke pelanggan (Beli dari Gudang) — caller yang bertanggung jawab juga
+     * membuat baris `InventorySerialSale` lewat `recordSerialSale()`, method
+     * ini CUMA menulis flag `ownership`/`acquisition_source`, bukan sale-nya.
      */
     public function installSerial(
         InventorySerial $serial,
@@ -165,10 +175,11 @@ class InventoryService
         iterable $technicians,
         User $actor,
         bool $returnExistingSerial = true,
+        DeviceOwnership $ownership = DeviceOwnership::COMPANY,
     ): InventoryTransaction {
         $technicianIds = Collection::make($technicians)->pluck('id')->all();
 
-        return DB::transaction(function () use ($serial, $customer, $fopTask, $actor, $technicianIds, $returnExistingSerial) {
+        return DB::transaction(function () use ($serial, $customer, $fopTask, $actor, $technicianIds, $returnExistingSerial, $ownership) {
             // Re-fetch + lockForUpdate() DI DALAM transaction — semua guard
             // di bawah dicek dari kopi yang di-lock, bukan $serial parameter
             // yang bisa stale. Dua submit "selesaikan instalasi" bersamaan
@@ -200,6 +211,11 @@ class InventoryService
                     ->where('customer_id', $customer->id)
                     ->where('id', '!=', $serial->id)
                     ->where('status', SerialStatus::INSTALLED->value)
+                    // Modem milik pelanggan (Beli dari Gudang) BUKAN hak perusahaan
+                    // untuk ditarik lewat tukar modem yang tak berhubungan — kalau
+                    // ikut diretur, SN-nya balik ke stok padahal `InventorySerialSale`
+                    // masih mencatatnya terjual ke pelanggan ini.
+                    ->where('ownership', '!=', DeviceOwnership::CUSTOMER->value)
                     ->lockForUpdate()
                     ->get()
                 : collect();
@@ -259,6 +275,7 @@ class InventoryService
                 'fop_task_id' => $fopTask->id,
                 'installed_at' => now(),
                 'current_technician_id' => null,
+                'ownership' => $ownership,
             ]);
 
             // Sinkronisasi data perangkat ke Master Pelanggan — CUMA kalau SN
@@ -288,6 +305,9 @@ class InventoryService
                         'serial_number' => $serial->serial_number,
                         'mac_address' => $serial->mac_address ?: $customer->customerDevice?->mac_address,
                         'device_retrieved_at' => null,
+                        'acquisition_source' => $ownership === DeviceOwnership::CUSTOMER
+                            ? DeviceAcquisitionSource::BELI_GUDANG
+                            : DeviceAcquisitionSource::SEWA,
                     ]
                 );
             }
@@ -304,6 +324,59 @@ class InventoryService
                 'created_by' => $actor->id,
             ]);
         });
+    }
+
+    /**
+     * Modem "Beli Sendiri" — pelanggan pakai unit milik sendiri, TIDAK PERNAH
+     * lewat gudang (§DeviceOwnership). Tidak ada `InventorySerial` yang
+     * disentuh sama sekali, cuma `customer_devices` ditulis manual — pola
+     * `updateOrCreate` sama blok existing di `installSerial()` di atas,
+     * supaya device lama (hasil Sewa/Beli dari Gudang sebelumnya, kalau
+     * pelanggan pernah ganti cara pemilikan) tertimpa, bukan dobel baris.
+     *
+     * @param  array{brand: string, model: string, serial_number: string}  $deviceAttributes
+     */
+    public function recordCustomerOwnedDevice(Customer $customer, array $deviceAttributes, User $actor): CustomerDevice
+    {
+        return $customer->customerDevice()->updateOrCreate(
+            ['customer_id' => $customer->id],
+            [
+                'device_type' => 'ONT',
+                'brand' => $deviceAttributes['brand'],
+                'model' => $deviceAttributes['model'],
+                'serial_number' => $deviceAttributes['serial_number'],
+                'acquisition_source' => DeviceAcquisitionSource::BELI_SENDIRI,
+                'device_retrieved_at' => null,
+            ]
+        );
+    }
+
+    /**
+     * Catat satu baris penjualan SN gudang ke pelanggan (Beli dari Gudang).
+     * Method ini CUMA menulis ledger penjualan — flag `ownership` di
+     * `inventory_serials` sendiri ditulis `installSerial()` (dua tanggung
+     * jawab beda, dipanggil berurutan oleh caller, bukan digabung di sini
+     * supaya sale tetap bisa dicatat ulang terpisah dari install kalau
+     * dibutuhkan alur lain nanti).
+     *
+     * `$price` harus > 0 — guard ini NGANGGEP bug pemanggil (form validasi
+     * harga wajib sudah lolos sebelum sampai sini), bukan error input biasa,
+     * makanya `InvalidArgumentException`, bukan `ValidationException`,
+     * sejalan pola guard existing lain di method ini.
+     */
+    public function recordSerialSale(InventorySerial $serial, Customer $customer, ?FopTask $fopTask, float $price, User $actor): InventorySerialSale
+    {
+        if ($price <= 0) {
+            throw new InvalidArgumentException('Harga jual SN harus lebih besar dari nol.');
+        }
+
+        return InventorySerialSale::create([
+            'inventory_serial_id' => $serial->id,
+            'customer_id' => $customer->id,
+            'fop_task_id' => $fopTask?->id,
+            'price' => $price,
+            'created_by' => $actor->id,
+        ]);
     }
 
     /**

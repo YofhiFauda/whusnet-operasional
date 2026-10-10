@@ -4,6 +4,11 @@ Tanggal: 2026-10-08
 Status: **analisa saja — belum ada perubahan kode.**
 Terkait: `docs/task-teknisi/business-logic.md` §7b (Kategori C-REQ), ADHOC-108/ADHOC-152.
 
+> **Gap 1 — SELESAI, lihat spec+plan 2026-10-10.** Rencana solving di bawah sudah dieksekusi penuh
+> (10 task, subagent-driven). Spec teknis & keputusan desain: `docs/plan/task-teknisi/rancangan-ownership-modem-sewa-beli.md`.
+> Plan eksekusi per-task: `docs/superpowers/plans/2026-10-09-ownership-modem-sewa-beli.md`.
+> Isi Q&A Gap 1 di bawah ini TETAP dipertahankan sebagai jejak keputusan — jangan dihapus/ditulis ulang.
+
 ---
 
 ## Gap 1 — Sistem tidak punya pembeda modem Beli vs Sewa

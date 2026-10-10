@@ -48,7 +48,19 @@
         : collect();
     $reportWorkTools = $reportFopTask ? $reportFopTask->workTools()->orderBy('id')->get() : collect();
 
-    $approveHasErrors = $errors->hasAny(['amount', 'description', 'manual_subtype_name', 'customer_id']);
+    // Breakdown Harga Modem + Jasa (ownership modem sewa/beli, Task 6,
+    // 2026-10-09) — kalau laporan "Beli dari Gudang" sudah menulis
+    // InventorySerialSale buat task ini, form approve menampilkan 2 input
+    // (Harga Modem + Biaya Jasa) sebagai pengganti satu input `amount`.
+    // $reportFopTask dipakai lagi (SAMA anchor dengan material/SN di atas)
+    // biar gak ada dua cara berbeda nebak FopTask mana yang relevan.
+    $modemSale = $reportFopTask
+        ? \App\Models\InventorySerialSale::where('fop_task_id', $reportFopTask->id)->first()
+        : null;
+
+    $approveHasErrors = $modemSale
+        ? $errors->hasAny(['modem_price', 'service_fee', 'manual_subtype_name', 'customer_id'])
+        : $errors->hasAny(['amount', 'description', 'manual_subtype_name', 'customer_id']);
     $rejectHasErrors = $errors->has('reason');
 @endphp
 
@@ -633,6 +645,54 @@
                             </div>
                             @endif
 
+                            @if($modemSale)
+                            {{-- Breakdown Harga Modem + Jasa (ownership modem sewa/beli, Task 6) —
+                                 pelanggan "Beli dari Gudang" wajib liat rincian, bukan satu nominal
+                                 gelondongan. TIDAK ADA input `amount`/`description` di cabang ini —
+                                 controller approve() gak pernah baca field itu kalau sale row ada,
+                                 jadi inputnya juga tidak boleh dikirim (dua sumber nilai = rawan selisih). --}}
+                            <div class="bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/80 dark:border-sky-900/60 rounded-lg p-3 text-[11px] text-sky-800 dark:text-sky-300">
+                                Task ini punya penjualan modem (Beli dari Gudang) — isi harga modem &amp; biaya jasa terpisah, tagihan otomatis dirinci.
+                            </div>
+
+                            {{-- Harga Modem (prefilled dari InventorySerialSale::price) --}}
+                            <div class="space-y-1">
+                                <label for="modem_price" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Harga Modem (Rupiah) <span class="text-rose-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs font-bold">
+                                        Rp
+                                    </div>
+                                    <input type="text" inputmode="numeric" name="modem_price" id="modem_price" data-rupiah
+                                           value="{{ old('modem_price', $modemSale->price) }}" required placeholder="0"
+                                           class="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs">
+                                </div>
+                                <p class="text-[10px] text-slate-400 dark:text-slate-500">Pra-terisi dari laporan teknisi &bull; dapat dikoreksi CS, ikut ditulis balik ke catatan penjualan modem.</p>
+                                @error('modem_price')
+                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Biaya Jasa --}}
+                            <div class="space-y-1">
+                                <label for="service_fee" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Biaya Jasa (Rupiah) <span class="text-rose-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs font-bold">
+                                        Rp
+                                    </div>
+                                    <input type="text" inputmode="numeric" name="service_fee" id="service_fee" data-rupiah
+                                           value="{{ old('service_fee') }}" required placeholder="0"
+                                           class="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs">
+                                </div>
+                                <p class="text-[10px] text-slate-400 dark:text-slate-500">Wajib diinput CS sesuai tarif resmi (tidak otomatis dari teknisi).</p>
+                                @error('service_fee')
+                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            @else
                             {{-- Description --}}
                             <div class="space-y-1">
                                 <label for="description" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -668,6 +728,7 @@
                                 <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
                                 @enderror
                             </div>
+                            @endif
 
                             {{-- Action Submit Button --}}
                             <div class="pt-2">

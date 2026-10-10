@@ -202,6 +202,7 @@ class TaskCreqBillingReportTest extends TestCase
             ->post(route('tasks.maintenance.store', $task), $this->basePayload() + [
                 'creq_category' => 'tambah_modem',
                 'selected_inventory_serial_id' => $serial->id,
+                'modem_ownership_choice' => 'sewa_gudang',
             ]);
 
         $response->assertSessionHasNoErrors();
@@ -247,6 +248,7 @@ class TaskCreqBillingReportTest extends TestCase
             ->post(route('tasks.maintenance.store', $task), $this->basePayload() + [
                 'creq_category' => 'tambah_modem',
                 'selected_inventory_serial_id' => $newSerial->id,
+                'modem_ownership_choice' => 'sewa_gudang',
             ]);
 
         $response->assertSessionHasNoErrors();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\CReqCategory;
 use App\Enums\CReqVerificationStatus;
+use App\Enums\DeviceOwnership;
 use App\Enums\EquipmentClass;
 use App\Enums\FopTaskPriority;
 use App\Enums\MaterialKind;
@@ -215,6 +216,15 @@ class TaskMaintenanceController extends Controller
         $isCreq = $task->task_type === TaskType::CREQ;
         $creqCategory = $isCreq ? CReqCategory::tryFrom((string) $request->input('creq_category')) : null;
 
+        // SN custody cuma boleh ikut kalau pilihan ownership-nya memang
+        // memasang modem dari gudang. Combobox SN cuma disembunyikan x-show —
+        // nilai lama tetap ter-POST walau radio sudah dipindah ke 'Tidak
+        // Ganti'/'Beli Sendiri'; kalau lolos, installSerial() tetap jalan
+        // (Sewa/COMPANY) di atas pilihan yang bilang "tidak ada SN gudang".
+        $modemOwnershipChoiceInput = $request->input('modem_ownership_choice');
+        $serialProhibited = in_array($modemOwnershipChoiceInput, ['tidak_ganti', 'beli_sendiri'], true);
+        $serialRequired = in_array($modemOwnershipChoiceInput, ['sewa_gudang', 'beli_gudang'], true);
+
         $task->loadMissing('customer');
         $currentPopId = $task->customer?->pop_id;
 
@@ -237,7 +247,26 @@ class TaskMaintenanceController extends Controller
             // gak bawa/ganti, dibiarkan kosong dan gak nyentuh SN sama
             // sekali. Kalau diisi, wajib dari custody tim ini (Rule::in) —
             // SATU-SATUNYA sumber, gak ada teks manual (pola sama ADHOC-54).
-            'selected_inventory_serial_id' => ['nullable', 'integer', Rule::in($eligibleSerialIds)],
+            'selected_inventory_serial_id' => [
+                Rule::requiredIf($serialRequired),
+                Rule::prohibitedIf($serialProhibited),
+                'nullable',
+                'integer',
+                Rule::in($eligibleSerialIds),
+            ],
+            // Ownership modem (rancangan ownership modem sewa/beli, 2026-10-09)
+            // — radio di atas combobox SN existing. `required_with` (bukan
+            // `required` polos): wajib begitu teknisi benar-benar pilih SN
+            // dari custody, supaya `installSerial()` tau ownership apa yang
+            // ditulis (Sewa Gudang = COMPANY, Beli dari Gudang = CUSTOMER).
+            // 'beli_sendiri' JUSTRU gak perlu SN sama sekali (modem pelanggan
+            // sendiri, gak lewat gudang — lihat `recordCustomerOwnedDevice()`),
+            // makanya bukan required_if kebalik dari SN.
+            'modem_ownership_choice' => ['nullable', 'required_with:selected_inventory_serial_id', Rule::in(['tidak_ganti', 'sewa_gudang', 'beli_sendiri', 'beli_gudang'])],
+            'manual_device_brand' => ['nullable', 'string', 'max:100', 'required_if:modem_ownership_choice,beli_sendiri'],
+            'manual_device_model' => ['nullable', 'string', 'max:100', 'required_if:modem_ownership_choice,beli_sendiri'],
+            'manual_device_serial_number' => ['nullable', 'string', 'max:100', 'required_if:modem_ownership_choice,beli_sendiri'],
+            'modem_sale_price' => ['nullable', 'numeric', 'min:0.01', 'required_if:modem_ownership_choice,beli_gudang'],
             // Roll kabel — OPSIONAL sama seperti SN di atas.
             'selected_inventory_roll_id' => ['nullable', 'integer', Rule::in($eligibleRollIds)],
             'roll_meters_used' => ['nullable', 'numeric', 'min:0.01', 'required_with:selected_inventory_roll_id'],
@@ -270,6 +299,13 @@ class TaskMaintenanceController extends Controller
             'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
             'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
             'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
+            'modem_ownership_choice.required_with' => 'Pilih cara pemilikan modem (Sewa Gudang/Beli dari Gudang) begitu SN dipilih dari custody.',
+            'manual_device_brand.required_if' => 'Brand modem wajib diisi untuk Beli Sendiri.',
+            'manual_device_model.required_if' => 'Model modem wajib diisi untuk Beli Sendiri.',
+            'manual_device_serial_number.required_if' => 'Serial number modem wajib diisi untuk Beli Sendiri.',
+            'modem_sale_price.required_if' => 'Harga jual modem wajib diisi untuk Beli dari Gudang.',
+            'selected_inventory_serial_id.required' => 'Pilih SN modem dari custody tim untuk Sewa Gudang/Beli dari Gudang.',
+            'selected_inventory_serial_id.prohibited' => 'SN custody hanya boleh dipilih untuk Sewa Gudang/Beli dari Gudang — kosongkan pilihan SN.',
         ];
 
         if ($isCreq) {
@@ -302,7 +338,7 @@ class TaskMaintenanceController extends Controller
             // opsional (Maintenance biasa boleh gak ganti modem) — kategori
             // ini WAJIB pilih dari custody tim, gak ada "Tidak ganti modem".
             if ($creqCategory?->requiresModem()) {
-                $rules['selected_inventory_serial_id'] = ['required', 'integer', Rule::in($eligibleSerialIds)];
+                $rules['selected_inventory_serial_id'] = ['required', Rule::prohibitedIf($serialProhibited), 'integer', Rule::in($eligibleSerialIds)];
             }
 
             $messages['creq_category_custom_name.required'] = 'Nama kategori wajib diisi untuk kategori Lainnya.';
@@ -317,6 +353,12 @@ class TaskMaintenanceController extends Controller
         }
 
         $validated = $request->validate($rules, $messages);
+
+        // Default 'tidak_ganti' kalau field kosong (SN gak dipilih) — perilaku
+        // lama (ownership modem sewa/beli, 2026-10-09). Dipakai di dua titik
+        // eksekusi di bawah: cabang "beli_sendiri" (gak butuh SN) dan cabang
+        // SN-install (ownership COMPANY/CUSTOMER + sale).
+        $modemOwnershipChoice = $validated['modem_ownership_choice'] ?? 'tidak_ganti';
 
         // Sisa custody Material Terpakai (koreksi lanjutan ADHOC-54,
         // 2026-09-12) — pagar UI/UX, SEBELUM data disimpan. Penegakan final
@@ -421,6 +463,20 @@ class TaskMaintenanceController extends Controller
             // baris dilewat — laporan maintenance tetap tersimpan. Menggagalkan
             // laporan yang fotonya sudah diunggah cuma karena anchor belum
             // terbentuk jelas lebih merugikan.
+            // Beli Sendiri (rancangan ownership modem sewa/beli, 2026-10-09)
+            // — modem milik pelanggan sendiri, TIDAK PERNAH lewat gudang:
+            // TIDAK memanggil `installSerial()` sama sekali, cuma menulis
+            // `customer_devices` manual. Gak gantung custody tim/FopTask
+            // (beda dari cabang SN-install di bawah), jadi dieksekusi di
+            // sini, bukan di dalam blok `if ($fopTask)`.
+            if ($modemOwnershipChoice === 'beli_sendiri' && $task->customer) {
+                app(InventoryService::class)->recordCustomerOwnedDevice($task->customer, [
+                    'brand' => $validated['manual_device_brand'],
+                    'model' => $validated['manual_device_model'],
+                    'serial_number' => $validated['manual_device_serial_number'],
+                ], auth()->user());
+            }
+
             $workToolService = app(TaskWorkToolService::class);
             $fopTask = $workToolService->resolveTaskFor($task);
 
@@ -483,7 +539,23 @@ class TaskMaintenanceController extends Controller
                     if (! empty($validated['selected_inventory_serial_id'])) {
                         $serial = InventorySerial::findOrFail($validated['selected_inventory_serial_id']);
                         $returnExistingSerial = ! ($isCreq && $creqCategory?->addsModemWithoutReturningExisting());
-                        app(InventoryService::class)->installSerial($serial, $task->customer, $fopTask, $teamTechnicians, auth()->user(), $returnExistingSerial);
+
+                        // Ownership modem (rancangan ownership modem sewa/beli,
+                        // 2026-10-09) — 'beli_gudang' = SN dijual ke pelanggan
+                        // (ownership CUSTOMER di `inventory_serials`), selain
+                        // itu ('sewa_gudang'/'tidak_ganti' tapi SN tetap
+                        // kepilih) = perilaku lama (ownership COMPANY).
+                        $ownership = $modemOwnershipChoice === 'beli_gudang' ? DeviceOwnership::CUSTOMER : DeviceOwnership::COMPANY;
+
+                        app(InventoryService::class)->installSerial($serial, $task->customer, $fopTask, $teamTechnicians, auth()->user(), $returnExistingSerial, $ownership);
+
+                        // Ledger penjualan — CUMA kalau beneran "Beli dari
+                        // Gudang". `modem_sale_price` sudah wajib diisi lewat
+                        // validasi (`required_if:modem_ownership_choice,beli_gudang`)
+                        // begitu lolos ke sini.
+                        if ($modemOwnershipChoice === 'beli_gudang') {
+                            app(InventoryService::class)->recordSerialSale($serial, $task->customer, $fopTask, (float) $validated['modem_sale_price'], auth()->user());
+                        }
                     }
 
                     // Roll kabel — OPSIONAL sama pola SN di atas, one-shot

@@ -151,7 +151,17 @@
                     </p>
                 </div>
 
-                @if($installedSerials->isNotEmpty())
+                @if($showOwnershipSkipBanner)
+                <div class="p-3 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2 font-ui">
+                    <svg class="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                        <span class="font-semibold">Modem pelanggan ini sudah menjadi milik sendiri (sudah dibeli) — tidak perlu ditarik.</span>
+                        <p class="mt-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">Tidak ada SN milik perusahaan yang tersisa di pelanggan ini. Cukup konfirmasi — tidak perlu isi SN.</p>
+                    </div>
+                </div>
+                @elseif($installedSerials->isNotEmpty())
                 <div class="p-3 rounded-lg bg-sky-50/70 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 text-xs text-sky-800 dark:text-sky-300 flex items-start gap-2 font-ui">
                     <svg class="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -181,6 +191,7 @@
                 </div>
                 @endif
 
+                @unless($showOwnershipSkipBanner)
                 {{-- Dynamic Serial Input Rows --}}
                 <div class="space-y-3">
                     <template x-for="(row, i) in rows" :key="i">
@@ -221,6 +232,7 @@
                     </svg>
                     Tambah SN
                 </button>
+                @endunless
 
                 {{-- Foto Kondisi Alat --}}
                 <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-1.5">

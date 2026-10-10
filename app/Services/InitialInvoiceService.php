@@ -61,10 +61,16 @@ class InitialInvoiceService
      * klien, sesuai keputusan lama di kelas ini. Kalau override kosong/null,
      * fallback ke hasil hitung otomatis.
      *
+     * `$modemSaleAmount` adalah nominal "Beli dari Gudang" (ownership modem
+     * sewa/beli) — dilempar dari controller instalasi (Task 4) sebagai
+     * parameter, BUKAN dibaca ulang dari `CustomerInstallation` di sini. Service
+     * ini sengaja tidak tahu apa-apa soal entitas instalasi; ia hanya menerima
+     * nominal jadi, sama seperti `extra_cable_fee` dkk.
+     *
      * @param  array{extra_installation_fee?: mixed, extra_cable_fee?: mixed, extra_pole_fee?: mixed, other_fee?: mixed, prorate_amount_override?: mixed}  $fees
-     * @return array{prorate_amount: float, prorate_days: int, days_in_month: int, subtotal: float, discount: float, ppn: float, ppn_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float, next_month_amount: float}
+     * @return array{prorate_amount: float, prorate_days: int, days_in_month: int, subtotal: float, discount: float, ppn: float, ppn_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount: float, total_amount: float, next_month_amount: float}
      */
-    public function calculate(CustomerServiceModel $service, string $issueDate, array $fees = []): array
+    public function calculate(CustomerServiceModel $service, string $issueDate, array $fees = [], float $modemSaleAmount = 0.0): array
     {
         $issue = Carbon::parse($issueDate);
         $daysInMonth = $issue->daysInMonth;
@@ -89,12 +95,13 @@ class InitialInvoiceService
         $cableFee = Money::atLeastZero($fees['extra_cable_fee'] ?? 0);
         $poleFee = Money::atLeastZero($fees['extra_pole_fee'] ?? 0);
         $otherFee = Money::atLeastZero($fees['other_fee'] ?? 0);
+        $modemSale = Money::atLeastZero($modemSaleAmount);
 
-        // Lima komponen dijumlahkan sekaligus di ranah sen. Rantai penjumlahan
+        // Enam komponen dijumlahkan sekaligus di ranah sen. Rantai penjumlahan
         // float menumpuk galat, dan angka inilah yang dicetak di kwitansi
         // pertama pelanggan — nominal yang tak sama dengan jumlah rinciannya
         // adalah dokumen yang tidak bisa dipertanggungjawabkan.
-        $subtotal = Money::sum([$prorateAmount, $installationFee, $cableFee, $poleFee, $otherFee]);
+        $subtotal = Money::sum([$prorateAmount, $installationFee, $cableFee, $poleFee, $otherFee, $modemSale]);
         $discount = Money::atLeastZero($service->discount ?? 0);
         // PPN itu PERSEN, bukan rupiah — tidak lewat Money.
         $ppnRate = max(0, (float) ($service->ppn ?? 0));
@@ -122,6 +129,7 @@ class InitialInvoiceService
             'extra_cable_fee' => $cableFee,
             'extra_pole_fee' => $poleFee,
             'other_fee' => $otherFee,
+            'modem_sale_amount' => $modemSale,
             'total_amount' => Money::add($afterDiscount, $ppnAmount),
             'next_month_amount' => $nextMonthAmount,
         ];
@@ -142,9 +150,18 @@ class InitialInvoiceService
      *   dikonfirmasi CS ke pelanggan tidak bergeser walau harga
      *   paket/diskon berubah di antara dua titik waktu itu.
      *
+     * `$modemSaleAmount` dilempar ULANG di sini (bukan cuma dibaca dari
+     * `$billing['modem_sale_amount']`) supaya jalur BD (`$billing` snapshot
+     * yang dititipkan CS, lihat docblock di atas) tetap bisa melampirkan baris
+     * "Jual Modem" tanpa snapshot-nya wajib sudah memuat key itu — nilainya
+     * disuntik ke salinan `$billing` sebelum dilempar ke `lineSpecs()`. Kalau
+     * `$billing['subtotal']` sudah dihitung lewat `calculate()` dengan
+     * `$modemSaleAmount` yang SAMA, invarian subtotal di `InvoiceItemBuilder`
+     * tetap terjaga; kalau beda, builder akan menolak menulis.
+     *
      * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}  $billing
      */
-    public function issue(Customer $customer, CustomerServiceModel $service, array $billing, string $issueDateStr, int $createdByUserId): Invoice
+    public function issue(Customer $customer, CustomerServiceModel $service, array $billing, string $issueDateStr, int $createdByUserId, float $modemSaleAmount = 0.0): Invoice
     {
         $issueDate = Carbon::parse($issueDateStr);
         $billingPeriod = $issueDate->format('Y-m');
@@ -182,7 +199,9 @@ class InitialInvoiceService
         // Rincian baris per kategori pendapatan (ADHOC-60) — builder menolak
         // menulis kalau jumlah barisnya tidak sama dengan subtotal, jadi
         // ketimpangan rumus ketahuan di sini, bukan diam-diam masuk laporan.
-        app(InvoiceItemBuilder::class)->rebuildFor($invoice, $this->lineSpecs($billing));
+        $lineBilling = $billing;
+        $lineBilling['modem_sale_amount'] = $modemSaleAmount;
+        app(InvoiceItemBuilder::class)->rebuildFor($invoice, $this->lineSpecs($lineBilling));
 
         return $invoice;
     }
@@ -205,14 +224,26 @@ class InitialInvoiceService
      * lunas), yang WAJIB tetap pakai invoice terpisah supaya tidak menimpa
      * tagihan yang sudah ada.
      *
-     * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}  $billing
-     * @return array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}
+     * `modem_sale_amount` (ownership modem sewa/beli, 2026-10-09, task 4
+     * koreksi) — kalau sudah ada di `$billing` (dititipkan CS lewat
+     * `calculate()` di `finalVerify()`, lihat docblock situ), diikutkan lagi
+     * ke rekomputasi `subtotal` di sini, PERSIS cara `calculate()`
+     * menjumlahkannya. Sebelum koreksi ini method ini cuma menjumlah lima
+     * suku (tanpa modem) — kategori Bisnis yang pilih "Beli dari Gudang" jadi
+     * SN-nya kejual (ownership CUSTOMER, `InventorySerialSale` tercatat,
+     * custody kepotong) TAPI baris tagihannya ikut lenyap dari subtotal di
+     * sini (silent, invoice tetap terbit tanpa error) — modem keluar gudang
+     * tanpa pernah ditagih. Default `?? 0` kalau key-nya belum ada
+     * (pemanggil lama yang belum tahu soal ownership modem).
+     *
+     * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount?: float, total_amount: float}  $billing
+     * @return array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount?: float, total_amount: float}
      */
     public function withInstallationFee(array $billing, float $installationFee): array
     {
         $billing['extra_installation_fee'] = Money::atLeastZero($installationFee);
 
-        // Sama persis lima suku yang dijumlahkan di calculate() — cuma
+        // Enam suku — sama persis yang dijumlahkan di calculate() — cuma
         // extra_installation_fee-nya sekarang bukan 0 lagi.
         $billing['subtotal'] = Money::sum([
             $billing['prorate_amount'],
@@ -220,6 +251,7 @@ class InitialInvoiceService
             $billing['extra_cable_fee'],
             $billing['extra_pole_fee'],
             $billing['other_fee'],
+            $billing['modem_sale_amount'] ?? 0,
         ]);
 
         $afterDiscount = Money::atLeastZero(Money::sub($billing['subtotal'], $billing['discount']));
@@ -239,7 +271,7 @@ class InitialInvoiceService
      * alur verifikasi aktivasi, dan supaya controller tetap tipis — perakitan
      * baris adalah keputusan bisnis, bukan urusan controller.
      *
-     * Lima komponen di sini SAMA PERSIS dengan lima suku yang dijumlahkan jadi
+     * Enam komponen di sini SAMA PERSIS dengan enam suku yang dijumlahkan jadi
      * `subtotal` di `calculate()`. Kalau salah satunya ditambah/dikurangi di
      * sana, daftar ini harus ikut berubah — `InvoiceItemBuilder` akan menolak
      * menulis kalau jumlahnya tidak sama dengan subtotal, jadi ketimpangannya
@@ -248,7 +280,15 @@ class InitialInvoiceService
      * Materai/biaya lain masuk kategori `lainnya` dengan nama ketikan, karena
      * kategori itu memang tidak punya sub kategori master.
      *
-     * @param  array{prorate_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float}  $billing
+     * Baris "Jual Modem" (ownership sewa/beli) numpang sub kategori
+     * `jasa_perbaikan` yang sudah ada — bukan kategori baru — karena nominalnya
+     * sama sifatnya dengan `tambah_kabel`/`tambah_tiang`: biaya tambahan
+     * sekali-jalan di luar langganan & instalasi standar. `amount` default 0
+     * kalau key-nya tidak ada (pemanggil lama yang belum tahu soal ownership
+     * modem) — `InvoiceItemBuilder::rebuildFor()` sudah otomatis skip baris
+     * bernominal 0, jadi tidak perlu guard tambahan di sini.
+     *
+     * @param  array{prorate_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount?: float}  $billing
      * @return list<array{category_code: string, subcategory_code?: string|null, custom_name?: string|null, description?: string|null, amount: mixed}>
      */
     public function lineSpecs(array $billing): array
@@ -283,6 +323,12 @@ class InitialInvoiceService
                 'custom_name' => 'Materai / Biaya Lain',
                 'description' => null,
                 'amount' => $billing['other_fee'],
+            ],
+            [
+                'category_code' => RevenueCategory::CODE_JASA_PERBAIKAN,
+                'subcategory_code' => 'jual_modem',
+                'description' => null,
+                'amount' => $billing['modem_sale_amount'] ?? 0,
             ],
         ];
     }

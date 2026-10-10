@@ -127,12 +127,25 @@ class BusinessDevelopmentVerificationController extends Controller
             // dikonfirmasi ke pelanggan (lihat docblock kelas ini).
             $billing = $initialInvoiceService->withInstallationFee($pending['billing'], (float) $validated['installation_fee']);
 
+            // Harga "Jual Modem" (ownership modem sewa/beli, 2026-10-09, task
+            // 4 koreksi) — dibaca dari snapshot yang SAMA, bukan dihitung
+            // ulang: `finalVerify()` sudah menitipkannya di
+            // `$pending['billing']['modem_sale_amount']` (lewat
+            // `calculate()`). Kategori Bisnis tidak dikecualikan dari "Beli
+            // dari Gudang" — tidak ada alasan bisnis buat itu — jadi
+            // nominalnya WAJIB ikut diteruskan ke `issue()`, kalau tidak
+            // argumen defaultnya (0.0) menimpa `$billing['modem_sale_amount']`
+            // di dalam `issue()` dan baris tagihannya lenyap diam-diam padahal
+            // SN-nya sudah kejual (ownership CUSTOMER, custody kepotong).
+            $modemSaleAmount = (float) ($pending['billing']['modem_sale_amount'] ?? 0);
+
             $initialInvoice = $initialInvoiceService->issue(
                 $customer,
                 $customer->customerService,
                 $billing,
                 $pending['issue_date'],
-                auth()->id()
+                auth()->id(),
+                $modemSaleAmount
             );
 
             $oldStatus = $customer->status;
