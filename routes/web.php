@@ -946,6 +946,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/warehouse/reports/export', [WarehouseReportController::class, 'export'])->name('warehouse.reports.export');
     });
 
+    // Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli, Task 9)
+    // — sub-feature TERPISAH dari `warehouse_report.view` biar bisa
+    // di-toggle sendiri lewat Role Matrix, pola sama `tickets.selesai`.
+    Route::middleware('permission:warehouse_report.sold_to_customer.view')->group(function () {
+        Route::get('/warehouse/reports/sold-to-customer', [WarehouseReportController::class, 'soldToCustomer'])->name('warehouse.reports.sold-to-customer');
+    });
+
     // Permintaan Stok Cabang→Pusat (2026-09-03)
     Route::middleware('permission:warehouse_stock_request.view')->group(function () {
         Route::get('/warehouse/stock-requests', [WarehouseStockRequestController::class, 'index'])->name('warehouse.stock-requests.index');

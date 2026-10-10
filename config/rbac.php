@@ -620,6 +620,14 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli,
+        // Task 9) — halaman sendiri di bawah `warehouse_report`, pola sama
+        // `tickets.selesai`. Cuma VIEW, read-only — data mentah di
+        // `inventory_serial_sales` (Task 1).
+        'warehouse_report.sold_to_customer' => [
+            ActionCode::VIEW->value,
+        ],
+
         // Permintaan Stok Cabang→Pusat (2026-09-03) — jawaban gap "cabang
         // habis stok, Pusat gak sadar". APPROVE/REJECT dipegang sisi Pusat
         // (fulfill/tolak), CANCEL dipegang pengaju sendiri (dicek scope
@@ -894,5 +902,8 @@ return [
         'creq_billing_verification.view' => 'Lihat Antrean Verifikasi Biaya C-REQ',
         'creq_billing_verification.approve' => 'Setujui Biaya C-REQ (lanjut ke Tagihan Manual)',
         'creq_billing_verification.reject' => 'Tolak Biaya C-REQ',
+
+        // Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli, Task 9)
+        'warehouse_report.sold_to_customer.view' => 'Lihat Laporan Barang Terjual ke Pelanggan',
     ],
 ];
