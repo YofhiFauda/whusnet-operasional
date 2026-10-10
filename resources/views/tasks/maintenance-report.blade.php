@@ -186,14 +186,19 @@
             </div>
             @endif
 
+            @unless($task->task_type === \App\Enums\TaskType::CREQ)
             {{-- ── Section 1c: Task Berbayar (MTN/O-REQ/INFR REQ polos) ──
                  Sama seperti checkbox "Task Berbayar" C-REQ di atas, tapi
                  field & model beda (`mtn_is_billable`/`mtn_billing_note` →
                  `TaskMaintenanceBillingDetail`, bukan `TaskCreqDetail`) —
                  dua sumber kebenaran terpisah biar gak collide di satu
-                 form. DI LUAR blok Kategori C-REQ di atas, berlaku untuk
-                 semua task_type; backend tetap menjaga field ini cuma
-                 dieksekusi kalau `! $isCreq` (lihat TaskMaintenanceController). --}}
+                 form. Khusus task_type NON-C-REQ — kalau $isCreq, checkbox
+                 "Task Berbayar" C-REQ di atas sudah cukup; nampilin dua
+                 checkbox "Task Berbayar" sekaligus di satu form cuma bikin
+                 teknisi bingung mana yang kepake (backend juga udah nolak
+                 `mtn_is_billable` buat C-REQ lewat guard `! $isCreq` di
+                 TaskMaintenanceController, jadi blok ini emang gak relevan
+                 buat C-REQ baik UI maupun eksekusi). --}}
             <div class="px-6 py-4" style="border-bottom:1px solid var(--color-border)">
                 <p class="mb-4" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
                     Task Berbayar
@@ -212,6 +217,7 @@
                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;resize:vertical;outline:none">{{ old('mtn_billing_note') }}</textarea>
                 </div>
             </div>
+            @endunless
 
             {{-- ── Section 2: Material Terpakai ────────────────────────
                  Menggantikan lima kolom teks lama (kabel/modem/patchcord/
@@ -596,7 +602,7 @@ document.getElementById('maintenance-form')?.addEventListener('submit', function
 });
 
 // Toggle catatan biaya untuk MTN/O-REQ/INFR REQ polos — di luar blok
-// @if CREQ karena render untuk semua task_type (lihat Section 1c di atas).
+// if-CREQ karena render untuk semua task_type NON-C-REQ (lihat Section 1c di atas).
 // Nama fungsi beda dari creqToggleBillable() biar gak collision kalau
 // task_type-nya CREQ (dua blok sama-sama ter-render).
 function mtnToggleBillable() {
