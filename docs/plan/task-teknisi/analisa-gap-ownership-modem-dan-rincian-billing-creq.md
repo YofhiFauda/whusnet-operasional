@@ -1,12 +1,14 @@
 # Analisa Gap: Kepemilikan Modem (Beli vs Sewa) & Rincian Nominal Verifikasi C-REQ
 
 Tanggal: 2026-10-08
-Status: **analisa saja — belum ada perubahan kode.**
+Status: **Gap 1 & Gap 2 — SELESAI dikerjakan (2026-10-10). Gap 3, 4, 5 — belum dikerjakan (lihat catatan per gap).**
 Terkait: `docs/task-teknisi/business-logic.md` §7b (Kategori C-REQ), ADHOC-108/ADHOC-152.
 
 > **Gap 1 — SELESAI, lihat spec+plan 2026-10-10.** Rencana solving di bawah sudah dieksekusi penuh
 > (10 task, subagent-driven). Spec teknis & keputusan desain: `docs/plan/task-teknisi/rancangan-ownership-modem-sewa-beli.md`.
 > Plan eksekusi per-task: `docs/superpowers/plans/2026-10-09-ownership-modem-sewa-beli.md`.
+> Cakupan yang SUDAH tuntas: kolom inventory_serials.ownership (company/customer) + customer_devices.acquisition_source (sewa/beli_sendiri/beli_gudang), tabel inventory_serial_sales; radio ownership di laporan MTN & C-REQ, gate contract_type di Pemasangan; DEAC skip SN milik pelanggan (termasuk kasus campuran dan kasus Beli Sendiri tanpa SN); badge di Detail/List Pelanggan; Laporan Barang Terjual ke Pelanggan (POP-scoped); penegakan ownership di jalur tulis swap & pickup.
+> Yang BELUM / keputusan terbuka: modem terjual lewat MTN/C-REQ yang tidak ditandai berbayar tidak punya jalur tagihan (unbilled, bukan bug data); modem lama sebelum fix tetap company/Sewa (tidak ada backfill, sesuai keputusan).
 > Isi Q&A Gap 1 di bawah ini TETAP dipertahankan sebagai jejak keputusan — jangan dihapus/ditulis ulang.
 
 ---
@@ -53,6 +55,8 @@ NAHHH kita meang harus membedakan karena untuk tambah modem itu, pelanggan beli 
 > **Gap 2 — SELESAI, lihat rancangan+plan 2026-10-10.** Rancangan solving di bawah sudah dieksekusi penuh
 > (5 task, subagent-driven). Spec teknis & keputusan desain: `docs/plan/task-teknisi/rancangan-verifikasi-biaya-creq-mtn.md`.
 > Plan eksekusi per-task: `docs/superpowers/plans/2026-10-10-verifikasi-biaya-creq-mtn-breakdown.md`.
+> Cakupan yang SUDAH tuntas: breakdown per-item (nama + nominal per baris, tabel 	ask_billing_items) untuk C-REQ **dan** MTN berbayar; baris "Jual Modem" auto-seed dari InventorySerialSale; MTN polos sekarang punya jalur billing (	ask_maintenance_billing_details) — dibatasi ke 	ask_type = MAINTENANCE saja, O-REQ/INFR REQ sengaja belum (butuh keputusan produk soal kategori invoice-nya).
+> Yang BELUM (sengaja, di luar scope Gap 2): rincian per-baris belum tampil di layar lain (Detail Pelanggan, form Pembayaran) — masih baca kolom invoice lama; invoice tetap 1 mount + 1 description gabungan (skema Invoice tidak diubah).
 > Isi Q&A Gap 2 di bawah ini TETAP dipertahankan sebagai jejak keputusan — jangan dihapus/ditulis ulang.
 
 ## Gap 2 — Verifikasi Biaya C-REQ cuma 1 field nominal, gak ada rincian per-item terstruktur
