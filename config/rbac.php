@@ -77,6 +77,13 @@ return [
             ActionCode::DELETE->value,
         ],
 
+        'master_network_node_types' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+        ],
+
         'users' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,

@@ -39,6 +39,7 @@ class DatabaseSeeder extends Seeder
         $this->call(WarehouseFeatureSeeder::class); // Gudang/Inventory (ADHOC-54, Fase 1)
         $this->call(FopAnalyticsFeatureSeeder::class);
         $this->call(OdpFeatureSeeder::class); // Dashboard Analitik FOP
+        $this->call(NetworkNodeTypeSeeder::class); // Master Tipe Node Jaringan (ODC/ODP/dll + flag perilaku)
         $this->call(CustomerAcquisitionFeatureSeeder::class); // Customer Acquisition (Busdev) - Pelanggan Aktif < 30 Hari
         $this->call(BusinessDevelopmentVerificationFeatureSeeder::class); // Antrean Menunggu Verifikasi BD (pelanggan Bisnis pra-ACTIVE)
         $this->call(CustomerRegistrationVerificationFeatureSeeder::class); // Antrean Verifikasi Registrasi (ADHOC-73)

@@ -45,6 +45,7 @@ use App\Http\Controllers\Master\DistributionController;
 use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\ItemCategoryController;
 use App\Http\Controllers\Master\ItemController;
+use App\Http\Controllers\Master\NetworkNodeTypeController;
 use App\Http\Controllers\Master\PackageCategoryController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\Master\RegionController;
@@ -675,6 +676,26 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:ticket_issue_categories.delete')->group(function () {
         Route::delete('/master/issue-categories/{category}', [TicketIssueCategoryController::class, 'destroy'])->name('master.ticket-issue-categories.destroy');
+    });
+
+    // Master Tipe Node Jaringan - Static Routes First
+    Route::middleware('permission:master_network_node_types.create|master_network_node_types.update')->group(function () {
+        Route::get('/master/network-node-types/create', [NetworkNodeTypeController::class, 'create'])->name('master.network-node-types.create');
+        Route::post('/master/network-node-types', [NetworkNodeTypeController::class, 'store'])->name('master.network-node-types.store');
+    });
+
+    Route::middleware('permission:master_network_node_types.view')->group(function () {
+        Route::get('/master/network-node-types', [NetworkNodeTypeController::class, 'index'])->name('master.network-node-types.index');
+    });
+
+    // Master Tipe Node Jaringan - Dynamic Routes Last
+    Route::middleware('permission:master_network_node_types.create|master_network_node_types.update')->group(function () {
+        Route::get('/master/network-node-types/{networkNodeType}/edit', [NetworkNodeTypeController::class, 'edit'])->name('master.network-node-types.edit');
+        Route::put('/master/network-node-types/{networkNodeType}', [NetworkNodeTypeController::class, 'update'])->name('master.network-node-types.update');
+    });
+
+    Route::middleware('permission:master_network_node_types.delete')->group(function () {
+        Route::delete('/master/network-node-types/{networkNodeType}', [NetworkNodeTypeController::class, 'destroy'])->name('master.network-node-types.destroy');
     });
 
     // Master Barang/Material - Static Routes First
