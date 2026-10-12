@@ -1,342 +1,330 @@
-# Rancangan: Manajemen Aset Infrastruktur per Lokasi (Pusat/Cabang/Mini POP/ODP)
+# Rancangan: Pohon Infrastruktur Jaringan Dinamis + Aset Gudang per Lokasi
 
-Status: **DRAFT — brainstorming, belum diimplementasi.**
-Dibuat: 2026-10-09
+Status: **DRAFT v2 — brainstorming, belum diimplementasi.**
+Dibuat: 2026-10-09. **Revisi total 2026-10-12** — v1 (model `odps` fix 1 level
+anak Mini POP) diganti total jadi pohon generik. Riwayat keputusan v1
+dipertahankan di §9 (kenapa dibuang), jangan dibaca sebagai desain aktif.
 
 ## 1. Latar Belakang
 
-Modul Gudang sekarang (`docs/warehouse/`) cuma mengenal 2 level lokasi stok:
-`pops.type = pusat` (gudang pusat) dan `cabang` (gudang cabang). Barang yang
-keluar dari gudang cuma punya 2 nasib: **custody teknisi** (dipinjam, dikembalikan)
-atau **terpasang ke pelanggan** (`SerialStatus::INSTALLED`, lewat `InventoryService::installSerial()`).
+Rantai infrastruktur jaringan riil **jauh lebih dalam dan tidak tetap**
+jumlah levelnya (disediakan user, 2026-10-12):
 
-Kebutuhan baru: melacak aset infrastruktur jaringan yang **netap** di lokasi
-selain gudang dan selain pelanggan — OLT/switch di Mini POP, ODP box + splitter
-di ODP, UPS/aki di ruang server Cabang. Dipicu/dimutasi lewat task `O-REQ`
-(Office Request) dan `INFR REQ` (Infrastruktur Request) — dua `TaskType` yang
-sudah ada tapi belum nyambung ke Gudang sama sekali.
+```
+Pusat (NOC) → Core Router/Switch → Backbone/Transport → Cabang (POP)
+  → Router/Switch Agregasi POP → OLT (= "Mini POP" existing, OLT ke-2/3/dst
+    di POP yang sama) → PON Port/Card → Kabel Feeder → ODC (+splitter) →
+      Kabel Distribusi → ODP (+splitter) → Kabel Drop → ONT/ONU pelanggan
+```
 
-Kebutuhan turunan dari diskusi: bukan cuma "catat barangnya ada di mana" tapi
-juga **audit 2 arah**:
-- Dari SN/aset → lokasinya di mana sekarang (sudah mirip Lacak Barang yang ada).
-- Dari lokasi (Mini POP/ODP tertentu) → aset apa saja yang terpasang di situ
-  (tidak ada sekarang — Gudang 100% SN-centric, bukan lokasi-centric).
+Modul Gudang sekarang cuma kenal 2 lokasi stok (`pops.type=pusat/cabang`) +
+custody teknisi + terpasang ke pelanggan (`SerialStatus::INSTALLED`). Tidak
+ada cara mencatat "OLT ini ada di mana", "ODC/ODP ini kapasitasnya berapa,
+sisa berapa", atau "apa saja yang netap terpasang di titik X" — dan levelnya
+**tidak boleh fix** (v1 rancangan ini sempat salah asumsi "ODP = anak tetap
+Mini POP", ditolak user karena rantai nyata punya level yang berubah per
+cabang dan bisa bertambah ke depannya — lihat §9).
 
-## 2. Keputusan dari Diskusi (jangan ditinjau ulang tanpa alasan baru)
+**Tiga kebutuhan yang harus dijawab desain ini, di titik mana pun di rantai:**
+1. Kapasitas & sisa kosong (berapa port/slot, berapa terpakai).
+2. Alat apa saja yang netap terpasang di titik itu (dari Gudang).
+3. Audit dua arah — dari alat → lokasinya, dari lokasi → isinya — DAN
+   pohonnya harus bisa tumbuh/berubah tanpa migration baru tiap ada level
+   baru.
 
-1. **ODP adalah node baru**, anak dari Mini POP (`1 Mini POP → banyak ODP`) —
-   **bukan** `Distribution` yang sudah ada. `Distribution` tetap murni label
-   segmen CID, bisa di-reassign bebas, dan **secara konsep bukan** anak
-   struktural Mini POP (walau kolom `pop_id`-nya ada) — dua konsep ini sengaja
-   dipisah, jangan digabung.
-2. **Dua kelas barang masuk cakupan**: (a) aset tetap baru — OLT, switch,
-   ODP box, tower, UPS/aki — belum ada representasinya sama sekali; (b)
-   perluasan barang Gudang yang sudah ada (splitter, kabel) supaya bisa
-   dicatat "terpasang di ODP X", bukan cuma "stok di gudang".
-3. **O-REQ dan INFR-REQ dua-duanya bisa**: pasang aset baru ATAU
-   ganti/mutasi aset yang sudah ada di suatu lokasi.
-4. **Alur pasang = pola custody→install yang sudah ada**, cuma target
-   akhirnya digeneralisasi: teknisi `Issue` dari gudang Cabang → custody →
-   submit laporan O-REQ/INFR-REQ → barang pindah dari custody jadi
-   "terpasang" di lokasi (Mini POP/ODP), **bukan** hanya logika baru dari nol.
-5. **Status "terpasang" (deployed) dibutuhkan di SEMUA level**, termasuk
-   Pusat/Cabang — OLT yang sudah naik rak beda maknanya dari OLT yang masih
-   jadi stok cadangan di gudang. Jadi bukan cuma Mini POP/ODP yang butuh
-   status baru, Pusat/Cabang pun butuh pembeda "stok" vs "terpasang".
-6. **Butuh halaman baru yang lokasi-centric** ("pilih lokasi, lihat semua
-   aset di situ"), bukan hanya memperluas Lacak Barang yang SN-centric
-   ("pilih SN, lihat riwayatnya"). Dua entry point, satu sumber data.
+## 2. Keputusan Inti (2026-10-12, jangan ditinjau ulang tanpa alasan baru)
 
-## 3. Entitas & Perubahan Data Model
+1. **Satu tabel pohon generik `network_nodes`**, self-referencing
+   (`parent_id`), kedalaman bebas — bukan satu tabel per level (ODC, OLT,
+   ODP masing-masing tabel sendiri itu yang bikin kaku di v1).
+2. **`node_type` lewat tabel lookup `network_node_types`** yang dikelola
+   admin (Master Data biasa, CRUD) — **bukan** PHP enum. Nambah tipe
+   infrastruktur baru (mis. "Repeater", "ODC Tier-2") cukup tambah baris,
+   tanpa sentuh kode/migration/deploy. Ini jawaban langsung kebutuhan
+   "sedinamis mungkin".
+3. **Mini POP existing (`pops.type=mini_pop`) TIDAK dipindah/diubah.** Dia
+   sudah representasi "OLT ke-2/3/dst di POP yang sama" (konfirmasi user)
+   dan dibutuhkan mesin CID/RBAC/billing yang sudah jalan — jangan disentuh.
+   `network_nodes` nyambung ke dunia POP lewat `root_pop_id` (FK `pops`,
+   boleh Cabang ATAU Mini POP tergantung cabang itu punya Mini POP atau
+   tidak) — node-node di bawahnya (PON Port, ODC, ODP, dst) jalan generik
+   lewat `parent_id`, tidak peduli root-nya Cabang atau Mini POP langsung.
+   Ini otomatis menjawab dilema lama "ODP anak Cabang vs Mini POP" — kedua
+   topologi sah, tergantung cabang.
+4. **Kapasitas generik, dua bentuk, node pilih yang relevan:**
+   - `capacity` (int di `network_nodes`) — ringkasan angka doang, buat node
+     yang tidak butuh identitas per-slot (mis. Backbone bandwidth).
+   - `network_node_ports` (tabel anak, port bernomor + `is_used`) — buat
+     node yang butuh slot diskrit bisa dicek satu-satu (PON Port di OLT,
+     splitter port di ODC/ODP). **Ini generalisasi dari `odp_ports` yang
+     sudah dibangun — bukan tabel baru yang beririsan, lihat §6.**
+5. **Aset Gudang (SN/qty) nempel ke `network_nodes` lewat SATU kolom**
+   polimorfik-tunggal, bukan pasangan kolom per level seperti v1 (dulu
+   `current_pop_id`+`current_odp_id` dua kolom) — karena sekarang cuma ada
+   SATU tabel tujuan (`network_nodes`), tidak perlu pasangan exclusive lagi.
+6. **Dua data berbeda di satu node, jangan dicampur:**
+   - **Kapasitas/port** = soal "berapa slot, berapa kosong" (`capacity`/`network_node_ports`) — murni angka/okupansi, tidak perlu tahu SN spesifik.
+   - **Aset terpasang** = soal "barang APA dari Gudang yang netap di sini" (`inventory_serials`/`infrastructure_balances`, ber-SN/qty, berasal dari ledger).
+   Satu node bisa punya dua-duanya sekaligus (OLT: kapasitas PON port +
+   chassis OLT itu sendiri sebagai aset bernomor SN).
 
-### 3.1 Tabel baru `odps`
+## 3. Entitas & Skema
 
-Pola sama seperti master POP (self-referencing dihindari, cukup FK ke Mini POP):
+### 3.1 `network_node_types` (master lookup, dikelola admin)
 
 | Kolom | Tipe | Keterangan |
 |---|---|---|
 | `id` | PK | |
-| `pop_id` | FK `pops`, restrict | **Wajib** Mini POP (`type=mini_pop`) — ditegakkan Service, bukan DB constraint (sama pola `distributions.pop_id`) |
-| `code` | `string(30)` unique | Kode ODP, manual diisi admin (konsisten dengan filosofi POP: "semua kode ditentukan manual") |
-| `name` | `string(150)` | |
-| `capacity_port` | `integer` nullable | Opsional — jumlah port splitter, kalau admin mau catat |
-| `latitude`/`longitude` | `decimal` nullable | Opsional, buat peta (kalau dibutuhkan UI peta belakangan) |
-| `status` | `string(20)` default `active` | `active`/`inactive` — ODP yang dibongkar gak dihapus, dinonaktifkan (jejak aset lama tetap valid) |
-| `notes` | `text` nullable | |
+| `code` | `string(30)` unique | mis. `olt`, `pon_port`, `odc`, `odp`, `backbone`, `aggregation_switch`, `core_router` |
+| `name` | `string(100)` | Label tampilan |
+| `is_active` | boolean default true | |
+| `sort_order` | int default 0 | |
 | timestamps | | |
 
-CRUD di Master Data (`/master/odp`), permission `odps.view|create|update|delete`
-(generate dari `features`×`actions`, bukan hardcode) — pola identik Master POP/Distribution.
+CRUD di `/master/network-node-types`, permission `master_network_node_types.{view,create,update,delete}`
+(generate dari `features`×`actions`). Guard hapus: tolak kalau masih dipakai
+`network_nodes.node_type_id` manapun (pola `MasterRecordRemovalService` yang
+sudah ada di repo untuk master lain).
 
-**Kenapa bukan dalam tabel `pops`:** `pops` dipakai luas buat RBAC scope tree
-(`EffectiveAccessService::resolvePopTree()`), CID generation, dan hierarki
-billing. ODP tidak butuh ikut seluruh mesin itu — ODP murni lokasi fisik aset,
-nebeng FK ke Mini POP sudah cukup. Menambah `type=odp` ke `pops` beresiko
-mencampur konsep "node RBAC/billing" dengan "node lokasi aset" yang sifatnya beda.
+**Seed awal** (idempotent, `updateOrCreate` by `code`): `core_router`,
+`backbone`, `aggregation_switch`, `olt`, `pon_port`, `odc`, `odp` — tujuh
+tipe dari rantai yang disebut user §1. Admin boleh tambah lebih banyak kapan
+pun lewat UI, tanpa seed ulang.
 
-### 3.2 `OwnershipMode` — case baru
-
-```php
-case INFRASTRUCTURE_ASSET = 'infrastructure_asset';
-```
-
-Beda dari `COMPANY_ASSET` yang sudah ada (alat kerja — OTDR/laptop, **cuma
-looping** `ISSUED ⇄ RETURNED`, **tidak pernah netap**). `INFRASTRUCTURE_ASSET`
-boleh transisi ke status baru `SerialStatus::DEPLOYED` dan **netap** di sana
-(OLT, switch, ODP box, UPS) — bukan dipinjam-balikin, melainkan dipasang permanen
-sampai diganti/dicabut lewat O-REQ/INFR-REQ lain.
-
-`INSTALLABLE` (ke pelanggan) tetap terpisah — splitter/kabel yang dipasang di
-ODP **bukan** `INSTALLABLE` ke pelanggan tunggal, tapi juga bukan `COMPANY_ASSET`
-(bukan alat kerja). Barang ini butuh `INFRASTRUCTURE_ASSET` juga, walau fisiknya
-mirip barang `INSTALLABLE` existing (splitter kadang terpasang di sisi pelanggan,
-kadang di ODP) — axis `OwnershipMode` jadi property **transaksi** kapan perlu
-dibedakan per penggunaan, bukan cuma property `Item` statis, kalau ternyata satu
-Item (misal splitter 1x8) bisa dipasang baik ke pelanggan maupun ke ODP. **Ini
-titik yang perlu digali lagi saat spek detail** — lihat §7 Open Items.
-
-### 3.3 `SerialStatus` — case baru
-
-```php
-case DEPLOYED = 'deployed';
-```
-
-Label: "Terpasang di Infrastruktur". `badgeVariant()` → `success` (sehat, netap),
-sejajar `AVAILABLE`/`INSTALLED`.
-
-### 3.4 `inventory_serials` — kolom lokasi baru
+### 3.2 `network_nodes` (pohon, kedalaman bebas)
 
 | Kolom | Tipe | Keterangan |
 |---|---|---|
-| `current_odp_id` | FK `odps` nullable, null-on-delete | Diisi kalau `status=DEPLOYED` **dan** lokasinya ODP |
+| `id` | PK | |
+| `parent_id` | FK `network_nodes` nullable, restrict | Null = root (langsung anak `root_pop_id`) |
+| `root_pop_id` | FK `pops`, restrict | Anchor Cabang/Mini POP — **tidak berubah** sepanjang hidup node (beda dari `parent_id` yang bisa dipindah kalau topologi direstruktur), dipakai scope RBAC + breadcrumb cepat tanpa manjat seluruh `parent_id` tiap kali |
+| `node_type_id` | FK `network_node_types`, restrict | |
+| `code` | `string(50)` unique | Manual diisi admin, sama filosofi POP |
+| `name` | `string(150)` | |
+| `capacity` | `integer` nullable | Ringkasan, dipakai kalau node TIDAK punya baris `network_node_ports` |
+| `address` | `text` nullable | Mirror `pops.address` |
+| `village`/`district`/`city` | `string(100)` nullable | Mirror `pops` |
+| `latitude`/`longitude` | `decimal(10,7)` nullable | Mirror `pops` — buat maps nanti, **tidak** auto-geocode sekarang (manual dulu, field-nya disiapkan supaya nanti gampang disambung API maps tanpa migration lagi) |
+| `status` | `string(20)` default `active` | `active`/`inactive` |
+| `notes` | `text` nullable | |
+| timestamps | | |
 
-**`current_pop_id` yang sudah ada dipakai ulang** untuk kasus `status=DEPLOYED`
-di Pusat/Cabang/Mini POP — kolom ini sekarang punya 2 makna tergantung `status`:
-- `status ∈ {AVAILABLE, RECEIVED, ISSUED-pending, ...}` → "ada di gudang ini,
-  masih stok" (makna lama, tidak berubah).
-- `status = DEPLOYED` → "terpasang netap di lokasi ini" (makna baru).
+Index: `parent_id`, `root_pop_id`, `node_type_id`.
 
-**Ini AMAN dilakukan** — `inventory_serials.current_pop_id` **tidak pernah**
-dibatasi `Pop::WAREHOUSE_TYPES` di level model/DB (beda dari `inventory_balances`,
-lihat §3.5 di bawah). Pembatasan `WAREHOUSE_TYPES=['pusat','cabang']` cuma
-ditegakkan Service-level untuk alur stok (`InventoryReceiveService`/
-`InventoryTransferService`/`InventoryIssueService`), bukan untuk kolom ini
-secara umum. Konsisten dengan prinsip Gudang §12 ("axis independen,
-`current_pop_id`/`current_technician_id` sengaja dibiarkan sebagai jejak
-forensik") — satu kolom, makna ditentukan `status` yang mendampinginya.
+**Cegah circular parent** — sama pola `PopController` (`exclude semua
+descendant dari pilihan parent_id`), ditegakkan Service, bukan DB.
 
-### 3.5 **KOREKSI** — barang QUANTITY butuh tabel baru, BUKAN kolom di `inventory_balances`
+**Kenapa bukan reuse `pops`:** `pops` sarat makna RBAC-tree/CID/billing
+(`EffectiveAccessService::resolvePopTree()`, `generateComplexCid()`).
+Mencampur "node topologi fisik di bawah Mini POP" ke tabel yang juga
+menentukan CID pelanggan berisiko besar salah pakai tanpa sengaja. Tabel
+terpisah, nyambung lewat `root_pop_id` (satu arah, bukan dua arah).
 
-**Revisi dari draf awal** (ditemukan saat perencanaan detail, 2026-10-09):
-rancangan awal mau menambah `odp_id` + izinkan `mini_pop` di `inventory_balances`.
-Ini **menabrak invariant yang sudah ada dan sengaja**: `Pop::WAREHOUSE_TYPES =
-['pusat','cabang']` (`app/Models/Pop.php:67`) — **Mini POP sengaja TIDAK
-PERNAH dianggap gudang** (ADHOC-54: "titik distribusi fisik, bukan kantor
-cabang berstaf"), dan `inventory_balances.pop_id` punya dokumentasi tegas
-"TIDAK PERNAH mini_pop" yang ditegakkan di titik tulis Service. Menambah jalur
-yang bikin `inventory_balances` punya baris ber-makna "mini_pop"/"odp"
-mencampur konsep "stok gudang yang bisa di-Transfer/Issue" dengan "aset netap
-infrastruktur" — dua lifecycle yang beda.
+### 3.3 `network_node_ports` (generalisasi `odp_ports`)
 
-**Keputusan baru:** tabel proyeksi terpisah, `infrastructure_balances`
-— pola sama `inventory_balances` (proyeksi, diturunkan dari ledger, bukan
-sumber kebenaran) tapi khusus barang QUANTITY yang **terpasang netap**
-(bukan stok yang masih bisa dipindah-pindah):
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | PK | |
+| `network_node_id` | FK `network_nodes`, cascade-on-delete | |
+| `number` | `unsignedSmallInteger` | |
+| `is_used` | boolean default false | |
+| timestamps | | |
+
+Unique `(network_node_id, number)`. **Sama bentuk** dengan `odp_ports`
+existing (lihat §6) — cuma ganti FK target.
+
+### 3.4 Enum Gudang — tidak berubah dari v1
+
+- `OwnershipMode::INFRASTRUCTURE_ASSET` — barang yang boleh transisi ke
+  `SerialStatus::DEPLOYED` dan netap (beda `COMPANY_ASSET` yang cuma
+  loop ISSUED⇄RETURNED).
+- `SerialStatus::DEPLOYED` — "terpasang netap di infrastruktur", badge
+  `success`.
+- `InventoryTransactionType::DEPLOY` / `RETRIEVE_INFRA` — ledger, sejajar
+  `install`/`return` yang sudah ada.
+
+### 3.5 `inventory_serials` — SATU kolom lokasi (bukan pasangan seperti v1)
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `current_network_node_id` | FK `network_nodes` nullable, null-on-delete | Diisi kalau `status=DEPLOYED`. Pengganti `current_odp_id` v1 — v1 butuh 2 kolom (`current_pop_id`+`current_odp_id`) karena ada 2 tabel tujuan; sekarang cuma 1 tabel tujuan jadi 1 kolom cukup |
+
+`current_pop_id` yang sudah ada **tidak dipakai lagi** untuk kasus deploy —
+beda dari v1. `current_pop_id` balik ke makna aslinya 100% ("ada di gudang
+Pusat/Cabang, masih stok"), tidak dicampur lagi.
+
+### 3.6 `infrastructure_balances` — proyeksi saldo QUANTITY/ROLL yang di-deploy
+
+Alasan tabel terpisah dari `inventory_balances` **tidak berubah dari v1** —
+`inventory_balances.pop_id` dibatasi `Pop::WAREHOUSE_TYPES=['pusat','cabang']`
+secara sengaja (ADHOC-54), jadi barang QUANTITY/ROLL yang di-deploy ke
+`network_nodes` butuh proyeksi sendiri.
 
 | Kolom | Tipe | Keterangan |
 |---|---|---|
 | `id` | PK | |
 | `item_id` | FK `items`, restrict | |
-| `lot_no` | `string(50)` default `''` | Sentinel kosong, sama pola `inventory_balances` |
-| `pop_id` | FK `pops` nullable, restrict | Lokasi = Pusat/Cabang/**Mini POP** (3 level diperbolehkan di sini — beda dari `inventory_balances` yang cuma 2) |
-| `odp_id` | FK `odps` nullable, restrict | Lokasi = ODP |
+| `lot_no` | `string(50)` default `''` | `''` = QUANTITY generik, `roll_code` = asal dari roll kabel tertentu (lihat v1 §3.5 lama, prinsip sama) |
+| `network_node_id` | FK `network_nodes`, restrict | **Satu kolom lokasi**, bukan pasangan `pop_id`/`odp_id` seperti v1 |
 | `qty` | `decimal(12,2)` default 0 | |
+| timestamps | | |
 
-Unique: `(pop_id, odp_id, item_id, lot_no)`. Constraint aplikasi (Service):
-tepat satu dari `pop_id`/`odp_id` terisi, yang lain `null`.
+Index: `(item_id, network_node_id)`. **Tidak ada unique index** — keunikan
+"satu baris per lokasi+item+lot" ditegakkan Service (`lockForUpdate()` +
+`firstOrCreate`), bukan DB constraint (alasan sama v1: kombinasi nullable
+exclusive bikin unique index standar tidak berfungsi — di sini malah lebih
+simpel karena cuma 1 kolom lokasi, tidak ada exclusivity, tapi tetap pakai
+pola Service-enforced konsisten dengan `inventory_serials`).
 
-**Kenapa tabel baru, bukan kolom di tabel lama:** konsisten dengan alasan
-`task_materials` dulu dibuat baru alih-alih numpang kolom existing (lihat
-`docs/fop-task/rancangan-request-pemasangan-dan-material-task.md` §2.2) —
-"tabel baru kalau kolom tidak cukup" berlaku juga di sini karena makna
-"gudang" dan "terpasang netap" sudah punya invariant yang saling bertentangan
-secara sengaja, bukan cuma beda nama kolom.
-
-### 3.5a `WarehouseStockAsOfService` — TIDAK disentuh
-
-Karena `infrastructure_balances` adalah tabel proyeksi sendiri (bukan baris
-baru di `inventory_balances`), replay logic `WarehouseStockAsOfService` yang
-sudah ada **tidak perlu diubah**. Laporan Gudang (stok Pusat/Cabang) dan
-laporan Aset Infrastruktur (Mini POP/ODP) tetap 2 sumber proyeksi yang jelas
-terpisah — menghindari laporan stok gudang tiba-tiba kemasukan baris "stok"
-Mini POP yang sebenarnya bukan stok.
-
-### 3.6 `inventory_transactions` — kolom & tipe baru
+### 3.7 `inventory_transactions` — kolom & tipe (disederhanakan dari v1)
 
 | Kolom | Tipe | Keterangan |
 |---|---|---|
-| `to_odp_id` | FK `odps` nullable, null-on-delete | Mirror `to_pop_id` |
-| `from_odp_id` | FK `odps` nullable, null-on-delete | Mirror `from_pop_id` — dipakai saat aset dicabut dari satu ODP (ganti/upgrade) |
+| `to_network_node_id` | FK `network_nodes` nullable, null-on-delete | Mirror `to_pop_id`, dipakai `deploy` |
+| `from_network_node_id` | FK `network_nodes` nullable, null-on-delete | Mirror `from_pop_id`, dipakai `retrieve_infra` |
 
-`InventoryTransactionType` dapat 2 nilai baru:
+`InventoryTransactionType::DEPLOY`/`RETRIEVE_INFRA` — kombinasi kolom sama
+semantik v1, cuma target lokasi sekarang **satu kolom** (`to_network_node_id`/
+`from_network_node_id`), bukan pasangan `to_pop_id`/`to_odp_id`.
 
-| Type | Kombinasi kolom | Makna |
-|---|---|---|
-| `deploy` | `from_technician_id`, (`to_pop_id` **atau** `to_odp_id`) | Aset pindah dari custody teknisi jadi terpasang netap — titik terminal, sejajar `install` yang sudah ada tapi target lokasi bukan `customer_id` |
-| `retrieve_infra` | (`from_pop_id` **atau** `from_odp_id`), `to_technician_id` | Aset dicabut balik dari lokasi ke custody teknisi (mis. OLT lama dicabut sebelum diganti, mau dibawa balik ke gudang/dibuang) |
-
-Kedua tipe baru ini **mengikuti pola yang sama persis** dengan
-`issue`/`return`/`install` yang sudah ada — ledger append-only, row locking,
-reference number per pola `generateReferenceNumber()`. Satu ledger, tiga
-pembaca proyeksi tergantung `tracking_type` item (**koreksi data 2026-10-09**:
-splitter/ODP box = SERIALIZED, kabel = ROLL — bukan QUANTITY, lihat
-`docs/superpowers/plans/2026-10-09-aset-infrastruktur-lokasi.md` Task 2a):
-- **SERIALIZED** (splitter, ODP box, OLT, switch) → proyeksi dibaca dari
-  `inventory_serials.status/current_pop_id/current_odp_id` (SATU baris = SATU
-  unit, gak butuh tabel saldo — sama seperti `install` sekarang).
-- **QUANTITY** (aksesoris pasang, bukan splitter/kabel) → proyeksi ditulis ke
-  `infrastructure_balances` (§3.5) dengan `lot_no=''`, **bukan** `inventory_balances`.
-- **ROLL** (kabel dropcore/fiber) → **tidak** lewat `TechnicianCustody`
-  (roll dipegang langsung, bukan custody agregat — Gudang business-logic §1).
-  Proyeksi ditulis ke `infrastructure_balances` juga, tapi `lot_no=roll_code`
-  (bukan sentinel kosong) supaya meter dari roll berbeda tetap tertelusur per-roll.
-
-Untuk QUANTITY & ROLL, `to_pop_id`/`to_odp_id` baris `deploy` dan
-`from_pop_id`/`from_odp_id` baris `retrieve_infra` dibaca Service yang
-meng-update `infrastructure_balances`, mirror cara `inventory_balances`
-diupdate di `issue`/`transfer` sekarang (increment/decrement langsung di
-Service yang sama dengan penulisan ledger, satu transaction).
+Tiga pembaca proyeksi tergantung `tracking_type` (sama prinsip v1 §3.6 lama,
+disalin karena masih berlaku):
+- **SERIALIZED** (OLT, switch, ODP box, splitter — lihat koreksi seeder di
+  plan Task) → proyeksi dibaca `inventory_serials.status/current_network_node_id`.
+- **QUANTITY** (aksesoris) → `infrastructure_balances`, `lot_no=''`.
+- **ROLL** (kabel) → `infrastructure_balances`, `lot_no=roll_code`, **tidak**
+  lewat `TechnicianCustody` (roll dipegang langsung, lihat Gudang
+  business-logic §1).
 
 ## 4. Alur Pasang/Ganti Aset lewat O-REQ/INFR-REQ
 
-Mengikuti pola **integrasi Task Teknisi ↔ Gudang** yang sudah ada
-(`InventoryService`, lihat `docs/warehouse/business-logic.md` §6), bukan jalur baru:
+**Tidak berubah dari v1 secara alur** — tetap: Issue dari Gudang Cabang →
+custody → submit Laporan O-REQ/INFR REQ (`TaskMaintenanceController`,
+seksi baru) → `InventoryService::deploySerial()`/`deployQuantity()`/
+`deployRoll()`. **Yang berubah cuma target parameter**: dulu `(?Pop $pop,
+?Odp $odp)` sepasang exclusive, sekarang **satu** `NetworkNode $node` —
+method-method ini jadi lebih simpel signature-nya.
 
-```
-1. Teknisi Issue dari Gudang Cabang (pola sama: InventoryIssueService)
-   → custody teknisi (QUANTITY) atau SN status=ISSUED (SERIALIZED)
+Dropdown lokasi di form laporan: **tree picker** (pilih Cabang/Mini POP dulu
+→ `root_pop_id`, lalu navigasi turun `parent_id` sampai node yang dimaksud)
+— bukan dropdown flat Mini POP+ODP terpisah seperti v1, karena kedalaman
+sekarang bisa berapa pun.
 
-2. Teknisi kerjakan task O-REQ/INFR REQ, submit Laporan — **BUKAN form baru**,
-   O-REQ & INFR REQ **sudah** lewat `TaskMaintenanceController::report()`/`store()`
-   yang sama dengan MTN/C-REQ (satu controller, satu view
-   `tasks/maintenance-report.blade.php`, one-shot `sync()+complete()` dalam
-   satu request). Cukup tambah **seksi baru** "Pasang/Ganti Infrastruktur" di
-   form itu, tampil kondisional cuma untuk `task_type ∈ {OREQ, INFR}`:
-   → pilih target lokasi: Mini POP / ODP (dropdown berjenjang
-     Cabang → Mini POP → ODP, pola sama modal "Atur Mini POP & Distribusi")
-   → pilih SN yang dipasang (SERIALIZED, dari custody tim — sumber sama
-     `eligibleSerialsForTeam()`, filter `ownership_mode=INFRASTRUCTURE_ASSET`
-     bukan `INSTALLABLE`) dan/atau qty dari custody (QUANTITY)
+Mutasi/ganti aset existing (OLT lama diganti baru) — **tidak berubah dari
+v1**: `retrieveSerialFromLocation()` (cabut, balik ke custody actor) +
+`deploySerial()` (pasang baru), satu transaksi.
 
-3. InventoryService::deployToLocation() (method baru, sejajar installSerial())
-   - SERIALIZED: SN → status=DEPLOYED, current_pop_id ATAU current_odp_id diisi
-     (exclusive), current_technician_id dikosongkan. Ledger `deploy`.
-   - QUANTITY: consumeFromCustody() (SUDAH ADA, tidak diubah) kurangi custody,
-     lalu baris `deploy` ke to_pop_id/to_odp_id menambah **`infrastructure_balances`**
-     (§3.5 — BUKAN `inventory_balances`) di lokasi tujuan. Guard
-     OwnershipMode::INFRASTRUCTURE_ASSET ditegakkan di titik ini —
-     satu-satunya pintu transisi, sama prinsip installSerial().
+## 5. Halaman: Aset & Kapasitas per Lokasi (gabung, bukan dua halaman)
 
-4. Mutasi/ganti aset existing (OLT lama diganti baru):
-   - Laporan INFR-REQ dengan 2 bagian: SN lama "dicabut" (retrieve_infra,
-     balik ke custody teknisi yang submit laporan) + SN baru "dipasang"
-     (deploy, langkah 3). Satu transaksi DB, satu submit laporan — supaya
-     tidak ada window "lokasi kosong" di antara cabut dan pasang.
-```
+**Beda dari v1** — v1 merancang halaman baru terpisah dari apa pun yang ada.
+Sekarang: **generalisasi halaman `/network/odps` yang sudah dibangun**
+(lihat §6) jadi `/network/nodes` yang bisa menampilkan **node apa pun** di
+pohon, tidak cuma ODP, dan menyatukan 2 hal di satu halaman:
 
-**Kenapa custody dulu, bukan langsung dari gudang:** sama alasan Issue→Install
-yang sudah ada — custody adalah jejak "siapa yang pegang barang ini sebelum
-dipasang", penting buat audit kalau ada selisih fisik.
+- **Kapasitas** (yang sudah ada di `/network/odps`): jumlah port, dipakai,
+  kosong, badge "Red Zone" kalau mendekati penuh.
+- **Aset terpasang** (baru, dari §3.5/3.6): daftar SN `status=DEPLOYED` +
+  saldo `infrastructure_balances` yang `network_node_id`=node ini.
 
-### 4.1 Jalur admin langsung (tanpa laporan teknisi)
+**Navigasi**: breadcrumb dari `root_pop_id` (Cabang → Mini POP kalau ada)
+lalu turun lewat `parent_id` sampai node yang dipilih — tree browser, bukan
+3 dropdown independen seperti v1.
 
-**Di luar scope rancangan ini untuk saat ini** — diskusi awal (Q&A) menyebut
-kemungkinan ini, tapi belum ada keputusan final. Dicatat di §7 Open Items.
+**Link "Riwayat"** per SN tetap ke `warehouse.traceability.index` yang
+sudah ada (SN-centric) — tidak berubah dari v1, tetap 2 entry point 1 sumber
+data (ledger).
 
-## 5. Halaman Baru: Aset per Lokasi (lokasi-centric)
+Scope POP: `assertNetworkNodeInScope()` (baru, trait `AuthorizesWarehousePop`)
+— resolve lewat `node->root_pop_id` langsung (1 lookup, lebih simpel dari
+v1 yang perlu manjat `odp->miniPop->parent_id`).
 
-Gudang yang ada 100% **SN-centric** (Lacak Barang: pilih SN → lihat riwayat).
-Kebutuhan baru murni **lokasi-centric**: pilih lokasi → lihat semua aset di situ.
-Dua entry point berbeda, satu sumber data (ledger) — tidak duplikasi logic.
+## 6. Rekonsiliasi dengan Kerja Codex (`odps`/`odp_ports`, uncommitted)
 
-**Halaman:** `/warehouse/location-assets` (nama route tentatif,
-`warehouse.location-assets.index`), permission baru `warehouse_location_asset.view`
-(bukan menumpang `warehouse.view` — sesuai aturan CLAUDE.md "tiap halaman
-baru punya permission sendiri" kalau beda fungsi, dan ini beda fungsi/akses
-dari Dashboard Gudang biasa).
+Ditemukan 2026-10-09 lewat audit working tree: task lain (`docs/superpowers/plans/2026-10-10-redesign-fop-unified-dashboard.md`
+Task 7, "Kapasitas ODP/ODC port hampir penuh") sudah bikin `odps`/`odp_ports`
++ `App\Http\Controllers\Network\OdpController` + `FopUnifiedDashboardService::getOdpSummary()`
+("Red Zone" alert) + 5 test `OdpNetworkManagementTest` — **uncommitted**,
+ditemukan sebelum semuanya di-commit.
 
-- **Selector berjenjang**: Cabang → Mini POP → (opsional) ODP. Pilih sampai
-  Mini POP saja = lihat semua aset yang `current_pop_id` = Mini POP itu
-  **plus** rollup semua ODP di bawahnya (buat audit cepat "Mini POP C1 lengkap
-  infrastrukturnya apa, termasuk semua ODP-nya"). Pilih sampai ODP spesifik =
-  cuma aset di ODP itu.
-- **Isi tabel**: SN (SERIALIZED, status=DEPLOYED, dari `inventory_serials`) +
-  nama item + tanggal dipasang (`deployed_at`, dari ledger `created_at` baris
-  `deploy` terakhir) + saldo QUANTITY (splitter banyak, kabel sisa, dari
-  **`infrastructure_balances`** §3.5) kalau ada di node itu.
-- **Breadcrumb** di atas tabel: `Cabang Jetis → Mini POP C1 → ODP B` — jawab
-  langsung pertanyaan "ODP B terpasang di Mini POP mana" tanpa klik tambahan.
-- **Link "Riwayat"** per baris SN → lempar ke Lacak Barang (`warehouse.traceability.show`)
-  yang sudah ada, reuse penuh, tidak reimplementasi tampilan riwayat ledger.
-- **Scope POP**: sama trait `AuthorizesWarehousePop` — `pop_admin` cuma lihat
-  node (Mini POP/ODP) di bawah Cabang scope-nya.
+**Tidak dibuang** — direshape jadi instance pertama pohon ini:
+- `odps` → data pindah jadi baris `network_nodes` dengan `node_type_id`
+  = lookup `'odp'`, `root_pop_id` = `odps.pop_id` lama, `parent_id = null`
+  (root, karena `odps` lama tidak punya struktur bertingkat).
+- `odp_ports` → data pindah jadi `network_node_ports` (bentuk kolom identik,
+  cuma ganti FK target).
+- `App\Http\Controllers\Network\OdpController` → generalisasi jadi
+  `NetworkNodeController` (bisa CRUD node apa pun, tree-aware — tombol
+  "Tambah ODP" di UI existing jadi "Tambah Node" dengan `node_type_id`
+  dipilih = `odp` secara default kalau dipanggil dari konteks yang sama).
+- `FopUnifiedDashboardService::getOdpSummary()` — query diupdate baca
+  `network_nodes`/`network_node_ports` filter `node_type.code='odp'`,
+  **perilaku/output tidak berubah** (Red Zone tetap jalan sama).
+- `OdpNetworkManagementTest` — 5 test disesuaikan ke API baru
+  (`network.nodes.*` routes), assertion inti (capacity, red zone, scope
+  POP) dipertahankan.
 
-### 5.1 Master ODP juga dapat breadcrumb
+**Tidak ada data produksi yang hilang** — semuanya uncommitted di working
+tree yang sama, direshape sebelum pernah di-commit/deploy.
 
-Halaman Master ODP (`/master/odp`) list & detail menampilkan kolom/baris
-"Mini POP" + "Cabang" (join `pop_id` naik 2 level) — ini **statis dari
-struktur data**, tidak butuh ledger, beda sumber dari §5 di atas yang
-menjawab "isinya apa", bukan "dia anak siapa".
+## 7. RBAC & Permission
 
-## 6. RBAC & Scope
-
-- Permission baru: `odps.{view,create,update,delete}` (Master ODP, generate
-  dari `features`×`actions`), `warehouse_location_asset.view` (halaman §5).
+- `master_network_node_types.{view,create,update,delete}` — Master Data
+  tipe node (§3.1).
+- `network_nodes.{view,create,update,delete}` — menggantikan `network_odps`
+  yang sudah ada (reshape permission, bukan permission baru independen —
+  satu rename lewat `PermissionGeneratorService` + update seeder).
 - Tidak ada permission baru untuk `deploy`/`retrieve_infra` — reuse
-  `warehouse_issue.create`/`warehouse_reassign.create` sesuai konteks laporan
-  (mengikuti pola reuse permission yang konsisten di seluruh modul Gudang,
-  lihat `docs/warehouse/business-logic.md` §11).
-- Scope Mini POP/ODP **ikut Cabang induknya** — `pop_admin` dengan scope
-  Cabang Jetis otomatis boleh lihat/kelola semua Mini POP + ODP di bawah
-  Jetis, konsisten `EffectiveAccessService::resolvePopTree()` yang sudah ada
-  (ODP tidak masuk pohon RBAC langsung karena bukan baris `pops`, tapi
-  resolusinya didapat cukup lewat `odp.pop_id` → `mini_pop.parent_id` →
-  Cabang, 2 lookup, tidak butuh `resolvePopTree()` diubah).
+  `warehouse_issue.create`/`warehouse_reassign.create` (sama prinsip v1).
+- Scope: `root_pop_id` → `EffectiveAccessService::getAllowedPopIds()`
+  langsung (root_pop_id SELALU Cabang atau Mini POP, dua-duanya sudah
+  masuk hasil `resolvePopTree()` existing) — satu lookup, tidak perlu jalan
+  lewat hierarki `parent_id` buat scope check (`parent_id` cuma buat
+  breadcrumb/struktur tampilan, bukan basis scope).
 
-## 7. Open Items (belum diputuskan, perlu digali lagi sebelum implementasi)
+## 8. Open Items (belum diputuskan)
 
-Status per 2026-10-09 (sesi lanjutan sebelum writing-plans) — 5 item di atas
-**sudah diputuskan**, dipertahankan di sini sebagai jejak keputusan:
+1. **Kapasitas: info doang atau ada guard "penuh, tidak bisa tambah"?**
+   Punya codex (`odp_ports`) SUDAH menegakkan guard (`addPorts()` menolak
+   >128 total) — beda dari keputusan v1 lama ("murni informasional, ikut
+   Distribution"). **Keputusan baru: ikut yang sudah dibangun codex** (ada
+   guard, port ditambah bukan dikurangi) — v1's Open Item #3 dicabut,
+   prinsip Distribution tidak lagi jadi acuan di sini karena kasusnya beda
+   (Distribution = label CID, ODP/node = kapasitas fisik port riil yang
+   SUDAH ada kebutuhan nyata ditegakkan, dibuktikan `OdpNetworkManagementTest`).
+2. **Jalur admin assign aset langsung tanpa laporan teknisi** — tetap
+   DEFERRED (sama v1 §7 lama), di luar scope plan ini.
+3. **Field survey `nearest_odp` (teks bebas)** — tetap DEFERRED, tidak
+   disatukan ke `network_nodes` di plan ini.
+4. **Berapa dalam seed awal rantai dibuat sekaligus?** — plan ini cuma
+   bikin struktur generik + 7 `network_node_types` awal (§3.1). Mengisi
+   data riil tiap cabang (OLT mana, ODC mana, ODP mana — ratusan/ribuan
+   baris) **di luar scope coding plan ini**, itu kerja input data
+   operasional admin pasca-fitur jadi.
 
-1. **RESOLVED — `OwnershipMode` tetap property `Item` statis.** Keputusan
-   user: kalau fisik barang sama (splitter 1x8) tapi dipakai di 2 konteks
-   (ke pelanggan vs ke ODP), admin bikin **2 kode Item master beda**
-   (misal `SPLITTER-1X8-PEL` = `INSTALLABLE`, `SPLITTER-1X8-ODP` =
-   `INFRASTRUCTURE_ASSET`) — bukan ubah axis jadi property transaksi. Tidak
-   ada perubahan struktur `Item`/enum di luar penambahan case §3.2.
-2. **DEFERRED — jalur admin assign langsung tanpa laporan teknisi.** Di luar
-   scope plan ini. Semua `deploy`/`retrieve_infra` lewat laporan O-REQ/INFR-REQ
-   teknisi (§4). Kalau nanti dibutuhkan, itu rancangan/plan terpisah.
-3. **DECIDED — `capacity_port` murni informasional.** Ikut prinsip
-   Distribution (`docs/master/distribution/business-logic.md` §3): dicatat,
-   tidak ada guard "ODP penuh". Kolom tetap ada (nullable) buat catatan
-   admin, tidak ditegakkan Service.
-4. **DEFERRED — field survey `nearest_odp` (teks bebas) tidak disentuh.**
-   Tetap teks bebas, terpisah dari master `odps` baru. Penyatuan (migrasi
-   ke dropdown `Odp`) di luar scope plan ini.
-5. **IN SCOPE — penyesuaian `adjustSerialStatus()`.** Masuk sebagai task
-   di plan: SN `status=DEPLOYED` yang diadjust ke `LOST`/`DAMAGED`/`SCRAPPED`/
-   `QUARANTINE` wajib mengosongkan `current_pop_id`/`current_odp_id` juga
-   (pola sama pengosongan `customer_id` saat SN `INSTALLED` diadjust, Gudang
-   business-logic §7/§12).
+## 9. Riwayat — Kenapa v1 Dibuang (2026-10-12)
 
-## 8. Dokumen Terkait
+v1 (odp sebagai tabel tunggal, wajib anak Mini POP) ditolak user karena:
+1. Rantai nyata (§1) punya banyak level (Core Router, Backbone, Agregasi,
+   OLT, PON Port, ODC, ODP, Kabel) yang v1 sama sekali tidak punya tempat
+   — v1 cuma punya 1 level baru (ODP) di atas yang sudah ada.
+2. "ODP wajib anak Mini POP" ternyata tidak selalu benar secara topologi
+   (ada cabang yang OLT-nya langsung di Cabang tanpa Mini POP perantara) —
+   dan lebih dalam dari itu, pertanyaan yang tepat bukan "ODP anak siapa"
+   tapi "bagaimana pohon ini tetap bisa tumbuh tanpa migration tiap level
+   baru muncul".
+3. Keputusan v1 §7 Open Item #1 (pisah 2 Item master per OwnershipMode)
+   dan §3.5 (tabel `infrastructure_balances` dengan pasangan kolom
+   `pop_id`/`odp_id`) **tetap berlaku** di v2 — itu bukan bagian yang
+   salah, cuma strukturnya disederhanakan jadi 1 kolom lokasi karena v2
+   cuma punya 1 tabel tujuan.
+
+## 10. Dokumen Terkait
 
 - `docs/warehouse/README.md`, `business-logic.md`, `database-schema.md` —
-  konvensi ledger yang diikuti (bukan diubah struktural).
-- `docs/master/pop/business-logic.md` — pola hierarki & scope yang ditiru
-  untuk `odps`.
-- `docs/master/distribution/business-logic.md` — contoh kenapa Distribution
-  sengaja dipisah dari ODP (§2 keputusan di atas).
+  konvensi ledger yang diikuti.
+- `docs/master/pop/business-logic.md` — pola hierarki/scope POP yang
+  ditiru untuk `network_nodes`.
+- `docs/superpowers/plans/2026-10-10-redesign-fop-unified-dashboard.md` —
+  asal kerja `odps`/`odp_ports` yang direkonsiliasi di §6.
 - `docs/fop-task/rancangan-request-pemasangan-dan-material-task.md` — pola
   estimasi vs terpakai yang relevan buat laporan O-REQ/INFR-REQ.
