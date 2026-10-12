@@ -656,17 +656,22 @@ return [
             ActionCode::CANCEL->value,
         ],
 
+        // Master node jaringan ber-port (ODC/ODP/dst), dulu `network_odps`.
+        // Di-rename di baris Feature yang SAMA oleh migration reshape
+        // (2026_10_12_110300), jadi role_permissions lama tetap nempel. Tanpa
+        // DELETE — NetworkNodeController tidak punya destroy().
+        'network_nodes' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+        ],
+
         // Dashboard Analitik FOP (docs/plan/analisa-dashboard-analitik-fop.md)
         // — pola & performa lintas periode (alat kerja, wilayah, beban/solving
         // teknisi, backlog, durasi terlama). Feature SENDIRI, bukan numpang
         // `task.view.all` (dashboard operasional harian `/fop`) — audiens
         // beda (dibuka mingguan/bulanan buat evaluasi, bukan tiap shift) dan
         // harus bisa dimatikan per-role independen. Cuma VIEW, read-only murni.
-        'network_odps' => [
-            ActionCode::VIEW->value,
-            ActionCode::CREATE->value,
-            ActionCode::UPDATE->value,
-        ],
 
         'fop_analytics' => [
             ActionCode::VIEW->value,

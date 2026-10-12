@@ -29,6 +29,23 @@ class NetworkNodeTypeSeeder extends Seeder
             ]
         );
 
+        // Feature `network_nodes` (master node ber-port, dulu `network_odps`).
+        // DB lama: migration reshape 2026_10_12_110300 sudah me-rename baris
+        // `network_odps` jadi kode ini, jadi updateOrCreate cuma menyentuh baris
+        // itu. Instalasi baru tidak pernah punya `network_odps` — di sini
+        // dibuat. Dua jalur, satu hasil akhir: tepat satu baris `network_nodes`.
+        // Wajib sebelum generate() (sekali saja) supaya permission-nya terbentuk.
+        Feature::updateOrCreate(
+            ['code' => 'network_nodes'],
+            [
+                'name' => 'Master Pohon Infrastruktur Jaringan',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 33,
+                'is_active' => true,
+                'parent_id' => null,
+            ]
+        );
+
         app(PermissionGeneratorService::class)->generate();
 
         $types = [

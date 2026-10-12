@@ -54,7 +54,7 @@ use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
-use App\Http\Controllers\Network\OdpController;
+use App\Http\Controllers\Network\NetworkNodeController;
 use App\Http\Controllers\NocDashboardController;
 use App\Http\Controllers\NocWorksheetController;
 use App\Http\Controllers\NotificationController;
@@ -1181,15 +1181,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/fop/pipeline', [FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
     });
 
-    Route::middleware('permission:network_odps.view')->group(function () {
-        Route::get('/network/odps', [OdpController::class, 'index'])->name('network.odps.index');
+    Route::middleware('permission:network_nodes.view')->group(function () {
+        Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
     });
-    Route::middleware('permission:network_odps.create')->group(function () {
-        Route::post('/network/odps', [OdpController::class, 'store'])->name('network.odps.store');
+    Route::middleware('permission:network_nodes.create')->group(function () {
+        Route::post('/network/nodes', [NetworkNodeController::class, 'store'])->name('network.nodes.store');
     });
-    Route::middleware('permission:network_odps.update')->group(function () {
-        Route::post('/network/odps/{odp}/ports', [OdpController::class, 'addPorts'])->name('network.odps.ports.add');
-        Route::put('/network/odp-ports/{port}', [OdpController::class, 'updatePort'])->name('network.odp-ports.update');
+    Route::middleware('permission:network_nodes.update')->group(function () {
+        Route::post('/network/nodes/{node}/ports', [NetworkNodeController::class, 'addPorts'])->name('network.nodes.ports.add');
+        Route::put('/network/node-ports/{port}', [NetworkNodeController::class, 'updatePort'])->name('network.node-ports.update');
     });
 
     // Dashboard Analitik FOP — agregat lintas periode, permission SENDIRI
