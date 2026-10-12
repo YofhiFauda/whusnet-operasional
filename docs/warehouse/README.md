@@ -47,6 +47,7 @@ Gudang **direpresentasikan lewat `pops`** (`type` = `pusat`/`cabang`) — sengaj
 - Traceability per SN: `warehouse.traceability.index`
 - Riwayat ledger: `warehouse.history.index`
 - Laporan bulanan: `warehouse.reports.index`
+- Laporan Barang Terjual ke Pelanggan (modem Beli dari Gudang, 2026-10-09): `warehouse.reports.sold-to-customer` — permission `warehouse_report.sold_to_customer.view`, POP-scoped. Belum ada link di nav; diakses lewat URL langsung.
 - Scan-first: `warehouse.scan.index`
 
 ## Dokumen Terkait
