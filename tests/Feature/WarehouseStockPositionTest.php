@@ -285,6 +285,32 @@ class WarehouseStockPositionTest extends TestCase
     }
 
     #[Test]
+    public function ringkasan_memisahkan_empat_kondisi_serial(): void
+    {
+        $modem = Item::create(['code' => 'WSP-FOUR', 'name' => 'Modem Empat Kondisi', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'serialized']);
+        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WSPF1', 'WSPF2', 'WSPF3', 'WSPF4'], 350000, $this->owner);
+
+        InventorySerial::where('serial_number', 'WSPF2')->update(['condition' => ItemCondition::USED_GOOD->value]);
+        InventorySerial::where('serial_number', 'WSPF3')->update(['condition' => ItemCondition::USED_GOOD->value, 'condition_checked_at' => now()]);
+        InventorySerial::where('serial_number', 'WSPF4')->update(['condition' => ItemCondition::USED_DAMAGED->value]);
+
+        $row = $this->summary(collect([$this->pusat->id]))->firstWhere(fn ($row) => $row['item']->id === $modem->id);
+        $conditions = $row['condition_summary'];
+
+        $this->assertSame(4, $conditions->count());
+        $this->assertSame(1, $conditions->firstWhere('condition', ItemCondition::NEW)['count']);
+        $this->assertSame(1, $conditions->first(fn ($entry) => $entry['condition'] === ItemCondition::USED_GOOD && ! $entry['checked'])['count']);
+        $this->assertSame(1, $conditions->first(fn ($entry) => $entry['condition'] === ItemCondition::USED_GOOD && $entry['checked'])['count']);
+        $this->assertSame(1, $conditions->firstWhere('condition', ItemCondition::USED_DAMAGED)['count']);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan', 'pop_id' => $this->pusat->id]));
+        $response->assertOk()
+            ->assertSee('Bekas — Belum Dicek: 1')
+            ->assertSee('Bekas — Sudah Dicek: 1')
+            ->assertSee('Bekas — Rusak: 1');
+    }
+
+    #[Test]
     public function halaman_ringkasan_tampilkan_kondisi_sn_dan_label_tidak_dilacak_untuk_quantity(): void
     {
         $modem = Item::create(['code' => 'WSP-CONDPAGE', 'name' => 'Modem Kondisi Halaman', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'serialized']);

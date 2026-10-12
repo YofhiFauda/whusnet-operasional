@@ -922,7 +922,7 @@
                             <!-- Section: Material Realita Terpakai -->
                             <div class="p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60 space-y-3">
                                 <label class="block font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">
-                                    Perangkat Pasif / Material Terpakai Realita <span class="text-rose-500">*</span>
+                                    Perangkat Pasif / Material Terpakai Realita (Opsional)
                                 </label>
                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Material yang benar-benar dipakai di lokasi dari custody tim Anda.</p>
                                 <x-estimasi-patokan :rows="$estimasiPasif" title="Estimasi Perangkat Pasif" />
@@ -1306,11 +1306,6 @@
         if (btn) btn.disabled = false;
     }
 
-    function hasMaterialTerpakaiRow() {
-        const qtyInputs = document.querySelectorAll('input[name^="materials["][name$="[qty]"]');
-        return Array.from(qtyInputs).some(input => parseFloat(input.value) > 0);
-    }
-
     function buildFase6IncompleteWarning() {
         const missingParts = [];
 
@@ -1329,9 +1324,9 @@
             missingParts.push('Foto belum lengkap: ' + missingPhotos.join(', '));
         }
 
-        if (! hasMaterialTerpakaiRow()) {
-            missingParts.push('Material Terpakai: belum ada baris dengan jumlah > 0');
-        }
+        // Material Terpakai SENGAJA TIDAK ikut pengecekan ini (koreksi
+        // 2026-10-12, permintaan eksplisit user) — opsional, sama seperti
+        // laporan lain.
 
         return missingParts.length > 0 ? missingParts.join('\n') : null;
     }
@@ -1575,9 +1570,9 @@
         if (stepNumber === 6 && ! pemasanganComplete) {
             const missing = getMissingRequiredFields(5);
 
-            if (missing.length === 0 && ! hasMaterialTerpakaiRow()) {
-                missing.push('Material Terpakai (minimal 1 baris, jumlah > 0)');
-            }
+            // Material Terpakai SENGAJA TIDAK ikut syarat ini (koreksi
+            // 2026-10-12, permintaan eksplisit user) — opsional, sama
+            // seperti laporan lain.
 
             if (missing.length === 0) {
                 attemptActivate();

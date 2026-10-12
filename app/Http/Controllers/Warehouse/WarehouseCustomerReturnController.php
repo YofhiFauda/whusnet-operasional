@@ -21,7 +21,6 @@ use App\Services\FileUploadService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
 use App\Support\LikeSearch;
-use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -101,14 +100,12 @@ class WarehouseCustomerReturnController extends Controller
     {
         $user = auth()->user();
 
-        // Baris SN kosong (baris repeatable yang tak diisi) dibuang sebelum
-        // validasi; nominal dinormalkan di server ("150.000" → 150000).
+        // Baris SN kosong pada form repeatable dibuang sebelum validasi.
         $request->merge([
             'serials' => collect($request->input('serials', []))
                 ->filter(fn ($row) => is_array($row) && trim((string) ($row['serial_number'] ?? '')) !== '')
                 ->values()
                 ->all(),
-            'estimated_value' => RupiahInput::parse($request->input('estimated_value')),
         ]);
 
         $validated = $request->validate([
@@ -121,12 +118,12 @@ class WarehouseCustomerReturnController extends Controller
             'condition_photo' => ['required', 'image', 'max:2048'],
             'accessories' => ['nullable', 'array'],
             'accessories.*' => ['string', Rule::in(array_keys(TaskDeviceRetrieval::ACCESSORY_OPTIONS))],
-            // Opsional: kosong = Rp 0 di Laporan Bulanan. Berlaku per unit.
-            'estimated_value' => ['nullable', 'numeric', 'min:0'],
+            'estimated_value' => ['prohibited'],
             'notes' => ['nullable', 'string', 'max:500'],
         ], [
             'serials.required' => 'Isi minimal satu nomor seri (SN) modem yang diterima.',
             'serials.min' => 'Isi minimal satu nomor seri (SN) modem yang diterima.',
+            'estimated_value.prohibited' => 'Harga modem retur hanya boleh diinput saat konfirmasi Gudang Pusat.',
         ]);
 
         $customer = $this->scopedTerminatedCustomers($access)->find($validated['customer_id']);
@@ -157,7 +154,7 @@ class WarehouseCustomerReturnController extends Controller
                         $customer,
                         $cabang,
                         ItemCondition::from($validated['condition']),
-                        isset($validated['estimated_value']) ? (float) $validated['estimated_value'] : null,
+                        null,
                         $user,
                         $validated['notes'] ?? null,
                         $photoPath,

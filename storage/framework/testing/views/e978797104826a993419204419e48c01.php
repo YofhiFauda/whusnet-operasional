@@ -93,6 +93,30 @@
         </div>
     </div>
 
+    <?php if($task->started_via === 'qr_scan'): ?>
+    <?php
+        $attendanceFlag = $task->attendanceFlag();
+    ?>
+    <section class="rounded-xl border border-border bg-surface p-4 shadow-xs space-y-2">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-text-main font-ui">Lokasi Mulai Kerja</h2>
+        <div class="flex flex-wrap items-center gap-2 text-xs font-ui">
+            <span class="font-semibold text-text-secondary">Metode: <?php echo e($task->started_via); ?></span>
+            <span class="rounded-md border px-2 py-0.5 font-bold <?php echo e($attendanceFlag === 'ok' ? 'border-success-border bg-success-bg text-success' : ($attendanceFlag === 'perlu_review' ? 'border-warning-border bg-warning-bg text-warning' : 'border-error-border bg-error-bg text-error')); ?>">
+                <?php echo e(match ($attendanceFlag) { 'ok' => 'Dalam Radius', 'perlu_review' => 'Perlu Review', 'out_of_radius' => 'Di Luar Radius', default => 'Tanpa Koordinat' }); ?>
+
+            </span>
+            <?php if($task->started_distance_meters !== null): ?>
+                <span class="text-text-secondary"><?php echo e(number_format($task->started_distance_meters, 0, ',', '.')); ?> meter dari pelanggan</span>
+            <?php endif; ?>
+        </div>
+        <?php if($task->started_latitude !== null && $task->started_longitude !== null): ?>
+            <a href="https://www.google.com/maps/search/?api=1&query=<?php echo e($task->started_latitude); ?>,<?php echo e($task->started_longitude); ?>" target="_blank" rel="noopener" class="text-xs font-semibold text-primary hover:underline font-ui">
+                Lihat titik absen di Maps
+            </a>
+        <?php endif; ?>
+    </section>
+    <?php endif; ?>
+
     
     <?php
         $topActualMin = $task->actualDurationMinutes();

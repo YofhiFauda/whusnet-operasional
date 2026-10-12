@@ -140,6 +140,25 @@
                     </span>
                     @endif
                 </button>
+
+                {{-- Sub-permission TERPISAH (warehouse_report.sold_to_customer.view)
+                     dari dua tab di atas (warehouse_report.view) — tombol tab
+                     disembunyikan total kalau gak ada izinnya, bukan cuma
+                     dibikin disabled. --}}
+                @can('warehouse_report.sold_to_customer.view')
+                <button @click="activeTab = 'sold_to_customer'" type="button"
+                        :class="activeTab === 'sold_to_customer' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'"
+                        class="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs transition-all cursor-pointer">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="truncate">Barang Terjual</span>
+                    @if(count($soldToCustomerSales) > 0)
+                    <span class="hidden xs:inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold"
+                          :class="activeTab === 'sold_to_customer' ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'">
+                        {{ count($soldToCustomerSales) }}
+                    </span>
+                    @endif
+                </button>
+                @endcan
             </div>
         </div>
     </div>
@@ -637,6 +656,15 @@
         @endif
 
     </div>
+
+    <!-- =========================================================================
+         TAB 3: BARANG TERJUAL KE PELANGGAN
+         ========================================================================= -->
+    @can('warehouse_report.sold_to_customer.view')
+    <div x-show="activeTab === 'sold_to_customer'" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;" class="space-y-4">
+        @include('warehouse.reports.partials._sold_to_customer_table', ['sales' => $soldToCustomerSales])
+    </div>
+    @endcan
 
 </div>
 

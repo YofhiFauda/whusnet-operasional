@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CReqCategory;
 use App\Enums\FopTaskPriority;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
@@ -315,5 +316,98 @@ class FopTask extends Model
     {
         return $this->usesClientRequestDeadline()
             && $this->client_request_date->isAfter(Carbon::now()->startOfDay());
+    }
+
+    /**
+     * Resolusi jenis pemakaian / pekerjaan untuk badge laporan (PSB, MTN, C-REQ, dll).
+     *
+     * @return array{type: string, detail: ?string, label: string}
+     */
+    public function resolveUsageBadge(?bool $isModemInstall = null): array
+    {
+        $category = $this->category;
+        $categoryValue = $category instanceof TaskType ? $category->value : (string) $category;
+
+        $type = match ($categoryValue) {
+            TaskType::PEMASANGAN->value => 'PSB',
+            TaskType::MAINTENANCE->value => 'MTN',
+            TaskType::CREQ->value => 'C-REQ',
+            TaskType::AMBIL_MODEM->value => 'DEAC',
+            TaskType::SURVEY->value => 'SURVEY',
+            TaskType::INFR->value => 'INFR',
+            TaskType::OREQ->value => 'O-REQ',
+            default => $categoryValue ?: 'PSB',
+        };
+
+        $detail = null;
+
+        if ($categoryValue === TaskType::CREQ->value) {
+            $creqDetail = null;
+            if ($this->relationLoaded('task') && $this->task) {
+                if ($this->task->relationLoaded('creqDetail')) {
+                    $creqDetail = $this->task->creqDetail;
+                } elseif (! $this->task->preventsLazyLoading) {
+                    $creqDetail = $this->task->creqDetail;
+                }
+            } elseif (! $this->relationLoaded('task') && ! $this->preventsLazyLoading) {
+                $creqDetail = $this->task?->creqDetail;
+            }
+
+            if ($creqDetail?->category) {
+                $detail = match ($creqDetail->category) {
+                    CReqCategory::PINDAH_LOKASI => 'Pindah Lokasi',
+                    CReqCategory::PINDAH_KABEL => 'Pindah Kabel',
+                    CReqCategory::TAMBAH_MODEM => $isModemInstall ? 'Ganti Modem' : 'Tambah Modem',
+                    CReqCategory::MIGRASI => 'Migrasi',
+                    CReqCategory::LAINNYA => $creqDetail->category_custom_name ?: 'Lainnya',
+                    default => $creqDetail->category->label(),
+                };
+            } elseif (! empty($this->tugas)) {
+                $tugasLower = strtolower($this->tugas);
+                if (str_contains($tugasLower, 'pindah lokasi')) {
+                    $detail = 'Pindah Lokasi';
+                } elseif (str_contains($tugasLower, 'migrasi')) {
+                    $detail = 'Migrasi';
+                } elseif (str_contains($tugasLower, 'ganti modem')) {
+                    $detail = 'Ganti Modem';
+                } elseif (str_contains($tugasLower, 'pindah kabel')) {
+                    $detail = 'Pindah Kabel';
+                } elseif (str_contains($tugasLower, 'tambah modem')) {
+                    $detail = 'Tambah Modem';
+                }
+            }
+        } elseif ($categoryValue === TaskType::MAINTENANCE->value) {
+            if ($isModemInstall === true) {
+                $detail = 'Ganti Modem';
+            } elseif (! empty($this->tugas) && str_contains(strtolower($this->tugas), 'ganti modem')) {
+                $detail = 'Ganti Modem';
+            }
+        }
+
+        $formattedLabel = $detail ? "{$type} — {$detail}" : $type;
+
+        return [
+            'type' => $type,
+            'detail' => $detail,
+            'label' => $formattedLabel,
+        ];
+    }
+
+    /**
+     * Resolusi aman dari objek nullable FopTask.
+     *
+     * @return array{type: string, detail: ?string, label: string}
+     */
+    public static function resolveUsageBadgeForTask(?self $fopTask, ?bool $isModemInstall = null): array
+    {
+        if ($fopTask === null) {
+            return [
+                'type' => 'PSB',
+                'detail' => null,
+                'label' => 'PSB',
+            ];
+        }
+
+        return $fopTask->resolveUsageBadge($isModemInstall);
     }
 }

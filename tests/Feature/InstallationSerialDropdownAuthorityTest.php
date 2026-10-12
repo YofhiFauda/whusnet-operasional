@@ -315,4 +315,38 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
 
         $response->assertSessionHasErrors('selected_inventory_serial_id');
     }
+
+    /**
+     * Laporan user: modem yang diissue dari Cabang Jetis kepakai buat
+     * pemasangan di Cabang Sandya. SN ini di custody TIM task ini (bukan
+     * teknisi lain seperti test di atas), tapi berasal dari cabang BEDA
+     * dengan cabang task — tetap wajib ditolak.
+     */
+    #[Test]
+    public function sn_dropdown_dari_cabang_lain_ditolak(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabangTask] = $this->setupInProgressInstallation();
+
+        $cabangLain = Pop::create(['code' => 'CABANG-LAIN-SN', 'pop_code' => 'CBL', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'Cabang Lain SN Test', 'type' => 'cabang', 'status' => 'active']);
+
+        $catAktif = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $ont = Item::create([
+            'code' => 'ONT-SN-XBR', 'name' => 'ONT Lintas Cabang Test', 'item_category_id' => $catAktif->id,
+            'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => OwnershipMode::INSTALLABLE->value,
+        ]);
+
+        $admin = User::factory()->create();
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($pusat, $ont, ['ZTE-XBR-001'], 250000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabangLain, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-XBR-001']]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, ['ZTE-XBR-001'], [], $admin);
+        // Issue dari Cabang Lain, bukan dari $cabangTask (cabang task ini).
+        app(InventoryIssueService::class)->issue($cabangLain, $technician, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-XBR-001']]], $admin);
+
+        $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePayload() + [
+            'selected_inventory_serial_id' => $serial->id,
+        ]);
+
+        $response->assertSessionHasErrors('selected_inventory_serial_id');
+    }
 }

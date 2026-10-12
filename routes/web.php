@@ -53,6 +53,7 @@ use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
+use App\Http\Controllers\Network\OdpController;
 use App\Http\Controllers\NocDashboardController;
 use App\Http\Controllers\NocWorksheetController;
 use App\Http\Controllers\NotificationController;
@@ -64,6 +65,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QrAttendanceController;
 use App\Http\Controllers\QrInAppScanController;
 use App\Http\Controllers\QrScanController;
+use App\Http\Controllers\QrScanLogController;
 use App\Http\Controllers\QrTicketController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SalesOmsetDashboardController;
@@ -380,6 +382,12 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:audit_logs.view')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+    });
+
+    // Riwayat Scan QR (docs/plan/qr-code/, feature+permission sudah
+    // ada sejak QrFeatureSeeder — baru dipakai sekarang, ADHOC audit dashboard 2026-10-12).
+    Route::middleware('permission:qr_scan_logs.view')->group(function () {
+        Route::get('/qr-scan-logs', [QrScanLogController::class, 'index'])->name('qr-scan-logs.index');
     });
 
     Route::middleware('permission:payments.create')->group(function () {
@@ -817,12 +825,19 @@ Route::middleware('auth')->group(function () {
         // atau condition=used_damaged, read-only, reuse warehouse.view.
         Route::get('/warehouse/damaged', [WarehouseDamagedStockController::class, 'index'])->name('warehouse.damaged.index');
 
-        // Rekap Pemakaian Material Lapangan (Daily Material Consumption Report)
-        Route::get('/warehouse/usage', [WarehouseUsageController::class, 'index'])->name('warehouse.usage.index');
-        Route::get('/warehouse/usage/export', [WarehouseUsageController::class, 'export'])->name('warehouse.usage.export');
-
         // Riwayat Pengambilan Alat (ADHOC-88) — view-only, reuse warehouse.view.
         Route::get('/warehouse/retrievals', [WarehouseRetrievalHistoryController::class, 'index'])->name('warehouse.retrievals.index');
+    });
+
+    // Rekap Pemakaian Material Lapangan — gerbang TERPISAH dari grup di atas
+    // (OR: warehouse.view|warehouse.usage.view) biar `fop` bisa dikasih akses
+    // CUMA ke halaman ini lewat permission sempit `warehouse.usage.view`,
+    // tanpa ikut kebuka Stok/Scan/History/Damaged/Retrievals yang masih
+    // digerbangi `warehouse.view` penuh di atas. Role lama (atasan/pic_gudang/
+    // admin_gudang/pop_admin) tetap jalan lewat sisi `warehouse.view` OR ini.
+    Route::middleware('permission:warehouse.view|warehouse.usage.view')->group(function () {
+        Route::get('/warehouse/usage', [WarehouseUsageController::class, 'index'])->name('warehouse.usage.index');
+        Route::get('/warehouse/usage/export', [WarehouseUsageController::class, 'export'])->name('warehouse.usage.export');
     });
 
     // Ambang Stok Rendah (2026-09-03) — reuse permission warehouse_adjustment.create,
@@ -1145,10 +1160,22 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/fop/pipeline', [FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
     });
 
+    Route::middleware('permission:network_odps.view')->group(function () {
+        Route::get('/network/odps', [OdpController::class, 'index'])->name('network.odps.index');
+    });
+    Route::middleware('permission:network_odps.create')->group(function () {
+        Route::post('/network/odps', [OdpController::class, 'store'])->name('network.odps.store');
+    });
+    Route::middleware('permission:network_odps.update')->group(function () {
+        Route::post('/network/odps/{odp}/ports', [OdpController::class, 'addPorts'])->name('network.odps.ports.add');
+        Route::put('/network/odp-ports/{port}', [OdpController::class, 'updatePort'])->name('network.odp-ports.update');
+    });
+
     // Dashboard Analitik FOP — agregat lintas periode, permission SENDIRI
     // (bukan task.view.all di atas, itu operasional harian, beda audiens).
     Route::middleware('permission:fop_analytics.view')->group(function () {
         Route::get('/fop/analitik', [FopAnalyticsController::class, 'index'])->name('fop.analytics');
+        Route::get('/fop/analitik/rincian', [FopAnalyticsController::class, 'drilldown'])->name('fop.analytics.drilldown');
     });
 
     // ── Task Management ──────────────────────────────────────────

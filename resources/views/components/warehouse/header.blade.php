@@ -16,6 +16,7 @@
     $canViewCustody = $user->hasPermission('warehouse_custody.view');
     $canViewTraceability = $user->hasPermission('warehouse_traceability.view');
     $canViewReport = $user->hasPermission('warehouse_report.view');
+    $canViewSoldToCustomer = $user->hasPermission('warehouse_report.sold_to_customer.view');
     $canViewStockRequest = $user->hasPermission('warehouse_stock_request.view');
     $canViewTransfer = $user->hasPermission('warehouse_transfer.view');
 
@@ -250,6 +251,14 @@
                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {{ $tabClass('reports') }}">
                 <svg class="w-3.5 h-3.5 {{ $tabIconClass('reports') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M18.7 8l-5.1 5.1-2.8-2.8L7 14"/></svg>
                 <span>Laporan</span>
+            </a>
+            @endif
+            @if($canViewSoldToCustomer)
+            <a href="{{ route('warehouse.reports.sold-to-customer') }}"
+               data-active-tab="{{ $active === 'sold-to-customer' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {{ $tabClass('sold-to-customer') }}">
+                <svg class="w-3.5 h-3.5 {{ $tabIconClass('sold-to-customer') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Laporan Barang Terjual</span>
             </a>
             @endif
 
@@ -506,6 +515,12 @@
                                 <span>Laporan</span>
                             </a>
                             @endif
+                            @if($canViewSoldToCustomer)
+                            <a href="{{ route('warehouse.reports.sold-to-customer') }}" class="{{ $mobDropdownClass('sold-to-customer') }}">
+                                <svg class="w-3.5 h-3.5 {{ $mobDropdownIconClass('sold-to-customer') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span>Barang Terjual</span>
+                            </a>
+                            @endif
                             @if($canViewTraceability)
                             <a href="{{ route('warehouse.traceability.index') }}" class="{{ $mobDropdownClass('traceability') }}">
                                 <svg class="w-3.5 h-3.5 {{ $mobDropdownIconClass('traceability') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -624,6 +639,15 @@
                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap {{ $tabClass('reports') }} transition-all shrink-0 active:scale-95">
                 <svg class="w-3.5 h-3.5 {{ $tabIconClass('reports') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M18.7 8l-5.1 5.1-2.8-2.8L7 14"/></svg>
                 <span>Laporan</span>
+            </a>
+            @endif
+
+            @if($canViewSoldToCustomer)
+            <a href="{{ route('warehouse.reports.sold-to-customer') }}"
+               data-active-tab="{{ $active === 'sold-to-customer' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap {{ $tabClass('sold-to-customer') }} transition-all shrink-0 active:scale-95">
+                <svg class="w-3.5 h-3.5 {{ $tabIconClass('sold-to-customer') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Barang Terjual</span>
             </a>
             @endif
 

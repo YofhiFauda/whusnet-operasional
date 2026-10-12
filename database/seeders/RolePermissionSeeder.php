@@ -77,6 +77,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.view',
                 'dashboard.view',
                 'fop_analytics.view',
+                'network_odps.view',
                 'fop_tasks.view',
                 'invoices.print',
                 'invoices.view',
@@ -89,7 +90,7 @@ class RolePermissionSeeder extends Seeder
                 'packages.view',
                 'payments.view',
                 'pops.view',
-                'qr_scan_logs.view', // Dashboard anomali scan QR (docs/plan/qr-code/)
+                'qr_scan_logs.view', // Riwayat percobaan scan QR (docs/plan/qr-code/)
                 'reports.export',
                 'reports.view',
                 'roles.view',
@@ -429,6 +430,7 @@ class RolePermissionSeeder extends Seeder
                 'pops.update',
                 'pops.view',
                 'qr_scan.view', // Scan QR Internal (2026-08-27)
+                'qr_scan_logs.view', // Riwayat percobaan scan QR untuk pengawasan FOP
                 'task.approve',
                 'task.assign.team',
                 'task.cancel',
@@ -442,6 +444,10 @@ class RolePermissionSeeder extends Seeder
                 'tickets.history.view',
                 'tickets.qr.create',
                 'tickets.view',
+                'network_odps.view',
+                'network_odps.create',
+                'network_odps.update',
+                'warehouse.usage.view', // Rekap Pemakaian Material Lapangan (harian/mingguan/bulanan/custom)
                 'warehouse_custody.view',
                 'warehouse_traceability.view',
             ],

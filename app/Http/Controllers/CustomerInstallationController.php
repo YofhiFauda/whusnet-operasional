@@ -23,6 +23,7 @@ use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TechnicianCustody;
 use App\Models\User;
@@ -221,14 +222,27 @@ class CustomerInstallationController extends Controller
     {
         $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
 
-        return $teamTechnicianIds === []
-            ? collect()
-            : InventorySerial::query()
-                ->whereIn('current_technician_id', $teamTechnicianIds)
-                ->where('status', SerialStatus::ISSUED->value)
-                ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
-                ->with('item')
-                ->get();
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        // Cuma tampilkan SN yang asal cabangnya SAMA dengan cabang task ini
+        // (laporan user: modem Jetis kepakai di Sandya) — teknisi yang pegang
+        // custody dari 2 cabang beda (mis. scope lintas cabang) gak boleh
+        // lihat/pilih SN cabang lain buat task ini. Penegakan SEBENARNYA
+        // tetap di `InventoryService::installSerial()` — filter ini cuma
+        // UX, biar teknisi gak ketolak belakangan pas sudah isi laporan.
+        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
+
+        return InventorySerial::query()
+            ->whereIn('current_technician_id', $teamTechnicianIds)
+            ->where('status', SerialStatus::ISSUED->value)
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item')
+            ->get();
     }
 
     /**
@@ -255,9 +269,17 @@ class CustomerInstallationController extends Controller
             return collect();
         }
 
+        // Sama filter cabang dengan `eligibleSerialsForTeam()` — lot custody
+        // dari cabang lain gak ditampilkan di sini (UX; penegakan sebenarnya
+        // di `InventoryService::consumeFromCustody()`).
+        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
+
         return TechnicianCustody::query()
             ->whereIn('technician_id', $teamTechnicianIds)
             ->active()
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
             ->with('item.category')
             ->get()
             ->filter(fn (TechnicianCustody $custody) => $custody->item
@@ -292,14 +314,24 @@ class CustomerInstallationController extends Controller
     {
         $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
 
-        return $teamTechnicianIds === []
-            ? collect()
-            : InventoryRoll::query()
-                ->whereIn('current_technician_id', $teamTechnicianIds)
-                ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
-                ->where('length_remaining', '>', 0)
-                ->with('item')
-                ->get();
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        // Sama filter cabang dengan `eligibleSerialsForTeam()` — roll dari
+        // cabang lain gak ditampilkan di sini (UX; penegakan sebenarnya di
+        // `InventoryService::consumeFromRoll()`).
+        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
+
+        return InventoryRoll::query()
+            ->whereIn('current_technician_id', $teamTechnicianIds)
+            ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+            ->where('length_remaining', '>', 0)
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item')
+            ->get();
     }
 
     public function report(Customer $customer, Request $request)
@@ -435,17 +467,18 @@ class CustomerInstallationController extends Controller
             ? $installWorkTools
             : $workToolService->surveyRowsForCustomer($customer);
 
-        // Gerbang Laporan Speedtest (ADHOC): panel step 6 cuma kebuka kalau
-        // Laporan Pemasangan & Perangkat sudah lengkap — 3 foto wajib +
-        // minimal satu baris material terpakai. Dihitung dari data
-        // tersimpan, BUKAN dari status installation, supaya tahan reload
-        // & tidak butuh kolom baru buat menandai "tahap pemasangan selesai".
+        // Gerbang Laporan Speedtest (ADHOC, koreksi 2026-10-12): panel step 6
+        // cuma kebuka kalau Laporan Pemasangan & Perangkat sudah lengkap — 3
+        // foto wajib. Material Terpakai/Perangkat Pasif SENGAJA TIDAK ikut
+        // syarat ini lagi (permintaan eksplisit user) — opsional di semua
+        // laporan termasuk Pemasangan, sama seperti Maintenance. Dihitung
+        // dari data tersimpan, BUKAN dari status installation, supaya tahan
+        // reload & tidak butuh kolom baru buat menandai "tahap pemasangan
+        // selesai".
         $pemasanganComplete = $installation
             && $installation->installation_photo
             && $installation->contract_photo
-            && $installation->signature_photo
-            && $installFopTask
-            && $installFopTask->materials()->terpakai()->exists();
+            && $installation->signature_photo;
 
         // Dropdown untuk form koreksi Step 1 (kota) & Step 3 (paket internet).
         $cities = City::orderBy('name')->get(['id', 'name']);
@@ -576,19 +609,10 @@ class CustomerInstallationController extends Controller
                 return redirect()->back()->withInput()->withErrors(['speedtest_photo' => 'Foto hasil speedtest wajib diunggah saat status selesai.']);
             }
 
-            // Pemasangan selesai tanpa satupun material tercatat hampir pasti
-            // laporan yang belum diisi, bukan pemasangan tanpa material.
-            // Dicek di sini (bukan di rules) supaya baris qty 0 / nama kosong
-            // ikut terhitung tidak valid — aturan yang sama dipakai
-            // TaskMaterialService waktu menyimpan.
-            $hasMaterial = collect($validated['materials'] ?? [])->contains(
-                fn ($row) => (float) ($row['qty'] ?? 0) > 0
-                    && (! empty($row['item_id']) || trim((string) ($row['item_name'] ?? '')) !== '')
-            );
-
-            if (! $hasMaterial) {
-                return redirect()->back()->withInput()->withErrors(['materials' => 'Perangkat pasif terpakai wajib diisi minimal satu baris saat status selesai.']);
-            }
+            // Material Terpakai/Perangkat Pasif OPSIONAL (koreksi 2026-10-12,
+            // permintaan eksplisit user) — dulu wajib minimal satu baris saat
+            // status selesai, sekarang disamakan dengan laporan lain
+            // (Maintenance dkk) yang sudah opsional dari awal.
         }
 
         // Calculate speed conformity if package exists
@@ -1379,30 +1403,29 @@ class CustomerInstallationController extends Controller
 
             DB::commit();
 
-            // Pesan sukses beda tergantung apakah foto+material sudah lengkap
-            // (Fase 6 kebuka) atau belum (Aktivasi tersimpan, tapi teknisi masih
-            // harus balik lagi upload foto & catat material). Hitung ulang di
-            // sini (bukan pakai $pemasanganComplete dari report(), request beda)
-            // — logika sama persis, lihat catatan di report().
-            $hasMaterialTerpakai = $installFopTask && $installFopTask->materials()->terpakai()->exists();
+            // Pesan sukses beda tergantung apakah foto sudah lengkap (Fase 6
+            // kebuka) atau belum (Aktivasi tersimpan, tapi teknisi masih
+            // harus balik lagi upload foto). Hitung ulang di sini (bukan
+            // pakai $pemasanganComplete dari report(), request beda) — logika
+            // sama persis, lihat catatan di report(). Material Terpakai
+            // SENGAJA TIDAK ikut syarat ini (koreksi 2026-10-12, permintaan
+            // eksplisit user) — opsional, sama seperti laporan lain.
             $fase6Unlocked = $installation->installation_photo
                 && $installation->contract_photo
-                && $installation->signature_photo
-                && $hasMaterialTerpakai;
+                && $installation->signature_photo;
 
             // Kasus nyata (2026-09-12, laporan Siti Nuryani 2): teknisi menekan
-            // Aktivasi berkali-kali yakin sudah isi foto+material, tapi
-            // hasFile()/materials-nya kosong tiap kali — flash generik "lengkapi
-            // foto & material" gak nunjuk mana yang sebenarnya belum nyangkut,
-            // jadi teknisi gak sadar submit-nya gak membawa apa-apa. Sebutkan
-            // persis yang kosong di sini supaya ketauan dari pesan sukses ini
-            // sendiri, bukan cuma dari status "Fase 6 terkunci" yang generik.
+            // Aktivasi berkali-kali yakin sudah isi foto, tapi hasFile()-nya
+            // kosong tiap kali — flash generik "lengkapi foto" gak nunjuk mana
+            // yang sebenarnya belum nyangkut, jadi teknisi gak sadar submit-nya
+            // gak membawa apa-apa. Sebutkan persis yang kosong di sini supaya
+            // ketauan dari pesan sukses ini sendiri, bukan cuma dari status
+            // "Fase 6 terkunci" yang generik.
             if (! $fase6Unlocked) {
                 $missingParts = array_filter([
                     ! $installation->installation_photo ? 'Foto Pemasangan' : null,
                     ! $installation->contract_photo ? 'Foto Kontrak' : null,
                     ! $installation->signature_photo ? 'Foto TTD Pelanggan' : null,
-                    ! $hasMaterialTerpakai ? 'Material Terpakai (minimal 1 baris, jumlah > 0)' : null,
                 ]);
 
                 $message = 'Data Pemasangan & Perangkat tersimpan, TAPI belum lengkap untuk membuka Laporan Speedtest — belum tersimpan: '
@@ -1466,13 +1489,15 @@ class CustomerInstallationController extends Controller
         $materialService = app(TaskMaterialService::class);
         $installFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN);
 
+        // Material Terpakai/Perangkat Pasif SENGAJA TIDAK ikut syarat gerbang
+        // ini (koreksi 2026-10-12, permintaan eksplisit user) — opsional,
+        // sama seperti laporan lain (Maintenance dkk). Foto tetap wajib.
         abort_unless(
             $installation
                 && $installation->installation_photo
                 && $installation->contract_photo
                 && $installation->signature_photo
-                && $installFopTask
-                && $installFopTask->materials()->terpakai()->exists(),
+                && $installFopTask,
             422,
             'Selesaikan dan simpan Laporan Pemasangan & Perangkat (tekan Aktivasi) terlebih dahulu sebelum mengisi Laporan Speedtest.'
         );

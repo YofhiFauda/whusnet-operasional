@@ -100,6 +100,7 @@ class WarehouseFeatureSeeder extends Seeder
         // `warehouse_report.view` di Role Matrix.
         $subFeatures = [
             ['parent' => 'warehouse_report', 'code' => 'warehouse_report.sold_to_customer', 'name' => 'Laporan Barang Terjual ke Pelanggan', 'sort_order' => 1],
+            ['parent' => 'warehouse', 'code' => 'warehouse.usage', 'name' => 'Rekap Pemakaian Material Lapangan', 'sort_order' => 1],
         ];
 
         foreach ($subFeatures as $sf) {

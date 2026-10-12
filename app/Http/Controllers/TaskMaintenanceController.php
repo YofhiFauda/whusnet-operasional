@@ -53,14 +53,24 @@ class TaskMaintenanceController extends Controller
     {
         $teamTechnicianIds = $task->teamMembers->pluck('user_id')->all();
 
-        return $teamTechnicianIds === []
-            ? collect()
-            : InventorySerial::query()
-                ->whereIn('current_technician_id', $teamTechnicianIds)
-                ->where('status', SerialStatus::ISSUED->value)
-                ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
-                ->with('item')
-                ->get();
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        // Cuma tampilkan SN yang asal cabangnya sama dengan cabang task ini
+        // (laporan user: modem Jetis kepakai di Sandya). Penegakan SEBENARNYA
+        // tetap di `InventoryService::installSerial()` — ini cuma UX.
+        $targetCabangId = Pop::resolveCabangId($task->pop_id);
+
+        return InventorySerial::query()
+            ->whereIn('current_technician_id', $teamTechnicianIds)
+            ->where('status', SerialStatus::ISSUED->value)
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item')
+            ->get();
     }
 
     /**
@@ -81,9 +91,14 @@ class TaskMaintenanceController extends Controller
             return collect();
         }
 
+        $targetCabangId = Pop::resolveCabangId($task->pop_id);
+
         return TechnicianCustody::query()
             ->whereIn('technician_id', $teamTechnicianIds)
             ->active()
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
             ->with('item.category')
             ->get()
             ->filter(fn (TechnicianCustody $custody) => $custody->item
@@ -115,14 +130,21 @@ class TaskMaintenanceController extends Controller
     {
         $teamTechnicianIds = $task->teamMembers->pluck('user_id')->all();
 
-        return $teamTechnicianIds === []
-            ? collect()
-            : InventoryRoll::query()
-                ->whereIn('current_technician_id', $teamTechnicianIds)
-                ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
-                ->where('length_remaining', '>', 0)
-                ->with('item')
-                ->get();
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        $targetCabangId = Pop::resolveCabangId($task->pop_id);
+
+        return InventoryRoll::query()
+            ->whereIn('current_technician_id', $teamTechnicianIds)
+            ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+            ->where('length_remaining', '>', 0)
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item')
+            ->get();
     }
 
     public function report(Task $task)

@@ -56,7 +56,9 @@ class WarehouseScanLookupTest extends TestCase
             ->assertSee('badge-success', false)
             ->assertSee('badge-error', false)
             ->assertSee('badge-info', false)
-            ->assertSee('badge-warning', false);
+            ->assertSee('badge-warning', false)
+            ->assertSee("'badge-info': result.condition_label === 'Bekas — Belum Dicek'", false)
+            ->assertSee("'badge-warning': result.condition_label === 'Bekas — Sudah Dicek'", false);
     }
 
     protected function setUp(): void

@@ -83,7 +83,8 @@ Endpoint lama `customers.installation.store` (`routes/web.php:530` → `store()`
 Artinya ada dua jalur berbeda yang bisa menyimpan data pemasangan: wizard teknisi
 (dua submit) dan modal admin (satu submit). Rancangan ini memilih **hanya wizard
 teknisi** — itu jalur lapangan yang sebenarnya dan satu-satunya yang punya gerbang
-kelengkapan data (3 foto wajib + material terpakai). Modal admin tidak memicu webhook.
+kelengkapan data (3 foto wajib — material terpakai **opsional** sejak 2026-10-12,
+disamakan dengan laporan lain). Modal admin tidak memicu webhook.
 
 Kalau kelak jalur admin juga perlu memicu webhook, ia men-dispatch
 `InstallationActivated` yang sama secara eksplisit — keputusan sadar, bukan efek

@@ -75,6 +75,16 @@
                 </div>
 
                 <div>
+                    <label for="estimated_value" class="block mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">Harga Modem Retur (Rp) — Opsional</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2.5 text-xs font-bold text-slate-400">Rp</span>
+                        <input id="estimated_value" type="text" inputmode="decimal" data-rupiah name="estimated_value" value="{{ old('estimated_value') }}" placeholder="0"
+                               class="w-full text-xs font-semibold pl-9 pr-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 font-mono">
+                    </div>
+                    <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Harga per unit ditentukan Gudang Pusat. Kosong = Rp 0 di laporan.</p>
+                </div>
+
+                <div>
                     <label class="block mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">Catatan Penerimaan Pusat (Opsional)</label>
                     <textarea name="notes" rows="3" maxlength="500" class="w-full text-xs px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200"></textarea>
                 </div>

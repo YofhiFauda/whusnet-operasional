@@ -42,7 +42,7 @@ class WarehouseReturnDispatchController extends Controller
             ->whereNotNull('current_pop_id')
             ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('current_pop_id', $access->getAllowedPopIds($user)))
             ->when($popFilter, fn ($q) => $q->where('current_pop_id', $popFilter))
-            ->with(['item', 'currentPop', 'latestRetrievalLog'])
+            ->with(['item', 'currentPop', 'latestRetrievalLog.task.creqDetail'])
             ->orderByDesc('updated_at')
             ->get();
 

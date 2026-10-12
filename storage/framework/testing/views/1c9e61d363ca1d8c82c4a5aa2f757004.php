@@ -176,6 +176,26 @@
 
             </span>
             <span class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">Redaman: <?php echo e($customer->customerTechnicalDetail->fiber_signal ?? ($customer->customerDevice->signal_power ?? '-')); ?></span>
+            <?php if (isset($component)) { $__componentOriginaldaa46128741911989d4bffe5bf5b15e9 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldaa46128741911989d4bffe5bf5b15e9 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.warehouse.acquisition-badge','data' => ['device' => $customer->customerDevice,'class' => 'mt-1.5 self-start']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('warehouse.acquisition-badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['device' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($customer->customerDevice),'class' => 'mt-1.5 self-start']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldaa46128741911989d4bffe5bf5b15e9)): ?>
+<?php $attributes = $__attributesOriginaldaa46128741911989d4bffe5bf5b15e9; ?>
+<?php unset($__attributesOriginaldaa46128741911989d4bffe5bf5b15e9); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldaa46128741911989d4bffe5bf5b15e9)): ?>
+<?php $component = $__componentOriginaldaa46128741911989d4bffe5bf5b15e9; ?>
+<?php unset($__componentOriginaldaa46128741911989d4bffe5bf5b15e9); ?>
+<?php endif; ?>
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>

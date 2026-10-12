@@ -12,6 +12,7 @@ use App\Models\Pop;
 use App\Models\Ticket;
 use App\Models\TicketHistory;
 use App\Models\User;
+use App\Services\NocAnalyticsService;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -33,6 +34,10 @@ use Illuminate\Support\Facades\Cache;
  */
 class NocDashboardController extends Controller
 {
+    public function __construct(
+        private readonly NocAnalyticsService $analyticsService
+    ) {}
+
     public function index(Request $request)
     {
         $user = auth()->user();
@@ -344,8 +349,28 @@ class NocDashboardController extends Controller
 
         $userPops = Pop::forUser(auth()->user())->get(['id', 'name', 'code']);
 
+        // Data Live Command Center & Deep Analytics dari NocAnalyticsService
+        // Cache 60 detik per user+filter (hanya skalar array aman)
+        $telemetryCacheKey = sprintf(
+            'dashboard:noc:telemetry:%d:%s:%s',
+            auth()->id(),
+            $datePreset,
+            $selectedPopId ?? ''
+        );
+
+        [$liveTelemetry, $deepAnalytics] = Cache::remember(
+            $telemetryCacheKey,
+            60,
+            fn () => [
+                $this->analyticsService->getLiveCommandCenterData($baseQuery, $selectedPopId),
+                $this->analyticsService->getDeepAnalyticsData($filteredQuery, $baseQuery, $userPops),
+            ]
+        );
+
         return view('noc.dashboard', [
             'stats' => $stats,
+            'liveTelemetry' => $liveTelemetry,
+            'deepAnalytics' => $deepAnalytics,
             'monthlyComplaintTrend' => $monthlyComplaintTrend,
             'perPopAnalytics' => $perPopAnalytics,
             'deltaStats' => $deltaStats,

@@ -5,14 +5,18 @@ namespace App\Http\Controllers;
 use App\Enums\CashDepositStatus;
 use App\Enums\DepositStatus;
 use App\Enums\PaymentStatus;
+use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TicketBucket;
+use App\Enums\TransferStatus;
 use App\Models\CashDeposit;
 use App\Models\CollectorDeposit;
 use App\Models\Customer;
 use App\Models\CustomerStatusLog;
 use App\Models\InventoryBalance;
+use App\Models\InventorySerial;
+use App\Models\InventoryTransfer;
 use App\Models\Invoice;
 use App\Models\PackageCategory;
 use App\Models\Payment;
@@ -125,6 +129,7 @@ class DashboardController extends Controller
                 $invoiceQuery,
                 $periodStartDate,
                 $periodEndDate,
+                $periodTo,
                 $popId,
                 $canViewCash,
                 $canViewTickets,
@@ -137,7 +142,7 @@ class DashboardController extends Controller
                     ->where('payment_status', PaymentStatus::VALID->value)
                     ->sum('amount');
 
-                return [
+                $baseStats = [
                     'total_customers' => (clone $customerQuery)->count(),
                     'active_customers' => (clone $customerQuery)->where('status', 'active')->count(),
                     'incomplete_customers' => (clone $customerQuery)
@@ -178,9 +183,25 @@ class DashboardController extends Controller
                         'low_stock_count' => $warehousePopIds->isNotEmpty()
                             ? InventoryBalance::query()->whereIn('pop_id', $warehousePopIds)->lowStock()->count()
                             : 0,
+                        'warehouse_asset_overview' => $this->warehouseAssetOverview($warehousePopIds),
                     ] : []),
                     ...($canViewFopDelivery ? $this->fopDeliveryStats($popId, $periodStartDate, $periodEndDate) : []),
+
+                    'financial_trend' => $this->monthlyFinancialTrend($popId, $periodTo),
+                    'payment_channels' => $this->paymentChannels($popId, $periodStartDate, $periodEndDate),
+                    'aging_receivables' => $this->agingReceivables($popId),
+                    'customer_completeness' => $this->customerCompletenessDistribution($popId),
                 ];
+
+                $baseStats['operational_pulse'] = $this->operationalPulse(
+                    $baseStats,
+                    $canViewCash,
+                    $canViewTickets,
+                    $canViewFopDelivery,
+                    $canViewWarehouse
+                );
+
+                return $baseStats;
             }
         );
 
@@ -190,6 +211,11 @@ class DashboardController extends Controller
             ->groupBy('pop_id')
             ->orderByDesc('total')
             ->get();
+
+        $customersByPopChartData = [
+            'labels' => $customersByPop->map(fn ($r) => $r->pop?->name ?? 'Tanpa Cabang')->values()->toArray(),
+            'data' => $customersByPop->map(fn ($r) => (int) $r->total)->values()->toArray(),
+        ];
 
         $dueInvoices = (clone $invoiceQuery)
             ->with(['customer', 'pop'])
@@ -265,6 +291,7 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'stats',
             'customersByPop',
+            'customersByPopChartData',
             'dueInvoices',
             'incompleteCustomers',
             'pendingCashDeposits',
@@ -570,12 +597,24 @@ class DashboardController extends Controller
             })
             ->count();
 
+        $resolvedCount = $ticketQuery()->inBucket(TicketBucket::SELESAI)->count();
+        $resolvedBreachCount = $ticketQuery()
+            ->inBucket(TicketBucket::SELESAI)
+            ->whereNotNull('sla_deadline_at')
+            ->whereNotNull('resolved_at')
+            ->whereColumn('resolved_at', '>', 'sla_deadline_at')
+            ->count();
+        $slaComplianceRate = $resolvedCount > 0
+            ? round((($resolvedCount - $resolvedBreachCount) / $resolvedCount) * 100, 1)
+            : 100.0;
+
         return [
             'ticket_bucket_masuk' => $ticketQuery()->inBucket(TicketBucket::MASUK)->count(),
             'ticket_bucket_diproses' => $ticketQuery()->inBucket(TicketBucket::DIPROSES)->count(),
-            'ticket_bucket_selesai' => $ticketQuery()->inBucket(TicketBucket::SELESAI)->count(),
+            'ticket_bucket_selesai' => $resolvedCount,
             'ticket_bucket_dibatalkan' => $ticketQuery()->inBucket(TicketBucket::DIBATALKAN)->count(),
             'ticket_sla_breach_count' => $breachCount,
+            'ticket_sla_compliance_rate' => $slaComplianceRate,
         ];
     }
 
@@ -711,5 +750,306 @@ class DashboardController extends Controller
         }
 
         return $period;
+    }
+
+    /**
+     * Tren Keuangan 6 Bulan Terakhir (Invoice vs Pembayaran Valid).
+     *
+     * @return array{
+     *     labels: array<int, string>,
+     *     invoices: array<int, float>,
+     *     payments: array<int, float>
+     * }
+     */
+    private function monthlyFinancialTrend(string|int|null $popId, string $periodTo): array
+    {
+        $baseCarbon = Carbon::createFromFormat('Y-m', $periodTo)->startOfMonth();
+        $months = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $months[] = (clone $baseCarbon)->subMonthsNoOverflow($i)->format('Y-m');
+        }
+
+        $minPeriod = $months[0];
+        $maxPeriod = $months[count($months) - 1];
+        $minDate = Carbon::createFromFormat('Y-m', $minPeriod)->startOfMonth()->toDateString();
+        $maxDate = Carbon::createFromFormat('Y-m', $maxPeriod)->endOfMonth()->toDateString();
+
+        $invoicesByMonth = (clone $this->scopedInvoiceQuery($popId))
+            ->whereBetween('billing_period', [$minPeriod, $maxPeriod])
+            ->selectRaw('billing_period, sum(total_amount) as total')
+            ->groupBy('billing_period')
+            ->pluck('total', 'billing_period');
+
+        $payments = (clone $this->scopedPaymentQuery($popId))
+            ->where('payment_status', PaymentStatus::VALID->value)
+            ->whereBetween('payment_date', [$minDate, $maxDate])
+            ->get(['payment_date', 'amount']);
+
+        $paymentsByMonth = $payments->groupBy(function ($p) {
+            return is_string($p->payment_date)
+                ? substr($p->payment_date, 0, 7)
+                : $p->payment_date?->format('Y-m');
+        })->map(fn ($group) => (float) $group->sum('amount'));
+
+        $labels = [];
+        $invoiceSeries = [];
+        $paymentSeries = [];
+
+        foreach ($months as $m) {
+            $labels[] = Carbon::createFromFormat('Y-m', $m)->translatedFormat('M Y');
+            $invoiceSeries[] = (float) ($invoicesByMonth->get($m) ?? 0);
+            $paymentSeries[] = (float) ($paymentsByMonth->get($m) ?? 0);
+        }
+
+        return [
+            'labels' => $labels,
+            'invoices' => $invoiceSeries,
+            'payments' => $paymentSeries,
+        ];
+    }
+
+    /**
+     * Distribusi Kanal Pembayaran periode filter.
+     *
+     * @return array<string, array{amount: float, count: int, label: string}>
+     */
+    private function paymentChannels(string|int|null $popId, Carbon $startDate, Carbon $endDate): array
+    {
+        $rows = (clone $this->scopedPaymentQuery($popId))
+            ->where('payment_status', PaymentStatus::VALID->value)
+            ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->selectRaw('payment_method, sum(amount) as total_amount, count(*) as total_count')
+            ->groupBy('payment_method')
+            ->get();
+
+        $channels = [
+            'transfer' => ['amount' => 0.0, 'count' => 0, 'label' => 'Transfer Bank'],
+            'cash' => ['amount' => 0.0, 'count' => 0, 'label' => 'Kasir Kantor'],
+            'kolektor' => ['amount' => 0.0, 'count' => 0, 'label' => 'Kolektor Lapangan'],
+            'saldo' => ['amount' => 0.0, 'count' => 0, 'label' => 'Saldo Pelanggan'],
+            'lainnya' => ['amount' => 0.0, 'count' => 0, 'label' => 'Lainnya'],
+        ];
+
+        foreach ($rows as $row) {
+            $method = $row->payment_method ?? 'lainnya';
+            if (! isset($channels[$method])) {
+                $method = 'lainnya';
+            }
+            $channels[$method]['amount'] += (float) $row->total_amount;
+            $channels[$method]['count'] += (int) $row->total_count;
+        }
+
+        return $channels;
+    }
+
+    /**
+     * Aging Piutang (Tagihan sebelum bulan berjalan yang belum lunas).
+     *
+     * @return array{
+     *     lancar: array{amount: float, count: int},
+     *     days_1_30: array{amount: float, count: int},
+     *     days_31_60: array{amount: float, count: int},
+     *     days_over_60: array{amount: float, count: int}
+     * }
+     */
+    private function agingReceivables(string|int|null $popId): array
+    {
+        $invoices = (clone $this->scopedInvoiceQuery($popId))
+            ->piutang()
+            ->get(['due_date', 'remaining_amount']);
+
+        $now = now()->startOfDay();
+        $brackets = [
+            'lancar' => ['amount' => 0.0, 'count' => 0],
+            'days_1_30' => ['amount' => 0.0, 'count' => 0],
+            'days_31_60' => ['amount' => 0.0, 'count' => 0],
+            'days_over_60' => ['amount' => 0.0, 'count' => 0],
+        ];
+
+        foreach ($invoices as $inv) {
+            $rem = (float) $inv->remaining_amount;
+            if (! $inv->due_date || $inv->due_date->greaterThanOrEqualTo($now)) {
+                $brackets['lancar']['amount'] += $rem;
+                $brackets['lancar']['count']++;
+            } else {
+                $daysOverdue = (int) $inv->due_date->diffInDays($now);
+                if ($daysOverdue <= 30) {
+                    $brackets['days_1_30']['amount'] += $rem;
+                    $brackets['days_1_30']['count']++;
+                } elseif ($daysOverdue <= 60) {
+                    $brackets['days_31_60']['amount'] += $rem;
+                    $brackets['days_31_60']['count']++;
+                } else {
+                    $brackets['days_over_60']['amount'] += $rem;
+                    $brackets['days_over_60']['count']++;
+                }
+            }
+        }
+
+        return $brackets;
+    }
+
+    /**
+     * Distribusi Status Kelengkapan Data Pelanggan.
+     *
+     * @return array{draft: int, perlu_dilengkapi: int, lengkap: int, siap_billing: int}
+     */
+    private function customerCompletenessDistribution(string|int|null $popId): array
+    {
+        $counts = (clone $this->scopedCustomerQuery($popId))
+            ->selectRaw('data_completeness_status, count(*) as count')
+            ->groupBy('data_completeness_status')
+            ->pluck('count', 'data_completeness_status');
+
+        return [
+            'draft' => (int) ($counts->get('draft') ?? 0),
+            'perlu_dilengkapi' => (int) ($counts->get('perlu_dilengkapi') ?? 0),
+            'lengkap' => (int) ($counts->get('lengkap') ?? 0),
+            'siap_billing' => (int) ($counts->get('siap_billing') ?? 0),
+        ];
+    }
+
+    /**
+     * Ringkasan Aset Gudang (In-Transit, Custody Teknisi, Retur Rusak).
+     *
+     * @param  Collection<int, int>  $warehousePopIds
+     * @return array{
+     *     in_transit_count: int,
+     *     custody_count: int,
+     *     damaged_returned_count: int
+     * }
+     */
+    private function warehouseAssetOverview(Collection $warehousePopIds): array
+    {
+        if ($warehousePopIds->isEmpty()) {
+            return [
+                'in_transit_count' => 0,
+                'custody_count' => 0,
+                'damaged_returned_count' => 0,
+            ];
+        }
+
+        $inTransitCount = InventoryTransfer::query()
+            ->whereIn('from_pop_id', $warehousePopIds)
+            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->count();
+
+        $custodyCount = InventorySerial::query()
+            ->whereIn('current_pop_id', $warehousePopIds)
+            ->whereIn('status', [SerialStatus::ISSUED->value, SerialStatus::IN_USE->value])
+            ->count();
+
+        $damagedReturnedCount = InventorySerial::query()
+            ->whereIn('current_pop_id', $warehousePopIds)
+            ->whereIn('status', [
+                SerialStatus::DAMAGED->value,
+                SerialStatus::RETURNED->value,
+                SerialStatus::QUARANTINE->value,
+                SerialStatus::SCRAPPED->value,
+            ])
+            ->count();
+
+        return [
+            'in_transit_count' => $inTransitCount,
+            'custody_count' => $custodyCount,
+            'damaged_returned_count' => $damagedReturnedCount,
+        ];
+    }
+
+    /**
+     * Menghitung status kesehatan operasional (Normal / Warning / Danger) per pilar.
+     *
+     * @param  array<string, mixed>  $stats
+     * @return array{
+     *     finance: array{status: string, label: string},
+     *     network: array{status: string, label: string},
+     *     field: array{status: string, label: string},
+     *     warehouse: array{status: string, label: string},
+     *     overall: array{status: string, label: string}
+     * }
+     */
+    private function operationalPulse(
+        array $stats,
+        bool $canViewCash,
+        bool $canViewTickets,
+        bool $canViewFopDelivery,
+        bool $canViewWarehouse
+    ): array {
+        // Finance pulse
+        $financeStatus = 'good';
+        $financeLabel = 'Sehat';
+        if ($canViewCash) {
+            $shortfall = $stats['collector_shortfall_count'] ?? 0;
+            $diffs = $stats['cash_deposit_open_difference_count'] ?? 0;
+            if ($shortfall > 0 || $diffs > 0) {
+                $financeStatus = 'danger';
+                $financeLabel = ($shortfall + $diffs).' Masalah Kas';
+            } elseif (($stats['collection_rate'] ?? 100) !== null && ($stats['collection_rate'] ?? 100) < 70) {
+                $financeStatus = 'warning';
+                $financeLabel = 'Collection <70%';
+            }
+        }
+
+        // Network pulse
+        $networkStatus = 'good';
+        $networkLabel = 'Normal';
+        if ($canViewTickets) {
+            $breaches = $stats['ticket_sla_breach_count'] ?? 0;
+            $activeTickets = ($stats['ticket_bucket_masuk'] ?? 0) + ($stats['ticket_bucket_diproses'] ?? 0);
+            if ($breaches > 0) {
+                $networkStatus = 'danger';
+                $networkLabel = $breaches.' Breach SLA';
+            } elseif ($activeTickets > 10) {
+                $networkStatus = 'warning';
+                $networkLabel = $activeTickets.' Tiket Aktif';
+            }
+        }
+
+        // Field pulse
+        $fieldStatus = 'good';
+        $fieldLabel = 'Lancar';
+        if ($canViewFopDelivery) {
+            $overduePsb = $stats['fop_overdue_psb_count'] ?? 0;
+            $overdueSurvey = $stats['fop_overdue_survey_count'] ?? 0;
+            $totalOverdue = $overduePsb + $overdueSurvey;
+            if ($totalOverdue > 3) {
+                $fieldStatus = 'danger';
+                $fieldLabel = $totalOverdue.' Overdue Antrean';
+            } elseif ($totalOverdue > 0) {
+                $fieldStatus = 'warning';
+                $fieldLabel = $totalOverdue.' Perlu Perhatian';
+            }
+        }
+
+        // Warehouse pulse
+        $warehouseStatus = 'good';
+        $warehouseLabel = 'Aman';
+        if ($canViewWarehouse) {
+            $lowStock = $stats['low_stock_count'] ?? 0;
+            if ($lowStock > 5) {
+                $warehouseStatus = 'danger';
+                $warehouseLabel = $lowStock.' Item Kritis';
+            } elseif ($lowStock > 0) {
+                $warehouseStatus = 'warning';
+                $warehouseLabel = $lowStock.' Stok Menipis';
+            }
+        }
+
+        $allStatuses = [$financeStatus, $networkStatus, $fieldStatus, $warehouseStatus];
+        if (in_array('danger', $allStatuses, true)) {
+            $overall = ['status' => 'danger', 'label' => 'Perhatian Kritis'];
+        } elseif (in_array('warning', $allStatuses, true)) {
+            $overall = ['status' => 'warning', 'label' => 'Waspada'];
+        } else {
+            $overall = ['status' => 'good', 'label' => 'Sistem Prima'];
+        }
+
+        return [
+            'finance' => ['status' => $financeStatus, 'label' => $financeLabel],
+            'network' => ['status' => $networkStatus, 'label' => $networkLabel],
+            'field' => ['status' => $fieldStatus, 'label' => $fieldLabel],
+            'warehouse' => ['status' => $warehouseStatus, 'label' => $warehouseLabel],
+            'overall' => $overall,
+        ];
     }
 }

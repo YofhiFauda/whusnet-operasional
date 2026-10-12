@@ -23,31 +23,6 @@
     {{-- Header terpadu (Design System Naked Header) --}}
     <x-warehouse.header active="dashboard" title="Dashboard & Riwayat Gudang" subtitle="Pusat kendali stok fisik, arus barang harian, custody teknisi, dan buku besar logistik ISP." />
 
-    {{-- Scope Selector POP (Naked context filter) --}}
-    <form action="{{ route('warehouse.index') }}" method="GET" id="scopeForm" class="flex justify-end -mt-2">
-        <div class="relative">
-            <select name="pop_id"
-                    id="scopeSelect"
-                    onchange="document.getElementById('scopeForm').submit()"
-                    aria-label="Filter cakupan gudang"
-                    class="appearance-none bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg pl-3.5 pr-8 py-2 text-xs font-semibold shadow-2xs hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 cursor-pointer transition-colors">
-                <option value="" {{ empty($selectedPopId) ? 'selected' : '' }}>
-                    Semua POP (Nasional)
-                </option>
-                @foreach($pops as $pop)
-                <option value="{{ $pop->id }}" {{ (string) $selectedPopId === (string) $pop->id ? 'selected' : '' }}>
-                    [{{ $pop->type === 'pusat' ? 'Pusat' : 'Cabang' }}] {{ $pop->name }}
-                </option>
-                @endforeach
-            </select>
-            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 dark:text-slate-500">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
-            </div>
-        </div>
-    </form>
-
     {{-- ═══════════════════════════════════════════════════════
          ZONA 0 : PERLU TINDAKAN (analisa-ui-ux §B4/U7)
          Hierarki dulu: apa yang HARUS dikerjakan sekarang, di atas,

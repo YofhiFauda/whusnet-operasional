@@ -16,7 +16,6 @@ use App\Services\EffectiveAccessService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
 use App\Support\LikeSearch;
-use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -62,6 +61,7 @@ class WarehouseReturnReceiveController extends Controller
                 'customer',
                 'issuedFromPop',
                 'latestRetrievalLog.task.deviceRetrieval',
+                'latestRetrievalLog.task.creqDetail',
                 'latestRetrievalLog.retrievedBy',
             ])
             ->orderByDesc('updated_at')
@@ -95,13 +95,14 @@ class WarehouseReturnReceiveController extends Controller
             'issuedFromPop',
             'latestRetrievalLog.task.deviceRetrieval',
             'latestRetrievalLog.task.completedBy',
+            'latestRetrievalLog.task.creqDetail',
             'latestRetrievalLog.retrievedBy',
         ]);
 
         $retrievalLog = $serial->latestRetrievalLog ?? DeviceRetrievalLog::query()
             ->where('serial_id', $serial->id)
             ->latest('retrieved_at')
-            ->with(['task.deviceRetrieval', 'task.completedBy', 'retrievedBy', 'customer'])
+            ->with(['task.deviceRetrieval', 'task.completedBy', 'task.creqDetail', 'retrievedBy', 'customer'])
             ->first();
 
         $taskDeviceRetrieval = $retrievalLog?->task?->deviceRetrieval;
@@ -124,16 +125,13 @@ class WarehouseReturnReceiveController extends Controller
         $user = auth()->user();
         $this->assertPopIdInScope($serial->issued_from_pop_id, $user, $access);
 
-        // Nominal diketik dengan titik ribuan ("150.000") — dinormalkan di
-        // server, bukan cuma masking JS (lihat App\Support\RupiahInput).
-        $request->merge(['estimated_value' => RupiahInput::parse($request->input('estimated_value'))]);
-
         $validated = $request->validate([
             'condition' => ['required', Rule::in([ItemCondition::USED_GOOD->value, ItemCondition::USED_DAMAGED->value])],
             'item_id' => ['nullable', 'integer', 'exists:items,id'],
-            // Opsional: modem legacy tidak punya harga beli. Kosong = Rp 0 di laporan.
-            'estimated_value' => ['nullable', 'numeric', 'min:0'],
+            'estimated_value' => ['prohibited'],
             'notes' => ['nullable', 'string', 'max:500'],
+        ], [
+            'estimated_value.prohibited' => 'Harga modem retur hanya boleh diinput saat konfirmasi Gudang Pusat.',
         ]);
 
         try {
@@ -143,7 +141,7 @@ class WarehouseReturnReceiveController extends Controller
                 ! empty($validated['item_id']) ? Item::findOrFail($validated['item_id']) : null,
                 $user,
                 $validated['notes'] ?? null,
-                isset($validated['estimated_value']) ? (float) $validated['estimated_value'] : null,
+                null,
             );
         } catch (InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());

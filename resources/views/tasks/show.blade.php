@@ -93,6 +93,29 @@
         </div>
     </div>
 
+    @if($task->started_via === 'qr_scan')
+    @php
+        $attendanceFlag = $task->attendanceFlag();
+    @endphp
+    <section class="rounded-xl border border-border bg-surface p-4 shadow-xs space-y-2">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-text-main font-ui">Lokasi Mulai Kerja</h2>
+        <div class="flex flex-wrap items-center gap-2 text-xs font-ui">
+            <span class="font-semibold text-text-secondary">Metode: {{ $task->started_via }}</span>
+            <span class="rounded-md border px-2 py-0.5 font-bold {{ $attendanceFlag === 'ok' ? 'border-success-border bg-success-bg text-success' : ($attendanceFlag === 'perlu_review' ? 'border-warning-border bg-warning-bg text-warning' : 'border-error-border bg-error-bg text-error') }}">
+                {{ match ($attendanceFlag) { 'ok' => 'Dalam Radius', 'perlu_review' => 'Perlu Review', 'out_of_radius' => 'Di Luar Radius', default => 'Tanpa Koordinat' } }}
+            </span>
+            @if($task->started_distance_meters !== null)
+                <span class="text-text-secondary">{{ number_format($task->started_distance_meters, 0, ',', '.') }} meter dari pelanggan</span>
+            @endif
+        </div>
+        @if($task->started_latitude !== null && $task->started_longitude !== null)
+            <a href="https://www.google.com/maps/search/?api=1&query={{ $task->started_latitude }},{{ $task->started_longitude }}" target="_blank" rel="noopener" class="text-xs font-semibold text-primary hover:underline font-ui">
+                Lihat titik absen di Maps
+            </a>
+        @endif
+    </section>
+    @endif
+
     {{-- ══ Primary Detail Panel (Single Unified Card Budget: 1) ═══════════════ --}}
     @php
         $topActualMin = $task->actualDurationMinutes();

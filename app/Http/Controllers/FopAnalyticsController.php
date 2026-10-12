@@ -6,6 +6,7 @@ use App\Enums\InventoryTransactionType;
 use App\Enums\MaterialKind;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Models\FopTask;
 use App\Models\InventoryTransaction;
 use App\Models\Pop;
 use App\Models\Task;
@@ -91,6 +92,8 @@ class FopAnalyticsController extends Controller
         $modemRanking = $this->buildModemUsageRanking($user, $popFilter, $periodStart, $periodEnd);
         $modemInstalasiTotal = collect($modemRanking)->sum('instalasi');
         $modemMaintenanceTotal = collect($modemRanking)->sum('maintenance');
+        $modemCreqTotal = collect($modemRanking)->sum('creq');
+        $modemOtherTotal = collect($modemRanking)->sum('other');
         $materialTrendChart = $this->buildTrendChartRows($materialTrend, $materialRanking, 'item_name');
         $toolTypesUsed = count($toolRanking);
         $toolTypesActive = WorkTool::where('is_active', true)->count();
@@ -129,11 +132,14 @@ class FopAnalyticsController extends Controller
             'periodFrom' => $periodStart->format('Y-m-d'),
             'periodTo' => $periodEnd->format('Y-m-d'),
             'materialRanking' => $materialRanking,
+            'toolRanking' => $toolRanking,
             'toolTotal' => $toolTotal,
             'materialTrendChart' => $materialTrendChart,
             'modemRanking' => $modemRanking,
             'modemInstalasiTotal' => $modemInstalasiTotal,
             'modemMaintenanceTotal' => $modemMaintenanceTotal,
+            'modemCreqTotal' => $modemCreqTotal,
+            'modemOtherTotal' => $modemOtherTotal,
             'toolTypesUsed' => $toolTypesUsed,
             'toolTypesActive' => $toolTypesActive,
             'regionInstallation' => $regionInstallation['rows'],
@@ -153,6 +159,81 @@ class FopAnalyticsController extends Controller
             'durationRanking' => $durationRanking['rows'],
             'durationAverage' => $durationRanking['average'],
             'periodComparison' => $periodComparison,
+        ]);
+    }
+
+    public function drilldown(Request $request): View
+    {
+        $filters = $request->validate([
+            'kind' => ['required', 'in:tool,material,region_installation,region_maintenance,region_cancelled,workload,solving'],
+            'value' => ['required', 'string', 'max:150'],
+            'from' => ['required', 'date_format:Y-m-d'],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'pop_id' => ['nullable', 'integer'],
+        ]);
+
+        $user = auth()->user();
+        $start = Carbon::parse($filters['from'])->startOfDay();
+        $end = Carbon::parse($filters['to'])->endOfDay();
+        $popFilter = isset($filters['pop_id']) ? (int) $filters['pop_id'] : null;
+        $kind = $filters['kind'];
+        $value = $filters['value'];
+
+        if (in_array($kind, ['tool', 'material'], true)) {
+            $fopTasks = FopTask::query()
+                ->with('pop')
+                ->applyUserScope($user)
+                ->when($popFilter, fn ($query) => $query->where('pop_id', $popFilter))
+                ->whereHas($kind === 'tool' ? 'workTools' : 'materials', function ($query) use ($kind, $value, $start, $end): void {
+                    $query->where($kind === 'tool' ? 'tool_name' : 'item_name', $value)
+                        ->whereBetween('created_at', [$start, $end]);
+
+                    if ($kind === 'material') {
+                        $query->where('kind', MaterialKind::TERPAKAI->value);
+                    }
+                })
+                ->orderByDesc('task_date')
+                ->paginate(25)
+                ->withQueryString();
+
+            return view('fop.analytics-drilldown', [
+                'title' => ($kind === 'tool' ? 'Alat Kerja: ' : 'Material: ').$value,
+                'tasks' => null,
+                'fopTasks' => $fopTasks,
+                'backUrl' => route('fop.analytics', $request->only('from', 'to', 'pop_id')),
+            ]);
+        }
+
+        $tasks = Task::query()
+            ->applyUserScope($user)
+            ->with(['fopTask', 'pop'])
+            ->when($popFilter, fn ($query) => $query->where('tasks.pop_id', $popFilter));
+
+        if (str_starts_with($kind, 'region_')) {
+            $tasks->whereHas('customer', fn ($query) => $query->where('district_id', (int) $value))
+                ->whereBetween('tasks.scheduled_at', [$start, $end]);
+
+            if ($kind === 'region_installation') {
+                $tasks->where('task_type', TaskType::PEMASANGAN->value)->where('status', TaskStatus::SELESAI->value);
+            } elseif ($kind === 'region_maintenance') {
+                $tasks->where('task_type', TaskType::MAINTENANCE->value);
+            } else {
+                $tasks->where('status', TaskStatus::DIBATALKAN->value);
+            }
+        } elseif ($kind === 'workload') {
+            $tasks->whereHas('teamMembers', fn ($query) => $query->where('user_id', (int) $value))
+                ->whereBetween('tasks.scheduled_at', [$start, $end]);
+        } else {
+            $tasks->where('completed_by', (int) $value)
+                ->where('status', TaskStatus::SELESAI->value)
+                ->whereBetween('tasks.completed_at', [$start, $end]);
+        }
+
+        return view('fop.analytics-drilldown', [
+            'title' => 'Rincian '.str_replace('_', ' ', $kind),
+            'tasks' => $tasks->orderByDesc('tasks.id')->paginate(25)->withQueryString(),
+            'fopTasks' => null,
+            'backUrl' => route('fop.analytics', $request->only('from', 'to', 'pop_id')),
         ]);
     }
 
@@ -258,11 +339,9 @@ class FopAnalyticsController extends Controller
      * Section 1c — Ranking barang GUDANG terpakai (bukan alat kerja —
      * `task_materials` kind=TERPAKAI, hasil `InventoryService::consumeFromCustody()`/
      * `installSerial()`, ADHOC-54). GROUP BY `item_name` (snapshot string,
-     * pola sama `buildToolUsageRanking()`) dan SUM `qty` — beda dari alat
-     * kerja yang cukup COUNT baris, barang gudang punya satuan (meter,
-     * pcs) yang jumlahnya sendiri lebih berarti daripada jumlah baris catat.
+     * pola sama `buildToolUsageRanking()`) dan SUM `qty`.
      *
-     * @return array<int, array{item_name: string, total: float}>
+     * @return array<int, array{item_name: string, unit: string, total: float}>
      */
     private function buildMaterialUsageRanking(User $user, ?int $popFilter, Carbon $start, Carbon $end): array
     {
@@ -271,11 +350,11 @@ class FopAnalyticsController extends Controller
             ->tap(fn ($q) => $this->scopeFopTaskJoin($q, $user, $popFilter))
             ->where('task_materials.kind', MaterialKind::TERPAKAI->value)
             ->whereBetween('task_materials.created_at', [$start, $end])
-            ->selectRaw('task_materials.item_name as item_name, SUM(task_materials.qty) as total')
+            ->selectRaw('task_materials.item_name as item_name, MAX(task_materials.unit) as unit, SUM(task_materials.qty) as total')
             ->groupBy('task_materials.item_name')
             ->orderByDesc('total')
             ->get()
-            ->map(fn ($row) => ['item_name' => $row->item_name, 'total' => (float) $row->total])
+            ->map(fn ($row) => ['item_name' => $row->item_name, 'unit' => (string) ($row->unit ?? ''), 'total' => (float) $row->total])
             ->all();
     }
 
@@ -320,8 +399,8 @@ class FopAnalyticsController extends Controller
     }
 
     /**
-     * Section 1e — Modem/ONT TERPASANG ke pelanggan, dipecah Instalasi vs
-     * Maintenance (ADHOC, 2026-09-12, permintaan eksplisit user).
+     * Section 1e — Modem/ONT TERPASANG ke pelanggan, dipisah menurut
+     * Instalasi, Maintenance, C-REQ, dan kategori lainnya (ADHOC, 2026-09-12, permintaan eksplisit user).
      *
      * BEDA JALUR dari `buildMaterialUsageRanking()` — modem itemnya
      * `tracking_type=SERIALIZED` (per-unit, py SN pabrik), jadi gak pernah
@@ -332,20 +411,12 @@ class FopAnalyticsController extends Controller
      * INSTALL. Makanya modem HARUS diquery terpisah dari ranking barang
      * gudang biasa, bukan sekadar filter kategori di query yang sama.
      *
-     * "Instalasi" vs "Maintenance" dibaca dari `fop_tasks.category` pada
-     * task yang memicu INSTALL itu (TaskType::PEMASANGAN/MAINTENANCE) —
+     * Kelompok pemasangan dibaca dari `fop_tasks.category` pada
+     * task yang memicu INSTALL itu (PSB, MTN, C-REQ, atau lainnya) —
      * BUKAN kolom terpisah di ledger, karena `inventory_transactions`
      * gak punya kolom "alasan pasang".
      *
-     * PENTING (temuan investigasi 2026-09-12): `installSerial()` SAAT INI
-     * cuma dipanggil dari `CustomerInstallationController::storeSpeedtest()`
-     * (jalur Instalasi/PSB). `TaskMaintenanceController` BELUM py jalur
-     * ganti modem yang menulis SN — jadi kolom "maintenance" di sini akan
-     * SELALU 0 sampai fitur ganti-modem-saat-maintenance dibangun (di luar
-     * scope Dashboard Analitik, JANGAN dibangun di sini). Ini bukan bug
-     * query, itu memang belum ada datanya di sistem.
-     *
-     * @return array<int, array{item_name: string, instalasi: int, maintenance: int}>
+     * @return array<int, array{item_name: string, instalasi: int, maintenance: int, creq: int, other: int}>
      */
     private function buildModemUsageRanking(User $user, ?int $popFilter, Carbon $start, Carbon $end): array
     {
@@ -364,13 +435,18 @@ class FopAnalyticsController extends Controller
         $grouped = [];
 
         foreach ($rows as $row) {
-            $grouped[$row->item_name] ??= ['item_name' => $row->item_name, 'instalasi' => 0, 'maintenance' => 0];
-            $bucket = $row->category === TaskType::MAINTENANCE->value ? 'maintenance' : 'instalasi';
+            $grouped[$row->item_name] ??= ['item_name' => $row->item_name, 'instalasi' => 0, 'maintenance' => 0, 'creq' => 0, 'other' => 0];
+            $bucket = match ($row->category) {
+                TaskType::PEMASANGAN->value => 'instalasi',
+                TaskType::MAINTENANCE->value => 'maintenance',
+                TaskType::CREQ->value => 'creq',
+                default => 'other',
+            };
             $grouped[$row->item_name][$bucket] += (int) $row->total;
         }
 
         return collect($grouped)
-            ->sortByDesc(fn (array $r) => $r['instalasi'] + $r['maintenance'])
+            ->sortByDesc(fn (array $r) => $r['instalasi'] + $r['maintenance'] + $r['creq'] + $r['other'])
             ->values()
             ->all();
     }
@@ -405,11 +481,11 @@ class FopAnalyticsController extends Controller
             ->when($type, fn ($q) => $q->where('tasks.task_type', $type->value))
             ->when($status, fn ($q) => $q->where('tasks.status', $status->value))
             ->whereBetween('tasks.scheduled_at', [$start, $end])
-            ->selectRaw('districts.name as district_name, COUNT(*) as total')
+            ->selectRaw('districts.id as district_id, districts.name as district_name, COUNT(*) as total')
             ->groupBy('districts.id', 'districts.name')
             ->orderByDesc('total')
             ->get()
-            ->map(fn ($row) => ['district_name' => $row->district_name, 'total' => (int) $row->total]);
+            ->map(fn ($row) => ['district_id' => (int) $row->district_id, 'district_name' => $row->district_name, 'total' => (int) $row->total]);
 
         return ['rows' => $all->take(20)->values()->all(), 'total' => $all->count()];
     }
@@ -500,7 +576,7 @@ class FopAnalyticsController extends Controller
         // lazy-load relasi itu, dan `Model::preventLazyLoading()` aktif
         // non-production (meledak `LazyLoadingViolationException`).
         return Task::query()
-            ->with('customer')
+            ->with(['customer', 'fopTask'])
             ->applyUserScope($user)
             ->when($popFilter, fn ($q) => $q->where('tasks.pop_id', $popFilter))
             ->whereIn('status', self::BACKLOG_STATUSES)
@@ -510,6 +586,7 @@ class FopAnalyticsController extends Controller
             ->through(fn (Task $t) => [
                 'id' => $t->id,
                 'task_number' => $t->task_number,
+                'fop_task_id' => $t->fopTask?->id,
                 'customer_name' => $t->customer?->full_name ?? '—',
                 'task_type_label' => $t->task_type->label(),
                 'umur_jam' => (int) $t->created_at->diffInHours(now()),
@@ -559,7 +636,7 @@ class FopAnalyticsController extends Controller
      */
     private function buildLongestDurationRanking(User $user, ?int $popFilter, Carbon $start, Carbon $end): array
     {
-        $tasks = Task::with('completedBy')
+        $tasks = Task::with(['completedBy', 'fopTask'])
             ->applyUserScope($user)
             ->when($popFilter, fn ($q) => $q->where('tasks.pop_id', $popFilter))
             ->where('status', TaskStatus::SELESAI->value)
@@ -568,7 +645,9 @@ class FopAnalyticsController extends Controller
             ->whereBetween('completed_at', [$start, $end])
             ->get()
             ->map(fn (Task $t) => [
+                'id' => $t->id,
                 'task_number' => $t->task_number,
+                'fop_task_id' => $t->fopTask?->id,
                 'durasi_menit' => $t->actualDurationMinutes(),
                 'teknisi' => $t->completedBy?->name,
                 'task_type' => $t->task_type->label(),

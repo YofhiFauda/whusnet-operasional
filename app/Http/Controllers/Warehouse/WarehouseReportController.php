@@ -43,13 +43,7 @@ class WarehouseReportController extends Controller
     {
         $user = auth()->user();
 
-        $pops = Pop::query()
-            ->warehouse()
-            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
-            ->orderBy('type')
-            ->orderBy('name')
-            ->get();
-
+        $pops = $this->accessibleWarehousePops($access, $user);
         $popIds = $pops->pluck('id');
 
         $period = $request->query('period') ?: now()->format('Y-m');
@@ -61,6 +55,16 @@ class WarehouseReportController extends Controller
         $movementRows = $this->buildMovementSummary($popIds, $popFilter, $periodStart, $periodEnd, $stockAsOf);
         $adjustmentRows = $this->buildAdjustmentSummary($popIds, $popFilter, $periodStart, $periodEnd);
         $movementCounts = $this->buildMovementCounts($popIds, $popFilter, $periodStart, $periodEnd);
+
+        // Tab "Barang Terjual" (sub-permission TERPISAH dari warehouse_report.view,
+        // lihat routes/web.php) — data cuma dihitung kalau user benar-benar
+        // punya izinnya, bukan cuma disembunyikan di view. Ikut filter
+        // periode/POP yang sama dengan tab Mutasi/Kerugian (keputusan user
+        // 2026-10-12), bukan "semua waktu" seperti halaman standalone lama.
+        $soldToCustomerSales = collect();
+        if ($user->hasPermission('warehouse_report.sold_to_customer.view')) {
+            $soldToCustomerSales = $this->buildSoldToCustomerSales($popIds, $popFilter, $periodStart, $periodEnd);
+        }
 
         // Total Nilai Kerugian (ADHOC-79) — cuma RUSAK+HILANG yang dihitung
         // (keputusan eksplisit user 2026-09-17), reason lain (quarantine/
@@ -97,7 +101,7 @@ class WarehouseReportController extends Controller
             ->all();
 
         return view('warehouse.reports.index', compact(
-            'pops', 'period', 'popFilter', 'movementRows', 'adjustmentRows', 'movementCounts', 'kpi', 'lossChartData'
+            'pops', 'period', 'popFilter', 'movementRows', 'adjustmentRows', 'movementCounts', 'kpi', 'lossChartData', 'soldToCustomerSales'
         ));
     }
 
@@ -108,32 +112,66 @@ class WarehouseReportController extends Controller
      * recordSerialSale()` (Task 1-6), laporan ini CUMA menyusun ulang buat
      * tampilan, BUKAN sumber kebenaran baru.
      *
+     * Halaman standalone ini dan tab "Barang Terjual" di `index()` berbagi
+     * `buildSoldToCustomerSales()` yang sama (2026-10-12) — filter
+     * periode/POP konsisten di dua tempat, bukan dua sumber kebenaran.
+     *
      * POP scope: SATU-SATUNYA cara data sale beda cabang bisa dibedakan di
      * sini cuma lewat `customer->pop_id` (sale itu sendiri gak punya kolom
      * pop_id) — pelanggan yang beli-nya menentukan cabang mana baris ini
-     * "milik". Pola scoping sama persis `index()` di atas: `hasAllPopAccess()`
-     * lolos tanpa filter, selain itu `whereIn('customer.pop_id', $allowedPopIds)`.
-     * Array kosong dari `getAllowedPopIds()` CUMA valid kalau `hasAllPopAccess()`
-     * juga true (ALL_POP) — kalau bukan, user itu scope SELECTED_POP tanpa
-     * target sama sekali, query HARUS tetap kosong (jangan diartikan "semua").
+     * "milik". `accessibleWarehousePops()` sudah menegakkan deny-by-default
+     * (array kosong = filter `whereIn('pop_id', [])` = kosong, bukan "semua"),
+     * jadi tidak perlu ditafsirkan ulang di sini.
      */
     public function soldToCustomer(Request $request, EffectiveAccessService $access): View
     {
         $user = auth()->user();
-        $hasAllPopAccess = $access->hasAllPopAccess($user);
-        $allowedPopIds = $access->getAllowedPopIds($user);
 
-        $sales = InventorySerialSale::query()
+        $pops = $this->accessibleWarehousePops($access, $user);
+        $popIds = $pops->pluck('id');
+
+        $period = $request->query('period') ?: now()->format('Y-m');
+        $popFilter = $request->integer('pop_id') ?: null;
+
+        $periodStart = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+        $periodEnd = $periodStart->copy()->endOfMonth();
+
+        $sales = $this->buildSoldToCustomerSales($popIds, $popFilter, $periodStart, $periodEnd);
+
+        return view('warehouse.reports.sold-to-customer', compact('sales', 'pops', 'period', 'popFilter'));
+    }
+
+    /**
+     * POP yang statusnya Gudang (`Pop::WAREHOUSE_TYPES`) DAN terjangkau user
+     * — satu fungsi dipakai `index()` dan `soldToCustomer()` biar dua laporan
+     * ini selalu sepakat soal "cabang mana yang keliatan", bukan dihitung
+     * ulang dengan logic yang bisa menyimpang pelan-pelan.
+     */
+    private function accessibleWarehousePops(EffectiveAccessService $access, $user): Collection
+    {
+        return Pop::query()
+            ->warehouse()
+            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Baris `InventorySerialSale` terpotong POP (lewat `customer.pop_id`,
+     * sale sendiri gak punya kolom pop_id) dan periode — pola `$scopedPops`
+     * yang sama dengan `buildMovementSummary()`/`buildAdjustmentSummary()`.
+     */
+    private function buildSoldToCustomerSales(Collection $popIds, ?int $popFilter, Carbon $periodStart, Carbon $periodEnd): Collection
+    {
+        $scopedPops = $popFilter ? collect([$popFilter])->intersect($popIds) : $popIds;
+
+        return InventorySerialSale::query()
             ->with(['inventorySerial.item', 'customer.pop', 'fopTask', 'createdBy'])
-            ->whereHas('customer', function ($q) use ($hasAllPopAccess, $allowedPopIds) {
-                if (! $hasAllPopAccess) {
-                    $q->whereIn('pop_id', $allowedPopIds);
-                }
-            })
+            ->whereHas('customer', fn ($q) => $q->whereIn('pop_id', $scopedPops))
+            ->whereBetween('created_at', [$periodStart, $periodEnd])
             ->latest('id')
             ->get();
-
-        return view('warehouse.reports.sold-to-customer', compact('sales'));
     }
 
     /**

@@ -35,7 +35,7 @@ class WarehouseStockPositionService
 {
     /**
      * @param  Collection<int, int>  $popIds  POP dalam scope aktor.
-     * @return Collection<int, array{item: Item, total: float, per_pop: Collection<int, array{pop_id: int, qty: float, lots: array<int, array{lot_no: string, qty: float}>}>, held: float, problem: float, in_transit: float, holders: Collection<int, array{user_id: int, name: string, qty: float}>, last_activity: array{type: string, by: string, at: Carbon|null, ref: string|null}|null, condition_summary: Collection<int, array{condition: ItemCondition, count: int}>|null}>
+     * @return Collection<int, array{item: Item, total: float, per_pop: Collection<int, array{pop_id: int, qty: float, lots: array<int, array{lot_no: string, qty: float}>}>, held: float, problem: float, in_transit: float, holders: Collection<int, array{user_id: int, name: string, qty: float}>, last_activity: array{type: string, by: string, at: Carbon|null, ref: string|null}|null, condition_summary: Collection<int, array{condition: ItemCondition, checked: bool, count: int}>|null}>
      */
     public function summarize(
         Collection $popIds,
@@ -122,7 +122,7 @@ class WarehouseStockPositionService
      * dijumlah di `availableByPopAndItem()`, supaya totalnya konsisten.
      *
      * @param  Collection<int, int>  $popIds
-     * @return Collection<int, Collection<int, array{condition: ItemCondition, count: int}>>
+     * @return Collection<int, Collection<int, array{condition: ItemCondition, checked: bool, count: int}>>
      */
     private function conditionByItem(Collection $popIds): Collection
     {
@@ -130,13 +130,16 @@ class WarehouseStockPositionService
             ->whereIn('current_pop_id', $popIds)
             ->where('status', SerialStatus::AVAILABLE->value)
             ->select('item_id', 'condition')
+            ->selectRaw("CASE WHEN condition = 'used_good' AND condition_checked_at IS NOT NULL THEN 1 ELSE 0 END as checked")
             ->selectRaw('COUNT(*) as count')
             ->groupBy('item_id', 'condition')
+            ->groupByRaw("CASE WHEN condition = 'used_good' AND condition_checked_at IS NOT NULL THEN 1 ELSE 0 END")
             ->get();
 
         return $rows->groupBy('item_id')->map(function ($perItem) {
             return $perItem->map(fn ($row) => [
                 'condition' => $row->condition,
+                'checked' => (bool) $row->checked,
                 'count' => (int) $row->count,
             ])->values();
         });

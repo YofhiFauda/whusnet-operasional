@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CReqCategory;
 use App\Enums\DeviceRetrievalOutcome;
+use App\Enums\DeviceRetrievalSource;
 use App\Enums\InventoryTransactionType;
 use App\Enums\ItemCondition;
 use App\Enums\ScopeType;
@@ -11,6 +13,7 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
+use App\Models\DeviceRetrievalLog;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -19,6 +22,7 @@ use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
+use App\Models\TaskCreqDetail;
 use App\Models\TaskDeviceRetrieval;
 use App\Models\TaskTeam;
 use App\Models\User;
@@ -476,5 +480,108 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
             ->assertSee('Modem ditarik kondisi utuh dari ruang tamu.')
             ->assertSee('Foto Bukti Fisik Lapangan')
             ->assertSee('Terima ke Gudang');
+    }
+
+    #[Test]
+    public function halaman_retur_gudang_bisa_dibuka_untuk_modem_hasil_creq_swap_tanpa_lazy_loading_violation(): void
+    {
+        // Buat 2 Task C-REQ & 2 Serial agar count($items) > 1 (Laravel hanya menyetel preventsLazyLoading saat count > 1)
+        $creqTask1 = Task::create([
+            'task_number' => 'TASK-CREQ-1001',
+            'task_type' => TaskType::CREQ->value,
+            'title' => 'C-REQ 1 '.$this->customer->id,
+            'pop_id' => $this->cabang->id,
+            'customer_id' => $this->customer->id,
+            'status' => TaskStatus::SELESAI->value,
+            'created_by' => $this->owner->id,
+            'updated_by' => $this->owner->id,
+        ]);
+        TaskCreqDetail::create([
+            'task_id' => $creqTask1->id,
+            'category' => CReqCategory::TAMBAH_MODEM,
+        ]);
+
+        $serial1 = InventorySerial::create([
+            'serial_number' => 'CREQ-SWAP-001',
+            'item_id' => $this->modem->id,
+            'status' => SerialStatus::RETURNED,
+            'issued_from_pop_id' => $this->cabang->id,
+            'current_pop_id' => $this->cabang->id,
+            'current_technician_id' => $this->teknisi->id,
+            'condition' => ItemCondition::USED_GOOD,
+        ]);
+
+        DeviceRetrievalLog::create([
+            'customer_id' => $this->customer->id,
+            'serial_id' => $serial1->id,
+            'serial_number' => $serial1->serial_number,
+            'item_id' => $this->modem->id,
+            'source' => DeviceRetrievalSource::CREQ_SWAP,
+            'task_id' => $creqTask1->id,
+            'retrieved_by' => $this->teknisi->id,
+            'warehouse_pop_id' => $this->cabang->id,
+            'condition' => ItemCondition::USED_GOOD,
+            'retrieved_at' => now(),
+        ]);
+
+        $creqTask2 = Task::create([
+            'task_number' => 'TASK-CREQ-1002',
+            'task_type' => TaskType::CREQ->value,
+            'title' => 'C-REQ 2 '.$this->customer->id,
+            'pop_id' => $this->cabang->id,
+            'customer_id' => $this->customer->id,
+            'status' => TaskStatus::SELESAI->value,
+            'created_by' => $this->owner->id,
+            'updated_by' => $this->owner->id,
+        ]);
+        TaskCreqDetail::create([
+            'task_id' => $creqTask2->id,
+            'category' => CReqCategory::MIGRASI,
+        ]);
+
+        $serial2 = InventorySerial::create([
+            'serial_number' => 'CREQ-SWAP-002',
+            'item_id' => $this->modem->id,
+            'status' => SerialStatus::RETURNED,
+            'issued_from_pop_id' => $this->cabang->id,
+            'current_pop_id' => $this->cabang->id,
+            'current_technician_id' => $this->teknisi->id,
+            'condition' => ItemCondition::USED_GOOD,
+        ]);
+
+        DeviceRetrievalLog::create([
+            'customer_id' => $this->customer->id,
+            'serial_id' => $serial2->id,
+            'serial_number' => $serial2->serial_number,
+            'item_id' => $this->modem->id,
+            'source' => DeviceRetrievalSource::CREQ_SWAP,
+            'task_id' => $creqTask2->id,
+            'retrieved_by' => $this->teknisi->id,
+            'warehouse_pop_id' => $this->cabang->id,
+            'condition' => ItemCondition::USED_GOOD,
+            'retrieved_at' => now(),
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('warehouse.returns.index'))
+            ->assertOk()
+            ->assertSee('CREQ-SWAP-001')
+            ->assertSee('Bekas Ganti Modem')
+            ->assertSee('CREQ-SWAP-002')
+            ->assertSee('Bekas Migrasi');
+
+        // Uji degradasi anggun: jika creqDetail belum di-eager-load dan preventsLazyLoading aktif,
+        // originLabel() tidak boleh melempar LazyLoadingViolationException dan mengembalikan default label.
+        $fetchedSerial = InventorySerial::where('serial_number', 'CREQ-SWAP-001')
+            ->with('latestRetrievalLog.task')
+            ->first();
+        $fetchedSerial->latestRetrievalLog->task->preventsLazyLoading = true;
+        $this->assertEquals('Bekas Ganti Modem (C-REQ)', $fetchedSerial->latestRetrievalLog->originLabel());
+
+        $this->actingAs($this->owner)
+            ->get(route('warehouse.returns.receive.create', $serial1))
+            ->assertOk()
+            ->assertSee('CREQ-SWAP-001')
+            ->assertSee('Bekas Ganti Modem');
     }
 }

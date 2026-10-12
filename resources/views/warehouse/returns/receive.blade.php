@@ -261,15 +261,7 @@
                     <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Pilih jika tipe modem aktual di tangan berbeda dari pencatatan lama.</p>
                 </div>
 
-                <div>
-                    <label class="block mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">Nilai Taksiran Perangkat (Rp) — Opsional</label>
-                    <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-xs font-bold text-slate-400">Rp</span>
-                        <input type="text" inputmode="decimal" data-rupiah name="estimated_value" value="{{ old('estimated_value') }}" placeholder="0"
-                               class="w-full text-xs font-semibold pl-9 pr-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-mono">
-                    </div>
-                    <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Bisa dikosongkan (otomatis dihitung Rp 0 di Laporan Nilai Inventori).</p>
-                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Harga modem retur ditentukan oleh Gudang Pusat saat konfirmasi penerimaan.</p>
 
                 <div>
                     <label class="block mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">Catatan Penerimaan Gudang (Opsional)</label>

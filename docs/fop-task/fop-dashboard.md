@@ -1,6 +1,8 @@
 # FOP Dashboard (`/fop`)
 
-Landing page FOP: ringkasan operasional harian — stat card, Team FOP Aktif, antrean survey, list teknisi.
+Landing page FOP: **Operational Command Center** 1 halaman — rancangan & audit lengkap di [docs/plan/fop/rancangan-fop-unified-dashboard.md](../plan/fop/rancangan-fop-unified-dashboard.md) (§5 berisi tabel audit "temuan → status implementasi" per 2026-10-12). Dokumen ini fokus ke mekanisme teknis; untuk daftar lengkap zona visual & keputusan desain, baca rancangan itu dulu.
+
+Data terpadu lintas modul (pipeline pelanggan, tiket, task/tim FOP, teknisi, gudang, ODP) disusun oleh `App\Services\FopUnifiedDashboardService` — **bukan** cuma `FopDashboardController` seperti versi dokumen lama ini sebelumnya (lihat §"Struktur halaman" di bawah).
 
 ## Route
 
@@ -47,21 +49,24 @@ Data yang disiapkan (POP-scoped via `EffectiveAccessService` — user tanpa akse
 
 ## View: `resources/views/fop/dashboard.blade.php`
 
-### Struktur halaman
+### Struktur halaman (redesign 2026-10-10/12 — Command Center)
 
-1. **Header** — judul + tanggal hari ini.
-2. **Stat cards** (grid 2/4 kolom) — Antrean Survey, Perlu Aksi FOP, Sedang Berjalan, Selesai Hari Ini. Badge merah "X Terlambat" muncul kalau `overdue_survey`/`overdue_installation` > 0.
-3. **Team FOP Aktif** — grid card per `FopTaskTeam` aktif:
-   - Header: nama team + `work_date`
-   - Body: list tiket (`tugas` + badge status warna — sejak unifikasi 2026-07-20, `TaskStatus` kalau ada Task terhubung, atau `FopTask.status` sendiri kalau standalone/draft, lihat `database-schema.md`)
-   - Footer: avatar inisial anggota (max 4 + counter) + total tiket
-   - Klik card → `openTeamDetail(team.id)` (Alpine) buka detail panel
-   - Link "Kelola Team →" ke `/fop-tasks`
-4. Antrean survey list + tabel teknisi (di bawah, tidak ditampilkan penuh di sini — lihat file blade langsung).
+Dual Mode Switcher di header (`⚡ Operasional Harian` ↔ `📊 Rekapitulasi & Analitik`, link ke `/fop/analitik`, gerbang `@can('fop_analytics.view')`) — lihat [dashboard analitik FOP](#dashboard-analitik-fop-fopanalitik) di bawah.
+
+1. **Zona 1 — Emergency Ticker** (`fop.partials._emergency_ticker`) — alert tiket priority urgent/emergency + overdue survey, dari `FopUnifiedDashboardService::getEmergencyAlerts()`.
+2. **Zona 2 — Hero Metrics** (`fop.partials._hero_metrics`, 6 kartu) — Antrean Survey, Perlu Aksi FOP, Task Selesai Hari Ini, Tiket Gangguan, **SLA Compliance**, Armada Teknisi. `FopUnifiedDashboardService::getHeroMetrics()`.
+   - **SLA Compliance %** (diperbaiki 2026-10-12 — dulu rasio buatan campur 3 antrean beda makna) — sekarang breach rate sungguhan: `Ticket::isSlaBreached()` atas tiket terbuka + `Task::isOverSla()` atas task hari ini, satu populasi gabungan. Lihat §5 rancangan.
+   - **Armada Teknisi Utilization%** (diperbaiki 2026-10-12 — dulu `(aktif+terjadwal)/total` menggelembungkan angka) — sekarang murni `aktif/total`.
+3. **Zona 3 — Customer Delivery Pipeline** (`fop.partials._pipeline_funnel`) — 7-step funnel (Registrasi → Aktif), `getCustomerPipelineSummary()`.
+4. **Zona 4 — Two-Column Command Grid**:
+   - **Kolom kiri (tactical board, tab switcher)**: Team FOP Aktif (drag & drop antar tim, lihat §"Team FOP Aktif" lama di bawah — mekanismenya sama), Antrean Survey, Tiket Gangguan & C-REQ (`fop.partials._tickets_telemetry`, link ke riwayat FopTask kalau tiket sudah eskalasi).
+   - **Kolom kanan (telemetry)**: Radar Teknisi (`fop.partials._technician_radar` — bar beban kerja relatif ke teknisi tersibuk, badge alat kerja dari `FopTask->workTools`, banner "beban tidak merata" kalau ada yang >4 task sementara yang lain standby), Inventory Telemetry (`fop.partials._inventory_telemetry` — Keluar/Terpakai/Sisa, widget Stok Kritis ONT/Modem, watchlist modem retur transit, **link ke Rekap Pemakaian Material** `/warehouse/usage` gerbang `warehouse.usage.view`), **Rincian Pemakaian Hari Ini** (`fop.partials._material_usage_detail` — daftar transaksi individual material/alat hari ini: barang, siapa mengerjakan, dipakai pada pelanggan atau infrastruktur, `FopUnifiedDashboardService::getMaterialUsageDetail()`), **Kapasitas ODP** (`fop.partials._distribution_glance` — entitas `Odp`/`OdpPort` terpisah dari Distribusi CID, Red Zone watchlist port terpakai ≥85%, `getOdpSummary()`, link `@can('network_odps.view')` ke `/network/odps`).
+
+**Team FOP Aktif** (mekanisme drag & drop, tidak berubah dari sebelum redesign): grid card per `FopTaskTeam` aktif — header nama team + `work_date`, body list tiket (`tugas` + badge status warna, drag antar tim lewat `switch-team`), footer avatar inisial anggota, klik card → `openTeamDetail()` (Alpine) buka detail panel. Native HTML5 drag & drop auto-scroll window saat kursor dekat tepi viewport (`autoScrollOnDragOver()`, 2026-10-10 — drag tim di baris paling atas ke tim yang letaknya jauh di bawah viewport).
 
 ### Design system
 
-Warna status pakai CSS var: `--color-success`, `--color-warning`, `--color-error`, `--color-info` (+ varian `-bg`/`-border`). Card dasar masih pakai Tailwind `bg-white border-slate-200` (belum full migrasi ke `--color-surface`).
+Warna status pakai CSS var: `--color-success`, `--color-warning`, `--color-error`, `--color-info` (+ varian `-bg`/`-border`). Komponen baru (`metric-card`, partial-partial di atas) sudah full token `bg-surface`/`border-border`/`text-text-main`.
 
 ## SLA Overdue Logic
 
@@ -95,6 +100,15 @@ Query ini basisnya tabel `customers` join `tasks` (bukan `customer_surveys` sepe
 
 - **Guard:** `$this->authorize('viewAll', Task::class)` — policy, bukan middleware permission string.
 - **POP scope:** `EffectiveAccessService::hasAllPopAccess()` / `getAllowedPopIds()` — user tanpa akses semua POP cuma lihat data POP dia.
+- Sub-komponen punya gerbang sendiri: tiket `tickets.view`/`tickets.history.view`, gudang `warehouse.usage.view` (bukan `warehouse.view` penuh — sengaja sempit biar `fop` gak ikut kebuka Stok/Scan/History/Damaged/Retrievals, lihat `routes/web.php` gerbang OR `warehouse.view|warehouse.usage.view`), ODP `network_odps.view`/`.create`/`.update`.
+
+## Dashboard Analitik FOP (`/fop/analitik`)
+
+Halaman terpisah (`FopAnalyticsController`), agregat lintas periode (harian/mingguan/bulanan/tahunan + custom `from`/`to`) — **bukan** operasional live kayak `/fop`. Permission sendiri (`fop_analytics.view`). Sejak audit 2026-10-12: setiap tabel ranking/leaderboard/backlog/durasi punya link drill-down ke `FopAnalyticsController::drilldown()` (route `fop.analytics.drilldown`) yang nampilin daftar Task/FopTask individual di balik satu angka ranking, tetap di-scope `applyUserScope($user)` + filter POP. Detail lengkap tiap section: [docs/plan/analisa-dashboard-analitik-fop.md](../plan/analisa-dashboard-analitik-fop.md) dan §5 [rancangan-fop-unified-dashboard.md](../plan/fop/rancangan-fop-unified-dashboard.md).
+
+## Riwayat Scan QR (`/qr-scan-logs`)
+
+Halaman baru 2026-10-12 (`QrScanLogController`, permission `qr_scan_logs.view` — **owner, atasan, fop**, bukan `admin`) — satu-satunya pembaca tabel `qr_scan_logs` yang sejak Fase 1 QR Attendance sudah menjejak SETIAP percobaan scan termasuk gagal (`bad_signature`/`token_revoked`/`out_of_radius`/dll) tapi gak pernah dibaca controller/view apa pun. Jawaban langsung buat "sulit melihat celah orang main di lapangan" — scan gagal berulang dari teknisi yang sama adalah sinyal nyata. POP diturunkan dari relasi (`customer`/`task`/`ticket`, paling spesifik duluan); baris yang gak bisa diturunkan POP-nya dibuang buat user yang discope POP (deny-by-default). Rancangan asal & tabel kolom: `docs/plan/qr-code/rancangan-qr-pelanggan-final.md` §4.2/§5.
 
 ## Related
 
@@ -103,12 +117,15 @@ Query ini basisnya tabel `customers` join `tasks` (bukan `customer_surveys` sepe
 - [database-schema.md](database-schema.md) — tabel `fop_tasks`, `fop_task_teams`
 - [analisa-auto-team.md](analisa-auto-team.md) — analisa & Sprint Backlog Task 1/2
 - [analisa-sync-execution-task.md](analisa-sync-execution-task.md) — bugfix & sync execution Task terkait Team
+- [docs/plan/fop/rancangan-fop-unified-dashboard.md](../plan/fop/rancangan-fop-unified-dashboard.md) — rancangan Command Center + §5 audit implementasi (2026-10-12)
+- [docs/master/odp/README.md](../master/odp/README.md) — Master ODP (entitas Kapasitas ODP di Zona 4)
 
 ---
 
 **Files:**
 - `app/Http/Controllers/FopDashboardController.php`
-- `resources/views/fop/dashboard.blade.php`
-- `routes/web.php` — `GET /fop`, `GET /api/fop/pipeline`
+- `app/Services/FopUnifiedDashboardService.php` — agregator data lintas modul (pipeline, tiket, teknisi, gudang, ODP, material usage detail)
+- `resources/views/fop/dashboard.blade.php` + `resources/views/fop/partials/_*.blade.php`
+- `routes/web.php` — `GET /fop`, `GET /api/fop/pipeline`, `GET /fop/analitik`, `GET /fop/analitik/rincian`, `GET /qr-scan-logs`, `GET /network/odps`
 
-**Last updated:** 2026-07-11 (ditambah catatan Task 1/2: sumber data Team `$activeFopTeams`, known issue SQL MySQL-only)
+**Last updated:** 2026-10-12 (audit dashboard FOP & Analitik FOP — Command Center redesign, SLA/utilization real metric, ODP Red Zone, drill-down Analitik, Riwayat Scan QR, Rincian Pemakaian Material)

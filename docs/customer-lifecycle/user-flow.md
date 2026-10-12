@@ -48,8 +48,8 @@ Buat pelanggan yang **belum ditugaskan** (belum ada teknisi jalan) ATAU **udah d
 1. Buka antrean pemasangan, klik "Mulai Pemasangan" → sama seperti survey, dicek dulu gak ada task lain yang lagi jalan.
 2. Timer pemasangan mulai. Kerjakan instalasi fisik.
 3. Isi form laporan lengkap: device (tipe, brand, serial, MAC, WiFi, PPPoE), data teknis (ODP/OLT/VLAN), hasil speedtest (upload/download/jitter/latency/packet loss), foto pemasangan + kontrak + TTD pelanggan + foto speedtest.
-4. **Perangkat Pasif Terpakai** (2026-07-31) — daftar sudah terisi dari estimasi surveyor; teknisi tinggal **mengubah jumlahnya ke realita**, tambah atau hapus baris. Ini yang benar-benar dipakai, bukan perkiraan. Wajib minimal satu baris kalau status `completed`.
-5. Pilih status: `completed` (semua foto wajib lengkap + minimal satu baris material, kalau kurang satu aja ditolak dengan pesan spesifik) / `failed` (butuh revisi, balik ke antrean) / progress (belum kelar).
+4. **Perangkat Pasif Terpakai** (2026-07-31, jadi **opsional** 2026-10-12) — daftar sudah terisi dari estimasi surveyor; teknisi tinggal **mengubah jumlahnya ke realita**, tambah atau hapus baris. Ini yang benar-benar dipakai, bukan perkiraan. **Opsional** — disamakan dengan laporan lain (Maintenance dkk), tidak lagi wajib minimal satu baris walau status `completed`.
+5. Pilih status: `completed` (semua foto wajib lengkap — Pemasangan, Kontrak, TTD, Speedtest; material TIDAK ikut syarat ini) / `failed` (butuh revisi, balik ke antrean) / progress (belum kelar).
 6. Submit `completed` → pelanggan otomatis masuk antrean Verifikasi Admin. Admin melihat tabel **Estimasi vs Terpakai + selisih** di halaman verifikasi.
 
 ### 4b. Admin/FOP — Batalkan Pemasangan (baru 2026-07-21)

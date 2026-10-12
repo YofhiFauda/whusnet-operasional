@@ -147,4 +147,25 @@ class FopTaskHistoryDetailPageTest extends TestCase
         // Histori status (Task 9) tetap tampil di halaman ini.
         $response->assertSee('Sedang Dikerjakan');
     }
+
+    /**
+     * Regresi — `started_via`/`started_distance_meters` (absen QR, Fase 3)
+     * tercatat sejak lama tapi gak pernah ditampilkan di halaman Detail
+     * Riwayat FopTask (ADHOC audit dashboard, 2026-10-12).
+     */
+    public function test_history_detail_page_shows_lokasi_mulai_kerja_block(): void
+    {
+        $fopTask = $this->makeSurveyFopTaskWithReport();
+        $fopTask->task->forceFill([
+            'started_via' => 'qr_scan',
+            'started_distance_meters' => 1000,
+        ])->saveQuietly();
+
+        $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.history.show', $fopTask->id));
+
+        $response->assertOk();
+        $response->assertSee('Lokasi Mulai Kerja');
+        $response->assertSee('Di Luar Radius');
+        $response->assertSee('1.000 meter dari pelanggan');
+    }
 }

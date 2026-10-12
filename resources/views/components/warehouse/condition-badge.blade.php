@@ -1,6 +1,7 @@
 @props([
     'condition' => null, // App\Enums\ItemCondition|string|null
     'checked' => true,    // sudah dicek fisik? (condition_checked_at !== null)
+    'count' => null,
 ])
 
 {{--
@@ -21,9 +22,9 @@
         $value === \App\Enums\ItemCondition::USED_DAMAGED->value => ['error', 'Bekas — Rusak'],
         $value === \App\Enums\ItemCondition::NEW->value => ['success', 'Baru'],
         // used_good: pecah berdasar sudah/belum dicek fisik
-        $checked => ['info', 'Bekas — Sudah Dicek'],
-        default => ['warning', 'Bekas — Belum Dicek'],
+        $checked => ['warning', 'Bekas — Sudah Dicek'],
+        default => ['info', 'Bekas — Belum Dicek'],
     };
 @endphp
 
-<x-ui.badge :variant="$variant" {{ $attributes }}>{{ $label }}</x-ui.badge>
+<x-ui.badge :variant="$variant" {{ $attributes }}>{{ $label }}@if($count !== null): {{ $count }}@endif</x-ui.badge>

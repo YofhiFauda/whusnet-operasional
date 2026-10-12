@@ -550,7 +550,9 @@ Permission baru lewat `features` × `actions` (`PermissionGeneratorService`):
 | `customers.qr.cancel` | admin, owner | Cabut token — lebih destruktif, permission terpisah |
 | `customers.qr.print` | admin, pop_admin | Cetak stiker/kartu |
 | `tasks.qr_attendance.create` | teknisi, fop | Absen via QR |
-| `qr_scan_logs.view` | owner, atasan, admin | Dashboard anomali |
+| `qr_scan_logs.view` | owner, atasan, **fop** (bukan admin — koreksi 2026-10-12, keputusan eksplisit user) | Riwayat scan QR (`/qr-scan-logs`), termasuk percobaan gagal |
+
+> **Koreksi 2026-10-12 (audit Dashboard FOP, `docs/plan/fop/rancangan-fop-unified-dashboard.md` §5):** halaman `/qr-scan-logs` baru benar-benar dibangun saat itu — sebelumnya permission `qr_scan_logs.view` sudah di-generate sejak Fase 1 tapi gak ada controller/view yang membacanya. Audience diputuskan ulang: **owner, atasan, fop** — bukan `admin` seperti baris tabel di atas semula. FOP butuh ini buat mengawasi teknisi di bawahnya (celah lapangan: `bad_signature`/`out_of_radius` berulang), bukan buat mengawasi dirinya sendiri. Lihat `App\Http\Controllers\QrScanLogController`, `database/seeders/RolePermissionSeeder.php` (role `fop`/`atasan`).
 
 > **Penting:** `manage` bukan `ActionCode` yang valid di repo ini. `cancel` adalah pengganti yang benar untuk "cabut". `attendance` bukan action — gunakan `tasks.qr_attendance.create`.
 

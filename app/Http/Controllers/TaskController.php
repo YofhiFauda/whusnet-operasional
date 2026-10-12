@@ -216,6 +216,7 @@ class TaskController extends Controller
             'completedBy',
             'auditLogs.user',
             'maintenanceReport',
+            'creqDetail',
             // fopTask.notes (pointer/catatan FOP) & fopTask.ticket->catatan_teknis
             // (asesmen NOC) SENGAJA gak pernah digabung ke task->description
             // (lihat FopTaskController::store()/update() & TicketService::

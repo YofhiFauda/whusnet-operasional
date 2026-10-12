@@ -101,6 +101,36 @@ class Pop extends Model
     }
 
     /**
+     * Naik ke akar pohon POP (Cabang) dari sebuah id POP (bisa Mini POP) —
+     * satu sumber kebenaran buat "dua POP ini satu Cabang atau beda Cabang",
+     * dipakai guard lintas-cabang di `InventoryService` (barang yang diissue
+     * dari Gudang Cabang A gak boleh dipasang/dipakai di Task Cabang B).
+     * Pohon POP dangkal (Cabang → Mini POP), jadi walk ini aman tanpa cache —
+     * pola sama `CustomerController::resolveCabangPopId()` (duplikasi sadar,
+     * beda lapisan: itu private controller buat namespacing legacy key, ini
+     * public model buat dipakai Service).
+     */
+    public static function resolveCabangId(?int $popId): ?int
+    {
+        if ($popId === null) {
+            return null;
+        }
+
+        $pop = self::find($popId);
+
+        if (! $pop) {
+            return null;
+        }
+
+        $node = $pop;
+        while ($node && $node->parent_id) {
+            $node = self::find($node->parent_id);
+        }
+
+        return $node?->id ?? $pop->id;
+    }
+
+    /**
      * @return HasMany<InventoryBalance, $this>
      */
     public function inventoryBalances(): HasMany

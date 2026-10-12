@@ -198,14 +198,14 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         $this->assertNotNull($log->photoPath(), 'foto kondisi dibaca dari laporan task');
 
         $this->actingAs($this->owner)
-            ->post(route('warehouse.returns.receive.store', $serial), ['condition' => 'used_damaged', 'estimated_value' => '150.000'])
+            ->post(route('warehouse.returns.receive.store', $serial), ['condition' => 'used_damaged'])
             ->assertSessionHas('success');
 
         $log->refresh();
         $this->assertTrue($log->isReceived());
         $this->assertEquals($this->owner->id, $log->received_by);
         $this->assertEquals(ItemCondition::USED_DAMAGED, $log->condition);
-        $this->assertEquals('150000.00', $log->estimated_value);
+        $this->assertNull($log->estimated_value);
         // Pelaku pengambilan tetap teknisi — tidak tertimpa penerima gudang.
         $this->assertEquals($this->teknisi->id, $log->retrieved_by);
     }
@@ -232,22 +232,58 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
     }
 
     #[Test]
-    public function nilai_taksiran_disimpan_di_ledger_baris_penerimaan(): void
+    public function harga_retur_ditolak_di_tahap_cabang_tanpa_mutasi(): void
     {
         $serial = $this->makeInstalledSerial('HS-SN-003');
         $this->deacPickup('HS-SN-003');
+        $count = InventoryTransaction::where('serial_id', $serial->id)->count();
 
         $this->actingAs($this->owner)
             ->post(route('warehouse.returns.receive.store', $serial), ['condition' => 'used_good', 'estimated_value' => '1.250.000'])
-            ->assertSessionHasNoErrors();
+            ->assertSessionHasErrors('estimated_value');
 
-        // Tipe RETURN saja, baris TERAKHIR (Tahap 1 Cabang) — ADHOC-108: gak
-        // ada lagi `to_pop_id` di baris ini (lihat catatan test di atas).
-        $received = InventoryTransaction::where('serial_id', $serial->id)
-            ->where('type', InventoryTransactionType::RETURN->value)
-            ->latest('id')
-            ->firstOrFail();
-        $this->assertEquals(1250000.0, (float) $received->unit_price_snapshot);
+        $this->assertEquals($count, InventoryTransaction::where('serial_id', $serial->id)->count());
+        $this->assertEquals($this->teknisi->id, $serial->refresh()->current_technician_id);
+        $this->assertFalse(DeviceRetrievalLog::where('serial_id', $serial->id)->firstOrFail()->isReceived());
+    }
+
+    #[Test]
+    public function pic_gudang_bisa_menerima_retur_tanpa_input_harga(): void
+    {
+        $serial = $this->makeInstalledSerial('PIC-RETURN');
+        $this->deacPickup('PIC-RETURN');
+        $role = Role::where('code', 'pic_gudang')->firstOrFail();
+        $pic = User::factory()->create(['role_id' => $role->id]);
+        $pic->roleScopes()->create(['role_id' => $role->id, 'scope_type' => ScopeType::ALL_POP->value]);
+
+        $this->actingAs($pic)->get(route('warehouse.returns.receive.create', $serial))
+            ->assertOk()->assertDontSee('name="estimated_value"', false);
+        $this->actingAs($pic)->get(route('warehouse.returns.from-customer.create', ['customer' => $this->customer->id]))
+            ->assertOk()->assertDontSee('name="estimated_value"', false)
+            ->assertSee('name="accessories[]"', false);
+        $this->actingAs($pic)->post(route('warehouse.returns.receive.store', $serial), [
+            'condition' => 'used_good', 'estimated_value' => '150.000',
+        ])->assertSessionHasErrors('estimated_value');
+        $this->assertEquals($this->teknisi->id, $serial->refresh()->current_technician_id);
+
+        $this->actingAs($pic)->post(route('warehouse.returns.receive.store', $serial), ['condition' => 'used_good'])
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertNull(DeviceRetrievalLog::where('serial_id', $serial->id)->firstOrFail()->estimated_value);
+    }
+
+    #[Test]
+    public function walk_in_menolak_harga_sebelum_mengunggah_foto_atau_mengubah_serial(): void
+    {
+        $serial = $this->makeInstalledSerial('WI-PRICE-REJECT');
+
+        $this->actingAs($this->owner)->post(route('warehouse.returns.from-customer.store'), $this->walkInPayload([
+            'serials' => [['serial_number' => $serial->serial_number, 'item_id' => '']],
+            'estimated_value' => '200.000',
+        ]))->assertSessionHasErrors('estimated_value');
+
+        $this->assertEquals(SerialStatus::INSTALLED, $serial->refresh()->status);
+        $this->assertFalse(DeviceRetrievalLog::where('serial_id', $serial->id)->exists());
+        $this->assertSame([], Storage::disk('public')->allFiles());
     }
 
     #[Test]
@@ -421,7 +457,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         $serial = $this->makeInstalledSerial('WI-SN-001');
 
         $this->actingAs($this->owner)
-            ->post(route('warehouse.returns.from-customer.store'), $this->walkInPayload(['estimated_value' => '200.000', 'notes' => 'Diantar sendiri']))
+            ->post(route('warehouse.returns.from-customer.store'), $this->walkInPayload(['notes' => 'Diantar sendiri']))
             ->assertRedirect(route('warehouse.retrievals.index'))
             ->assertSessionHasNoErrors();
 
@@ -436,7 +472,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
 
         $ledger = InventoryTransaction::where('serial_id', $serial->id)->where('type', InventoryTransactionType::RETURN->value)->firstOrFail();
         $this->assertNull($ledger->to_pop_id);
-        $this->assertEquals(200000.0, (float) $ledger->unit_price_snapshot);
+        $this->assertNull($ledger->unit_price_snapshot);
 
         $log = DeviceRetrievalLog::where('serial_id', $serial->id)->firstOrFail();
         $this->assertEquals(DeviceRetrievalSource::WALK_IN, $log->source);

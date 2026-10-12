@@ -4,267 +4,369 @@
 <?php $__env->startSection('breadcrumb_parent_url', '/'); ?>
 
 <?php $__env->startSection('content'); ?>
-<div x-data="fopDashboardHandler()" class="flex flex-col gap-5 sm:gap-6 max-w-screen-2xl mx-auto font-sans text-text-main px-1 sm:px-0">
+<div x-data="fopDashboardHandler()" class="flex flex-col gap-4 sm:gap-5 max-w-screen-2xl mx-auto font-sans text-text-main px-1 sm:px-0">
 
     
-    <div class="page-header flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between mb-1">
+    <div class="page-header flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div class="page-header-left">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-2xs">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                     </svg>
                 </div>
-                <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">FOP Dashboard</h1>
+                <div>
+                    <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">FOP Operational Command Center</h1>
+                    <p class="text-xs text-text-muted mt-0.5 font-sans">Monitoring terpadu modul lapangan, armada teknisi, material, & SLA · <?php echo e(now()->translatedFormat('l, d F Y')); ?></p>
+                </div>
             </div>
-            <p class="text-xs text-text-muted mt-0.5 font-sans">Ringkasan pengerjaan harian lapangan dan koordinasi tim teknisi · <?php echo e(now()->translatedFormat('l, d F Y')); ?></p>
         </div>
-        <div>
-            <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors shadow-2xs font-sans">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+        <div class="flex items-center gap-2.5 flex-wrap">
+            
+            <div class="inline-flex rounded-lg border border-border bg-surface p-1 shadow-2xs">
+                <span class="px-2.5 py-1 text-xs font-bold rounded-md bg-primary text-white">⚡ Operasional Harian</span>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('fop_analytics.view')): ?>
+                <a href="<?php echo e(route('fop.analytics')); ?>" class="px-2.5 py-1 text-xs font-medium text-text-muted hover:text-text-main transition-colors">📊 Rekapitulasi &amp; Analitik</a>
+                <?php endif; ?>
+            </div>
+
+            <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-surface border border-border text-text-main rounded-lg hover:bg-surface-muted transition-colors shadow-2xs font-sans">
+                <svg class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                 <span>Kelola Task FOP</span>
             </a>
         </div>
     </div>
 
     
-    <div id="stat-cards-container" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <!-- Card 1: Antrean Survey -->
-        <div class="metric-card <?php echo e(($stats['overdue_survey'] ?? 0) > 0 ? 'status-error' : 'status-info'); ?>">
-            <div>
-                <div class="metric-card-label">
-                    <span>Antrean Survey</span>
-                    <svg class="h-4 w-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" />
-                    </svg>
-                </div>
-                <div class="metric-card-value-container">
-                    <p class="metric-card-value"><?php echo e($stats['antrian_survey']); ?></p>
-                    <?php if(($stats['overdue_survey'] ?? 0) > 0): ?>
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-sans uppercase tracking-wider bg-error-bg text-error border border-error-border animate-pulse">
-                            <?php echo e($stats['overdue_survey']); ?> Overdue
-                        </span>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <p class="metric-card-footer">Pelanggan baru terdaftar</p>
-        </div>
-
-        <!-- Card 2: Perlu Aksi FOP -->
-        <div class="metric-card <?php echo e(($stats['overdue_installation'] ?? 0) > 0 ? 'status-error' : (($stats['perlu_aksi_fop'] ?? 0) > 0 ? 'status-warning' : '')); ?>">
-            <div>
-                <div class="metric-card-label">
-                    <span>Perlu Aksi FOP</span>
-                    <svg class="h-4 w-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                </div>
-                <div class="metric-card-value-container">
-                    <p class="metric-card-value"><?php echo e($stats['perlu_aksi_fop']); ?></p>
-                    <?php if(($stats['overdue_installation'] ?? 0) > 0): ?>
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-sans uppercase tracking-wider bg-error-bg text-error border border-error-border animate-pulse">
-                            <?php echo e($stats['overdue_installation']); ?> Overdue
-                        </span>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <p class="metric-card-footer">Survey selesai & verifikasi</p>
-        </div>
-
-        <!-- Card 3: Sedang Berjalan -->
-        <div class="metric-card status-info">
-            <div>
-                <div class="metric-card-label">
-                    <span>Sedang Berjalan</span>
-                    <svg class="h-4 w-4 text-text-muted shrink-0 animate-spin" style="animation-duration: 8s" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
-                    </svg>
-                </div>
-                <div class="metric-card-value-container">
-                    <p class="metric-card-value"><?php echo e($stats['berjalan']); ?></p>
-                </div>
-            </div>
-            <p class="metric-card-footer">Task aktif lapangan hari ini</p>
-        </div>
-
-        <!-- Card 4: Selesai Hari Ini -->
-        <div class="metric-card status-success">
-            <div>
-                <div class="metric-card-label">
-                    <span>Selesai Hari Ini</span>
-                    <svg class="h-4 w-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-                <div class="metric-card-value-container">
-                    <p class="metric-card-value"><?php echo e($stats['selesai_hari_ini']); ?></p>
-                </div>
-            </div>
-            <p class="metric-card-footer">Target harian yang tercapai</p>
-        </div>
-    </div>
+    <?php echo $__env->make('fop.partials._emergency_ticker', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     
-    <div id="gudang-stats-container" class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Pemakaian Alat Gudang (Hari Ini)</p>
-            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('warehouse_report.view')): ?>
-            <a href="<?php echo e(route('warehouse.reports.index')); ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
-                <span>Lihat Laporan Gudang</span>
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-            </a>
-            <?php endif; ?>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div class="metric-card status-info">
-                <div>
-                    <div class="metric-card-label"><span>Keluar dari Gudang</span></div>
-                    <div class="metric-card-value-container">
-                        <p class="metric-card-value"><?php echo e(rtrim(rtrim(number_format($gudangStats['keluar'], 2, ',', '.'), '0'), ',')); ?></p>
-                    </div>
-                </div>
-                <p class="metric-card-footer">Diserahkan ke teknisi hari ini</p>
-            </div>
-            <div class="metric-card status-success">
-                <div>
-                    <div class="metric-card-label"><span>Terpakai</span></div>
-                    <div class="metric-card-value-container">
-                        <p class="metric-card-value"><?php echo e(rtrim(rtrim(number_format($gudangStats['terpakai'], 2, ',', '.'), '0'), ',')); ?></p>
-                    </div>
-                </div>
-                <p class="metric-card-footer">Dipasang/dihabiskan di laporan hari ini</p>
-            </div>
-            <div class="metric-card status-warning">
-                <div>
-                    <div class="metric-card-label"><span>Sisa di Tangan Teknisi</span></div>
-                    <div class="metric-card-value-container">
-                        <p class="metric-card-value"><?php echo e(rtrim(rtrim(number_format($gudangStats['sisa_di_teknisi'], 2, ',', '.'), '0'), ',')); ?></p>
-                    </div>
-                </div>
-                <p class="metric-card-footer">Belum dipakai / belum dikembalikan</p>
-            </div>
-        </div>
-    </div>
+    <?php echo $__env->make('fop.partials._hero_metrics', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     
-    <div id="fop-teams-board" class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Team FOP Aktif</p>
-            <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
-                <span>Kelola Tim & Jadwal</span>
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-            </a>
-        </div>
-        <?php if($activeFopTeams->count() > 0): ?>
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-            <?php $__currentLoopData = $activeFopTeams; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $team): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-            <div @dragover.prevent="onTeamDragOver(<?php echo e($team['id']); ?>)"
-                 @dragleave="onTeamDragLeave(<?php echo e($team['id']); ?>)"
-                 @drop.prevent="onTeamDrop(<?php echo e($team['id']); ?>)"
-                 :class="dragOverTeamId === <?php echo e($team['id']); ?> ? 'border-primary ring-4 ring-primary/10 bg-primary/5 shadow-md scale-[1.01]' : 'border-border bg-surface shadow-xs'"
-                 class="flex flex-col border rounded-xl overflow-hidden hover:shadow-md hover:border-primary-border/60 transition-all duration-200">
-                
-                
-                <button type="button" @click="openTeamDetail(<?php echo e($team['id']); ?>)"
-                        class="text-left px-4 py-3 border-b border-border bg-surface-muted hover:bg-slate-200/50 dark:hover:bg-slate-700/50 flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
-                    <span class="text-xs font-bold text-text-main font-sans"><?php echo e($team['name']); ?></span>
-                    <span class="text-[10px] text-text-muted font-medium font-sans bg-surface px-2 py-0.5 rounded border border-border shadow-xs"><?php echo e($team['work_date']); ?></span>
-                </button>
+    <?php echo $__env->make('fop.partials._pipeline_funnel', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
-                
-                <div class="p-3 sm:p-4 flex-1 flex flex-col gap-2 max-h-56 overflow-y-auto custom-scrollbar">
-                    <?php $__empty_1 = true; $__currentLoopData = $team['tasks']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                    <div draggable="<?php echo e($t['draggable'] ? 'true' : 'false'); ?>"
-                         @dragstart="<?php echo e($t['draggable'] ? 'true' : 'false'); ?> ? startTaskDrag($event, <?php echo e($t['fop_task_id']); ?>, <?php echo e($team['id']); ?>, <?php echo \Illuminate\Support\Js::from($t['tugas'])->toHtml() ?>) : $event.preventDefault()"
-                         @dragend="endTaskDrag()"
-                         @click="openTeamDetail(<?php echo e($team['id']); ?>)"
-                         :class="[
-                            'flex items-center justify-between text-[11px] rounded-lg p-2 sm:px-2.5 sm:py-2 border transition-all duration-150 shadow-xs',
-                            dragging && dragging.fopTaskId === <?php echo e($t['fop_task_id']); ?>
+    
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
 
-                                ? 'opacity-40 border-dashed bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'
-                                : (<?php echo e($t['draggable'] ? 'true' : 'false'); ?>
+        
+        <div class="xl:col-span-7 flex flex-col gap-4">
 
-                                    ? 'cursor-grab hover:bg-slate-100 dark:hover:bg-slate-700/50 border-border hover:border-primary/30'
-                                    : 'cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60')
-                         ]">
-                        <div class="flex items-center gap-2 truncate flex-1 mr-1">
-                            <?php if($t['draggable']): ?>
-                            <!-- Drag Handle Icon on desktop -->
-                            <svg class="hidden md:block h-3.5 w-3.5 text-text-disabled shrink-0 cursor-grab" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8.5 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+            
+            <div class="flex items-center justify-between bg-surface border border-border rounded-xl p-1.5 shadow-2xs">
+                <div class="flex items-center gap-1 flex-wrap">
+                    <button type="button"
+                            @click="activeTacticalTab = 'teams'"
+                            :class="activeTacticalTab === 'teams' ? 'bg-primary text-white shadow-xs font-bold' : 'text-text-secondary hover:bg-surface-muted font-medium'"
+                            class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        <span>Team FOP Aktif</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="activeTacticalTab === 'teams' ? 'bg-white/20 text-white' : 'bg-surface-muted text-text-muted'">
+                            <?php echo e($activeFopTeams->count()); ?>
+
+                        </span>
+                    </button>
+
+                    <button type="button"
+                            @click="activeTacticalTab = 'survey'"
+                            :class="activeTacticalTab === 'survey' ? 'bg-primary text-white shadow-xs font-bold' : 'text-text-secondary hover:bg-surface-muted font-medium'"
+                            class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                        <span>Antrean Survey</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="activeTacticalTab === 'survey' ? 'bg-white/20 text-white' : 'bg-surface-muted text-text-muted'">
+                            <?php echo e($surveyQueue->count()); ?>
+
+                        </span>
+                    </button>
+
+                    <button type="button"
+                            @click="activeTacticalTab = 'tickets'"
+                            :class="activeTacticalTab === 'tickets' ? 'bg-primary text-white shadow-xs font-bold' : 'text-text-secondary hover:bg-surface-muted font-medium'"
+                            class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        <span>Tiket Gangguan & C-REQ</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="activeTacticalTab === 'tickets' ? 'bg-white/20 text-white' : 'bg-surface-muted text-text-muted'">
+                            <?php echo e($fieldTickets->count()); ?>
+
+                        </span>
+                    </button>
+                </div>
+
+                <div class="hidden sm:flex items-center gap-2 pr-2 text-[10px] text-text-muted">
+                    <span class="inline-block w-2 h-2 rounded-full bg-success"></span>
+                    <span>Live Command</span>
+                </div>
+            </div>
+
+            
+            <div x-show="activeTacticalTab === 'teams'" class="flex flex-col gap-3">
+                <div id="fop-teams-board" class="flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Team FOP Aktif Hari Ini</p>
+                        <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
+                            <span>Kelola Tim & Jadwal</span>
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                             </svg>
-                            <?php endif; ?>
-                            <div class="flex flex-col gap-0.5 truncate flex-1">
-                                <span class="text-text-main font-semibold truncate"><?php echo e($t['tugas']); ?></span>
-                                <span class="text-[9px] text-text-muted truncate font-sans"><?php echo e($t['customer_name']); ?></span>
+                        </a>
+                    </div>
+                    <?php if($activeFopTeams->count() > 0): ?>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <?php $__currentLoopData = $activeFopTeams; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $team): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <div @dragover.prevent="onTeamDragOver(<?php echo e($team['id']); ?>)"
+                             @dragleave="onTeamDragLeave(<?php echo e($team['id']); ?>)"
+                             @drop.prevent="onTeamDrop(<?php echo e($team['id']); ?>)"
+                             :class="dragOverTeamId === <?php echo e($team['id']); ?> ? 'border-primary ring-4 ring-primary/10 bg-primary/5 shadow-md scale-[1.01]' : 'border-border bg-surface shadow-xs'"
+                             class="flex flex-col border rounded-xl overflow-hidden hover:shadow-md hover:border-primary-border/60 transition-all duration-200">
+
+                            
+                            <button type="button" @click="openTeamDetail(<?php echo e($team['id']); ?>)"
+                                    class="text-left px-4 py-3 border-b border-border bg-surface-muted hover:bg-slate-200/50 dark:hover:bg-slate-700/50 flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
+                                <div>
+                                    <span class="text-xs font-bold text-text-main font-sans"><?php echo e($team['name']); ?></span>
+                                    <span class="text-[10px] text-text-muted font-mono block mt-0.5"><?php echo e($team['completed_tasks']); ?>/<?php echo e($team['total_tasks']); ?> Selesai (<?php echo e($team['progress_percent']); ?>%)</span>
+                                </div>
+                                <span class="text-[10px] text-text-muted font-medium font-sans bg-surface px-2 py-0.5 rounded border border-border shadow-xs"><?php echo e($team['work_date']); ?></span>
+                            </button>
+
+                            
+                            <div class="p-3 sm:p-4 flex-1 flex flex-col gap-2 max-h-56 overflow-y-auto custom-scrollbar">
+                                <?php $__empty_1 = true; $__currentLoopData = $team['tasks']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $t): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                                <div draggable="<?php echo e($t['draggable'] ? 'true' : 'false'); ?>"
+                                     @dragstart="<?php echo e($t['draggable'] ? 'true' : 'false'); ?> ? startTaskDrag($event, <?php echo e($t['fop_task_id']); ?>, <?php echo e($team['id']); ?>, <?php echo \Illuminate\Support\Js::from($t['tugas'])->toHtml() ?>) : $event.preventDefault()"
+                                     @dragend="endTaskDrag()"
+                                     @click="openTeamDetail(<?php echo e($team['id']); ?>)"
+                                     :class="[
+                                        'flex items-center justify-between text-[11px] rounded-lg p-2 sm:px-2.5 sm:py-2 border transition-all duration-150 shadow-xs',
+                                        dragging && dragging.fopTaskId === <?php echo e($t['fop_task_id']); ?>
+
+                                            ? 'opacity-40 border-dashed bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'
+                                            : (<?php echo e($t['draggable'] ? 'true' : 'false'); ?>
+
+                                                ? 'cursor-grab hover:bg-slate-100 dark:hover:bg-slate-700/50 border-border hover:border-primary/30'
+                                                : 'cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60')
+                                     ]">
+                                    <div class="flex items-center gap-2 truncate flex-1 mr-1">
+                                        <?php if($t['draggable']): ?>
+                                        <svg class="hidden md:block h-3.5 w-3.5 text-text-disabled shrink-0 cursor-grab" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M8.5 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+                                        </svg>
+                                        <?php endif; ?>
+                                        <div class="flex flex-col gap-0.5 truncate flex-1">
+                                            <span class="text-text-main font-semibold truncate"><?php echo e($t['tugas']); ?></span>
+                                            <span class="text-[9px] text-text-muted truncate font-sans"><?php echo e($t['customer_name']); ?></span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-1.5 shrink-0 ml-1">
+                                        <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border font-sans"
+                                            style="<?php echo e($t['status_style']); ?>">
+                                            <?php echo e($t['status']); ?>
+
+                                        </span>
+
+                                        <?php if($t['draggable'] && $activeFopTeams->count() > 1): ?>
+                                        <button type="button"
+                                                @click.stop="openMobileSwitchTeamModal(<?php echo e($t['fop_task_id']); ?>, <?php echo e($team['id']); ?>, <?php echo \Illuminate\Support\Js::from($t['tugas'])->toHtml() ?>)"
+                                                class="md:hidden p-1 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 cursor-pointer shadow-2xs"
+                                                title="Pindahkan ke Tim Lain">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                        </button>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                                <div class="flex flex-col items-center justify-center py-6 text-text-muted">
+                                    <svg class="h-6 w-6 text-text-disabled mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5" />
+                                    </svg>
+                                    <p class="text-[10px] italic font-sans">Belum ada pengerjaan hari ini</p>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+
+                            
+                            <button type="button" @click="openTeamDetail(<?php echo e($team['id']); ?>)"
+                                    class="text-left px-4 py-3 border-t border-border bg-surface hover:bg-surface-muted flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
+                                <div class="flex items-center -space-x-2">
+                                    <?php $__currentLoopData = $team['members']->take(4); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <span class="h-6 w-6 rounded-full bg-primary text-white border-2 border-surface flex items-center justify-center text-[9px] font-bold tracking-tight font-sans shadow-xs" title="<?php echo e($member['name']); ?>">
+                                        <?php echo e($member['initials']); ?>
+
+                                    </span>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    <?php if($team['members']->count() > 4): ?>
+                                    <span class="h-6 w-6 rounded-full bg-slate-200 text-slate-700 dark:text-slate-300 border-2 border-surface flex items-center justify-center text-[9px] font-bold font-sans shadow-xs">
+                                        +<?php echo e($team['members']->count() - 4); ?>
+
+                                    </span>
+                                    <?php endif; ?>
+                                </div>
+                                <span class="text-[10px] text-text-muted font-sans font-medium"><?php echo e($team['members']->count()); ?> Teknisi · <?php echo e($team['total_tasks']); ?> Task</span>
+                            </button>
+                        </div>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </div>
+                    <?php else: ?>
+                    <div class="bg-surface border border-border rounded-xl flex flex-col items-center justify-center py-12 text-text-muted shadow-xs">
+                        <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <p class="text-sm font-medium font-sans">Belum ada tim dengan task aktif.</p>
+                        <p class="text-xs text-text-muted mt-0.5 font-sans">Jadwalkan task di Task FOP untuk mengaktifkan tim.</p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            
+            <div x-show="activeTacticalTab === 'survey'" class="flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Antrean Survey (Batas Respon 1×24 Jam)</p>
+                </div>
+
+                <div id="antrian-survey-container" class="bg-surface border border-border rounded-xl shadow-xs overflow-hidden">
+                    <?php if($surveyQueue->count() > 0): ?>
+
+                    
+                    <div class="block md:hidden divide-y divide-border">
+                        <?php $__currentLoopData = $surveyQueue; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <div class="p-3.5 flex flex-col gap-2">
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <p class="font-bold text-text-main text-xs font-sans"><?php echo e($item['name']); ?></p>
+                                    <p class="text-[10px] font-mono text-text-muted font-semibold"><?php echo e($item['cid']); ?> · <?php echo e($item['pop_name']); ?></p>
+                                </div>
+                                <a href="<?php echo e(route('customers.show', $item['id'])); ?>"
+                                   class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs">
+                                    <span>Detail</span>
+                                    <svg class="h-3 w-3 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                </a>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
+                                <span class="text-[10px] text-text-muted"><?php echo e($item['registered_at']); ?></span>
+                                <?php if (isset($component)) { $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => ''.e($item['deadline_iso']).'','totalSeconds' => $item['total_seconds'],'label' => 'Sisa Waktu','compact' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('countdown-timer'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['deadline' => ''.e($item['deadline_iso']).'','total-seconds' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($item['total_seconds']),'label' => 'Sisa Waktu','compact' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
+<?php $attributes = $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
+<?php unset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
+<?php $component = $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
+<?php unset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
+<?php endif; ?>
                             </div>
                         </div>
-                        
-                        <div class="flex items-center gap-1.5 shrink-0 ml-1">
-                            <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border font-sans"
-                                style="<?php echo e($t['status_style']); ?>">
-                                <?php echo e($t['status']); ?>
-
-                            </span>
-                            
-                            
-                            <?php if($t['draggable'] && $activeFopTeams->count() > 1): ?>
-                            <button type="button"
-                                    @click.stop="openMobileSwitchTeamModal(<?php echo e($t['fop_task_id']); ?>, <?php echo e($team['id']); ?>, <?php echo \Illuminate\Support\Js::from($t['tugas'])->toHtml() ?>)"
-                                    class="md:hidden p-1 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 cursor-pointer shadow-2xs"
-                                    title="Pindahkan ke Tim Lain">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                            </button>
-                            <?php endif; ?>
-                        </div>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </div>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                    <div class="flex flex-col items-center justify-center py-6 text-text-muted">
-                        <svg class="h-6 w-6 text-text-disabled mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5" />
+
+                    
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-border bg-surface-muted">
+                                    <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-2/5">Pelanggan</th>
+                                    <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">POP Cabang</th>
+                                    <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Terdaftar</th>
+                                    <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Sisa Waktu Survey</th>
+                                    <th class="px-4 py-3 w-[80px]"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border">
+                                <?php $__currentLoopData = $surveyQueue; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <tr class="hover:bg-surface-muted/50 transition-colors duration-150">
+                                    <td class="px-4 py-3">
+                                        <div class="flex flex-col gap-0.5">
+                                            <p class="font-bold text-text-main text-xs font-sans"><?php echo e($item['name']); ?></p>
+                                            <p class="text-[10px] font-mono text-text-muted font-semibold tracking-tight"><?php echo e($item['cid']); ?></p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-text-secondary text-xs font-sans font-medium"><?php echo e($item['pop_name']); ?></td>
+                                    <td class="px-4 py-3 text-text-muted text-xs font-sans"><?php echo e($item['registered_at']); ?></td>
+                                    <td class="px-4 py-3">
+                                        <?php if (isset($component)) { $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => ''.e($item['deadline_iso']).'','totalSeconds' => $item['total_seconds'],'label' => 'Sisa Waktu']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('countdown-timer'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['deadline' => ''.e($item['deadline_iso']).'','total-seconds' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($item['total_seconds']),'label' => 'Sisa Waktu']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
+<?php $attributes = $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
+<?php unset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
+<?php $component = $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
+<?php unset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
+<?php endif; ?>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <a href="<?php echo e(route('customers.show', $item['id'])); ?>"
+                                           class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs transition-all duration-150 cursor-pointer">
+                                            <span>Detail</span>
+                                            <svg class="h-3.5 w-3.5 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php else: ?>
+                    <div class="flex flex-col items-center justify-center py-12 text-text-muted">
+                        <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <p class="text-[10px] italic font-sans">Belum ada pengerjaan hari ini</p>
+                        <p class="text-sm font-medium font-sans">Tidak ada pelanggan dalam antrean survey.</p>
+                        <p class="text-xs text-text-muted mt-0.5 font-sans">Semua pendaftaran survey telah dijadwalkan.</p>
                     </div>
                     <?php endif; ?>
                 </div>
-
-                
-                <button type="button" @click="openTeamDetail(<?php echo e($team['id']); ?>)"
-                        class="text-left px-4 py-3 border-t border-border bg-surface hover:bg-surface-muted flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
-                    <div class="flex items-center -space-x-2">
-                        <?php $__currentLoopData = $team['members']->take(4); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <span class="h-6 w-6 rounded-full bg-primary text-white border-2 border-surface flex items-center justify-center text-[9px] font-bold tracking-tight font-sans shadow-xs" title="<?php echo e($member['name']); ?>">
-                            <?php echo e($member['initials']); ?>
-
-                        </span>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                        <?php if($team['members']->count() > 4): ?>
-                        <span class="h-6 w-6 rounded-full bg-slate-200 text-slate-700 dark:text-slate-300 border-2 border-surface flex items-center justify-center text-[9px] font-bold font-sans shadow-xs">
-                            +<?php echo e($team['members']->count() - 4); ?>
-
-                        </span>
-                        <?php endif; ?>
-                    </div>
-                    <span class="text-[10px] text-text-muted font-sans font-medium"><?php echo e($team['members']->count()); ?> Teknisi · <?php echo e($team['total_tasks']); ?> Task</span>
-                </button>
             </div>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+            
+            <div x-show="activeTacticalTab === 'tickets'" class="flex flex-col gap-3">
+                <?php echo $__env->make('fop.partials._tickets_telemetry', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+            </div>
+
         </div>
-        <?php else: ?>
-        <div class="bg-surface border border-border rounded-xl flex flex-col items-center justify-center py-12 text-text-muted shadow-xs">
-            <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <p class="text-sm font-medium font-sans">Belum ada tim dengan task aktif.</p>
-            <p class="text-xs text-text-muted mt-0.5 font-sans">Jadwalkan task di Task FOP untuk mengaktifkan tim.</p>
+
+        
+        <div class="xl:col-span-5 flex flex-col gap-4">
+
+            
+            <?php echo $__env->make('fop.partials._technician_radar', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+            
+            <?php echo $__env->make('fop.partials._inventory_telemetry', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+            
+            <?php echo $__env->make('fop.partials._material_usage_detail', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+            
+            <?php echo $__env->make('fop.partials._distribution_glance', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
         </div>
-        <?php endif; ?>
+
     </div>
+
     
     <script type="application/json" id="fop-teams-json"><?php echo json_encode($activeFopTeams, 15, 512) ?></script>
 
@@ -305,7 +407,7 @@
                 <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider">Pilih Tim Tujuan</label>
                 <div class="flex flex-col gap-2">
                     <template x-for="team in teamsData.filter(t => t.id !== mobileSwitchSelectTeamModal.fromTeamId)" :key="team.id">
-                        <button type="button" 
+                        <button type="button"
                                 @click="selectTargetTeamForMobileSwitch(team.id)"
                                 class="w-full text-left p-3 border border-border rounded-lg bg-surface hover:bg-surface-muted transition-colors flex items-center justify-between cursor-pointer">
                             <div>
@@ -380,7 +482,7 @@
                                     <a :href="t.task_id ? `<?php echo e(url('/tasks')); ?>/${t.task_id}` : '#'"
                                        class="block p-3.5 hover:bg-surface-muted transition-colors duration-150 cursor-pointer"
                                        :class="!t.task_id ? 'pointer-events-none opacity-60' : ''">
-                                        
+
                                         <div class="flex items-start justify-between gap-2 mb-2">
                                             <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border font-sans"
                                                   :class="t.badge_classes"
@@ -467,8 +569,8 @@
 
             <div class="p-5 space-y-4 font-sans overflow-y-auto flex-1 custom-scrollbar">
                 <p class="text-xs text-text-secondary leading-relaxed bg-primary-soft/50 p-3 rounded-lg border border-primary-border">
-                    Pindahkan task <span class="font-bold text-text-main font-mono" x-text="switchTeamModal.tugas"></span> dari 
-                    <span class="font-bold text-text-main" x-text="switchTeamModal.fromTeamName"></span> ke 
+                    Pindahkan task <span class="font-bold text-text-main font-mono" x-text="switchTeamModal.tugas"></span> dari
+                    <span class="font-bold text-text-main" x-text="switchTeamModal.fromTeamName"></span> ke
                     <span class="font-bold text-text-main" x-text="switchTeamModal.toTeamName"></span>.
                 </p>
 
@@ -523,269 +625,13 @@
         </div>
     </div>
 
-    
-    <div class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Antrean Survey</p>
-            <span class="text-xs text-text-muted font-medium font-sans bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded shadow-2xs">Batas respon 1×24 jam</span>
-        </div>
-        
-        <div id="antrian-survey-container" class="bg-surface border border-border rounded-xl shadow-xs overflow-hidden">
-            <?php if($surveyQueue->count() > 0): ?>
-            
-            
-            <div class="block md:hidden divide-y divide-border">
-                <?php $__currentLoopData = $surveyQueue; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                <div class="p-3.5 flex flex-col gap-2">
-                    <div class="flex items-start justify-between gap-2">
-                        <div>
-                            <p class="font-bold text-text-main text-xs font-sans"><?php echo e($item['name']); ?></p>
-                            <p class="text-[10px] font-mono text-text-muted font-semibold"><?php echo e($item['cid']); ?> · <?php echo e($item['pop_name']); ?></p>
-                        </div>
-                        <a href="<?php echo e(route('customers.show', $item['id'])); ?>"
-                           class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs">
-                            <span>Detail</span>
-                            <svg class="h-3 w-3 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
-                        </a>
-                    </div>
-                    <div class="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
-                        <span class="text-[10px] text-text-muted"><?php echo e($item['registered_at']); ?></span>
-                        <?php if (isset($component)) { $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => ''.e($item['deadline_iso']).'','totalSeconds' => $item['total_seconds'],'label' => 'Sisa Waktu','compact' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('countdown-timer'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['deadline' => ''.e($item['deadline_iso']).'','total-seconds' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($item['total_seconds']),'label' => 'Sisa Waktu','compact' => true]); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
-<?php $attributes = $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
-<?php unset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
-<?php $component = $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
-<?php unset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
-<?php endif; ?>
-                    </div>
-                </div>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-            </div>
-
-            
-            <div class="hidden md:block overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b border-border bg-surface-muted">
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-2/5">Pelanggan</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">POP Cabang</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Terdaftar</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Sisa Waktu Survey</th>
-                            <th class="px-4 py-3 w-[80px]"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        <?php $__currentLoopData = $surveyQueue; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <tr class="hover:bg-surface-muted/50 transition-colors duration-150">
-                            <td class="px-4 py-3">
-                                <div class="flex flex-col gap-0.5">
-                                    <p class="font-bold text-text-main text-xs font-sans"><?php echo e($item['name']); ?></p>
-                                    <p class="text-[10px] font-mono text-text-muted font-semibold tracking-tight"><?php echo e($item['cid']); ?></p>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-text-secondary text-xs font-sans font-medium"><?php echo e($item['pop_name']); ?></td>
-                            <td class="px-4 py-3 text-text-muted text-xs font-sans"><?php echo e($item['registered_at']); ?></td>
-                            <td class="px-4 py-3">
-                                <?php if (isset($component)) { $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => ''.e($item['deadline_iso']).'','totalSeconds' => $item['total_seconds'],'label' => 'Sisa Waktu']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('countdown-timer'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['deadline' => ''.e($item['deadline_iso']).'','total-seconds' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($item['total_seconds']),'label' => 'Sisa Waktu']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
-<?php $attributes = $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
-<?php unset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
-<?php $component = $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
-<?php unset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
-<?php endif; ?>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <a href="<?php echo e(route('customers.show', $item['id'])); ?>"
-                                   class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs transition-all duration-150 cursor-pointer">
-                                    <span>Detail</span>
-                                    <svg class="h-3.5 w-3.5 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </a>
-                            </td>
-                        </tr>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                    </tbody>
-                </table>
-            </div>
-            <?php else: ?>
-            <div class="flex flex-col items-center justify-center py-12 text-text-muted">
-                <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p class="text-sm font-medium font-sans">Tidak ada pelanggan dalam antrean survey.</p>
-                <p class="text-xs text-text-muted mt-0.5 font-sans">Semua pendaftaran survey telah dijadwalkan.</p>
-            </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    
-    <div class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Status Teknisi</p>
-        </div>
-        <div id="status-teknisi-container" class="bg-surface border border-border rounded-xl shadow-xs overflow-hidden">
-            <?php if($teknisiList->count() > 0): ?>
-            
-            
-            <div class="block md:hidden divide-y divide-border">
-                <?php $__currentLoopData = $teknisiList; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tek): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                <div class="p-3.5 flex flex-col gap-2">
-                    <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2.5">
-                            <div class="h-7 w-7 rounded-full bg-primary-soft text-primary border border-primary-border flex items-center justify-center text-[10px] font-bold shrink-0 font-sans shadow-2xs">
-                                <?php echo e($tek['initials']); ?>
-
-                            </div>
-                            <div>
-                                <span class="font-bold text-text-main text-xs font-sans block"><?php echo e($tek['name']); ?></span>
-                                <span class="text-[10px] font-mono font-semibold text-text-secondary"><?php echo e($tek['task_count']); ?> Task</span>
-                                <?php if(($tek['overdue_count'] ?? 0) > 0): ?>
-                                    <span class="text-[9px] font-bold text-error">(<?php echo e($tek['overdue_count']); ?> tertunda)</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-
-                        <?php if($tek['status'] === 'aktif'): ?>
-                            <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-success-bg text-success border-success-border">
-                                <span class="h-1.5 w-1.5 rounded-full bg-current animate-pulse"></span>
-                                <span>Aktif</span>
-                            </span>
-                        <?php elseif($tek['status'] === 'terjadwal'): ?>
-                            <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-info-bg text-info border-info-border">
-                                <span>Terjadwal</span>
-                            </span>
-                        <?php else: ?>
-                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full border border-border bg-slate-50 dark:bg-slate-800/50 text-text-muted font-sans">
-                                <span>Standby</span>
-                            </span>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <?php if($tek['location'] && $tek['location'] !== '-'): ?>
-                    <div class="flex items-center gap-1.5 text-[11px] text-text-muted pt-1 border-t border-border/50">
-                        <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span class="truncate"><?php echo e($tek['location']); ?></span>
-                    </div>
-                    <?php endif; ?>
-                </div>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-            </div>
-
-            
-            <div class="hidden md:block overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b border-border bg-surface-muted">
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-2/5">Teknisi</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Status</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Task Aktif Hari Ini</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Lokasi Terakhir</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        <?php $__currentLoopData = $teknisiList; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tek): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <tr class="hover:bg-surface-muted/50 transition-colors duration-150">
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-2.5">
-                                    <div class="h-7 w-7 rounded-full bg-primary-soft text-primary border border-primary-border flex items-center justify-center text-[10px] font-bold shrink-0 font-sans shadow-2xs">
-                                        <?php echo e($tek['initials']); ?>
-
-                                    </div>
-                                    <span class="font-bold text-text-main text-xs font-sans"><?php echo e($tek['name']); ?></span>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <?php if($tek['status'] === 'aktif'): ?>
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-success-bg text-success border-success-border">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-current animate-pulse"></span>
-                                        <span>Aktif</span>
-                                    </span>
-                                <?php elseif($tek['status'] === 'terjadwal'): ?>
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-info-bg text-info border-info-border">
-                                        <span>Terjadwal</span>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full border border-border bg-slate-50 dark:bg-slate-800/50 text-text-muted font-sans">
-                                        <span>Standby</span>
-                                    </span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="px-4 py-3 text-xs font-semibold font-mono text-text-secondary">
-                                <?php echo e($tek['task_count']); ?> Task
-                                <?php if(($tek['overdue_count'] ?? 0) > 0): ?>
-                                    <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border border-error-border bg-error-bg text-error font-sans"
-                                          title="Task yang jadwalnya sudah lewat">
-                                        <?php echo e($tek['overdue_count']); ?> tertunda
-                                    </span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="px-4 py-3 text-text-secondary text-xs font-sans">
-                                <?php if($tek['location'] && $tek['location'] !== '-'): ?>
-                                    <div class="flex items-center gap-1.5">
-                                        <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                        <span class="truncate max-w-[280px]" title="<?php echo e($tek['location']); ?>"><?php echo e($tek['location']); ?></span>
-                                    </div>
-                                <?php else: ?>
-                                    <span class="text-text-disabled italic font-light font-sans">—</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                    </tbody>
-                </table>
-            </div>
-            <?php else: ?>
-            <div class="flex flex-col items-center justify-center py-12 text-text-muted border-t border-border">
-                <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <p class="text-sm font-medium font-sans">Tidak ada teknisi terdaftar di POP wilayah Anda.</p>
-                <p class="text-xs text-text-muted mt-0.5 font-sans">Daftarkan teknisi baru atau sesuaikan wilayah POP pada Manajemen User.</p>
-            </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
 </div>
 
 <?php $__env->startPush('scripts'); ?>
 <script>
 function fopDashboardHandler() {
     return {
+        activeTacticalTab: 'teams',
         teamsData: <?php echo json_encode($activeFopTeams, 15, 512) ?>,
         teamDetail: { open: false, data: null },
         dragOverTeamId: null,
@@ -850,6 +696,27 @@ function fopDashboardHandler() {
             this.dragging = { fopTaskId, fromTeamId, tugas };
             event.dataTransfer.effectAllowed = 'move';
             event.dataTransfer.setData('text/plain', String(fopTaskId));
+        },
+
+        // Native HTML5 drag & drop TIDAK auto-scroll window begitu card
+        // tujuan (mis. Team 24) ada di luar viewport — cursor cuma mengirim
+        // event `dragover`, bukan `mousemove`, jadi gak ada cara lain
+        // mendeteksi posisi kursor saat drag berlangsung selain listener ini.
+        // Dipasang sekali di window (lihat initEchoListeners/init), jalan
+        // terus selama `dragging` truthy, berhenti otomatis begitu
+        // endTaskDrag() mengosongkan `dragging`.
+        autoScrollOnDragOver(event) {
+            if (!this.dragging) return;
+            const edge = 90;
+            const maxSpeed = 22;
+            const y = event.clientY;
+            const vh = window.innerHeight;
+
+            if (y < edge) {
+                window.scrollBy(0, -Math.ceil(((edge - y) / edge) * maxSpeed));
+            } else if (y > vh - edge) {
+                window.scrollBy(0, Math.ceil(((y - (vh - edge)) / edge) * maxSpeed));
+            }
         },
 
         endTaskDrag() {
@@ -952,6 +819,7 @@ function fopDashboardHandler() {
 
         init() {
             this.initEchoListeners();
+            window.addEventListener('dragover', (e) => this.autoScrollOnDragOver(e));
         },
 
         initEchoListeners() {
@@ -981,7 +849,7 @@ function fopDashboardHandler() {
                 const html = await res.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                
+
                 ['stat-cards-container', 'status-teknisi-container'].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
@@ -998,7 +866,7 @@ function fopDashboardHandler() {
                 const html = await res.text();
                 const doc = new DOMParser().parseFromString(html, 'text/html');
 
-                ['stat-cards-container', 'antrian-survey-container', 'status-teknisi-container'].forEach(id => {
+                ['stat-cards-container', 'antrian-survey-container', 'status-teknisi-container', 'emergency-ticker-container', 'customer-pipeline-funnel'].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
                     if (el && newEl) el.innerHTML = newEl.innerHTML;

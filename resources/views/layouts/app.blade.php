@@ -373,7 +373,7 @@
             </div>
 
             {{-- ── Group: JARINGAN & LAPANGAN ── --}}
-            @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view'))
+            @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('qr_scan_logs.view') || auth()->user()->hasPermission('network_odps.view'))
             <div>
                 <div class="sidebar-group-header">
                     <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Jaringan &amp; Lapangan</p>
@@ -447,6 +447,18 @@
                     </a>
                     @endif
                     @endif
+
+                    @can('network_odps.view')
+                    <a href="{{ route('network.odps.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.odps.*') || Request::routeIs('network.odp-ports.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
+                        <span class="sidebar-text">Master ODP &amp; Port</span>
+                    </a>
+                    @endcan
+
+                    @can('qr_scan_logs.view')
+                    <a href="{{ route('qr-scan-logs.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('qr-scan-logs.index') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
+                        <span class="sidebar-text">Riwayat Scan QR</span>
+                    </a>
+                    @endcan
 
                     @if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('noc_worksheet.view') || auth()->user()->hasPermission('noc_dashboard.view'))
                     <div class="space-y-1">
@@ -765,7 +777,10 @@
                                 <a href="{{ route('warehouse.traceability.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/traceability*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Lacak Barang / SN</a>
                                 @endif
                                 @if(auth()->user()->hasPermission('warehouse_report.view'))
-                                <a href="{{ route('warehouse.reports.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/reports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Laporan Gudang</a>
+                                <a href="{{ route('warehouse.reports.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/reports') || (Request::is('warehouse/reports/*') && ! Request::is('warehouse/reports/sold-to-customer*')) ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Laporan Gudang</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('warehouse_report.sold_to_customer.view'))
+                                <a href="{{ route('warehouse.reports.sold-to-customer') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/reports/sold-to-customer*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Laporan Barang Terjual</a>
                                 @endif
                                 @if(auth()->user()->hasPermission('warehouse_stock_request.view'))
                                 <a href="{{ route('warehouse.stock-requests.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Permintaan Stok</a>

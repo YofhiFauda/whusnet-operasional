@@ -541,9 +541,7 @@
                                     @endif
                                 </div>
                                 <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-800">
-                                        {{ $log['task_category'] }}
-                                    </span>
+                                    <x-task.usage-badge :type="$log['task_type']" :detail="$log['task_detail']" />
                                     @if($log['task_number'] !== '-')
                                     <span class="font-mono text-[11px] text-slate-400">#{{ $log['task_number'] }}</span>
                                     @endif
@@ -606,8 +604,11 @@
                                 {{ $log['customer_name'] }}
                                 @endif
                             </span>
-                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">
-                                {{ $log['task_category'] }} @if($log['task_number'] !== '-') (#{{ $log['task_number'] }}) @endif
+                            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                                <x-task.usage-badge :type="$log['task_type']" :detail="$log['task_detail']" />
+                                @if($log['task_number'] !== '-')
+                                <span class="text-[10px] text-slate-400 font-mono">#{{ $log['task_number'] }}</span>
+                                @endif
                             </div>
                         </div>
                         <div class="text-right">

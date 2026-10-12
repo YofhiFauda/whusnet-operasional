@@ -628,6 +628,14 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Rekap Pemakaian Material Lapangan (/warehouse/usage) — sub-feature
+        // di bawah `warehouse` (BUKAN root baru), supaya bisa di-grant ke
+        // `fop` tanpa ikut membuka Stok/Scan/History/Damaged/Retrievals lewat
+        // `warehouse.view` penuh — rutenya digerbangi OR (`warehouse.view|warehouse.usage.view`).
+        'warehouse.usage' => [
+            ActionCode::VIEW->value,
+        ],
+
         // Permintaan Stok Cabang→Pusat (2026-09-03) — jawaban gap "cabang
         // habis stok, Pusat gak sadar". APPROVE/REJECT dipegang sisi Pusat
         // (fulfill/tolak), CANCEL dipegang pengaju sendiri (dicek scope
@@ -647,6 +655,12 @@ return [
         // `task.view.all` (dashboard operasional harian `/fop`) — audiens
         // beda (dibuka mingguan/bulanan buat evaluasi, bukan tiap shift) dan
         // harus bisa dimatikan per-role independen. Cuma VIEW, read-only murni.
+        'network_odps' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+        ],
+
         'fop_analytics' => [
             ActionCode::VIEW->value,
         ],
@@ -905,5 +919,8 @@ return [
 
         // Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli, Task 9)
         'warehouse_report.sold_to_customer.view' => 'Lihat Laporan Barang Terjual ke Pelanggan',
+
+        // Rekap Pemakaian Material Lapangan (/warehouse/usage)
+        'warehouse.usage.view' => 'Lihat Rekap Pemakaian Material Lapangan',
     ],
 ];

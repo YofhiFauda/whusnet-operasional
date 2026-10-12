@@ -520,8 +520,8 @@
                         $conditionBadge = match(true) {
                             $serialConditionVal === 'new' => ['label' => 'Baru', 'class' => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
                             $serialConditionVal === 'used_damaged' => ['label' => 'Bekas — Rusak', 'class' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800'],
-                            $txn->serial?->condition_checked_at !== null => ['label' => 'Bekas — Sudah Dicek', 'class' => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800'],
-                            default => ['label' => 'Bekas — Belum Dicek', 'class' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'],
+                            $txn->serial?->condition_checked_at !== null => ['label' => 'Bekas — Sudah Dicek', 'class' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'],
+                            default => ['label' => 'Bekas — Belum Dicek', 'class' => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800'],
                         };
                     @endphp
                     <tr class="hover:bg-sky-50/40 dark:hover:bg-slate-700/40 transition-colors group cursor-pointer"

@@ -28,7 +28,7 @@ class WarehouseBadgeTest extends TestCase
     {
         return [
             'baru' => [ItemCondition::NEW, 'success'],
-            'bekas baik' => [ItemCondition::USED_GOOD, 'info'],
+            'bekas baik' => [ItemCondition::USED_GOOD, 'warning'],
             'bekas rusak' => [ItemCondition::USED_DAMAGED, 'error'],
         ];
     }
@@ -75,25 +75,25 @@ class WarehouseBadgeTest extends TestCase
     }
 
     #[Test]
-    public function condition_badge_bekas_belum_dicek_render_warning(): void
+    public function condition_badge_bekas_belum_dicek_render_info(): void
     {
         $html = Blade::render('<x-warehouse.condition-badge :condition="$c" :checked="false" />', [
             'c' => ItemCondition::USED_GOOD,
         ]);
 
         $this->assertStringContainsString('Belum Dicek', $html);
-        $this->assertStringContainsString('badge-warning', $html);
+        $this->assertStringContainsString('badge-info', $html);
     }
 
     #[Test]
-    public function condition_badge_bekas_sudah_dicek_render_info(): void
+    public function condition_badge_bekas_sudah_dicek_render_warning(): void
     {
         $html = Blade::render('<x-warehouse.condition-badge :condition="$c" :checked="true" />', [
             'c' => ItemCondition::USED_GOOD,
         ]);
 
         $this->assertStringContainsString('Sudah Dicek', $html);
-        $this->assertStringContainsString('badge-info', $html);
+        $this->assertStringContainsString('badge-warning', $html);
     }
 
     #[Test]

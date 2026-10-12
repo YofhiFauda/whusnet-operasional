@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Warehouse;
 use App\Enums\InventoryTransactionType;
 use App\Enums\MaterialKind;
 use App\Http\Controllers\Controller;
+use App\Models\FopTask;
 use App\Models\InventoryTransaction;
 use App\Models\ItemCategory;
 use App\Models\Pop;
@@ -275,6 +276,7 @@ class WarehouseUsageController extends Controller
                 'fopTask.pop',
                 'fopTask.customer.pop',
                 'fopTask.technicians',
+                'fopTask.task.creqDetail',
                 'customer.pop',
                 'recordedBy',
             ])
@@ -299,6 +301,8 @@ class WarehouseUsageController extends Controller
                 ?? $tm->fopTask?->technicians->first()?->name
                 ?? '-';
 
+            $badge = FopTask::resolveUsageBadgeForTask($tm->fopTask);
+
             $entries->push([
                 'source' => 'task_material',
                 'source_id' => $tm->id,
@@ -318,7 +322,9 @@ class WarehouseUsageController extends Controller
                 'customer_id' => $tm->customer_id ?? $tm->fopTask?->customer_id,
                 'fop_task_id' => $tm->fop_task_id,
                 'task_number' => $tm->fopTask?->task_number ?? '-',
-                'task_category' => $tm->fopTask?->category?->label() ?? 'Pemasangan',
+                'task_type' => $badge['type'],
+                'task_detail' => $badge['detail'],
+                'task_category' => $badge['label'],
                 'pop_name' => $popName,
                 'unit_price' => (float) ($tm->unit_price_snapshot ?? 0),
                 'total_price' => (float) ($tm->unit_price_snapshot ?? 0) * (float) $tm->qty,
@@ -335,6 +341,7 @@ class WarehouseUsageController extends Controller
                 'serial.customer.pop',
                 'fopTask.pop',
                 'fopTask.customer.pop',
+                'fopTask.task.creqDetail',
                 'fromTechnician',
                 'createdBy',
             ])
@@ -362,6 +369,9 @@ class WarehouseUsageController extends Controller
                 ?? $trx->createdBy?->name
                 ?? '-';
 
+            $isModemInstall = ($trx->item?->tracking_type?->value === 'serialized') || $trx->serial_id !== null;
+            $badge = FopTask::resolveUsageBadgeForTask($trx->fopTask, $isModemInstall);
+
             $entries->push([
                 'source' => 'inventory_transaction',
                 'source_id' => $trx->id,
@@ -381,7 +391,9 @@ class WarehouseUsageController extends Controller
                 'customer_id' => $trx->fopTask?->customer_id ?? $trx->serial?->customer_id,
                 'fop_task_id' => $trx->fop_task_id,
                 'task_number' => $trx->fopTask?->task_number ?? '-',
-                'task_category' => $trx->fopTask?->category?->label() ?? 'Instalasi',
+                'task_type' => $badge['type'],
+                'task_detail' => $badge['detail'],
+                'task_category' => $badge['label'],
                 'pop_name' => $popName,
                 'unit_price' => (float) ($trx->unit_price_snapshot ?? 0),
                 'total_price' => (float) ($trx->unit_price_snapshot ?? 0) * (float) ($trx->qty ?: 1),

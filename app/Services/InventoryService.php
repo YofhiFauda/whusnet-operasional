@@ -23,6 +23,7 @@ use App\Models\InventorySerial;
 use App\Models\InventorySerialSale;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
+use App\Models\Pop;
 use App\Models\TaskMaterial;
 use App\Models\TechnicianCustody;
 use App\Models\User;
@@ -88,10 +89,24 @@ class InventoryService
         }
 
         return DB::transaction(function () use ($technicianIds, $item, $qtyUsed, $fopTask, $customer, $actor) {
+            // Barang yang diissue dari Cabang A gak boleh dipasang/dipakai di
+            // Task Cabang B (laporan user: modem Jetis kepakai di Sandya) —
+            // lot custody dari cabang lain SENGAJA di-skip dari FIFO di sini
+            // (bukan dilempar begitu nemu baris pertama), bukan dianggap
+            // "tidak ada" — kalau total custody cabang yang cocok gak cukup,
+            // `InsufficientCustodyException` di bawah yang jalan, pesannya
+            // sama seperti kasus custody beneran kurang. `issued_from_pop_id`
+            // NULL (data legacy sebelum kolom ini ada) tetap lolos — fail-open,
+            // gak retroaktif ngeblokir data lama yang gak kebaca cabangnya.
+            $targetCabangId = Pop::resolveCabangId($fopTask->pop_id);
+
             $lots = TechnicianCustody::query()
                 ->whereIn('technician_id', $technicianIds)
                 ->where('item_id', $item->id)
                 ->where('qty_remaining', '>', 0)
+                ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                    $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+                }))
                 ->orderBy('issued_at')
                 ->lockForUpdate()
                 ->get();
@@ -198,6 +213,15 @@ class InventoryService
 
             if ($serial->item?->ownership_mode !== OwnershipMode::INSTALLABLE) {
                 throw new InvalidArgumentException("Item {$serial->item?->name} berstatus aset perusahaan (company_asset) — gak boleh diinstall ke pelanggan.");
+            }
+
+            // Barang yang diissue dari Cabang A gak boleh dipasang di Task
+            // Cabang B (laporan user: modem Jetis kepakai di Sandya).
+            // `issued_from_pop_id`/`$fopTask->pop_id` NULL (data legacy) tetap
+            // lolos — fail-open, gak retroaktif ngeblokir data lama.
+            $targetCabangId = Pop::resolveCabangId($fopTask->pop_id);
+            if ($targetCabangId !== null && $serial->issued_from_pop_id !== null && $serial->issued_from_pop_id !== $targetCabangId) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} berasal dari cabang lain — gak bisa diinstall untuk task di cabang ini.");
             }
 
             $fromTechnicianId = $serial->current_technician_id;
@@ -427,6 +451,13 @@ class InventoryService
 
             if (! in_array($roll->current_technician_id, $technicianIds, true)) {
                 throw new InvalidArgumentException("Roll {$roll->roll_code} bukan custody tim ini.");
+            }
+
+            // Sama guard lintas-cabang dengan `installSerial()` — roll yang
+            // diissue dari Cabang A gak boleh dipakai di Task Cabang B.
+            $targetCabangId = Pop::resolveCabangId($fopTask->pop_id);
+            if ($targetCabangId !== null && $roll->issued_from_pop_id !== null && $roll->issued_from_pop_id !== $targetCabangId) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} berasal dari cabang lain — gak bisa dipakai untuk task di cabang ini.");
             }
 
             if ($metersUsed > (float) $roll->length_remaining) {

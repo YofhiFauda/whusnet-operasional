@@ -95,6 +95,31 @@
         </div>
     </div>
 
+    <?php if($fopTask->task?->started_via === 'qr_scan'): ?>
+        <?php
+        $attendanceTask = $fopTask->task;
+        $attendanceFlag = $attendanceTask->attendanceFlag();
+        ?>
+        <section class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-4 shadow-sm space-y-2">
+        <h2 class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-ui">Lokasi Mulai Kerja</h2>
+        <div class="flex flex-wrap items-center gap-2 text-[11px] font-ui">
+            <span class="text-slate-600 dark:text-slate-300">Metode: <?php echo e($attendanceTask->started_via); ?></span>
+            <span class="rounded border px-2 py-0.5 font-semibold <?php echo e($attendanceFlag === 'ok' ? 'border-green-200 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : ($attendanceFlag === 'perlu_review' ? 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' : 'border-red-200 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400')); ?>">
+                <?php echo e(match ($attendanceFlag) { 'ok' => 'Dalam Radius', 'perlu_review' => 'Perlu Review', 'out_of_radius' => 'Di Luar Radius', default => 'Tanpa Koordinat' }); ?>
+
+            </span>
+            <?php if($attendanceTask->started_distance_meters !== null): ?>
+                <span class="text-slate-600 dark:text-slate-300"><?php echo e(number_format($attendanceTask->started_distance_meters, 0, ',', '.')); ?> meter dari pelanggan</span>
+            <?php endif; ?>
+        </div>
+        <?php if($attendanceTask->started_latitude !== null && $attendanceTask->started_longitude !== null): ?>
+            <a href="https://www.google.com/maps/search/?api=1&query=<?php echo e($attendanceTask->started_latitude); ?>,<?php echo e($attendanceTask->started_longitude); ?>" target="_blank" rel="noopener" class="text-[11px] font-medium text-blue-600 hover:underline font-ui">
+                Lihat titik absen di Maps
+            </a>
+        <?php endif; ?>
+        </section>
+    <?php endif; ?>
+
     
     <?php if (! ($showTicketDetail)): ?>
     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">

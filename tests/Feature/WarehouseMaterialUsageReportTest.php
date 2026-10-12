@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\InventoryTransactionType;
 use App\Enums\MaterialKind;
+use App\Enums\ScopeType;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\FopTask;
@@ -142,6 +143,37 @@ class WarehouseMaterialUsageReportTest extends TestCase
     {
         $this->actingAs($this->teknisi)
             ->get(route('warehouse.usage.index'))
+            ->assertForbidden();
+    }
+
+    /**
+     * Regresi — `fop` dikasih permission SEMPIT `warehouse.usage.view` (bukan
+     * `warehouse.view` penuh) khusus biar bisa lihat rekap pemakaian material
+     * harian/mingguan/bulanan/custom. Wajib lolos ke halaman ini TAPI tetap
+     * 403 di halaman gudang lain yang masih digerbangi `warehouse.view` murni
+     * — membuktikan permission sempit itu gak diam-diam leak ke seluruh modul.
+     */
+    #[Test]
+    public function fop_role_can_view_usage_page_but_not_other_warehouse_pages(): void
+    {
+        $fopRole = Role::where('code', 'fop')->firstOrFail();
+        $fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        UserRoleScope::create([
+            'user_id' => $fopUser->id,
+            'role_id' => $fopRole->id,
+            'scope_type' => ScopeType::ALL_POP->value,
+        ]);
+
+        $this->actingAs($fopUser)
+            ->get(route('warehouse.usage.index'))
+            ->assertOk();
+
+        $this->actingAs($fopUser)
+            ->get(route('warehouse.usage.export'))
+            ->assertSuccessful();
+
+        $this->actingAs($fopUser)
+            ->get(route('warehouse.stock.index'))
             ->assertForbidden();
     }
 

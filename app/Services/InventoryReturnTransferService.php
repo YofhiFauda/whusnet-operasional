@@ -7,6 +7,7 @@ use App\Enums\ItemCondition;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Enums\TransferStatus;
+use App\Models\DeviceRetrievalLog;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
@@ -113,8 +114,14 @@ class InventoryReturnTransferService
      * dispatch di dalamnya sudah dikonfirmasi — kalau masih ada SN lain
      * dalam pengiriman yang sama belum dicek, header dibiarkan `IN_TRANSIT`.
      */
-    public function confirmAtPusat(InventorySerial $serial, ItemCondition $condition, ?Item $correctedItem, User $actor, ?string $notes = null): InventoryTransaction
+    public function confirmAtPusat(InventorySerial $serial, ItemCondition $condition, ?Item $correctedItem, User $actor, ?string $notes = null, ?float $estimatedValue = null): InventoryTransaction
     {
+        abort_unless($actor->hasPermission('warehouse_transfer.create'), 403);
+
+        if ($estimatedValue !== null && $estimatedValue < 0) {
+            throw new InvalidArgumentException('Harga modem retur tidak boleh negatif.');
+        }
+
         if ($condition === ItemCondition::NEW) {
             throw new InvalidArgumentException('Kondisi modem hasil retur harus "bekas baik" atau "bekas rusak" — bukan baru.');
         }
@@ -123,7 +130,7 @@ class InventoryReturnTransferService
             throw new InvalidArgumentException("Barang {$correctedItem->name} bukan barang ber-SN.");
         }
 
-        return DB::transaction(function () use ($serial, $condition, $correctedItem, $actor, $notes) {
+        return DB::transaction(function () use ($serial, $condition, $correctedItem, $actor, $notes, $estimatedValue) {
             $serial = InventorySerial::query()->lockForUpdate()->findOrFail($serial->id);
 
             if ($serial->status !== SerialStatus::TRANSFERRED) {
@@ -143,6 +150,10 @@ class InventoryReturnTransferService
             }
 
             $transfer = InventoryTransfer::query()->lockForUpdate()->findOrFail($dispatchLine->inventory_transfer_id);
+
+            $pusat = Pop::findOrFail($transfer->to_pop_id);
+            $access = app(EffectiveAccessService::class);
+            abort_unless($pusat->isPusat() && ($access->hasAllPopAccess($actor) || in_array($pusat->id, $access->getAllowedPopIds($actor), true)), 403);
 
             if (! $transfer->isInTransit()) {
                 throw new InvalidArgumentException("Pengiriman {$transfer->reference_number} sudah ditutup.");
@@ -165,10 +176,17 @@ class InventoryReturnTransferService
                 'serial_id' => $serial->id,
                 'qty' => 1,
                 'to_pop_id' => $transfer->to_pop_id,
+                'unit_price_snapshot' => $estimatedValue !== null && $estimatedValue > 0 ? $estimatedValue : null,
                 'reason' => 'Konfirmasi retur modem diterima Gudang Pusat.',
                 'notes' => $notes,
                 'created_by' => $actor->id,
             ]);
+
+            DeviceRetrievalLog::query()
+                ->where('serial_id', $serial->id)
+                ->latest('id')
+                ->first()
+                ?->update(['estimated_value' => $transaction->unit_price_snapshot]);
 
             $dispatchCount = InventoryTransaction::where('inventory_transfer_id', $transfer->id)->whereNotNull('from_pop_id')->count();
             $confirmCount = InventoryTransaction::where('inventory_transfer_id', $transfer->id)->whereNotNull('to_pop_id')->count();

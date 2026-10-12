@@ -343,7 +343,7 @@
             </div>
 
             
-            <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view')): ?>
+            <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('qr_scan_logs.view') || auth()->user()->hasPermission('network_odps.view')): ?>
             <div>
                 <div class="sidebar-group-header">
                     <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Jaringan &amp; Lapangan</p>
@@ -416,6 +416,18 @@
                         </div>
                     </a>
                     <?php endif; ?>
+                    <?php endif; ?>
+
+                    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('network_odps.view')): ?>
+                    <a href="<?php echo e(route('network.odps.index')); ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium <?php echo e(Request::routeIs('network.odps.*') || Request::routeIs('network.odp-ports.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60'); ?>">
+                        <span class="sidebar-text">Master ODP &amp; Port</span>
+                    </a>
+                    <?php endif; ?>
+
+                    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('qr_scan_logs.view')): ?>
+                    <a href="<?php echo e(route('qr-scan-logs.index')); ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium <?php echo e(Request::routeIs('qr-scan-logs.index') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60'); ?>">
+                        <span class="sidebar-text">Riwayat Scan QR</span>
+                    </a>
                     <?php endif; ?>
 
                     <?php if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('noc_worksheet.view') || auth()->user()->hasPermission('noc_dashboard.view')): ?>
@@ -726,7 +738,10 @@
                                 <a href="<?php echo e(route('warehouse.traceability.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/traceability*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Lacak Barang / SN</a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_report.view')): ?>
-                                <a href="<?php echo e(route('warehouse.reports.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/reports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Laporan Gudang</a>
+                                <a href="<?php echo e(route('warehouse.reports.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/reports') || (Request::is('warehouse/reports/*') && ! Request::is('warehouse/reports/sold-to-customer*')) ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Laporan Gudang</a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('warehouse_report.sold_to_customer.view')): ?>
+                                <a href="<?php echo e(route('warehouse.reports.sold-to-customer')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/reports/sold-to-customer*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Laporan Barang Terjual</a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
                                 <a href="<?php echo e(route('warehouse.stock-requests.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Permintaan Stok</a>
