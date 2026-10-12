@@ -91,6 +91,18 @@ class NetworkNode extends Model
     }
 
     /**
+     * Port node ini, selalu terurut `number` ASC — urutan ini dipakai UI
+     * daftar port & kalkulasi kapasitas, jadi jangan diandalkan dari urutan
+     * insert.
+     *
+     * @return HasMany<NetworkNodePort, $this>
+     */
+    public function ports(): HasMany
+    {
+        return $this->hasMany(NetworkNodePort::class)->orderBy('number');
+    }
+
+    /**
      * Naik rantai `parent` sampai node puncak (yang punya `anchor_pop_id`),
      * lalu resolve ke Cabang. Pohon POP dangkal (Cabang → Mini POP, lihat
      * `Pop::resolveCabangId()`), jadi "naik" di sisi POP cukup satu langkah:
