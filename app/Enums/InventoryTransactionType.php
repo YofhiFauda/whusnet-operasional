@@ -65,6 +65,20 @@ enum InventoryTransactionType: string
      */
     case INSTALL = 'install';
 
+    /**
+     * Unit SERIALIZED/QUANTITY/ROLL terpasang netap ke titik infrastruktur
+     * jaringan (ODC/ODP/splitter). Bukan ke pelanggan — beda dari INSTALL,
+     * jadi tidak masuk `customer_technical_details`.
+     */
+    case DEPLOY = 'deploy';
+
+    /**
+     * Pencabutan balik dari titik infrastruktur ke custody teknisi (mis. saat
+     * ODP dibongkar). Kebalikan DEPLOY — tidak menyentuh `inventory_balances`
+     * gudang, sama seperti alur RETURN ke custody.
+     */
+    case RETRIEVE_INFRA = 'retrieve_infra';
+
     public function label(): string
     {
         return match ($this) {
@@ -76,6 +90,8 @@ enum InventoryTransactionType: string
             self::TRANSFER_CUSTODY => 'Alih Custody Teknisi',
             self::STOCK_OPNAME => 'Stok Opname',
             self::INSTALL => 'Terpasang di Pelanggan',
+            self::DEPLOY => 'Terpasang di Infrastruktur',
+            self::RETRIEVE_INFRA => 'Dicabut dari Infrastruktur',
         };
     }
 }
