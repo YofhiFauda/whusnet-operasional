@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\OwnershipMode;
 use App\Enums\TrackingType;
 use App\Models\Item;
 use Database\Seeders\ItemSeeder;
@@ -56,6 +57,39 @@ class ItemSeederTrackingTypeTest extends TestCase
         $item = Item::where('code', 'DC-1C')->firstOrFail();
 
         $this->assertSame(TrackingType::ROLL, $item->tracking_type);
+    }
+
+    #[Test]
+    public function splitter_odp_and_feeder_are_seeded_as_infrastructure_assets(): void
+    {
+        foreach (['SPL-1X2', 'SPL-1X4', 'SPL-1X8', 'SPL-1X16', 'SPL-1X32', 'ODP-8', 'ODP-16', 'ODC-24', 'KBL-FEEDER-12C'] as $code) {
+            $this->assertSame(
+                OwnershipMode::INFRASTRUCTURE_ASSET,
+                Item::where('code', $code)->firstOrFail()->ownership_mode,
+                "{$code} harus aset infrastruktur",
+            );
+        }
+    }
+
+    #[Test]
+    public function dropcore_stays_installable_because_it_is_cut_to_customers(): void
+    {
+        foreach (['DC-1C', 'DC-2C'] as $code) {
+            $this->assertSame(OwnershipMode::INSTALLABLE, Item::where('code', $code)->firstOrFail()->ownership_mode);
+        }
+    }
+
+    #[Test]
+    public function reseeding_updates_ownership_mode_of_existing_item(): void
+    {
+        // Lingkungan dev/staging yang udah di-seed sebelum perbaikan ini:
+        // updateOrCreate wajib menimpa ownership_mode lama (lewat Eloquent,
+        // gak kena kunci `$locked` UI di ItemController).
+        Item::where('code', 'ODP-8')->update(['ownership_mode' => OwnershipMode::INSTALLABLE->value]);
+
+        $this->seed(ItemSeeder::class);
+
+        $this->assertSame(OwnershipMode::INFRASTRUCTURE_ASSET, Item::where('code', 'ODP-8')->firstOrFail()->ownership_mode);
     }
 
     #[Test]

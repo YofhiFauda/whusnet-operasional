@@ -3,6 +3,7 @@
 namespace Tests\Feature\Master;
 
 use App\Models\NetworkNodeType;
+use Database\Seeders\NetworkNodeTypeSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -161,5 +162,30 @@ class NetworkNodeTypeCrudTest extends TestCase
 
         $response->assertRedirect();
         $this->assertDatabaseMissing('network_node_types', ['id' => $type->id]);
+    }
+
+    /**
+     * Gejala yang dijaga: NetworkNodeTypeSeeder pakai updateOrCreate, jadi
+     * tiap db:seed ulang (deploy) mereset ambang Red Zone/max port yang
+     * sudah diubah admin lewat halaman ini balik ke nilai seed.
+     */
+    #[Test]
+    public function reseed_does_not_overwrite_admin_edits_to_node_types(): void
+    {
+        $this->seed(NetworkNodeTypeSeeder::class);
+
+        $odp = NetworkNodeType::where('code', 'odp')->firstOrFail();
+        $this->assertSame(80, (int) $odp->red_zone_threshold);
+
+        $odp->update(['red_zone_threshold' => 65, 'max_ports' => 48, 'name' => 'ODP Custom Admin']);
+
+        $this->seed(NetworkNodeTypeSeeder::class);
+
+        $odp->refresh();
+        $this->assertSame(65, (int) $odp->red_zone_threshold);
+        $this->assertSame(48, (int) $odp->max_ports);
+        $this->assertSame('ODP Custom Admin', $odp->name);
+        $this->assertSame(1, NetworkNodeType::where('code', 'odp')->count());
+        $this->assertSame(6, NetworkNodeType::count());
     }
 }

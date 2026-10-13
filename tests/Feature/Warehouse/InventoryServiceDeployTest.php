@@ -349,4 +349,51 @@ class InventoryServiceDeployTest extends TestCase
         $this->assertSame(0, InfrastructureBalance::count());
         $this->assertSame(0, InventoryTransaction::count());
     }
+
+    #[Test]
+    public function consume_from_custody_menolak_barang_aset_infrastruktur(): void
+    {
+        $closure = $this->makeItem('DPL-CLOSURE-C', 'quantity', 'infrastructure_asset');
+        $lot = TechnicianCustody::create([
+            'technician_id' => $this->technician->id,
+            'issued_from_pop_id' => $this->cabangA->id,
+            'item_id' => $closure->id,
+            'qty_remaining' => 5,
+            'status' => 'issued',
+            'issued_at' => now(),
+        ]);
+
+        try {
+            app(InventoryService::class)->consumeFromCustody([$this->technician], $closure, 1, $this->fopTask, null, $this->actor);
+            $this->fail('consumeFromCustody() seharusnya menolak aset infrastruktur.');
+        } catch (InvalidArgumentException $e) {
+            $this->assertStringContainsString('deployQuantity()', $e->getMessage());
+        }
+
+        $this->assertEquals(5, $lot->refresh()->qty_remaining);
+    }
+
+    #[Test]
+    public function consume_from_roll_menolak_roll_aset_infrastruktur(): void
+    {
+        $kabel = $this->makeItem('DPL-FEEDER-C', 'roll', 'infrastructure_asset', 'meter');
+        $roll = InventoryRoll::create([
+            'item_id' => $kabel->id,
+            'roll_code' => 'ROLL-DPL-C01',
+            'status' => RollStatus::ISSUED,
+            'current_technician_id' => $this->technician->id,
+            'issued_from_pop_id' => $this->cabangA->id,
+            'length_total' => 100,
+            'length_remaining' => 100,
+        ]);
+
+        try {
+            app(InventoryService::class)->consumeFromRoll($roll, 10, [$this->technician], $this->fopTask, null, $this->actor);
+            $this->fail('consumeFromRoll() seharusnya menolak roll aset infrastruktur.');
+        } catch (InvalidArgumentException $e) {
+            $this->assertStringContainsString('deployRoll()', $e->getMessage());
+        }
+
+        $this->assertEquals(100, $roll->refresh()->length_remaining);
+    }
 }

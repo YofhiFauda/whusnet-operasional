@@ -118,16 +118,23 @@
             <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
         @enderror
 
-        <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
+        {{-- Kepemilikan berlaku buat SEMUA cara lacak: QUANTITY/ROLL boleh jadi
+             Aset Infrastruktur (aksesoris/kabel yang dipasang netap ke titik
+             jaringan). Cuma "Aset Perusahaan" yang SERIALIZED-only — opsinya
+             dimatikan per-opsi, bukan seluruh select (dulu seluruh select
+             disabled → QUANTITY/ROLL gak pernah bisa jadi infrastruktur). --}}
+        <div class="pt-2">
             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kepemilikan</label>
-            <select name="ownership_mode" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <select name="ownership_mode" x-effect="if (trackingType !== 'serialized' && $el.value === 'company_asset') { $el.value = 'installable' }" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
                 @foreach($ownershipModes as $om)
-                <option value="{{ $om->value }}" {{ old('ownership_mode', 'installable') === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
+                <option value="{{ $om->value }}" @if($om === \App\Enums\OwnershipMode::COMPANY_ASSET) :disabled="trackingType !== 'serialized'" @endif {{ old('ownership_mode', 'installable') === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
                 @endforeach
             </select>
-            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — gak pernah tercatat terpasang ke pelanggan, cuma dipinjam-pakaikan lalu wajib balik.</p>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — cuma Bernomor Seri, gak pernah tercatat terpasang, dipinjam-pakaikan lalu wajib balik. "Aset Infrastruktur" buat barang yang dipasang netap ke titik jaringan (ODP, splitter, kabel feeder).</p>
+        </div>
 
-            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5 mt-4">Sumber Serial Number</label>
+        <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Sumber Serial Number</label>
             <select name="auto_generate_serial" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
                 <option value="0" {{ old('auto_generate_serial', '0') === '0' ? 'selected' : '' }}>Manual (barang punya SN asli dari vendor — modem, ONT, router)</option>
                 <option value="1" {{ old('auto_generate_serial') === '1' ? 'selected' : '' }}>Digenerate Sistem (barang gak punya SN — ODP, Splitter, dll)</option>

@@ -2,7 +2,9 @@
 
 namespace Tests\Unit;
 
+use App\Models\AuditLog;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -36,5 +38,25 @@ class NetworkNodePortModelTest extends TestCase
         $this->expectException(QueryException::class);
 
         $node->ports()->create(['number' => 1, 'is_used' => false]);
+    }
+
+    /**
+     * Regresi vs `OdpPort` lama (punya RecordsAuditLogs created+updated):
+     * port baru & toggle is_used wajib meninggalkan jejak audit.
+     */
+    #[Test]
+    public function it_writes_audit_log_on_create_and_on_is_used_update(): void
+    {
+        $node = NetworkNode::factory()->create();
+        $port = $node->ports()->create(['number' => 1, 'is_used' => false]);
+
+        $created = AuditLog::where('auditable_type', NetworkNodePort::class)->where('auditable_id', $port->id)->where('action', 'create')->sole();
+        $this->assertSame('Port Node Jaringan', $created->module);
+
+        $port->update(['is_used' => true]);
+
+        $updated = AuditLog::where('auditable_type', NetworkNodePort::class)->where('auditable_id', $port->id)->where('action', 'update')->sole();
+        $this->assertFalse((bool) $updated->old_values['is_used']);
+        $this->assertTrue((bool) $updated->new_values['is_used']);
     }
 }

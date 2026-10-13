@@ -196,13 +196,23 @@ class ItemController extends Controller
         }
 
         if (! $locked) {
-            // Qty/Batch gak relevan sama sumbu kepemilikan (cuma SERIALIZED yang
-            // bisa jadi Aset Perusahaan) — dipaksa installable biar gak ada
-            // kombinasi ganjil "kabel drum berstatus aset perusahaan".
             $trackingType = TrackingType::from($validated['tracking_type']);
-            $validated['ownership_mode'] = $trackingType === TrackingType::SERIALIZED
-                ? ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value)
-                : OwnershipMode::INSTALLABLE->value;
+            if ($trackingType === TrackingType::SERIALIZED) {
+                $validated['ownership_mode'] = $validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value;
+            } else {
+                // QUANTITY/ROLL: boleh INSTALLABLE (default) atau INFRASTRUCTURE_ASSET
+                // (aksesoris/kabel yang dipasang netap ke titik jaringan, bukan ke
+                // pelanggan — lihat InventoryService::deployQuantity()/deployRoll()).
+                // Dulu dipaksa INSTALLABLE tanpa celah → jalur deploy QUANTITY/ROLL
+                // gak pernah kejangkau dari UI. COMPANY_ASSET TIDAK berlaku di
+                // sini — itu konsep alat kerja yang dipinjam-pakaikan lalu WAJIB
+                // balik (OTDR dst), bukan barang habis pakai/dipasang netap;
+                // kalau dikirim tetap diturunkan ke INSTALLABLE.
+                $submitted = $validated['ownership_mode'] ?? null;
+                $validated['ownership_mode'] = in_array($submitted, [OwnershipMode::INSTALLABLE->value, OwnershipMode::INFRASTRUCTURE_ASSET->value], true)
+                    ? $submitted
+                    : OwnershipMode::INSTALLABLE->value;
+            }
 
             // Non-SERIALIZED gak punya konsep sumber SN sama sekali — paksa
             // false, bukan cuma andalkan `prohibited` (kolom tetap kudu keisi

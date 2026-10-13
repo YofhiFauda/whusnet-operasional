@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Models\AuditLog;
 use App\Models\NetworkNode;
 use App\Models\Pop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -109,5 +110,24 @@ class NetworkNodeModelTest extends TestCase
         // adalah tanggung jawab NetworkNodeService::assertPlacement() di
         // Task 6, lengkap dengan test-nya sendiri di sana.
         $this->markTestIncomplete('XOR validation belongs to NetworkNodeService — Task 6');
+    }
+
+    /**
+     * Node baru wajib teraudit (padanan `Odp` lama), TAPI update generik
+     * tidak — `NetworkNodeService::move()` sudah menulis audit 'move'
+     * eksplisit; kalau trait ikut audit 'updated', satu pemindahan jadi dua
+     * baris.
+     */
+    #[Test]
+    public function creation_is_audited_but_generic_update_is_not(): void
+    {
+        $node = NetworkNode::factory()->create();
+
+        $created = AuditLog::where('auditable_type', NetworkNode::class)->where('auditable_id', $node->id)->where('action', 'create')->sole();
+        $this->assertSame('Node Jaringan', $created->module);
+
+        $node->update(['name' => 'Nama Baru']);
+
+        $this->assertSame(0, AuditLog::where('auditable_type', NetworkNode::class)->where('auditable_id', $node->id)->where('action', 'update')->count());
     }
 }

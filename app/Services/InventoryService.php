@@ -84,6 +84,14 @@ class InventoryService
             throw new InvalidArgumentException("Item {$item->name} SERIALIZED — pakai jalur instalasi SN, bukan consumeFromCustody().");
         }
 
+        // Cermin guard di deployQuantity() (yang nolak non-infrastruktur):
+        // barang infrastruktur yang "terpakai ke pelanggan" bikin saldo
+        // titik jaringan (InfrastructureBalance) gak pernah tercatat — stok
+        // fisik terpasang di tiang hilang dari jejak lokasi.
+        if ($item->ownership_mode === OwnershipMode::INFRASTRUCTURE_ASSET) {
+            throw new InvalidArgumentException("Item {$item->name} aset infrastruktur (ownership_mode) — pakai jalur deployQuantity(), bukan consumeFromCustody().");
+        }
+
         $technicianIds = Collection::make($technicians)->pluck('id')->all();
 
         if ($technicianIds === []) {
@@ -453,6 +461,13 @@ class InventoryService
 
             if (! in_array($roll->current_technician_id, $technicianIds, true)) {
                 throw new InvalidArgumentException("Roll {$roll->roll_code} bukan custody tim ini.");
+            }
+
+            // Cermin guard deployRoll() — roll infrastruktur (feeder) wajib
+            // lewat jalur deploy supaya meter terpasang tercatat di titik
+            // jaringan, bukan hilang sebagai "terpakai pelanggan".
+            if ($roll->item?->ownership_mode === OwnershipMode::INFRASTRUCTURE_ASSET) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} aset infrastruktur (ownership_mode) — pakai jalur deployRoll(), bukan consumeFromRoll().");
             }
 
             // Sama guard lintas-cabang dengan `installSerial()` — roll yang

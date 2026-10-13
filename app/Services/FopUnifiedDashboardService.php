@@ -393,7 +393,8 @@ class FopUnifiedDashboardService
             ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
             ->get();
 
-        $redZoneNodes = $nodes->filter(fn (NetworkNode $node) => $this->isInRedZone($node));
+        // Aturan ambang satu sumber di model — dipakai juga listing Network Node.
+        $redZoneNodes = $nodes->filter(fn (NetworkNode $node) => $node->isInRedZone());
 
         $redZone = $redZoneNodes
             ->sortByDesc(fn (NetworkNode $node) => $node->used_ports_count / $node->ports_count)
@@ -412,26 +413,6 @@ class FopUnifiedDashboardService
             'red_zone_count' => $redZoneNodes->count(),
             'red_zone' => $redZone,
         ];
-    }
-
-    /**
-     * Ambang disimpan sebagai PERSEN (80 = 80%), rasio pemakaian pecahan —
-     * jangan bandingkan langsung. `used/ports >= threshold/100` dikali silang
-     * jadi `used*100 >= threshold*ports`: aritmetika integer murni, tanpa
-     * risiko float di tepat ambang (mis. 7/10 vs 70%). Tipe tanpa ambang
-     * (null) tidak pernah Red Zone.
-     */
-    private function isInRedZone(NetworkNode $node): bool
-    {
-        $threshold = $node->nodeType?->red_zone_threshold;
-
-        // `<= 0`, bukan `=== 0`: withCount bisa balik string numerik di driver
-        // tertentu — `"0" === 0` false lalu pembagian/perbandingan jadi salah.
-        if ($threshold === null || (int) $node->ports_count <= 0) {
-            return false;
-        }
-
-        return $node->used_ports_count * 100 >= $threshold * $node->ports_count;
     }
 
     /**

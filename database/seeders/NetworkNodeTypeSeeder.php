@@ -57,8 +57,15 @@ class NetworkNodeTypeSeeder extends Seeder
             ['code' => 'odp', 'name' => 'ODP', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
         ];
 
+        // firstOrCreate, BUKAN updateOrCreate (beda dari dua Feature di atas,
+        // yang memang harus terus direkonsiliasi): enam tipe ini master data
+        // yang boleh diubah admin lewat halaman Master Tipe Node (spec §3.1 —
+        // "nilai awal, bisa diubah admin"). updateOrCreate bakal mereset
+        // red_zone_threshold/max_ports/dst hasil edit admin tiap kali seeder
+        // dijalankan ulang (deploy, db:seed rutin). Nilai di bawah cuma
+        // dipakai saat baris pertama kali dibuat.
         foreach ($types as $index => $type) {
-            NetworkNodeType::updateOrCreate(
+            NetworkNodeType::firstOrCreate(
                 ['code' => $type['code']],
                 [
                     'name' => $type['name'],

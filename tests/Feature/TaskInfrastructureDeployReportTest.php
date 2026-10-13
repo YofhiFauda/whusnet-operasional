@@ -362,4 +362,64 @@ class TaskInfrastructureDeployReportTest extends TestCase
             ->assertOk()
             ->assertDontSee('Pasang/Ganti Infrastruktur');
     }
+
+    #[Test]
+    public function picker_material_dan_roll_pelanggan_tidak_menampilkan_aset_infrastruktur(): void
+    {
+        $this->withoutVite();
+
+        $task = $this->makeTask(TaskType::OREQ);
+
+        $infraClosure = $this->makeItem('INF-CLOSURE-P', 'quantity');
+        $infraClosure->update(['equipment_class_override' => 'pasif']);
+        $konektor = Item::create([
+            'code' => 'CUST-KONEKTOR-P', 'name' => 'Konektor Pelanggan', 'unit' => 'pcs',
+            'item_category_id' => $this->category->id, 'tracking_type' => 'quantity',
+            'ownership_mode' => 'installable', 'equipment_class_override' => 'pasif',
+        ]);
+        foreach ([$infraClosure, $konektor] as $item) {
+            TechnicianCustody::create([
+                'technician_id' => $this->technician->id,
+                'issued_from_pop_id' => $this->pop->id,
+                'item_id' => $item->id,
+                'qty_remaining' => 5,
+                'status' => 'issued',
+                'issued_at' => now(),
+            ]);
+        }
+
+        $infraRoll = InventoryRoll::create([
+            'item_id' => $this->makeItem('INF-FEEDER-P', 'roll', 'meter')->id,
+            'roll_code' => 'ROLL-INF-P01', 'status' => RollStatus::ISSUED,
+            'current_technician_id' => $this->technician->id, 'issued_from_pop_id' => $this->pop->id,
+            'length_total' => 100, 'length_remaining' => 100,
+        ]);
+        $dropcore = Item::create([
+            'code' => 'CUST-DC-P', 'name' => 'Dropcore Pelanggan', 'unit' => 'meter',
+            'item_category_id' => $this->category->id, 'tracking_type' => 'roll', 'ownership_mode' => 'installable',
+        ]);
+        $customerRoll = InventoryRoll::create([
+            'item_id' => $dropcore->id,
+            'roll_code' => 'ROLL-CUST-P01', 'status' => RollStatus::ISSUED,
+            'current_technician_id' => $this->technician->id, 'issued_from_pop_id' => $this->pop->id,
+            'length_total' => 100, 'length_remaining' => 100,
+        ]);
+
+        $this->actingAs($this->technician)->get(route('tasks.maintenance.report', $task))
+            ->assertOk()
+            ->assertViewHas('eligiblePassiveCustody', fn ($rows) => $rows->pluck('item_id')->all() === [$konektor->id])
+            ->assertViewHas('eligibleRolls', fn ($rolls) => $rolls->pluck('id')->all() === [$customerRoll->id])
+            ->assertViewHas('eligibleInfraCustody', fn ($rows) => $rows->pluck('item_id')->contains($infraClosure->id))
+            ->assertViewHas('eligibleInfraRolls', fn ($rolls) => $rolls->pluck('id')->contains($infraRoll->id));
+
+        // Roll infrastruktur dikirim lewat field roll PELANGGAN → ditolak
+        // Rule::in sebagai error form, roll gak terpotong.
+        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $task), [
+            'kendala_teknis' => 'Coba potong feeder ke pelanggan.',
+            'selected_inventory_roll_id' => $infraRoll->id,
+            'roll_meters_used' => 10,
+        ])->assertSessionHasErrors('selected_inventory_roll_id');
+
+        $this->assertEquals(100, $infraRoll->refresh()->length_remaining);
+    }
 }

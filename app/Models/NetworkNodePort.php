@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,7 +21,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class NetworkNodePort extends Model
 {
-    use HasFactory;
+    use HasFactory, RecordsAuditLogs;
+
+    // Padanan `OdpPort` lama (created + updated) — toggle is_used port itu
+    // perubahan kapasitas yang dipakai Red Zone FOP; tanpa jejak, gak bisa
+    // dilacak siapa yang menandai port terpakai/kosong.
+    protected string $auditModule = 'Port Node Jaringan';
+
+    protected array $auditEvents = ['created', 'updated'];
 
     /**
      * @return array<string, string>

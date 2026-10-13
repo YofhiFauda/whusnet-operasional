@@ -54,8 +54,11 @@
                     <h2 class="text-base font-bold text-text-main">{{ $node->code }} · {{ $node->name }}</h2>
                     <p class="text-xs text-text-muted">{{ $node->nodeType?->name }} · {{ $node->breadcrumbLabel() }} · {{ $node->used_ports_count }}/{{ $node->ports_count }} port terpakai</p>
                 </div>
-                <span class="rounded-lg border px-2 py-1 text-xs font-bold {{ $usagePercent >= 85 ? 'border-error-border bg-error-bg text-error' : 'border-border bg-surface-muted text-text-secondary' }}">
-                    {{ $usagePercent >= 85 ? 'Red Zone · ' : '' }}{{ $usagePercent }}%
+                {{-- Red Zone dari ambang per tipe node (NetworkNode::isInRedZone()),
+                     sama persis dengan dashboard FOP — bukan 85% hardcode. --}}
+                @php $isRedZone = $node->isInRedZone(); @endphp
+                <span class="rounded-lg border px-2 py-1 text-xs font-bold {{ $isRedZone ? 'border-error-border bg-error-bg text-error' : 'border-border bg-surface-muted text-text-secondary' }}" data-red-zone="{{ $isRedZone ? '1' : '0' }}">
+                    {{ $isRedZone ? 'Red Zone · ' : '' }}{{ $usagePercent }}%
                 </span>
             </div>
             <div class="mt-4 flex flex-wrap gap-2">

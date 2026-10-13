@@ -253,6 +253,50 @@ class OdpNetworkManagementTest extends TestCase
     }
 
     /**
+     * Gejala yang dijaga: badge Red Zone di halaman listing Network Node
+     * dulu pakai 85% hardcode, sementara dashboard FOP pakai ambang per tipe
+     * — node yang sama bisa Red Zone di satu layar dan normal di layar lain.
+     * Sekarang keduanya lewat `NetworkNode::isInRedZone()`.
+     */
+    public function test_badge_red_zone_listing_memakai_ambang_per_tipe_sama_dengan_dashboard(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create(['code' => 'ODP-RZ', 'name' => 'POP ODP RZ', 'type' => 'cabang', 'status' => 'active']);
+        $node = $this->makeNode($pop->id, 'ODP-RZ-1', 'Ambang Listing');
+        // 5/7 = 71% — di bawah 85% hardcode lama.
+        for ($number = 1; $number <= 7; $number++) {
+            $node->ports()->create(['number' => $number, 'is_used' => $number <= 5]);
+        }
+
+        NetworkNodeType::where('id', $this->odpTypeId)->update(['red_zone_threshold' => 70]);
+        $this->actingAs($owner)->get(route('network.nodes.index'))
+            ->assertOk()
+            ->assertSee('data-red-zone="1"', false)
+            ->assertSee('Red Zone · 71%');
+        $this->assertSame(1, app(FopUnifiedDashboardService::class)->getOdpSummary(true, [])['red_zone_count']);
+
+        // Kebalikannya: 6/7 = 86% (di atas 85% lama) tapi ambang tipe 90 →
+        // bukan Red Zone di listing maupun dashboard.
+        $node->ports()->where('number', 6)->update(['is_used' => true]);
+        NetworkNodeType::where('id', $this->odpTypeId)->update(['red_zone_threshold' => 90]);
+        $this->actingAs($owner)->get(route('network.nodes.index'))
+            ->assertOk()
+            ->assertSee('data-red-zone="0"', false)
+            ->assertDontSee('data-red-zone="1"', false)
+            ->assertDontSee('Red Zone · 86%');
+        $this->assertSame(0, app(FopUnifiedDashboardService::class)->getOdpSummary(true, [])['red_zone_count']);
+    }
+
+    public function test_is_in_red_zone_aman_tanpa_with_count(): void
+    {
+        $pop = Pop::create(['code' => 'ODP-NC', 'name' => 'POP ODP NC', 'type' => 'cabang', 'status' => 'active']);
+        $node = $this->makeNode($pop->id, 'ODP-NC-1', 'Tanpa WithCount');
+        $node->ports()->create(['number' => 1, 'is_used' => true]);
+
+        $this->assertFalse(NetworkNode::findOrFail($node->id)->isInRedZone());
+    }
+
+    /**
      * Reshape data lama: tabel `odps`/`odp_ports` (file create-nya sudah
      * dihapus, jadi dibuat ulang manual di sini dengan bentuk aslinya) harus
      * pindah utuh ke `network_nodes`/`network_node_ports`, Feature + kode

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -37,7 +38,18 @@ use Illuminate\Support\Facades\DB;
 ])]
 class NetworkNode extends Model
 {
-    use HasFactory;
+    use HasFactory, RecordsAuditLogs;
+
+    protected string $auditModule = 'Node Jaringan';
+
+    // SENGAJA cuma 'created', bukan 'updated': `NetworkNodeService::move()`
+    // udah nulis AuditLog eksplisit sendiri saat `$node->update([...])` —
+    // kalau 'updated' ikut di sini, satu pemindahan jadi dua baris audit.
+    // Belum ada jalur edit field node lain (NetworkNodeController cuma
+    // store/addPorts/updatePort). Kalau nanti ada form edit node, audit-nya
+    // tulis eksplisit di jalur itu atau pindahkan move() ke trait ini —
+    // jangan dua-duanya.
+    protected array $auditEvents = ['created'];
 
     /**
      * @return array<string, string>
@@ -156,6 +168,34 @@ class NetworkNode extends Model
 
             return $anchor->parent_id !== null ? $anchor->parent : $anchor;
         });
+    }
+
+    /**
+     * Satu-satunya sumber aturan "node ini Red Zone?" — dipakai dashboard FOP
+     * (`FopUnifiedDashboardService`) DAN halaman listing Network Node. Dulu
+     * listing pakai 85% hardcode sementara dashboard pakai ambang per tipe
+     * (`red_zone_threshold`), jadi node yang sama bisa Red Zone di satu
+     * layar dan normal di layar lain.
+     *
+     * Ambang disimpan sebagai PERSEN (80 = 80%). `used/ports >= threshold/100`
+     * dikali silang jadi `used*100 >= threshold*ports`: aritmetika integer
+     * murni, tanpa risiko float tepat di ambang (mis. 7/10 vs 70%).
+     *
+     * `ports_count`/`used_ports_count` = alias `withCount()` dari query
+     * pemanggil, bukan kolom. Instance tanpa withCount → dianggap 0 port →
+     * false (aman, gak melempar). Tipe tanpa ambang (null) tidak pernah Red
+     * Zone. `<= 0` (bukan `=== 0`): withCount bisa balik string numerik di
+     * driver tertentu.
+     */
+    public function isInRedZone(): bool
+    {
+        $threshold = $this->nodeType?->red_zone_threshold;
+
+        if ($threshold === null || (int) ($this->ports_count ?? 0) <= 0) {
+            return false;
+        }
+
+        return ($this->used_ports_count ?? 0) * 100 >= $threshold * $this->ports_count;
     }
 
     /**
