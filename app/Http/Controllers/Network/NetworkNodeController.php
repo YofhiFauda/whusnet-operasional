@@ -9,6 +9,7 @@ use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
 use App\Services\NetworkNodeService;
+use App\Services\NetworkPortAssignmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,6 +51,7 @@ class NetworkNodeController extends Controller
         $parentOptions = NetworkNode::query()
             ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
             ->with('nodeType', 'anchorPop.parent')
+            ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
             ->orderBy('code')->get();
         $treeChildren = $parentOptions->groupBy(fn (NetworkNode $node) => $node->parent_id ?? 0);
         $nodesById = $parentOptions->keyBy('id');
@@ -69,10 +71,18 @@ class NetworkNodeController extends Controller
             $labelFor($option);
         }
 
-        return view('network.nodes.index', compact('nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels'));
+        $totalNodesCount = $parentOptions->count();
+        $totalPortsCount = (int) $parentOptions->sum('ports_count');
+        $totalUsedPortsCount = (int) $parentOptions->sum('used_ports_count');
+        $redZoneNodesCount = $parentOptions->filter(fn ($n) => $n->isInRedZone())->count();
+
+        return view('network.nodes.index', compact(
+            'nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels',
+            'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount'
+        ));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, NetworkNodeService $service): RedirectResponse
     {
         $request->merge(['code' => strtoupper(trim((string) $request->input('code')))]);
         $user = auth()->user();
@@ -87,6 +97,7 @@ class NetworkNodeController extends Controller
             'code' => ['required', 'string', 'max:50', Rule::unique('network_nodes', 'code')],
             'name' => ['required', 'string', 'max:150'],
             'capacity' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            ...$this->locationRules(),
         ]);
 
         $parent = isset($validated['parent_id']) ? NetworkNode::findOrFail($validated['parent_id']) : null;
@@ -102,6 +113,11 @@ class NetworkNodeController extends Controller
         }
 
         $nodeType = NetworkNodeType::findOrFail($validated['node_type_id']);
+        try {
+            $service->assertTypePlacement($nodeType, $parent, $anchor);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['parent_id' => $exception->getMessage()]);
+        }
         $portCount = $nodeType->has_ports ? (int) ($validated['capacity'] ?? 0) : 0;
 
         if ($nodeType->has_ports && $portCount < 1) {
@@ -121,6 +137,7 @@ class NetworkNodeController extends Controller
                 'name' => trim($validated['name']),
                 'capacity' => $nodeType->has_ports ? null : ($validated['capacity'] ?? null),
                 'status' => 'active',
+                ...array_intersect_key($validated, array_flip(['address', 'village', 'district', 'city', 'latitude', 'longitude'])),
             ]);
 
             for ($number = 1; $number <= $portCount; $number++) {
@@ -129,6 +146,40 @@ class NetworkNodeController extends Controller
         });
 
         return redirect()->route('network.nodes.index')->with('success', 'Node berhasil ditambahkan.');
+    }
+
+    public function show(NetworkNode $node): View
+    {
+        $this->authorizeNodeScope($node);
+        $node->load('nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode', 'children.nodeType', 'deployedSerials.item', 'infrastructureBalances.item');
+
+        return view('network.nodes.show', ['node' => $node, 'location' => $node->effectiveLocation()]);
+    }
+
+    public function update(Request $request, NetworkNode $node): RedirectResponse
+    {
+        $this->authorizeNodeScope($node);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'status' => ['sometimes', Rule::in(['active', 'inactive'])],
+            ...$this->locationRules(),
+        ]);
+
+        $node->update($validated);
+
+        return redirect()->route('network.nodes.show', $node)->with('success', 'Detail node berhasil diperbarui.');
+    }
+
+    private function locationRules(): array
+    {
+        return [
+            'address' => ['nullable', 'string', 'max:2000'],
+            'village' => ['nullable', 'string', 'max:100'],
+            'district' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+        ];
     }
 
     public function move(Request $request, NetworkNode $node, NetworkNodeService $service): RedirectResponse
@@ -177,17 +228,44 @@ class NetworkNodeController extends Controller
         return redirect()->route('network.nodes.index')->with('success', 'Kapasitas node berhasil ditambah.');
     }
 
-    public function updatePort(Request $request, NetworkNodePort $port): RedirectResponse
+    public function updatePort(Request $request, NetworkNodePort $port, NetworkPortAssignmentService $assignments): RedirectResponse
     {
         $port->load('node');
         $this->authorizeNodeScope($port->node);
 
         $validated = $request->validate([
             'is_used' => ['required', 'boolean'],
+            'physical_removal_confirmed' => ['accepted_if:is_used,0'],
+            'release_note' => [Rule::requiredIf(! $request->boolean('is_used')), 'nullable', 'string', 'max:500'],
         ]);
-        $port->update(['is_used' => (bool) $validated['is_used']]);
+        if ((bool) $validated['is_used']) {
+            $assignments->assignManual($port, 'Terpakai (belum diverifikasi)', $request->user());
 
-        return redirect()->route('network.nodes.index')->with('success', 'Status port berhasil diperbarui.');
+            return redirect()->route('network.nodes.index')->with('success', 'Port ditandai terpakai dan perlu diverifikasi.');
+        }
+
+        $assignments->release($port, $request->user(), $validated['release_note']);
+
+        return redirect()->route('network.nodes.show', $port->node)->with('success', 'Port berhasil dilepas dengan catatan fisik.');
+    }
+
+    public function assignNodePort(Request $request, NetworkNodePort $port, NetworkPortAssignmentService $assignments): RedirectResponse
+    {
+        $port->load('node');
+        $this->authorizeNodeScope($port->node);
+        $validated = $request->validate([
+            'target_node_id' => ['required', 'integer', Rule::exists('network_nodes', 'id')],
+        ]);
+        $target = NetworkNode::findOrFail($validated['target_node_id']);
+        $this->authorizeNodeScope($target);
+
+        try {
+            $assignments->assignNode($port, $target, $request->user());
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['target_node_id' => $exception->getMessage()]);
+        }
+
+        return redirect()->route('network.nodes.show', $port->node)->with('success', 'Anak node terhubung ke port.');
     }
 
     /**

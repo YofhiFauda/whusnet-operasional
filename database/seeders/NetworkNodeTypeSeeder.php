@@ -7,6 +7,7 @@ use App\Models\Feature;
 use App\Models\NetworkNodeType;
 use App\Services\PermissionGeneratorService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class NetworkNodeTypeSeeder extends Seeder
 {
@@ -53,19 +54,22 @@ class NetworkNodeTypeSeeder extends Seeder
             ['code' => 'backbone', 'name' => 'Backbone/Transport', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'aggregation_switch', 'name' => 'Router/Switch Agregasi POP', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'pon_port', 'name' => 'PON Port/Card', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
+            ['code' => 'olt_chassis', 'name' => 'Chassis OLT', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
+            ['code' => 'olt_card', 'name' => 'Kartu OLT', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => 128, 'red_zone_threshold' => null],
             ['code' => 'odc', 'name' => 'ODC', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
             ['code' => 'odp', 'name' => 'ODP', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
         ];
 
         // firstOrCreate, BUKAN updateOrCreate (beda dari dua Feature di atas,
-        // yang memang harus terus direkonsiliasi): enam tipe ini master data
+        // yang memang harus terus direkonsiliasi): delapan tipe ini master data
         // yang boleh diubah admin lewat halaman Master Tipe Node (spec §3.1 —
         // "nilai awal, bisa diubah admin"). updateOrCreate bakal mereset
         // red_zone_threshold/max_ports/dst hasil edit admin tiap kali seeder
         // dijalankan ulang (deploy, db:seed rutin). Nilai di bawah cuma
         // dipakai saat baris pertama kali dibuat.
+        $createdCodes = [];
         foreach ($types as $index => $type) {
-            NetworkNodeType::firstOrCreate(
+            $createdType = NetworkNodeType::firstOrCreate(
                 ['code' => $type['code']],
                 [
                     'name' => $type['name'],
@@ -77,6 +81,39 @@ class NetworkNodeTypeSeeder extends Seeder
                     'sort_order' => $index + 1,
                 ]
             );
+            if ($createdType->wasRecentlyCreated) {
+                $createdCodes[] = $type['code'];
+            }
+        }
+
+        $defaultRules = [
+            'core_router' => ['pops' => ['pusat', 'cabang'], 'nodes' => []],
+            'backbone' => ['pops' => ['pusat', 'cabang'], 'nodes' => ['core_router']],
+            'aggregation_switch' => ['pops' => ['cabang'], 'nodes' => ['backbone', 'core_router']],
+            'olt_chassis' => ['pops' => ['mini_pop'], 'nodes' => []],
+            'olt_card' => ['pops' => ['mini_pop'], 'nodes' => []],
+            'pon_port' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card']],
+            'odc' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card', 'pon_port']],
+            'odp' => ['pops' => ['cabang', 'mini_pop'], 'nodes' => ['odc']],
+        ];
+        $ids = NetworkNodeType::query()->pluck('id', 'code');
+        foreach ($createdCodes as $code) {
+            foreach ($defaultRules[$code]['pops'] as $popType) {
+                DB::table('network_node_type_rules')->insert([
+                    'child_type_id' => $ids[$code],
+                    'anchor_pop_type' => $popType,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+            foreach ($defaultRules[$code]['nodes'] as $parentCode) {
+                DB::table('network_node_type_rules')->insert([
+                    'child_type_id' => $ids[$code],
+                    'parent_type_id' => $ids[$parentCode],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
     }
 }

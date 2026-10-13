@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NetworkNodeType;
 use Illuminate\Database\Seeder;
 
 /**
@@ -116,9 +117,9 @@ class ItemSeeder extends Seeder
             ['code' => 'MC-1000', 'name' => 'Media Converter Fiber to UTP Gigabit', 'category' => 'media_converter', 'unit' => 'pcs', 'tracking_type' => 'serialized'],
 
             // ── OLT / OLT Module — kategori TAMBAHAN. Hulu FTTH di Gudang
-            //    Pusat/POP, TIDAK PERNAH dipasang ke pelanggan → company_asset.
-            ['code' => 'OLT-ZTE-C320', 'name' => 'OLT ZTE C320 Chassis', 'category' => 'olt_module', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'ownership_mode' => 'company_asset'],
-            ['code' => 'OLT-MODULE-GPON-8P', 'name' => 'OLT Module GPON 8 Port', 'category' => 'olt_module', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'ownership_mode' => 'company_asset'],
+            //    Pusat/POP, TIDAK PERNAH dipasang ke pelanggan, tetapi netap di Mini POP → infrastructure_asset.
+            ['code' => 'OLT-ZTE-C320', 'name' => 'OLT ZTE C320 Chassis', 'category' => 'olt_module', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'OLT-MODULE-GPON-8P', 'name' => 'OLT Module GPON 8 Port', 'category' => 'olt_module', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset'],
 
             // ── Switch Jaringan — kategori TAMBAHAN. Switch akses/distribusi
             //    di gudang/tower — infra, bukan barang pelanggan.
@@ -168,6 +169,11 @@ class ItemSeeder extends Seeder
             ['code' => 'KONEKTOR-RJ45', 'name' => 'Konektor RJ45', 'category' => 'lainnya', 'unit' => 'pcs'],
         ];
 
+        $oltNodeTypes = [
+            'OLT-ZTE-C320' => 'olt_chassis',
+            'OLT-MODULE-GPON-8P' => 'olt_card',
+        ];
+
         foreach ($items as $item) {
             Item::updateOrCreate(
                 ['code' => $item['code']],
@@ -182,6 +188,11 @@ class ItemSeeder extends Seeder
                     'is_active' => true,
                 ]
             );
+            if (isset($oltNodeTypes[$item['code']])) {
+                Item::where('code', $item['code'])->whereNull('infrastructure_node_type_id')->update([
+                    'infrastructure_node_type_id' => NetworkNodeType::where('code', $oltNodeTypes[$item['code']])->value('id'),
+                ]);
+            }
         }
     }
 }

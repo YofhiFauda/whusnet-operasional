@@ -29,6 +29,53 @@ class NetworkNodeModelTest extends TestCase
     }
 
     #[Test]
+    public function resolve_pop_works_on_collection_without_eager_loading(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang', 'name' => 'Cabang Jetis']);
+
+        NetworkNode::factory()->create([
+            'anchor_pop_id' => $cabang->id,
+            'parent_id' => null,
+            'name' => 'ODC-01',
+        ]);
+        NetworkNode::factory()->create([
+            'anchor_pop_id' => $cabang->id,
+            'parent_id' => null,
+            'name' => 'ODC-02',
+        ]);
+
+        $nodes = NetworkNode::all();
+        $this->assertCount(2, $nodes);
+
+        foreach ($nodes as $node) {
+            $this->assertSame($cabang->id, $node->resolvePop()?->id);
+        }
+    }
+
+    #[Test]
+    public function resolve_pop_and_breadcrumb_and_effective_location_work_on_nested_children_collection_without_eager_loading(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang', 'name' => 'Cabang Jetis']);
+
+        $odc = NetworkNode::factory()->create([
+            'anchor_pop_id' => $cabang->id,
+            'parent_id' => null,
+            'name' => 'ODC-01',
+        ]);
+        $odp = NetworkNode::factory()->child($odc)->create(['name' => 'ODP-01']);
+        $splitter = NetworkNode::factory()->child($odp)->create(['name' => 'Splitter-01']);
+
+        $nodes = NetworkNode::whereIn('id', [$odc->id, $odp->id, $splitter->id])->get();
+        $this->assertCount(3, $nodes);
+
+        foreach ($nodes as $node) {
+            $this->assertSame($cabang->id, $node->resolvePop()?->id);
+            $this->assertNotEmpty($node->breadcrumbLabel());
+            $this->assertNotEmpty($node->effectiveLocation());
+        }
+    }
+
+    #[Test]
     public function root_node_anchored_to_mini_pop_resolves_to_parent_cabang(): void
     {
         $cabang = Pop::factory()->create(['type' => 'cabang', 'name' => 'Cabang Jetis']);

@@ -18,12 +18,14 @@ use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\UserRoleScopeTarget;
+use App\Services\InventoryService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\ItemCategorySeeder;
@@ -436,5 +438,67 @@ class TaskInfrastructureDeployReportTest extends TestCase
         ])->assertSessionHasErrors('selected_inventory_roll_id');
 
         $this->assertEquals(100, $infraRoll->refresh()->length_remaining);
+    }
+
+    #[Test]
+    public function kartu_olt_hanya_menerima_satu_aset_modul_dari_gudang(): void
+    {
+        $miniPop = Pop::factory()->create(['type' => 'mini_pop', 'parent_id' => $this->pop->id]);
+        $cardType = NetworkNodeType::firstOrCreate(['code' => 'olt_card'], ['name' => 'Kartu OLT', 'has_ports' => true]);
+        $card = NetworkNode::factory()->create(['anchor_pop_id' => $miniPop->id, 'node_type_id' => $cardType->id]);
+        $task = $this->makeTask(TaskType::INFR);
+        $wrong = $this->issuedSerial($this->makeItem('WRONG-CARD', 'serialized'), 'WRONG-CARD-SN');
+        $service = app(InventoryService::class);
+
+        try {
+            $service->deploySerial($wrong, $card, $task->fopTask, [$this->technician], $this->technician);
+            $this->fail('Kartu OLT tidak boleh berisi jenis barang yang bukan modul OLT.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame(SerialStatus::ISSUED, $wrong->fresh()->status);
+        }
+
+        $chassisType = NetworkNodeType::firstOrCreate(['code' => 'olt_chassis'], ['name' => 'Chassis OLT', 'has_ports' => false]);
+        $chassisItem = Item::create([
+            'code' => 'OLT-TEST-CHASSIS', 'name' => 'Chassis OLT Uji', 'unit' => 'pcs',
+            'item_category_id' => ItemCategory::where('code', 'olt_module')->firstOrFail()->id,
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+            'infrastructure_node_type_id' => $chassisType->id,
+        ]);
+        $wrongSku = $this->issuedSerial($chassisItem, 'CHASSIS-SN-1');
+        try {
+            $service->deploySerial($wrongSku, $card, $task->fopTask, [$this->technician], $this->technician);
+            $this->fail('SKU chassis tidak boleh dipasang sebagai kartu OLT.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame(SerialStatus::ISSUED, $wrongSku->fresh()->status);
+        }
+        $item = Item::create([
+            'code' => 'OLT-TEST-CARD', 'name' => 'Modul OLT Uji', 'unit' => 'pcs',
+            'item_category_id' => ItemCategory::where('code', 'olt_module')->firstOrFail()->id,
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+            'infrastructure_node_type_id' => $cardType->id,
+        ]);
+        $first = $this->issuedSerial($item, 'CARD-SN-1');
+        $second = $this->issuedSerial($item, 'CARD-SN-2');
+        $service->deploySerial($first, $card, $task->fopTask, [$this->technician], $this->technician);
+        $this->assertSame($card->id, $first->fresh()->current_network_node_id);
+        $this->expectException(\InvalidArgumentException::class);
+        $service->deploySerial($second, $card, $task->fopTask, [$this->technician], $this->technician);
+    }
+
+    #[Test]
+    public function service_deploy_serial_menolak_node_di_cabang_lain_setelah_lock(): void
+    {
+        $task = $this->makeTask(TaskType::INFR);
+        $serial = $this->issuedSerial($this->makeItem('INF-BRANCH-GUARD', 'serialized'), 'SN-BRANCH-GUARD');
+        $foreignNode = NetworkNode::factory()->create(['anchor_pop_id' => $this->popLain->id]);
+
+        try {
+            app(InventoryService::class)->deploySerial(
+                $serial, $foreignNode, $task->fopTask, [$this->technician], $this->technician
+            );
+            $this->fail('Node cabang lain harus ditolak pada level service.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame(SerialStatus::ISSUED, $serial->fresh()->status);
+        }
     }
 }

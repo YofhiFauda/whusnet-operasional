@@ -1,6 +1,6 @@
 # Rancangan: Pohon Infrastruktur Jaringan Dinamis + Aset Gudang per Lokasi
 
-Status: **v3 diimplementasikan pada worktree network-nodes-infra; open item pada §7 tetap tertunda.**
+Status: **v3 diimplementasikan; perluasan operasional 2026-10-13 dijelaskan pada §10.**
 Dibuat: 2026-10-09. Revisi v2: 2026-10-12. Revisi v3: 2026-10-12 — OLT = Mini POP,
 penempatan model folder-di-drive (`anchor_pop_id` hanya di node puncak), cabang
 diturunkan (tidak disimpan), snapshot cabang di ledger, aturan tipe-di-bawah-tipe
@@ -336,3 +336,16 @@ Tidak ada data produksi yang hilang: semuanya masih uncommitted di working tree.
   kerja `odps`/`odp_ports` yang direkonsiliasi di §6.
 - `docs/fop-task/rancangan-request-pemasangan-dan-material-task.md`: pola
   estimasi vs terpakai untuk laporan O-REQ/INFR-REQ.
+
+## 10. Perluasan Operasional 2026-10-13
+
+Keputusan pada bagian ini menggantikan penundaan aturan tipe, chassis, dan pengelolaan port pada v3:
+
+- Mini POP tetap identitas OLT. Slot OLT bernomor dikelola di Mini POP; node `olt_card` mengisi slot hanya setelah aset serial Gudang benar-benar di-deploy. Node `olt_chassis` menjadi lokasi serial chassis, tanpa menggandakan Mini POP.
+- Alamat, wilayah administratif, dan koordinat dapat dicatat per node dan diwariskan per field dari induk/POP. Perpindahan subtree lintas cabang ditolak jika masih ada assignment port aktif, SN terpasang, atau saldo infrastruktur di subtree.
+- Aturan tipe anak ke tipe induk atau tipe POP dikelola admin melalui `network_node_type_rules`. Tipe baru tanpa aturan tetap fleksibel sampai admin menetapkan aturannya.
+- Port memiliki riwayat assignment ke pelanggan, anak node langsung, atau label manual. Pengelola dapat menghubungkan anak node ke port melalui detail node. Pemasangan pelanggan memakai port ODP yang tersedia; port yang sama tidak dapat dipakai ganda. Port lama `is_used` direkonsiliasi sebagai manual, lalu dicocokkan dengan data teknis pelanggan hanya bila kombinasi ODP, nomor port, cabang, dan pelanggan unik. Kasus ambigu tetap menunggu verifikasi di detail node.
+- Pelepasan port dilakukan eksplisit oleh pengguna berizin dengan konfirmasi pelepasan fisik dan catatan alasan. Isolasi atau status putus pelanggan sendiri tidak otomatis mengosongkan port.
+- Dua SKU katalog OLT lama diubah ke `infrastructure_asset` agar bisa mengikuti ledger deploy/retrieve. Komponen chassis atau kartu OLT hanya menerima satu SN aktif dari kategori `olt_module`; SKU harus menunjuk tipe node tujuan melalui `items.infrastructure_node_type_id` yang dapat dikelola di Master Barang.
+
+Batas operasional yang masih perlu keputusan lanjutan: laporan tugas DEAC belum mencatat pelepasan kabel/port secara khusus, dan kapasitas performa pohon besar belum diukur. Input topologi dan verifikasi kasus data lama yang ambigu tetap pekerjaan operasional.

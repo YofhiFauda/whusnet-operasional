@@ -550,7 +550,22 @@ class InventoryService
             }
 
             $node = $this->freshNode($node);
+            if (in_array($node->nodeType?->code, ['olt_chassis', 'olt_card'], true)) {
+                if ($serial->item?->category?->code !== 'olt_module'
+                    || $serial->item->infrastructure_node_type_id !== $node->node_type_id) {
+                    throw new InvalidArgumentException('SKU aset tidak sesuai dengan tipe komponen OLT tujuan.');
+                }
+                if ($node->deployedSerials()->where('status', SerialStatus::DEPLOYED->value)->exists()) {
+                    throw new InvalidArgumentException('Komponen OLT ini sudah memiliki satu aset terpasang.');
+                }
+            } elseif ($serial->item?->infrastructure_node_type_id !== null
+                && $serial->item->infrastructure_node_type_id !== $node->node_type_id) {
+                throw new InvalidArgumentException('SKU aset hanya dapat dipasang pada tipe node yang ditetapkan di Master Barang.');
+            }
             $toPopId = $node->resolvePop()?->id;
+            if ($targetCabangId !== null && $toPopId !== $targetCabangId) {
+                throw new InvalidArgumentException('Node tujuan berada di cabang berbeda dari task.');
+            }
             $fromTechnicianId = $serial->current_technician_id;
 
             $serial->update([
@@ -810,7 +825,7 @@ class InventoryService
      */
     private function freshNode(NetworkNode $node): NetworkNode
     {
-        return NetworkNode::query()->findOrFail($node->id);
+        return NetworkNode::query()->lockForUpdate()->findOrFail($node->id);
     }
 
     /**

@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'code',
     'name',
     'item_category_id',
+    'infrastructure_node_type_id',
     'unit',
     'is_active',
     'tracking_type',
@@ -54,6 +55,11 @@ class Item extends Model
             'meter_per_roll' => 'decimal:2',
             'minimum_length' => 'decimal:2',
         ];
+    }
+
+    public function infrastructureNodeType(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNodeType::class, 'infrastructure_node_type_id');
     }
 
     public function category(): BelongsTo

@@ -186,6 +186,41 @@ class NetworkNodeTypeCrudTest extends TestCase
         $this->assertSame(48, (int) $odp->max_ports);
         $this->assertSame('ODP Custom Admin', $odp->name);
         $this->assertSame(1, NetworkNodeType::where('code', 'odp')->count());
-        $this->assertSame(6, NetworkNodeType::count());
+        $this->assertSame(8, NetworkNodeType::count());
+        $this->assertTrue(NetworkNodeType::where('code', 'olt_chassis')->exists());
+        $this->assertDatabaseHas('network_node_type_rules', [
+            'child_type_id' => $odp->id,
+            'parent_type_id' => NetworkNodeType::where('code', 'odc')->value('id'),
+        ]);
+    }
+
+    #[Test]
+    public function admin_can_manage_allowed_parent_types_and_pop_anchors(): void
+    {
+        $this->loginAsAdmin();
+
+        $parent = NetworkNodeType::create(['code' => 'odc', 'name' => 'ODC', 'has_ports' => true]);
+        $child = NetworkNodeType::create(['code' => 'odp', 'name' => 'ODP', 'has_ports' => true]);
+
+        $this->put(route('master.network-node-types.update', $child), [
+            'code' => 'odp',
+            'name' => 'ODP',
+            'is_active' => '1',
+            'rules_configured' => '1',
+            'allowed_parent_type_ids' => [$parent->id],
+            'allowed_anchor_pop_types' => ['mini_pop'],
+        ])->assertRedirect(route('master.network-node-types.index'));
+
+        $this->assertDatabaseHas('network_node_type_rules', [
+            'child_type_id' => $child->id,
+            'parent_type_id' => $parent->id,
+        ]);
+        $this->assertDatabaseHas('network_node_type_rules', [
+            'child_type_id' => $child->id,
+            'anchor_pop_type' => 'mini_pop',
+        ]);
+
+        $this->get(route('master.network-node-types.edit', $child))
+            ->assertOk()->assertSee('Induk yang Diizinkan');
     }
 }

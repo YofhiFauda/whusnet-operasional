@@ -847,6 +847,23 @@
                                     <x-ui.icon name="workflow" class="w-4 h-4" /> Distribusi Jaringan (ODP / OLT)
                                 </h5>
 
+                                @if($hasManagedOdp)
+                                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Pilih ODP & Port Tersedia <span class="text-rose-500">*</span>
+                                    <select name="network_node_port_id" required
+                                        x-on:change="document.getElementById('odp_number').value = $event.target.selectedOptions[0]?.dataset.code || ''; document.getElementById('odp_port').value = $event.target.selectedOptions[0]?.dataset.port || ''"
+                                        class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                                        <option value="">Pilih titik dan port</option>
+                                        @foreach($odpPortOptions as $option)
+                                        <option value="{{ $option->id }}" data-code="{{ $option->node->code }}" data-port="{{ $option->number }}"
+                                            @selected(old('network_node_port_id', $currentOdpPortId) == $option->id)>
+                                            {{ $option->node->code }} · Port {{ $option->number }}
+                                            {{ $option->activeAssignment->isNotEmpty() ? '(terpasang untuk pelanggan ini)' : '(kosong)' }}
+                                        </option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                @endif
+
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>

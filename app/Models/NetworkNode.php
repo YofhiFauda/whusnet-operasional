@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -71,6 +72,54 @@ class NetworkNode extends Model
      *
      * @return BelongsTo<NetworkNode, $this>
      */
+    /**
+     * @return array{address:?string,village:?string,district:?string,city:?string,latitude:mixed,longitude:mixed,source_node_id:?int,source_pop_id:?int,inherited_fields:list<string>}
+     */
+    public function effectiveLocation(): array
+    {
+        $ancestors = [];
+        $current = $this;
+        while ($current !== null) {
+            $ancestors[] = $current;
+            $current = $current->resolveParentNode();
+        }
+
+        $top = end($ancestors) ?: null;
+        $pop = $top?->resolveAnchorPop();
+        $fields = ['address', 'village', 'district', 'city', 'latitude', 'longitude'];
+        $location = [];
+        $sources = [];
+        $inheritedFields = [];
+
+        foreach ($fields as $field) {
+            foreach ($ancestors as $ancestor) {
+                if ($ancestor->{$field} !== null && $ancestor->{$field} !== '') {
+                    $location[$field] = $ancestor->{$field};
+                    $sources[$field] = $ancestor;
+                    break;
+                }
+            }
+
+            if (! array_key_exists($field, $location)) {
+                $location[$field] = $pop?->{$field};
+                $sources[$field] = null;
+            }
+
+            if ($location[$field] !== null && $sources[$field]?->id !== $this->id) {
+                $inheritedFields[] = $field;
+            }
+        }
+
+        $addressSource = $sources['address'];
+
+        return [
+            ...$location,
+            'source_node_id' => $addressSource?->id,
+            'source_pop_id' => $addressSource === null ? $pop?->id : null,
+            'inherited_fields' => $inheritedFields,
+        ];
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(NetworkNode::class, 'parent_id');
@@ -95,6 +144,11 @@ class NetworkNode extends Model
     public function anchorPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'anchor_pop_id');
+    }
+
+    public function oltSlot(): HasOne
+    {
+        return $this->hasOne(OltSlot::class, 'card_node_id');
     }
 
     public function nodeType(): BelongsTo
@@ -142,11 +196,11 @@ class NetworkNode extends Model
 
     /**
      * Naik rantai `parent` sampai node puncak (yang punya `anchor_pop_id`),
-     * lalu resolve ke Cabang. Pohon POP dangkal (Cabang → Mini POP, lihat
-     * `Pop::resolveCabangId()`), jadi "naik" di sisi POP cukup satu langkah:
-     * kalau anchor-nya Mini POP (punya `parent_id`), kembalikan Cabang
-     * induknya; kalau anchor-nya sudah Cabang/Pusat (`parent_id` null),
-     * kembalikan anchor itu sendiri.
+     * lalu resolve anchor-nya ke Cabang lewat `Pop::resolveCabangId()`:
+     * anchor Mini POP → Cabang induknya, anchor Cabang → dirinya, anchor
+     * Pusat → Pusat. JANGAN balik ke "kalau anchor punya parent, ambil
+     * parent-nya" — Cabang produksi punya parent (Pusat), jadi node yang
+     * ditambatkan ke Cabang bakal terbaca Pusat.
      *
      * Di-memo pakai `once()` — dipanggil berulang dari breadcrumb/listing
      * dalam satu request/loop tampilan, dan hasilnya tidak berubah selama
@@ -157,16 +211,24 @@ class NetworkNode extends Model
         return once(function (): ?Pop {
             $node = $this;
             while ($node !== null && $node->anchor_pop_id === null) {
-                $node = $node->parent;
+                $node = $node->resolveParentNode();
             }
 
-            $anchor = $node?->anchorPop;
-
-            if ($anchor === null) {
+            if ($node === null || $node->anchor_pop_id === null) {
                 return null;
             }
 
-            return $anchor->parent_id !== null ? $anchor->parent : $anchor;
+            $cabangId = Pop::resolveCabangId($node->anchor_pop_id);
+
+            if ($cabangId === null) {
+                return null;
+            }
+
+            if ($node->relationLoaded('anchorPop') && $node->anchorPop?->id === $cabangId) {
+                return $node->anchorPop;
+            }
+
+            return Pop::find($cabangId);
         });
     }
 
@@ -189,7 +251,11 @@ class NetworkNode extends Model
      */
     public function isInRedZone(): bool
     {
-        $threshold = $this->nodeType?->red_zone_threshold;
+        $nodeType = $this->relationLoaded('nodeType')
+            ? $this->nodeType
+            : ($this->node_type_id ? NetworkNodeType::find($this->node_type_id) : null);
+
+        $threshold = $nodeType?->red_zone_threshold;
 
         if ($threshold === null || (int) ($this->ports_count ?? 0) <= 0) {
             return false;
@@ -254,14 +320,18 @@ class NetworkNode extends Model
 
         $top = $this;
         while ($top !== null && $top->anchor_pop_id === null) {
-            $top = $top->parent;
+            $top = $top->resolveParentNode();
         }
 
-        $anchor = $top?->anchorPop;
+        $anchor = $top?->resolveAnchorPop();
 
         if ($anchor !== null) {
-            if ($anchor->parent_id !== null && $anchor->parent !== null) {
-                $parts[] = $anchor->parent->name;
+            $anchorParent = $anchor->relationLoaded('parent')
+                ? $anchor->parent
+                : ($anchor->parent_id ? Pop::find($anchor->parent_id) : null);
+
+            if ($anchor->parent_id !== null && $anchorParent !== null) {
+                $parts[] = $anchorParent->name;
             }
             $parts[] = $anchor->name;
         }
@@ -270,9 +340,23 @@ class NetworkNode extends Model
         $node = $this;
         while ($node !== null) {
             $nodeNames[] = $node->name;
-            $node = $node->parent;
+            $node = $node->resolveParentNode();
         }
 
         return implode(' → ', array_merge($parts, array_reverse($nodeNames)));
+    }
+
+    private function resolveParentNode(): ?self
+    {
+        return $this->relationLoaded('parent')
+            ? $this->parent
+            : ($this->parent_id ? self::find($this->parent_id) : null);
+    }
+
+    private function resolveAnchorPop(): ?Pop
+    {
+        return $this->relationLoaded('anchorPop')
+            ? $this->anchorPop
+            : ($this->anchor_pop_id ? Pop::find($this->anchor_pop_id) : null);
     }
 }

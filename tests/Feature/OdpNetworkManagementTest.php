@@ -6,6 +6,7 @@ use App\Enums\ScopeType;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
+use App\Models\NetworkPortAssignment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -54,6 +55,45 @@ class OdpNetworkManagementTest extends TestCase
         ]);
     }
 
+    public function test_node_menyimpan_lokasi_sendiri_dan_mewarisi_lokasi_induk(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create([
+            'code' => 'LOC-A', 'name' => 'POP Lokasi', 'type' => 'cabang', 'status' => 'active',
+            'address' => 'Jalan POP 1', 'city' => 'Ponorogo', 'latitude' => -7.8650000, 'longitude' => 111.4690000,
+        ]);
+
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => $this->odpTypeId,
+            'anchor_pop_id' => $pop->id,
+            'code' => 'ODP-LOC-A',
+            'name' => 'ODP Lokasi A',
+            'capacity' => 2,
+            'address' => 'Tiang RT 02',
+            'village' => 'Siman',
+            'district' => 'Siman',
+            'city' => 'Ponorogo',
+            'latitude' => -7.8660000,
+            'longitude' => 111.4700000,
+        ])->assertRedirect(route('network.nodes.index'));
+
+        $parent = NetworkNode::where('code', 'ODP-LOC-A')->firstOrFail();
+        $this->assertSame('Tiang RT 02', $parent->address);
+        $this->assertSame('Siman', $parent->village);
+
+        $child = NetworkNode::create([
+            'parent_id' => $parent->id, 'node_type_id' => $this->odpTypeId,
+            'code' => 'ODP-LOC-B', 'name' => 'ODP Lokasi B', 'status' => 'active',
+        ]);
+        $this->assertSame('Tiang RT 02', $child->effectiveLocation()['address']);
+        $this->assertSame($parent->id, $child->effectiveLocation()['source_node_id']);
+
+        $this->actingAs($owner)->patch(route('network.nodes.update', $child), [
+            'name' => 'ODP Lokasi B', 'address' => 'Tiang RT 03',
+        ])->assertRedirect(route('network.nodes.show', $child));
+        $this->assertSame('Tiang RT 03', $child->refresh()->effectiveLocation()['address']);
+    }
+
     public function test_odp_memiliki_port_child_dan_red_zone_dihitung_dari_status_port(): void
     {
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
@@ -78,6 +118,8 @@ class OdpNetworkManagementTest extends TestCase
                 'is_used' => 1,
             ])->assertRedirect(route('network.nodes.index'));
         }
+
+        $this->assertSame(7, NetworkPortAssignment::where('active_key', 1)->count());
 
         $summary = app(FopUnifiedDashboardService::class)->getOdpSummary(true, []);
         $this->assertSame(1, $summary['total_odps']);
@@ -404,15 +446,24 @@ class OdpNetworkManagementTest extends TestCase
         $this->actingAs($owner)->post(route('network.nodes.store'), [
             'node_type_id' => $odcTypeId,
             'parent_id' => $core->id,
-            'code' => 'ODC-CHILD-1',
-            'name' => 'ODC Anak',
+            'code' => 'ODC-INVALID-1',
+            'name' => 'ODC Tidak Valid',
+            'capacity' => 4,
+        ])->assertSessionHasErrors('parent_id');
+
+        $backboneTypeId = NetworkNodeType::where('code', 'backbone')->value('id');
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => $backboneTypeId,
+            'parent_id' => $core->id,
+            'code' => 'BACKBONE-CHILD-1',
+            'name' => 'Backbone Anak',
             'capacity' => 4,
         ])->assertRedirect(route('network.nodes.index'));
 
-        $child = NetworkNode::where('code', 'ODC-CHILD-1')->firstOrFail();
+        $child = NetworkNode::where('code', 'BACKBONE-CHILD-1')->firstOrFail();
         $this->assertSame($core->id, $child->parent_id);
         $this->assertNull($child->anchor_pop_id);
-        $this->assertSame(4, $child->ports()->count());
+        $this->assertSame(0, $child->ports()->count());
     }
 
     public function test_route_pindah_node_mengikuti_scope_dan_menolak_siklus(): void

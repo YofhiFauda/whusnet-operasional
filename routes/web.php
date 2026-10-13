@@ -56,6 +56,7 @@ use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
 use App\Http\Controllers\Network\NetworkInventoryController;
 use App\Http\Controllers\Network\NetworkNodeController;
+use App\Http\Controllers\Network\OltSlotController;
 use App\Http\Controllers\NocDashboardController;
 use App\Http\Controllers\NocWorksheetController;
 use App\Http\Controllers\NotificationController;
@@ -632,8 +633,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/master/pop/{pop}/edit', [PopController::class, 'edit'])->name('master.pop.edit');
         Route::put('/master/pop/{pop}', [PopController::class, 'update'])->name('master.pop.update');
         Route::post('/master/pop/{pop}/toggle', [PopController::class, 'toggleStatus'])->name('master.pop.toggle');
+
     });
 
+    Route::middleware('permission:pops.update')->group(function () {
+        Route::post('/master/pop/{pop}/olt-slots', [OltSlotController::class, 'store'])->name('master.pop.olt.slots.store');
+        Route::post('/master/pop/{pop}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('master.pop.olt.slots.card');
+    });
     Route::middleware('permission:pops.delete')->group(function () {
         Route::delete('/master/pop/{pop}', [PopController::class, 'destroy'])->name('master.pop.destroy');
     });
@@ -1184,15 +1190,20 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:network_nodes.view')->group(function () {
         Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
+        // Static dulu, dinamis belakangan -- '/network/inventaris' wajib didaftar
+        // sebelum '/network/nodes/{node}' supaya tidak ditelan route dinamis.
         Route::get('/network/inventaris', [NetworkInventoryController::class, 'index'])->name('network.inventaris.index');
+        Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
     });
     Route::middleware('permission:network_nodes.create')->group(function () {
         Route::post('/network/nodes', [NetworkNodeController::class, 'store'])->name('network.nodes.store');
     });
     Route::middleware('permission:network_nodes.update')->group(function () {
+        Route::patch('/network/nodes/{node}', [NetworkNodeController::class, 'update'])->name('network.nodes.update');
         Route::patch('/network/nodes/{node}/move', [NetworkNodeController::class, 'move'])->name('network.nodes.move');
         Route::post('/network/nodes/{node}/ports', [NetworkNodeController::class, 'addPorts'])->name('network.nodes.ports.add');
         Route::put('/network/node-ports/{port}', [NetworkNodeController::class, 'updatePort'])->name('network.node-ports.update');
+        Route::post('/network/node-ports/{port}/assign-node', [NetworkNodeController::class, 'assignNodePort'])->name('network.node-ports.assign-node');
     });
 
     // Dashboard Analitik FOP — agregat lintas periode, permission SENDIRI

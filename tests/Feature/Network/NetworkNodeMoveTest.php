@@ -4,13 +4,16 @@ namespace Tests\Feature\Network;
 
 use App\Enums\ScopeType;
 use App\Models\AuditLog;
+use App\Models\Customer;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
 use App\Services\NetworkNodeService;
+use App\Services\NetworkPortAssignmentService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
@@ -247,6 +250,27 @@ class NetworkNodeMoveTest extends TestCase
         } catch (HttpException $exception) {
             $this->assertSame(403, $exception->getStatusCode());
             $this->assertSame($cabangA->id, $node->fresh()->anchor_pop_id);
+        }
+    }
+
+    #[Test]
+    public function move_lintas_cabang_ditolak_saat_subtree_masih_punya_port_pelanggan_aktif(): void
+    {
+        $cabangA = Pop::factory()->create(['type' => 'cabang']);
+        $cabangB = Pop::factory()->create(['type' => 'cabang']);
+        $odpType = NetworkNodeType::create(['code' => 'odp', 'name' => 'ODP', 'has_ports' => true]);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabangA->id, 'node_type_id' => $odpType->id]);
+        $port = $node->ports()->create(['number' => 1]);
+        $customer = Customer::factory()->create(['pop_id' => $cabangA->id]);
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        app(NetworkPortAssignmentService::class)->assignCustomer($port, $customer, $actor);
+
+        try {
+            app(NetworkNodeService::class)->move($node, null, $cabangB, $actor);
+            $this->fail('Subtree dengan penempatan pelanggan aktif tidak boleh pindah cabang.');
+        } catch (InvalidArgumentException) {
+            $this->assertSame($cabangA->id, $node->fresh()->anchor_pop_id);
+            $this->assertSame($customer->id, $port->assignments()->where('active_key', 1)->firstOrFail()->customer_id);
         }
     }
 }

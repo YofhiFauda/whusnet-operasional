@@ -2,8 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\SerialStatus;
 use App\Models\AuditLog;
+use App\Models\InfrastructureBalance;
+use App\Models\InventorySerial;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
+use App\Models\NetworkNodeType;
+use App\Models\NetworkPortAssignment;
 use App\Models\Pop;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +47,8 @@ class NetworkNodeService
                 throw new InvalidArgumentException('Node tidak boleh dipindah ke dalam dirinya sendiri atau turunannya.');
             }
 
+            $this->assertTypePlacement($node->nodeType, $newParent, $newPop);
+
             $fromPopId = $node->resolvePop()?->id;
             $toPopIdBeforeMove = $newParent?->resolvePop()?->id
                 ?? ($newPop !== null ? Pop::resolveCabangId($newPop->id) : null);
@@ -55,6 +63,10 @@ class NetworkNodeService
                 403,
                 'Aktor harus memiliki scope cabang asal dan tujuan.'
             );
+            if ($fromPopId !== $toPopIdBeforeMove) {
+                $this->assertCrossBranchSubtreeIsEmpty($node->id);
+            }
+
             $oldParentId = $node->parent_id;
             $oldAnchorPopId = $node->anchor_pop_id;
 
@@ -128,6 +140,72 @@ class NetworkNodeService
      * Loop biasa, bukan recursive CTE — kedalaman pohon ini kecil (lihat
      * brief Task 6), jadi query rekursif cuma overhead yang tidak perlu.
      */
+    /**
+     * Rules are opt-in for existing custom types. Once a child type has at least
+     * one rule, every new placement must match a managed parent or POP type.
+     */
+    public function assertTypePlacement(NetworkNodeType $type, ?NetworkNode $parent, ?Pop $anchor): void
+    {
+        self::assertPlacement($parent, $anchor);
+
+        $rules = DB::table('network_node_type_rules')
+            ->where('child_type_id', $type->id)
+            ->get(['parent_type_id', 'anchor_pop_type']);
+
+        if ($rules->isEmpty()) {
+            return;
+        }
+
+        $allowed = $rules->contains(function (object $rule) use ($parent, $anchor): bool {
+            if ($parent !== null) {
+                return $rule->parent_type_id !== null
+                    && (int) $rule->parent_type_id === $parent->node_type_id;
+            }
+
+            return $rule->anchor_pop_type !== null && $rule->anchor_pop_type === $anchor?->type;
+        });
+
+        if (! $allowed) {
+            throw new InvalidArgumentException("Tipe {$type->name} tidak boleh ditempatkan di induk atau POP tersebut.");
+        }
+    }
+
+    /**
+     * A subtree with live physical connections or deployed stock needs a
+     * dedicated relocation workflow so its customer and ledger scope stays
+     * correct. Lock its ports before checking to serialize against assignment.
+     */
+    private function assertCrossBranchSubtreeIsEmpty(int $nodeId): void
+    {
+        $rows = DB::select(
+            'WITH RECURSIVE subtree AS (
+                SELECT id FROM network_nodes WHERE id = ?
+                UNION ALL
+                SELECT child.id FROM network_nodes child JOIN subtree parent ON child.parent_id = parent.id
+            ) SELECT id FROM subtree',
+            [$nodeId]
+        );
+        $nodeIds = array_map(static fn (object $row): int => (int) $row->id, $rows);
+        $portIds = NetworkNodePort::query()->whereIn('network_node_id', $nodeIds)
+            ->orderBy('id')->lockForUpdate()->pluck('id');
+
+        $hasAssignments = NetworkPortAssignment::query()->where('active_key', 1)
+            ->where(function ($query) use ($portIds, $nodeIds) {
+                $query->whereIn('network_node_port_id', $portIds)
+                    ->orWhereIn('target_node_id', $nodeIds);
+            })->exists();
+        $hasSerials = InventorySerial::query()->whereIn('current_network_node_id', $nodeIds)
+            ->where('status', SerialStatus::DEPLOYED)->exists();
+        $hasBalances = InfrastructureBalance::query()->whereIn('network_node_id', $nodeIds)
+            ->where('qty', '>', 0)->exists();
+
+        if ($hasAssignments || $hasSerials || $hasBalances) {
+            throw new InvalidArgumentException(
+                'Node dengan koneksi pelanggan, sambungan jaringan, atau aset terpasang tidak boleh dipindah lintas cabang.'
+            );
+        }
+    }
+
     private function isSelfOrDescendant(NetworkNode $candidate, NetworkNode $node): bool
     {
         $current = $candidate;

@@ -51,6 +51,11 @@ class Pop extends Model
         ];
     }
 
+    public function oltSlots(): HasMany
+    {
+        return $this->hasMany(OltSlot::class);
+    }
+
     public function distributions(): HasMany
     {
         return $this->hasMany(Distribution::class);
@@ -101,14 +106,20 @@ class Pop extends Model
     }
 
     /**
-     * Naik ke akar pohon POP (Cabang) dari sebuah id POP (bisa Mini POP) —
-     * satu sumber kebenaran buat "dua POP ini satu Cabang atau beda Cabang",
-     * dipakai guard lintas-cabang di `InventoryService` (barang yang diissue
-     * dari Gudang Cabang A gak boleh dipasang/dipakai di Task Cabang B).
-     * Pohon POP dangkal (Cabang → Mini POP), jadi walk ini aman tanpa cache —
-     * pola sama `CustomerController::resolveCabangPopId()` (duplikasi sadar,
-     * beda lapisan: itu private controller buat namespacing legacy key, ini
-     * public model buat dipakai Service).
+     * Naik dari sebuah id POP (bisa Mini POP) sampai ketemu POP bertipe
+     * `cabang` — satu sumber kebenaran buat "dua POP ini satu Cabang atau
+     * beda Cabang", dipakai guard lintas-cabang di `InventoryService`,
+     * `NetworkPortAssignmentService`, dan `NetworkNode::resolvePop()`.
+     *
+     * BERHENTI di Cabang, JANGAN naik ke akar. Hierarki produksi tiga tingkat:
+     * Pusat > Cabang > Mini POP (`app:import-legacy-sql --pusat-code` memasang
+     * `parent_id` Cabang ke Pusat). Versi lama naik sampai akar, jadi semua
+     * Cabang terbaca sebagai Pusat dan guard lintas-cabang lolos diam-diam
+     * (Jetis = Sandya). Dijaga `CabangResolutionUnderPusatTest`.
+     *
+     * POP Pusat (atau POP tanpa Cabang di atasnya) mengembalikan akarnya
+     * sendiri — Pusat bukan bagian Cabang mana pun. Pohon POP dangkal, jadi
+     * walk ini aman tanpa cache.
      */
     public static function resolveCabangId(?int $popId): ?int
     {
@@ -123,7 +134,7 @@ class Pop extends Model
         }
 
         $node = $pop;
-        while ($node && $node->parent_id) {
+        while ($node && ! $node->isCabang() && $node->parent_id) {
             $node = self::find($node->parent_id);
         }
 

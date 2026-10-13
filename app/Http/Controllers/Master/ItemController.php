@@ -7,11 +7,13 @@ use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NetworkNodeType;
 use App\Services\MasterRecordRemovalService;
 use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -56,8 +58,9 @@ class ItemController extends Controller
         $categories = ItemCategory::active()->ordered()->get();
         $trackingTypes = TrackingType::cases();
         $ownershipModes = OwnershipMode::cases();
+        $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
 
-        return view('master.items.create', compact('categories', 'trackingTypes', 'ownershipModes'));
+        return view('master.items.create', compact('categories', 'trackingTypes', 'ownershipModes', 'nodeTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -82,9 +85,10 @@ class ItemController extends Controller
             ->get();
         $trackingTypes = TrackingType::cases();
         $ownershipModes = OwnershipMode::cases();
+        $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
         $trackingTypeLocked = $item->inventoryTransactions()->exists();
 
-        return view('master.items.edit', compact('item', 'categories', 'trackingTypes', 'ownershipModes', 'trackingTypeLocked'));
+        return view('master.items.edit', compact('item', 'categories', 'trackingTypes', 'ownershipModes', 'trackingTypeLocked', 'nodeTypes'));
     }
 
     public function update(Request $request, Item $item): RedirectResponse
@@ -143,6 +147,7 @@ class ItemController extends Controller
             'item_category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
             'unit' => ['required', 'string', 'max:20'],
             'is_active' => 'required|boolean',
+            'infrastructure_node_type_id' => ['nullable', 'integer', Rule::exists('network_node_types', 'id')],
         ];
 
         if (! $locked) {
@@ -182,7 +187,20 @@ class ItemController extends Controller
         }
 
         $validated = $request->validate($rules);
+        if ($item && ! $request->exists('infrastructure_node_type_id')) {
+            $validated['infrastructure_node_type_id'] = $item->infrastructure_node_type_id;
+        }
 
+        $effectiveOwnership = $locked ? $item->ownership_mode->value : ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value);
+        $nodeTypeId = isset($validated['infrastructure_node_type_id']) ? (int) $validated['infrastructure_node_type_id'] : null;
+        $validated['infrastructure_node_type_id'] = $nodeTypeId;
+        if ($nodeTypeId !== null && $effectiveOwnership !== OwnershipMode::INFRASTRUCTURE_ASSET->value) {
+            throw ValidationException::withMessages(['infrastructure_node_type_id' => 'Tipe node hanya berlaku untuk aset infrastruktur.']);
+        }
+        if ($item && $item->infrastructure_node_type_id !== $nodeTypeId
+            && $item->inventorySerials()->where('status', 'deployed')->exists()) {
+            throw ValidationException::withMessages(['infrastructure_node_type_id' => 'Tipe node tidak dapat diganti selama ada SN terpasang.']);
+        }
         // Server-side, jangan cuma percaya field `unit` disabled di klien
         // (bisa diakalin lewat devtools) — roll SELALU meter, gak ada jalan
         // lain (koreksi 2026-09-16, akar laporan "tampilan 1.000 roll

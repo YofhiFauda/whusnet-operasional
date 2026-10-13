@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
+use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
 use App\Services\MasterRecordRemovalService;
@@ -149,11 +150,23 @@ class PopController extends Controller
     {
         $this->authorizePopScope($pop);
 
-        $pop->load(['parent', 'children' => function ($q) {
+        $pop->load(['oltSlots.cardNode.ports', 'oltSlots.cardNode.deployedSerials.item', 'parent', 'children' => function ($q) {
             $q->orderBy('name');
         }]);
 
-        return view('master.pop.show', compact('pop'));
+        $cardOptions = $pop->type === 'mini_pop'
+            ? NetworkNode::query()->where('anchor_pop_id', $pop->id)
+                ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_card'))
+                ->whereDoesntHave('oltSlot')->orderBy('code')->get()
+            : collect();
+
+        $chassisNodes = $pop->type === 'mini_pop'
+            ? NetworkNode::query()->where('anchor_pop_id', $pop->id)
+                ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_chassis'))
+                ->with('deployedSerials.item')->orderBy('code')->get()
+            : collect();
+
+        return view('master.pop.show', compact('pop', 'cardOptions', 'chassisNodes'));
     }
 
     /**

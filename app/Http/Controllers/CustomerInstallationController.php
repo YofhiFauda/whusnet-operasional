@@ -23,6 +23,8 @@ use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TechnicianCustody;
@@ -33,6 +35,7 @@ use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
 use App\Services\InventoryService;
+use App\Services\NetworkPortAssignmentService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
@@ -491,7 +494,11 @@ class CustomerInstallationController extends Controller
         $internetPackages = InternetPackage::orderBy('name')->get();
         $surveyFields = $customer->latestSurvey?->difficultyAndNote() ?? ['difficulty_level' => null, 'survey_note' => null];
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif'));
+        $hasManagedOdp = $this->managedOdpNodeIds($customer)->isNotEmpty();
+        $odpPortOptions = $this->odpPortsFor($customer);
+        $currentOdpPortId = $odpPortOptions->first(fn (NetworkNodePort $port) => $port->activeAssignment->first()?->customer_id === $customer->id)?->id;
+
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif', 'odpPortOptions', 'currentOdpPortId', 'hasManagedOdp'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -1057,6 +1064,9 @@ class CustomerInstallationController extends Controller
         $contractType = $customer->customerService?->contract_type;
         $modemAcquisitionChoiceInput = $request->input('modem_acquisition_choice');
 
+        $hasManagedOdp = $this->managedOdpNodeIds($customer)->isNotEmpty();
+        $managedOdpPorts = $this->odpPortsFor($customer);
+
         $validated = $request->validate([
             // Informasi Perangkat Aktif + Nomor/Port ODP — SATU-SATUNYA syarat
             // wajib buat tombol Aktivasi (ADHOC). Nomor/Slot/Port OLT sengaja
@@ -1080,8 +1090,9 @@ class CustomerInstallationController extends Controller
             'pppoe_username' => 'nullable|string|max:150',
             'pppoe_password' => 'nullable|string|max:150',
             'router_number' => 'nullable|string|max:50',
-            'odp_number' => 'required|string|max:100',
-            'odp_port' => 'required|string|max:50',
+            'network_node_port_id' => [Rule::requiredIf($hasManagedOdp), 'nullable', 'integer', Rule::in($managedOdpPorts->pluck('id'))],
+            'odp_number' => [Rule::requiredIf(! $hasManagedOdp), 'nullable', 'string', 'max:100'],
+            'odp_port' => [Rule::requiredIf(! $hasManagedOdp), 'nullable', 'string', 'max:50'],
             'olt_number' => 'nullable|string|max:50',
             'olt_slot' => 'nullable|string|max:20',
             'olt_port' => 'nullable|string|max:50',
@@ -1197,6 +1208,12 @@ class CustomerInstallationController extends Controller
             'selected_inventory_serial_id.prohibited' => 'Beli Sendiri tidak memakai SN dari Gudang — kosongkan pilihan SN custody.',
             'modem_acquisition_choice.prohibited' => 'Cara pemilikan modem hanya untuk pelanggan kontrak Beli.',
         ]);
+
+        if (! empty($validated['network_node_port_id'])) {
+            $selectedOdpPort = $managedOdpPorts->firstWhere('id', (int) $validated['network_node_port_id']);
+            $validated['odp_number'] = $selectedOdpPort->node->code;
+            $validated['odp_port'] = (string) $selectedOdpPort->number;
+        }
 
         // selected_inventory_serial_id sudah divalidasi wajib & anggota
         // custody tim ini di atas — SN yang disimpan SELALU berasal dari sini,
@@ -1340,6 +1357,10 @@ class CustomerInstallationController extends Controller
             }
 
             $installation->save();
+
+            if (! empty($validated['network_node_port_id'])) {
+                app(NetworkPortAssignmentService::class)->assignCustomer($selectedOdpPort, $customer, $request->user());
+            }
 
             // Redaman awal disimpan di customer_technical_details, bukan
             // kolom installation — konsisten dengan store() & modal admin.
@@ -1689,5 +1710,38 @@ class CustomerInstallationController extends Controller
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Port ODP yang tersedia di cabang pelanggan, termasuk port miliknya
+     * sendiri saat laporan dipilih ulang. Node cabang lain tidak dikirim ke UI.
+     */
+    private function managedOdpNodeIds(Customer $customer): Collection
+    {
+        $branchId = Pop::resolveCabangId($customer->pop_id);
+        if ($branchId === null) {
+            return collect();
+        }
+
+        $popIds = Pop::query()->where('parent_id', $branchId)->pluck('id')->push($branchId)->all();
+
+        return NetworkNode::query()
+            ->inPops($popIds)
+            ->whereHas('nodeType', fn ($query) => $query->where('code', 'odp'))
+            ->pluck('id');
+    }
+
+    private function odpPortsFor(Customer $customer): Collection
+    {
+        return NetworkNodePort::query()
+            ->whereIn('network_node_id', $this->managedOdpNodeIds($customer))
+            ->where(function ($query) use ($customer) {
+                $query->where('is_used', false)
+                    ->orWhereHas('activeAssignment', fn ($assignment) => $assignment->where('customer_id', $customer->id));
+            })
+            ->with(['node', 'activeAssignment'])
+            ->orderBy('network_node_id')
+            ->orderBy('number')
+            ->get();
     }
 }

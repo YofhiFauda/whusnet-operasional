@@ -133,6 +133,17 @@
             <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — cuma Bernomor Seri, gak pernah tercatat terpasang, dipinjam-pakaikan lalu wajib balik. "Aset Infrastruktur" buat barang yang dipasang netap ke titik jaringan (ODP, splitter, kabel feeder).</p>
         </div>
 
+        <div class="pt-2">
+            <label for="infrastructure_node_type_id" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Tipe Node Tujuan</label>
+            <select name="infrastructure_node_type_id" id="infrastructure_node_type_id" class="w-full sm:w-1/2 px-3 py-2 rounded-md border border-slate-300 bg-white text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                <option value="">Fleksibel (selain komponen OLT)</option>
+                @foreach($nodeTypes as $nodeType)
+                    <option value="{{ $nodeType->id }}" @selected((int) old('infrastructure_node_type_id') === $nodeType->id)>{{ $nodeType->name }}</option>
+                @endforeach
+            </select>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Khusus aset infrastruktur. Chassis dan kartu OLT wajib dipetakan ke tipe node yang sesuai.</p>
+            @error('infrastructure_node_type_id')<p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>@enderror
+        </div>
         <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Sumber Serial Number</label>
             <select name="auto_generate_serial" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">

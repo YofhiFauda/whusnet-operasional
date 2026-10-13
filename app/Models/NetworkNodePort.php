@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Port generik milik sebuah `NetworkNode` (ODC/ODP/splitter/dst). Nomor port
@@ -43,8 +44,18 @@ class NetworkNodePort extends Model
     }
 
     /**
-     * @return BelongsTo<NetworkNode, $this>
+     * @return HasMany<NetworkPortAssignment, $this>
      */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(NetworkPortAssignment::class, 'network_node_port_id');
+    }
+
+    public function activeAssignment(): HasMany
+    {
+        return $this->assignments()->where('active_key', 1);
+    }
+
     public function node(): BelongsTo
     {
         return $this->belongsTo(NetworkNode::class, 'network_node_id');

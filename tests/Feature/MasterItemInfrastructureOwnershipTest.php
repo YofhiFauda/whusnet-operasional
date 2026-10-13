@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Enums\OwnershipMode;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NetworkNodeType;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\ItemCategorySeeder;
+use Database\Seeders\ItemSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -119,5 +121,35 @@ class MasterItemInfrastructureOwnershipTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/<select name="ownership_mode"[^>]*:disabled/', $html);
         $this->assertMatchesRegularExpression('/<option value="company_asset"[^>]*:disabled="trackingType !== \'serialized\'"/', $html);
         $this->assertDoesNotMatchRegularExpression('/<option value="infrastructure_asset"[^>]*:disabled/', $html);
+    }
+
+    #[Test]
+    public function katalog_olt_seeder_dapat_dideploy_sebagai_aset_infrastruktur(): void
+    {
+        $this->seed(ItemSeeder::class);
+
+        foreach (['OLT-ZTE-C320', 'OLT-MODULE-GPON-8P'] as $code) {
+            $item = Item::where('code', $code)->firstOrFail();
+            $this->assertSame(OwnershipMode::INFRASTRUCTURE_ASSET, $item->ownership_mode);
+            $this->assertSame($code === 'OLT-ZTE-C320' ? 'olt_chassis' : 'olt_card', $item->infrastructureNodeType?->code);
+        }
+    }
+
+    #[Test]
+    public function master_barang_dapat_memetakan_sku_ke_tipe_node(): void
+    {
+        $type = NetworkNodeType::where('code', 'olt_card')->firstOrFail();
+        $this->actingAs($this->owner)->post(route('master.items.store'), [
+            'code' => 'OLT-ADMIN-CARD', 'name' => 'Kartu OLT Admin',
+            'item_category_id' => ItemCategory::where('code', 'olt_module')->firstOrFail()->id,
+            'unit' => 'pcs', 'is_active' => 1, 'tracking_type' => 'serialized',
+            'auto_generate_serial' => 0, 'ownership_mode' => 'infrastructure_asset',
+            'infrastructure_node_type_id' => $type->id,
+        ])->assertRedirect(route('master.items.index'));
+
+        $item = Item::where('code', 'OLT-ADMIN-CARD')->firstOrFail();
+        $this->assertSame($type->id, $item->infrastructure_node_type_id);
+        $this->actingAs($this->owner)->get(route('master.items.edit', $item))
+            ->assertOk()->assertSee('Tipe Node Tujuan');
     }
 }
