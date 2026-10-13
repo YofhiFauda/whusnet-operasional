@@ -8,6 +8,7 @@
     <div class="rounded-xl border border-border bg-surface p-5">
         <h1 class="text-xl font-bold text-text-main">Master Node Jaringan dan Port</h1>
         <p class="mt-1 text-sm text-text-muted">Node jaringan (ODC, ODP, dst) adalah data infrastruktur terpisah dari label Distribusi pembentuk CID. Kapasitas dihitung dari jumlah port child, dan pemakaian port dicatat manual.</p>
+        <a href="{{ route('network.inventaris.index') }}" class="mt-3 inline-block text-xs font-semibold text-primary hover:underline">Lihat Inventaris Infrastruktur →</a>
     </div>
 
     @can('network_nodes.create')
