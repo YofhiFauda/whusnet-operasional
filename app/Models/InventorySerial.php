@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'condition_checked_by',
     'ownership',
     'current_pop_id',
+    'current_network_node_id',
     'current_technician_id',
     'issued_from_pop_id',
     'customer_id',
@@ -65,6 +66,11 @@ class InventorySerial extends Model
     public function currentPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'current_pop_id');
+    }
+
+    public function currentNetworkNode(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'current_network_node_id');
     }
 
     public function currentTechnician(): BelongsTo
