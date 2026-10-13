@@ -373,7 +373,7 @@
             </div>
 
             {{-- ── Group: JARINGAN & LAPANGAN ── --}}
-            @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('qr_scan_logs.view') || auth()->user()->hasPermission('network_odps.view'))
+            @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('qr_scan_logs.view') || auth()->user()->hasPermission('network_nodes.view'))
             <div>
                 <div class="sidebar-group-header">
                     <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Jaringan &amp; Lapangan</p>
@@ -448,9 +448,9 @@
                     @endif
                     @endif
 
-                    @can('network_odps.view')
-                    <a href="{{ route('network.odps.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.odps.*') || Request::routeIs('network.odp-ports.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
-                        <span class="sidebar-text">Master ODP &amp; Port</span>
+                    @can('network_nodes.view')
+                    <a href="{{ route('network.nodes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
+                        <span class="sidebar-text">Master Node Jaringan &amp; Port</span>
                     </a>
                     @endcan
 

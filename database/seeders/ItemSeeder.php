@@ -23,7 +23,8 @@ use Illuminate\Database\Seeder;
  * - `tracking_type`: SERIALIZED buat barang aktif per-unit (modem/ONT/radio/
  *   router) dan barang drum/roll (BATCH, kabel feeder) — QUANTITY buat
  *   sisanya.
- * - `ownership_mode`: cuma relevan buat SERIALIZED. INSTALLABLE = dipasang
+ * - `ownership_mode`: INFRASTRUCTURE_ASSET (splitter/ODP/feeder) = dipasang
+ *   netap ke titik jaringan, berlaku juga buat QUANTITY/ROLL. INSTALLABLE = dipasang
  *   ke pelanggan (boleh transisi ke `SerialStatus::INSTALLED`). COMPANY_ASSET
  *   = alat/infra perusahaan (mis. router Mikrotik gateway PPPoE, radio
  *   backbone PtP antar tower) — TIDAK PERNAH terpasang ke pelanggan.
@@ -61,21 +62,33 @@ class ItemSeeder extends Seeder
         $categoryIds = ItemCategory::pluck('id', 'code');
 
         $items = [
-            // ── Splitter / ODP — passive, quantity ──────────────────────
-            ['code' => 'SPL-1X2', 'name' => 'Splitter 1:2', 'category' => 'splitter_odp', 'unit' => 'pcs'],
-            ['code' => 'SPL-1X4', 'name' => 'Splitter 1:4', 'category' => 'splitter_odp', 'unit' => 'pcs'],
-            ['code' => 'SPL-1X8', 'name' => 'Splitter 1:8', 'category' => 'splitter_odp', 'unit' => 'pcs'],
-            ['code' => 'SPL-1X16', 'name' => 'Splitter 1:16', 'category' => 'splitter_odp', 'unit' => 'pcs'],
-            ['code' => 'SPL-1X32', 'name' => 'Splitter 1:32', 'category' => 'splitter_odp', 'unit' => 'pcs'],
-            ['code' => 'ODP-8', 'name' => 'ODP 8 Port', 'category' => 'splitter_odp', 'unit' => 'pcs'],
-            ['code' => 'ODP-16', 'name' => 'ODP 16 Port', 'category' => 'splitter_odp', 'unit' => 'pcs'],
-            ['code' => 'ODC-24', 'name' => 'ODC 24 Port', 'category' => 'splitter_odp', 'unit' => 'pcs'],
+            // ── Splitter / ODP — serialized per unit, SN digenerate sistem
+            //    (`auto_generate_serial`): dipasang fisik ke jaringan, tiap
+            //    unit perlu identitas sendiri untuk dilacak. Ditandai aset
+            //    infrastruktur — dipasang ke titik jaringan (deploySerial()),
+            //    bukan ke pelanggan.
+            ['code' => 'SPL-1X2', 'name' => 'Splitter 1:2', 'category' => 'splitter_odp', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'auto_generate_serial' => true, 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'SPL-1X4', 'name' => 'Splitter 1:4', 'category' => 'splitter_odp', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'auto_generate_serial' => true, 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'SPL-1X8', 'name' => 'Splitter 1:8', 'category' => 'splitter_odp', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'auto_generate_serial' => true, 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'SPL-1X16', 'name' => 'Splitter 1:16', 'category' => 'splitter_odp', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'auto_generate_serial' => true, 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'SPL-1X32', 'name' => 'Splitter 1:32', 'category' => 'splitter_odp', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'auto_generate_serial' => true, 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'ODP-8', 'name' => 'ODP 8 Port', 'category' => 'splitter_odp', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'auto_generate_serial' => true, 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'ODP-16', 'name' => 'ODP 16 Port', 'category' => 'splitter_odp', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'auto_generate_serial' => true, 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'ODC-24', 'name' => 'ODC 24 Port', 'category' => 'splitter_odp', 'unit' => 'pcs', 'tracking_type' => 'serialized', 'auto_generate_serial' => true, 'ownership_mode' => 'infrastructure_asset'],
 
-            // ── Kabel Dropcore — passive, quantity (2 slot harga otomatis
-            // kalau harga beli berubah, ADHOC-75 — bukan BATCH manual lagi) ──
-            ['code' => 'DC-1C', 'name' => 'Kabel Dropcore 1 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter'],
-            ['code' => 'DC-2C', 'name' => 'Kabel Dropcore 2 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter'],
-            ['code' => 'KBL-FEEDER-12C', 'name' => 'Kabel Fiber Optik Feeder 12 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter'],
+            // ── Kabel Dropcore/Feeder — ROLL: dilacak per drum, sisa meter
+            //    berkurang sebagian-sebagian (`inventory_rolls`), bukan
+            //    QUANTITY polos maupun SERIALIZED atomik.
+            //    Feeder = aset infrastruktur (ditarik netap antar titik
+            //    jaringan, jalur deployRoll()). Dropcore SENGAJA tetap
+            //    INSTALLABLE: dropcore dipotong ke rumah pelanggan di PSB/MTN
+            //    (consumeFromRoll() di CustomerInstallationController &
+            //    TaskMaintenanceController) — kalau ditandai infrastruktur,
+            //    consumeFromRoll() menolaknya & picker roll pelanggan
+            //    menyembunyikannya, PSB macet.
+            ['code' => 'DC-1C', 'name' => 'Kabel Dropcore 1 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter', 'tracking_type' => 'roll'],
+            ['code' => 'DC-2C', 'name' => 'Kabel Dropcore 2 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter', 'tracking_type' => 'roll'],
+            ['code' => 'KBL-FEEDER-12C', 'name' => 'Kabel Fiber Optik Feeder 12 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter', 'tracking_type' => 'roll', 'ownership_mode' => 'infrastructure_asset'],
 
             // ── Patch Cord — passive, quantity ──────────────────────────
             ['code' => 'PC-SCUPC-1M', 'name' => 'Patch Cord SC/UPC 1 Meter', 'category' => 'patch_cord', 'unit' => 'pcs'],
@@ -163,6 +176,7 @@ class ItemSeeder extends Seeder
                     'item_category_id' => $categoryIds[$item['category']] ?? null,
                     'unit' => $item['unit'],
                     'tracking_type' => $item['tracking_type'] ?? 'quantity',
+                    'auto_generate_serial' => $item['auto_generate_serial'] ?? false,
                     'ownership_mode' => $item['ownership_mode'] ?? 'installable',
                     'equipment_class_override' => $item['equipment_class_override'] ?? null,
                     'is_active' => true,

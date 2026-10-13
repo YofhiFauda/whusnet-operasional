@@ -238,6 +238,26 @@ class InventoryAdjustmentService
                 $updates['installed_at'] = null;
             }
 
+            // SN yang DEPLOYED ke node infrastruktur ditarik status-nya: SN-nya
+            // udah gak ada di node itu, pointer lokasinya harus ikut lepas
+            // (sama logikanya dengan customer_id di atas, beda konsep lokasi).
+            //
+            // Node + Cabang-nya DISNAPSHOT dulu sebelum pointer dikosongkan —
+            // kalau tidak, baris ADJUSTMENT gak punya lokasi asal sama sekali
+            // (SN DEPLOYED selalu `current_pop_id = null` sejak deploySerial()),
+            // jadi kerugian aset infrastruktur gak ketauan dari titik mana dan
+            // gak muncul di riwayat Gudang yang memfilter per `from_pop_id`.
+            // Cabang di-resolve SAAT transaksi (pola sama snapshot ledger
+            // DEPLOY/RETRIEVE_INFRA) — node dipindah belakangan, histori tetap.
+            $fromNetworkNodeId = null;
+            $fromNetworkNodePopId = null;
+
+            if ($serial->status === SerialStatus::DEPLOYED) {
+                $fromNetworkNodeId = $serial->current_network_node_id;
+                $fromNetworkNodePopId = $serial->currentNetworkNode?->resolvePop()?->id;
+                $updates['current_network_node_id'] = null;
+            }
+
             $serial->update($updates);
 
             return InventoryTransaction::create([
@@ -246,8 +266,9 @@ class InventoryAdjustmentService
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => -1,
-                'from_pop_id' => $serial->current_pop_id,
+                'from_pop_id' => $serial->current_pop_id ?? $fromNetworkNodePopId,
                 'from_technician_id' => $serial->current_technician_id,
+                'from_network_node_id' => $fromNetworkNodeId,
                 'reason' => $reason,
                 'notes' => $notes,
                 'evidence_file_path' => $evidenceFilePath,

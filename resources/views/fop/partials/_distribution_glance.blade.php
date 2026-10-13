@@ -5,8 +5,8 @@
             <h4 class="text-xs font-bold text-text-main uppercase tracking-wider">Kapasitas ODP</h4>
             <p class="text-[11px] text-text-muted">Status port diisi manual oleh petugas pada POP yang dapat diakses.</p>
         </div>
-        @can('network_odps.view')
-        <a href="{{ route('network.odps.index') }}" class="text-xs font-semibold text-primary hover:underline">Kelola ODP</a>
+        @can('network_nodes.view')
+        <a href="{{ route('network.nodes.index') }}" class="text-xs font-semibold text-primary hover:underline">Kelola ODP</a>
         @endcan
     </div>
     <div class="rounded-xl border border-border bg-surface p-4 shadow-xs">
@@ -16,7 +16,7 @@
                 <p class="text-xl font-bold text-text-main">{{ number_format($odpSummary['total_odps'] ?? 0, 0, ',', '.') }}</p>
             </div>
             <div class="text-right">
-                <p class="text-[11px] text-text-muted">Red Zone ≥85%</p>
+                <p class="text-[11px] text-text-muted">Red Zone</p>
                 <p class="text-xl font-bold text-error">{{ $odpSummary['red_zone_count'] ?? 0 }}</p>
             </div>
         </div>
@@ -33,7 +33,7 @@
         <p class="mt-2 text-[11px] text-text-muted">Menampilkan 5 ODP terpadat dari {{ $odpSummary['red_zone_count'] }} Red Zone.</p>
         @endif
         @else
-        <p class="mt-3 border-t border-border pt-3 text-xs text-text-muted">Belum ada ODP dengan pemakaian port ≥85%.</p>
+        <p class="mt-3 border-t border-border pt-3 text-xs text-text-muted">Belum ada ODP yang masuk Red Zone.</p>
         @endif
     </div>
 </div>

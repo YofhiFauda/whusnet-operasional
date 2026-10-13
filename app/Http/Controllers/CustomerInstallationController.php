@@ -282,9 +282,12 @@ class CustomerInstallationController extends Controller
             }))
             ->with('item.category')
             ->get()
+            // Aset infrastruktur dikecualikan — `consumeFromCustody()`
+            // menolaknya (jalurnya deployQuantity() di laporan O-REQ/INFR REQ).
             ->filter(fn (TechnicianCustody $custody) => $custody->item
                 && $custody->item->tracking_type !== TrackingType::SERIALIZED
-                && $custody->item->effective_equipment_class === EquipmentClass::PASIF)
+                && $custody->item->effective_equipment_class === EquipmentClass::PASIF
+                && $custody->item->ownership_mode !== OwnershipMode::INFRASTRUCTURE_ASSET)
             ->groupBy('item_id')
             ->map(function ($rows) {
                 $item = $rows->first()->item;
@@ -327,6 +330,9 @@ class CustomerInstallationController extends Controller
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
             ->where('length_remaining', '>', 0)
+            // Roll infrastruktur (feeder) gak boleh dipotong ke pelanggan —
+            // `consumeFromRoll()` menolaknya (jalurnya deployRoll()).
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', '!=', OwnershipMode::INFRASTRUCTURE_ASSET->value))
             ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
                 $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
             }))

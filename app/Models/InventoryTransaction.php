@@ -33,6 +33,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'unit_price_snapshot',
     'from_pop_id',
     'to_pop_id',
+    'from_network_node_id',
+    'to_network_node_id',
     'from_technician_id',
     'to_technician_id',
     'fop_task_id',
@@ -84,6 +86,16 @@ class InventoryTransaction extends Model
     public function toPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'to_pop_id');
+    }
+
+    public function fromNetworkNode(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'from_network_node_id');
+    }
+
+    public function toNetworkNode(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'to_network_node_id');
     }
 
     public function fromTechnician(): BelongsTo

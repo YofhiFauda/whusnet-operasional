@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse\Concerns;
 
+use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
@@ -85,5 +86,30 @@ trait AuthorizesWarehousePop
         if ($user->role?->code === 'pic_gudang' && ! $user->isPicGudangOf($pop)) {
             abort(403, "Cabang {$pop->name} bukan gudang yang Anda kelola sebagai PIC Gudang.");
         }
+    }
+
+    /**
+     * Gerbang scope POP buat `NetworkNode` — resolve dulu ke Cabang
+     * pemiliknya (`NetworkNode::resolvePop()`, naik rantai `parent` sampai
+     * node puncak lalu ke Cabang), baru didelegasikan ke
+     * `assertPopIdInScope()`. Beda dari v2 (`root_pop_id` sekali lookup
+     * langsung di kolom) — sekarang topologi node bisa berlapis
+     * (ODC → ODP → splitter), jadi wajib lewat resolver berjalan-rantai
+     * (di-memo per request lewat `once()` di Task 4).
+     *
+     * Node yang resolve-nya `null` (anchor/parent tidak lengkap — XOR belum
+     * ditegakkan, lihat docblock `NetworkNode`) dianggap di luar scope,
+     * bukan dilewatkan — beda dengan `assertPopIdInScope()` yang
+     * null-safe buat kolom `*_pop_id` nullable yang SAH null (custody
+     * teknisi). Di sini null berarti data tidak lengkap/rusak, jadi default
+     * ke tolak, bukan izinkan.
+     *
+     * @throws HttpException 403
+     */
+    protected function assertNetworkNodeInScope(NetworkNode $node, User $user, EffectiveAccessService $access): void
+    {
+        $pop = $node->resolvePop();
+        abort_unless($pop !== null, 403, 'Node jaringan ini belum ditambatkan ke POP manapun.');
+        $this->assertPopIdInScope($pop->id, $user, $access);
     }
 }

@@ -45,6 +45,7 @@ use App\Http\Controllers\Master\DistributionController;
 use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\ItemCategoryController;
 use App\Http\Controllers\Master\ItemController;
+use App\Http\Controllers\Master\NetworkNodeTypeController;
 use App\Http\Controllers\Master\PackageCategoryController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\Master\RegionController;
@@ -53,7 +54,7 @@ use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
-use App\Http\Controllers\Network\OdpController;
+use App\Http\Controllers\Network\NetworkNodeController;
 use App\Http\Controllers\NocDashboardController;
 use App\Http\Controllers\NocWorksheetController;
 use App\Http\Controllers\NotificationController;
@@ -677,6 +678,26 @@ Route::middleware('auth')->group(function () {
         Route::delete('/master/issue-categories/{category}', [TicketIssueCategoryController::class, 'destroy'])->name('master.ticket-issue-categories.destroy');
     });
 
+    // Master Tipe Node Jaringan - Static Routes First
+    Route::middleware('permission:master_network_node_types.create|master_network_node_types.update')->group(function () {
+        Route::get('/master/network-node-types/create', [NetworkNodeTypeController::class, 'create'])->name('master.network-node-types.create');
+        Route::post('/master/network-node-types', [NetworkNodeTypeController::class, 'store'])->name('master.network-node-types.store');
+    });
+
+    Route::middleware('permission:master_network_node_types.view')->group(function () {
+        Route::get('/master/network-node-types', [NetworkNodeTypeController::class, 'index'])->name('master.network-node-types.index');
+    });
+
+    // Master Tipe Node Jaringan - Dynamic Routes Last
+    Route::middleware('permission:master_network_node_types.create|master_network_node_types.update')->group(function () {
+        Route::get('/master/network-node-types/{networkNodeType}/edit', [NetworkNodeTypeController::class, 'edit'])->name('master.network-node-types.edit');
+        Route::put('/master/network-node-types/{networkNodeType}', [NetworkNodeTypeController::class, 'update'])->name('master.network-node-types.update');
+    });
+
+    Route::middleware('permission:master_network_node_types.delete')->group(function () {
+        Route::delete('/master/network-node-types/{networkNodeType}', [NetworkNodeTypeController::class, 'destroy'])->name('master.network-node-types.destroy');
+    });
+
     // Master Barang/Material - Static Routes First
     Route::middleware('permission:items.create|items.update')->group(function () {
         Route::get('/master/items/create', [ItemController::class, 'create'])->name('master.items.create');
@@ -1160,15 +1181,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/fop/pipeline', [FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
     });
 
-    Route::middleware('permission:network_odps.view')->group(function () {
-        Route::get('/network/odps', [OdpController::class, 'index'])->name('network.odps.index');
+    Route::middleware('permission:network_nodes.view')->group(function () {
+        Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
     });
-    Route::middleware('permission:network_odps.create')->group(function () {
-        Route::post('/network/odps', [OdpController::class, 'store'])->name('network.odps.store');
+    Route::middleware('permission:network_nodes.create')->group(function () {
+        Route::post('/network/nodes', [NetworkNodeController::class, 'store'])->name('network.nodes.store');
     });
-    Route::middleware('permission:network_odps.update')->group(function () {
-        Route::post('/network/odps/{odp}/ports', [OdpController::class, 'addPorts'])->name('network.odps.ports.add');
-        Route::put('/network/odp-ports/{port}', [OdpController::class, 'updatePort'])->name('network.odp-ports.update');
+    Route::middleware('permission:network_nodes.update')->group(function () {
+        Route::patch('/network/nodes/{node}/move', [NetworkNodeController::class, 'move'])->name('network.nodes.move');
+        Route::post('/network/nodes/{node}/ports', [NetworkNodeController::class, 'addPorts'])->name('network.nodes.ports.add');
+        Route::put('/network/node-ports/{port}', [NetworkNodeController::class, 'updatePort'])->name('network.node-ports.update');
     });
 
     // Dashboard Analitik FOP — agregat lintas periode, permission SENDIRI

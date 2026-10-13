@@ -24,6 +24,8 @@ pohon ini, tidak dibuang.
 
 **Spec:** `docs/superpowers/specs/2026-10-09-aset-infrastruktur-lokasi-design.md` (v3)
 
+**Status implementasi (2026-10-13):** Task 1-13 telah diimplementasikan di worktree network-nodes-infra. Rekonsiliasi grant, pembuatan dan pemindahan node bertingkat, guard scope pindah, tree browser, dan tree picker dilengkapi dalam ADHOC-166. Checklist langkah di bawah adalah catatan rencana historis, bukan status eksekusi terkini.
+
 ## Global Constraints
 
 - Semua nomor dokumen ledger lewat `generateReferenceNumber()` yang sudah

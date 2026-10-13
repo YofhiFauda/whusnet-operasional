@@ -9,7 +9,7 @@ use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\InventoryBalance;
 use App\Models\InventorySerial;
-use App\Models\Odp;
+use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TaskMaterial;
@@ -376,33 +376,41 @@ class FopUnifiedDashboardService
     }
 
     /**
-     * Kapasitas ODP berasal dari port child, terpisah dari label Distribusi CID.
+     * Kapasitas node ber-port (ODC/ODP/dst) berasal dari port child, terpisah
+     * dari label Distribusi CID. Yang dihitung cuma node yang tipenya
+     * `has_ports` + `monitors_capacity`; ambang Red Zone per tipe
+     * (`red_zone_threshold`, persen 0-100). Nama method & key output
+     * (`total_odps`, dst) sengaja dipertahankan — dibaca widget dashboard FOP.
      *
      * @return array<string, mixed>
      */
     public function getOdpSummary(bool $hasAllPopAccess, array $allowedPopIds): array
     {
-        $odps = Odp::query()
-            ->when(! $hasAllPopAccess, fn ($query) => $query->whereIn('pop_id', $allowedPopIds))
+        $nodes = NetworkNode::query()
+            ->whereHas('nodeType', fn ($query) => $query->where('has_ports', true)->where('monitors_capacity', true))
+            ->when(! $hasAllPopAccess, fn ($query) => $query->inPops($allowedPopIds))
+            ->with('nodeType')
             ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
             ->get();
 
-        $redZone = $odps
-            ->filter(fn (Odp $odp) => $odp->ports_count > 0 && $odp->used_ports_count / $odp->ports_count >= 0.85)
-            ->sortByDesc(fn (Odp $odp) => $odp->used_ports_count / $odp->ports_count)
+        // Aturan ambang satu sumber di model — dipakai juga listing Network Node.
+        $redZoneNodes = $nodes->filter(fn (NetworkNode $node) => $node->isInRedZone());
+
+        $redZone = $redZoneNodes
+            ->sortByDesc(fn (NetworkNode $node) => $node->used_ports_count / $node->ports_count)
             ->take(5)
-            ->map(fn (Odp $odp) => [
-                'code' => $odp->code,
-                'used' => $odp->used_ports_count,
-                'capacity' => $odp->ports_count,
-                'percent' => (int) round($odp->used_ports_count / $odp->ports_count * 100),
+            ->map(fn (NetworkNode $node) => [
+                'code' => $node->code,
+                'used' => $node->used_ports_count,
+                'capacity' => $node->ports_count,
+                'percent' => (int) round($node->used_ports_count / $node->ports_count * 100),
             ])
             ->values()
             ->all();
 
         return [
-            'total_odps' => $odps->count(),
-            'red_zone_count' => $odps->filter(fn (Odp $odp) => $odp->ports_count > 0 && $odp->used_ports_count / $odp->ports_count >= 0.85)->count(),
+            'total_odps' => $nodes->count(),
+            'red_zone_count' => $redZoneNodes->count(),
             'red_zone' => $redZone,
         ];
     }
