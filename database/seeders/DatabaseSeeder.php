@@ -55,6 +55,8 @@ class DatabaseSeeder extends Seeder
 
         // $this->call(CustomerSeeder::class);
         // $this->call(MasterPopSeeder::class);
+        // $this->call(WarehouseExampleSeeder::class);
+        // $this->call(NetworkInventoryExampleSeeder::class); // Contoh data Inventaris Infrastruktur (ADHOC-167)
 
         // $this->call(TechnicianSeeder::class);
         // $this->call(PicGudangSeeder::class); // Demo PIC Gudang Jetis & Sandya (ADHOC-120), WAJIB setelah RoleSeeder/RolePermissionSeeder
