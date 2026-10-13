@@ -425,7 +425,9 @@ class FopUnifiedDashboardService
     {
         $threshold = $node->nodeType?->red_zone_threshold;
 
-        if ($threshold === null || $node->ports_count === 0) {
+        // `<= 0`, bukan `=== 0`: withCount bisa balik string numerik di driver
+        // tertentu — `"0" === 0` false lalu pembagian/perbandingan jadi salah.
+        if ($threshold === null || (int) $node->ports_count <= 0) {
             return false;
         }
 

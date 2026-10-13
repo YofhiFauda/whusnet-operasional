@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\ScopeType;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Models\Role;
@@ -206,6 +207,28 @@ class OdpNetworkManagementTest extends TestCase
     }
 
     /**
+     * Tipe `max_ports = null` (tanpa batas) melewati closure cap per tipe —
+     * tanpa plafon datar, satu request store() bisa minta jutaan baris port.
+     */
+    public function test_store_tipe_tanpa_max_ports_tetap_dibatasi_plafon_datar(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create(['code' => 'ODP-H', 'name' => 'POP ODP H', 'type' => 'cabang', 'status' => 'active']);
+        NetworkNodeType::where('id', $this->odpTypeId)->update(['max_ports' => null]);
+
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => $this->odpTypeId,
+            'anchor_pop_id' => $pop->id,
+            'code' => 'ODP-BIG',
+            'name' => 'ODP Besar',
+            'capacity' => 1001,
+        ])->assertSessionHasErrors('capacity');
+
+        $this->assertDatabaseMissing('network_nodes', ['code' => 'ODP-BIG']);
+        $this->assertSame(0, NetworkNodePort::count());
+    }
+
+    /**
      * Ambang Red Zone dibaca per tipe (`red_zone_threshold`, persen 0-100),
      * bukan 85% hardcode: 7/10 = 70% masuk Red Zone kalau ambang tipe 70,
      * dan keluar lagi kalau ambangnya dinaikkan ke 80.
@@ -237,6 +260,96 @@ class OdpNetworkManagementTest extends TestCase
      * lalu tabel lama di-drop.
      */
     public function test_migrasi_reshape_memindahkan_odps_lama_ke_network_nodes(): void
+    {
+        [$nodesFeatureId, $atasan, $pop, $createdAt] = $this->simulateLegacyOdpDatabase();
+
+        $this->runReshapeMigration();
+
+        $node = NetworkNode::where('code', 'ODP-LAMA-1')->firstOrFail();
+        $this->assertSame($pop->id, $node->anchor_pop_id);
+        $this->assertNull($node->parent_id);
+        $this->assertSame('odp', $node->nodeType->code);
+        $this->assertSame('ODP Lama', $node->name);
+        $this->assertSame('active', $node->status);
+        $this->assertNull($node->capacity);
+        $this->assertSame($createdAt, $node->created_at->format('Y-m-d H:i:s'));
+        $this->assertSame([[1, true], [2, false]], $node->ports->map(fn ($port) => [$port->number, $port->is_used])->all());
+
+        $this->assertFalse(Schema::hasTable('odps'));
+        $this->assertFalse(Schema::hasTable('odp_ports'));
+
+        $this->assertDatabaseMissing('features', ['code' => 'network_odps']);
+        $this->assertDatabaseHas('features', ['id' => $nodesFeatureId, 'code' => 'network_nodes']);
+        $this->assertDatabaseMissing('permissions', ['code' => 'network_odps.view']);
+        $permissionId = DB::table('permissions')->where('code', 'network_nodes.view')->value('id');
+        $this->assertNotNull($permissionId);
+        $this->assertDatabaseHas('role_permissions', ['role_id' => $atasan->id, 'permission_id' => $permissionId]);
+    }
+
+    /**
+     * Regresi grant hilang: tipe `odp` belum di-seed → copy node melempar.
+     * Rename Feature/permission harus SUDAH ter-commit sebelum lemparan itu.
+     * Kalau ikut ter-rollback, operator menjalankan NetworkNodeTypeSeeder
+     * (yang membuat Feature `network_nodes` baru), lalu migrate ulang melihat
+     * `network_nodes` sudah ada dan melewati rename — grant role tertinggal
+     * di `network_odps.*` yang tidak dibaca siapa pun.
+     */
+    public function test_migrasi_reshape_rename_permission_tetap_jalan_walau_tipe_odp_belum_di_seed(): void
+    {
+        [$nodesFeatureId, $atasan, $pop] = $this->simulateLegacyOdpDatabase();
+        DB::table('network_node_types')->where('code', 'odp')->delete();
+
+        try {
+            $this->runReshapeMigration();
+            $this->fail('Migration harus melempar selama tipe odp belum ada.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('NetworkNodeTypeSeeder', $exception->getMessage());
+        }
+
+        // Rename sudah terjadi di percobaan pertama, data lama belum disentuh.
+        $this->assertDatabaseMissing('features', ['code' => 'network_odps']);
+        $this->assertDatabaseHas('features', ['id' => $nodesFeatureId, 'code' => 'network_nodes']);
+        $this->assertDatabaseMissing('permissions', ['code' => 'network_odps.view']);
+        $viewPermissionId = DB::table('permissions')->where('code', 'network_nodes.view')->value('id');
+        $this->assertDatabaseHas('permissions', ['id' => $viewPermissionId, 'feature_id' => $nodesFeatureId]);
+        $this->assertDatabaseHas('role_permissions', ['role_id' => $atasan->id, 'permission_id' => $viewPermissionId]);
+        $this->assertTrue(Schema::hasTable('odps'));
+        $this->assertTrue(Schema::hasTable('odp_ports'));
+        $this->assertSame(0, NetworkNode::count());
+
+        // Ikuti pesan error: seed tipe, lalu migrate ulang.
+        $this->seed(NetworkNodeTypeSeeder::class);
+        $this->runReshapeMigration();
+
+        $node = NetworkNode::where('code', 'ODP-LAMA-1')->firstOrFail();
+        $this->assertSame($pop->id, $node->anchor_pop_id);
+        $this->assertSame(2, $node->ports()->count());
+        $this->assertFalse(Schema::hasTable('odps'));
+        $this->assertFalse(Schema::hasTable('odp_ports'));
+
+        // Tidak ada Feature yatim/dobel; grant atasan tetap di permission yang sama.
+        $this->assertSame([$nodesFeatureId], DB::table('features')->where('code', 'network_nodes')->pluck('id')->all());
+        $this->assertSame($viewPermissionId, DB::table('permissions')->where('code', 'network_nodes.view')->value('id'));
+        $this->assertDatabaseHas('role_permissions', ['role_id' => $atasan->id, 'permission_id' => $viewPermissionId]);
+
+        $atasanUser = User::factory()->create(['role_id' => $atasan->id]);
+        $this->actingAs($atasanUser)->get(route('network.nodes.index'))->assertOk()->assertSee('ODP-LAMA-1');
+    }
+
+    private function runReshapeMigration(): void
+    {
+        (require database_path('migrations/2026_10_12_110300_reshape_odps_into_network_nodes.php'))->up();
+    }
+
+    /**
+     * Bangun ulang bentuk DB lama: tabel `odps`/`odp_ports` (file create-nya
+     * sudah dihapus) berisi satu ODP dua port, Feature `network_odps` dengan
+     * `network_odps.view` yang di-grant ke atasan, dan belum ada Feature
+     * `network_nodes`.
+     *
+     * @return array{0: int, 1: Role, 2: Pop, 3: string}
+     */
+    private function simulateLegacyOdpDatabase(): array
     {
         Schema::create('odps', function (Blueprint $table) {
             $table->id();
@@ -284,27 +397,7 @@ class OdpNetworkManagementTest extends TestCase
             ['odp_id' => $odpId, 'number' => 2, 'is_used' => false, 'created_at' => $createdAt, 'updated_at' => $createdAt],
         ]);
 
-        (require database_path('migrations/2026_10_12_110300_reshape_odps_into_network_nodes.php'))->up();
-
-        $node = NetworkNode::where('code', 'ODP-LAMA-1')->firstOrFail();
-        $this->assertSame($pop->id, $node->anchor_pop_id);
-        $this->assertNull($node->parent_id);
-        $this->assertSame('odp', $node->nodeType->code);
-        $this->assertSame('ODP Lama', $node->name);
-        $this->assertSame('active', $node->status);
-        $this->assertNull($node->capacity);
-        $this->assertSame($createdAt, $node->created_at->format('Y-m-d H:i:s'));
-        $this->assertSame([[1, true], [2, false]], $node->ports->map(fn ($port) => [$port->number, $port->is_used])->all());
-
-        $this->assertFalse(Schema::hasTable('odps'));
-        $this->assertFalse(Schema::hasTable('odp_ports'));
-
-        $this->assertDatabaseMissing('features', ['code' => 'network_odps']);
-        $this->assertDatabaseHas('features', ['id' => $nodesFeatureId, 'code' => 'network_nodes']);
-        $this->assertDatabaseMissing('permissions', ['code' => 'network_odps.view']);
-        $permissionId = DB::table('permissions')->where('code', 'network_nodes.view')->value('id');
-        $this->assertNotNull($permissionId);
-        $this->assertDatabaseHas('role_permissions', ['role_id' => $atasan->id, 'permission_id' => $permissionId]);
+        return [$nodesFeatureId, $atasan, $pop, $createdAt];
     }
 
     /**
@@ -315,7 +408,7 @@ class OdpNetworkManagementTest extends TestCase
     {
         $this->assertFalse(Schema::hasTable('odps'));
 
-        (require database_path('migrations/2026_10_12_110300_reshape_odps_into_network_nodes.php'))->up();
+        $this->runReshapeMigration();
 
         $this->assertSame(1, DB::table('features')->where('code', 'network_nodes')->count());
     }

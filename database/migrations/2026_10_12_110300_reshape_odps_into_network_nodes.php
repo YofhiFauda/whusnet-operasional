@@ -26,11 +26,23 @@ return new class extends Migration
             return;
         }
 
-        DB::transaction(function (): void {
-            $this->copyOdpsToNetworkNodes();
-            $this->renameFeatureAndPermissions();
-        });
+        // Rename DULUAN, di transaksi sendiri — sengaja TIDAK satu transaksi
+        // dengan copy data. Seeder baru (`NetworkNodeTypeSeeder`) mendaftarkan
+        // Feature `network_nodes` lewat updateOrCreate. Kalau copy di bawah
+        // gagal (tipe `odp` belum di-seed) dan ikut menggulung rename, operator
+        // yang menuruti pesan error akan menjalankan seeder SEBELUM migrate
+        // diulang → seeder membuat baris `network_nodes` baru yang kosong,
+        // rename di percobaan kedua di-skip (unique `code`), dan semua grant
+        // role di `network_odps` yatim. Rename duluan = baris yang sama sudah
+        // bernama `network_nodes` saat seeder jalan, grant ikut selamat.
+        DB::transaction(fn () => $this->renameFeatureAndPermissions());
 
+        // Boleh melempar (tipe `odp` belum ada) — transaksinya bergulung bersih,
+        // `odps`/`odp_ports` di bawah belum di-drop, migrate tinggal diulang.
+        DB::transaction(fn () => $this->copyOdpsToNetworkNodes());
+
+        // Baru tercapai kalau copy sukses: exception di atas sudah keluar dari
+        // up() sebelum sampai sini, jadi data lama tidak pernah di-drop duluan.
         Schema::dropIfExists('odp_ports');
         Schema::dropIfExists('odps');
 

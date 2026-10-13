@@ -23,7 +23,9 @@ use Illuminate\View\View;
  *
  * Scope POP: `NetworkNode` tidak punya kolom `pop_id` (cabang di-resolve
  * dari pohon), jadi `HasPopScope` tidak berlaku — listing lewat
- * `scopeInPops()`, otorisasi per-record lewat `resolvePop()`.
+ * `scopeInPops()`, otorisasi per-record lewat `authorizeNodeScope()` yang
+ * memakai `inPops()` yang sama (bukan `resolvePop()` — alasannya di docblock
+ * `authorizeNodeScope()`).
  */
 class NetworkNodeController extends Controller
 {
@@ -77,6 +79,10 @@ class NetworkNodeController extends Controller
                 'required',
                 'integer',
                 'min:1',
+                // Plafon datar: tipe `max_ports = null` (tanpa batas) membuat
+                // closure di bawah dilewati, padahal loop di bawah membuat satu
+                // baris per port — tanpa ini satu request bisa minta jutaan baris.
+                'max:1000',
                 function (string $attribute, mixed $value, Closure $fail) use ($nodeType): void {
                     if ($nodeType?->max_ports !== null && (int) $value > $nodeType->max_ports) {
                         $fail("Kapasitas maksimal {$nodeType->max_ports} port.");
