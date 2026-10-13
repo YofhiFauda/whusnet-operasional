@@ -14,11 +14,13 @@ use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TrackingType;
+use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\FopTask;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TaskCreqDetail;
@@ -27,6 +29,7 @@ use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\FileUploadService;
+use App\Services\EffectiveAccessService;
 use App\Services\InventoryService;
 use App\Services\NumberSequenceService;
 use App\Services\TaskMaterialService;
@@ -36,9 +39,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class TaskMaintenanceController extends Controller
 {
+    use AuthorizesWarehousePop;
+
     /**
      * SN Perangkat Aktif yang boleh dipasang lewat laporan Maintenance ini —
      * custody anggota tim task, status ISSUED, item-nya installable (bukan
@@ -147,6 +154,160 @@ class TaskMaintenanceController extends Controller
             ->get();
     }
 
+    /**
+     * Padanan `eligibleSerialsForTeam()` buat seksi "Pasang/Ganti
+     * Infrastruktur" (O-REQ/INFR REQ). SATU perbedaan: ownership_mode
+     * INFRASTRUCTURE_ASSET, bukan INSTALLABLE — SN yang dipasang netap ke
+     * titik jaringan, bukan ke pelanggan. Dua daftar ini SENGAJA saling
+     * lepas: modem pelanggan yang nyasar ke ODC bakal hilang dari jalur
+     * install/retur pelanggan (guard yang sama ada di
+     * `InventoryService::deploySerial()`, ini cuma UX + Rule::in).
+     */
+    private function eligibleInfraSerialsForTeam(Task $task)
+    {
+        $teamTechnicianIds = $task->teamMembers->pluck('user_id')->all();
+
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        $targetCabangId = Pop::resolveCabangId($task->pop_id);
+
+        return InventorySerial::query()
+            ->whereIn('current_technician_id', $teamTechnicianIds)
+            ->where('status', SerialStatus::ISSUED->value)
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INFRASTRUCTURE_ASSET->value))
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item')
+            ->get();
+    }
+
+    /**
+     * Padanan `eligiblePassiveCustodyForTeam()` buat aset infrastruktur
+     * QUANTITY (closure, aksesoris ODP, dst). BEDA filter: tracking_type
+     * QUANTITY (bukan "bukan SERIALIZED" — ROLL punya jalur sendiri lewat
+     * `eligibleInfraRollsForTeam()`) + ownership_mode INFRASTRUCTURE_ASSET
+     * (bukan equipment_class PASIF — konsep aktif/pasif gak relevan buat
+     * aset yang netap di titik jaringan).
+     */
+    private function eligibleInfraCustodyForTeam(Task $task)
+    {
+        $teamTechnicianIds = $task->teamMembers->pluck('user_id')->all();
+
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        $targetCabangId = Pop::resolveCabangId($task->pop_id);
+
+        return TechnicianCustody::query()
+            ->whereIn('technician_id', $teamTechnicianIds)
+            ->active()
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item.category')
+            ->get()
+            ->filter(fn (TechnicianCustody $custody) => $custody->item
+                && $custody->item->tracking_type === TrackingType::QUANTITY
+                && $custody->item->ownership_mode === OwnershipMode::INFRASTRUCTURE_ASSET)
+            ->groupBy('item_id')
+            ->map(function ($rows) {
+                $item = $rows->first()->item;
+
+                return [
+                    'item_id' => $item->id,
+                    'code' => $item->code,
+                    'name' => $item->name,
+                    'unit' => $item->unit,
+                    'type' => $item->category?->code,
+                    'available' => (float) $rows->sum('qty_remaining'),
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * Padanan `eligibleRollsForTeam()` + filter eksplisit ownership_mode
+     * INFRASTRUCTURE_ASSET. Yang lama gak filter ownership_mode sama sekali
+     * (semua roll saat itu kebetulan kabel yang netap) — sekarang dua
+     * konteks (pelanggan vs titik jaringan) pakai method service beda, jadi
+     * filter-nya harus tertulis di sini.
+     */
+    private function eligibleInfraRollsForTeam(Task $task)
+    {
+        $teamTechnicianIds = $task->teamMembers->pluck('user_id')->all();
+
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        $targetCabangId = Pop::resolveCabangId($task->pop_id);
+
+        return InventoryRoll::query()
+            ->whereIn('current_technician_id', $teamTechnicianIds)
+            ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+            ->where('length_remaining', '>', 0)
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INFRASTRUCTURE_ASSET->value))
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item')
+            ->get();
+    }
+
+    /**
+     * Titik jaringan milik Cabang task ini — node yang ditambatkan ke Cabang
+     * itu SENDIRI maupun ke Mini POP di bawahnya, plus semua turunannya.
+     * Bukan `inPops([$task->pop_id])` polos: `task.pop_id` bisa Mini POP,
+     * dan node yang ditambatkan ke Cabang induknya (ODC utama) bakal hilang
+     * dari daftar; sebaliknya task di Cabang bakal kehilangan node yang
+     * ditambatkan ke Mini POP-nya. Sama definisi "cabang node" yang dipakai
+     * `NetworkNode::resolvePop()` (Mini POP → Cabang induk) — jadi daftar
+     * ini dan cek di validasi `store()` gak bisa menyimpang.
+     *
+     * Null kalau task gak punya POP — caller memperlakukannya "tidak ada
+     * node", bukan "semua node" (deny-by-default).
+     */
+    private function infraNodeQueryForTask(Task $task)
+    {
+        $cabangId = Pop::resolveCabangId($task->pop_id);
+
+        if ($cabangId === null) {
+            return null;
+        }
+
+        $popIds = Pop::query()->where('parent_id', $cabangId)->pluck('id')
+            ->push($cabangId)
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return NetworkNode::query()->inPops($popIds);
+    }
+
+    /**
+     * Kandidat "Cabut SN Lama" (ganti aset) — SN yang SUDAH DEPLOYED di
+     * titik jaringan mana pun di cabang task ini, BUKAN custody tim. Teknisi
+     * bisa mencabut SN yang dipasang orang lain sebelumnya; begitu dicabut,
+     * SN balik ke custody aktor (`retrieveSerialFromLocation()`).
+     */
+    private function eligibleInfraRetrievableSerialsForTeam(Task $task)
+    {
+        $nodeQuery = $this->infraNodeQueryForTask($task);
+
+        if ($nodeQuery === null) {
+            return collect();
+        }
+
+        return InventorySerial::query()
+            ->where('status', SerialStatus::DEPLOYED->value)
+            ->whereIn('current_network_node_id', $nodeQuery->pluck('id'))
+            ->with('item', 'currentNetworkNode')
+            ->get();
+    }
+
     public function report(Task $task)
     {
         $this->authorize('statusComplete', $task);
@@ -199,6 +360,20 @@ class TaskMaintenanceController extends Controller
         $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($task);
         $eligibleRolls = $this->eligibleRollsForTeam($task);
 
+        // Seksi "Pasang/Ganti Infrastruktur" — cuma ditampilkan view untuk
+        // O-REQ/INFR REQ, jadi query-nya juga cuma jalan di dua tipe itu
+        // (form ini dipakai MTN/C-REQ juga, gak ada gunanya nge-query pohon
+        // node tiap buka laporan MTN).
+        $showsInfraSection = in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true);
+        $eligibleInfraSerials = $showsInfraSection ? $this->eligibleInfraSerialsForTeam($task) : collect();
+        $eligibleInfraCustody = $showsInfraSection ? $this->eligibleInfraCustodyForTeam($task) : collect();
+        $eligibleInfraRolls = $showsInfraSection ? $this->eligibleInfraRollsForTeam($task) : collect();
+        $eligibleInfraRetrievableSerials = $showsInfraSection ? $this->eligibleInfraRetrievableSerialsForTeam($task) : collect();
+        $infraNodeQuery = $showsInfraSection ? $this->infraNodeQueryForTask($task) : null;
+        $infraNodeOptions = $infraNodeQuery
+            ? $infraNodeQuery->with(['nodeType', 'anchorPop.parent', 'parent.anchorPop.parent'])->orderBy('code')->get()
+            : collect();
+
         // Dropdown Kategori C-REQ (docs/plan/task-teknisi/
         // rancangan-biaya-creq-verifikasi-cs.md §2) — cuma dipakai view kalau
         // task_type = CREQ, tapi selalu dioper biar view gak perlu query lagi.
@@ -210,7 +385,7 @@ class TaskMaintenanceController extends Controller
         $cabangPops = Pop::query()->where('type', 'cabang')->where('status', 'active')
             ->orderBy('name')->get(['id', 'name']);
 
-        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops'));
+        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops','eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
@@ -390,6 +565,80 @@ class TaskMaintenanceController extends Controller
             $messages['selected_inventory_serial_id.required'] = 'Kategori Tambah Modem wajib memilih SN modem dari custody tim.';
             $messages['creq_target_pop_id.required'] = 'Kategori Migrasi wajib memilih POP tujuan.';
             $messages['creq_target_pop_id.exists'] = 'POP tujuan tidak valid.';
+        }
+
+        // Seksi "Pasang/Ganti Infrastruktur" — cuma O-REQ/INFR REQ. Rule-nya
+        // SENGAJA cuma didaftarkan untuk dua tipe itu: field `infra_*` yang
+        // ikut ter-POST di task MTN/C-REQ gak lolos ke `$validated`, jadi
+        // blok eksekusi di bawah (yang cuma membaca `$validated`) gak pernah
+        // jalan buat tipe lain.
+        if (in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true)) {
+            $eligibleInfraSerialIds = $this->eligibleInfraSerialsForTeam($task)->pluck('id');
+            $eligibleInfraRetrievableSerialIds = $this->eligibleInfraRetrievableSerialsForTeam($task)->pluck('id');
+            $eligibleInfraCustodyItemIds = $this->eligibleInfraCustodyForTeam($task)->pluck('item_id');
+            $eligibleInfraRollIds = $this->eligibleInfraRollsForTeam($task)->pluck('id');
+
+            $anyInfraFieldFilled = $request->filled('infra_selected_serial_id')
+                || $request->filled('infra_retrieve_old_serial_id')
+                || $request->filled('infra_quantity_item_id')
+                || $request->filled('infra_selected_roll_id');
+
+            $taskCabangId = Pop::resolveCabangId($task->pop_id);
+            $access = app(EffectiveAccessService::class);
+            $actor = $request->user();
+
+            $rules['infra_target_network_node_id'] = [
+                Rule::requiredIf($anyInfraFieldFilled),
+                'nullable',
+                'integer',
+                Rule::exists('network_nodes', 'id'),
+                // Dua gerbang, dua-duanya wajib:
+                // 1) node harus di Cabang TASK ini — deploy untuk task Cabang
+                //    A ke ODC Cabang B salah secara bisnis, walau aktornya
+                //    ALL_POP (scope user gak akan menangkap ini);
+                // 2) node harus di scope POP AKTOR (`assertNetworkNodeInScope()`,
+                //    satu-satunya titik penegakan scope node).
+                // `assertNetworkNodeInScope()` lempar HttpException (abort 403);
+                // ditangkap di sini dan diubah jadi $fail() supaya muncul
+                // sebagai error field (redirect back + old input), bukan
+                // halaman 403 mentah yang membuang seluruh isian laporan.
+                // JANGAN panggil method itu lagi di luar closure ini.
+                function ($attribute, $value, $fail) use ($taskCabangId, $access, $actor) {
+                    $node = NetworkNode::find($value);
+
+                    if (! $node) {
+                        return; // sudah ditolak Rule::exists
+                    }
+
+                    if ($taskCabangId === null || $node->resolvePop()?->id !== $taskCabangId) {
+                        $fail('Titik jaringan yang dipilih bukan milik cabang task ini.');
+
+                        return;
+                    }
+
+                    try {
+                        $this->assertNetworkNodeInScope($node, $actor, $access);
+                    } catch (HttpException $e) {
+                        $fail($e->getMessage() ?: 'Titik jaringan yang dipilih di luar scope POP Anda.');
+                    }
+                },
+            ];
+            $rules['infra_selected_serial_id'] = ['nullable', 'integer', Rule::in($eligibleInfraSerialIds)];
+            // Sumber BEDA dari SN pasang: kandidat cabut = SN yang sudah
+            // DEPLOYED di titik jaringan cabang ini, bukan custody tim.
+            $rules['infra_retrieve_old_serial_id'] = ['nullable', 'integer', Rule::in($eligibleInfraRetrievableSerialIds)];
+            $rules['infra_quantity_item_id'] = ['nullable', 'integer', Rule::in($eligibleInfraCustodyItemIds)];
+            $rules['infra_quantity_qty'] = ['nullable', 'numeric', 'min:0.01', 'required_with:infra_quantity_item_id'];
+            $rules['infra_selected_roll_id'] = ['nullable', 'integer', Rule::in($eligibleInfraRollIds)];
+            $rules['infra_roll_meters_used'] = ['nullable', 'numeric', 'min:0.01', 'required_with:infra_selected_roll_id'];
+
+            $messages['infra_target_network_node_id.required'] = 'Pilih titik jaringan tujuan kalau mengisi Pasang/Ganti Infrastruktur.';
+            $messages['infra_selected_serial_id.in'] = 'SN infrastruktur yang dipilih bukan bagian dari custody tim Anda saat ini.';
+            $messages['infra_retrieve_old_serial_id.in'] = 'SN lama yang dipilih tidak sedang terpasang di titik jaringan cabang ini.';
+            $messages['infra_quantity_item_id.in'] = 'Barang yang dipilih tidak ada di custody aset infrastruktur tim Anda.';
+            $messages['infra_quantity_qty.required_with'] = 'Qty terpakai wajib diisi kalau barang qty dipilih.';
+            $messages['infra_selected_roll_id.in'] = 'Roll yang dipilih bukan bagian dari custody aset infrastruktur tim Anda.';
+            $messages['infra_roll_meters_used.required_with'] = 'Meter terpakai wajib diisi kalau roll dipilih.';
         }
 
         $validated = $request->validate($rules, $messages);
@@ -632,6 +881,26 @@ class TaskMaintenanceController extends Controller
                         app(InventoryService::class)->consumeFromRoll($roll, (float) $validated['roll_meters_used'], $teamTechnicians, $fopTask, $task->customer, auth()->user());
                     }
                 }
+
+                // Pasang/Ganti Infrastruktur (O-REQ/INFR REQ) — SENGAJA di luar
+                // blok `if ($task->customer && ...)` di atas: INFR REQ lazimnya
+                // pekerjaan jaringan murni TANPA pelanggan, dan deploy ke titik
+                // jaringan gak butuh pelanggan sama sekali. Kalau ditaruh di
+                // dalam blok itu, isian yang sudah lolos validasi bakal
+                // DILEWATI DIAM-DIAM untuk task tanpa pelanggan — teknisi
+                // mengira aset sudah tercatat terpasang, padahal SN masih di
+                // custody-nya. `$teamTechnicians` dipakai ulang kalau blok di
+                // atas sudah me-resolve-nya.
+                if (! empty($validated['infra_target_network_node_id'])) {
+                    $infraTechnicians = $teamTechnicians ?? User::whereIn('id', $task->teamMembers->pluck('user_id'))->get();
+                    $this->deployInfrastructure($validated, $fopTask, $infraTechnicians);
+                }
+            } elseif (! empty($validated['infra_target_network_node_id'])) {
+                // Gak ada FopTask (task manual tanpa pelanggan & tanpa anchor)
+                // — semua method deploy butuh FopTask buat ledger. Gagal keras
+                // (rollback seluruh laporan) lebih baik daripada laporan
+                // selesai tapi aset gak pernah tercatat terpasang.
+                throw new RuntimeException('Task ini belum punya Task FOP — pemasangan infrastruktur tidak bisa dicatat. Hubungi FOP.');
             }
 
             // Selesaikan task
@@ -645,6 +914,45 @@ class TaskMaintenanceController extends Controller
             DB::rollBack();
 
             return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Eksekusi seksi "Pasang/Ganti Infrastruktur" — dipanggil dari DALAM
+     * `DB::beginTransaction()` milik `store()`, jadi gagal di langkah mana
+     * pun (mis. custody kurang) me-rollback seluruh laporan, termasuk SN
+     * lama yang sudah sempat dicabut.
+     *
+     * Urutan: cabut SN lama DULU, baru pasang — ganti aset = satu kejadian
+     * fisik, dan ledger RETRIEVE_INFRA sebaiknya mendahului DEPLOY penggantinya.
+     *
+     * @param  array<string, mixed>  $validated
+     * @param  iterable<User>  $technicians
+     */
+    private function deployInfrastructure(array $validated, FopTask $fopTask, iterable $technicians): void
+    {
+        $inventory = app(InventoryService::class);
+        $actor = auth()->user();
+        $node = NetworkNode::findOrFail($validated['infra_target_network_node_id']);
+
+        if (! empty($validated['infra_retrieve_old_serial_id'])) {
+            $oldSerial = InventorySerial::findOrFail($validated['infra_retrieve_old_serial_id']);
+            $inventory->retrieveSerialFromLocation($oldSerial, $fopTask, $actor);
+        }
+
+        if (! empty($validated['infra_selected_serial_id'])) {
+            $infraSerial = InventorySerial::findOrFail($validated['infra_selected_serial_id']);
+            $inventory->deploySerial($infraSerial, $node, $fopTask, $technicians, $actor);
+        }
+
+        if (! empty($validated['infra_quantity_item_id']) && ! empty($validated['infra_quantity_qty'])) {
+            $infraItem = Item::findOrFail($validated['infra_quantity_item_id']);
+            $inventory->deployQuantity($technicians, $infraItem, (float) $validated['infra_quantity_qty'], $node, $fopTask, $actor);
+        }
+
+        if (! empty($validated['infra_selected_roll_id']) && ! empty($validated['infra_roll_meters_used'])) {
+            $infraRoll = InventoryRoll::findOrFail($validated['infra_selected_roll_id']);
+            $inventory->deployRoll($infraRoll, (float) $validated['infra_roll_meters_used'], $node, $technicians, $fopTask, $actor);
         }
     }
 }
