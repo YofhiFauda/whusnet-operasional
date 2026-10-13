@@ -103,6 +103,32 @@ class NetworkNode extends Model
     }
 
     /**
+     * SN serialized (modem, ONT, dst) yang SEDANG dideploy netap di node ini
+     * (`InventorySerial::status = DEPLOYED`). Reverse direction dari
+     * `current_network_node_id` (Task 8) — Task 8 sendiri tidak menambah
+     * relasi balik ini di `NetworkNode`, baru ditambahkan di Task 13 supaya
+     * halaman node bisa menampilkan aset Gudang yang nempel.
+     *
+     * @return HasMany<InventorySerial, $this>
+     */
+    public function deployedSerials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class, 'current_network_node_id');
+    }
+
+    /**
+     * Saldo stok QUANTITY/ROLL yang dideploy ke node ini (lihat docblock
+     * `InfrastructureBalance` — proyeksi dari ledger `inventory_transactions`,
+     * bukan sumber kebenaran sendiri). Reverse direction `InfrastructureBalance::networkNode()`.
+     *
+     * @return HasMany<InfrastructureBalance, $this>
+     */
+    public function infrastructureBalances(): HasMany
+    {
+        return $this->hasMany(InfrastructureBalance::class);
+    }
+
+    /**
      * Naik rantai `parent` sampai node puncak (yang punya `anchor_pop_id`),
      * lalu resolve ke Cabang. Pohon POP dangkal (Cabang → Mini POP, lihat
      * `Pop::resolveCabangId()`), jadi "naik" di sisi POP cukup satu langkah:

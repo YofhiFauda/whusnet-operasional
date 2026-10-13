@@ -74,6 +74,27 @@
                 @endcan
                 @endforeach
             </div>
+            @if($node->deployedSerials->isNotEmpty() || $node->infrastructureBalances->isNotEmpty())
+            <div class="mt-4 border-t border-border pt-4">
+                <p class="mb-2 text-xs font-semibold text-text-secondary">Aset Terpasang</p>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($node->deployedSerials as $serial)
+                    <a href="{{ route('warehouse.traceability.index', ['sn' => $serial->serial_number]) }}"
+                       class="rounded-lg border border-border bg-surface-muted px-3 py-2 text-xs text-text-secondary hover:border-primary"
+                       title="Lihat riwayat SN {{ $serial->serial_number }}">
+                        SN {{ $serial->serial_number }} · {{ $serial->item?->name }}
+                    </a>
+                    @endforeach
+                    @foreach($node->infrastructureBalances as $balance)
+                    @if((float) $balance->qty > 0)
+                    <span class="rounded-lg border border-border bg-surface-muted px-3 py-2 text-xs text-text-secondary">
+                        {{ $balance->item?->name }}{{ $balance->lot_no ? ' ('.$balance->lot_no.')' : '' }} · {{ rtrim(rtrim(number_format((float) $balance->qty, 2, ',', '.'), '0'), ',') }} {{ $balance->item?->unit }}
+                    </span>
+                    @endif
+                    @endforeach
+                </div>
+            </div>
+            @endif
             @can('network_nodes.update')
             <form method="POST" action="{{ route('network.nodes.ports.add', $node) }}" class="mt-4 flex items-end gap-2 border-t border-border pt-4">
                 @csrf

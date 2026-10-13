@@ -38,7 +38,7 @@ class NetworkNodeController extends Controller
             ->when(! $this->access->hasAllPopAccess($user), function ($query) use ($user) {
                 $query->inPops($this->access->getAllowedPopIds($user));
             })
-            ->with('nodeType', 'ports', 'anchorPop.parent', 'parent')
+            ->with('nodeType', 'ports', 'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item')
             ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
             ->when($request->filled('node_type_id'), fn ($query) => $query->where('node_type_id', $request->integer('node_type_id')))
             ->orderBy('code')
