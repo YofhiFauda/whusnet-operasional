@@ -18,11 +18,13 @@ use App\Models\Customer;
 use App\Models\CustomerDevice;
 use App\Models\DeviceRetrievalLog;
 use App\Models\FopTask;
+use App\Models\InfrastructureBalance;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventorySerialSale;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
+use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Models\TaskMaterial;
 use App\Models\TechnicianCustody;
@@ -486,6 +488,332 @@ class InventoryService
                 'recorded_by' => $actor->id,
             ]);
         });
+    }
+
+    /**
+     * Unit SERIALIZED dipasang netap di titik infrastruktur jaringan
+     * (ODC/ODP/splitter) — kembaran `installSerial()` tapi tujuannya
+     * `NetworkNode`, bukan pelanggan. Pola re-fetch + `lockForUpdate()` dan
+     * urutan guard SENGAJA sama persis dengan `installSerial()` (alasan
+     * race-nya sama: dua submit bersamaan buat SN yang sama).
+     *
+     * `to_pop_id` di ledger = Cabang node SAAT INI (snapshot), bukan
+     * diturunkan belakangan lewat join ke `network_nodes` — node bisa
+     * dipindah cabang (`NetworkNodeService::move()`), dan laporan "barang
+     * Cabang A dipasang di mana" gak boleh ikut berubah retroaktif.
+     *
+     * @param  iterable<User>  $technicians
+     */
+    public function deploySerial(InventorySerial $serial, NetworkNode $node, FopTask $fopTask, iterable $technicians, User $actor): InventoryTransaction
+    {
+        $technicianIds = Collection::make($technicians)->pluck('id')->all();
+
+        return DB::transaction(function () use ($serial, $node, $fopTask, $technicianIds, $actor) {
+            $serial = InventorySerial::query()->with('item')->lockForUpdate()->findOrFail($serial->id);
+
+            if ($serial->status !== SerialStatus::ISSUED) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan ISSUED — gak bisa di-deploy.");
+            }
+
+            if (! in_array($serial->current_technician_id, $technicianIds, true)) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} bukan custody tim ini.");
+            }
+
+            // Kebalikan guard `installSerial()`: modem pelanggan (INSTALLABLE)
+            // yang ke-deploy ke ODC bakal hilang dari jalur install/retur
+            // pelanggan, alat kerja (COMPANY_ASSET) gak pernah boleh netap.
+            if ($serial->item?->ownership_mode !== OwnershipMode::INFRASTRUCTURE_ASSET) {
+                throw new InvalidArgumentException("Item {$serial->item?->name} bukan aset infrastruktur (ownership_mode) — gak bisa di-deploy ke titik jaringan.");
+            }
+
+            // Sama guard lintas-cabang dengan `installSerial()` — SN yang
+            // diissue dari Cabang A gak boleh dipasang untuk Task Cabang B.
+            // NULL (data legacy) tetap lolos — fail-open.
+            $targetCabangId = Pop::resolveCabangId($fopTask->pop_id);
+            if ($targetCabangId !== null && $serial->issued_from_pop_id !== null && $serial->issued_from_pop_id !== $targetCabangId) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} berasal dari cabang lain — gak bisa di-deploy untuk task di cabang ini.");
+            }
+
+            $node = $this->freshNode($node);
+            $toPopId = $node->resolvePop()?->id;
+            $fromTechnicianId = $serial->current_technician_id;
+
+            $serial->update([
+                'status' => SerialStatus::DEPLOYED,
+                'current_network_node_id' => $node->id,
+                'current_technician_id' => null,
+            ]);
+
+            return InventoryTransaction::create([
+                'type' => InventoryTransactionType::DEPLOY,
+                'reference_number' => $this->generateReferenceNumber('DPL'),
+                'item_id' => $serial->item_id,
+                'serial_id' => $serial->id,
+                'qty' => 1,
+                'from_technician_id' => $fromTechnicianId,
+                'to_network_node_id' => $node->id,
+                'to_pop_id' => $toPopId,
+                'fop_task_id' => $fopTask->id,
+                'notes' => "SN {$serial->serial_number} dipasang netap di {$node->breadcrumbLabel()} (Task {$fopTask->task_number}).",
+                'created_by' => $actor->id,
+            ]);
+        });
+    }
+
+    /**
+     * Item QUANTITY/BATCH dipasang netap di titik infrastruktur — FIFO lintas
+     * custody tim, SAMA PERSIS dengan `consumeFromCustody()` (urut
+     * `issued_at`, lot cabang lain di-skip, `InsufficientCustodyException`
+     * kalau total cabang yang cocok gak cukup). Bedanya: bukan nulis
+     * `task_materials`, tapi satu baris ledger DEPLOY per lot (bawa
+     * `unit_price_snapshot` lot itu sendiri, disalin, bukan diquery ulang)
+     * + akumulasi ke SATU baris `infrastructure_balances` per (item, node)
+     * dengan `lot_no=''` — lot custody cuma relevan buat harga di ledger,
+     * proyeksi stok per node gak perlu dipecah per lot.
+     *
+     * @param  iterable<User>  $technicians
+     * @return list<array{custody_id:int, lot_no:?string, qty:float, transaction_id:int}>
+     */
+    public function deployQuantity(iterable $technicians, Item $item, float $qtyUsed, NetworkNode $node, FopTask $fopTask, User $actor): array
+    {
+        if ($qtyUsed <= 0) {
+            throw new InvalidArgumentException('Qty yang di-deploy harus lebih besar dari nol.');
+        }
+
+        if ($item->tracking_type === TrackingType::SERIALIZED || $item->tracking_type === TrackingType::ROLL) {
+            throw new InvalidArgumentException("Item {$item->name} {$item->tracking_type->value} — pakai deploySerial()/deployRoll(), bukan deployQuantity().");
+        }
+
+        $technicianIds = Collection::make($technicians)->pluck('id')->all();
+
+        if ($technicianIds === []) {
+            throw new InvalidArgumentException('Daftar teknisi (anggota tim) tidak boleh kosong.');
+        }
+
+        return DB::transaction(function () use ($technicianIds, $item, $qtyUsed, $node, $fopTask, $actor) {
+            // Lot dari cabang lain di-skip dari FIFO (bukan dilempar) — alasan
+            // & perilaku fail-open NULL sama dengan `consumeFromCustody()`.
+            $targetCabangId = Pop::resolveCabangId($fopTask->pop_id);
+
+            $lots = TechnicianCustody::query()
+                ->whereIn('technician_id', $technicianIds)
+                ->where('item_id', $item->id)
+                ->where('qty_remaining', '>', 0)
+                ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                    $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+                }))
+                ->orderBy('issued_at')
+                ->lockForUpdate()
+                ->get();
+
+            $available = (float) $lots->sum('qty_remaining');
+
+            // Dicek SEBELUM nulis apa pun — bukan mengandalkan rollback di
+            // akhir loop kayak `consumeFromCustody()`: caller yang menangkap
+            // exception ini di dalam transaction-nya sendiri (savepoint
+            // nested) tetap aman, tapi gak ada alasan nulis ledger+balance
+            // dulu buat dibuang.
+            if ($available < $qtyUsed) {
+                throw new InsufficientCustodyException($technicianIds, $item, $qtyUsed, $available);
+            }
+
+            $node = $this->freshNode($node);
+            $toPopId = $node->resolvePop()?->id;
+            $location = $node->breadcrumbLabel();
+
+            $remaining = $qtyUsed;
+            $deployed = [];
+
+            foreach ($lots as $lot) {
+                if ($remaining <= 0) {
+                    break;
+                }
+
+                $take = min((float) $lot->qty_remaining, $remaining);
+                $newRemaining = (float) $lot->qty_remaining - $take;
+
+                $lot->qty_remaining = $newRemaining;
+                $lot->status = $newRemaining <= 0 ? CustodyStatus::CONSUMED : CustodyStatus::PARTIALLY_USED;
+                $lot->save();
+
+                $transaction = InventoryTransaction::create([
+                    'type' => InventoryTransactionType::DEPLOY,
+                    'reference_number' => $this->generateReferenceNumber('DPL'),
+                    'item_id' => $item->id,
+                    'lot_no' => $lot->lot_no,
+                    'qty' => $take,
+                    'unit_price_snapshot' => $lot->unit_price_snapshot,
+                    'from_technician_id' => $lot->technician_id,
+                    'to_network_node_id' => $node->id,
+                    'to_pop_id' => $toPopId,
+                    'fop_task_id' => $fopTask->id,
+                    'notes' => "{$take} {$item->unit} {$item->name} dipasang netap di {$location} (Task {$fopTask->task_number}).",
+                    'created_by' => $actor->id,
+                ]);
+
+                $deployed[] = [
+                    'custody_id' => $lot->id,
+                    'lot_no' => $lot->lot_no,
+                    'qty' => $take,
+                    'transaction_id' => $transaction->id,
+                ];
+
+                $remaining -= $take;
+            }
+
+            $this->incrementInfrastructureBalance($item->id, $node->id, '', $qtyUsed);
+
+            return $deployed;
+        });
+    }
+
+    /**
+     * Potong meter roll kabel buat dipasang netap di titik infrastruktur —
+     * pola & urutan guard sama `consumeFromRoll()` (status, custody, lintas
+     * cabang, sisa cukup). Roll TETAP di custody teknisi (cuma
+     * `length_remaining`/`status` yang berubah); yang "pindah" ke node cuma
+     * meteran yang dipotong, tercatat di `infrastructure_balances` dengan
+     * `lot_no = roll_code` — bukan `''` kayak item QUANTITY, supaya
+     * tampilan node bisa bedain kabel dari roll mana.
+     *
+     * Status roll tetap vocabulary `RollStatus` (IN_USE/DEPLETED) — enum itu
+     * melacak HABISNYA roll fisik, bukan lokasi pemasangan, jadi gak ada
+     * (dan gak perlu) case DEPLOYED di sana.
+     *
+     * @param  iterable<User>  $technicians
+     */
+    public function deployRoll(InventoryRoll $roll, float $metersUsed, NetworkNode $node, iterable $technicians, FopTask $fopTask, User $actor): InventoryTransaction
+    {
+        if ($metersUsed <= 0) {
+            throw new InvalidArgumentException('Meter yang di-deploy harus lebih besar dari nol.');
+        }
+
+        $technicianIds = Collection::make($technicians)->pluck('id')->all();
+
+        return DB::transaction(function () use ($roll, $metersUsed, $node, $technicianIds, $fopTask, $actor) {
+            $roll = InventoryRoll::query()->with('item')->lockForUpdate()->findOrFail($roll->id);
+
+            if (! in_array($roll->status, [RollStatus::ISSUED, RollStatus::IN_USE], true)) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} statusnya '{$roll->status->value}', bukan ISSUED/IN_USE — gak bisa dipotong.");
+            }
+
+            if (! in_array($roll->current_technician_id, $technicianIds, true)) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} bukan custody tim ini.");
+            }
+
+            if ($roll->item?->ownership_mode !== OwnershipMode::INFRASTRUCTURE_ASSET) {
+                throw new InvalidArgumentException("Item {$roll->item?->name} bukan aset infrastruktur (ownership_mode) — gak bisa di-deploy ke titik jaringan.");
+            }
+
+            // Sama guard lintas-cabang dengan `consumeFromRoll()`.
+            $targetCabangId = Pop::resolveCabangId($fopTask->pop_id);
+            if ($targetCabangId !== null && $roll->issued_from_pop_id !== null && $roll->issued_from_pop_id !== $targetCabangId) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} berasal dari cabang lain — gak bisa di-deploy untuk task di cabang ini.");
+            }
+
+            if ($metersUsed > (float) $roll->length_remaining) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} sisa ".$roll->length_remaining." meter, diminta {$metersUsed} meter.");
+            }
+
+            $newRemaining = (float) $roll->length_remaining - $metersUsed;
+
+            $roll->update([
+                'length_remaining' => $newRemaining,
+                'status' => $newRemaining <= 0 ? RollStatus::DEPLETED : RollStatus::IN_USE,
+            ]);
+
+            $node = $this->freshNode($node);
+
+            $this->incrementInfrastructureBalance($roll->item_id, $node->id, $roll->roll_code, $metersUsed);
+
+            return InventoryTransaction::create([
+                'type' => InventoryTransactionType::DEPLOY,
+                'reference_number' => $this->generateReferenceNumber('DPL'),
+                'item_id' => $roll->item_id,
+                'roll_id' => $roll->id,
+                'lot_no' => $roll->roll_code,
+                'qty' => $metersUsed,
+                'unit_price_snapshot' => $roll->unit_price_snapshot,
+                'from_technician_id' => $roll->current_technician_id,
+                'to_network_node_id' => $node->id,
+                'to_pop_id' => $node->resolvePop()?->id,
+                'fop_task_id' => $fopTask->id,
+                'notes' => "{$metersUsed} meter dari roll {$roll->roll_code} dipasang netap di {$node->breadcrumbLabel()} (Task {$fopTask->task_number}).",
+                'created_by' => $actor->id,
+            ]);
+        });
+    }
+
+    /**
+     * Cabut SN yang `DEPLOYED` dari titik infrastruktur, balik ke custody
+     * `$actor` (yang fisik megang setelah dibongkar). Node & Cabang asal
+     * dibaca SEBELUM `current_network_node_id` dikosongkan — itu satu-satunya
+     * kesempatan buat snapshot `from_pop_id`.
+     *
+     * Gak ada guard lintas-cabang di sini: retrieve narik barang yang SUDAH
+     * terpasang di suatu tempat balik ke tangan teknisi, gak ada "tujuan
+     * cabang yang salah" kayak deploy.
+     */
+    public function retrieveSerialFromLocation(InventorySerial $serial, FopTask $fopTask, User $actor): InventoryTransaction
+    {
+        return DB::transaction(function () use ($serial, $fopTask, $actor) {
+            $serial = InventorySerial::query()->with('item')->lockForUpdate()->findOrFail($serial->id);
+
+            if ($serial->status !== SerialStatus::DEPLOYED) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan DEPLOYED — gak bisa dicabut dari lokasi.");
+            }
+
+            $fromNodeId = $serial->current_network_node_id;
+            $fromPopId = $serial->currentNetworkNode?->resolvePop()?->id;
+
+            $serial->update([
+                'status' => SerialStatus::ISSUED,
+                'current_technician_id' => $actor->id,
+                'current_network_node_id' => null,
+            ]);
+
+            return InventoryTransaction::create([
+                'type' => InventoryTransactionType::RETRIEVE_INFRA,
+                'reference_number' => $this->generateReferenceNumber('RTR'),
+                'item_id' => $serial->item_id,
+                'serial_id' => $serial->id,
+                'qty' => 1,
+                'from_network_node_id' => $fromNodeId,
+                'from_pop_id' => $fromPopId,
+                'to_technician_id' => $actor->id,
+                'fop_task_id' => $fopTask->id,
+                'notes' => "SN {$serial->serial_number} dicabut dari lokasi, kembali ke custody {$actor->name} (Task {$fopTask->task_number}).",
+                'created_by' => $actor->id,
+            ]);
+        });
+    }
+
+    /**
+     * Instance node segar dari DB — `resolvePop()` di-memo `once()` per
+     * instance, jadi `$node` dari caller yang sudah pernah resolve SEBELUM
+     * node itu dipindah cabang bakal ngasih snapshot `to_pop_id` basi.
+     */
+    private function freshNode(NetworkNode $node): NetworkNode
+    {
+        return NetworkNode::query()->findOrFail($node->id);
+    }
+
+    /**
+     * Satu baris proyeksi per (item, node, lot_no) — keunikan ditegakkan di
+     * sini (lock + firstOrCreate), bukan unique index, lihat migration
+     * `create_infrastructure_balances_table`. Selalu dipanggil di dalam
+     * transaction yang SAMA dengan penulisan baris ledger DEPLOY-nya.
+     */
+    private function incrementInfrastructureBalance(int $itemId, int $nodeId, string $lotNo, float $qty): void
+    {
+        $balance = InfrastructureBalance::query()
+            ->lockForUpdate()
+            ->firstOrCreate(
+                ['item_id' => $itemId, 'network_node_id' => $nodeId, 'lot_no' => $lotNo],
+                ['qty' => 0],
+            );
+
+        $balance->increment('qty', $qty);
     }
 
     /**
