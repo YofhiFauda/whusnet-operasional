@@ -139,3 +139,33 @@ Yang **belum ada**: mekanisme "Pusat jual barang itu ke Cabang lain" sebagai tra
 
 ---
 
+
+### Catatan analisis lanjutan Gap 5 — jual antar OLT/cabang (2026-10-12)
+
+**Klarifikasi user:** OLT A dan OLT B dapat terkait dengan investor berbeda. Jika barang yang dibeli untuk OLT A dialihkan menjadi milik OLT B, OLT B harus membelinya dari OLT A. Pusat mengelola barang dan menerima pembayaran untuk pihak asal. **Aplikasi ini khusus operasional; investor tidak dikelola di sini.** Status badan hukum/NPWP belum diketahui. Istilah "jual" di bawah adalah klasifikasi operasional, bukan keputusan pengakuan pendapatan atau pajak Pusat.
+
+**Koreksi usulan awal:** Barang yang berada di Gudang Pusat tidak otomatis berasal dari/milik Pusat. Jangan menambah master investor, akun investor, jurnal umum, atau pembayaran pelanggan untuk Gap 5. Penanda modem milik perusahaan/pelanggan yang sudah ada tidak boleh dipakai sebagai identitas OLT/cabang asal.
+
+**Rancangan operasional yang disarankan (belum diimplementasikan):**
+
+1. **Pisahkan asal, lokasi fisik, dan tujuan.** Tiap SN/barang yang dijual harus terlacak ke OLT/cabang asal, lokasi saat ini, dan OLT/cabang tujuan. Retur ke Pusat tidak menghapus asal. Stok barang sejenis yang berasal dari beberapa OLT harus bisa dipisahkan menurut asal, termasuk barang kuantitas; total stok item saja tidak cukup. Identitas dan hak investor dikelola di luar aplikasi.
+2. **Bedakan transfer stok biasa dari jual antar unit.** Catat nomor transaksi, asal, tujuan, barang/SN/qty, harga jual per baris, aktor, tanggal, status dispatch, penerimaan fisik, dan konfirmasi pembayaran Pusat. Harga jual terpisah dari biaya/nilai stok pada inventory_transactions.unit_price_snapshot dan nilai taksiran retur; kedua nilai terakhir tidak boleh otomatis dianggap harga jual.
+3. **Hanya Gudang Pusat yang mengendalikan transaksi.** Permission jual khusus dan scope Pusat wajib ditegakkan di route dan service, termasuk request langsung. Scope all_pop saja tidak memberi hak jual. PIC Gudang Cabang tidak dapat membuat jual-beli, menentukan harga, atau memulai transfer antar cabang. Jika cabang tujuan perlu membuktikan penerimaan fisik, sediakan aksi "Terima Barang" yang terbatas pada kiriman masuk ke cabangnya tanpa akses mengubah transaksi/harga.
+4. **Barang rusak tidak boleh dijual.** Kandidat awal Gap 5 adalah stok retur di Pusat yang tersedia, kondisi final used_good, dan sudah diperiksa. Service wajib menolak used_damaged, DAMAGED, QUARANTINE, SCRAPPED, dan barang bekas yang belum diperiksa meski request dimanipulasi. Penjualan barang new memerlukan keputusan terpisah.
+5. **Pertahankan alur fisik dua fase.** Dispatch mengurangi stok Pusat dan menandai barang dalam perjalanan. Stok tujuan baru bertambah setelah SN/qty diterima fisik. Selisih penerimaan tetap terlihat untuk investigasi. Lacak Barang harus menyambungkan OLT/cabang asal → retur → Pusat → jual → OLT/cabang tujuan. Koreksi memakai jejak pembalik, bukan menghapus histori.
+6. **Pembukuan di sini sebatas laporan operasional.** Pusat melihat nilai jual, status pembayaran yang dikonfirmasi, sisa belum dibayar, dan nilai yang perlu diselesaikan kepada pihak asal. Kas, rekening, jurnal, pajak, serta hak investor dicatat pada proses keuangan di luar aplikasi. Transaksi ini tidak masuk ke invoices/payments pelanggan dan tidak digabung dengan laporan Barang Terjual ke Pelanggan.
+7. **Penyajian data.** Pusat melihat daftar transaksi, nilai, status fisik/pembayaran, rekap per asal/tujuan, dan selisih. Cabang tujuan hanya melihat kiriman masuk dan stok dalam scope POP-nya; PIC Gudang Cabang tidak melihat harga atau rekap lintas cabang.
+
+**Keputusan terbuka:** siapa di Pusat yang menyetujui harga; apakah pengiriman boleh sebelum pembayaran; kapan barang tujuan boleh di-issue/dipasang; cara konfirmasi pembayaran dan penyelesaian ke pihak asal; apakah barang new boleh dijual; format dokumen operasional. Penjual formal, dokumen pajak, dan pengakuan pendapatan diputuskan di luar aplikasi setelah status hukum jelas.
+
+**Scope:** Ini dokumentasi analisis post-MVP Gap 5, bukan implementasi task aktif. docs/TASKS.md tetap menunjukkan S8.10-T003 (FOP Notification Dashboard) In Progress. Tidak ada perubahan kode, database, permission, atau status task dari catatan ini.
+
+#### Keputusan user atas harga, pembayaran, dan pemakaian (2026-10-12)
+
+Bagian "Keputusan terbuka" pada catatan lanjutan di atas diperbarui untuk tiga hal berikut:
+
+1. **Harga jual:** ditentukan dan diinput oleh Gudang Pusat. PIC Gudang Cabang tidak berhak menetapkan atau mengubahnya. Harga jual transaksi tetap dibedakan dari nilai taksiran retur dan biaya/nilai stok.
+2. **Waktu pembayaran:** barang boleh dikirim dan diterima OLT/cabang tujuan sebelum pembayaran dilakukan atau lunas. Status pembayaran tetap ditampilkan dan dilacak oleh Pusat; belum bayar tidak menghalangi dispatch ataupun penerimaan fisik.
+3. **Waktu pemakaian:** setelah SN/qty yang benar dikonfirmasi diterima secara fisik di tujuan, barang boleh menjadi stok tersedia dan di-issue/dipasang meskipun pembayaran belum lunas. Barang yang masih dalam perjalanan atau belum cocok saat penerimaan tidak boleh dipakai sebagai stok tujuan.
+
+Dengan demikian, status fisik dan status pembayaran adalah dua alur terpisah. Pembayaran yang tertunda menjadi daftar tindak lanjut Pusat, bukan pengunci stok. Ketentuan ini tidak memberikan PIC Gudang Cabang akses untuk memulai jual-beli/transfer atau mengubah harga. Keputusan lain pada daftar terbuka sebelumnya tetap terbuka.

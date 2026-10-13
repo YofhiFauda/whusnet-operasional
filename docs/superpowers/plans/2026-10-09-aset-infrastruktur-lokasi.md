@@ -402,10 +402,13 @@ public function move(NetworkNode $node, ?NetworkNode $newParent, ?Pop $newPop, U
 
   `isSelfOrDescendant()` naik dari `$newParent` sampai puncak, cek apakah
   melewati `$node->id`. Jangan pakai CTE di sini, cukup loop (kedalaman kecil).
-  Catat audit lewat mekanisme yang sudah ada (cek `app/Observers/` dan
-  `docs/` audit log saat implementasi). **Tabel `network_node_moves` baru
-  dibuat kalau audit log existing tidak cukup**, dan itu keputusan yang harus
-  dikonfirmasi dulu (Open Item spec nomor 6).
+  Catat audit pakai `App\Models\AuditLog::log($node, 'move', $old, $new)` dengan
+  `$old`/`$new` berisi `parent_id`, `anchor_pop_id`, `from_pop_id`, `to_pop_id`
+  (cabang disertakan supaya pembacaan manual tidak perlu menghitung ulang).
+  Tidak ada tabel `network_node_moves`. Kekurangannya, laporan "semua pindah
+  ke cabang X" tidak bisa di-query langsung karena nilai di JSON. Itu diterima
+  sekarang, karena laporan tersebut belum diminta.
+  Pastikan `NetworkNode` tidak punya observer yang ikut mencatat, supaya tidak dobel.
 - [ ] **Step 4: Run, verify passes**
 - [ ] **Step 5: Commit**: `feat: NetworkNodeService::move() dengan validasi XOR dan siklus, dicatat audit`
 
@@ -729,6 +732,5 @@ Task 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 
 ## Open Item (tidak menghalangi eksekusi)
 
 Lihat spec §7. Ringkasnya: chassis OLT (node pembungkus, setelah v3), tipe-di-bawah-tipe
-(ditunda), pindah lintas cabang (permission khusus?), task O-REQ/INFR terbuka saat node pindah,
-dan log pindah (audit log existing cukup?). Task 6 harus memutuskan poin log pindah
-sebelum commit.
+(ditunda), pindah lintas cabang (permission khusus?), dan task O-REQ/INFR terbuka saat node
+pindah. Log pindah sudah diputuskan: pakai `AuditLog` (lihat Task 6).

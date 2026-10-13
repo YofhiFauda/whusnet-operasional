@@ -212,9 +212,11 @@ NetworkNodeService::move(NetworkNode $node, ?NetworkNode $newParent, ?Pop $newPo
   otomatis tanpa di-rewrite.
 - Ditolak: siklus; `$newParent` dan `$newPop` sama-sama terisi atau sama-sama kosong.
 - Scope: aktor harus punya scope di **cabang asal dan cabang tujuan**.
-- Jejak: dicatat ke audit log yang sudah ada di repo (siapa, kapan, dari, ke).
-  Tabel `network_node_moves` hanya dibuat kalau audit log existing tidak cukup
-  (dicek saat implementasi).
+- Jejak: dicatat lewat `App\Models\AuditLog::log()` yang sudah ada (user, IP,
+  waktu, nilai lama/baru). Nilai lama/baru memuat `parent_id`, `anchor_pop_id`,
+  `from_pop_id`, `to_pop_id`. Tidak ada tabel `network_node_moves`. Laporan
+  "semua pindah ke cabang X" belum bisa di-query langsung (nilai JSON), diterima
+  untuk sekarang.
 - Ledger tidak ikut berubah. Riwayat "terpasang di mana" dijaga snapshot §3.7.
 
 ### 3.9 RBAC & Scope
@@ -303,8 +305,8 @@ Tidak ada data produksi yang hilang: semuanya masih uncommitted di working tree.
    permission khusus.
 5. **Task O-REQ/INFR yang masih terbuka saat node pindah cabang:** tetap di cabang
    asal, atau ikut pindah? Belum diputuskan.
-6. **Log pindah:** audit log existing cukup atau perlu `network_node_moves`?
-   Dicek saat implementasi.
+6. **Log pindah:** sudah diputuskan pakai `AuditLog` (§3.8). Tabel khusus
+   ditunda sampai ada kebutuhan laporan yang tidak bisa dijawab dari JSON.
 7. **Seed data riil** (OLT mana, ODC mana, ODP mana, ratusan/ribuan baris):
    di luar scope coding. Input data operasional admin.
 8. **Performa query lintas cabang** belum diukur (§5).

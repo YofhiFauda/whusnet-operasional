@@ -50,7 +50,7 @@
 
     @if($isBatch)
         {{-- ========================================================================= --}}
-        {{-- ⚡ BATCH INCIDENT COMMAND HUB (TAMPILAN TIKET MASSAL SEPERTI TKT-2026-0328) --}}
+        {{-- BATCH INCIDENT COMMAND HUB (TAMPILAN TIKET MASSAL SEPERTI TKT-2026-0328) --}}
         {{-- ========================================================================= --}}
         
         {{-- Hero Banner Insiden Massal --}}

@@ -972,7 +972,7 @@
                                         <template x-if="task.is_batch">
                                             <div class="mt-0.5 flex items-center gap-1.5 text-[10px] min-w-0">
                                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-bold font-mono bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800">
-                                                    ⚡ BATCH
+                                                    BATCH
                                                 </span>
                                                 <span class="text-violet-600 dark:text-violet-400 font-bold font-mono" x-text="(task.batch_members ? task.batch_members.length : 0) + ' Pelanggan'"></span>
                                             </div>
