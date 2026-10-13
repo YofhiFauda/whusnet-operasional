@@ -238,6 +238,13 @@ class InventoryAdjustmentService
                 $updates['installed_at'] = null;
             }
 
+            // SN yang DEPLOYED ke node infrastruktur ditarik status-nya: SN-nya
+            // udah gak ada di node itu, pointer lokasinya harus ikut lepas
+            // (sama logikanya dengan customer_id di atas, beda konsep lokasi).
+            if ($serial->status === SerialStatus::DEPLOYED) {
+                $updates['current_network_node_id'] = null;
+            }
+
             $serial->update($updates);
 
             return InventoryTransaction::create([
