@@ -28,8 +28,8 @@ use App\Models\TaskMaintenanceBillingDetail;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
-use App\Services\FileUploadService;
 use App\Services\EffectiveAccessService;
+use App\Services\FileUploadService;
 use App\Services\InventoryService;
 use App\Services\NumberSequenceService;
 use App\Services\TaskMaterialService;
@@ -385,7 +385,7 @@ class TaskMaintenanceController extends Controller
         $cabangPops = Pop::query()->where('type', 'cabang')->where('status', 'active')
             ->orderBy('name')->get(['id', 'name']);
 
-        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops','eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions'));
+        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
