@@ -452,6 +452,9 @@
                     <a href="{{ route('network.nodes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
                         <span class="sidebar-text">Master Node Jaringan &amp; Port</span>
                     </a>
+                    <a href="{{ route('network.inventaris.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.inventaris.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
+                        <span class="sidebar-text">Inventaris Infrastruktur</span>
+                    </a>
                     @endcan
 
                     @can('qr_scan_logs.view')

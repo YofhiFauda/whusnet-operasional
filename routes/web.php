@@ -54,6 +54,7 @@ use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
+use App\Http\Controllers\Network\NetworkInventoryController;
 use App\Http\Controllers\Network\NetworkNodeController;
 use App\Http\Controllers\NocDashboardController;
 use App\Http\Controllers\NocWorksheetController;
@@ -1183,6 +1184,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:network_nodes.view')->group(function () {
         Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
+        Route::get('/network/inventaris', [NetworkInventoryController::class, 'index'])->name('network.inventaris.index');
     });
     Route::middleware('permission:network_nodes.create')->group(function () {
         Route::post('/network/nodes', [NetworkNodeController::class, 'store'])->name('network.nodes.store');
