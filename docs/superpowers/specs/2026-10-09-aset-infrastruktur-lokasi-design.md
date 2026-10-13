@@ -1,6 +1,6 @@
 # Rancangan: Pohon Infrastruktur Jaringan Dinamis + Aset Gudang per Lokasi
 
-Status: **DRAFT v3 — belum diimplementasi.**
+Status: **v3 diimplementasikan pada worktree network-nodes-infra; open item pada §7 tetap tertunda.**
 Dibuat: 2026-10-09. Revisi v2: 2026-10-12. Revisi v3: 2026-10-12 — OLT = Mini POP,
 penempatan model folder-di-drive (`anchor_pop_id` hanya di node puncak), cabang
 diturunkan (tidak disimpan), snapshot cabang di ledger, aturan tipe-di-bawah-tipe

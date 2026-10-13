@@ -102,14 +102,11 @@ class NetworkNodeModelTest extends TestCase
     }
 
     #[Test]
-    public function xor_placement_rule_is_enforced_by_service_not_model(): void
+    public function empty_pop_scope_returns_no_nodes(): void
     {
-        // Aturan XOR (parent_id XOR anchor_pop_id — tidak boleh dua-duanya
-        // terisi, tidak boleh dua-duanya kosong) SENGAJA tidak ditegakkan di
-        // model/migration ini. Model ini hanya struktur data; penegakan XOR
-        // adalah tanggung jawab NetworkNodeService::assertPlacement() di
-        // Task 6, lengkap dengan test-nya sendiri di sana.
-        $this->markTestIncomplete('XOR validation belongs to NetworkNodeService — Task 6');
+        NetworkNode::factory()->create();
+
+        $this->assertSame(0, NetworkNode::query()->inPops([])->count());
     }
 
     /**

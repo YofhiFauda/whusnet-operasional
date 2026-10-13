@@ -129,11 +129,46 @@ return new class extends Migration
             return;
         }
 
-        if (DB::table('features')->where('code', 'network_nodes')->exists()) {
-            // Feature baru sudah ada duluan (seeder baru jalan sebelum migrate).
-            // Unique `code` menolak rename — biarkan baris lama apa adanya,
-            // Role Matrix perlu dicentang ulang manual. Sengaja tidak menggabung
-            // otomatis: memindah role_permissions antar feature berisiko dobel.
+        $newFeatureId = DB::table('features')->where('code', 'network_nodes')->value('id');
+
+        if ($newFeatureId !== null) {
+            // Seeder Task 3 can create the new Feature before legacy migration.
+            // Copy grants by action before deleting the old Feature.
+            $oldPermissions = DB::table('permissions')->where('feature_id', $oldFeatureId)->get();
+
+            foreach ($oldPermissions as $oldPermission) {
+                $newPermissionId = DB::table('permissions')
+                    ->where('feature_id', $newFeatureId)
+                    ->where('action_id', $oldPermission->action_id)
+                    ->value('id');
+
+                if ($newPermissionId === null) {
+                    $newPermissionId = DB::table('permissions')->insertGetId([
+                        'feature_id' => $newFeatureId,
+                        'action_id' => $oldPermission->action_id,
+                        'code' => 'network_nodes.'.substr($oldPermission->code, strlen('network_odps.')),
+                        'name' => null,
+                        'module' => $oldPermission->module,
+                        'description' => $oldPermission->description,
+                        'created_at' => $oldPermission->created_at,
+                        'updated_at' => $oldPermission->updated_at,
+                    ]);
+                }
+
+                $roleIds = DB::table('role_permissions')
+                    ->where('permission_id', $oldPermission->id)
+                    ->pluck('role_id');
+
+                foreach ($roleIds as $roleId) {
+                    DB::table('role_permissions')->insertOrIgnore([
+                        'role_id' => $roleId,
+                        'permission_id' => $newPermissionId,
+                    ]);
+                }
+            }
+
+            DB::table('features')->where('id', $oldFeatureId)->delete();
+
             return;
         }
 

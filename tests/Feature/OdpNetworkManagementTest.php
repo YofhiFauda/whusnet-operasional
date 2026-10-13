@@ -190,7 +190,7 @@ class OdpNetworkManagementTest extends TestCase
      * Tipe tanpa port (`has_ports=false`, mis. Core Router) tidak boleh
      * dibuat lewat endpoint ini — form-nya membuat N port sekaligus.
      */
-    public function test_store_menolak_tipe_node_tanpa_port(): void
+    public function test_store_menerima_tipe_node_tanpa_port_tanpa_membuat_port(): void
     {
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
         $pop = Pop::create(['code' => 'ODP-G', 'name' => 'POP ODP G', 'type' => 'cabang', 'status' => 'active']);
@@ -201,9 +201,11 @@ class OdpNetworkManagementTest extends TestCase
             'code' => 'CR-01',
             'name' => 'Core',
             'capacity' => 8,
-        ])->assertSessionHasErrors('node_type_id');
+        ])->assertRedirect(route('network.nodes.index'));
 
-        $this->assertDatabaseMissing('network_nodes', ['code' => 'CR-01']);
+        $core = NetworkNode::where('code', 'CR-01')->firstOrFail();
+        $this->assertSame(8, $core->capacity);
+        $this->assertSame(0, $core->ports()->count());
     }
 
     /**
@@ -380,6 +382,101 @@ class OdpNetworkManagementTest extends TestCase
         $this->actingAs($atasanUser)->get(route('network.nodes.index'))->assertOk()->assertSee('ODP-LAMA-1');
     }
 
+    public function test_admin_dapat_membuat_node_tanpa_port_dan_anak_bertingkat(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create(['code' => 'TREE-A', 'name' => 'POP Pohon', 'type' => 'cabang', 'status' => 'active']);
+        $coreTypeId = NetworkNodeType::where('code', 'core_router')->value('id');
+        $odcTypeId = NetworkNodeType::where('code', 'odc')->value('id');
+
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => $coreTypeId,
+            'anchor_pop_id' => $pop->id,
+            'code' => 'CORE-1',
+            'name' => 'Core Utama',
+            'capacity' => 100,
+        ])->assertRedirect(route('network.nodes.index'));
+
+        $core = NetworkNode::where('code', 'CORE-1')->firstOrFail();
+        $this->assertSame(0, $core->ports()->count());
+        $this->assertSame(100, $core->capacity);
+
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => $odcTypeId,
+            'parent_id' => $core->id,
+            'code' => 'ODC-CHILD-1',
+            'name' => 'ODC Anak',
+            'capacity' => 4,
+        ])->assertRedirect(route('network.nodes.index'));
+
+        $child = NetworkNode::where('code', 'ODC-CHILD-1')->firstOrFail();
+        $this->assertSame($core->id, $child->parent_id);
+        $this->assertNull($child->anchor_pop_id);
+        $this->assertSame(4, $child->ports()->count());
+    }
+
+    public function test_route_pindah_node_mengikuti_scope_dan_menolak_siklus(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create(['code' => 'TREE-B', 'name' => 'POP Pohon B', 'type' => 'cabang', 'status' => 'active']);
+        $root = $this->makeNode($pop->id, 'ROOT-B', 'Root');
+        $child = NetworkNode::create([
+            'parent_id' => $root->id,
+            'anchor_pop_id' => null,
+            'node_type_id' => $this->odpTypeId,
+            'code' => 'CHILD-B',
+            'name' => 'Child',
+        ]);
+
+        $this->actingAs($owner)->patch(route('network.nodes.move', $root), [
+            'parent_id' => $child->id,
+        ])->assertSessionHasErrors('parent_id');
+
+        $this->assertNull($root->fresh()->parent_id);
+        $this->actingAs($owner)->patch(route('network.nodes.move', $child), [
+            'anchor_pop_id' => $pop->id,
+        ])->assertRedirect(route('network.nodes.index'));
+        $this->assertSame($pop->id, $child->fresh()->anchor_pop_id);
+    }
+
+    public function test_index_menampilkan_pohon_node_dengan_anak_bertingkat(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create(['code' => 'TREE-C', 'name' => 'Cabang Pohon', 'type' => 'cabang', 'status' => 'active']);
+        $root = $this->makeNode($pop->id, 'TREE-ROOT', 'Node Induk');
+        NetworkNode::create([
+            'parent_id' => $root->id,
+            'anchor_pop_id' => null,
+            'node_type_id' => $this->odpTypeId,
+            'code' => 'TREE-CHILD',
+            'name' => 'Node Anak',
+        ]);
+
+        $this->actingAs($owner)->get(route('network.nodes.index'))
+            ->assertOk()
+            ->assertSee('data-tree-node-id="'.$root->id.'"', false)
+            ->assertSee('data-tree-parent-id="'.$root->id.'"', false)
+            ->assertSee('Node Anak');
+    }
+
+    public function test_tipe_tanpa_port_tidak_bisa_diberi_port_melalui_endpoint(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create(['code' => 'CORE-NP', 'name' => 'POP Core', 'type' => 'cabang', 'status' => 'active']);
+        $core = NetworkNode::create([
+            'anchor_pop_id' => $pop->id,
+            'node_type_id' => NetworkNodeType::where('code', 'core_router')->value('id'),
+            'code' => 'CORE-NP-1',
+            'name' => 'Core',
+            'capacity' => 100,
+        ]);
+
+        $this->actingAs($owner)->post(route('network.nodes.ports.add', $core), [
+            'additional_capacity' => 1,
+        ])->assertStatus(422);
+        $this->assertSame(0, $core->ports()->count());
+    }
+
     private function runReshapeMigration(): void
     {
         (require database_path('migrations/2026_10_12_110300_reshape_odps_into_network_nodes.php'))->up();
@@ -455,5 +552,45 @@ class OdpNetworkManagementTest extends TestCase
         $this->runReshapeMigration();
 
         $this->assertSame(1, DB::table('features')->where('code', 'network_nodes')->count());
+    }
+
+    public function test_migrasi_susulan_memulihkan_grant_setelah_reshape_lama_sudah_tercatat_ran(): void
+    {
+        [, $atasan] = $this->simulateLegacyOdpDatabase();
+        $this->seed(NetworkNodeTypeSeeder::class);
+        Schema::drop('odp_ports');
+        Schema::drop('odps');
+
+        $migrationPath = glob(database_path('migrations/*_reconcile_legacy_network_odp_permissions.php'))[0];
+        (require $migrationPath)->up();
+
+        $newPermissionId = DB::table('permissions')->where('code', 'network_nodes.view')->value('id');
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $atasan->id,
+            'permission_id' => $newPermissionId,
+        ]);
+        $this->assertDatabaseMissing('features', ['code' => 'network_odps']);
+    }
+
+    public function test_migrasi_mempertahankan_grant_lama_jika_seeder_tipe_sudah_membuat_feature_baru(): void
+    {
+        [, $atasan] = $this->simulateLegacyOdpDatabase();
+
+        $this->seed(NetworkNodeTypeSeeder::class);
+        $newPermissionId = DB::table('permissions')->where('code', 'network_nodes.view')->value('id');
+        $this->assertNotNull($newPermissionId);
+        $this->assertDatabaseMissing('role_permissions', [
+            'role_id' => $atasan->id,
+            'permission_id' => $newPermissionId,
+        ]);
+
+        $this->runReshapeMigration();
+
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $atasan->id,
+            'permission_id' => $newPermissionId,
+        ]);
+        $this->assertDatabaseMissing('features', ['code' => 'network_odps']);
+        $this->assertSame(1, NetworkNode::where('code', 'ODP-LAMA-1')->count());
     }
 }

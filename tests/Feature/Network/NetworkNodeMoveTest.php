@@ -2,19 +2,31 @@
 
 namespace Tests\Feature\Network;
 
+use App\Enums\ScopeType;
 use App\Models\AuditLog;
 use App\Models\NetworkNode;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use App\Services\NetworkNodeService;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class NetworkNodeMoveTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RoleSeeder::class);
+    }
 
     #[Test]
     public function move_mengubah_anchor_dan_resolvepop_turunan_ikut_berubah(): void
@@ -31,7 +43,7 @@ class NetworkNodeMoveTest extends TestCase
 
         $odp = NetworkNode::factory()->child($odc1)->create();
 
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
 
         (new NetworkNodeService)->move($odc1, null, $miniPopB, $actor);
 
@@ -61,7 +73,7 @@ class NetworkNodeMoveTest extends TestCase
         $odc2 = NetworkNode::factory()->child($olt)->create();
         $odp = NetworkNode::factory()->child($odc1)->create();
 
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
 
         (new NetworkNodeService)->move($odp, $odc2, null, $actor);
 
@@ -82,7 +94,7 @@ class NetworkNodeMoveTest extends TestCase
         ]);
         $odp = NetworkNode::factory()->child($odc1)->create();
 
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
 
         $originalParentId = $odc1->parent_id;
         $originalAnchorPopId = $odc1->anchor_pop_id;
@@ -146,7 +158,7 @@ class NetworkNodeMoveTest extends TestCase
             'anchor_pop_id' => $miniPopA->id,
         ]);
 
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
 
         (new NetworkNodeService)->move($odc1, null, $miniPopB, $actor);
 
@@ -175,7 +187,7 @@ class NetworkNodeMoveTest extends TestCase
         $odc2 = NetworkNode::factory()->child($olt)->create();
         $odp = NetworkNode::factory()->child($odc1)->create();
 
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
 
         (new NetworkNodeService)->move($odp, $odc2, null, $actor);
 
@@ -191,12 +203,50 @@ class NetworkNodeMoveTest extends TestCase
     }
 
     #[Test]
-    public function snapshot_inventory_transactions_belum_bisa_diuji_di_task_ini(): void
+    public function move_lintas_cabang_ditolak_jika_aktor_hanya_punya_scope_asal(): void
     {
-        $this->markTestIncomplete(
-            'Kolom to_network_node_id/from_network_node_id di inventory_transactions '.
-            'baru dibuat di Task 8 — placeholder ini mendokumentasikan requirement '.
-            '"move() tidak menyentuh baris inventory_transactions" sampai tabelnya ada.'
-        );
+        $cabangA = Pop::factory()->create(['type' => 'cabang']);
+        $cabangB = Pop::factory()->create(['type' => 'cabang']);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabangA->id, 'parent_id' => null]);
+        $role = Role::where('code', 'admin')->firstOrFail();
+        $actor = User::factory()->create(['role_id' => $role->id]);
+        $scope = UserRoleScope::create([
+            'user_id' => $actor->id,
+            'role_id' => $role->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabangA->id]);
+
+        try {
+            (new NetworkNodeService)->move($node, null, $cabangB, $actor);
+            $this->fail('Pindah ke cabang di luar scope harus ditolak.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+            $this->assertSame($cabangA->id, $node->fresh()->anchor_pop_id);
+        }
+    }
+
+    #[Test]
+    public function move_ditolak_jika_aktor_hanya_punya_scope_tujuan(): void
+    {
+        $cabangA = Pop::factory()->create(['type' => 'cabang']);
+        $cabangB = Pop::factory()->create(['type' => 'cabang']);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabangA->id, 'parent_id' => null]);
+        $role = Role::where('code', 'admin')->firstOrFail();
+        $actor = User::factory()->create(['role_id' => $role->id]);
+        $scope = UserRoleScope::create([
+            'user_id' => $actor->id,
+            'role_id' => $role->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabangB->id]);
+
+        try {
+            (new NetworkNodeService)->move($node, null, $cabangB, $actor);
+            $this->fail('Pindah dari cabang di luar scope harus ditolak.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+            $this->assertSame($cabangA->id, $node->fresh()->anchor_pop_id);
+        }
     }
 }

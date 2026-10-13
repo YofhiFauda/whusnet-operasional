@@ -42,6 +42,19 @@ class NetworkNodeService
             }
 
             $fromPopId = $node->resolvePop()?->id;
+            $toPopIdBeforeMove = $newParent?->resolvePop()?->id
+                ?? ($newPop !== null ? Pop::resolveCabangId($newPop->id) : null);
+            $access = app(EffectiveAccessService::class);
+            $allowedPopIds = $access->getAllowedPopIds($actor);
+            abort_unless(
+                $fromPopId !== null
+                    && $toPopIdBeforeMove !== null
+                    && ($access->hasAllPopAccess($actor)
+                        || (in_array($fromPopId, $allowedPopIds, true)
+                            && in_array($toPopIdBeforeMove, $allowedPopIds, true))),
+                403,
+                'Aktor harus memiliki scope cabang asal dan tujuan.'
+            );
             $oldParentId = $node->parent_id;
             $oldAnchorPopId = $node->anchor_pop_id;
 

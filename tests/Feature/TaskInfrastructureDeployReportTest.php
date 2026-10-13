@@ -364,6 +364,21 @@ class TaskInfrastructureDeployReportTest extends TestCase
     }
 
     #[Test]
+    public function picker_lokasi_laporan_menampilkan_parent_dan_child_secara_berjenjang(): void
+    {
+        $this->withoutVite();
+        $task = $this->makeTask(TaskType::INFR);
+        $child = NetworkNode::factory()->child($this->node)->create(['name' => 'ODP Turunan']);
+
+        $this->actingAs($this->technician)->get(route('tasks.maintenance.report', $task))
+            ->assertOk()
+            ->assertSee('data-infra-node-tree', false)
+            ->assertSee('data-infra-node-id="'.$this->node->id.'"', false)
+            ->assertSee('data-infra-parent-id="'.$this->node->id.'"', false)
+            ->assertSee('ODP Turunan');
+    }
+
+    #[Test]
     public function picker_material_dan_roll_pelanggan_tidak_menampilkan_aset_infrastruktur(): void
     {
         $this->withoutVite();

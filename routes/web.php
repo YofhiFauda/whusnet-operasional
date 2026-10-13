@@ -1188,6 +1188,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/nodes', [NetworkNodeController::class, 'store'])->name('network.nodes.store');
     });
     Route::middleware('permission:network_nodes.update')->group(function () {
+        Route::patch('/network/nodes/{node}/move', [NetworkNodeController::class, 'move'])->name('network.nodes.move');
         Route::post('/network/nodes/{node}/ports', [NetworkNodeController::class, 'addPorts'])->name('network.nodes.ports.add');
         Route::put('/network/node-ports/{port}', [NetworkNodeController::class, 'updatePort'])->name('network.node-ports.update');
     });

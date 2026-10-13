@@ -9,12 +9,13 @@ use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
 use App\Services\NetworkNodeService;
-use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 /**
  * Master node jaringan ber-port (ODC/ODP/dst) + status port manual.
@@ -45,9 +46,30 @@ class NetworkNodeController extends Controller
             ->paginate(10)
             ->withQueryString();
         $pops = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
-        $nodeTypes = NetworkNodeType::where('has_ports', true)->where('is_active', true)->orderBy('sort_order')->get();
+        $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
+        $parentOptions = NetworkNode::query()
+            ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
+            ->with('nodeType', 'anchorPop.parent')
+            ->orderBy('code')->get();
+        $treeChildren = $parentOptions->groupBy(fn (NetworkNode $node) => $node->parent_id ?? 0);
+        $nodesById = $parentOptions->keyBy('id');
+        $breadcrumbLabels = [];
+        $labelFor = function (NetworkNode $node) use (&$labelFor, &$breadcrumbLabels, $nodesById): string {
+            if (isset($breadcrumbLabels[$node->id])) {
+                return $breadcrumbLabels[$node->id];
+            }
 
-        return view('network.nodes.index', compact('nodes', 'pops', 'nodeTypes'));
+            $parent = $node->parent_id ? $nodesById->get($node->parent_id) : null;
+            $anchor = $node->anchorPop;
+            $prefix = $parent ? $labelFor($parent) : implode(' / ', array_filter([$anchor?->parent?->name, $anchor?->name]));
+
+            return $breadcrumbLabels[$node->id] = trim($prefix.' / '.$node->name, ' /');
+        };
+        foreach ($parentOptions as $option) {
+            $labelFor($option);
+        }
+
+        return view('network.nodes.index', compact('nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -57,60 +79,74 @@ class NetworkNodeController extends Controller
         $popRule = $this->access->hasAllPopAccess($user)
             ? Rule::exists('pops', 'id')
             : Rule::in($this->access->getAllowedPopIds($user));
-        $nodeType = NetworkNodeType::find($request->integer('node_type_id'));
 
         $validated = $request->validate([
-            'node_type_id' => [
-                'required',
-                'integer',
-                Rule::exists('network_node_types', 'id'),
-                // Endpoint ini selalu membuat N port sekaligus — tipe tanpa
-                // port (Core Router, Backbone, dst) tidak punya arti di sini.
-                function (string $attribute, mixed $value, Closure $fail) use ($nodeType): void {
-                    if ($nodeType !== null && ! $nodeType->has_ports) {
-                        $fail('Tipe node ini tidak memiliki port.');
-                    }
-                },
-            ],
-            'anchor_pop_id' => ['required', 'integer', $popRule],
+            'node_type_id' => ['required', 'integer', Rule::exists('network_node_types', 'id')->where('is_active', true)],
+            'parent_id' => ['nullable', 'integer', Rule::exists('network_nodes', 'id')],
+            'anchor_pop_id' => ['nullable', 'integer', $popRule],
             'code' => ['required', 'string', 'max:50', Rule::unique('network_nodes', 'code')],
             'name' => ['required', 'string', 'max:150'],
-            'capacity' => [
-                'required',
-                'integer',
-                'min:1',
-                // Plafon datar: tipe `max_ports = null` (tanpa batas) membuat
-                // closure di bawah dilewati, padahal loop di bawah membuat satu
-                // baris per port — tanpa ini satu request bisa minta jutaan baris.
-                'max:1000',
-                function (string $attribute, mixed $value, Closure $fail) use ($nodeType): void {
-                    if ($nodeType?->max_ports !== null && (int) $value > $nodeType->max_ports) {
-                        $fail("Kapasitas maksimal {$nodeType->max_ports} port.");
-                    }
-                },
-            ],
+            'capacity' => ['nullable', 'integer', 'min:0', 'max:1000'],
         ]);
 
-        // Jalur ini cuma membuat node puncak (ditambatkan ke POP, sama dengan
-        // ODP flat lama). Aturan XOR tetap lewat satu pintu.
-        NetworkNodeService::assertPlacement(null, Pop::findOrFail($validated['anchor_pop_id']));
+        $parent = isset($validated['parent_id']) ? NetworkNode::findOrFail($validated['parent_id']) : null;
+        $anchor = isset($validated['anchor_pop_id']) ? Pop::findOrFail($validated['anchor_pop_id']) : null;
+        try {
+            NetworkNodeService::assertPlacement($parent, $anchor);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['parent_id' => $exception->getMessage()]);
+        }
 
-        DB::transaction(function () use ($validated): void {
+        if ($parent !== null) {
+            $this->authorizeNodeScope($parent);
+        }
+
+        $nodeType = NetworkNodeType::findOrFail($validated['node_type_id']);
+        $portCount = $nodeType->has_ports ? (int) ($validated['capacity'] ?? 0) : 0;
+
+        if ($nodeType->has_ports && $portCount < 1) {
+            throw ValidationException::withMessages(['capacity' => 'Kapasitas port wajib minimal satu.']);
+        }
+
+        if ($nodeType->max_ports !== null && $portCount > $nodeType->max_ports) {
+            throw ValidationException::withMessages(['capacity' => "Kapasitas maksimal {$nodeType->max_ports} port."]);
+        }
+
+        DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount): void {
             $node = NetworkNode::create([
-                'parent_id' => null,
-                'anchor_pop_id' => $validated['anchor_pop_id'],
-                'node_type_id' => $validated['node_type_id'],
-                'code' => strtoupper(trim($validated['code'])),
+                'parent_id' => $parent?->id,
+                'anchor_pop_id' => $anchor?->id,
+                'node_type_id' => $nodeType->id,
+                'code' => $validated['code'],
                 'name' => trim($validated['name']),
+                'capacity' => $nodeType->has_ports ? null : ($validated['capacity'] ?? null),
                 'status' => 'active',
             ]);
 
-            for ($number = 1; $number <= $validated['capacity']; $number++) {
+            for ($number = 1; $number <= $portCount; $number++) {
                 $node->ports()->create(['number' => $number, 'is_used' => false]);
             }
         });
 
-        return redirect()->route('network.nodes.index')->with('success', 'Node dan port berhasil ditambahkan.');
+        return redirect()->route('network.nodes.index')->with('success', 'Node berhasil ditambahkan.');
+    }
+
+    public function move(Request $request, NetworkNode $node, NetworkNodeService $service): RedirectResponse
+    {
+        $validated = $request->validate([
+            'parent_id' => ['nullable', 'integer', Rule::exists('network_nodes', 'id')],
+            'anchor_pop_id' => ['nullable', 'integer', Rule::exists('pops', 'id')],
+        ]);
+        $parent = isset($validated['parent_id']) ? NetworkNode::findOrFail($validated['parent_id']) : null;
+        $anchor = isset($validated['anchor_pop_id']) ? Pop::findOrFail($validated['anchor_pop_id']) : null;
+
+        try {
+            $service->move($node, $parent, $anchor, $request->user());
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['parent_id' => $exception->getMessage()]);
+        }
+
+        return redirect()->route('network.nodes.index')->with('success', 'Node berhasil dipindah.');
     }
 
     public function addPorts(Request $request, NetworkNode $node): RedirectResponse
@@ -118,11 +154,12 @@ class NetworkNodeController extends Controller
         $this->authorizeNodeScope($node);
 
         $validated = $request->validate([
-            'additional_capacity' => ['required', 'integer', 'min:1', 'max:128'],
+            'additional_capacity' => ['required', 'integer', 'min:1', 'max:1000'],
         ]);
 
         DB::transaction(function () use ($node, $validated): void {
             $lockedNode = NetworkNode::query()->whereKey($node->id)->lockForUpdate()->firstOrFail();
+            abort_unless($lockedNode->nodeType?->has_ports, 422, 'Tipe node ini tidak memiliki port.');
             $lastNumber = (int) $lockedNode->ports()->max('number');
             // max_ports null = tipe tanpa batas — cek dilewati, bukan dianggap 0.
             $maxPorts = $lockedNode->nodeType?->max_ports;

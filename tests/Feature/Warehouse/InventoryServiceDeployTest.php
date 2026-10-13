@@ -16,10 +16,12 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\NetworkNode;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Services\InventoryService;
 use App\Services\NetworkNodeService;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
@@ -288,6 +290,9 @@ class InventoryServiceDeployTest extends TestCase
 
         $transaction = app(InventoryService::class)->deploySerial($serial, $this->odc, $this->fopTask, [$this->technician], $this->actor);
 
+        $this->seed(RoleSeeder::class);
+        $this->actor->update(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $this->actor->unsetRelation('role');
         app(NetworkNodeService::class)->move($this->odc, null, $this->cabangB, $this->actor);
 
         $this->assertSame($this->cabangB->id, NetworkNode::find($this->odc->id)->resolvePop()?->id);

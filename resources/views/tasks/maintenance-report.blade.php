@@ -421,16 +421,27 @@
                     <p class="text-[11px] mb-2 font-semibold" style="color:var(--color-warning,#d97706)">⚠ Belum ada titik jaringan terdaftar di cabang task ini — pemasangan infrastruktur belum bisa dicatat.</p>
                 @else
                     @php
-                        $infraNodeComboOptions = collect([['value' => '', 'label' => 'Tidak ada lokasi dipilih', 'search' => 'tidak ada lokasi']])
-                            ->concat($infraNodeOptions->map(fn ($node) => [
-                                'value' => $node->id,
-                                'label' => $node->breadcrumbLabel(),
-                                'search' => $node->breadcrumbLabel() . ' ' . $node->code,
-                                'hint' => trim(($node->nodeType?->name ?? '') . ' · ' . $node->code, ' ·'),
-                            ]))->values();
+                        $infraNodeChildren = $infraNodeOptions->groupBy(fn ($node) => $node->parent_id ?? 0);
                     @endphp
-                    <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">Lokasi (Titik Jaringan)</label>
-                    <x-combobox id="infra_target_network_node_id" name="infra_target_network_node_id" :options-expr="json_encode($infraNodeComboOptions)" :value-expr="json_encode((string) old('infra_target_network_node_id', ''))" placeholder="Cari titik jaringan..." />
+                    <fieldset class="rounded-lg border border-border bg-surface p-3" data-infra-node-tree>
+                        <legend class="px-1 text-xs font-semibold text-text-secondary">Lokasi (Titik Jaringan)</legend>
+                        <label class="flex items-center gap-2 text-xs text-text-secondary">
+                            <input type="radio" name="infra_target_network_node_id" value="" @checked(old('infra_target_network_node_id', '') === '')>
+                            Tidak ada lokasi dipilih
+                        </label>
+                        <div class="mt-2 space-y-2">
+                            @foreach($infraNodeChildren->get(0, collect())->groupBy('anchor_pop_id') as $infraRoots)
+                            <details class="rounded-lg border border-border p-2" open>
+                                <summary class="cursor-pointer text-xs font-semibold text-text-main">{{ $infraRoots->first()->anchorPop?->name ?? 'POP' }}</summary>
+                                <div class="mt-2 space-y-2 border-l border-border pl-3">
+                                    @foreach($infraRoots as $infraTreeNode)
+                                    @include('tasks.partials.infra-node-option', ['infraTreeNode' => $infraTreeNode, 'infraNodeChildren' => $infraNodeChildren])
+                                    @endforeach
+                                </div>
+                            </details>
+                            @endforeach
+                        </div>
+                    </fieldset>
                     @error('infra_target_network_node_id')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
 
                     {{-- SN infrastruktur yang dipasang (dari custody tim) --}}
