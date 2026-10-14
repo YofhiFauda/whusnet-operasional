@@ -447,6 +447,7 @@ class RolePermissionSeeder extends Seeder
                 'network_nodes.view',
                 'network_nodes.create',
                 'network_nodes.update',
+                'network_nodes.register_infra',
                 'warehouse.usage.view', // Rekap Pemakaian Material Lapangan (harian/mingguan/bulanan/custom)
                 'warehouse_custody.view',
                 'warehouse_traceability.view',
