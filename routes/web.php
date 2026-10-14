@@ -54,6 +54,7 @@ use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
+use App\Http\Controllers\Network\InfraAssetRegistrationController;
 use App\Http\Controllers\Network\NetworkInventoryController;
 use App\Http\Controllers\Network\NetworkNodeController;
 use App\Http\Controllers\Network\OltSlotController;
@@ -1190,6 +1191,7 @@ Route::middleware('auth')->group(function () {
         // sebelum '/network/nodes/{node}' supaya tidak ditelan route dinamis.
         Route::get('/network/inventaris', [NetworkInventoryController::class, 'index'])->name('network.inventaris.index');
         Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
+        Route::get('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'create'])->name('network.nodes.register-asset.create');
     });
     Route::middleware('permission:network_nodes.create')->group(function () {
         Route::post('/network/nodes', [NetworkNodeController::class, 'store'])->name('network.nodes.store');
@@ -1202,6 +1204,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/node-ports/{port}/assign-node', [NetworkNodeController::class, 'assignNodePort'])->name('network.node-ports.assign-node');
         Route::post('/network/nodes/{chassis}/olt-slots', [OltSlotController::class, 'store'])->name('network.nodes.olt-slots.store');
         Route::post('/network/nodes/{chassis}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('network.nodes.olt-slots.card');
+    });
+    Route::middleware('permission:network_nodes.register_infra')->group(function () {
+        Route::post('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'store'])->name('network.nodes.register-asset.store');
     });
 
     // Dashboard Analitik FOP — agregat lintas periode, permission SENDIRI

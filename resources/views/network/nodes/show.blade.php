@@ -76,7 +76,15 @@
     <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-sm font-black uppercase tracking-wider text-text-main">Aset Gudang Terpasang</h2>
-            <span class="text-xs text-text-muted">{{ $node->deployedSerials->count() }} unit serial</span>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-text-muted">{{ $node->deployedSerials->count() }} unit serial</span>
+                @can('network_nodes.register_infra')
+                <a href="{{ route('network.nodes.register-asset.create', $node) }}"
+                   class="inline-flex items-center gap-1 rounded-lg border border-sky-300 px-2.5 py-1 text-xs font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors">
+                    Registrasi Aset Lama
+                </a>
+                @endcan
+            </div>
         </div>
         @if($node->deployedSerials->isEmpty() && $node->infrastructureBalances->where('qty', '>', 0)->isEmpty())
             <p class="text-xs text-text-muted">Belum ada aset yang dicatat terpasang pada node ini.</p>
