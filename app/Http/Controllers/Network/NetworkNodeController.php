@@ -151,9 +151,26 @@ class NetworkNodeController extends Controller
     public function show(NetworkNode $node): View
     {
         $this->authorizeNodeScope($node);
-        $node->load('nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode', 'children.nodeType', 'deployedSerials.item', 'infrastructureBalances.item');
+        $node->load(
+            'nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode',
+            'children.nodeType', 'deployedSerials.item', 'infrastructureBalances.item',
+            'oltSlots.cardNode.deployedSerials', 'oltSlots.cardNode.ports',
+        );
 
-        return view('network.nodes.show', ['node' => $node, 'location' => $node->effectiveLocation()]);
+        // Opsi kartu bebas: anak langsung chassis ini bertipe `olt_card` yang
+        // belum terpasang di slot manapun — kartu selalu anak chassis lewat
+        // `parent_id` (Task 2/3), bukan ditambatkan ke POP langsung.
+        $cardOptions = $node->nodeType?->code === 'olt_chassis'
+            ? NetworkNode::query()->where('parent_id', $node->id)
+                ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_card'))
+                ->whereDoesntHave('oltSlot')->orderBy('code')->get()
+            : collect();
+
+        return view('network.nodes.show', [
+            'node' => $node,
+            'location' => $node->effectiveLocation(),
+            'cardOptions' => $cardOptions,
+        ]);
     }
 
     public function update(Request $request, NetworkNode $node): RedirectResponse

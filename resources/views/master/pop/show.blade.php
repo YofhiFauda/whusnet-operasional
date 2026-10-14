@@ -15,67 +15,23 @@
 </div>
 
 @if($pop->type === 'mini_pop')
+@can('network_nodes.view')
 <section class="mb-6 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-    @can('network_nodes.view')
-    <div class="mb-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-        <h3 class="text-xs font-bold uppercase text-slate-700 dark:text-slate-300">Chassis OLT terpasang</h3>
-        @forelse($chassisNodes as $chassis)
-        <div class="mt-2 text-xs text-slate-700 dark:text-slate-300">
-            <span class="font-semibold">{{ $chassis->code }}</span>
-            @forelse($chassis->deployedSerials as $serial)
-            <span class="ml-2">{{ $serial->item?->name }} · SN {{ $serial->serial_number }}</span>
-            @empty
-            <span class="ml-2 text-amber-600">Belum memiliki SN terpasang</span>
-            @endforelse
-        </div>
+    <h3 class="text-xs font-bold uppercase text-slate-700 dark:text-slate-300">Chassis OLT terpasang</h3>
+    @forelse($chassisNodes as $chassis)
+    <div class="mt-2 text-xs text-slate-700 dark:text-slate-300">
+        <a href="{{ route('network.nodes.show', $chassis) }}" class="font-semibold text-sky-700 hover:underline dark:text-sky-400">{{ $chassis->code }} · {{ $chassis->name }}</a>
+        @forelse($chassis->deployedSerials as $serial)
+        <span class="ml-2">{{ $serial->item?->name }} · SN {{ $serial->serial_number }}</span>
         @empty
-        <p class="mt-2 text-xs text-slate-500">Belum ada chassis OLT tercatat.</p>
+        <span class="ml-2 text-amber-600">Belum memiliki SN terpasang</span>
         @endforelse
     </div>
-    @endcan
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">OLT · Slot dan Kartu</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">{{ $pop->oltSlots->filter(fn ($slot) => $slot->cardNode?->deployedSerials->isNotEmpty())->count() }} / {{ $pop->oltSlots->count() }} slot memiliki kartu terpasang.</p>
-        </div>
-        @can('pops.update')
-        <form method="POST" action="{{ route('master.pop.olt.slots.store', $pop) }}" class="flex items-end gap-2">
-            @csrf
-            <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Total slot
-                <input type="number" name="slot_count" min="1" max="64" value="{{ max(1, $pop->oltSlots->count()) }}" required class="mt-1 block w-24 rounded-lg border border-slate-300 bg-white px-2 py-2 dark:border-slate-600 dark:bg-slate-900">
-            </label>
-            <button class="rounded-lg bg-sky-600 px-3 py-2 text-xs font-bold text-white">Tambah Slot</button>
-        </form>
-        @endcan
-    </div>
-    <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        @foreach($pop->oltSlots as $slot)
-        <article class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-            <p class="text-xs font-bold uppercase text-slate-500">Slot {{ $slot->number }}</p>
-            @if($slot->cardNode)
-            <a href="{{ route('network.nodes.show', $slot->cardNode) }}" class="mt-1 block text-sm font-semibold text-sky-700 dark:text-sky-400">{{ $slot->cardNode->code }} · {{ $slot->cardNode->name }}</a>
-            <p class="text-xs text-slate-500">{{ $slot->cardNode->deployedSerials->count() ? 'Kartu terpasang' : 'Node kartu belum memiliki aset Gudang' }}</p>
-            <p class="text-xs text-slate-500">{{ $slot->cardNode->ports->where('is_used', true)->count() }} / {{ $slot->cardNode->ports->count() }} port PON terpakai</p>
-            @else
-            <p class="mt-1 text-sm text-slate-500">Kosong</p>
-            @can('pops.update')
-            <form method="POST" action="{{ route('master.pop.olt.slots.card', [$pop, $slot]) }}" class="mt-2 space-y-2">
-                @csrf
-                <select name="network_node_id" required class="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs dark:border-slate-600 dark:bg-slate-900">
-                    <option value="">Pilih kartu OLT</option>
-                    @foreach($cardOptions as $card)
-                    <option value="{{ $card->id }}">{{ $card->code }} · {{ $card->name }}</option>
-                    @endforeach
-                </select>
-                <button class="rounded-lg border border-sky-600 px-2 py-1 text-xs font-semibold text-sky-700">Tempatkan</button>
-            </form>
-            @endcan
-            @endif
-        </article>
-        @endforeach
-    </div>
-    @if($errors->any())<p class="mt-3 text-xs text-rose-600">{{ $errors->first() }}</p>@endif
+    @empty
+    <p class="mt-2 text-xs text-slate-500">Belum ada chassis OLT tercatat.</p>
+    @endforelse
 </section>
+@endcan
 @endif
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
