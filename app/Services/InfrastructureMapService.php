@@ -182,15 +182,28 @@ class InfrastructureMapService
                 ->when($selectedPopId !== null, fn ($query) => $query->where('parent_id', $selectedPopId))
                 ->pluck('id')->all();
 
+        // Sejak Task 1, chassis OLT boleh ditambatkan langsung ke POP
+        // `cabang` (bukan cuma Mini POP) — `$miniPopIds` doang bikin chassis
+        // yang ditambatkan ke Cabang kehilangan slot OLT-nya di peta ini.
+        // Scoping-nya mengikuti aturan $miniPopIds persis: gak ada seleksi
+        // → semua Cabang yang keliatan user ($cabangs, sudah lewat
+        // `forUser()`); seleksi cocok salah satu Cabang → cuma Cabang itu;
+        // seleksi gak cocok Cabang manapun → kosong (konsisten $popIds di atas).
+        $cabangIdsForChassis = $selectedPopId !== null && ! $cabangs->contains('id', $selectedPopId)
+            ? []
+            : ($selectedPopId !== null ? [$selectedPopId] : $cabangs->pluck('id')->all());
+
+        $anchorPopIds = array_values(array_unique(array_merge($miniPopIds, $cabangIdsForChassis)));
+
         // Slot OLT kini dimiliki node chassis (`olt_slots.chassis_node_id`),
-        // bukan POP langsung — satu Mini POP bisa punya beberapa chassis.
-        // Buat tetap bisa menampilkan rekap per Mini POP, cari dulu node
-        // chassis yang ditambatkan ke tiap Mini POP, lalu petakan
-        // chassis_node_id → anchor_pop_id supaya hasil groupBy tetap berupa
-        // Collection dikunci id Mini POP, sama seperti sebelumnya (dipakai
+        // bukan POP langsung — satu Mini POP/Cabang bisa punya beberapa
+        // chassis. Buat tetap bisa menampilkan rekap per POP, cari dulu node
+        // chassis yang ditambatkan ke tiap POP (Mini POP atau Cabang), lalu
+        // petakan chassis_node_id → anchor_pop_id supaya hasil groupBy tetap
+        // berupa Collection dikunci id POP, sama seperti sebelumnya (dipakai
         // `$slotsByPop->has($popId)`/`->get($popId)` di view peta jaringan).
-        $chassisNodesForSlots = $miniPopIds !== []
-            ? NetworkNode::query()->whereIn('anchor_pop_id', $miniPopIds)
+        $chassisNodesForSlots = $anchorPopIds !== []
+            ? NetworkNode::query()->whereIn('anchor_pop_id', $anchorPopIds)
                 ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_chassis'))
                 ->get(['id', 'anchor_pop_id'])
             : collect();

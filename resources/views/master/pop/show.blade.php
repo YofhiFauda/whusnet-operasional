@@ -14,7 +14,7 @@
     </a>
 </div>
 
-@if($pop->type === 'mini_pop')
+@if(in_array($pop->type, ['mini_pop', 'cabang'], true))
 @can('network_nodes.view')
 <section class="mb-6 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
     <h3 class="text-xs font-bold uppercase text-slate-700 dark:text-slate-300">Chassis OLT terpasang</h3>

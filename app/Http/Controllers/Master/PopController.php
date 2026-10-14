@@ -164,7 +164,12 @@ class PopController extends Controller
                 ->whereDoesntHave('oltSlot')->orderBy('code')->get()
             : collect();
 
-        $chassisNodes = $pop->type === 'mini_pop'
+        // Sejak Task 1, chassis OLT boleh ditambatkan langsung ke POP
+        // `cabang` (bukan cuma `mini_pop`) — lihat NetworkNodeTypeSeeder
+        // (`olt_chassis` => pops ['mini_pop', 'cabang']). Query ini WAJIB
+        // ikut dua tipe itu, bukan cuma `mini_pop`, supaya chassis yang
+        // ditambatkan ke Cabang gak hilang dari Detail POP-nya.
+        $chassisNodes = in_array($pop->type, ['mini_pop', 'cabang'], true)
             ? NetworkNode::query()->where('anchor_pop_id', $pop->id)
                 ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_chassis'))
                 ->with(['deployedSerials.item', 'oltSlots.cardNode.ports', 'oltSlots.cardNode.deployedSerials.item'])
