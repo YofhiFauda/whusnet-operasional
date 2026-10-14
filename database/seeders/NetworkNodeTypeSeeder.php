@@ -56,6 +56,7 @@ class NetworkNodeTypeSeeder extends Seeder
             ['code' => 'pon_port', 'name' => 'PON Port/Card', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'olt_chassis', 'name' => 'Chassis OLT', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'olt_card', 'name' => 'Kartu OLT', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => 128, 'red_zone_threshold' => null],
+            ['code' => 'feeder', 'name' => 'Kabel Feeder', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'odc', 'name' => 'ODC', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
             ['code' => 'odp', 'name' => 'ODP', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
         ];
@@ -90,10 +91,16 @@ class NetworkNodeTypeSeeder extends Seeder
             'core_router' => ['pops' => ['pusat', 'cabang'], 'nodes' => []],
             'backbone' => ['pops' => ['pusat', 'cabang'], 'nodes' => ['core_router']],
             'aggregation_switch' => ['pops' => ['cabang'], 'nodes' => ['backbone', 'core_router']],
-            'olt_chassis' => ['pops' => ['mini_pop'], 'nodes' => []],
-            'olt_card' => ['pops' => ['mini_pop'], 'nodes' => []],
+            // Mini POP sekarang sebuah LOKASI fisik, bisa menaungi beberapa
+            // chassis OLT sekaligus — jadi chassis boleh anchor Mini POP ATAU
+            // Cabang langsung (bukan 1:1 lagi). Kartu OLT WAJIB jadi anak
+            // chassis (bukan anchor POP langsung) karena satu chassis bisa
+            // punya banyak kartu dan kartu tanpa chassis tidak bermakna.
+            'olt_chassis' => ['pops' => ['mini_pop', 'cabang'], 'nodes' => []],
+            'olt_card' => ['pops' => [], 'nodes' => ['olt_chassis']],
             'pon_port' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card']],
-            'odc' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card', 'pon_port']],
+            'feeder' => ['pops' => ['mini_pop'], 'nodes' => ['olt_chassis']],
+            'odc' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card', 'pon_port', 'feeder']],
             'odp' => ['pops' => ['cabang', 'mini_pop'], 'nodes' => ['odc']],
         ];
         $ids = NetworkNodeType::query()->pluck('id', 'code');
