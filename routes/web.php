@@ -636,10 +636,6 @@ Route::middleware('auth')->group(function () {
 
     });
 
-    Route::middleware('permission:pops.update')->group(function () {
-        Route::post('/master/pop/{pop}/olt-slots', [OltSlotController::class, 'store'])->name('master.pop.olt.slots.store');
-        Route::post('/master/pop/{pop}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('master.pop.olt.slots.card');
-    });
     Route::middleware('permission:pops.delete')->group(function () {
         Route::delete('/master/pop/{pop}', [PopController::class, 'destroy'])->name('master.pop.destroy');
     });
@@ -1204,6 +1200,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/nodes/{node}/ports', [NetworkNodeController::class, 'addPorts'])->name('network.nodes.ports.add');
         Route::put('/network/node-ports/{port}', [NetworkNodeController::class, 'updatePort'])->name('network.node-ports.update');
         Route::post('/network/node-ports/{port}/assign-node', [NetworkNodeController::class, 'assignNodePort'])->name('network.node-ports.assign-node');
+        Route::post('/network/nodes/{chassis}/olt-slots', [OltSlotController::class, 'store'])->name('network.nodes.olt-slots.store');
+        Route::post('/network/nodes/{chassis}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('network.nodes.olt-slots.card');
     });
 
     // Dashboard Analitik FOP — agregat lintas periode, permission SENDIRI
