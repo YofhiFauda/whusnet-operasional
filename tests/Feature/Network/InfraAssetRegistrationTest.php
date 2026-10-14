@@ -29,12 +29,17 @@ use Tests\TestCase;
  * atas List kosong) yang memanggil `InventoryService::registerExistingInfraSerial()`
  * (Task 6).
  *
- * Permission `network_nodes.register_infra` BELUM digrant ke role manapun
- * di `RolePermissionSeeder` produksi (itu Task 8, dijalankan setelah task
- * ini) — jadi test sukses di sini men-attach permission-nya LANGSUNG ke
- * role `fop` di dalam test (independen dari role matrix produksi), dan test
- * penolakan memakai role `fop` TANPA attach itu (fop cuma punya
- * `network_nodes.view` dari seeder produksi).
+ * Permission `network_nodes.register_infra` digrant ke role `fop` lewat
+ * `RolePermissionSeeder` produksi (Task 8) — DAN cuma benar-benar tercipta
+ * kalau `ActionSeeder` punya entry `register_infra` (ketauan review
+ * lintas-task Fase 0: tanpa itu `PermissionGeneratorService` silent-skip
+ * permission-nya, jadi grant di RolePermissionSeeder ikut no-op). Test
+ * sukses di sini SENGAJA lewat rantai seeder produksi penuh (bukan
+ * `Permission::firstOrCreate()` buatan test) supaya regresi seperti itu
+ * ketahuan di sini, bukan baru ketahuan di produksi. Test penolakan memakai
+ * role `atasan` (punya `network_nodes.view` tapi BUKAN `register_infra`)
+ * supaya gerbangnya benar-benar permission ini, bukan cuma akses modul
+ * `network_nodes` secara umum.
  */
 class InfraAssetRegistrationTest extends TestCase
 {
@@ -70,16 +75,6 @@ class InfraAssetRegistrationTest extends TestCase
         return $user;
     }
 
-    private function grantRegisterInfra(string $roleCode): void
-    {
-        $role = Role::where('code', $roleCode)->firstOrFail();
-        $permission = Permission::firstOrCreate(
-            ['code' => 'network_nodes.register_infra'],
-            ['name' => 'Registrasi Aset Infrastruktur Lama', 'feature_id' => null, 'action_id' => null, 'module' => 'test', 'description' => 'test']
-        );
-        $role->permissions()->syncWithoutDetaching([$permission->id]);
-    }
-
     private function makeItem(string $ownershipMode = 'infrastructure_asset', string $trackingType = 'serialized'): Item
     {
         $category = ItemCategory::where('code', 'infra_register_view_test')->first()
@@ -103,9 +98,11 @@ class InfraAssetRegistrationTest extends TestCase
     public function test_user_tanpa_permission_register_infra_ditolak(): void
     {
         $cabang = Pop::factory()->create(['type' => 'cabang']);
-        // fop punya network_nodes.view dari RolePermissionSeeder produksi,
-        // tapi BELUM punya network_nodes.register_infra (Task 8 belum jalan).
-        $user = $this->makeScopedUser('fop', $cabang);
+        // 'atasan' punya network_nodes.view dari RolePermissionSeeder
+        // produksi, tapi BUKAN network_nodes.register_infra — membuktikan
+        // gerbangnya permission register_infra itu sendiri, bukan cuma
+        // akses modul network_nodes secara umum.
+        $user = $this->makeScopedUser('atasan', $cabang);
         $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'parent_id' => null]);
         $item = $this->makeItem();
 
@@ -119,11 +116,39 @@ class InfraAssetRegistrationTest extends TestCase
         $this->assertSame(0, InventorySerial::count());
     }
 
+    /**
+     * Pembuktian langsung Finding 1 (review lintas-task Fase 0): sebelum
+     * `ActionSeeder` punya entry `REGISTER_INFRA`, permission
+     * `network_nodes.register_infra` TIDAK PERNAH tercipta oleh
+     * `PermissionGeneratorService::generate()` — jadi grant ke role `fop` di
+     * `RolePermissionSeeder` silent-no-op juga. Test ini menegaskan DUA hal
+     * dari rantai seeder produksi murni (tanpa bantuan test): baris
+     * permission-nya benar-benar ada, DAN role `fop` benar-benar
+     * memilikinya — baru setelah itu test sukses di bawah membuktikan jalur
+     * HTTP-nya juga lolos (bukan 403).
+     */
+    #[Test]
+    public function test_permission_register_infra_tergenerate_dan_tergrant_ke_fop_dari_seeder_produksi(): void
+    {
+        $permission = Permission::where('code', 'network_nodes.register_infra')->first();
+
+        $this->assertNotNull($permission, 'Permission network_nodes.register_infra wajib tercipta dari ActionSeeder + PermissionGeneratorService.');
+
+        $fop = Role::where('code', 'fop')->firstOrFail();
+
+        $this->assertTrue(
+            $fop->permissions()->where('permissions.id', $permission->id)->exists(),
+            'Role fop wajib benar-benar memiliki permission network_nodes.register_infra dari RolePermissionSeeder produksi.'
+        );
+    }
+
     #[Test]
     public function test_registrasi_sukses_redirect_ke_detail_node_dengan_sn_baru(): void
     {
         $cabang = Pop::factory()->create(['type' => 'cabang']);
-        $this->grantRegisterInfra('fop');
+        // 'fop' dapat network_nodes.register_infra langsung dari rantai
+        // seeder produksi (ActionSeeder → PermissionGeneratorService →
+        // RolePermissionSeeder) — TANPA bantuan apa pun dari test ini.
         $user = $this->makeScopedUser('fop', $cabang);
         $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'parent_id' => null]);
         $item = $this->makeItem();
@@ -146,7 +171,8 @@ class InfraAssetRegistrationTest extends TestCase
     public function test_registrasi_gagal_validasi_tampil_di_halaman_create_bukan_list(): void
     {
         $cabang = Pop::factory()->create(['type' => 'cabang']);
-        $this->grantRegisterInfra('fop');
+        // 'fop' dapat network_nodes.register_infra dari rantai seeder
+        // produksi — sama seperti test sukses di atas.
         $user = $this->makeScopedUser('fop', $cabang);
         $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'parent_id' => null]);
         $item = $this->makeItem();

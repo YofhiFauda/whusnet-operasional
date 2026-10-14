@@ -139,6 +139,11 @@ class ActionSeeder extends Seeder
                 'name' => 'Change',
                 'description' => 'Ganti paket internet pelanggan aktif, terpisah dari update field umum',
             ],
+            [
+                'code' => ActionCode::REGISTER_INFRA,
+                'name' => 'Register Infra',
+                'description' => 'Registrasi aset infrastruktur lama yang belum pernah masuk ledger gudang',
+            ],
         ];
 
         foreach ($actions as $action) {
