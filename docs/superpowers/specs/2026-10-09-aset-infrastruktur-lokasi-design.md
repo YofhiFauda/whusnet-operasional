@@ -1,10 +1,13 @@
 # Rancangan: Pohon Infrastruktur Jaringan Dinamis + Aset Gudang per Lokasi
 
-Status: **v3 diimplementasikan; perluasan operasional 2026-10-13 dijelaskan pada §10.**
+Status: **v3 diimplementasikan; perluasan operasional 2026-10-13 di §10; revisi
+Fase 0 (Mini POP = lokasi, bukan 1 OLT) di §11, 2026-10-14.**
 Dibuat: 2026-10-09. Revisi v2: 2026-10-12. Revisi v3: 2026-10-12 — OLT = Mini POP,
 penempatan model folder-di-drive (`anchor_pop_id` hanya di node puncak), cabang
 diturunkan (tidak disimpan), snapshot cabang di ledger, aturan tipe-di-bawah-tipe
-ditunda. Riwayat keputusan v1 & v2 di §8, bukan desain aktif.
+ditunda. Revisi v4 (§11, 2026-10-14): Mini POP = lokasi fisik yang bisa menaungi
+N chassis OLT, bukan identitas 1 OLT. Riwayat keputusan v1 & v2 di §8, bukan
+desain aktif.
 
 ## 1. Latar Belakang
 
@@ -349,3 +352,55 @@ Keputusan pada bagian ini menggantikan penundaan aturan tipe, chassis, dan penge
 - Dua SKU katalog OLT lama diubah ke `infrastructure_asset` agar bisa mengikuti ledger deploy/retrieve. Komponen chassis atau kartu OLT hanya menerima satu SN aktif dari kategori `olt_module`; SKU harus menunjuk tipe node tujuan melalui `items.infrastructure_node_type_id` yang dapat dikelola di Master Barang.
 
 Batas operasional yang masih perlu keputusan lanjutan: laporan tugas DEAC belum mencatat pelepasan kabel/port secara khusus, dan kapasitas performa pohon besar belum diukur. Input topologi dan verifikasi kasus data lama yang ambigu tetap pekerjaan operasional.
+
+## 11. Revisi 2026-10-14 (Fase 0 — jawaban `analisa-gap-peta-infrastruktur.md` §6)
+
+Alasan baru: user melaporkan kasus nyata **satu Mini POP bisa punya 3-4 chassis
+OLT fisik**, membuktikan premis v3 poin 3 ("Mini POP = 1 OLT, merepresentasikan
+OLT ke-2/3/dst") salah. §10 poin 1 ("Mini POP tetap identitas OLT") ikut
+**digantikan**, bukan dihapus dari riwayat.
+
+1. **Lapisan Pusat: tidak pakai layer "Metro" terpisah.** Node Core/Backbone/
+   Server cukup ditambatkan langsung ke POP `pusat` (WHUSNET), sama seperti
+   yang sudah digariskan §3.1 analisa gap — tanpa tipe/istilah tambahan.
+2. **Mini POP = lokasi fisik, bukan identitas satu OLT.** Chassis OLT
+   (`olt_chassis`) jadi node anak — boleh anak **Mini POP** (lokasi lapangan
+   terpisah) atau anak **POP Cabang langsung** (kalau OLT nempel di gedung
+   Cabang, tidak perlu Mini POP tersendiri). **Satu lokasi (Cabang atau Mini
+   POP) boleh menaungi berapa pun chassis** — nambah unit OLT di titik yang
+   sama = tambah node `olt_chassis`, BUKAN bikin Mini POP baru.
+3. **Mini POP baru dibuat hanya kalau ada lokasi fisik baru** (alamat/
+   koordinat beda dari Cabang induknya), tidak lagi berdasar jumlah OLT.
+4. **Registrasi aset lama (chassis/kartu OLT): manual satu-satu**, pola sama
+   dengan `odp_port` di `CustomerInstallationController` — field teks bebas
+   kalau node/slot belum terdaftar sebagai `network_node` resmi, berubah jadi
+   pilihan dari daftar resmi begitu node itu terdaftar. Tidak perlu seeder;
+   tipe `olt_chassis` didaftarkan sekali di Master Tipe Node, instance-nya
+   dibuat manual per lokasi nyata lewat `/network/nodes`.
+
+Kalimat yang **tidak berlaku lagi** (biarkan di §2 dan §10 sebagai riwayat,
+jangan dihapus): "Mini POP tetap merepresentasikan OLT ke-2/3/dst di sebuah
+Cabang" dan "Mini POP tetap identitas OLT".
+
+5. **Feeder: ikut lacak stok fisik (Opsi B), bukan sekadar node topologi.**
+   Feeder jadi node (tipe `feeder`, parent OLT/Mini POP, `capacity` = jumlah
+   core, port assignment ke ODC tujuan) **dan** dipasang lewat jalur Gudang
+   yang sama dengan kabel Drop: `consumeFromRoll()` saat pemasangan (laporan
+   O-REQ/INFR) mengurangi `infrastructure_balances` di lot ROLL asal dan
+   mencatat ledger `DEPLOY`. Pencabutan ikut jalur retrieve yang sama (meter
+   sisa balik ke ROLL / jadi scrap). Feeder = barang terpasang, sama kelasnya
+   dengan ODC/ODP/Drop — bukan jalur pasif tanpa jejak material.
+6. **Keterbatasan yang diketahui, SENGAJA tidak diotomasi:** migration
+   `2026_10_14_000001_add_feeder_node_type_and_fix_olt_rules.php` menyusulkan
+   baris `network_node_type_rules` `olt_chassis`/`olt_card` yang baru (anchor
+   `olt_chassis` → Cabang, parent `olt_card` → `olt_chassis`) secara idempotent
+   — ini aman diotomasi karena cuma tambah/hapus baris aturan, bukan data. Yang
+   **TIDAK** diotomasi: rename kolom `olt_slots.pop_id` → `chassis_node_id`.
+   Database yang sempat menjalankan migration `olt_slots` versi LAMA (ADHOC-166/
+   168, sebelum revisi ini) sebelum Fase 0 selesai akan punya baris `olt_slots`
+   yang masih berisi `pop_id` alih-alih `chassis_node_id` — memetakan slot lama
+   ke chassis node yang benar butuh keputusan data-dependent (slot ini
+   sebelumnya milik chassis mana) yang tidak bisa ditebak otomatis dengan aman.
+   Database semacam itu wajib `migrate:fresh` (kalau datanya cuma data uji)
+   atau migration reconciliation tersendiri yang ditulis manual sambil melihat
+   data riil — jangan dibungkus diam-diam ke migration Fase 0 manapun.

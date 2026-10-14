@@ -12,6 +12,21 @@ return new class extends Migration
      * sama seperti 145033 (idempotent, pakai exists-check) supaya DB lama
      * dan DB baru (lewat NetworkNodeTypeSeeder) berakhir di aturan final
      * yang sama.
+     *
+     * Juga menyusulkan aturan `olt_chassis`/`olt_card` ke bentuk final Fase 0
+     * (`olt_chassis` boleh anchor Cabang langsung, `olt_card` WAJIB anak
+     * `olt_chassis` — lihat NetworkNodeTypeSeeder) — ini AMAN diotomasi,
+     * cuma nambah/hapus baris aturan.
+     *
+     * KETERBATASAN YANG DIKETAHUI (SENGAJA TIDAK diotomasi di sini): kalau
+     * DB ini sempat menjalankan migration `olt_slots` versi LAMA (ADHOC-166/
+     * 168) yang masih menyimpan `pop_id` (bukan `chassis_node_id`), migration
+     * ini TIDAK merekonsiliasi kolom itu — memetakan slot lama ke chassis
+     * node yang benar butuh keputusan data-dependent yang gak bisa ditebak
+     * otomatis dengan aman. Lihat §11 poin 6
+     * `docs/superpowers/specs/2026-10-09-aset-infrastruktur-lokasi-design.md`.
+     * DB semacam itu wajib `migrate:fresh` atau migration reconciliation
+     * manual tersendiri.
      */
     public function up(): void
     {
@@ -69,6 +84,59 @@ return new class extends Migration
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+        }
+
+        $cardTypeId = DB::table('network_node_types')->where('code', 'olt_card')->value('id');
+
+        // Rekonsiliasi aturan `olt_chassis`/`olt_card` ke bentuk final Fase 0
+        // (lihat NetworkNodeTypeSeeder `$defaultRules`). DB yang migration
+        // 145033/ADHOC-166-168 sudah jalan sebelumnya masih punya aturan
+        // LAMA: chassis cuma anchor Mini POP, kartu anchor POP langsung.
+        // Idempotent (exists-check per baris) — aman dijalankan di DB baru
+        // (belum ada baris apa pun, seeder yang isi) maupun DB lama (baris
+        // lama dikoreksi, bukan didobel).
+        if ($chassisTypeId !== null) {
+            // `olt_chassis` WAJIB boleh anchor Cabang langsung (chassis
+            // nempel di gedung Cabang tanpa Mini POP) — baris anchor Mini
+            // POP yang sudah ada TIDAK disentuh, cuma nambah Cabang.
+            $chassisAnchorsCabang = DB::table('network_node_type_rules')
+                ->where('child_type_id', $chassisTypeId)
+                ->where('anchor_pop_type', 'cabang')
+                ->exists();
+            if (! $chassisAnchorsCabang) {
+                DB::table('network_node_type_rules')->insert([
+                    'child_type_id' => $chassisTypeId,
+                    'anchor_pop_type' => 'cabang',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        if ($cardTypeId !== null) {
+            // Baris LAMA "`olt_card` anchor Mini POP langsung" sudah gak
+            // berlaku — kartu OLT sekarang WAJIB jadi anak `olt_chassis`
+            // (satu chassis bisa punya banyak kartu, kartu tanpa chassis
+            // gak bermakna). Hapus baris stale-nya kalau masih ada.
+            DB::table('network_node_type_rules')
+                ->where('child_type_id', $cardTypeId)
+                ->where('anchor_pop_type', 'mini_pop')
+                ->delete();
+
+            if ($chassisTypeId !== null) {
+                $cardHasChassisParent = DB::table('network_node_type_rules')
+                    ->where('child_type_id', $cardTypeId)
+                    ->where('parent_type_id', $chassisTypeId)
+                    ->exists();
+                if (! $cardHasChassisParent) {
+                    DB::table('network_node_type_rules')->insert([
+                        'child_type_id' => $cardTypeId,
+                        'parent_type_id' => $chassisTypeId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
         }
     }
 
