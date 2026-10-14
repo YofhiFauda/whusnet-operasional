@@ -51,11 +51,6 @@ class Pop extends Model
         ];
     }
 
-    public function oltSlots(): HasMany
-    {
-        return $this->hasMany(OltSlot::class);
-    }
-
     public function distributions(): HasMany
     {
         return $this->hasMany(Distribution::class);

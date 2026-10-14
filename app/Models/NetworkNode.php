@@ -151,6 +151,18 @@ class NetworkNode extends Model
         return $this->hasOne(OltSlot::class, 'card_node_id');
     }
 
+    /**
+     * Slot milik chassis OLT ini (node bertipe `olt_chassis`) — satu Mini POP
+     * bisa punya beberapa chassis, jadi nomor slot discope per-chassis lewat
+     * relasi ini, bukan lagi per-POP (`Pop::oltSlots()` dihapus Task 2).
+     *
+     * @return HasMany<OltSlot, $this>
+     */
+    public function oltSlots(): HasMany
+    {
+        return $this->hasMany(OltSlot::class, 'chassis_node_id');
+    }
+
     public function nodeType(): BelongsTo
     {
         return $this->belongsTo(NetworkNodeType::class);
