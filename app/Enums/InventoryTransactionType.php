@@ -79,6 +79,16 @@ enum InventoryTransactionType: string
      */
     case RETRIEVE_INFRA = 'retrieve_infra';
 
+    /**
+     * SN yang sudah lama berdiri di lapangan (aset lama, mis. opname chassis
+     * eksisting), belum pernah lewat RECEIVE/ISSUE/DEPLOY — tidak ada jejak
+     * ledger sebelumnya. SATU-SATUNYA tipe yang boleh membuat SN langsung
+     * `DEPLOYED` TANPA `FopTask` DAN tanpa pernah `ISSUED` ke custody teknisi
+     * (`InventoryService::registerExistingInfraSerial()`) — beda dari DEPLOY
+     * yang selalu berasal dari custody teknisi yang sudah ada.
+     */
+    case REGISTER_INFRA = 'register_infra';
+
     public function label(): string
     {
         return match ($this) {
@@ -92,6 +102,7 @@ enum InventoryTransactionType: string
             self::INSTALL => 'Terpasang di Pelanggan',
             self::DEPLOY => 'Terpasang di Infrastruktur',
             self::RETRIEVE_INFRA => 'Dicabut dari Infrastruktur',
+            self::REGISTER_INFRA => 'Registrasi Aset Lama (Infrastruktur)',
         };
     }
 }

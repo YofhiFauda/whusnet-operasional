@@ -591,6 +591,68 @@ class InventoryService
     }
 
     /**
+     * Registrasi SN aset infrastruktur yang sudah lama berdiri di lapangan
+     * (mis. chassis OLT yang sudah netap sejak tahun lalu) tapi belum pernah
+     * masuk ledger sama sekali — BEDA SENGAJA dari `deploySerial()`: SN di
+     * sini TIDAK pernah lewat RECEIVE/ISSUE, jadi TIDAK ADA custody teknisi
+     * atau `FopTask` buat disyaratkan. Satu-satunya jalur yang boleh membuat
+     * `InventorySerial` baru langsung berstatus `DEPLOYED` dalam satu
+     * transaksi dengan baris ledgernya (`InventoryTransactionType::REGISTER_INFRA`).
+     *
+     * `reason` WAJIB diisi (alasan registrasi, mis. "opname awal, chassis
+     * sudah berdiri sejak 2023") — beda dari `notes` di DEPLOY yang cuma
+     * pointer, di sini `reason` itu audit trail utama kenapa SN ini muncul
+     * tiba-tiba tanpa riwayat RECEIVE/ISSUE sebelumnya.
+     */
+    public function registerExistingInfraSerial(string $serialNumber, Item $item, NetworkNode $node, string $reason, User $actor): InventorySerial
+    {
+        return DB::transaction(function () use ($serialNumber, $item, $node, $reason, $actor) {
+            $reason = trim($reason);
+
+            if ($reason === '') {
+                throw new InvalidArgumentException('Alasan registrasi wajib diisi.');
+            }
+
+            if ($item->ownership_mode !== OwnershipMode::INFRASTRUCTURE_ASSET) {
+                throw new InvalidArgumentException("Item {$item->name} bukan aset infrastruktur (ownership_mode) — gak bisa diregistrasi sebagai aset lama.");
+            }
+
+            if ($item->tracking_type !== TrackingType::SERIALIZED) {
+                throw new InvalidArgumentException("Item {$item->name} bukan tracking_type serialized — gak bisa diregistrasi lewat registerExistingInfraSerial().");
+            }
+
+            if (InventorySerial::where('serial_number', $serialNumber)->exists()) {
+                throw new InvalidArgumentException("SN {$serialNumber} sudah terdaftar.");
+            }
+
+            $node = $this->freshNode($node);
+
+            $serial = InventorySerial::create([
+                'item_id' => $item->id,
+                'serial_number' => $serialNumber,
+                'status' => SerialStatus::DEPLOYED,
+                'current_network_node_id' => $node->id,
+                'current_technician_id' => null,
+            ]);
+
+            InventoryTransaction::create([
+                'type' => InventoryTransactionType::REGISTER_INFRA,
+                'serial_id' => $serial->id,
+                'item_id' => $item->id,
+                'qty' => 1,
+                'to_network_node_id' => $node->id,
+                'to_pop_id' => $node->resolvePop()?->id,
+                'reason' => $reason,
+                'fop_task_id' => null,
+                'created_by' => $actor->id,
+                'notes' => "SN {$serialNumber} diregistrasi sebagai aset lama di {$node->breadcrumbLabel()}.",
+            ]);
+
+            return $serial;
+        });
+    }
+
+    /**
      * Item QUANTITY/BATCH dipasang netap di titik infrastruktur — FIFO lintas
      * custody tim, SAMA PERSIS dengan `consumeFromCustody()` (urut
      * `issued_at`, lot cabang lain di-skip, `InsufficientCustodyException`

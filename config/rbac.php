@@ -664,6 +664,7 @@ return [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
             ActionCode::UPDATE->value,
+            ActionCode::REGISTER_INFRA->value,
         ],
 
         // Dashboard Analitik FOP (docs/plan/analisa-dashboard-analitik-fop.md)
