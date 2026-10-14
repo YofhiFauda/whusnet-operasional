@@ -9,6 +9,7 @@ use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodeType;
 use App\Models\User;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -131,5 +132,71 @@ class InventoryServiceRegisterInfraTest extends TestCase
 
         $this->assertSame(1, InventorySerial::count());
         $this->assertSame(0, InventoryTransaction::count());
+    }
+
+    /**
+     * Cermin `kartu_olt_hanya_menerima_satu_aset_modul_dari_gudang()`
+     * (`tests/Feature/TaskInfrastructureDeployReportTest.php`) tapi lewat
+     * `registerExistingInfraSerial()` — review lintas-task Fase 0 menemukan
+     * guard kompatibilitas SKU ↔ komponen OLT CUMA ditegakkan `deploySerial()`,
+     * jadi jalur registrasi aset lama bisa menyelipkan SKU yang gak sesuai
+     * tipe komponen chassis/card. Setelah diekstrak ke
+     * `assertNodeAcceptsSerialItem()` dan dipanggil dari kedua method, SKU
+     * yang bukan `olt_module` (atau `olt_module` tapi `infrastructure_node_type_id`-nya
+     * gak cocok tipe node tujuan) wajib ditolak di sini juga.
+     */
+    #[Test]
+    public function test_registrasi_sku_tidak_sesuai_tipe_komponen_olt_ditolak(): void
+    {
+        $cardType = NetworkNodeType::firstOrCreate(['code' => 'olt_card'], ['name' => 'Kartu OLT', 'has_ports' => true]);
+        $card = NetworkNode::factory()->create(['node_type_id' => $cardType->id]);
+        $wrongItem = $this->makeItem();
+        $actor = User::factory()->create();
+
+        try {
+            app(InventoryService::class)->registerExistingInfraSerial('SN-LEGACY-OLT-WRONG-SKU', $wrongItem, $card, 'Opname awal', $actor);
+            $this->fail('registerExistingInfraSerial() seharusnya menolak SKU yang bukan olt_module di komponen OLT.');
+        } catch (InvalidArgumentException) {
+            // diharapkan
+        }
+
+        $this->assertSame(0, InventorySerial::count());
+        $this->assertSame(0, InventoryTransaction::count());
+    }
+
+    /**
+     * Guard "satu aset per komponen OLT" (`deploySerial()`) ikut harus
+     * berlaku di `registerExistingInfraSerial()` — chassis/card yang sudah
+     * punya SN `DEPLOYED` gak boleh ketambahan SN kedua lewat jalur
+     * registrasi aset lama juga.
+     */
+    #[Test]
+    public function test_registrasi_dua_sn_di_komponen_olt_yang_sama_ditolak(): void
+    {
+        $cardType = NetworkNodeType::firstOrCreate(['code' => 'olt_card'], ['name' => 'Kartu OLT', 'has_ports' => true]);
+        $card = NetworkNode::factory()->create(['node_type_id' => $cardType->id]);
+        $category = ItemCategory::firstOrCreate(['code' => 'olt_module'], ['name' => 'Modul OLT', 'default_unit' => 'pcs']);
+        $item = Item::create([
+            'code' => 'OLT-REGISTER-TEST-CARD',
+            'name' => 'Modul OLT Uji Registrasi',
+            'unit' => 'pcs',
+            'item_category_id' => $category->id,
+            'tracking_type' => 'serialized',
+            'ownership_mode' => 'infrastructure_asset',
+            'infrastructure_node_type_id' => $cardType->id,
+        ]);
+        $actor = User::factory()->create();
+
+        app(InventoryService::class)->registerExistingInfraSerial('SN-LEGACY-OLT-FIRST', $item, $card, 'Opname awal', $actor);
+
+        try {
+            app(InventoryService::class)->registerExistingInfraSerial('SN-LEGACY-OLT-SECOND', $item, $card, 'Opname awal', $actor);
+            $this->fail('registerExistingInfraSerial() seharusnya menolak komponen OLT yang sudah punya satu aset terpasang.');
+        } catch (InvalidArgumentException) {
+            // diharapkan
+        }
+
+        $this->assertSame(1, InventorySerial::count());
+        $this->assertSame(1, InventoryTransaction::count());
     }
 }

@@ -550,18 +550,7 @@ class InventoryService
             }
 
             $node = $this->freshNode($node);
-            if (in_array($node->nodeType?->code, ['olt_chassis', 'olt_card'], true)) {
-                if ($serial->item?->category?->code !== 'olt_module'
-                    || $serial->item->infrastructure_node_type_id !== $node->node_type_id) {
-                    throw new InvalidArgumentException('SKU aset tidak sesuai dengan tipe komponen OLT tujuan.');
-                }
-                if ($node->deployedSerials()->where('status', SerialStatus::DEPLOYED->value)->exists()) {
-                    throw new InvalidArgumentException('Komponen OLT ini sudah memiliki satu aset terpasang.');
-                }
-            } elseif ($serial->item?->infrastructure_node_type_id !== null
-                && $serial->item->infrastructure_node_type_id !== $node->node_type_id) {
-                throw new InvalidArgumentException('SKU aset hanya dapat dipasang pada tipe node yang ditetapkan di Master Barang.');
-            }
+            $this->assertNodeAcceptsSerialItem($serial->item, $node);
             $toPopId = $node->resolvePop()?->id;
             if ($targetCabangId !== null && $toPopId !== $targetCabangId) {
                 throw new InvalidArgumentException('Node tujuan berada di cabang berbeda dari task.');
@@ -626,6 +615,7 @@ class InventoryService
             }
 
             $node = $this->freshNode($node);
+            $this->assertNodeAcceptsSerialItem($item, $node);
 
             $serial = InventorySerial::create([
                 'item_id' => $item->id,
@@ -888,6 +878,38 @@ class InventoryService
     private function freshNode(NetworkNode $node): NetworkNode
     {
         return NetworkNode::query()->lockForUpdate()->findOrFail($node->id);
+    }
+
+    /**
+     * Kompatibilitas SKU ↔ tipe node komponen OLT — dipakai BARENG
+     * `deploySerial()` (pasang via custody teknisi) dan
+     * `registerExistingInfraSerial()` (registrasi aset lama langsung
+     * DEPLOYED). Sebelumnya cek ini CUMA ada di `deploySerial()`, jadi
+     * jalur registrasi bisa nyelipin SKU yang gak sesuai tipe chassis/card
+     * atau numpuk dua aset di satu komponen OLT yang sama — ketemu waktu
+     * review lintas-task Fase 0 (bukan dari task 6/7 sendiri-sendiri).
+     *
+     * - `olt_chassis`/`olt_card`: item wajib kategori `olt_module` DAN
+     *   `infrastructure_node_type_id`-nya cocok tipe node tujuan, DAN
+     *   komponen itu belum punya aset `DEPLOYED` lain (satu aset per
+     *   komponen).
+     * - Tipe node lain: kalau item punya `infrastructure_node_type_id`,
+     *   wajib cocok tipe node tujuan (item tanpa batasan tipe node lolos).
+     */
+    private function assertNodeAcceptsSerialItem(Item $item, NetworkNode $node): void
+    {
+        if (in_array($node->nodeType?->code, ['olt_chassis', 'olt_card'], true)) {
+            if ($item->category?->code !== 'olt_module'
+                || $item->infrastructure_node_type_id !== $node->node_type_id) {
+                throw new InvalidArgumentException('SKU aset tidak sesuai dengan tipe komponen OLT tujuan.');
+            }
+            if ($node->deployedSerials()->where('status', SerialStatus::DEPLOYED->value)->exists()) {
+                throw new InvalidArgumentException('Komponen OLT ini sudah memiliki satu aset terpasang.');
+            }
+        } elseif ($item->infrastructure_node_type_id !== null
+            && $item->infrastructure_node_type_id !== $node->node_type_id) {
+            throw new InvalidArgumentException('SKU aset hanya dapat dipasang pada tipe node yang ditetapkan di Master Barang.');
+        }
     }
 
     /**

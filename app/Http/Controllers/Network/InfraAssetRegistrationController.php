@@ -32,9 +32,17 @@ class InfraAssetRegistrationController extends Controller
     {
         $this->authorizeNodeScope($node);
 
+        // Cermin guard `InventoryService::assertNodeAcceptsSerialItem()` di
+        // level UI — item yang SKU-nya ditetapkan ke tipe node lain gak
+        // usah muncul di dropdown sama sekali, daripada user pilih lalu
+        // ditolak balik oleh validasi server.
         $items = Item::query()
             ->where('ownership_mode', OwnershipMode::INFRASTRUCTURE_ASSET)
             ->where('tracking_type', TrackingType::SERIALIZED)
+            ->where(function ($query) use ($node) {
+                $query->whereNull('infrastructure_node_type_id')
+                    ->orWhere('infrastructure_node_type_id', $node->node_type_id);
+            })
             ->orderBy('name')
             ->get();
 
