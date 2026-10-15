@@ -65,5 +65,15 @@
         const modal = document.getElementById('device-modal');
         if (modal) modal.classList.add('hidden');
     }
+
+    function openAdditionalDeviceModal() {
+        const modal = document.getElementById('additional-device-modal');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeAdditionalDeviceModal() {
+        const modal = document.getElementById('additional-device-modal');
+        if (modal) modal.classList.add('hidden');
+    }
 </script>
 @endsection

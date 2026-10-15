@@ -25,11 +25,13 @@ class CustomerFieldworkController extends Controller
         $customer->load([
             'customerDevice',
             'customerTechnicalDetail',
+            'additionalDevices',
             'installations.technician',
             'pop',
             'miniPop',
             'distribution',
             'internetPackage',
+            'customerService.internetPackage',
         ]);
 
         return view('customers.fieldwork', compact('customer'));

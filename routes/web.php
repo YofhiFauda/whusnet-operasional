@@ -15,6 +15,7 @@ use App\Http\Controllers\CollectorVisitController;
 use App\Http\Controllers\CollectorWorklistController;
 use App\Http\Controllers\CollectorWorksheetController;
 use App\Http\Controllers\CustomerAcquisitionController;
+use App\Http\Controllers\CustomerAdditionalDeviceController;
 use App\Http\Controllers\CustomerBillingWaiverController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
@@ -1125,6 +1126,11 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:customers.detail.devices.create|customers.detail.devices.update')->group(function () {
         Route::post('/customers/{customer}/device', [CustomerDeviceController::class, 'store'])->name('customers.device.store');
+    });
+
+    Route::middleware('permission:customers.detail.devices.create|customers.detail.devices.update')->group(function () {
+        Route::post('/customers/{customer}/additional-device', [CustomerAdditionalDeviceController::class, 'store'])->name('customers.additional-device.store');
+        Route::delete('/customers/{customer}/additional-device/{additionalDevice}', [CustomerAdditionalDeviceController::class, 'destroy'])->name('customers.additional-device.destroy');
     });
 
     Route::middleware('permission:customers.detail.packages.change')->group(function () {

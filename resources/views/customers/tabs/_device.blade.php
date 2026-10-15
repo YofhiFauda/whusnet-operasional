@@ -309,6 +309,59 @@
     </div>
 @endif
 
+{{--
+    PERANGKAT TAMBAHAN (AP, STB, dll.) — benefit paket, bukan perangkat
+    utama. Sengaja DI LUAR blok $hasAnyDeviceData: device tambahan bisa ada
+    walau perangkat utama (ONT/modem) belum terisi sama sekali.
+--}}
+@php
+    $additionalLimit = $customer->customerService?->internetPackage?->max_additional_devices ?? 0;
+    $additionalCount = $customer->additionalDevices->count();
+@endphp
+<div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+    <div class="px-5 py-3 bg-teal-50/50 dark:bg-teal-950/20 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 items-center justify-between">
+        <span class="text-xs font-bold text-teal-700 dark:text-teal-300 uppercase tracking-wider">
+            <i class="fa-solid fa-wifi mr-1.5"></i> PERANGKAT TAMBAHAN
+        </span>
+        @can('customers.detail.devices.update')
+            <button
+                type="button"
+                onclick="openAdditionalDeviceModal()"
+                @if($additionalCount >= $additionalLimit) disabled @endif
+                class="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-sm shrink-0 cursor-pointer"
+            >
+                <i class="fa-solid fa-plus mr-1"></i> Tambah Perangkat ({{ $additionalCount }}/{{ $additionalLimit }})
+            </button>
+        @endcan
+    </div>
+    <div class="p-5">
+        @if($additionalLimit === 0)
+            <p class="text-[11px] text-slate-500 mb-3">Paket pelanggan saat ini tidak punya jatah perangkat tambahan.</p>
+        @endif
+        @forelse($customer->additionalDevices as $additional)
+            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-2 text-xs last:border-b-0">
+                <span class="text-slate-700 dark:text-slate-200 searchable-text">
+                    <span class="font-semibold text-slate-900 dark:text-slate-100 uppercase">{{ $additional->device_type }}</span>
+                    — {{ $additional->brand }} {{ $additional->model }} ({{ $additional->serial_number ?: 'tanpa SN' }})
+                </span>
+                @can('customers.detail.devices.update')
+                    <form method="POST" action="{{ route('customers.additional-device.destroy', [$customer, $additional]) }}" onsubmit="return confirm('Hapus perangkat tambahan ini?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer">
+                            <i class="fa-solid fa-trash mr-1"></i> Hapus
+                        </button>
+                    </form>
+                @endcan
+            </div>
+        @empty
+            <p class="text-[11px] text-slate-400 text-center py-3">Belum ada perangkat tambahan.</p>
+        @endforelse
+    </div>
+</div>
+
+@include('customers.partials._additional_device_modal')
+
 @can('fill_device')
 <div id="device-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">

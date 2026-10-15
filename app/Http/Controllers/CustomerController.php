@@ -788,7 +788,7 @@ class CustomerController extends Controller
         // eager-load: Model::preventLazyLoading() aktif di luar production
         // (AppServiceProvider), akses $customer->customerDevice tanpa ini
         // meledak di test & lokal.
-        $customer->load(['customerDevice', 'customerTechnicalDetail']);
+        $customer->load(['customerDevice', 'customerTechnicalDetail', 'additionalDevices']);
 
         // Nilai awal step 7 = nilai yang tampil di Detail Pelanggan (urutan
         // cadangan Gudang → customer_devices → detail teknis → kolom lama),
@@ -1343,7 +1343,7 @@ class CustomerController extends Controller
             'pop',
             'collector',
             'customerAddress',
-            'customerService',
+            'customerService.internetPackage',
             'customerTechnicalDetail',
             // .role ikut dimuat: tabel "Ringkasan Waktu & Penanggung Jawab" di tab
             // Ringkasan menampilkan role tiap PIC.
@@ -1357,6 +1357,7 @@ class CustomerController extends Controller
             'installations.technician2',
             'installations.technician3',
             'customerDevice',
+            'additionalDevices',
             'documents.uploader',
             'invoices' => function ($query) {
                 $query->with('creator')->orderBy('billing_period', 'desc');
