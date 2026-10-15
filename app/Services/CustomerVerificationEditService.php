@@ -87,7 +87,7 @@ class CustomerVerificationEditService
      * persis dengan koreksi paket di `CustomerSurveyController::store()`.
      *
      * @throws \RuntimeException lewat CustomerPackageService::assertAdditionalDevicesWithinLimit()
-     *                            kalau perangkat tambahan pelanggan melebihi batas paket baru
+     *                           kalau perangkat tambahan pelanggan melebihi batas paket baru
      */
     public function updatePackage(Customer $customer, int $internetPackageId, User $actor): Customer
     {
