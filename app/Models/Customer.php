@@ -520,6 +520,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<CustomerAdditionalDevice, $this>
+     */
+    public function additionalDevices(): HasMany
+    {
+        return $this->hasMany(CustomerAdditionalDevice::class);
+    }
+
+    /**
      * Riwayat pengambilan modem dari pelanggan ini (ADHOC-88). Tetap utuh
      * walau `customer_devices.device_retrieved_at` direset saat Langganan Lagi.
      *
