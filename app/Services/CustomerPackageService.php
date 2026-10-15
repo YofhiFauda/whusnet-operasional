@@ -64,6 +64,8 @@ class CustomerPackageService
             throw new InvalidArgumentException('Paket baru sama dengan paket yang sedang berjalan.');
         }
 
+        $this->assertAdditionalDevicesWithinLimit($customer, $newPackage);
+
         $isUpgrade = (float) $newPackage->monthly_price > (float) $service->monthly_price;
         $currentPeriod = now()->format('Y-m');
 
@@ -136,6 +138,26 @@ class CustomerPackageService
             'monthly_price' => $monthlyPrice,
             'total_monthly_bill' => $totalBill,
         ]);
+    }
+
+    /**
+     * Ganti paket (upgrade MAUPUN downgrade) diblok kalau jumlah perangkat
+     * tambahan (AP/STB, dll. — `CustomerAdditionalDevice`) pelanggan melebihi
+     * `max_additional_devices` paket baru. Downgrade adalah kasus utama di
+     * sini karena limit paket yang lebih murah biasanya lebih kecil — guard
+     * ini SENGAJA dipanggil di luar blok `if ($isUpgrade)` di atas.
+     */
+    private function assertAdditionalDevicesWithinLimit(Customer $customer, InternetPackage $newPackage): void
+    {
+        $count = $customer->additionalDevices()->count();
+
+        if ($count > $newPackage->max_additional_devices) {
+            throw new RuntimeException(
+                "Ganti paket diblok — pelanggan punya {$count} perangkat tambahan, ".
+                "melebihi batas {$newPackage->max_additional_devices} di paket \"{$newPackage->name}\". ".
+                'Hapus perangkat tambahan dulu sebelum ganti paket.'
+            );
+        }
     }
 
     /**

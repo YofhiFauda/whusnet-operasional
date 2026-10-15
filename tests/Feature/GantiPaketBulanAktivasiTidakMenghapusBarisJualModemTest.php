@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Customer;
+use App\Models\CustomerAdditionalDevice;
 use App\Models\CustomerBalanceMutation;
 use App\Models\CustomerService;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
+use App\Services\CustomerPackageService;
 use App\Services\InitialInvoiceService;
 use Carbon\Carbon;
 use Database\Seeders\ActionSeeder;
@@ -19,6 +21,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -214,5 +217,30 @@ class GantiPaketBulanAktivasiTidakMenghapusBarisJualModemTest extends TestCase
         $depositTotal = (float) CustomerBalanceMutation::where('customer_id', $customer->id)->sum('amount');
         $this->assertEqualsWithDelta($expectedDeposit, $depositTotal, 1.0, 'Deposit tidak boleh memuat nominal modem yang tetap jadi milik pelanggan.');
         $this->assertLessThan(self::MODEM_PRICE, $depositTotal);
+    }
+
+    #[Test]
+    public function test_package_change_rejected_when_additional_devices_exceed_new_limit(): void
+    {
+        // Paket lama max_additional_devices = 2, pelanggan punya 2 device
+        // tambahan. Paket baru max_additional_devices = 1 → change() wajib
+        // RuntimeException SEBELUM mutasi apa pun (ADHOC perangkat tambahan).
+        $this->paketMurah->update(['max_additional_devices' => 2]);
+
+        $paketLimitKetat = InternetPackage::create([
+            'name' => 'Paket C 5 Mbps', 'package_code' => 'JMD-C-05', 'category' => 'Home', 'package_group' => 'Basic',
+            'bandwidth_label' => '5 Mbps', 'download_speed_mbps' => 5, 'upload_speed_mbps' => 5, 'monthly_price' => 100000,
+            'max_additional_devices' => 1,
+        ]);
+
+        [$customer] = $this->customerWithAwalInvoice($this->paketMurah, paid: false);
+
+        CustomerAdditionalDevice::create(['customer_id' => $customer->id, 'device_type' => 'AP']);
+        CustomerAdditionalDevice::create(['customer_id' => $customer->id, 'device_type' => 'STB']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('perangkat tambahan');
+
+        app(CustomerPackageService::class)->change($customer, $paketLimitKetat);
     }
 }
