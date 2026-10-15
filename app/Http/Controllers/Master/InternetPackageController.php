@@ -157,6 +157,7 @@ class InternetPackageController extends Controller
             'discount_default' => 'nullable|numeric|min:0|max:100',
             'modem' => 'nullable|string|max:100',
             'max_users' => 'nullable|integer|min:1',
+            'max_additional_devices' => 'nullable|integer|min:0|max:20',
             'ip_address_type' => 'nullable|string|max:100',
             'contract_period_months' => 'nullable|integer|min:1|max:120',
             'installation_fee' => 'nullable|numeric|min:0',
@@ -170,6 +171,7 @@ class InternetPackageController extends Controller
 
         $validated['ppn'] = $validated['ppn'] ?? 0;
         $validated['discount_default'] = $validated['discount_default'] ?? 0;
+        $validated['max_additional_devices'] = $validated['max_additional_devices'] ?? 0;
 
         return $validated;
     }

@@ -138,6 +138,10 @@
                     <input type="number" min="1" id="max_users" name="max_users" value="{{ old('max_users', $paket->max_users) }}" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm">
                 </div>
                 <div>
+                    <label for="max_additional_devices" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Maks. Perangkat Tambahan</label>
+                    <input type="number" min="0" id="max_additional_devices" name="max_additional_devices" value="{{ old('max_additional_devices', $paket->max_additional_devices ?? 0) }}" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm">
+                </div>
+                <div>
                     <label for="ip_address_type" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Jenis IP</label>
                     <input type="text" id="ip_address_type" name="ip_address_type" value="{{ old('ip_address_type', $paket->ip_address_type) }}" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm">
                 </div>
