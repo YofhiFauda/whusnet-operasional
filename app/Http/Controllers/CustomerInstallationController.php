@@ -890,7 +890,11 @@ class CustomerInstallationController extends Controller
             'internet_package_id' => 'required|exists:internet_packages,id',
         ]);
 
-        app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+        try {
+            app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return $this->redirectBackToInstallationReport($request, $customer, 'Paket internet pelanggan diperbarui.');
     }

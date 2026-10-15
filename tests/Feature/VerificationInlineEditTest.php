@@ -179,6 +179,39 @@ class VerificationInlineEditTest extends TestCase
         $this->assertEquals(210900, (float) $customer->customerService->total_monthly_bill);
     }
 
+    /**
+     * Finding 2 (final review perangkat-tambahan-paket, 2026-10-15):
+     * `CustomerVerificationEditService::updatePackage()` menulis
+     * `customer_services.internet_package_id` LANGSUNG, di luar
+     * `CustomerPackageService::change()` — jadi guard
+     * `assertAdditionalDevicesWithinLimit()` wajib dicek ulang di sini juga,
+     * supaya koreksi paket dari layar Verifikasi Registrasi tidak jadi jalur
+     * bypass limit perangkat tambahan paket.
+     */
+    #[Test]
+    public function cs_tidak_bisa_ganti_paket_di_verifikasi_registrasi_kalau_perangkat_tambahan_melebihi_limit(): void
+    {
+        $customer = $this->customerAt('registered');
+        $customer->customerService()->create([
+            'internet_package_id' => $this->packageA->id,
+            'package_name_snapshot' => $this->packageA->name,
+            'discount' => 0,
+            'ppn' => 0,
+            'monthly_price' => 100000,
+            'total_monthly_bill' => 100000,
+        ]);
+        // packageB default max_additional_devices = 0 (kolom belum diisi di
+        // setUp()) — satu perangkat tambahan saja sudah melebihi.
+        $customer->additionalDevices()->create(['device_type' => 'AP']);
+        $cs = $this->userWithOnly('customer_registration_verification.view', 'customer_registration_verification.approve');
+
+        $this->actingAs($cs)->put(route('customer-registration-verifications.update-package', $customer), [
+            'internet_package_id' => $this->packageB->id,
+        ])->assertSessionHas('error');
+
+        $this->assertSame($this->packageA->id, $customer->fresh()->internet_package_id);
+    }
+
     #[Test]
     public function edit_registrasi_ditolak_setelah_pelanggan_lewat_tahap_registrasi(): void
     {
@@ -240,6 +273,33 @@ class VerificationInlineEditTest extends TestCase
         ])->assertRedirect();
         $this->assertSame('ODP-BARU', $survey->fresh()->nearest_odp);
         $this->assertSame(75, $survey->fresh()->cable_estimation_meter);
+    }
+
+    /**
+     * Sama dengan finding 2 di atas, tapi lewat jalur Verifikasi Admin
+     * (CustomerVerificationController::updatePackage()) — caller KETIGA
+     * `CustomerVerificationEditService::updatePackage()`.
+     */
+    #[Test]
+    public function admin_tidak_bisa_ganti_paket_di_validasi_admin_kalau_perangkat_tambahan_melebihi_limit(): void
+    {
+        $customer = $this->customerAt('waiting_acc');
+        $customer->customerService()->create([
+            'internet_package_id' => $this->packageA->id,
+            'package_name_snapshot' => $this->packageA->name,
+            'discount' => 0,
+            'ppn' => 0,
+            'monthly_price' => 100000,
+            'total_monthly_bill' => 100000,
+        ]);
+        $customer->additionalDevices()->create(['device_type' => 'AP']);
+        $admin = $this->userWithOnly('customers.detail.installation.validate', 'customers.detail.installation.view');
+
+        $this->actingAs($admin)->put(route('customers.verification.update-package', $customer), [
+            'internet_package_id' => $this->packageB->id,
+        ])->assertSessionHas('error');
+
+        $this->assertSame($this->packageA->id, $customer->fresh()->internet_package_id);
     }
 
     #[Test]

@@ -9,6 +9,8 @@ use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Services\EffectiveAccessService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -159,6 +161,79 @@ class CustomerAdditionalDeviceTest extends TestCase
 
         $response->assertStatus(403);
         $this->assertDatabaseHas('customer_additional_devices', ['id' => $additional->id]);
+    }
+
+    public function test_additional_device_destroy_rejects_device_belonging_to_another_customer(): void
+    {
+        $pop = $this->createPop('ADD7');
+        $technician = $this->createUserWithRole('Teknisi');
+        $customerA = $this->createCustomer($pop, 'TEST-ADD-007-A');
+        $customerB = $this->createCustomer($pop, 'TEST-ADD-007-B');
+        $deviceOfA = $customerA->additionalDevices()->create([
+            'device_type' => 'AP',
+            'brand' => 'TP-Link',
+        ]);
+
+        // URL dirakit dengan customer B, tapi device-nya milik customer A —
+        // guard `$additionalDevice->customer_id === $customer->id` di
+        // CustomerAdditionalDeviceController::destroy() wajib nolak ini
+        // (404), bukan kehapus karena IDnya valid.
+        $response = $this->actingAs($technician)->delete(route('customers.additional-device.destroy', [$customerB, $deviceOfA]));
+
+        $response->assertStatus(404);
+        $this->assertDatabaseHas('customer_additional_devices', ['id' => $deviceOfA->id]);
+    }
+
+    public function test_additional_device_store_rejects_customer_outside_pop_scope(): void
+    {
+        $allowedPop = $this->createPop('ADD8');
+        $otherPop = $this->createPop('ADD9');
+        $technician = User::factory()->create();
+        $technician->role_id = Role::where('name', 'Teknisi')->firstOrFail()->id;
+        $technician->save();
+
+        UserRoleScope::create([
+            'user_id' => $technician->id,
+            'role_id' => $technician->role_id,
+            'scope_type' => 'selected_pop',
+        ])->targets()->create(['pop_id' => $allowedPop->id]);
+        app(EffectiveAccessService::class)->clearCache($technician);
+
+        $customerOutsideScope = $this->createCustomer($otherPop, 'TEST-ADD-008');
+
+        $response = $this->actingAs($technician)->post(route('customers.additional-device.store', $customerOutsideScope), [
+            'device_type' => 'AP',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseCount('customer_additional_devices', 0);
+    }
+
+    public function test_additional_device_destroy_rejects_customer_outside_pop_scope(): void
+    {
+        $allowedPop = $this->createPop('ADD10');
+        $otherPop = $this->createPop('ADD11');
+        $technician = User::factory()->create();
+        $technician->role_id = Role::where('name', 'Teknisi')->firstOrFail()->id;
+        $technician->save();
+
+        UserRoleScope::create([
+            'user_id' => $technician->id,
+            'role_id' => $technician->role_id,
+            'scope_type' => 'selected_pop',
+        ])->targets()->create(['pop_id' => $allowedPop->id]);
+        app(EffectiveAccessService::class)->clearCache($technician);
+
+        $customerOutsideScope = $this->createCustomer($otherPop, 'TEST-ADD-009');
+        $device = $customerOutsideScope->additionalDevices()->create([
+            'device_type' => 'AP',
+            'brand' => 'TP-Link',
+        ]);
+
+        $response = $this->actingAs($technician)->delete(route('customers.additional-device.destroy', [$customerOutsideScope, $device]));
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('customer_additional_devices', ['id' => $device->id]);
     }
 
     private function createActiveCustomerService(Customer $customer, InternetPackage $package): CustomerService

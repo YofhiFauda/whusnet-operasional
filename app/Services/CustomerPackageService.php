@@ -146,8 +146,14 @@ class CustomerPackageService
      * `max_additional_devices` paket baru. Downgrade adalah kasus utama di
      * sini karena limit paket yang lebih murah biasanya lebih kecil — guard
      * ini SENGAJA dipanggil di luar blok `if ($isUpgrade)` di atas.
+     *
+     * Public karena dipakai ulang di dua jalur LAIN yang juga bisa mengubah
+     * `customer_services.internet_package_id` tanpa lewat `change()` di atas:
+     * `CustomerController::update()` (form Edit Pelanggan) dan
+     * `CustomerVerificationEditService::updatePackage()` (koreksi paket dari
+     * layar Verifikasi). Jangan duplikasi logic ini — satu sumber kebenaran.
      */
-    private function assertAdditionalDevicesWithinLimit(Customer $customer, InternetPackage $newPackage): void
+    public function assertAdditionalDevicesWithinLimit(Customer $customer, InternetPackage $newPackage): void
     {
         $count = $customer->additionalDevices()->count();
 

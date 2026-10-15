@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\City;
 use App\Models\Customer;
+use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Pop;
@@ -128,6 +129,99 @@ class CustomerEditTest extends TestCase
             'pop_id' => $pop->id,
             'status' => 'active',
         ]);
+    }
+
+    /**
+     * Finding 2 (final review perangkat-tambahan-paket, 2026-10-15): Edit
+     * Pelanggan mengubah `customer_services.internet_package_id` LANGSUNG
+     * di luar `CustomerPackageService::change()`, jadi guard
+     * `assertAdditionalDevicesWithinLimit()` wajib dicek ulang di sini juga
+     * — tanpa ini, downgrade paket lewat Edit Pelanggan bisa membypass
+     * limit perangkat tambahan yang sama yang ditegakkan di tombol "Ganti
+     * Paket" (CustomerPackageController).
+     */
+    public function test_customer_edit_rejects_package_downgrade_when_additional_devices_exceed_new_limit(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $pop = Pop::create([
+            'code' => 'SMN8',
+            'pop_code' => 'SMN8',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko 8',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $oldPackage = InternetPackage::create([
+            'package_code' => 'EDIT-PKT-OLD',
+            'name' => 'Paket Lama Limit Besar',
+            'category' => 'Home',
+            'package_group' => 'Basic',
+            'bandwidth_label' => '20 Mbps',
+            'download_speed_mbps' => 20,
+            'upload_speed_mbps' => 20,
+            'monthly_price' => 200000,
+            'max_additional_devices' => 5,
+        ]);
+        $newPackage = InternetPackage::create([
+            'package_code' => 'EDIT-PKT-NEW',
+            'name' => 'Paket Baru Limit Kecil',
+            'category' => 'Home',
+            'package_group' => 'Basic',
+            'bandwidth_label' => '10 Mbps',
+            'download_speed_mbps' => 10,
+            'upload_speed_mbps' => 10,
+            'monthly_price' => 100000,
+            'max_additional_devices' => 1,
+        ]);
+
+        $customer = Customer::create([
+            'customer_code' => 'C-SMN-000008',
+            'full_name' => 'Pelanggan Perangkat Lebih',
+            'primary_phone' => '081234567890',
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'active',
+            'internet_package_id' => $oldPackage->id,
+        ]);
+
+        CustomerService::create([
+            'customer_id' => $customer->id,
+            'internet_package_id' => $oldPackage->id,
+            'package_name_snapshot' => $oldPackage->name,
+            'monthly_price' => $oldPackage->monthly_price,
+            'discount' => 0,
+            'ppn' => 0,
+            'total_monthly_bill' => $oldPackage->monthly_price,
+            'activation_date' => now()->toDateString(),
+            'due_date' => now()->addMonth()->toDateString(),
+            'billing_cycle' => 'monthly',
+            'service_status' => 'aktif',
+            'billing_status' => 'active',
+            'contract_type' => 'beli',
+        ]);
+
+        // Dua perangkat tambahan — melebihi limit paket baru (1).
+        $customer->additionalDevices()->create(['device_type' => 'AP']);
+        $customer->additionalDevices()->create(['device_type' => 'STB']);
+
+        $updatedData = [
+            'full_name' => $customer->full_name,
+            'primary_phone' => $customer->primary_phone,
+            'registration_date' => '2026-06-15',
+            'pop_id' => $pop->id,
+            'status' => 'active',
+            'internet_package_id' => $newPackage->id,
+        ];
+
+        $response = $this->put("/customers/{$customer->id}", $updatedData);
+
+        $response->assertSessionHasErrors('internet_package_id');
+        $this->assertDatabaseCount('customer_additional_devices', 2);
+        $this->assertSame($oldPackage->id, $customer->customerService()->first()->internet_package_id);
     }
 
     /**

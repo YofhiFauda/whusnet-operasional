@@ -52,6 +52,7 @@ use App\Services\BillingPeriodWaiverService;
 use App\Services\CustomerBalanceService;
 use App\Services\CustomerCidService;
 use App\Services\CustomerDeviceProfileService;
+use App\Services\CustomerPackageService;
 use App\Services\CustomerRelocationService;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
@@ -1082,8 +1083,15 @@ class CustomerController extends Controller
             $validated['foto_kontrak'] = FileUploadService::uploadInstallationPhoto($request->file('foto_kontrak'), $customer, 'kontrak');
         }
 
+        // Paket SEBELUM transaksi — dibandingkan dengan paket baru di langkah
+        // 3 untuk tahu apakah ini benar-benar ganti paket (bukan sekadar
+        // save ulang form dengan paket yang sama). $customer->internet_package_id
+        // sendiri ditulis ulang oleh $customer->update($validated) di langkah 1,
+        // jadi harus ditangkap SEBELUM transaksi jalan.
+        $currentPackageId = $customer->customerService?->internet_package_id;
+
         try {
-            DB::transaction(function () use ($customer, $validated, $serviceStatus) {
+            DB::transaction(function () use ($customer, $validated, $serviceStatus, $currentPackageId) {
                 // 1. Update customer record. CID ikut dibuat ulang di sini oleh
                 // CustomerObserver::updating() kalau POP/Mini POP/Distribusi
                 // berubah atau CID masih kosong (ADHOC-107 R3) — controller tidak
@@ -1183,6 +1191,15 @@ class CustomerController extends Controller
                 if (! empty($validated['internet_package_id'])) {
                     $package = InternetPackage::findOrFail($validated['internet_package_id']);
 
+                    // Guard yang sama dipakai CustomerPackageService::change() —
+                    // ganti paket (termasuk dari Edit Pelanggan ini) diblok kalau
+                    // perangkat tambahan pelanggan melebihi batas paket baru.
+                    // Cuma dicek kalau paketnya BENAR-BENAR berubah — save ulang
+                    // form dengan paket yang sama tidak boleh ketahan guard ini.
+                    if ($package->id !== $currentPackageId) {
+                        app(CustomerPackageService::class)->assertAdditionalDevicesWithinLimit($customer, $package);
+                    }
+
                     $monthlyPrice = (float) $package->monthly_price;
                     $discount = (float) ($validated['discount_amount'] ?? 0.00);
                     $ppn = (float) ($validated['tax_percent'] ?? 0.00);
@@ -1253,6 +1270,12 @@ class CustomerController extends Controller
             // Transaksi sudah di-rollback; tampilkan sebagai error validasi,
             // bukan halaman 500.
             return back()->withErrors(['pop_id' => $e->getMessage()])->withInput();
+        } catch (\RuntimeException $e) {
+            // CustomerPackageService::assertAdditionalDevicesWithinLimit()
+            // menolak ganti paket — pelanggan punya perangkat tambahan
+            // melebihi batas paket baru. Transaksi sudah di-rollback;
+            // tampilkan sebagai error validasi, bukan halaman 500.
+            return back()->withErrors(['internet_package_id' => $e->getMessage()])->withInput();
         }
 
         foreach ($originalFiles as $field => $path) {

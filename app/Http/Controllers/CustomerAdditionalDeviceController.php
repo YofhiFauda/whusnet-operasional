@@ -12,7 +12,13 @@ class CustomerAdditionalDeviceController extends Controller
     public function store(Request $request, Customer $customer): RedirectResponse
     {
         // Route middleware permission:customers.detail.devices.create|customers.detail.devices.update
-        // sudah menangani otorisasi — lihat routes/web.php.
+        // sudah menangani otorisasi — lihat routes/web.php. Scope POP belum
+        // ditangani middleware itu, jadi dicek manual di sini (pola sama
+        // dengan CustomerPackageController::update()) — tanpa ini user bisa
+        // menambah perangkat tambahan ke pelanggan cabang lain sepanjang dia
+        // punya permission di atas (larangan RBAC #3, CLAUDE.md).
+        abort_unless(Customer::query()->applyUserScope()->whereKey($customer->id)->exists(), 403);
+
         $validated = $request->validate([
             'device_type' => 'required|string|max:50',
             'brand' => 'nullable|string|max:100',
@@ -39,6 +45,9 @@ class CustomerAdditionalDeviceController extends Controller
 
     public function destroy(Customer $customer, CustomerAdditionalDevice $additionalDevice): RedirectResponse
     {
+        // Scope POP — lihat alasan yang sama di store() di atas.
+        abort_unless(Customer::query()->applyUserScope()->whereKey($customer->id)->exists(), 403);
+
         abort_unless($additionalDevice->customer_id === $customer->id, 404);
 
         $additionalDevice->delete();

@@ -226,7 +226,11 @@ class CustomerRegistrationVerificationController extends Controller
             'internet_package_id' => 'required|exists:internet_packages,id',
         ]);
 
-        app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+        try {
+            app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return redirect()->route('customer-registration-verifications.show', $customer)
             ->with('success', 'Paket internet pelanggan diperbarui.');
