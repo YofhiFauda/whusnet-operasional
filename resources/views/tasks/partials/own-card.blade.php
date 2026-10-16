@@ -26,7 +26,7 @@
 @endphp
 
 <div id="task-card-{{ $task->id }}"
-     class="relative bg-surface border border-border rounded-2xl overflow-hidden pl-5 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all duration-200 {{ $task->status->value === 'in_progress' ? 'ring-1 ring-amber-400 shadow-md shadow-amber-400/5' : '' }}"
+     class="relative bg-surface border border-border rounded-lg overflow-hidden pl-5 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs transition-all duration-150 {{ $task->status->value === 'in_progress' ? 'ring-1 ring-amber-400' : '' }}"
      data-task-id="{{ $task->id }}"
      data-task-type="{{ $task->task_type->value }}"
      data-task-status="{{ $task->status->value }}"

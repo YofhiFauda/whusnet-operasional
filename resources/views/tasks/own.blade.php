@@ -5,56 +5,48 @@
 @section('content')
 <div x-data="taskWorksheet()" class="max-w-4xl mx-auto space-y-5">
 
-    {{-- ══ Welcome Stats Banner (Mobile Optimized Premium Design) ════════════════════ --}}
-    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-slate-950/20 relative overflow-hidden border border-slate-800 select-none">
-        <!-- Background Decorative Glow -->
-        <div class="absolute -right-10 -bottom-10 w-44 h-44 bg-sky-500/15 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="absolute -left-10 -top-10 w-44 h-44 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            {{-- Welcome title --}}
-            <div>
-                <div class="flex items-center gap-1.5 text-sky-400 text-[10px] font-bold uppercase tracking-wider mb-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Status Aktif &middot; GPS Terhubung</span>
-                </div>
-                <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white font-ui">Halo, {{ auth()->user()->name }} 👋</h1>
-                <p class="text-xs text-slate-400 mt-0.5 font-medium font-ui">
-                    {{ now()->translatedFormat('l, d F Y') }}
-                </p>
+    {{-- ══ LAYER 1: NAKED PAGE HEADER ════════════════════════════════════════════ --}}
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+            <div class="flex items-center gap-1.5 text-xs text-text-muted mb-1 font-ui">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-semibold text-emerald-600 dark:text-emerald-400">Status Aktif &middot; GPS Terhubung</span>
+                <span class="text-text-disabled">&bull;</span>
+                <span>{{ now()->translatedFormat('l, d F Y') }}</span>
             </div>
-
-            {{-- Stats sub-cards --}}
-            <div class="grid grid-cols-3 gap-2 sm:gap-3 bg-slate-800/60 dark:bg-slate-950/60 p-2.5 rounded-2xl border border-slate-700/60 backdrop-blur-sm">
-                <div class="text-center px-1">
-                    <p class="text-[9px] uppercase tracking-wider text-slate-400 font-bold font-ui">Total</p>
-                    <p class="text-base font-black font-mono text-white mt-0.5" x-text="getTaskCount('all')"></p>
-                </div>
-                <div class="text-center border-x border-slate-700/80 px-2">
-                    <p class="text-[9px] uppercase tracking-wider text-rose-400 font-bold font-ui">Terlewat</p>
-                    <p class="text-base font-black font-mono text-rose-400 mt-0.5" x-text="getTaskCount('overdue')"></p>
-                </div>
-                <div class="text-center px-1">
-                    <p class="text-[9px] uppercase tracking-wider text-emerald-400 font-bold font-ui">Selesai</p>
-                    <p class="text-base font-black font-mono text-emerald-400 mt-0.5" x-text="getTaskCount('completed')"></p>
-                </div>
-            </div>
+            <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-text-main font-ui">Halo, {{ auth()->user()->name }} 👋</h1>
+            <p class="text-xs text-text-muted mt-0.5 font-ui">Pusat kendali tugas lapangan, jadwal rute, dan aksi eksekusi teknisi.</p>
         </div>
 
-        {{-- Quick action links at the bottom --}}
-        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-300">
-            <div class="flex items-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <div class="flex items-center gap-2">
+            <a href="{{ route('tasks.own.history') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-xs font-semibold text-text-main transition-colors shadow-2xs">
+                <svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                <span class="font-ui font-medium">Jadwal Tugas Lapangan</span>
-            </div>
-            <a href="{{ route('tasks.own.history') }}" class="font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors font-ui">
-                <span>Lihat Riwayat Selesai</span>
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                </svg>
+                <span>Riwayat Selesai</span>
             </a>
+        </div>
+    </div>
+
+    {{-- ══ LAYER 2: FLAT SUMMARY STRIP (Design.md Standard) ═════════════════════════ --}}
+    <div class="bg-surface border border-border rounded-lg shadow-2xs divide-y sm:divide-y-0 sm:divide-x divide-border grid grid-cols-1 sm:grid-cols-3">
+        <div class="p-3.5 sm:p-4 text-center sm:text-left flex items-center justify-between sm:justify-start gap-4">
+            <div>
+                <p class="text-[10px] uppercase tracking-wider text-text-muted font-bold font-ui">Total Tugas</p>
+                <p class="text-xl font-bold font-mono text-text-main mt-0.5" x-text="getTaskCount('all')"></p>
+            </div>
+        </div>
+        <div class="p-3.5 sm:p-4 text-center sm:text-left flex items-center justify-between sm:justify-start gap-4">
+            <div>
+                <p class="text-[10px] uppercase tracking-wider text-rose-500 font-bold font-ui">Terlewat / Overdue</p>
+                <p class="text-xl font-bold font-mono text-rose-600 dark:text-rose-400 mt-0.5" x-text="getTaskCount('overdue')"></p>
+            </div>
+        </div>
+        <div class="p-3.5 sm:p-4 text-center sm:text-left flex items-center justify-between sm:justify-start gap-4">
+            <div>
+                <p class="text-[10px] uppercase tracking-wider text-emerald-500 font-bold font-ui">Selesai Hari Ini</p>
+                <p class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5" x-text="getTaskCount('completed')"></p>
+            </div>
         </div>
     </div>
 
@@ -62,8 +54,8 @@
          dipegang, belum dipasang/dikembalikan. Embedded, bukan halaman/menu
          terpisah — cuma punya sendiri, gak digerbangi permission. ═════ --}}
     @if($myCustodies->isNotEmpty() || $mySerials->isNotEmpty())
-    <div class="bg-surface border border-border rounded-2xl p-4 shadow-xs">
-        <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-3 font-ui flex items-center gap-1.5">
+    <div class="bg-surface border border-border rounded-lg p-3.5 sm:p-4 shadow-2xs">
+        <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2.5 font-ui flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
             </svg>
@@ -91,12 +83,12 @@
     <div class="flex flex-col sm:flex-row items-center gap-3">
         {{-- Search input --}}
         <div class="relative w-full">
-            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"></path>
             </svg>
             <input type="text" x-model="searchQuery" placeholder="Cari nama, alamat, nomor task..." 
-                class="w-full h-11 pl-10 pr-9 rounded-2xl border border-border bg-surface text-xs text-text-main placeholder-text-disabled focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-ui shadow-sm">
-            <button x-show="searchQuery" @click="searchQuery = ''" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main transition-colors cursor-pointer">
+                class="w-full h-9.5 pl-9.5 pr-9 rounded-lg border border-border bg-surface text-xs text-text-main placeholder-text-disabled focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-ui shadow-2xs">
+            <button x-show="searchQuery" @click="searchQuery = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main transition-colors cursor-pointer">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
@@ -105,41 +97,41 @@
     {{-- ══ Horizontal slider filter tabs ═════════════════════════════ --}}
     <div class="flex items-center gap-1.5 overflow-x-auto pb-1.5 -mx-4 px-4 scrollbar-none select-none">
         <button @click="activeTab = 'all'" 
-            :class="activeTab === 'all' ? 'bg-primary text-white font-bold shadow-md shadow-primary/10' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-4 py-2 rounded-xl text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'all' ? 'bg-primary text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
             Semua (<span x-text="getTaskCount('all')"></span>)
         </button>
 
         <button @click="activeTab = 'overdue'" 
-            :class="activeTab === 'overdue' ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/10' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-4 py-2 rounded-xl text-xs transition duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'overdue' ? 'bg-rose-600 text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer active:scale-95 font-ui">
             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
             <span>Terlewat</span>
             <span x-text="getTaskCount('overdue')" class="text-[10px] bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold px-1.5 py-0.2 rounded-md"></span>
         </button>
 
         <button @click="activeTab = 'survey'" 
-            :class="activeTab === 'survey' ? 'bg-primary text-white font-bold shadow-md shadow-primary/10' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-4 py-2 rounded-xl text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'survey' ? 'bg-primary text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
             Survey
         </button>
 
         <button @click="activeTab = 'psb'" 
-            :class="activeTab === 'psb' ? 'bg-primary text-white font-bold shadow-md shadow-primary/10' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-4 py-2 rounded-xl text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'psb' ? 'bg-primary text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
             Pemasangan
         </button>
 
         <button @click="activeTab = 'maintenance'" 
-            :class="activeTab === 'maintenance' ? 'bg-primary text-white font-bold shadow-md shadow-primary/10' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-4 py-2 rounded-xl text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'maintenance' ? 'bg-primary text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
             Maintenance
         </button>
     </div>
 
     {{-- ══ Task Hari Ini Container ════════════════════════════════════════════ --}}
-    <div x-data="technicianNotifier()" class="space-y-3.5">
-        <div class="space-y-3.5" id="today-task-list">
+    <div x-data="technicianNotifier()" class="space-y-3">
+        <div class="space-y-3" id="today-task-list">
             @foreach($tasks as $task)
                 @include('tasks.partials.own-card', ['task' => $task])
             @endforeach
@@ -147,16 +139,18 @@
 
         {{-- Empty State Card --}}
         <div id="empty-state-card"
-             class="bg-surface border border-border rounded-2xl flex flex-col items-center justify-center py-16 px-4 gap-3 select-none text-center shadow-xs transition-all duration-200"
+             class="bg-surface border border-border rounded-lg flex flex-col items-center justify-center py-8 px-4 gap-2.5 select-none text-center shadow-2xs transition-all duration-200"
              style="{{ $tasks->count() > 0 ? 'display: none;' : '' }}">
-            <div class="w-12 h-12 rounded-2xl bg-surface-muted border border-border flex items-center justify-center text-text-muted opacity-60">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <div class="w-10 h-10 rounded-lg bg-surface-muted border border-border flex items-center justify-center text-text-muted opacity-70">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
             </div>
-            <p class="text-sm text-text-main font-bold font-ui">Tidak ada task yang ditemukan</p>
-            <p class="text-xs text-text-muted font-ui">Coba ubah filter atau kata kunci pencarian Anda.</p>
-            <button type="button" @click="searchQuery = ''; activeTab = 'all'" class="text-xs font-semibold text-primary hover:underline mt-1 font-ui cursor-pointer">Reset Filter</button>
+            <div>
+                <p class="text-xs text-text-main font-bold font-ui">Tidak ada task yang ditemukan</p>
+                <p class="text-[11px] text-text-muted font-ui mt-0.5">Coba ubah filter atau kata kunci pencarian Anda.</p>
+            </div>
+            <button type="button" @click="searchQuery = ''; activeTab = 'all'" class="text-xs font-semibold text-primary hover:underline font-ui cursor-pointer">Reset Filter</button>
         </div>
     </div>
 
