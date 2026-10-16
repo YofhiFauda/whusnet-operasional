@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CollectorRole;
 use App\Models\User;
+use App\Services\CollectorBalanceService;
 use App\Traits\RecordsCollectorBatch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,6 +30,18 @@ use Illuminate\Http\Request;
 class PaymentBatchController extends Controller
 {
     use RecordsCollectorBatch;
+
+    public function storeForTechnician(Request $request, User $technician, CollectorBalanceService $balance): JsonResponse
+    {
+        abort_unless($technician->isTechnician(), 404);
+        abort_unless($balance->isVisibleTo($technician, $request->user()), 403);
+
+        $this->normalizeBatchAmounts($request);
+
+        $validated = $request->validate($this->batchValidationRules());
+
+        return $this->recordBatch($technician, $request->user(), $validated, CollectorRole::TEKNISI);
+    }
 
     public function store(Request $request, User $collector): JsonResponse
     {

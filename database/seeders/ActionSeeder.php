@@ -20,6 +20,11 @@ class ActionSeeder extends Seeder
                 'description' => 'Melihat daftar data atau detail halaman',
             ],
             [
+                'code' => ActionCode::PUBLISH,
+                'name' => 'Publish',
+                'description' => 'Menerbitkan atau menarik artikel panduan',
+            ],
+            [
                 'code' => ActionCode::CREATE,
                 'name' => 'Create',
                 'description' => 'Menambah data baru',

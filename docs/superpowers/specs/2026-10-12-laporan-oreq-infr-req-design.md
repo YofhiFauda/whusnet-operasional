@@ -1,6 +1,6 @@
 # Rancangan Laporan O-REQ dan INFR-REQ: FOP, Gudang, Infrastruktur
 
-Status: **Fondasi dan seksi laporan dasar sudah diimplementasikan pada kode lokal; alur laporan lengkap belum. Audit 2026-10-15 di §0 adalah acuan status terbaru.**
+Status: **Fondasi dan seksi laporan dasar sudah diimplementasikan pada kode lokal; alur laporan lengkap belum. Keputusan lanjutan 2026-10-15 tentang baris aksi, slot/port, dan jejak Peta Infrastruktur (dulu disebut "Inventaris" — halaman itu sudah dihapus dan digabung ke Peta Infrastruktur) telah disetujui sebagai rancangan, belum sebagai fitur terimplementasi. Audit di §0 adalah acuan status kode terbaru.**
 
 ## 0. Audit relevansi 2026-10-15 — acuan status terbaru
 
@@ -8,11 +8,12 @@ Status: **Fondasi dan seksi laporan dasar sudah diimplementasikan pada kode loka
 
 | Area | Keadaan terbaru | Dampak pada rancangan laporan |
 |---|---|---|
-| Lokasi dan Gudang | Pohon node, port, aset DEPLOYED, saldo qty/roll, ledger DEPLOY/RETRIEVE_INFRA, serta peta baca Topologi/Inventaris sudah ada di kode lokal. | Alur utama tetap; laporan harus memakai sumber ini, bukan membuat model lokasi atau inventaris baru. |
-| Chassis OLT | Fase 0 ADHOC-173: Mini POP adalah lokasi fisik yang dapat menaungi banyak chassis. Chassis boleh ber-anchor ke Mini POP **atau Cabang langsung**; kartu menjadi anak chassis, slot dimiliki chassis. | Ketentuan lama di §8 yang hanya mengizinkan anchor Mini POP diganti dengan aturan ini. |
+| Lokasi dan Gudang | Pohon node, port, aset DEPLOYED, saldo qty/roll, ledger DEPLOY/RETRIEVE_INFRA sudah ada di kode lokal. **Halaman Inventaris berdiri sendiri sudah dihapus (2026-10-15)** — jejak aset/saldo sekarang disajikan dari Peta Infrastruktur (`InfrastructureMapController`/`InfrastructureMapService`, route `/network/peta`), bukan halaman terpisah. | Alur utama tetap; laporan harus memakai sumber ini. Setiap acuan "halaman Inventaris" di dokumen ini (§6, §10 poin 8) dibaca sebagai **Peta Infrastruktur** — jangan dibuat halaman Inventaris baru. |
+| Chassis OLT | Fase 0 ADHOC-173: Mini POP adalah lokasi fisik yang dapat menaungi banyak chassis. Chassis boleh ber-anchor ke Mini POP **atau Cabang langsung**; kartu menjadi anak chassis, slot dimiliki chassis (`OltSlot`, kolom `chassis_node_id`/`card_node_id`). | Ketentuan lama di §8 yang hanya mengizinkan anchor Mini POP diganti dengan aturan ini. |
 | Aset lama | Jalur registrasi aset lama REGISTER_INFRA dan halaman per node sudah ada. | Jangan membuat task, ISSUE, atau DEPLOY fiktif untuk aset yang sudah lama terpasang. |
 | Form O-REQ/INFR-REQ | Seksi infra dasar sudah ada: satu node tujuan, SN baru, SN lama, satu item qty, dan satu roll; transaksi di dalam submit laporan. | Task 12 plan v3 telah dijalankan sebagian. §10 di bawah adalah daftar gap lanjutan, bukan langkah sebelum form pertama dibuat. |
-| Port dan slot | Port assignment serta slot chassis dikelola tersendiri; peta membacanya. | DEPLOY barang pada node tidak otomatis membuktikan port tersambung, slot terisi, atau pelanggan menempati port. Perubahan port/slot butuh aksi dan verifikasi terpisah. |
+| Port dan slot | Port assignment (`NetworkPortAssignmentService`) serta slot chassis (`OltSlot`) dikelola tersendiri; Peta Infrastruktur membacanya. | DEPLOY barang pada node tidak otomatis membuktikan port tersambung, slot terisi, atau pelanggan menempati port. Perubahan port/slot butuh aksi dan verifikasi terpisah. |
+| Penempatan tipe node vs kompatibilitas SKU — **dua guard terpisah, jangan dicampur** | `network_node_type_rules` (dibaca `NetworkNodeService::assertTypePlacement()`) mengatur topologi: anak boleh ke parent-type/anchor-pop-type mana. **Bukan** aturan SKU. Kompatibilitas SKU↔node barang/aset ditegakkan terpisah di `InventoryService::assertNodeAcceptsSerialItem()` — cek `item.infrastructure_node_type_id` vs `node.node_type_id`, dan untuk `olt_chassis`/`olt_card` wajib kategori `olt_module` + slot/komponen belum terisi. Dipanggil dari `deploySerial()` dan `registerExistingInfraSerial()`. | Audit 2026-10-12 sebelumnya menyebut keduanya seolah satu aturan "kompatibilitas SKU OLT di registrasi aset lama" — itu salah sumber. Baris aksi Pasang/Ganti kartu OLT yang dibangun di rancangan laporan ini (§6, §10 poin 7) **memanggil `InventoryService::deploySerial()`**, yang menjalankan `assertNodeAcceptsSerialItem()` secara internal (`private`); jangan memanggil guard itu langsung atau menulis ulang cek SKU di controller laporan — satu sumber kebenaran untuk kompatibilitas barang, terpisah dari aturan penempatan node. |
 
 **Yang sudah ditangani sebagian:** pilihan SN lama sekarang berasal dari serial DEPLOYED dalam cabang task, bukan custody; mutasi Ganti berlangsung dalam satu transaksi. Task tanpa pelanggan yang mempunyai anchor FopTask dapat deploy; bila anchor tidak ada, submit dengan isian infra gagal keras. Barang infrastruktur ROLL dipisah dari picker roll pelanggan.
 
@@ -23,7 +24,7 @@ Status: **Fondasi dan seksi laporan dasar sudah diimplementasikan pada kode loka
 3. Tentukan alur koreksi/pembalik yang menjaga ledger append-only, termasuk cabut atau koreksi qty/roll dan feeder. Belum ada jalur retrieve qty/roll dari saldo node.
 4. Pastikan task non-pelanggan tanpa anchor bisa memperoleh anchor valid sebelum laporan atau gagal jelas sebelum pekerjaan dicatat; fallback membuat FopTask saat ini masih bergantung pada pelanggan.
 5. Tegakkan satu jalur pemakaian per item/SN/roll antara seksi generik dan infrastruktur, dan tampilkan aksi serta transaksi pada review FOP.
-6. Tentukan apakah pemeriksaan INFR tanpa mutasi wajib memilih node, dan cara mencatat port/slot yang benar-benar berubah. Jangan menyimpulkan perubahan port/slot dari keberadaan SN atau teks laporan.
+6. Terapkan keputusan: pemeriksaan pada node/port mencatat lokasi yang diperiksa tanpa mutasi stok; slot/port diisi dan diverifikasi hanya bila pekerjaan mengubah hubungan fisik. Jangan menyimpulkan perubahan port/slot dari keberadaan SN atau teks laporan.
 7. Migrasi dan seeder Infrastruktur pada database target perlu diverifikasi tersendiri. Status kode lokal dalam docs/TASKS.md tidak membuktikan database target sudah siap.
 
 Rujukan status terbaru: docs/superpowers/specs/2026-10-09-aset-infrastruktur-lokasi-design.md §10–11, docs/plan/infrastruktur/rancangan-operasional-infrastruktur-dinamis.md, docs/plan/infrastruktur/analisa-gap-peta-infrastruktur.md §6, dan docs/TASKS.md ADHOC-168/170/173/178. Fitur API konfigurasi otomatis tetap di luar rancangan ini.
@@ -49,7 +50,7 @@ Persetujuan FOP adalah quality gate laporan, bukan perintah kedua untuk menguran
 
 **O-REQ — pekerjaan internal kantor.** Catat uraian, tindakan, hasil, material/barang yang dipakai atau dikembalikan, dan bukti relevan. network_node opsional. Seksi Pasang/Ganti Infrastruktur hanya digunakan bila pekerjaan benar-benar menyentuh jaringan. Pekerjaan kantor tidak boleh dipaksa memilih ODP/ODC sebagai lokasi palsu. Alat kerja pinjaman mengikuti custody dan retur yang sudah ada. Pemasangan permanen aset kantor non-jaringan belum punya lokasi pada desain v3; jangan mencatatnya sebagai DEPLOYED di network_nodes.
 
-**INFR-REQ — pekerjaan jaringan.** Catat aksi periksa, pasang, ganti, atau cabut, lokasi jaringan, SN/qty/meter terkait, hasil, dan bukti. Node wajib jika ada perubahan aset atau pemakaian material yang menjadi saldo node. Pemeriksaan tanpa mutasi tidak mewajibkan baris barang. Satu laporan boleh memiliki beberapa aksi fisik.
+**INFR-REQ — pekerjaan jaringan.** Catat aksi periksa, pasang, ganti, atau cabut, lokasi jaringan, SN/qty/meter terkait, hasil, dan bukti. Node wajib jika ada perubahan aset atau pemakaian material yang menjadi saldo node. Pemeriksaan tanpa mutasi tidak mewajibkan baris barang. Satu laporan boleh memiliki beberapa baris aksi fisik, termasuk aksi pada node berbeda yang masih berada dalam POP task dan scope aktor.
 
 **Satu sumber pemakaian.** Form lama memiliki materials[] dan roll generik; plan v3 menambah infra_*. Satu item/SN/roll tidak boleh dikirim lewat dua seksi dan mengurangi stok dua kali. Barang yang menjadi aset/saldo jaringan dicatat melalui seksi Infrastruktur beserta node. Material kerja generik tetap melalui Material Terpakai. UI dan validasi server menolak duplikasi.
 
@@ -60,15 +61,15 @@ Persetujuan FOP adalah quality gate laporan, bukan perintah kedua untuk menguran
 3. Teknisi bekerja dan submit realisasi beserta lokasi serta bukti.
 4. Dalam satu transaksi database, laporan dan mutasi custody ke node disimpan. Ledger DEPLOY menyimpan snapshot cabang pada saat kejadian.
 5. FOP setuju/tolak/pending laporan tanpa membuat mutasi Gudang tambahan.
-6. Halaman node menunjukkan aset/saldo terpasang; traceability menunjukkan riwayat dari Gudang sampai node.
+6. Halaman node dan Peta Infrastruktur menunjukkan aset/saldo terpasang serta jejak pemasangan; Gudang dapat menelusuri riwayat custody sampai node. Data jejak berasal dari ledger dan relasi task/aksi yang sama, bukan salinan manual yang dapat berbeda.
 
 ## 5. FOP reject dan kirim ulang
 
 Laporan maintenance dapat dikirim ulang setelah FOP reject dan task kembali in_progress. Jika submit pertama sudah mencatat DEPLOY, kirim ulang foto/uraian tidak boleh membuat DEPLOY kedua, memotong custody kedua kali, atau menggandakan saldo node.
 
-Setiap **baris aksi fisik** perlu identitas stabil tersimpan di server sebagai kunci idempotensi. Seksi awal dari Task 12 sudah ada, tetapi identitas aksi ini belum tersedia. Rencanakan penyimpanannya pada tahap lanjutan, misalnya record aksi infrastruktur per task yang mereferensikan transaksi ledger. Kirim ulang aksi yang sama hanya mengubah bagian laporan yang boleh diedit. Jika barang/lokasi semula salah, buat transaksi pembalik/perpindahan dan aksi baru dengan alasan koreksi. Ledger tetap append-only. Perubahan fisik baru memakai identitas aksi baru.
+Setiap **baris aksi fisik** memiliki identitas stabil yang disimpan di server dan unik dalam task, misalnya record aksi infrastruktur per task yang mereferensikan satu atau beberapa transaksi ledger. Baris memuat jenis tindakan, node/lokasi masing-masing, barang atau SN/roll, jumlah/meter, pelaksana, waktu realisasi, serta perubahan slot/port bila relevan. Form awal Task 12 belum memiliki identitas aksi ini. Kirim ulang kunci aksi dengan isi mutasi yang sama mengembalikan hasil lama tanpa ledger baru atau pemotongan custody kedua. Kunci sama dengan isi mutasi berbeda ditolak sebagai konflik; edit bukti/uraian yang diizinkan tidak mengubah mutasi. Jika barang/lokasi salah, buat aksi koreksi dengan identitas baru dan transaksi pembalik/perpindahan beralasan. Ledger tetap append-only. Aksi fisik baru memakai identitas baru.
 
-Mutasi dan laporan harus atomik. Kegagalan validasi, saldo, atau salah satu aksi membatalkan seluruh submit; task tidak menjadi selesai.
+Validasi idempotensi harus terjadi di server dalam transaksi database, dengan penguncian saldo/serial dan batas unik identitas aksi per task agar dua request bersamaan tidak sama-sama memotong stok. Mutasi dan laporan harus atomik. Kegagalan validasi, saldo, atau salah satu aksi membatalkan seluruh submit; task tidak menjadi selesai.
 
 ## 6. Aturan aksi
 
@@ -79,7 +80,33 @@ Mutasi dan laporan harus atomik. Kegagalan validasi, saldo, atau salah satu aksi
 | Cabut | SN DEPLOYED pada node terpilih | RETRIEVE_INFRA ke custody teknisi pelaksana, lokasi SN kosong. |
 | Ganti | SN lama DEPLOYED di node dan SN baru ISSUED dari custody tim | Cabut lama dan pasang baru dalam satu transaksi. Gagal satu langkah membatalkan semuanya. |
 
+### Bentuk baris aksi dan hubungan fisik
+
+Satu laporan dapat berisi beberapa baris aksi. Setiap baris berdiri sendiri untuk lokasi, barang, kuantitas, dan kunci idempotensi; satu kunjungan dapat, misalnya, mengganti SN di satu chassis lalu memakai kabel dari roll di node lain. Setiap baris tervalidasi terhadap POP task dan scope aktor. Tindakan yang hanya memeriksa node tidak membuat transaksi stok.
+
+Slot dan port dicatat **sesuai perubahan fisik yang benar-benar terjadi**:
+
+| Pekerjaan | Data fisik yang diperlukan | Dampak |
+|---|---|---|
+| Periksa node/port tanpa perubahan | Node/port yang diperiksa, hasil dan bukti | Tidak mengubah stok, slot, atau port assignment. |
+| Pasang/ganti kartu OLT | Chassis, nomor slot, **node kartu** anak chassis, SN baru; SN lama bila ganti | SN dipasang pada node kartu; slot menyimpan posisi node kartu dalam chassis. Mutasi aset dan perubahan slot diperiksa sebagai satu aksi. |
+| Sambung/lepas/pindah kabel | Port asal/tujuan yang terlibat dan tindakan pada masing-masing ujung | Assignment port berubah hanya setelah validasi hubungan fisik dan kapasitas. |
+| Ganti perangkat tanpa mengubah kabel | Node, SN lama dan baru, konfirmasi koneksi tetap | Mutasi SN terjadi; assignment port tetap. |
+| O-REQ kantor tanpa pekerjaan jaringan | Uraian, material kantor jika ada | Tidak memaksa node, slot, atau port jaringan. |
+
+DEPLOY ke node tidak otomatis mengisi slot atau menghubungkan port. Khusus kartu OLT, verifikasi bahwa slot milik chassis dan node kartu adalah anak chassis tersebut; tujuan DEPLOY SN adalah node kartu, bukan node chassis atau baris slot. Jika baris aksi memang mengubah aset **dan** slot/port, perubahan tersebut harus berhasil bersama dalam satu transaksi; kegagalan salah satunya membatalkan aksi. Jika tidak ada perubahan koneksi, jangan buat assignment baru dari keberadaan SN. Detail implementasi mengikuti model slot chassis dan network_port_assignments yang sudah ada.
+
 Implementasi awal sudah mengambil kandidat infra_retrieve_old_serial_id dari SN DEPLOYED dalam cabang task, dan SN baru dari custody. Namun kandidat SN lama belum dibatasi ke node yang dipilih; retrieveSerialFromLocation() juga belum menerima node yang diharapkan. Validasi node SN lama harus ditegakkan ulang dengan lock saat transaksi. Qty/meter harus positif dan tidak melebihi custody. Cabut balik saldo qty/roll dari node belum didukung; rancang transaksi tersendiri sebelum menampilkan aksi tersebut.
+
+### Jejak pemasangan di Peta Infrastruktur dan Gudang
+
+**Koreksi 2026-10-15: tidak ada halaman "Inventaris" berdiri sendiri.** Halaman itu sudah dihapus dari kode (`NetworkInventoryController`, `NetworkInventoryService`, view `network/inventaris/index.blade.php`); fungsinya digabung ke **Peta Infrastruktur** (`InfrastructureMapController`/`InfrastructureMapService`, route `/network/peta`). Setiap sebutan "Inventaris" di bawah ini dan di §10 poin 8 dibaca sebagai Peta Infrastruktur.
+
+Setiap aset serial yang **dipasang melalui laporan O-REQ/INFR-REQ** harus dapat ditelusuri dari Peta Infrastruktur: **SN, barang, node pemasangan saat ini, teknisi pelaksana, waktu realisasi/mutasi, nomor task, baris aksi, dan transaksi ledger terkait**. Detail task dan review FOP menampilkan baris aksi beserta hasil mutasinya. Gudang melihat hubungan yang sama untuk menelusuri issue, custody, deploy, dan retrieve. Nomor task tetap wajib untuk O-REQ/INFR-REQ tanpa pelanggan.
+
+**Aset lama adalah jalur berbeda.** Aset yang sudah terpasang sebelum pencatatan sistem masuk melalui `REGISTER_INFRA`, dengan petugas pendata, waktu observasi/registrasi, node, dan alasan. Nomor task pemasangan serta teknisi pemasang boleh kosong jika memang tidak diketahui. Peta Infrastruktur menampilkan asal data sebagai registrasi aset lama dan tidak membuat ISSUE, DEPLOY, atau task fiktif.
+
+Peta Infrastruktur menampilkan status dan node aktif dari data aset, lalu mengambil riwayat pelaksana, waktu, nomor task, dan perpindahan dari ledger serta relasi baris aksi. Riwayat tidak ditimpa saat aset dicabut atau dipindah. Untuk barang qty/roll, tampilkan saldo node saat ini bersama riwayat transaksi (`InfrastructureBalance` hanya cache saldo, bukan sumber kebenaran — sumbernya tetap ledger); jangan menganggap jumlah DEPLOY historis sebagai saldo terkini. Jangan buat sumber riwayat kedua yang harus diselaraskan manual dengan Gudang.
 
 ## 7. Task tanpa pelanggan
 
@@ -89,7 +116,7 @@ O-REQ/INFR-REQ dapat mempunyai customer_id kosong. Semua mutasi aset tetap wajib
 
 Keputusan Fase 0 tanggal 2026-10-14: Mini POP adalah **lokasi fisik**, bukan identitas satu OLT. Satu Mini POP dapat memiliki beberapa node olt_chassis. Jika chassis berada di gedung Cabang, node boleh ber-anchor langsung ke POP Cabang tanpa membuat Mini POP baru. Kartu olt_card menjadi anak chassis dan nomor slot dikelola per chassis.
 
-Node chassis adalah posisi fisik yang tetap ketika SN unit diganti. Barang baru dari Gudang masuk melalui DEPLOY; barang lama yang sudah tercatat ditarik melalui RETRIEVE_INFRA. Chassis atau kartu yang sudah terpasang sebelum sistem memiliki jalur registrasi REGISTER_INFRA per node; jangan membuat task/DEPLOY fiktif. Satu node komponen hanya boleh mempunyai SN aktif yang kompatibel menurut tipe barang dan tipe node.
+Node chassis adalah posisi fisik yang tetap ketika SN unit diganti. Barang baru dari Gudang masuk melalui DEPLOY; barang lama yang sudah tercatat ditarik melalui RETRIEVE_INFRA. Chassis atau kartu yang sudah terpasang sebelum sistem memiliki jalur registrasi REGISTER_INFRA per node; jangan membuat task/DEPLOY fiktif. Satu node komponen hanya boleh mempunyai SN aktif yang kompatibel menurut tipe barang dan tipe node — ditegakkan oleh `InventoryService::assertNodeAcceptsSerialItem()` (bukan `network_node_type_rules`, yang mengatur penempatan topologi, lihat §0). Method itu `private` dan dipanggil di dalam `deploySerial()` serta `registerExistingInfraSerial()`; alur laporan memakai `deploySerial()`.
 
 Perubahan SN chassis tidak otomatis memindahkan anak topologi atau mengisi/melepas slot dan port. Pekerjaan topologi memakai NetworkNodeService::move() dan pengelolaan slot/port yang berizin, dengan pemeriksaan scope serta hubungan fisik.
 
@@ -111,7 +138,8 @@ Seksi dasar laporan O-REQ/INFR-REQ dan plan v3 Task 12 sudah ada pada kode lokal
 4. Anchor transaksi yang pasti untuk task tanpa pelanggan; gagal jelas jika tidak tersedia.
 5. Satu jalur pemakaian tiap item/SN/roll antara seksi generik dan Infrastruktur.
 6. Hasil aksi dan transaksi terlihat di detail task saat FOP meninjau laporan.
-7. Penentuan hubungan laporan dengan perubahan port/slot yang diverifikasi, tanpa menganggap DEPLOY otomatis membuat assignment.
+7. Field dan validasi slot/port kondisional per baris aksi; perubahan assignment hanya untuk tindakan fisik yang dilaporkan dan diverifikasi.
+8. Tampilan Peta Infrastruktur, Gudang, detail task, dan review FOP memakai jejak ledger/aksi yang sama untuk SN, pelaksana, waktu, task, dan node.
 
 Rancangan operasional lebih baru berada di docs/plan/infrastruktur/rancangan-operasional-infrastruktur-dinamis.md. Migrasi/seeder harus diverifikasi pada database target sebelum alur ini digunakan di sana.
 
@@ -120,7 +148,12 @@ Rancangan operasional lebih baru berada di docs/plan/infrastruktur/rancangan-ope
 - INFR-REQ tanpa pelanggan memasang SN custody ke node dalam scope; task, ledger, status SN, dan daftar aset node menunjuk kejadian yang sama.
 - O-REQ kantor tanpa kerja jaringan selesai tanpa node dan tanpa DEPLOY palsu. O-REQ yang memasang aset jaringan memakai guard yang sama dengan INFR-REQ.
 - Ganti mengambil SN lama dari node dan SN baru dari custody. SN lama di node lain atau SN baru di luar custody ditolak.
-- FOP menolak karena bukti kurang jelas; submit ulang tidak menambah DEPLOY atau mengurangi stok lagi.
+- Satu laporan memuat beberapa aksi dengan barang, jumlah, dan node berbeda; masing-masing divalidasi dan terlacak sendiri.
+- FOP menolak karena bukti kurang jelas; submit ulang baris aksi yang sama tidak menambah DEPLOY atau mengurangi stok lagi, termasuk bila dua request identik datang bersamaan.
+- Kunci aksi lama dengan mutasi berbeda ditolak; koreksi menggunakan aksi dan ledger baru beralasan.
+- Periksa port tanpa mutasi tidak mengurangi stok; pasang kartu memakai slot yang valid; sambung kabel memakai port yang valid; ganti SN tanpa mengubah koneksi tidak mengubah assignment.
+- Peta Infrastruktur dan Gudang menampilkan SN hasil DEPLOY, teknisi, waktu, nomor task, node, serta jejak ledger yang sama; histori tetap ada setelah retrieve. Aset lama REGISTER_INFRA menampilkan petugas pendata, waktu observasi, node, dan alasan tanpa task pemasangan fiktif.
+- Pasang/ganti kartu OLT menghubungkan chassis, nomor slot, node kartu anak chassis, dan SN pada node kartu; alur laporan memakai `InventoryService::deploySerial()` agar guard SKU yang sama berlaku.
 - Koreksi barang/lokasi membuat transaksi pembalik dan aksi baru tanpa menghapus riwayat.
 - Beberapa chassis OLT dapat dipasang pada node fisik yang ber-anchor ke satu Mini POP, atau langsung ke Cabang bila berada di gedung Cabang, tanpa membuat POP duplikat atau mengubah CID/RBAC pelanggan.
 - Duplikasi item/roll di dua seksi ditolak sebelum stok berubah; node di luar POP/scope juga ditolak.

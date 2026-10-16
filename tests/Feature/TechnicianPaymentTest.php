@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\CollectorRole;
 use App\Enums\ScopeType;
+use App\Models\CollectorDeposit;
 use App\Models\CollectorVisit;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
@@ -26,7 +27,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Teknisi mencatat pembayaran pelanggan di lapangan — ADHOC-122,
+ * Teknisi mencatat pembayaran pelanggan di lapangan â€” ADHOC-122,
  * docs/plan/kolektor/rancangan-pembayaran-teknisi.md.
  *
  * Yang dikunci: pelanggan TIDAK perlu di-assign ke teknisi (beda dari
@@ -88,7 +89,7 @@ class TechnicianPaymentTest extends TestCase
     }
 
     /**
-     * Pelanggan TANPA collector_id — sengaja tidak di-assign ke siapa pun.
+     * Pelanggan TANPA collector_id â€” sengaja tidak di-assign ke siapa pun.
      */
     private function createUnpaidInvoice(Pop $pop, string $code, float $total = 150000): Invoice
     {
@@ -289,12 +290,124 @@ class TechnicianPaymentTest extends TestCase
     }
 
     #[Test]
+    public function technician_worksheet_shows_unassigned_invoice_with_shared_payment_form(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-ADMIN-FORM');
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->get(route('collector-worksheet.technicians.show', [
+                'technician' => $this->teknisi->id,
+                'invoice_search' => 'TPY-ADMIN-FORM',
+            ]))
+            ->assertOk()
+            ->assertSee($invoice->invoice_number)
+            ->assertSee('cb-row-checkbox')
+            ->assertSee(route('payment-batches.technicians.store', $this->teknisi->id), false);
+    }
+
+    #[Test]
+    public function admin_cannot_record_for_technician_outside_technician_pop_scope(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->createPop('TPY6'), 'TPY-ADMIN-OUTSIDE');
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->postJson(route('payment-batches.technicians.store', $this->teknisi->id), $this->payload($invoice, 'admin-tech-outside'))
+            ->assertStatus(422);
+
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    #[Test]
+    public function admin_can_record_payment_for_technician_without_customer_assignment(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-ADMIN-PAY');
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->postJson(route('payment-batches.technicians.store', $this->teknisi->id), $this->payload($invoice, 'admin-tech-pay'))
+            ->assertOk()
+            ->assertJsonPath('processed', 1);
+
+        $this->assertDatabaseHas('payments', [
+            'invoice_id' => $invoice->id,
+            'collected_by' => $this->teknisi->id,
+            'collected_by_role' => 'teknisi',
+            'received_by' => $admin->id,
+        ]);
+    }
+
+    #[Test]
+    public function technician_payment_notifies_pop_admin_with_technician_worksheet_link(): void
+    {
+        Notification::fake();
+        $admin = $this->createUserWithRole('pop_admin', $this->pop);
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-NOTIFY-ADMIN');
+
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-notify-admin'))
+            ->assertOk();
+
+        Notification::assertSentTo($admin, AppNotification::class, function (AppNotification $notification): bool {
+            return str_contains($notification->title, 'Teknisi')
+                && $notification->actionUrl === route('collector-worksheet.technicians.show', $this->teknisi->id);
+        });
+    }
+
+    #[Test]
+    public function technician_payment_page_uses_collector_payment_table_for_unassigned_customer_in_pop(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-PARITY');
+        $this->createUnpaidInvoice($this->createPop('TPY5'), 'TPY-PARITY-OTHER');
+
+        $this->actingAs($this->teknisi)
+            ->get(route('technician-payments.index', ['search' => 'TPY-PARITY']))
+            ->assertOk()
+            ->assertSee($invoice->invoice_number)
+            ->assertSee('cb-row-checkbox')
+            ->assertSee('CB_RELOAD_ON_SUCCESS = true')
+            ->assertSee('cb-method')
+            ->assertSee('cb-bank')
+            ->assertSee('cb-sender')
+            ->assertDontSee('INV-TPY-PARITY-OTHER');
+    }
+
+    #[Test]
+    public function worksheet_groups_collectors_and_technicians_in_one_staff_list_with_tabs(): void
+    {
+        $collector = $this->createUserWithRole('kolektor', $this->pop);
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->get(route('collector-worksheet.index'))
+            ->assertOk()
+            ->assertSee('Daftar Petugas Pembayaran')
+            ->assertSee('Kolektor (1)')
+            ->assertSee('Teknisi (1)')
+            ->assertSee(route('collector-worksheet.show', $collector->id), false)
+            ->assertSee(route('collector-worksheet.technicians.show', $this->teknisi->id), false)
+            ->assertDontSee('Batas setor:');
+    }
+
+    #[Test]
+    public function worksheet_lists_scoped_technician_before_first_payment(): void
+    {
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->get(route('collector-worksheet.index'))
+            ->assertOk()
+            ->assertSee('/collector-worksheet/technicians/'.$this->teknisi->id, false);
+    }
+
+    #[Test]
     public function technician_payment_page_renders_for_teknisi_and_is_forbidden_for_kolektor(): void
     {
         $this->actingAs($this->teknisi)
             ->get(route('technician-payments.index'))
             ->assertOk()
-            ->assertSee(route('technician-payments.store'), false);
+            ->assertSee('Cari pelanggan atau tagihan dalam POP Anda');
 
         $kolektor = $this->createUserWithRole('kolektor', $this->pop);
 
@@ -314,6 +427,266 @@ class TechnicianPaymentTest extends TestCase
         $this->actingAs($this->teknisi)
             ->post(route('collector-worklist.deposit'), ['idempotency_key' => 'tek-dep-balik'])
             ->assertRedirect(route('technician-payments.index'));
+    }
+
+    #[Test]
+    public function technician_can_review_only_own_unsettled_payments_before_deposit(): void
+    {
+        $ownInvoice = $this->createUnpaidInvoice($this->pop, 'TPY-OWN-LIST');
+        $otherInvoice = $this->createUnpaidInvoice($this->pop, 'TPY-OTHER-LIST');
+        $otherTechnician = $this->createUserWithRole('teknisi', $this->pop);
+
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($ownInvoice, 'tek-own-list'))
+            ->assertOk();
+        $this->actingAs($otherTechnician)
+            ->postJson(route('technician-payments.store'), $this->payload($otherInvoice, 'tek-other-list'))
+            ->assertOk();
+
+        $ownPayment = Payment::where('collected_by', $this->teknisi->id)->firstOrFail();
+        $otherPayment = Payment::where('collected_by', $otherTechnician->id)->firstOrFail();
+
+        $this->actingAs($this->teknisi)
+            ->get(route('technician-payments.index', ['tab' => 'bayar']))
+            ->assertOk()
+            ->assertSee('Sudah Bayar (1)')
+            ->assertSee($ownPayment->payment_number)
+            ->assertSee('Pelanggan TPY-OWN-LIST')
+            ->assertDontSee($otherPayment->payment_number)
+            ->assertDontSee('Pelanggan TPY-OTHER-LIST');
+    }
+
+    #[Test]
+    public function technician_can_review_own_deposit_amount_and_status(): void
+    {
+        $ownInvoice = $this->createUnpaidInvoice($this->pop, 'TPY-OWN-DEPOSIT');
+        $otherInvoice = $this->createUnpaidInvoice($this->pop, 'TPY-OTHER-DEPOSIT');
+        $otherTechnician = $this->createUserWithRole('teknisi', $this->pop);
+
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($ownInvoice, 'tek-own-deposit'))
+            ->assertOk();
+        $this->actingAs($this->teknisi)
+            ->post(route('collector-worklist.deposit'), ['idempotency_key' => 'tek-own-deposit-submit'])
+            ->assertRedirect();
+
+        $this->actingAs($otherTechnician)
+            ->postJson(route('technician-payments.store'), $this->payload($otherInvoice, 'tek-other-deposit'))
+            ->assertOk();
+        $this->actingAs($otherTechnician)
+            ->post(route('collector-worklist.deposit'), ['idempotency_key' => 'tek-other-deposit-submit'])
+            ->assertRedirect();
+
+        $ownDeposit = CollectorDeposit::where('collector_id', $this->teknisi->id)->firstOrFail();
+        $otherDeposit = CollectorDeposit::where('collector_id', $otherTechnician->id)->firstOrFail();
+        $ownPayment = Payment::where('collected_by', $this->teknisi->id)->firstOrFail();
+
+        $response = $this->actingAs($this->teknisi)
+            ->get(route('technician-payments.index', ['tab' => 'setoran']))
+            ->assertOk()
+            ->assertSee($ownDeposit->deposit_number)
+            ->assertSee('Rp 150.000')
+            ->assertSee('Menunggu Verifikasi Admin')
+            ->assertSee($ownPayment->payment_number)
+            ->assertSee('Pelanggan TPY-OWN-DEPOSIT');
+
+        $this->assertSame([$ownDeposit->id], $response->viewData('deposits')->pluck('id')->all());
+        $this->assertNotSame($ownDeposit->id, $otherDeposit->id);
+    }
+
+    #[Test]
+    public function worksheet_admin_keeps_technician_visible_after_full_deposit(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-WORKSHEET');
+
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-worksheet'))
+            ->assertOk();
+        $this->actingAs($this->teknisi)
+            ->post(route('collector-worklist.deposit'), ['idempotency_key' => 'tek-worksheet-deposit'])
+            ->assertRedirect();
+
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->get(route('collector-worksheet.index'))
+            ->assertOk()
+            ->assertSee('/collector-worksheet/technicians/'.$this->teknisi->id, false);
+    }
+
+    #[Test]
+    public function technician_worksheet_has_four_distinct_payment_tabs(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-FOUR-TABS');
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-four-tabs'))
+            ->assertOk();
+        $payment = Payment::query()->firstOrFail();
+        $admin = $this->loginAsAdmin();
+        $url = fn (string $tab) => route('collector-worksheet.technicians.show', [
+            'technician' => $this->teknisi->id,
+            'tab' => $tab,
+        ]);
+
+        $this->actingAs($admin)->get(route('collector-worksheet.technicians.show', $this->teknisi->id))
+            ->assertOk()
+            ->assertSee('Setor Seluruh Saldo')
+            ->assertSee(route('collector-worksheet.technicians.deposit', $this->teknisi->id), false);
+
+        $this->actingAs($admin)->get($url('pembayaran'))
+            ->assertOk()
+            ->assertSee('Pembayaran')
+            ->assertSee('Sudah Dibayar')
+            ->assertSee('Setor')
+            ->assertSee('Riwayat Pembayaran')
+            ->assertDontSee($payment->payment_number);
+
+        $this->actingAs($admin)->get($url('sudah_bayar'))
+            ->assertOk()
+            ->assertSee($payment->payment_number);
+
+        $this->actingAs($admin)->get($url('riwayat_pembayaran'))
+            ->assertOk()
+            ->assertSee($payment->payment_number)
+            ->assertSee('Belum disetor');
+    }
+
+    #[Test]
+    public function admin_can_setor_for_technician_from_worksheet(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-ADMIN-SETOR');
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-admin-setor'))
+            ->assertOk();
+
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->post(route('collector-worksheet.technicians.deposit', $this->teknisi->id), [
+                'idempotency_key' => 'admin-tek-setor',
+            ])
+            ->assertRedirect(route('collector-worksheet.technicians.show', [
+                'technician' => $this->teknisi->id, 'tab' => 'setor',
+            ]));
+
+        $this->assertDatabaseHas('collector_deposits', [
+            'collector_id' => $this->teknisi->id,
+            'status' => 'menunggu_verifikasi',
+        ]);
+
+        $deposit = CollectorDeposit::where('collector_id', $this->teknisi->id)->firstOrFail();
+        $this->actingAs($admin)
+            ->get(route('collector-worksheet.technicians.show', [
+                'technician' => $this->teknisi->id, 'tab' => 'setor',
+            ]))
+            ->assertOk()
+            ->assertSee($deposit->deposit_number)
+            ->assertSee('Belum ada saldo yang dapat disetor.');
+    }
+
+    #[Test]
+    public function admin_outside_technician_pop_cannot_setor_for_technician(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-OUTSIDE-SETOR');
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-outside-setor'))
+            ->assertOk();
+
+        $otherAdmin = $this->createUserWithRole('pop_admin', $this->createPop('TPY7'));
+
+        $this->actingAs($otherAdmin)
+            ->post(route('collector-worksheet.technicians.deposit', $this->teknisi->id), [
+                'idempotency_key' => 'outside-tek-setor',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('collector_deposits', 0);
+        $this->assertEquals(150000, app(CollectorBalanceService::class)->balance($this->teknisi));
+    }
+
+    #[Test]
+    public function worksheet_admin_can_inspect_technician_payment_and_deposit_details(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-ADMIN-DETAIL');
+
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-admin-detail'))
+            ->assertOk();
+        $payment = Payment::where('collected_by', $this->teknisi->id)->firstOrFail();
+
+        $this->actingAs($this->teknisi)
+            ->post(route('collector-worklist.deposit'), ['idempotency_key' => 'tek-admin-detail-deposit'])
+            ->assertRedirect();
+        $deposit = CollectorDeposit::where('collector_id', $this->teknisi->id)->firstOrFail();
+
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->get(route('collector-worksheet.technicians.show', [
+                'technician' => $this->teknisi->id, 'tab' => 'setor',
+            ]))
+            ->assertOk()
+            ->assertSee($payment->payment_number)
+            ->assertSee($deposit->deposit_number)
+            ->assertSee('Pelanggan TPY-ADMIN-DETAIL')
+            ->assertSee('Rp 150.000');
+
+        $this->actingAs($admin)
+            ->get(route('collector-worksheet.technicians.show', [
+                'technician' => $this->teknisi->id, 'tab' => 'riwayat_pembayaran',
+            ]))
+            ->assertOk()
+            ->assertSee($payment->payment_number)
+            ->assertSee($deposit->deposit_number);
+    }
+
+    #[Test]
+    public function worksheet_admin_cannot_open_technician_cash_outside_pop_scope(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-SCOPE-DETAIL');
+
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-scope-detail'))
+            ->assertOk();
+
+        $otherPop = $this->createPop('TPY4');
+        $otherAdmin = $this->createUserWithRole('pop_admin', $otherPop);
+
+        $this->actingAs($otherAdmin)
+            ->get(route('collector-worksheet.technicians.show', $this->teknisi->id))
+            ->assertForbidden();
+    }
+
+    #[Test]
+    public function technician_deposit_verification_returns_admin_to_technician_worksheet(): void
+    {
+        $invoice = $this->createUnpaidInvoice($this->pop, 'TPY-VERIFY-DETAIL');
+
+        $this->actingAs($this->teknisi)
+            ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-verify-detail'))
+            ->assertOk();
+        $this->actingAs($this->teknisi)
+            ->post(route('collector-worklist.deposit'), ['idempotency_key' => 'tek-verify-detail-deposit'])
+            ->assertRedirect();
+
+        $deposit = CollectorDeposit::where('collector_id', $this->teknisi->id)->firstOrFail();
+        $admin = $this->loginAsAdmin();
+
+        $this->actingAs($admin)
+            ->post(route('collector-deposits.verify', $deposit->id), ['declared_amount' => '150000'])
+            ->assertRedirect(route('collector-worksheet.technicians.show', [
+                'technician' => $this->teknisi->id, 'tab' => 'setor',
+            ]));
+
+        $this->assertSame('terverifikasi', $deposit->fresh()->status->value);
+
+        $this->actingAs($admin)
+            ->get(route('collector-worksheet.technicians.show', [
+                'technician' => $this->teknisi->id, 'tab' => 'riwayat_pembayaran',
+            ]))
+            ->assertOk()
+            ->assertSee($deposit->deposit_number)
+            ->assertSee('Terverifikasi');
     }
 
     #[Test]

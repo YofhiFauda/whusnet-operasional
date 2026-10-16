@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CollectorRole;
 use App\Enums\DepositStatus;
 use App\Enums\InvoiceStatus;
 use App\Enums\NotificationType;
@@ -31,7 +32,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Worksheet Admin — halaman kerja ADMIN atas para kolektor.
+ * Worksheet Admin â€” halaman kerja ADMIN atas para kolektor.
  *
  * Dipisah tegas dari Worklist Kolektor (`/collector-worklist`,
  * CollectorWorklistController) menurut SIAPA PENGGUNANYA, bukan menurut data:
@@ -40,24 +41,24 @@ use Illuminate\View\View;
  * `kolektor` tetap tak perlu `payments.create` maupun `customers.update`.
  *
  * Isi:
- *   - index()  : 2 panel — daftar kolektor (kiri) + pelanggan yang BELUM
- *                di-assign ke kolektor mana pun (kanan, multi-select → assign).
- *   - show()   : per-kolektor, 5 tab —
- *                · Pembayaran : tunggakan kolektor ini + bayar mewakili
+ *   - index()  : 2 panel â€” daftar kolektor (kiri) + pelanggan yang BELUM
+ *                di-assign ke kolektor mana pun (kanan, multi-select â†’ assign).
+ *   - show()   : per-kolektor, 5 tab â€”
+ *                Â· Pembayaran : tunggakan kolektor ini + bayar mewakili
  *                  (1-by-1 / massal), untuk cross check.
- *                · Setoran    : hitung uang fisik, verifikasi, tangani
+ *                Â· Setoran    : hitung uang fisik, verifikasi, tangani
  *                  selisih/lebih setor, hapus buku (Owner).
- *                · Kunjungan  : laporan aging + riwayat kunjungan.
- *                · Kwitansi   : cetak ber-QR, upload bulk, pantau pencocokan,
- *                  cocokkan manual. SUMBU DOKUMEN — tak menyentuh status kas.
- *                · Atur Pelanggan : assign/reassign/lepas rute permanen
+ *                Â· Kunjungan  : laporan aging + riwayat kunjungan.
+ *                Â· Kwitansi   : cetak ber-QR, upload bulk, pantau pencocokan,
+ *                  cocokkan manual. SUMBU DOKUMEN â€” tak menyentuh status kas.
+ *                Â· Atur Pelanggan : assign/reassign/lepas rute permanen
  *                  `customers.collector_id`, di-scope ke kolektor ini.
  *
- * Tiga guard §B-3 tetap berlaku: (1) target wajib ber-role kolektor —
+ * Tiga guard Â§B-3 tetap berlaku: (1) target wajib ber-role kolektor â€”
  * dijamin authorizeCollector(), (2) POP pelanggan wajib masuk scope kolektor,
- * (3) larangan nonaktifkan kolektor bermuatan — di UserController::update().
+ * (3) larangan nonaktifkan kolektor bermuatan â€” di UserController::update().
  *
- * docs/plan/kolektor/analisa-alur-kolektor-2.0.md §3, §9.
+ * docs/plan/kolektor/analisa-alur-kolektor-2.0.md Â§3, Â§9.
  */
 class CollectorWorksheetController extends Controller
 {
@@ -70,13 +71,13 @@ class CollectorWorksheetController extends Controller
     ) {}
 
     /**
-     * Channel `collector-activity.{popId}` yang boleh didengarkan viewer ini —
+     * Channel `collector-activity.{popId}` yang boleh didengarkan viewer ini â€”
      * dipakai partial realtime aktivitas kas (setoran + pembayaran + rute).
      *
      * `getAllowedPopIds()` mengembalikan array KOSONG untuk akses semua POP,
      * dan array kosong itu ambigu (bisa berarti "belum di-setup"). Karena itu
      * `hasAllPopAccess()` diperiksa lebih dulu, sesuai aturan POP scope di
-     * CLAUDE.md — kalau dibalik, admin ber-akses penuh justru tidak berlangganan
+     * CLAUDE.md â€” kalau dibalik, admin ber-akses penuh justru tidak berlangganan
      * channel apa pun dan diam-diam tak pernah menerima kabar setoran.
      *
      * @return array<int, string>
@@ -89,7 +90,7 @@ class CollectorWorksheetController extends Controller
 
         $channels = array_map(fn ($popId) => 'collector-activity.'.$popId, $popIds);
 
-        // Kanal pribadi viewer sendiri — dipakai App\Events\CashDepositUpdated
+        // Kanal pribadi viewer sendiri â€” dipakai App\Events\CashDepositUpdated
         // buat ngasih tau ADMIN kalau setoran kasnya SENDIRI ke Owner/Bank baru
         // diperiksa/ditutup selisih. Sudah teregistrasi generik di
         // routes/channels.php (App.Models.User.{id}), gak perlu channel baru.
@@ -108,7 +109,7 @@ class CollectorWorksheetController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Total tunggakan per kolektor. SENGAJA bukan JOIN + GROUP BY di SQL —
+        // Total tunggakan per kolektor. SENGAJA bukan JOIN + GROUP BY di SQL â€”
         // HasPopScope::scopeApplyUserScope() menulis `pop_id` TANPA qualifier
         // tabel, jadi begitu di-JOIN dengan `customers` (yang juga punya
         // `pop_id`) langsung ambiguous di MySQL/SQLite. Volume datanya kecil
@@ -128,7 +129,7 @@ class CollectorWorksheetController extends Controller
         }
 
         // Panel kanan: pelanggan yang belum dipegang kolektor mana pun.
-        // `applyUserScope()` WAJIB — ini query pelanggan baru, dan panel ini
+        // `applyUserScope()` WAJIB â€” ini query pelanggan baru, dan panel ini
         // memuat seluruh pelanggan tak ber-kolektor kalau tidak dibatasi.
         $popIds = array_values(array_filter((array) $request->query('pop_id', [])));
         $miniPopIds = array_values(array_filter((array) $request->query('mini_pop_id', [])));
@@ -170,17 +171,17 @@ class CollectorWorksheetController extends Controller
 
         // Posisi kas ADMIN yang sedang membuka halaman ini. Ditampilkan di sini
         // karena inilah tempat uang kolektor berpindah tangan: begitu admin
-        // memverifikasi setoran, uangnya menjadi tanggung jawab dia — dan
+        // memverifikasi setoran, uangnya menjadi tanggung jawab dia â€” dan
         // sebelum modul Setoran Kas ada, perpindahan itu tak pernah tercatat
-        // di mana pun (docs/plan/kolektor/analisa-setoran-kas-admin.md §1).
+        // di mana pun (docs/plan/kolektor/analisa-setoran-kas-admin.md Â§1).
         $kasTunai = $this->cash->tunaiBelumDisetor($request->user());
         $kasNonTunai = $this->cash->nonTunaiRekap($request->user());
         $kasSelisih = $this->cash->selisihTerbuka($request->user());
 
         // Cuma JUMLAH sumber, bukan barisnya. Halaman ini sudah menarik daftar
-        // kolektor, seluruh tunggakan, dan pelanggan tak ber-kolektor —
+        // kolektor, seluruh tunggakan, dan pelanggan tak ber-kolektor â€”
         // menambah dua query agregat aman, menambah dua daftar penuh tidak.
-        // Rincian per pelanggan tetap jadi urusan halaman Setoran Kas (§9.1).
+        // Rincian per pelanggan tetap jadi urusan halaman Setoran Kas (Â§9.1).
         $kasSumberCount = $this->cash->unsettledCollectorDepositsQuery($request->user())->count()
             + $this->cash->unsettledManualPaymentsQuery($request->user())->count();
 
@@ -189,7 +190,7 @@ class CollectorWorksheetController extends Controller
         // sama.
         $kasIdempotencyKey = (string) str()->uuid();
 
-        // Riwayat setoran SENDIRI — pandangan PENYETOR (§10).
+        // Riwayat setoran SENDIRI â€” pandangan PENYETOR (Â§10).
         //
         // Sengaja tidak memuat `payments.customer` maupun nama kolektor:
         // pertanyaan admin di sini cuma "setoran saya sudah diperiksa belum",
@@ -210,13 +211,37 @@ class CollectorWorksheetController extends Controller
             ->paginate(5, ['*'], 'kas_page')
             ->withQueryString();
 
-        // Saldo & status setor TEKNISI (ADHOC-122) — peringatan saja, tidak
-        // memblokir apa pun. Dipisah dari daftar kolektor supaya admin melihat
-        // dua jalur uang lapangan dengan rincian masing-masing.
-        $technicianStatus = $this->balance->technicianSettlementStatus($request->user());
+        // Saldo & status setor TEKNISI (ADHOC-122) â€” peringatan saja, tidak
+        // memblokir apa pun. Teknisi dalam POP admin tetap tampil sebelum
+        // transaksi pertama supaya alur pembayarannya dapat dibuka.
+        $technicianStatuses = $this->balance->technicianSettlementStatus($request->user())->keyBy(fn (array $row) => $row['user']->id);
+        $technicianRows = User::query()
+            ->technicians()
+            ->orderBy('name')
+            ->get()
+            ->filter(function (User $technician) use ($request) {
+                if (! $this->balance->isVisibleTo($technician, $request->user())) {
+                    return false;
+                }
+
+                if ($this->access->hasAllPopAccess($request->user()) || $this->access->hasAllPopAccess($technician)) {
+                    return true;
+                }
+
+                return array_intersect(
+                    $this->access->getAllowedPopIds($technician),
+                    $this->access->getAllowedPopIds($request->user())
+                ) !== [];
+            })
+            ->map(fn (User $technician) => [
+                'user' => $technician,
+                'balance' => $technicianStatuses->get($technician->id)['balance'] ?? 0,
+                'overdue' => $technicianStatuses->get($technician->id)['overdue'] ?? false,
+            ])
+            ->values();
 
         return view('collector-worksheet.index', compact(
-            'technicianStatus',
+            'technicianRows',
             'activityChannels',
             'kasTunai',
             'kasNonTunai',
@@ -238,13 +263,109 @@ class CollectorWorksheetController extends Controller
         ));
     }
 
+    public function showTechnician(Request $request, User $technician): View
+    {
+        abort_unless($technician->isTechnician(), 404);
+        abort_unless(
+            $this->balance->isVisibleTo($technician, $request->user()),
+            403,
+            'Posisi kas teknisi ini memuat POP di luar scope Anda.'
+        );
+
+        $tab = in_array($request->query('tab'), ['pembayaran', 'sudah_bayar', 'setor', 'riwayat_pembayaran'], true)
+            ? $request->query('tab')
+            : 'pembayaran';
+
+        $invoiceSearch = LikeSearch::sanitize((string) $request->query('invoice_search', ''));
+        $invoices = Invoice::query()
+            ->applyUserScope($request->user())
+            ->applyUserScope($technician)
+            ->whereIn('invoice_status', CollectorWorklistService::OUTSTANDING_STATUSES)
+            ->where('billing_period', '<=', now()->format('Y-m'))
+            ->when(mb_strlen($invoiceSearch) < 3, fn ($query) => $query->whereRaw('1 = 0'))
+            ->when(mb_strlen($invoiceSearch) >= 3, fn ($query) => $query->where(function ($match) use ($invoiceSearch) {
+                $match->where('invoice_number', 'like', "%{$invoiceSearch}%")
+                    ->orWhereHas('customer', fn ($customer) => $customer
+                        ->where('full_name', 'like', "%{$invoiceSearch}%")
+                        ->orWhere('cid', 'like', "%{$invoiceSearch}%")
+                        ->orWhere('customer_code', 'like', "%{$invoiceSearch}%"));
+            }))
+            ->with('customer')
+            ->orderBy('customer_id')
+            ->orderBy('due_date')
+            ->orderBy('id')
+            ->paginate(150, ['*'], 'invoice_page')
+            ->withQueryString();
+        $bankAccounts = BankAccount::activeOptions();
+        $customerBalances = app(CustomerBalanceService::class)->balancesForCustomers(
+            collect($invoices->items())->pluck('customer_id')->all()
+        );
+
+        $balance = $this->balance->balance($technician);
+        $outstandingShortfall = $this->balance->outstandingShortfall($technician);
+        $openShortfallDeposits = $this->balance->openShortfallDeposits($technician);
+        $unsettledCount = $this->balance->unsettledPaymentsQuery($technician)->count();
+        $unsettledPayments = $tab === 'sudah_bayar'
+            ? $this->balance->unsettledPaymentsQuery($technician)
+                ->with(['customer:id,full_name,cid,customer_code', 'invoice:id,invoice_number,billing_period'])
+                ->orderByDesc('id')
+                ->paginate(50, ['*'], 'payment_page')
+                ->withQueryString()
+            : null;
+        $deposits = $tab === 'setor'
+            ? CollectorDeposit::query()
+                ->where('collector_id', $technician->id)
+                ->with([
+                    'payments' => fn ($query) => $query
+                        ->where('payment_status', PaymentStatus::VALID->value)
+                        ->with('customer:id,full_name,cid,customer_code'),
+                    'verifier:id,name',
+                    'settlesDeposit:id,deposit_number',
+                ])
+                ->orderByDesc('submitted_at')
+                ->orderByDesc('id')
+                ->paginate(25, ['*'], 'deposit_page')
+                ->withQueryString()
+            : null;
+        $paymentHistory = $tab === 'riwayat_pembayaran'
+            ? Payment::query()
+                ->applyUserScope($request->user())
+                ->where('collected_by', $technician->id)
+                ->where('collected_by_role', CollectorRole::TEKNISI->value)
+                ->with([
+                    'customer:id,full_name,cid,customer_code',
+                    'invoice:id,invoice_number,billing_period',
+                    'collectorDeposit:id,deposit_number,status',
+                ])
+                ->orderByDesc('id')
+                ->paginate(50, ['*'], 'history_page')
+                ->withQueryString()
+            : null;
+
+        return view('collector-worksheet.technician', compact(
+            'technician',
+            'tab',
+            'unsettledCount',
+            'paymentHistory',
+            'invoiceSearch',
+            'invoices',
+            'bankAccounts',
+            'customerBalances',
+            'balance',
+            'outstandingShortfall',
+            'openShortfallDeposits',
+            'unsettledPayments',
+            'deposits',
+        ));
+    }
+
     public function show(Request $request, User $collector): View
     {
         $this->authorizeCollector($collector);
 
         // Gerbang POP halaman kas kolektor.
         //
-        // `authorizeCollector()` cuma memastikan targetnya memang kolektor —
+        // `authorizeCollector()` cuma memastikan targetnya memang kolektor â€”
         // itu tidak menghalangi admin cabang A membuka kolektor cabang B dan
         // membaca saldo, riwayat setoran, catatan verifikasi, sampai alasan
         // hapus buku. Semua query lain di halaman ini sudah ber-scope, jadi
@@ -252,7 +373,7 @@ class CollectorWorksheetController extends Controller
         //
         // All-or-nothing, bukan "saring yang boleh": halaman ini menyajikan
         // ANGKA TOTAL. Total yang diam-diam disaring bukan menyembunyikan
-        // baris — ia berbohong, dan admin menghitung uang fisik dengan
+        // baris â€” ia berbohong, dan admin menghitung uang fisik dengan
         // patokan yang salah.
         abort_unless(
             $this->balance->isVisibleTo($collector, $request->user()),
@@ -264,19 +385,19 @@ class CollectorWorksheetController extends Controller
             ? $request->query('tab')
             : 'pembayaran';
 
-        // Sumbu DOKUMEN — sengaja tidak menyentuh status setoran (§13.2).
+        // Sumbu DOKUMEN â€” sengaja tidak menyentuh status setoran (Â§13.2).
         // Yang belum tercocokkan sengaja ikut ditampilkan: berkas tanpa pemilik
         // adalah pekerjaan yang tertinggal, bukan sesuatu yang boleh hilang
         // diam-diam dari layar admin.
-        // Berkas TERCOCOKKAN → disaring POP scope seperti query lain.
-        // Berkas BELUM tercocokkan → belum punya `pop_id` sehingga tak bisa
+        // Berkas TERCOCOKKAN â†’ disaring POP scope seperti query lain.
+        // Berkas BELUM tercocokkan â†’ belum punya `pop_id` sehingga tak bisa
         // di-scope; yang dipakai sebagai gantinya adalah kepemilikan unggahan.
         // Tanpa pembatas itu, panel ini membeberkan SELURUH kwitansi yatim di
-        // sistem — nama berkas, pengunggah, nomor yang terbaca — ke tiap admin,
+        // sistem â€” nama berkas, pengunggah, nomor yang terbaca â€” ke tiap admin,
         // lintas cabang.
         $viewer = $request->user();
 
-        // Aturan aksesnya tinggal di PaymentReceipt::scopeForWorksheet() —
+        // Aturan aksesnya tinggal di PaymentReceipt::scopeForWorksheet() â€”
         // dipakai bersama endpoint progres (PaymentReceiptController::progress)
         // supaya daftar dan penghitungnya tak pernah menyimpang.
         $receipts = PaymentReceipt::query()
@@ -294,19 +415,19 @@ class CollectorWorksheetController extends Controller
         // bayar tak punya baris payment sehingga mustahil ikut tercetak.
         //
         // `payment_status` WAJIB disaring: pembayaran yang DITOLAK (uang tak
-        // pernah sampai kantor) tak boleh dicetak kwitansinya — kertas resmi
+        // pernah sampai kantor) tak boleh dicetak kwitansinya â€” kertas resmi
         // yang menyatakan pelanggan sudah bayar untuk uang yang kantor sendiri
         // sudah tolak adalah dokumen yang melawan catatannya sendiri.
         //
         // Syarat KETIGA (keputusan user 2026-08-08): setorannya harus sudah
         // DIPERIKSA KANTOR. Kwitansi adalah dokumen kantor, bukan sesuatu yang
-        // terbit di lapangan — selama uangnya masih di tas kolektor, kantor
+        // terbit di lapangan â€” selama uangnya masih di tas kolektor, kantor
         // belum punya dasar menerbitkan bukti apa pun.
         //
         // Yang dipakai `isVerified()`, bukan "harus TERVERIFIKASI": setoran
         // yang berakhir Kurang Setor pun sudah selesai diperiksa. Pelanggan
         // yang membayar penuh tidak boleh kehilangan kwitansinya cuma karena
-        // kolektor kurang menyetor — itu urusan kantor dengan kolektor, bukan
+        // kolektor kurang menyetor â€” itu urusan kantor dengan kolektor, bukan
         // urusan pelanggan.
         $receiptCandidates = Payment::query()
             ->applyUserScope()
@@ -319,22 +440,22 @@ class CollectorWorksheetController extends Controller
             ->limit(200)
             ->get();
 
-        // Laporan aging kunjungan — bukan sekadar riwayat. Yang dicari admin
+        // Laporan aging kunjungan â€” bukan sekadar riwayat. Yang dicari admin
         // di sini adalah POLA: pelanggan yang berulang kali "tidak ada orang"
         // sementara tunggakannya menua. Satu baris belum tentu berarti apa-apa
-        // (§12); yang layak diaudit adalah pengulangannya.
+        // (Â§12); yang layak diaudit adalah pengulangannya.
         $aging = $this->visits->agingFor($collector)->paginate(25, ['*'], 'aging_page')->withQueryString();
         $visitHistory = $this->visits->historyFor($collector)->paginate(25, ['*'], 'visit_page')->withQueryString();
 
         // Dua angka uang kolektor, sengaja dipisah dan tak pernah dijumlahkan
-        // (§11.2): saldo di tangan vs kewajiban kurang setor.
+        // (Â§11.2): saldo di tangan vs kewajiban kurang setor.
         $balance = $this->balance->balance($collector);
         $unsettledCount = $this->balance->unsettledPaymentsQuery($collector)->count();
         $outstandingShortfall = $this->balance->outstandingShortfall($collector);
         $openShortfallDeposits = $this->balance->openShortfallDeposits($collector);
 
         // `payments.customer` dimuat di sini supaya tab Setoran bisa menampilkan
-        // "pelanggan yang bayar" per setoran tanpa N+1 — sebelumnya cuma
+        // "pelanggan yang bayar" per setoran tanpa N+1 â€” sebelumnya cuma
         // hitungan jumlah transaksi yang muncul, baris pelanggannya sendiri
         // tak pernah ditarik.
         $deposits = CollectorDeposit::query()
@@ -346,12 +467,12 @@ class CollectorWorksheetController extends Controller
             ->withQueryString();
 
         // Pandangan ADMIN: seluruh tunggakan kolektor ini, tanpa filter jendela
-        // jatuh tempo. Admin bukan pengetuk pintu — dia butuh gambaran penuh
+        // jatuh tempo. Admin bukan pengetuk pintu â€” dia butuh gambaran penuh
         // buat cross check. Jendela tagih cuma berlaku di Worklist Kolektor
-        // (CollectorWorklistService::dueInvoices(), §10).
+        // (CollectorWorklistService::dueInvoices(), Â§10).
         //
         // `invoice_search` dipisah dari `search` (tab Atur Pelanggan) meski
-        // sama-sama cari nama/kode/CID — satu kolektor bisa punya ratusan
+        // sama-sama cari nama/kode/CID â€” satu kolektor bisa punya ratusan
         // tunggakan sekaligus, dan tanpa param sendiri, filter tab Pembayaran
         // ikut kepencet begitu admin pindah ke tab lain lewat query string yang
         // sama.
@@ -361,10 +482,10 @@ class CollectorWorksheetController extends Controller
             ->paginate(150, ['*'], 'invoice_page')
             ->withQueryString();
 
-        // Tab TERSENDIRI "Sudah Bayar" — rincian di balik angka "Saldo Belum
+        // Tab TERSENDIRI "Sudah Bayar" â€” rincian di balik angka "Saldo Belum
         // Disetor" di kartu profil, persis isi setoran yang akan terbentuk
         // kalau admin menekan "Setor Atas Nama Kolektor" sekarang. SENGAJA
-        // dipisah dari tab Pembayaran (yang isinya tagihan BELUM dibayar) —
+        // dipisah dari tab Pembayaran (yang isinya tagihan BELUM dibayar) â€”
         // dua sumbu berbeda (belum ditagih vs sudah ditagih tapi belum
         // disetor) numpuk di satu tab bikin admin susah bedain mana yang
         // masih perlu ditagih dan mana yang tinggal disetor.
@@ -422,14 +543,14 @@ class CollectorWorksheetController extends Controller
      * Assign banyak pelanggan sekaligus ke seorang kolektor.
      *
      * Dua jalur masuk, SATU method dan satu blok guard:
-     *   - tab Atur Pelanggan → kolektor dari route `{collector}`, sudah tetap
+     *   - tab Atur Pelanggan â†’ kolektor dari route `{collector}`, sudah tetap
      *     dari halamannya;
-     *   - panel index → kolektor dari `collector_id` di body, karena di sana
+     *   - panel index â†’ kolektor dari `collector_id` di body, karena di sana
      *     tujuannya baru dipilih lewat dropdown.
      *
      * Versi body SENGAJA ditambahkan (2026-08-08). Sebelumnya panel index
      * menyusun URL tujuan di klien lewat Alpine (`:action`), dan Alpine dimuat
-     * dari CDN — begitu CDN tak termuat, `form.action` jatuh ke URL halaman
+     * dari CDN â€” begitu CDN tak termuat, `form.action` jatuh ke URL halaman
      * sendiri dan assign diam-diam gagal tanpa pesan apa pun. Target POST aksi
      * yang mengubah data tidak boleh bergantung skrip pihak ketiga.
      *
@@ -506,7 +627,7 @@ class CollectorWorksheetController extends Controller
     }
 
     /**
-     * Lepas SATU pelanggan dari kolektor ini (collector_id → null).
+     * Lepas SATU pelanggan dari kolektor ini (collector_id â†’ null).
      */
     public function release(User $collector, Customer $customer): RedirectResponse
     {
@@ -536,16 +657,16 @@ class CollectorWorksheetController extends Controller
     }
 
     /**
-     * Beri tahu kolektor bahwa rutenya berubah — notifikasi + siaran realtime.
+     * Beri tahu kolektor bahwa rutenya berubah â€” notifikasi + siaran realtime.
      *
      * Sebelum ini assign/lepas TIDAK memberi tahu siapa pun. Kolektor baru tahu
      * saat kebetulan membuka Worklist, dan pelanggan yang dilepas SESUDAH dia
-     * berangkat berarti dia menagih orang yang bukan lagi tanggungannya —
+     * berangkat berarti dia menagih orang yang bukan lagi tanggungannya â€”
      * kunjungan sia-sia, dan kalau uangnya terlanjur diterima, uang yang tak
      * punya tempat mendarat di sistem.
      *
      * Kegagalan mengabari tidak boleh membatalkan perubahan rute yang sudah
-     * tersimpan — pola sama dengan `CollectorDepositService::safelyNotify()`.
+     * tersimpan â€” pola sama dengan `CollectorDepositService::safelyNotify()`.
      */
     private function kabariPerubahanRute(User $collector, int $popId, string $aksi, int $jumlah, ?string $namaPelanggan): void
     {
@@ -554,7 +675,7 @@ class CollectorWorksheetController extends Controller
         $pesan = $namaPelanggan !== null
             ? ($diassign
                 ? "{$namaPelanggan} masuk ke rute penagihan Anda."
-                : "{$namaPelanggan} dikeluarkan dari rute penagihan Anda — jangan ditagih lagi.")
+                : "{$namaPelanggan} dikeluarkan dari rute penagihan Anda â€” jangan ditagih lagi.")
             : ($diassign
                 ? "{$jumlah} pelanggan masuk ke rute penagihan Anda."
                 : "{$jumlah} pelanggan dikeluarkan dari rute penagihan Anda.");

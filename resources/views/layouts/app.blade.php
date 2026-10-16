@@ -452,8 +452,8 @@
                     <a href="{{ route('network.nodes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
                         <span class="sidebar-text">Master Node Jaringan &amp; Port</span>
                     </a>
-                    <a href="{{ route('network.inventaris.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.inventaris.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
-                        <span class="sidebar-text">Inventaris Infrastruktur</span>
+                    <a href="{{ route('network.map.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.map.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
+                        <span class="sidebar-text">Peta Infrastruktur ISP</span>
                     </a>
                     @endcan
 
@@ -911,6 +911,11 @@
                     </svg>
                 </button>
 
+                <a href="{{ route('manuals.index') }}" aria-label="Pusat Panduan" title="Pusat Panduan" class="flex items-center gap-1 rounded-lg px-2 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-sky-50 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-sky-900/30 dark:hover:text-sky-300">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v17H6.5A2.5 2.5 0 0 0 4 22V5.5ZM20 5.5A2.5 2.5 0 0 0 17.5 3H12v17h5.5A2.5 2.5 0 0 1 20 22V5.5Z"/></svg>
+                    <span class="hidden lg:inline">Panduan</span>
+                </a>
+
                 {{-- Bantuan & Pintasan Keyboard (Desktop only) --}}
                 <button onclick="openHelp()" aria-label="Bantuan dan pintasan keyboard" title="Bantuan (?)"
                         class="hidden sm:flex items-center justify-center p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
@@ -1008,7 +1013,10 @@
         </header>
 
         {{-- Main Dynamic Page Content --}}
-        <main class="flex-1 p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto scroll-smooth">
+        {{-- Peta Infrastruktur butuh kanvas penuh tanpa margin/scroll halaman
+             (topologi di-pan di dalam, drawer detail buka-tutup sendiri) —
+             satu-satunya rute yang melepas padding+scroll <main> default. --}}
+        <main class="flex-1 overflow-y-auto scroll-smooth {{ Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8' }}">
             @yield('content')
         </main>
     </div>

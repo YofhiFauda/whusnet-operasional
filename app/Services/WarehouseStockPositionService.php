@@ -130,10 +130,10 @@ class WarehouseStockPositionService
             ->whereIn('current_pop_id', $popIds)
             ->where('status', SerialStatus::AVAILABLE->value)
             ->select('item_id', 'condition')
-            ->selectRaw("CASE WHEN condition = 'used_good' AND condition_checked_at IS NOT NULL THEN 1 ELSE 0 END as checked")
+            ->selectRaw("CASE WHEN `condition` = 'used_good' AND `condition_checked_at` IS NOT NULL THEN 1 ELSE 0 END as checked")
             ->selectRaw('COUNT(*) as count')
             ->groupBy('item_id', 'condition')
-            ->groupByRaw("CASE WHEN condition = 'used_good' AND condition_checked_at IS NOT NULL THEN 1 ELSE 0 END")
+            ->groupByRaw("CASE WHEN `condition` = 'used_good' AND `condition_checked_at` IS NOT NULL THEN 1 ELSE 0 END")
             ->get();
 
         return $rows->groupBy('item_id')->map(function ($perItem) {

@@ -44,16 +44,18 @@ class InfrastructureMapService
                 : array_values(array_intersect($popIds, $selected));
         }
 
+        $canViewDeviceSerials = $user->hasPermission('customers.detail.devices.view_sensitive');
+
         $nodes = NetworkNode::query()
             ->when($popIds !== null, fn ($query) => $query->whereIn('network_nodes.id', $this->scopedNodeIds($popIds)))
             ->with([
                 'nodeType',
                 'anchorPop.parent',
                 'ports.activeAssignment.customer.customerTechnicalDetail',
+                'ports.activeAssignment.customer.customerDevice',
                 'ports.activeAssignment.customer.inventorySerials' => fn ($query) => $query
                     ->where('status', SerialStatus::INSTALLED->value)
-                    ->with('item'),
-                'ports.activeAssignment.customer.internetPackage',
+                    ->with('item.category'),
                 'ports.activeAssignment.targetNode',
                 'deployedSerials' => fn ($query) => $query
                     ->where('status', SerialStatus::DEPLOYED->value)
@@ -185,23 +187,16 @@ class InfrastructureMapService
         // Sejak Task 1, chassis OLT boleh ditambatkan langsung ke POP
         // `cabang` (bukan cuma Mini POP) — `$miniPopIds` doang bikin chassis
         // yang ditambatkan ke Cabang kehilangan slot OLT-nya di peta ini.
-        // Scoping-nya mengikuti aturan $miniPopIds persis: gak ada seleksi
-        // → semua Cabang yang keliatan user ($cabangs, sudah lewat
-        // `forUser()`); seleksi cocok salah satu Cabang → cuma Cabang itu;
-        // seleksi gak cocok Cabang manapun → kosong (konsisten $popIds di atas).
         $cabangIdsForChassis = $selectedPopId !== null && ! $cabangs->contains('id', $selectedPopId)
             ? []
             : ($selectedPopId !== null ? [$selectedPopId] : $cabangs->pluck('id')->all());
-
         $anchorPopIds = array_values(array_unique(array_merge($miniPopIds, $cabangIdsForChassis)));
 
-        // Slot OLT kini dimiliki node chassis (`olt_slots.chassis_node_id`),
-        // bukan POP langsung — satu Mini POP/Cabang bisa punya beberapa
-        // chassis. Buat tetap bisa menampilkan rekap per POP, cari dulu node
-        // chassis yang ditambatkan ke tiap POP (Mini POP atau Cabang), lalu
-        // petakan chassis_node_id → anchor_pop_id supaya hasil groupBy tetap
-        // berupa Collection dikunci id POP, sama seperti sebelumnya (dipakai
-        // `$slotsByPop->has($popId)`/`->get($popId)` di view peta jaringan).
+        // Slot OLT dimiliki node chassis (`olt_slots.chassis_node_id`), bukan
+        // POP langsung — satu Mini POP/Cabang bisa punya beberapa chassis.
+        // Cari dulu node chassis yang ditambatkan ke tiap POP, lalu petakan
+        // chassis_node_id -> anchor_pop_id supaya groupBy tetap Collection
+        // dikunci id POP seperti sebelumnya ($slotsByPop->has($popId)/get()).
         $chassisNodesForSlots = $anchorPopIds !== []
             ? NetworkNode::query()->whereIn('anchor_pop_id', $anchorPopIds)
                 ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_chassis'))
@@ -216,121 +211,232 @@ class InfrastructureMapService
             : collect();
         $freeOltSlots = $slotsByPop->sum(fn ($slots) => $slots->whereNull('card_node_id')->count());
 
-        $clientNodes = [];
+        $nodeDetails = [];
         foreach ($nodes as $node) {
-            $portsList = [];
-            $downstreamCustomers = [];
-
+            $rows = $assets[$node->id] ?? [];
+            $portList = [];
             foreach ($node->ports->sortBy('number') as $port) {
                 $assignment = $port->activeAssignment->first();
-                $customer = $assignment?->customer;
-                $targetNode = $assignment?->targetNode;
+                $kind = 'empty';
+                $label = 'Port kosong';
+                $customerName = null;
+                $customerCid = null;
+                $customerModems = [];
+                $customerModemsHidden = false;
+                $targetNodeId = null;
+                $targetNodeCode = null;
+                $targetNodeName = null;
 
-                $pType = 'empty';
-                $pLabel = 'Kosong';
-                $cid = null;
-                $ontSn = null;
-                $ontModel = null;
-                $plan = null;
-
-                if ($customer) {
-                    $pType = 'customer';
-                    $pLabel = $customer->full_name;
-                    $cid = $customer->customer_number;
-                    $ontSn = $customer->customerTechnicalDetail?->router_or_ont_serial
-                        ?? $customer->inventorySerials->first()?->serial_number;
-                    $ontModel = $customer->inventorySerials->first()?->item?->name ?? 'ONT / Modem';
-                    $plan = $customer->internetPackage?->name ?? '';
-
-                    $downstreamCustomers[] = [
-                        'port' => $port->number,
-                        'name' => $customer->full_name,
-                        'cid' => $cid,
-                        'ont_model' => $ontModel,
-                        'ont_sn' => $ontSn,
-                        'plan' => $plan,
-                    ];
-                } elseif ($targetNode) {
-                    $pType = 'node';
-                    $pLabel = $targetNode->name;
-                } elseif ($assignment?->manual_label) {
-                    $pType = 'manual';
-                    $pLabel = $assignment->manual_label;
+                if ($assignment) {
+                    if ($assignment->customer) {
+                        $kind = 'customer';
+                        $customerName = $assignment->customer->full_name;
+                        $customerModemsHidden = ! $canViewDeviceSerials
+                            || ($popIds !== null && ! in_array($assignment->customer->pop_id, $popIds));
+                        if (! $customerModemsHidden) {
+                            $customerModems = $assignment->customer->networkPortModems();
+                        }
+                        $customerCid = $assignment->customer->cid ?? $assignment->customer->customer_code ?? ('CID-'.$assignment->customer->id);
+                        $label = $customerName;
+                    } elseif ($assignment->targetNode) {
+                        $kind = 'node';
+                        $targetNodeId = $assignment->targetNode->id;
+                        $targetNodeCode = $assignment->targetNode->code;
+                        $targetNodeName = $assignment->targetNode->name;
+                        $label = $targetNodeCode.' ('.$targetNodeName.')';
+                    } elseif ($assignment->manual_label) {
+                        $kind = 'manual';
+                        $label = $assignment->manual_label;
+                    }
                 } elseif ($port->is_used) {
-                    $pType = 'manual';
-                    $pLabel = 'Terpakai';
+                    $kind = 'manual';
+                    $label = 'Terpakai (belum terverifikasi)';
                 }
 
-                $portsList[] = [
-                    'n' => $port->number,
+                $portList[] = [
+                    'id' => $port->id,
+                    'number' => $port->number,
                     'is_used' => (bool) $port->is_used,
-                    'type' => $pType,
-                    'label' => $pLabel,
-                    'cid' => $cid,
-                    'ont_sn' => $ontSn,
-                    'ont_model' => $ontModel,
-                    'plan' => $plan,
-                    'target_node_id' => $targetNode?->id,
-                    'target_node_code' => $targetNode?->code,
-                    'target_node_name' => $targetNode?->name,
+                    'kind' => $kind,
+                    'label' => $label,
+                    'customer_name' => $customerName,
+                    'customer_cid' => $customerCid,
+                    'customer_modems' => $customerModems,
+                    'customer_modems_hidden' => $customerModemsHidden,
+                    'target_node_id' => $targetNodeId,
+                    'target_node_code' => $targetNodeCode,
+                    'target_node_name' => $targetNodeName,
                 ];
             }
 
-            $popSlots = [];
-            if ($node->anchor_pop_id && $slotsByPop->has($node->anchor_pop_id)) {
-                foreach ($slotsByPop->get($node->anchor_pop_id) as $slot) {
-                    $popSlots[] = [
-                        'slot' => $slot->number,
-                        'card_code' => $slot->cardNode?->code,
-                        'card_name' => $slot->cardNode?->name,
-                        'card_id' => $slot->card_node_id,
-                    ];
-                }
-            }
-
-            $totalPorts = (int) $node->ports_count;
-            $usedPorts = (int) $node->used_ports_count;
-            $utilizationPct = $totalPorts > 0 ? round(100 * $usedPorts / $totalPorts) : null;
-            $nodeAssets = $assets[$node->id] ?? [];
-
-            $clientNodes[$node->id] = [
+            $nodeDetails[$node->id] = [
                 'id' => $node->id,
                 'code' => $node->code,
                 'name' => $node->name,
-                'type_code' => $node->nodeType?->code ?? 'other',
-                'type_name' => $node->nodeType?->name ?? 'Node',
-                'status' => $node->status,
+                'type' => $node->nodeType?->code ?? 'other',
+                'typeName' => $node->nodeType?->name ?? 'Node',
                 'parent_id' => $node->parent_id,
                 'anchor_pop_id' => $node->anchor_pop_id,
                 'anchor_pop_name' => $node->anchorPop?->name,
-                'path' => $paths[$node->id] ?? '',
-                'capacity' => $node->capacity,
-                'ports_count' => $totalPorts,
-                'used_ports_count' => $usedPorts,
-                'free_ports_count' => max(0, $totalPorts - $usedPorts),
-                'utilization_percent' => $utilizationPct,
+                'cabang_name' => $node->anchorPop?->parent?->name ?? $node->anchorPop?->name ?? '—',
+                'status' => $node->status,
+                'path' => $paths[$node->id],
+                'ports_count' => (int) $node->ports_count,
+                'used_ports_count' => (int) $node->used_ports_count,
                 'is_red_zone' => $node->isInRedZone(),
-                'address' => $node->address,
-                'coordinates' => ($node->latitude && $node->longitude) ? "{$node->latitude}, {$node->longitude}" : null,
-                'detail_url' => route('network.nodes.show', $node),
-                'ports' => $portsList,
-                'customers' => $downstreamCustomers,
-                'slots' => $popSlots,
-                'active_assets' => array_values(array_filter($nodeAssets, fn (array $a): bool => ($a['kind'] ?? '') === 'SN')),
-                'passive_assets' => array_values(array_filter($nodeAssets, fn (array $a): bool => ($a['kind'] ?? '') !== 'SN')),
-                'children_ids' => $nodes->where('parent_id', $node->id)->pluck('id')->values()->all(),
+                'ports' => $portList,
+                'assets' => $rows,
+                'location_description' => $node->location_description,
+                'coverage_area' => $node->coverage_area,
+                'latitude' => $node->latitude,
+                'longitude' => $node->longitude,
+                'show_url' => route('network.nodes.show', $node),
             ];
+        }
+
+        $slotsData = [];
+        foreach ($slotsByPop as $popId => $slots) {
+            $slotsData[$popId] = $slots->map(fn ($slot) => [
+                'number' => $slot->number,
+                'card_node_id' => $slot->card_node_id,
+                'card_code' => $slot->cardNode?->code ?? null,
+                'card_name' => $slot->cardNode?->name ?? null,
+            ])->all();
+        }
+
+        $topologyPops = Pop::forUser($user)
+            ->whereIn('type', ['pusat', 'cabang', 'mini_pop'])
+            ->where('status', 'active')
+            ->when($selectedPopId !== null, function ($query) use ($selectedPopId, $cabangs): void {
+                if (! $cabangs->contains('id', $selectedPopId)) {
+                    $query->whereIn('id', []);
+
+                    return;
+                }
+
+                $query->where(fn ($scope) => $scope->where('id', $selectedPopId)->orWhere('parent_id', $selectedPopId));
+            })
+            ->orderBy('name')
+            ->get();
+        $visiblePopsById = $topologyPops->keyBy('id');
+        $topologyDetails = [];
+        $topologyIndex = [];
+        foreach ($topologyPops as $pop) {
+            $parent = $visiblePopsById->get($pop->parent_id);
+            $id = -$pop->id;
+            $parentId = $parent ? -$parent->id : null;
+            $uplink = $pop->uplink_node_id !== null ? $nodesById->get($pop->uplink_node_id) : null;
+            if ($parent !== null && $uplink !== null && $uplink->resolvePop()?->id === $parent->id) {
+                $parentId = $uplink->id;
+            }
+            $typeName = match ($pop->type) {
+                'pusat' => 'Pusat / Server Utama',
+                'cabang' => 'Cabang',
+                default => 'Mini POP',
+            };
+            $path = $parent ? $parent->name.' / '.$pop->name : $pop->name;
+            $topologyDetails[$id] = [
+                'id' => $id,
+                'code' => $pop->name,
+                'name' => $typeName,
+                'type' => 'pop_'.$pop->type,
+                'typeName' => $typeName,
+                'parent_id' => $parentId,
+                'anchor_pop_id' => null,
+                'anchor_pop_name' => $pop->name,
+                'cabang_name' => $pop->type === 'mini_pop' ? ($parent?->name ?? $pop->name) : $pop->name,
+                'status' => $pop->status,
+                'path' => $path,
+                'ports_count' => 0,
+                'used_ports_count' => 0,
+                'is_red_zone' => false,
+                'ports' => [],
+                'assets' => [],
+                'location_description' => $pop->address,
+                'coverage_area' => null,
+                'latitude' => $pop->latitude,
+                'longitude' => $pop->longitude,
+                'show_url' => $user->hasPermission('pops.view') ? route('master.pop.show', $pop) : null,
+            ];
+            $topologyIndex[$id] = [
+                'parent' => $parentId,
+                'type' => 'pop_'.$pop->type,
+                'search' => mb_strtolower($path.' '.$typeName),
+            ];
+        }
+        foreach ($nodes as $node) {
+            $parentId = $node->parent_id !== null && $nodesById->has($node->parent_id)
+                ? $node->parent_id
+                : ($visiblePopsById->has($node->anchor_pop_id) ? -$node->anchor_pop_id : null);
+            $topologyDetails[$node->id] = [...$nodeDetails[$node->id], 'parent_id' => $parentId];
+            $topologyIndex[$node->id] = [...$nodeIndex[$node->id], 'parent' => $parentId];
+        }
+
+        foreach ($nodes as $node) {
+            foreach ($node->ports as $port) {
+                $customer = $port->activeAssignment->first()?->customer;
+                if ($customer === null || ($popIds !== null && ! in_array($customer->pop_id, $popIds))) {
+                    continue;
+                }
+
+                $modems = $customer->networkPortModems();
+                if ($modems === []) {
+                    continue;
+                }
+
+                $id = -1000000000 - $customer->id;
+                $drop = $nodes->firstWhere('code', "CUST-{$customer->id}-DC")
+                    ?? $nodes->firstWhere('code', "TOPO-CUST-{$customer->id}-DC");
+                $parentId = $drop?->parent_id === $node->id ? $drop->id : $node->id;
+                $cid = $customer->cid ?? $customer->customer_code ?? 'CID-'.$customer->id;
+                $path = $paths[$node->id].' / Port '.$port->number.' / '.$cid;
+                $topologyDetails[$id] = [
+                    'id' => $id,
+                    'code' => $cid,
+                    'name' => $customer->full_name,
+                    'type' => 'customer_ont',
+                    'typeName' => 'ONT dipasang ke pelanggan',
+                    'parent_id' => $parentId,
+                    'anchor_pop_id' => null,
+                    'anchor_pop_name' => $nodeDetails[$node->id]['anchor_pop_name'],
+                    'cabang_name' => $nodeDetails[$node->id]['cabang_name'],
+                    'status' => 'active',
+                    'path' => $path,
+                    'ports_count' => 0,
+                    'used_ports_count' => 0,
+                    'is_red_zone' => false,
+                    'ports' => [],
+                    'assets' => [],
+                    'location_description' => 'Terhubung melalui '.$node->code.' port '.$port->number,
+                    'coverage_area' => null,
+                    'latitude' => null,
+                    'longitude' => null,
+                    'show_url' => $user->hasPermission('customers.view') ? route('customers.show', $customer) : null,
+                    'customer_modems' => $canViewDeviceSerials ? $modems : [],
+                    'customer_modems_hidden' => ! $canViewDeviceSerials,
+                ];
+                $topologyIndex[$id] = [
+                    'parent' => $parentId,
+                    'type' => 'customer_ont',
+                    'search' => mb_strtolower($path.' '.$customer->full_name),
+                ];
+            }
         }
 
         return [
             'nodes' => $nodes,
-            'clientNodes' => $clientNodes,
             'inventoryNodes' => $inventoryNodes,
             'rootsByPop' => $nodes->filter(fn (NetworkNode $node): bool => $node->parent_id === null || ! $nodesById->has($node->parent_id))->groupBy('anchor_pop_id'),
             'childrenByNode' => $nodes->whereNotNull('parent_id')->groupBy('parent_id'),
             'assetsByNode' => $assets,
             'pathsByNode' => $paths,
             'nodeIndex' => $nodeIndex,
+            'nodeDetails' => $nodeDetails,
+            'topologyDetails' => $topologyDetails,
+            'topologyIndex' => $topologyIndex,
+            'topologyPops' => $topologyPops,
+            'topologyPopChildren' => $topologyPops->groupBy(fn (Pop $pop): int => $visiblePopsById->has($pop->parent_id) ? $pop->parent_id : 0),
+            'slotsData' => $slotsData,
             'cabangs' => $cabangs,
             'slotsByPop' => $slotsByPop,
             'selectedPopId' => $selectedPopId,

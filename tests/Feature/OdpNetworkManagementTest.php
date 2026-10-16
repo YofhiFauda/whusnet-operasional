@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Enums\ScopeType;
+use App\Models\Customer;
+use App\Models\CustomerTechnicalDetail;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
@@ -510,6 +512,36 @@ class OdpNetworkManagementTest extends TestCase
             ->assertSee('Node Anak');
     }
 
+    public function test_index_menempatkan_cabang_dan_mini_pop_di_bawah_uplink_node(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pusat = Pop::create(['code' => 'TREE-P', 'name' => 'WHUSNET', 'type' => 'pusat', 'status' => 'active']);
+        $cabang = Pop::create(['code' => 'TREE-C', 'name' => 'Cabang Pohon', 'type' => 'cabang', 'parent_id' => $pusat->id, 'status' => 'active']);
+        $mini = Pop::create(['code' => 'TREE-M', 'name' => 'C1', 'type' => 'mini_pop', 'parent_id' => $cabang->id, 'status' => 'active']);
+        $server = NetworkNode::create([
+            'anchor_pop_id' => $pusat->id, 'node_type_id' => NetworkNodeType::where('code', 'server')->value('id'),
+            'code' => 'TREE-SERVER', 'name' => 'Server Utama', 'status' => 'active',
+        ]);
+        $backbone = NetworkNode::create([
+            'parent_id' => $server->id, 'node_type_id' => NetworkNodeType::where('code', 'backbone')->value('id'),
+            'code' => 'TREE-BB', 'name' => 'Backbone', 'status' => 'active',
+        ]);
+        $aggregation = NetworkNode::create([
+            'anchor_pop_id' => $cabang->id, 'node_type_id' => NetworkNodeType::where('code', 'aggregation_switch')->value('id'),
+            'code' => 'TREE-AGG', 'name' => 'Agregasi', 'status' => 'active',
+        ]);
+        NetworkNode::create([
+            'anchor_pop_id' => $mini->id, 'node_type_id' => NetworkNodeType::where('code', 'olt_chassis')->value('id'),
+            'code' => 'TREE-OLT', 'name' => 'OLT', 'status' => 'active',
+        ]);
+        $cabang->update(['uplink_node_id' => $backbone->id]);
+        $mini->update(['uplink_node_id' => $aggregation->id]);
+
+        $this->actingAs($owner)->get(route('network.nodes.index'))
+            ->assertOk()
+            ->assertSeeInOrder(['TREE-SERVER', 'TREE-BB', 'Cabang Pohon', 'TREE-AGG', 'C1', 'TREE-OLT']);
+    }
+
     public function test_tipe_tanpa_port_tidak_bisa_diberi_port_melalui_endpoint(): void
     {
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
@@ -643,5 +675,105 @@ class OdpNetworkManagementTest extends TestCase
         ]);
         $this->assertDatabaseMissing('features', ['code' => 'network_odps']);
         $this->assertSame(1, NetworkNode::where('code', 'ODP-LAMA-1')->count());
+    }
+
+    public function test_node_kosong_dapat_diubah_kode_dan_tipenya(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $node = $this->makeNode($pop->id, 'ODP-EDIT-01', 'Node Awal');
+        $coreType = NetworkNodeType::where('code', 'core_router')->firstOrFail();
+
+        $this->actingAs($owner)->patch(route('network.nodes.update', $node), [
+            'code' => 'CORE-EDIT-01',
+            'node_type_id' => $coreType->id,
+            'name' => 'Core Baru',
+            'status' => 'active',
+        ])->assertRedirect(route('network.nodes.show', $node));
+
+        $this->assertSame('CORE-EDIT-01', $node->fresh()->code);
+        $this->assertSame($coreType->id, $node->fresh()->node_type_id);
+        $this->get(route('network.nodes.show', $node))->assertOk()->assertSee('CORE-EDIT-01');
+    }
+
+    public function test_node_dengan_port_tidak_boleh_ganti_tipe_atau_kode(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $node = $this->makeNode($pop->id, 'ODP-TERPAKAI-01', 'Node Terpakai');
+        $node->ports()->create(['number' => 1]);
+        $coreType = NetworkNodeType::where('code', 'core_router')->firstOrFail();
+
+        $this->actingAs($owner)->patch(route('network.nodes.update', $node), [
+            'code' => 'CORE-TERPAKAI-01',
+            'node_type_id' => $coreType->id,
+            'name' => 'Ganti Paksa',
+        ])->assertSessionHasErrors('node_type_id');
+
+        $this->assertSame('ODP-TERPAKAI-01', $node->fresh()->code);
+        $this->assertSame($this->odpTypeId, $node->fresh()->node_type_id);
+    }
+
+    public function test_kode_node_dengan_port_dan_anak_boleh_diubah_tanpa_memutus_relasi(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $node = $this->makeNode($pop->id, 'ODP-KODE-LAMA', 'ODP Utama');
+        $port = $node->ports()->create(['number' => 1]);
+        $child = NetworkNode::create([
+            'parent_id' => $node->id,
+            'node_type_id' => $this->odpTypeId,
+            'code' => 'ODP-ANAK-01',
+            'name' => 'Node Anak',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($owner)->patch(route('network.nodes.update', $node), [
+            'code' => 'ODP-KODE-BARU',
+            'name' => $node->name,
+            'node_type_id' => $this->odpTypeId,
+        ])->assertRedirect(route('network.nodes.show', $node));
+
+        $this->assertSame('ODP-KODE-BARU', $node->fresh()->code);
+        $this->assertSame($node->id, $port->fresh()->network_node_id);
+        $this->assertSame($node->id, $child->fresh()->parent_id);
+    }
+
+    public function test_kode_odp_yang_masih_dirujuk_data_teknis_pelanggan_tidak_boleh_diubah(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $node = $this->makeNode($pop->id, 'ODP-PELANGGAN-LAMA', 'ODP Pelanggan');
+        $customer = Customer::factory()->create(['pop_id' => $pop->id]);
+        CustomerTechnicalDetail::create([
+            'customer_id' => $customer->id,
+            'odp_number' => $node->code,
+            'odp_port' => '1',
+        ]);
+
+        $this->actingAs($owner)->patch(route('network.nodes.update', $node), [
+            'code' => 'ODP-PELANGGAN-BARU',
+            'name' => $node->name,
+        ])->assertSessionHasErrors('code');
+
+        $this->assertSame('ODP-PELANGGAN-LAMA', $node->fresh()->code);
+    }
+
+    public function test_hapus_node_kosong_dan_nonaktifkan_node_yang_sudah_punya_port(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $empty = $this->makeNode($pop->id, 'ODP-KOSONG-01', 'Kosong');
+        $used = $this->makeNode($pop->id, 'ODP-BERPORT-01', 'Berport');
+        $port = $used->ports()->create(['number' => 1]);
+
+        $this->actingAs($owner)->delete(route('network.nodes.destroy', $empty))
+            ->assertRedirect(route('network.nodes.index'));
+        $this->assertModelMissing($empty);
+
+        $this->delete(route('network.nodes.destroy', $used))
+            ->assertRedirect(route('network.nodes.index'));
+        $this->assertSame('inactive', $used->fresh()->status);
+        $this->assertModelExists($port);
     }
 }

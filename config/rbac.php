@@ -47,6 +47,11 @@ return [
     'protected_roles' => ['owner'],
 
     'allowed_actions' => [
+        'manuals' => [
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::PUBLISH->value,
+        ],
         'dashboard' => [ActionCode::VIEW->value],
 
         'master_wilayah' => [
@@ -658,12 +663,13 @@ return [
 
         // Master node jaringan ber-port (ODC/ODP/dst), dulu `network_odps`.
         // Di-rename di baris Feature yang SAMA oleh migration reshape
-        // (2026_10_12_110300), jadi role_permissions lama tetap nempel. Tanpa
-        // DELETE — NetworkNodeController tidak punya destroy().
+        // (2026_10_12_110300), jadi role_permissions lama tetap nempel.
+        // Node kosong dapat dihapus; node dengan dependensi hanya dinonaktifkan.
         'network_nodes' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
             ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
             ActionCode::REGISTER_INFRA->value,
         ],
 

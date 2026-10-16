@@ -16,9 +16,18 @@
             &larr; Kembali ke pohon infrastruktur
         </a>
 
-        <div class="flex items-center gap-2 text-xs font-mono">
+        <div class="flex items-center gap-3">
+            @can('network_nodes.delete')
+            <form method="POST" action="{{ route('network.nodes.destroy', $node) }}" onsubmit="return confirm('Hapus node kosong? Node yang punya relasi akan dinonaktifkan.');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="rounded-xl border border-rose-300 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50">Hapus / Nonaktifkan</button>
+            </form>
+            @endcan
+            <div class="flex items-center gap-2 text-xs font-mono">
             <span class="text-text-muted">Node ID:</span>
             <span class="font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 rounded-md border border-sky-200 dark:border-sky-900">{{ $node->code }}</span>
+            </div>
         </div>
     </div>
 
@@ -170,7 +179,16 @@
                         <td class="px-4 py-3">{{ $port->is_used ? 'Terpakai' : 'Kosong' }}</td>
                         <td class="px-4 py-3 text-text-main">
                             @if($assignment?->customer)
-                                Pelanggan: {{ $assignment->customer->full_name }}
+                                <span class="font-semibold">Pelanggan: {{ $assignment->customer->full_name }}</span>
+                                @if($canViewDeviceSerials && ($allowedCustomerPopIds === null || in_array($assignment->customer->pop_id, $allowedCustomerPopIds)))
+                                @forelse($assignment->customer->networkPortModems() as $modem)
+                                    <span class="block mt-1 text-[11px] text-text-secondary">Modem/ONT: {{ $modem['name'] }} · SN {{ $modem['serial_number'] }} <span class="text-text-muted">({{ $modem['source'] }})</span></span>
+                                @empty
+                                    <span class="block mt-1 text-[11px] text-amber-700 dark:text-amber-400">Modem belum tercatat</span>
+                                @endforelse
+                                @else
+                                    <span class="block mt-1 text-[11px] text-text-muted">SN modem dibatasi oleh izin perangkat pelanggan</span>
+                                @endif
                             @elseif($assignment?->targetNode)
                                 Node: {{ $assignment->targetNode->code }} · {{ $assignment->targetNode->name }}
                             @elseif($assignment?->manual_label)
@@ -231,6 +249,17 @@
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
+            <label class="text-xs font-bold text-text-secondary">Kode Node <span class="text-rose-500">*</span>
+                <input name="code" required maxlength="50" value="{{ old('code', $node->code) }}" class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs font-mono">
+            </label>
+            <label class="text-xs font-bold text-text-secondary">Tipe Node <span class="text-rose-500">*</span>
+                <select name="node_type_id" required class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs">
+                    @foreach($nodeTypes as $type)
+                    <option value="{{ $type->id }}" @selected((int) old('node_type_id', $node->node_type_id) === $type->id)>{{ $type->name }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <p class="sm:col-span-2 text-xs text-text-muted">Kode dan tipe hanya dapat diubah sebelum node memiliki port atau relasi lain.</p>
             <label class="text-xs font-bold text-text-secondary">Nama Node <span class="text-rose-500">*</span>
                 <input name="name" required value="{{ old('name', $node->name) }}"
                        class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">

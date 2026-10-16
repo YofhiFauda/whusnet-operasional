@@ -52,7 +52,7 @@ class CustomerRegistrationVerificationController extends Controller
         $access = app(EffectiveAccessService::class);
         $user = $request->user();
 
-        $query = Customer::with(['pop', 'customerService.internetPackage', 'village.district', 'city', 'creator'])
+        $query = Customer::with(['pop', 'customerService.internetPackage', 'internetPackage', 'village.district', 'city', 'creator'])
             ->where('status', WorkflowTransition::REGISTERED->value)
             ->when(! $access->hasAllPopAccess($user), function ($q) use ($access, $user) {
                 $q->whereIn('pop_id', $access->getAllowedPopIds($user));

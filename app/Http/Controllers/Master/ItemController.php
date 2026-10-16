@@ -187,6 +187,15 @@ class ItemController extends Controller
         }
 
         $validated = $request->validate($rules);
+        $category = ItemCategory::query()->findOrFail($validated['item_category_id']);
+        $ownership = $locked
+            ? $item->ownership_mode->value
+            : ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value);
+        if ($category->code === 'modem_ont' && $ownership !== OwnershipMode::INSTALLABLE->value) {
+            throw ValidationException::withMessages([
+                'ownership_mode' => 'Modem/ONT pelanggan harus menggunakan kepemilikan Dipasang ke Pelanggan.',
+            ]);
+        }
         if ($item && ! $request->exists('infrastructure_node_type_id')) {
             $validated['infrastructure_node_type_id'] = $item->infrastructure_node_type_id;
         }

@@ -113,10 +113,10 @@
                                     $isPaid = $customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS;
                                     $isOverdue = !$isPaid && $customer->latestInvoice->isPiutang();
                                 @endphp
-                                <span class="font-bold {{ $isPaid ? 'text-emerald-600 dark:text-emerald-400' : ($isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white') }}">
+                                <span class="font-bold {{ $isPaid ? 'text-emerald-600 dark:text-emerald-400' : ($isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400') }}">
                                     Rp {{ number_format($customer->latestInvoice->total_amount, 0, ',', '.') }}
                                 </span>
-                                <span class="block text-[10px] font-sans font-semibold {{ $isPaid ? 'text-emerald-500' : ($isOverdue ? 'text-rose-500' : 'text-slate-400') }}">
+                                <span class="block text-[10px] font-sans font-semibold {{ $isPaid ? 'text-emerald-500' : ($isOverdue ? 'text-rose-500' : 'text-amber-500') }}">
                                     {{ $isPaid ? 'Lunas' : ($isOverdue ? 'Piutang' : 'Belum Bayar') }}
                                 </span>
                             @else
@@ -215,6 +215,7 @@
                     $isActive = $customer->status === 'active';
                     $isSuspended = $customer->status === 'suspended';
                     $isPaid = $customer->latestInvoice && $customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS;
+                    $isOverdue = $customer->latestInvoice && !$isPaid && $customer->latestInvoice->isPiutang();
                 @endphp
                 <div class="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:border-sky-300 dark:hover:border-sky-800 transition-all card-interactive flex flex-col justify-between space-y-3">
                     <div class="space-y-2">
@@ -252,11 +253,11 @@
                             </div>
                             <div>
                                 <span class="text-slate-400 text-[10px] block">Tagihan</span>
-                                <span class="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                                <span class="font-mono font-semibold {{ $isPaid ? 'text-emerald-600 dark:text-emerald-400' : ($isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400') }}">
                                     Rp {{ number_format($customer->latestInvoice->total_amount ?? 0, 0, ',', '.') }}
                                 </span>
-                                <span class="text-[9px] font-bold block {{ $isPaid ? 'text-emerald-500' : 'text-rose-500' }}">
-                                    ● {{ $isPaid ? 'LUNAS' : 'BELUM BAYAR' }}
+                                <span class="text-[9px] font-bold block {{ $isPaid ? 'text-emerald-500' : ($isOverdue ? 'text-rose-500' : 'text-amber-500') }}">
+                                    ● {{ $isPaid ? 'LUNAS' : ($isOverdue ? 'PIUTANG' : 'BELUM BAYAR') }}
                                 </span>
                             </div>
                             <div class="col-span-2">

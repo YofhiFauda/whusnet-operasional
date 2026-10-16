@@ -23,6 +23,7 @@ use LogicException;
     'name',
     'type',
     'parent_id',
+    'uplink_node_id',
     'address',
     'village',
     'district',
@@ -46,6 +47,7 @@ class Pop extends Model
     {
         return [
             'parent_id' => 'integer',
+            'uplink_node_id' => 'integer',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
         ];
@@ -159,6 +161,11 @@ class Pop extends Model
      *
      * @return HasMany<Pop, $this>
      */
+    public function uplinkNode(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'uplink_node_id');
+    }
+
     public function children(): HasMany
     {
         return $this->hasMany(Pop::class, 'parent_id');

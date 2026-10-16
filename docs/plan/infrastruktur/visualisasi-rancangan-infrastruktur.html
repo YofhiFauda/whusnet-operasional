@@ -1,0 +1,1507 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Rancangan Pohon Infrastruktur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: pohon posisi di kiri, panel tiga lapis (Posisi / Kapasitas / Barang) di kanan; bagian aturan & fase di bawah */
+:root {
+  --bg: #f3f5f6;
+  --surface: #ffffff;
+  --surface-2: #e9eef0;
+  --line: #cfd8dc;
+  --fg: #16232a;
+  --muted: #5a6b73;
+  --accent: #0b6e8a;
+  --accent-soft: #d6ecf2;
+  --active: #0f7a5c;
+  --active-soft: #d9f1e8;
+  --passive: #8a5a14;
+  --passive-soft: #f6ead3;
+  --proposal: #7a3fb0;
+  --proposal-soft: #eee3f8;
+  --warn: #b5730a;
+  --danger: #c0392b;
+  --danger-soft: #f8dcd8;
+  --ok: #2e8b57;
+  --port-empty: #ffffff;
+  --f-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1619; --surface: #152126; --surface-2: #1c2b31; --line: #2c3f46;
+    --fg: #e3ecef; --muted: #93a6ad; --accent: #4fb8d6; --accent-soft: #123341;
+    --active: #4cc79d; --active-soft: #11332a; --passive: #e0aa55; --passive-soft: #3a2a12;
+    --proposal: #b98ae6; --proposal-soft: #2c1f3b; --warn: #e3a03a; --danger: #ef7a6c; --danger-soft: #3d1c19;
+    --ok: #5cc48a; --port-empty: #1c2b31; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1619; --surface: #152126; --surface-2: #1c2b31; --line: #2c3f46;
+  --fg: #e3ecef; --muted: #93a6ad; --accent: #4fb8d6; --accent-soft: #123341;
+  --active: #4cc79d; --active-soft: #11332a; --passive: #e0aa55; --passive-soft: #3a2a12;
+  --proposal: #b98ae6; --proposal-soft: #2c1f3b; --warn: #e3a03a; --danger: #ef7a6c; --danger-soft: #3d1c19;
+  --ok: #5cc48a; --port-empty: #1c2b31; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; display: grid; gap: 36px; }
+h1, h2, h3 { font-family: var(--f-display); letter-spacing: .01em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 4vw, 44px); line-height: 1.05; font-weight: 700; }
+h2 { font-size: 26px; font-weight: 700; }
+h3 { font-size: 18px; font-weight: 600; }
+p { margin: 0; max-width: 72ch; }
+.eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--f-mono); font-size: 12.5px; }
+header.top { display: grid; gap: 10px; }
+header.top p { color: var(--muted); }
+
+/* Tiga lapis */
+.layers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.layer { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.layer .tag { font-family: var(--f-mono); font-size: 11px; color: var(--accent); }
+.layer p { font-size: 14px; color: var(--muted); }
+.layer code, td code, .note code, li code { font-family: var(--f-mono); font-size: 12px; background: var(--surface-2); padding: 0 4px; border-radius: 3px; }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 2px; border: 1px solid var(--line); display: inline-block; }
+
+/* Explorer */
+.explorer { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.tree { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 6px 12px; overflow-x: auto; }
+.tree ul { list-style: none; margin: 0; padding-left: 16px; border-left: 1px dashed var(--line); margin-left: 9px; }
+.tree > ul { border-left: none; padding-left: 0; margin-left: 0; }
+.tree li { margin: 2px 0; }
+.row { display: flex; align-items: center; gap: 4px; }
+.tg { width: 18px; height: 18px; border: none; background: none; color: var(--muted); cursor: pointer; font-family: var(--f-mono); font-size: 12px; padding: 0; flex: none; }
+.tg[disabled] { visibility: hidden; }
+.nb { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; text-align: left; border: 1px solid transparent; background: none; color: var(--fg); padding: 3px 6px; border-radius: 4px; cursor: pointer; font: inherit; font-size: 14px; }
+.nb:hover { background: var(--surface-2); }
+.nb.sel { background: var(--accent-soft); border-color: var(--accent); }
+.nb:focus-visible, .tg:focus-visible, .port:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tcode { font-family: var(--f-mono); font-size: 12px; white-space: nowrap; }
+.tname { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ty { font-family: var(--f-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 1px 5px; border-radius: 3px; background: var(--surface-2); color: var(--muted); flex: none; }
+.ty.pop { background: var(--accent-soft); color: var(--accent); }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.mk { font-family: var(--f-mono); font-size: 10px; color: var(--proposal); flex: none; }
+.pct { font-family: var(--f-mono); font-size: 11px; flex: none; font-variant-numeric: tabular-nums; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; display: grid; min-width: 0; }
+.ph { padding: 16px 18px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.ph .line1 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip { font-family: var(--f-mono); font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.crumb { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.sec { padding: 14px 18px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; min-width: 0; }
+.sec:last-child { border-bottom: none; }
+.sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.sec-h .eyebrow { color: var(--fg); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.note { font-size: 13px; color: var(--muted); }
+.prop { border-left: 3px solid var(--proposal); background: var(--proposal-soft); padding: 8px 10px; font-size: 13px; border-radius: 0 4px 4px 0; }
+.prop b { color: var(--proposal); }
+
+.bar { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; }
+.ports { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 4px; }
+.port { position: relative; height: 34px; border-radius: 4px; border: 1px solid var(--line); background: var(--port-empty); font-family: var(--f-mono); font-size: 11px; color: var(--muted); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.port.customer { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.port.node { background: var(--active-soft); border-color: var(--active); color: var(--active); }
+.port.manual { background: var(--passive-soft); border-color: var(--passive); color: var(--passive); }
+.port.uplink { background: var(--proposal-soft); border-color: var(--proposal); color: var(--proposal); }
+.port .fc { position: absolute; left: 3px; right: 3px; bottom: 3px; height: 4px; border-radius: 2px; }
+.port.on { outline: 2px solid var(--fg); }
+.pinfo { font-size: 13px; min-height: 1.5em; }
+
+.assets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.abox { border: 1px solid var(--line); border-radius: 5px; overflow: hidden; min-width: 0; }
+.abox h4 { margin: 0; font-family: var(--f-display); font-size: 15px; font-weight: 600; padding: 6px 10px; letter-spacing: .03em; }
+.abox.act h4 { background: var(--active-soft); color: var(--active); }
+.abox.pas h4 { background: var(--passive-soft); color: var(--passive); }
+.abox ul { list-style: none; margin: 0; padding: 0; }
+.abox li { padding: 8px 10px; border-top: 1px solid var(--line); display: grid; gap: 2px; font-size: 14px; }
+.abox li .src { font-size: 12px; color: var(--muted); }
+.abox .empty { padding: 10px; font-size: 13px; color: var(--muted); }
+.ont { border: 1px dashed var(--accent); border-radius: 5px; overflow: hidden; }
+.ont h4 { margin: 0; font-family: var(--f-display); font-size: 15px; font-weight: 600; padding: 6px 10px; background: var(--accent-soft); color: var(--accent); }
+.ont table { width: 100%; }
+.guards { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.guards li::marker { color: var(--warn); }
+
+/* Tabel */
+.tw { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; font-size: 14px; }
+.tw table { width: 100%; min-width: 760px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; background: var(--surface-2); }
+tr:last-child td { border-bottom: none; }
+td.a { color: var(--active); }
+td.p { color: var(--passive); }
+
+.guardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.gcard { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.gcard .gid { font-family: var(--f-mono); font-size: 12px; color: var(--warn); }
+.gcard p { font-size: 14px; color: var(--muted); }
+.gcard.new { border-color: var(--proposal); }
+.gcard.new .gid { color: var(--proposal); }
+
+.phases { display: grid; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.phase { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.phase:last-child { border-bottom: none; }
+.phase .n { font-family: var(--f-display); font-size: 30px; font-weight: 700; color: var(--accent); line-height: 1; }
+.phase p { font-size: 14px; color: var(--muted); }
+section { display: grid; gap: 14px; }
+
+.cb { font-family: var(--f-mono); font-size: 10px; font-weight: 600; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; flex: none; }
+.port.term { border-style: dashed; border-color: var(--danger); color: var(--danger); }
+.port.conf { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.casebox { display: grid; gap: 8px; }
+.case { border-left: 3px solid var(--warn); background: var(--surface-2); padding: 8px 10px; border-radius: 0 4px 4px 0; font-size: 14px; display: grid; gap: 4px; }
+.case .ch { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.case .ch b { font-family: var(--f-mono); font-size: 12px; }
+.case p { font-size: 13px; color: var(--muted); }
+.hist { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 2px; }
+.jump { font: inherit; font-family: var(--f-mono); font-size: 12px; color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
+.jump:hover { background: var(--accent-soft); }
+.jump:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 2px; }
+.fact .v { font-family: var(--f-display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.fact span:last-child { font-size: 13px; color: var(--muted); }
+
+/* Tab & tampilan topologi/inventaris */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { font: inherit; font-size: 14px; font-weight: 600; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 8px 14px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+.tabs button:focus-visible, .toolbar button:focus-visible, .toolbar select:focus-visible, .toolbar input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.explorer.wide { grid-template-columns: minmax(0, 1fr) minmax(0, 400px); }
+.view { min-width: 0; display: grid; gap: 10px; align-content: start; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.toolbar select, .toolbar input { font: inherit; font-size: 13px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--fg); }
+.ctl.grow { flex: 1 1 200px; }
+.ctl.grow input { width: 100%; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.zoom { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.zoom button { width: 30px; height: 30px; border: none; background: none; color: var(--fg); font-size: 16px; cursor: pointer; }
+.zoom span { min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; }
+.canvas { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: auto; height: 620px; max-height: 75vh;
+  background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 18px 18px; }
+.canvas svg { display: block; }
+.canvas .card { cursor: pointer; }
+.canvas .card:focus-visible rect.box { stroke: var(--accent); stroke-width: 2; }
+.canvas text { font-family: var(--f-body); }
+.canvas .t-tag, .canvas .t-mono { font-family: var(--f-mono); }
+.invsum { font-size: 13px; color: var(--muted); }
+.invsum b { color: var(--fg); font-variant-numeric: tabular-nums; }
+table.inv { min-width: 820px; }
+table.inv tbody tr { cursor: pointer; }
+table.inv tbody tr:hover { background: var(--surface-2); }
+table.inv tbody tr.sel { background: var(--accent-soft); }
+table.inv td { font-size: 13.5px; }
+table.inv td.num { font-family: var(--f-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mini { display: flex; align-items: center; gap: 6px; min-width: 110px; }
+.mini .bar { flex: 1; height: 6px; }
+
+@media (max-width: 1100px) {
+  .explorer.wide { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .explorer { grid-template-columns: minmax(0, 1fr); }
+  .canvas { height: 480px; }
+  .tree { max-height: 420px; overflow: auto; }
+  .layers { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .wrap { padding-inline: 16px; }
+  .assets { grid-template-columns: minmax(0, 1fr); }
+  .phase { grid-template-columns: 40px minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bar i { transition: width .3s ease; }
+}
+
+/* Tab + topologi data contoh */
+.ptabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.ptab { font: inherit; font-family: var(--f-display); font-size: 18px; font-weight: 600; letter-spacing: .02em; background: none; border: none; border-bottom: 3px solid transparent; color: var(--muted); padding: 8px 14px 6px; cursor: pointer; }
+.ptab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.ptab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ptabpanel { display: grid; gap: 36px; }
+.xstats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.xstat { padding: 12px 14px; border-right: 1px solid var(--line); display: grid; gap: 2px; }
+.xstat:last-child { border-right: none; }
+.xstat b { font-family: var(--f-display); font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+.xstat span { font-size: 12.5px; color: var(--muted); }
+.xtool { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.xtool input, .xtool select { font: inherit; font-size: 14px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; }
+.xtool input { flex: 1; min-width: 180px; }
+.tbtn { font: inherit; font-family: var(--f-mono); font-size: 14px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; min-width: 34px; height: 34px; cursor: pointer; padding: 0 10px; }
+.tbtn:hover { background: var(--surface-2); }
+.tbtn:focus-visible, .xtool input:focus-visible, .xtool select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.topo-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); gap: 16px; align-items: start; }
+.xcanvas { position: relative; height: 640px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; touch-action: none; cursor: grab;
+  background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px; }
+.xcanvas.drag { cursor: grabbing; }
+.xcanvas svg { width: 100%; height: 100%; display: block; }
+.lnk { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.lnk.hot { stroke: var(--accent); stroke-width: 2.2; }
+.nd { cursor: pointer; }
+.nd rect.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.nd:hover rect.box { stroke: var(--muted); }
+.nd.sel rect.box { stroke: var(--accent); stroke-width: 2.4; fill: var(--accent-soft); }
+.nd.plan rect.box { stroke-dasharray: 5 4; }
+.nd text { fill: var(--fg); font-family: var(--f-body); }
+.nd .t-type { font-family: var(--f-mono); font-size: 10px; fill: var(--muted); letter-spacing: .06em; }
+.nd .t-name { font-size: 13.5px; font-weight: 600; }
+.nd .t-use { font-family: var(--f-mono); font-size: 10.5px; fill: var(--muted); }
+.nd .barbg { fill: var(--surface-2); }
+.nd .full { fill: var(--danger); }
+.nd .full-t { fill: #ffffff; font-family: var(--f-mono); font-size: 9px; font-weight: 600; }
+.tgl circle { fill: var(--surface); stroke: var(--muted); stroke-width: 1.2; }
+.tgl text { fill: var(--fg); font-family: var(--f-mono); font-size: 10px; }
+.tgl:hover circle { stroke: var(--accent); }
+.xcanvas-hint { position: absolute; left: 10px; bottom: 8px; font-size: 12px; color: var(--muted); background: var(--surface); padding: 2px 6px; border-radius: 3px; pointer-events: none; }
+.port.ro { cursor: default; }
+.xview { min-width: 0; display: grid; gap: 10px; align-content: start; }
+.xseg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; width: fit-content; background: var(--surface); }
+.xseg button { font: inherit; font-size: 14px; font-weight: 600; border: none; background: none; color: var(--muted); padding: 7px 16px; cursor: pointer; }
+.xseg button + button { border-left: 1px solid var(--line); }
+.xseg button[aria-selected="true"] { background: var(--fg); color: var(--bg); }
+.xseg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.xchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.xchip { font: inherit; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: none; color: var(--muted); padding: 4px 8px; border-radius: 3px; cursor: pointer; }
+.xchip[aria-pressed="true"] { border-color: var(--fg); background: var(--surface); color: var(--fg); }
+.xchip i { width: 8px; height: 8px; display: inline-block; }
+.xchip[aria-pressed="false"] i { opacity: .4; }
+.xchip .c { font-family: var(--f-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.xchip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+table.xinv { width: 100%; min-width: 760px; }
+table.xinv td { font-size: 13.5px; }
+table.xinv tbody tr { cursor: pointer; }
+table.xinv tbody tr:hover { background: var(--surface-2); }
+table.xinv tbody tr.sel { background: var(--accent-soft); }
+table.xinv td.num { font-family: var(--f-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.xdev { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.xdev i { width: 8px; height: 8px; flex: none; }
+.xdev .tt { font-family: var(--f-mono); font-size: 10px; color: var(--muted); letter-spacing: .05em; flex: none; }
+.xutil { display: flex; align-items: center; gap: 8px; width: 150px; }
+.xutil .bar { flex: 1; height: 6px; }
+.xutil span { font-family: var(--f-mono); font-size: 12px; width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+.port.extra { background: var(--surface-2); border-style: dashed; }
+.rack { display: grid; gap: 2px; }
+.ru { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; align-items: center; font-size: 13px; }
+.ru .u { font-family: var(--f-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ru .blk { border: 1px solid var(--line); border-radius: 3px; padding: 3px 8px; overflow-wrap: anywhere; }
+.ru .blk.dev { background: var(--active-soft); border-color: var(--active); }
+.ru .blk.ext { background: var(--passive-soft); border-color: var(--passive); }
+.ru .blk.free { color: var(--muted); border-style: dashed; }
+.slotgrid { display: grid; gap: 8px; }
+.slot { border: 1px solid var(--line); border-radius: 5px; padding: 8px 10px; display: grid; gap: 6px; }
+.slot.empty { border-style: dashed; color: var(--muted); font-size: 13px; }
+.cores { display: grid; gap: 3px; }
+.core { display: grid; grid-template-columns: 26px 14px minmax(0, 1fr); gap: 8px; align-items: center; font-size: 13px; }
+.core .dotc { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); }
+.core .n { font-family: var(--f-mono); font-size: 11px; color: var(--muted); text-align: right; }
+.map { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 10px; font-size: 13.5px; border-radius: 0 4px 4px 0; display: grid; gap: 4px; }
+.map b { color: var(--accent); }
+.kidlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.kidlist button { font: inherit; font-size: 13.5px; background: none; border: none; color: var(--accent); cursor: pointer; padding: 2px 0; text-align: left; }
+@media (max-width: 1000px) {
+  .topo-wrap { grid-template-columns: minmax(0, 1fr); }
+  .xcanvas { height: 480px; }
+}
+@media (max-width: 640px) {
+  .xstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .xstat { border-bottom: 1px solid var(--line); }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Whusnet Operasional · Rancangan usulan · 13 Okt 2026</span>
+    <h1>Pohon infrastruktur dengan barang Gudang di setiap posisi</h1>
+    <p>Contoh visual dari <code class="mono">analisa-gap-peta-infrastruktur.md</code>. Data di bawah fiktif. Bagian yang bertanda <b style="color:var(--proposal)">◆ usulan</b> belum ada di kode, sisanya sudah ada atau sedang dikerjakan (belum di-commit).</p>
+  </header>
+
+  <nav class="ptabs" role="tablist" aria-label="Halaman">
+    <button class="ptab" role="tab" id="t-rancangan" data-ptab="rancangan" aria-selected="true" aria-controls="tab-rancangan" type="button">Rancangan Whusnet</button>
+    <button class="ptab" role="tab" id="t-topologi" data-ptab="topologi" aria-selected="false" aria-controls="tab-topologi" type="button">Data contoh prototipe</button>
+  </nav>
+
+  <div class="ptabpanel" id="tab-rancangan" role="tabpanel" aria-labelledby="t-rancangan">
+
+
+  <section>
+    <h2>Satu node, tiga lapis data</h2>
+    <div class="layers">
+      <div class="layer">
+        <span class="tag">LAPIS 1 · POSISI</span>
+        <h3>Di mana titik ini dalam jaringan</h3>
+        <p>Baris <code>network_nodes</code>. Ditambatkan ke POP (<code>anchor_pop_id</code>) atau berada di bawah node hulu (<code>parent_id</code>). Tidak menyimpan model atau SN perangkat.</p>
+      </div>
+      <div class="layer">
+        <span class="tag">LAPIS 2 · KAPASITAS</span>
+        <h3>Port, dan siapa yang menempatinya</h3>
+        <p><code>network_node_ports</code> + <code>network_port_assignments</code>. Satu port berisi pelanggan, node hilir, atau label manual, lengkap dengan riwayat pasang/lepas.</p>
+      </div>
+      <div class="layer">
+        <span class="tag">LAPIS 3 · BARANG GUDANG</span>
+        <h3>Perangkat fisik yang terpasang</h3>
+        <p>Aktif: SN berstatus <code>DEPLOYED</code> (<code>current_network_node_id</code>). Pasif: saldo <code>infrastructure_balances</code> (qty/roll). Ganti perangkat tidak mengubah posisi.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-h"><h2>Contoh pohon: WHUSNET → Jetis → C1</h2><span class="note">Pilih node di tab mana pun. Detailnya, termasuk peta port, barang Gudang, dan kasus terkait, tampil di panel samping.</span></div>
+    <p class="note">Susunan pohon mengikuti data <code class="mono">pops</code> yang sebenarnya: WHUSNET (pusat) → Jetis/Sandya (cabang) → C1/D1 (Mini POP). Node jaringan menempel ke POP lewat <code class="mono">anchor_pop_id</code> atau ke node lain lewat <code class="mono">parent_id</code>. Port uplink (ungu) tidak menentukan induk. Port itu hanya mencatat jalur fisik, misalnya backbone mana yang menyuplai Cabang Jetis.</p>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i>Port: pelanggan</span>
+      <span><i class="sw" style="background:var(--active-soft);border-color:var(--active)"></i>Port: node hilir</span>
+      <span><i class="sw" style="background:var(--passive-soft);border-color:var(--passive)"></i>Port: label manual</span>
+      <span><i class="sw" style="background:var(--proposal-soft);border-color:var(--proposal)"></i>Port: uplink antar-POP ◆</span>
+      <span><i class="sw"></i>Port kosong</span>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Tampilan">
+      <button role="tab" id="tab-tree" data-tab="tree" aria-selected="true">Per POP</button>
+      <button role="tab" id="tab-topo" data-tab="topo" aria-selected="false">Topologi</button>
+      <button role="tab" id="tab-inv" data-tab="inv" aria-selected="false">Inventaris</button>
+    </div>
+    <div class="explorer" id="explorer">
+      <div class="view" id="v-tree">
+        <nav class="tree" id="tree" aria-label="Pohon infrastruktur"></nav>
+      </div>
+      <div class="view" id="v-topo" hidden>
+        <div class="toolbar">
+          <label class="ctl"><span class="sr">Kedalaman topologi</span>
+            <select id="depth">
+              <option value="custom">Kedalaman: kustom</option>
+              <option value="cabang">Sampai Cabang</option>
+              <option value="minipop">Sampai Mini POP (OLT)</option>
+              <option value="odp" selected>Sampai ODP</option>
+              <option value="all">Sampai ONT (semua)</option>
+            </select>
+          </label>
+          <div class="zoom" role="group" aria-label="Zoom">
+            <button id="zoom-out" aria-label="Perkecil">−</button>
+            <span id="zoom-val" class="mono">100%</span>
+            <button id="zoom-in" aria-label="Perbesar">+</button>
+          </div>
+          <span class="note">Lingkaran di kanan kartu: ciutkan/buka. Garis ungu putus-putus: uplink antar-POP ◆.</span>
+        </div>
+        <div class="canvas" id="canvas"></div>
+      </div>
+      <div class="view" id="v-inv" hidden>
+        <div class="toolbar">
+          <label class="ctl"><span class="sr">Filter tipe</span><select id="inv-type"></select></label>
+          <label class="ctl grow"><span class="sr">Cari</span><input id="inv-q" type="search" placeholder="Cari kode, nama, SN, pelanggan, CID"></label>
+          <label class="ctl"><span class="sr">Urutan</span>
+            <select id="inv-sort">
+              <option value="topo">Urut: topologi</option>
+              <option value="util">Urut: utilisasi tertinggi</option>
+              <option value="free">Urut: kosong terbanyak</option>
+            </select>
+          </label>
+        </div>
+        <div class="invsum" id="inv-sum"></div>
+        <div class="tw"><table class="inv"><thead><tr><th>Node</th><th>Tipe</th><th>Cabang</th><th>Status</th><th>Kapasitas</th><th>Utilisasi</th><th>Aktif</th><th>Pasif</th></tr></thead><tbody id="inv-body"></tbody></table></div>
+      </div>
+      <article class="panel" id="panel" aria-live="polite"></article>
+    </div>
+  </section>
+
+  <section>
+    <h2>Kasus yang harus ditangani</h2>
+    <p class="note">K1–K7 diambil dari database Docker per 13 Okt 2026 (dibaca saja, tidak diubah). K8–K14 adalah skenario lapangan yang akan muncul begitu data mulai diisi. Klik kode node untuk melompat ke pohon.</p>
+    <div class="facts">
+      <div class="fact"><span class="eyebrow">Node jaringan</span><span class="v">3</span><span>2 ODP + 1 core router uji, semuanya tanpa induk node</span></div>
+      <div class="fact"><span class="eyebrow">Barang lapangan</span><span class="v">0</span><span>SN DEPLOYED dan saldo infrastruktur</span></div>
+      <div class="fact"><span class="eyebrow">Tanpa Mini POP</span><span class="v">725</span><span>708 Jetis + 17 Sandya</span></div>
+      <div class="fact"><span class="eyebrow">Putus langganan</span><span class="v">234</span><span>port ODP-nya harus dilepas</span></div>
+      <div class="fact"><span class="eyebrow">Person tergabung</span><span class="v">42</span><span>semua pelanggan Sandya berbagi person dengan Jetis</span></div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Kode</th><th>Sumber</th><th>Kasus</th><th>Status</th><th>Node</th></tr></thead>
+        <tbody id="caseRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Barang apa tampil di level mana</h2>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Level</th><th>Perangkat aktif (SN, <code>DEPLOYED</code>)</th><th>Barang pasif (qty / roll)</th><th>Dibaca dari</th></tr></thead>
+        <tbody>
+          <tr><td>POP Pusat · Core · Layanan</td><td class="a">Router core, server BNG/Radius, UPS</td><td class="p">Rack, PDU, SFP, patch cord</td><td>Node yang ditambatkan ke POP <code>pusat</code></td></tr>
+          <tr><td>Backbone</td><td class="a">Radio, media converter</td><td class="p">Kabel FO backbone (roll, meter), joint closure</td><td>Node <code>backbone</code>, uplink lewat port ◆</td></tr>
+          <tr><td>POP Cabang</td><td class="a">Switch agregasi, UPS</td><td class="p">Rack, OTB</td><td>Node <code>aggregation_switch</code></td></tr>
+          <tr><td>Mini POP (OLT)</td><td class="a">Chassis OLT ◆</td><td class="p">—</td><td>Node <code>olt_chassis</code> ◆ (L1)</td></tr>
+          <tr><td>Kartu OLT</td><td class="a">Kartu PON</td><td class="p">Modul SFP PON</td><td>Node <code>olt_card</code>, anak chassis ◆</td></tr>
+          <tr><td>Feeder ◆</td><td class="a">—</td><td class="p">Kabel feeder (roll, meter)</td><td>Node <code>feeder</code>, port = core</td></tr>
+          <tr><td>ODC · ODP</td><td class="a">—</td><td class="p">Kabinet/box, splitter</td><td>Node <code>odc</code> / <code>odp</code></td></tr>
+          <tr><td>Drop</td><td class="a">—</td><td class="p">Kabel drop (roll)</td><td>Dipakai saat instalasi, tercatat ke pelanggan</td></tr>
+          <tr><td>ONT</td><td class="a">ONT/modem (<code>INSTALLED</code>)</td><td class="p">—</td><td>Port ODP → pelanggan → SN pelanggan (bukan deploy)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Pembeda aktif/pasif diambil dari Item (<code>effective_equipment_class</code>), tanpa kolom baru di node.</p>
+  </section>
+
+  <section>
+    <h2>Penjaga yang harus ada sebelum UI dikejar</h2>
+    <div class="guardgrid">
+      <div class="gcard"><span class="gid">L1 · Chassis OLT</span><h3>Node <code class="mono">olt_chassis</code> di bawah Mini POP</h3><p>SN chassis di-deploy ke node ini. Kartu jadi anak chassis, bukan ditambatkan langsung ke Mini POP.</p></div>
+      <div class="gcard"><span class="gid">L2 · Aset lama</span><h3>Registrasi Aset Terpasang</h3><p>SN dibuat langsung <code class="mono">DEPLOYED</code> dengan ledger sendiri dan permission terpisah, tanpa task palsu.</p></div>
+      <div class="gcard"><span class="gid">L3 · Kompatibilitas</span><h3>Kategori barang ↔ tipe node</h3><p>Kartu PON tidak bisa di-deploy ke ODP. Tabel aturan dikelola admin, kosong berarti bebas.</p></div>
+      <div class="gcard"><span class="gid">L4 · Status</span><h3><code class="mono">acceptsNewAttachments()</code></h3><p>Node Rencana/Gangguan/Nonaktif menolak deploy dan pelanggan baru. Nonaktif hanya kalau node sudah kosong.</p></div>
+      <div class="gcard"><span class="gid">L5 · Jumlah port</span><h3>Port node = sumber kebenaran</h3><p>Spesifikasi barang hanya saran isian saat membuat node, tanpa sinkron otomatis.</p></div>
+      <div class="gcard new"><span class="gid">L6 · Temuan baru</span><h3>Port tujuan harus anak node pemilik port</h3><p><code class="mono">parent_id</code> dan sambungan port bisa saling bertentangan: ODP berada di bawah ODC-1, tapi port ODC-2 yang menunjuknya. Aturan: <code class="mono">target.parent_id = port.node_id</code>, kecuali uplink antar-POP (switch agregasi → OLT, backbone → cabang).</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Urutan pengerjaan</h2>
+    <div class="phases">
+      <div class="phase"><span class="n">0</span><div><h3>Kunci keputusan</h3><p>Chassis OLT (L1) diputuskan sebelum kerja <code class="mono">olt_slots</code> di-commit. Jawab pertanyaan lapisan pusat, OLT di Cabang, dan cara isi aset lama.</p></div></div>
+      <div class="phase"><span class="n">1</span><div><h3>Fondasi aturan</h3><p>Aturan susunan tipe, port kartu = port PON (16, bukan 128), status Rencana/Aktif/Gangguan/Nonaktif (L4), aturan L6, lepas kartu.</p></div></div>
+      <div class="phase"><span class="n">2</span><div><h3>Barang Gudang di tiap level</h3><p>Node chassis (L1), Registrasi Aset Terpasang (L2), kompatibilitas (L3), panel aktif/pasif di halaman detail node.</p></div></div>
+      <div class="phase"><span class="n">3</span><div><h3>Akses lanjut</h3><p>Tipe Feeder (port = core, warna serat dari nomor core), hitung ONT per PON secara berantai.</p></div></div>
+      <div class="phase"><span class="n">4</span><div><h3>Lapisan pusat (opsional)</h3><p>Core/Layanan/Backbone di POP Pusat, uplink lintas cabang lewat port, kapasitas Gbps, tinggi rack dari atribut Item.</p></div></div>
+      <div class="phase"><span class="n">5</span><div><h3>Tampilan</h3><p>Kanvas topologi, inventaris dengan urutan utilisasi, pencarian SN/pelanggan/alamat.</p></div></div>
+    </div>
+  </section>
+  </div>
+
+  <div class="ptabpanel" id="tab-topologi" role="tabpanel" aria-labelledby="t-topologi" hidden>
+    <section>
+      <div class="sec-h"><h2>Data contoh prototipe</h2><span class="note">Sumber: <code class="mono">data-contoh.JSON</code> (tanpa node layanan s3–s7)</span></div>
+      <p class="note">Tampilan mengikuti prototipe <code class="mono">peta-infrastruktur-isp.html</code>. Klik node untuk detail. Panel kanan juga menunjukkan bagaimana tiap node dicatat di rancangan Whusnet. Utilisasi: hijau di bawah 70%, kuning 70–89%, merah 90% ke atas (PENUH).</p>
+      <div class="xstats" id="topoStats"></div>
+      <div class="xseg" role="tablist" aria-label="Tampilan data contoh">
+        <button type="button" role="tab" data-xv="topo" aria-selected="true">Topologi</button>
+        <button type="button" role="tab" data-xv="inv" aria-selected="false">Daftar inventaris</button>
+      </div>
+      <div class="xtool">
+        <input id="topoSearch" type="search" placeholder="Cari nama, model, serial ONT, paket… (Enter)" aria-label="Cari node">
+        <select id="invSort" aria-label="Urutkan inventaris" hidden>
+          <option value="tree">Urutan topologi</option>
+          <option value="pct">Utilisasi tertinggi</option>
+          <option value="free">Kosong terbanyak</option>
+        </select>
+        <select id="topoDepth" aria-label="Kedalaman topologi">
+          <option value="custom">Kedalaman: kustom</option>
+          <option value="pop">Sampai POP</option>
+          <option value="olt">Sampai OLT</option>
+          <option value="odp" selected>Sampai ODP</option>
+          <option value="all">Semua (sampai ONT)</option>
+        </select>
+        <button class="tbtn" id="zOut" type="button" aria-label="Perkecil">−</button>
+        <button class="tbtn" id="zIn" type="button" aria-label="Perbesar">+</button>
+        <button class="tbtn" id="zFit" type="button">Pas</button>
+      </div>
+      <div class="topo-wrap">
+        <div class="xview" id="xvTopo">
+          <div class="xcanvas" id="topoCanvas">
+            <svg id="topoSvg" aria-label="Kanvas topologi" role="img"><g id="topoVp"></g></svg>
+            <span class="xcanvas-hint">Seret untuk geser · Ctrl + scroll untuk zoom</span>
+          </div>
+        </div>
+        <div class="xview" id="xvInv" hidden>
+          <div class="xchips" id="invChips" role="group" aria-label="Filter tipe perangkat"></div>
+          <div class="note" id="invSum"></div>
+          <div class="tw"><table class="xinv">
+            <thead><tr><th scope="col">Perangkat</th><th scope="col">Lokasi</th><th scope="col">Terpakai / kapasitas</th><th scope="col">Kosong</th><th scope="col">Utilisasi</th><th scope="col">Status</th></tr></thead>
+            <tbody id="invBody"></tbody>
+          </table></div>
+        </div>
+        <article class="panel" id="topoPanel" aria-live="polite"></article>
+      </div>
+    </section>
+  </div>
+
+</div>
+
+<script>
+const FIBER = [["Biru","#1f6fd1"],["Jingga","#f08a24"],["Hijau","#2e9e4f"],["Coklat","#8a5a2b"],["Abu-abu","#8c939b"],["Putih","#e8e8e4"],["Merah","#d63a3a"],["Hitam","#1b1b1b"],["Kuning","#f2c81f"],["Ungu","#7b4bc4"],["Merah muda","#f08fb6"],["Aqua","#3cc6cf"]];
+const STATUS = {
+  active: ["Aktif", "var(--ok)"],
+  planned: ["Rencana ◆", "var(--proposal)"],
+  fault: ["Gangguan ◆", "var(--danger)"],
+  inactive: ["Nonaktif", "var(--muted)"]
+};
+const CUSTOMERS = ["Siti Nugroho","Agus Riyadi","Dewi Lestari","Bambang Susilo","Rina Wahyuni","Joko Prasetyo","Sri Handayani","Eko Saputro","Wulan Sari","Hadi Purnomo","Nur Aini","Teguh Santoso","Yuli Astuti","Fajar Ramadhan"];
+
+function ports(total, fill) {
+  const list = [];
+  for (let n = 1; n <= total; n++) list.push({ n, use: null, label: "" });
+  fill.forEach(f => Object.assign(list[f.n - 1], f));
+  return list;
+}
+function custPorts(nums, offset, prefix, dist) {
+  return nums.map((n, i) => {
+    const name = CUSTOMERS[(i + offset) % CUSTOMERS.length];
+    return { n, use: "customer", label: name, ont: "ZTE F609", sn: prefix + String(4100 + i + offset * 3).padStart(6, "0"), cid: "C1" + dist + "RQ" + String(631 + i + offset * 7).padStart(6, "0") };
+  });
+}
+
+const N = {
+  whusnet: { kind: "pop", type: "POP pusat", code: "WHUSNET", name: "WHUSNET", status: "active", place: "pops · type=pusat · parent_id=null (akar)", children: ["core01", "jetis", "sandya"], note: "Akar hierarki POP. Cabang menempel ke sini lewat pops.parent_id. Barang dan perangkat Pusat dicatat di node yang ditambatkan ke WHUSNET." },
+  core01: { type: "core_router", code: "CORE-01", name: "Core Router", status: "active", place: "anchor: WHUSNET",
+    ports: ports(16, [{n:1,use:"node",label:"BB-JETIS-01"},{n:2,use:"node",label:"BNG-01"},{n:3,use:"node",label:"BB-SANDYA-01"},{n:4,use:"manual",label:"Upstream IIX"},{n:5,use:"manual",label:"IP Transit"}]),
+    active: [{ item: "MikroTik CCR2216-1G-12XS-2XQ", sn: "HG109AQ7Z21", src: "Registrasi Aset Terpasang ◆ (L2)" }],
+    passive: [{ item: "SFP+ 10G LR", qty: "6 pcs", src: "Registrasi Aset Terpasang ◆" }, { item: "Rack 42U", qty: "1 unit", src: "Registrasi Aset Terpasang ◆" }],
+    proposal: "Penempatan di POP Pusat sudah bisa sekarang. Yang baru: barang lama masuk lewat Registrasi Aset Terpasang (L2).",
+    children: ["bng01", "bbJetis", "bbSandya"] },
+  bng01: { type: "service ◆", code: "BNG-01", name: "BNG / Radius", status: "active", place: "parent: CORE-01", phase: 4,
+    active: [{ item: "Server Dell R650 (BNG)", sn: "7XQ2LK3", src: "Registrasi Aset Terpasang ◆" }, { item: "Server Dell R350 (Radius)", sn: "4BZ8MN1", src: "Registrasi Aset Terpasang ◆" }],
+    passive: [], proposal: "Tipe node layanan baru (Fase 4). Kapasitas tidak dihitung, hanya tempat barang." },
+  bbJetis: { type: "backbone", code: "BB-JETIS-01", name: "Backbone Fiber 10G → Jetis", status: "active", place: "parent: CORE-01", gbps: [6.4, 10],
+    ports: ports(4, [{n:1,use:"uplink",label:"AGG-JETIS-01 (Cabang Jetis)"}]),
+    active: [{ item: "Media Converter 10G", sn: "MC10G-55821", src: "Deploy · TFOP-20260911-000014" }],
+    passive: [{ item: "Kabel FO 24 core", qty: "3.200 m", lot: "R-0091", src: "Deploy roll · TFOP-20260911-000014" }, { item: "Joint Closure 48", qty: "3 pcs", src: "Deploy · TFOP-20260911-000014" }],
+    proposal: "Induk Jetis di pohon tetap WHUSNET (pops.parent_id). Port uplink ini mencatat jalur fisiknya: backbone mana yang menyuplai Cabang Jetis. Kapasitas Gbps belum ada kolomnya (Fase 4)." },
+  bbSandya: { type: "backbone", code: "BB-SANDYA-01", name: "Backbone Radio 1G → Sandya", status: "active", place: "parent: CORE-01", gbps: [0.4, 1],
+    ports: ports(2, [{n:1,use:"uplink",label:"AGG-SANDYA-01 (Cabang Sandya)"}]),
+    active: [{ item: "Radio PTP 5 GHz (sisi Pusat)", sn: "RAD5G-11820", src: "Registrasi Aset Terpasang ◆" }],
+    passive: [{ item: "Tiang antena 6 m", qty: "1 unit", src: "Registrasi Aset Terpasang ◆" }] },
+
+  jetis: { kind: "pop", type: "POP cabang", code: "C", name: "Jetis", status: "active", place: "pops · type=cabang · parent_id=WHUSNET", children: ["aggJetis", "c1"], note: "Unit cabang: scope RBAC, CID prefix C, gudang cabang. Cabang setiap node di bawahnya dihitung oleh Pop::resolveCabangId(), yang berhenti di sini, tidak naik ke WHUSNET." },
+  aggJetis: { type: "aggregation_switch", code: "AGG-JETIS-01", name: "Switch Agregasi Jetis", status: "active", place: "anchor: Jetis",
+    ports: ports(24, [{n:1,use:"uplink",label:"OLT-C1 (Mini POP C1)"},{n:24,use:"manual",label:"Uplink dari BB-JETIS-01"}]),
+    active: [{ item: "MikroTik CRS326-24S+2Q+", sn: "HE20B7KXP02", src: "Deploy · TFOP-20260702-000031" }],
+    passive: [{ item: "OTB 24 port", qty: "1 unit", src: "Deploy · TFOP-20260702-000031" }, { item: "Patch cord SC-UPC 3m", qty: "18 pcs", src: "Deploy · TFOP-20260702-000031" }],
+    proposal: "Jumlah port (24) diisi manual saat membuat node. Spesifikasi switch hanya jadi saran isian (L5). Port 1 adalah uplink antar-POP ke chassis OLT di Mini POP C1." },
+
+  c1: { kind: "pop", type: "Mini POP", code: "C1", name: "C1", status: "active", place: "pops · type=mini_pop · parent_id=Jetis", children: ["chsC1"], note: "OLT = Mini POP (keputusan v3). Distribusi X4A–X4D ada di bawah Mini POP ini. Mini POP bukan node, jadi chassis dicatat lewat node pembungkus." },
+  chsC1: { type: "olt_chassis ◆", code: "OLT-C1", name: "Chassis OLT C1", status: "active", place: "anchor: C1 (Mini POP)", phase: 2,
+    slots: [{ s: 1, card: "CARD-C1-1" }, { s: 2, card: "CARD-C1-2" }, { s: 3, card: null }, { s: 4, card: null }],
+    active: [{ item: "ZTE C320 chassis", sn: "ZTEC320A0019", src: "Registrasi Aset Terpasang ◆" }],
+    passive: [{ item: "Kabel power + grounding", qty: "1 set", src: "Registrasi Aset Terpasang ◆" }],
+    proposal: "L1: node chassis ditambatkan ke Mini POP. Slot OLT jadi milik chassis, kartu jadi anak chassis (attachCard() sekarang mewajibkan kartu langsung di Mini POP).",
+    children: ["card1", "card2"] },
+  card1: { type: "olt_card", code: "CARD-C1-1", name: "Kartu GTGO slot 1", status: "active", place: "parent: OLT-C1 · slot 1",
+    ponLoad: [[1, 23], [2, 9], [3, 2]],
+    ports: ports(16, [{n:1,use:"node",label:"FDR-C1-1.1"},{n:2,use:"node",label:"FDR-C1-1.2"},{n:3,use:"manual",label:"PON 1/3 · feeder belum dipetakan"}]),
+    active: [{ item: "Kartu GTGO 16 port GPON", sn: "ZTEGTGO77310", src: "Deploy · TFOP-20260815-000102" }],
+    passive: [{ item: "SFP GPON C+", qty: "3 pcs", src: "Deploy · TFOP-20260815-000102" }],
+    proposal: "Port kartu = port PON (16), bukan 128. Angka 128 pindah ke batas ONT per PON, dihitung berantai dari pelanggan di hilir (Fase 1 & 3).",
+    children: ["fdr11", "fdr12"] },
+  card2: { type: "olt_card", code: "CARD-C1-2", name: "Kartu GTGO slot 2", status: "fault", place: "parent: OLT-C1 · slot 2",
+    ponLoad: [[1, 5]],
+    ports: ports(16, [{n:1,use:"manual",label:"PON 2/1 · ODP belum dipetakan"}]),
+    active: [{ item: "Kartu GTGO 16 port GPON", sn: "ZTEGTGO80144", src: "Deploy · TFOP-20260921-000008" }],
+    passive: [],
+    proposal: "Status Gangguan (L4): kartu tidak menerima feeder atau pelanggan baru sampai pulih. Kartu tidak bisa dilepas selama port 1 masih terpakai." },
+  fdr11: { type: "feeder ◆", code: "FDR-C1-1.1", name: "Feeder 24 core", status: "active", place: "parent: CARD-C1-1 · PON 1", phase: 3, fiber: true,
+    ports: ports(24, [{n:1,use:"node",label:"ODC-C1-01"},{n:2,use:"node",label:"ODP-X4C-003"},{n:3,use:"manual",label:"Cadangan rusak (putus km 1,2)"}]),
+    active: [], passive: [{ item: "Kabel FO 24 core ADSS", qty: "850 m", lot: "R-0104", src: "Deploy roll · TFOP-20260815-000102" }],
+    proposal: "Tipe Feeder baru: port = core. Warna serat dihitung dari nomor core (12 warna per tube), tidak disimpan.",
+    children: ["odc01", "odp003"] },
+  fdr12: { type: "feeder ◆", code: "FDR-C1-1.2", name: "Feeder 12 core", status: "active", place: "parent: CARD-C1-1 · PON 2", phase: 3, fiber: true,
+    ports: ports(12, [{n:1,use:"node",label:"ODP-X4D-005"}]),
+    active: [], passive: [{ item: "Kabel FO 12 core ADSS", qty: "430 m", lot: "R-0098", src: "Deploy roll · TFOP-20260818-000044" }],
+    children: ["odp005"] },
+  odc01: { type: "odc", code: "ODC-C1-01", name: "ODC Jl. Raya Jetis", status: "active", place: "parent: FDR-C1-1.1 · core 1",
+    ports: ports(16, [{n:1,use:"node",label:"ODP-X4A-001"},{n:2,use:"node",label:"ODP-X4B-002"}]),
+    active: [], passive: [{ item: "Kabinet ODC 144", qty: "1 unit", src: "Deploy · TFOP-20260815-000102" }, { item: "Splitter PLC 1:16", qty: "1 pcs", src: "Deploy · TFOP-20260815-000102" }],
+    children: ["odp001", "odp002"] },
+  odp001: { type: "odp", code: "ODP-X4A-001", name: "ODP Gg. Melati", status: "active", place: "parent: ODC-C1-01 · port 1", redZone: 80,
+    ports: ports(16, [...custPorts([1,2,3,4,5,6,7,8,10,11,12,13], 0, "ZTEGC0", "X4A"), {n:14,use:"manual",label:"Tiang PLN, belum ada pelanggan"}]),
+    active: [], passive: [{ item: "Box ODP 16 core", qty: "1 unit", src: "Deploy · TFOP-20260816-000011" }, { item: "Splitter PLC 1:16", qty: "1 pcs", src: "Deploy · TFOP-20260816-000011" }],
+    ontNote: true },
+  odp002: { type: "odp", code: "ODP-X4B-002", name: "ODP Perum Asri", status: "active", place: "parent: ODC-C1-01 · port 2", redZone: 80,
+    ports: ports(8, custPorts([1,2,3,4,5,6,7,8], 4, "ZTEGD1", "X4B")),
+    active: [], passive: [{ item: "Box ODP 8 core", qty: "1 unit", src: "Registrasi Aset Terpasang ◆" }, { item: "Splitter PLC 1:8", qty: "1 pcs", src: "Registrasi Aset Terpasang ◆" }],
+    ontNote: true },
+  odp003: { type: "odp", code: "ODP-X4C-003", name: "ODP Pasar Jetis", status: "active", place: "parent: FDR-C1-1.1 · core 2", redZone: 80,
+    ports: ports(8, custPorts([1,2,5], 9, "ZTEGE2", "X4C")),
+    active: [], passive: [{ item: "Box ODP 8 core", qty: "1 unit", src: "Deploy · TFOP-20260901-000027" }],
+    ontNote: true },
+  odp005: { type: "odp", code: "ODP-X4D-005", name: "ODP Balai Desa", status: "planned", place: "parent: FDR-C1-1.2 · core 1", redZone: 80,
+    ports: ports(8, []),
+    active: [], passive: [],
+    proposal: "Status Rencana (L4): ODP sudah dipetakan, tapi belum boleh dipilih di form instalasi dan belum boleh menerima deploy." },
+
+  sandya: { kind: "pop", type: "POP cabang", code: "D", name: "Sandya", status: "active", place: "pops · type=cabang · parent_id=WHUSNET", children: ["aggSandya", "d1"], note: "Cabang kedua, CID prefix D. Sebelum perbaikan resolver, Sandya dan Jetis sama-sama terbaca WHUSNET, sehingga guard lintas cabang lolos." },
+  aggSandya: { type: "aggregation_switch", code: "AGG-SANDYA-01", name: "Switch Agregasi Sandya", status: "active", place: "anchor: Sandya",
+    ports: ports(8, [{n:1,use:"uplink",label:"OLT-D1 (Mini POP D1, rencana)"},{n:8,use:"manual",label:"Uplink dari BB-SANDYA-01"}]),
+    active: [{ item: "MikroTik CRS310-8G+2S+", sn: "HF31C0QW118", src: "Registrasi Aset Terpasang ◆" }],
+    passive: [] },
+  d1: { kind: "pop", type: "Mini POP", code: "D1", name: "D1", status: "active", place: "pops · type=mini_pop · parent_id=Sandya", children: ["chsD1"], note: "Mini POP Sandya. OLT-nya masih direncanakan." },
+  chsD1: { type: "olt_chassis ◆", code: "OLT-D1", name: "Chassis OLT D1", status: "planned", place: "anchor: D1 (Mini POP)", phase: 2,
+    slots: [{ s: 1, card: null }, { s: 2, card: null }],
+    active: [], passive: [],
+    proposal: "Belum ada barang. Begitu chassis dikirim dari Gudang Sandya lewat task INFR REQ, SN-nya muncul di sini sebagai DEPLOYED. Selama Rencana, kartu belum boleh dipasang (L4). SN dari Gudang Jetis ditolak: cabangnya beda." }
+};
+const ROOTS = ["whusnet"];
+
+// ===== Kasus tambahan: K1–K7 dari database (13 Okt 2026), K8–K14 skenario =====
+const CASES = {
+  K1: { real: true, tone: "perlu", node: "odpJts13", title: "ODP langsung di Cabang, belum terhubung ke OLT", text: "ODP-JTS-13 ditambatkan ke Jetis tanpa induk. Hasil reshape tabel odps lama. Topologinya putus: tidak bisa dihitung masuk PON mana. Perlu dipindah ke bawah feeder/ODC begitu jalurnya dipetakan. Selama itu tampil sebagai node yang belum terhubung." },
+  K2: { real: true, tone: "bahaya", node: "jts16", title: "Nama Jetis, tapi ditambatkan ke Mini POP Sandya", text: "JTS16 \"ODP JETIS 16\" anchor-nya D1 (Sandya). Setelah perbaikan resolver, pelanggan Jetis ditolak dipasang di sini. Sebelum perbaikan, guard lolos. Kalau memang salah input, pindahkan ke C1 lewat move(). Ledger lama tetap mencatat cabang Sandya (snapshot)." },
+  K3: { real: true, tone: "perlu", node: "junkCore", title: "Data uji di Pusat yang tidak bisa dihapus", text: "core_router \"DADASADS / adsasadsdas\" aktif di WHUSNET. Tidak ada jalur hapus node (FK restrict, tanpa route delete). Usul: hapus boleh hanya kalau node kosong (tanpa port terpakai, barang, anak, dan riwayat). Selebihnya cukup Nonaktif." },
+  K4: { real: true, tone: "perlu", node: "jetis", title: "Pelanggan tanpa Mini POP", text: "708 pelanggan Jetis dan 17 pelanggan Sandya punya mini_pop_id kosong. OLT mereka tidak diketahui. Form instalasi menawarkan semua ODP di cabang + Mini POP-nya, jadi tetap bisa ditempatkan. Begitu port ODP terisi, Mini POP bisa diturunkan dari pohon." },
+  K5: { real: true, tone: "bahaya", node: "odp002", title: "Pelanggan putus langganan masih memegang port", text: "234 pelanggan berstatus terminated. Kalau port ODP-nya tidak dilepas, port terlihat penuh padahal kosong (contoh: ODP-X4B-002 port 7). Usul: alur DEAC \"Ambil Alat\" juga melepas assignment port." },
+  K6: { real: true, tone: "perlu", node: "chsC1", title: "Belum ada satu pun barang lapangan tercatat", text: "inventory_serials DEPLOYED = 0 dan infrastructure_balances = 0. Semua perangkat yang sudah berdiri (OLT, switch, box ODP) belum masuk sistem. Ini alasan L2 Registrasi Aset Terpasang didahulukan sebelum tampilan topologi." },
+  K7: { real: true, tone: "aman", node: "cabangDebug", title: "POP debug tanpa induk", text: "\"Pusat Debug\" dan \"Cabang Debug\" tidak punya parent_id. Setelah perbaikan, Cabang Debug terbaca sebagai dirinya sendiri. Tidak ada node yang menempel. Cukup dinonaktifkan kalau tidak dipakai." },
+  K8: { real: false, tone: "bahaya", node: "odc02", title: "Induk di pohon dan sambungan port saling bertentangan (L6)", text: "ODP-X4B-002 berada di bawah ODC-C1-01, tapi port 1 ODC-C1-02 yang menunjuknya. Mana yang benar? Usul L6: port hanya boleh menunjuk anak langsung node pemilik port, jadi assign ini ditolak sampai ODP dipindah ke bawah ODC-C1-02." },
+  K9: { real: false, tone: "aman", node: "odp001b", title: "Splitter bertingkat: ODP di bawah ODP", text: "Port 16 ODP-X4A-001 menyuplai sub-ODP 1:8. Didukung tanpa tipe baru, asal sub-ODP adalah anak ODP induk (L6). Pelanggan sub-ODP ikut terhitung di PON 1." },
+  K10: { real: false, tone: "aman", node: "odp001", title: "Pelanggan pindah port", text: "Port 9 ODP-X4A-001 sekarang kosong, tapi riwayatnya tersimpan: assignment lama dilepas (released_at) saat pelanggan pindah ke ODP lain. Klik port 9." },
+  K11: { real: false, tone: "aman", node: "odp001", title: "Ganti ONT tanpa ganti port", text: "Port 2 tetap milik pelanggan yang sama. SN ONT berganti lewat ledger Gudang (RETURN lalu INSTALL), bukan lewat port. Klik port 2." },
+  K12: { real: false, tone: "bahaya", node: "odp003", title: "Barang salah tempat (L3)", text: "Kartu PON GTGO tercatat DEPLOYED di ODP-X4C-003. Sekarang deploySerial() hanya mengecek ownership_mode, jadi ini lolos. Usul L3: aturan kategori barang ↔ tipe node." },
+  K13: { real: false, tone: "bahaya", node: "odc00", title: "Node Nonaktif masih berisi barang dan pelanggan (L4)", text: "ODC-C1-00 sudah dibongkar dan dinonaktifkan, tapi kabinetnya masih tercatat di sini dan ODP-X4A-009 dengan 2 pelanggan masih menggantung di bawahnya. Usul L4: Nonaktif hanya boleh kalau port, barang, dan anaknya sudah kosong." },
+  K14: { real: false, tone: "perlu", node: "card3", title: "Kartu OLT belum masuk slot", text: "CARD-C1-3 sudah dibuat dan SN-nya ada, tapi belum dipasang di slot chassis mana pun. Port PON-nya tidak boleh dipakai sebelum kartu masuk slot." }
+};
+const TONE = { bahaya: ["Bermasalah", "var(--danger)"], perlu: ["Perlu tindakan", "var(--warn)"], aman: ["Didukung", "var(--ok)"] };
+
+Object.assign(N, {
+  junkCore: { type: "core_router", code: "DADASADS", name: "adsasadsdas", status: "active", place: "anchor: WHUSNET", active: [], passive: [], cases: ["K3"] },
+  odpJts13: { type: "odp", code: "ODP-JTS-13", name: "ODP JETIS 13", status: "active", place: "anchor: Jetis (tanpa induk node)", redZone: 80, ports: ports(8, []), active: [], passive: [], cases: ["K1"] },
+  jts16: { type: "odp", code: "JTS16", name: "ODP JETIS 16", status: "active", place: "anchor: D1 (Mini POP Sandya)", redZone: 80, ports: ports(8, []), active: [], passive: [], cases: ["K2"] },
+  card3: { type: "olt_card", code: "CARD-C1-3", name: "Kartu GTGO cadangan", status: "active", place: "anchor: C1 (belum di slot)", ports: ports(16, []),
+    active: [{ item: "Kartu GTGO 16 port GPON", sn: "ZTEGTGO81502", src: "Deploy · TFOP-20261002-000019" }], passive: [], cases: ["K14"] },
+  odc00: { type: "odc", code: "ODC-C1-00", name: "ODC lama Jl. Pemuda (dibongkar)", status: "inactive", place: "anchor: C1", ports: ports(8, [{n:1,use:"node",label:"ODP-X4A-009"}]),
+    active: [], passive: [{ item: "Kabinet ODC 48", qty: "1 unit", src: "Registrasi Aset Terpasang ◆ · belum ditarik" }], cases: ["K13"], children: ["odp009"] },
+  odp009: { type: "odp", code: "ODP-X4A-009", name: "ODP Jl. Pemuda", status: "active", place: "parent: ODC-C1-00 · port 1", redZone: 80, ports: ports(8, custPorts([1,2], 11, "ZTEGF3", "X4A")),
+    active: [], passive: [{ item: "Box ODP 8 core", qty: "1 unit", src: "Registrasi Aset Terpasang ◆" }], ontNote: true, cases: ["K13"] },
+  odc02: { type: "odc", code: "ODC-C1-02", name: "ODC Pertigaan Jetis", status: "active", place: "parent: FDR-C1-1.1 · core 4", ports: ports(8, [{n:1,use:"node",label:"ODP-X4B-002 (bukan anaknya)",conflict:true}]),
+    active: [], passive: [{ item: "Kabinet ODC 48", qty: "1 unit", src: "Deploy · TFOP-20260930-000040" }], cases: ["K8"] },
+  odp001b: { type: "odp", code: "ODP-X4A-001B", name: "Sub-ODP Gg. Melati Ujung", status: "active", place: "parent: ODP-X4A-001 · port 16", redZone: 80, ports: ports(8, custPorts([1,2,3], 6, "ZTEGH4", "X4A")),
+    active: [], passive: [{ item: "Splitter PLC 1:8", qty: "1 pcs", src: "Deploy · TFOP-20260925-000006" }], ontNote: true, cases: ["K9"] },
+  pusatDebug: { kind: "pop", type: "POP pusat", code: "DBG-PUSAT", name: "Pusat Debug", status: "active", place: "pops · type=pusat · parent_id=null", children: [], note: "Pusat kedua untuk debug. Tidak punya cabang.", cases: ["K7"] },
+  cabangDebug: { kind: "pop", type: "POP cabang", code: "DBG-CABANG", name: "Cabang Debug", status: "active", place: "pops · type=cabang · parent_id=null", children: [], note: "Cabang tanpa induk. resolveCabangId() mengembalikan dirinya sendiri.", cases: ["K7"] }
+});
+N.whusnet.children.push("junkCore");
+N.jetis.children.push("odpJts13");
+N.jetis.cases = ["K4"];
+N.chsC1.cases = ["K6"];
+N.c1.children.push("card3", "odc00");
+N.d1.children.push("jts16");
+N.fdr11.ports[3] = { n: 4, use: "node", label: "ODC-C1-02" };
+N.fdr11.children.push("odc02");
+N.odp001.ports[15] = { n: 16, use: "node", label: "ODP-X4A-001B (sub-ODP 1:8)" };
+N.odp001.children = ["odp001b"];
+N.odp001.ports[8] = { n: 9, use: null, label: "", history: ["12 Agu 2026 · Wulan Sari dipasang (TFOP-20260812-000007)", "3 Okt 2026 · dilepas: pelanggan pindah ke ODP-X4C-003 port 5"] };
+Object.assign(N.odp001.ports[1], { history: ["16 Agu 2026 · ONT ZTE F609 ZTEGC0004101 dipasang", "20 Sep 2026 · ONT rusak, ditarik ke Gudang Jetis (RETURN)", "20 Sep 2026 · ONT pengganti ZTEGC0009917 dipasang (INSTALL)"], sn: "ZTEGC0009917" });
+N.odp001.cases = ["K10", "K11"];
+Object.assign(N.odp002.ports[6], { label: N.odp002.ports[6].label + " · putus langganan 1 Okt 2026", terminated: true });
+N.odp002.cases = ["K5"];
+N.odp003.active = [{ item: "Kartu GTGO 16 port GPON", sn: "ZTEGTGO79021", src: "Deploy · TFOP-20260928-000012 · salah tempat" }];
+N.odp003.cases = ["K12"];
+ROOTS.push("pusatDebug", "cabangDebug");
+
+function used(node) { return node.ports ? node.ports.filter(p => p.use).length : null; }
+function utilColor(pct, rz) {
+  if (rz && pct >= rz) return "var(--danger)";
+  if (pct >= 70) return "var(--warn)";
+  return "var(--ok)";
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let selected = "odp001";
+const open = new Set(["whusnet", "jetis", "c1", "chsC1", "card1", "fdr11", "odc01"]);
+try { const s = localStorage.getItem("infra-sel"); if (s && N[s]) selected = s; } catch (e) {}
+
+function renderTree() {
+  const build = ids => "<ul>" + ids.map(id => {
+    const n = N[id];
+    const kids = n.children || [];
+    const isOpen = open.has(id);
+    const u = used(n);
+    let pct = "";
+    if (u !== null && n.ports.length) {
+      const v = Math.round(u / n.ports.length * 100);
+      pct = `<span class="pct" style="color:${utilColor(v, n.redZone)}">${u}/${n.ports.length}</span>`;
+    }
+    const st = STATUS[n.status];
+    const prop = (n.type || "").includes("◆") ? '<span class="mk" title="Usulan">◆</span>' : "";
+    return `<li><div class="row">
+      <button class="tg" data-tg="${id}" ${kids.length ? "" : "disabled"} aria-label="${isOpen ? "Ciutkan" : "Buka"} ${esc(n.code)}" aria-expanded="${isOpen}">${kids.length ? (isOpen ? "▾" : "▸") : ""}</button>
+      <button class="nb ${id === selected ? "sel" : ""}" data-sel="${id}">
+        <span class="dot" style="background:${st[1]}" title="${st[0]}"></span>
+        <span class="ty ${n.kind === "pop" ? "pop" : ""}">${esc((n.type || "").replace(" ◆", ""))}</span>${prop}
+        <span class="tcode">${esc(n.code)}</span><span class="tname">${esc(n.name)}</span>${pct}${(n.cases || []).map(c => `<span class="cb" style="color:${TONE[CASES[c].tone][1]}" title="${esc(CASES[c].title)}">${c}</span>`).join("")}
+      </button></div>${kids.length && isOpen ? build(kids) : ""}</li>`;
+  }).join("") + "</ul>";
+  document.getElementById("tree").innerHTML = build(ROOTS);
+}
+
+function parentMap() {
+  const m = {};
+  Object.entries(N).forEach(([k, v]) => (v.children || []).forEach(c => m[c] = k));
+  return m;
+}
+function cabangOf(id) {
+  const m = parentMap();
+  let cur = id;
+  while (cur) {
+    if (N[cur].type === "POP cabang") return N[cur].name;
+    if (N[cur].type === "POP pusat") return N[cur].name + " (node Pusat, bukan milik cabang mana pun)";
+    cur = m[cur];
+  }
+  return "-";
+}
+function crumb(id) {
+  const parentOf = {};
+  Object.entries(N).forEach(([k, v]) => (v.children || []).forEach(c => parentOf[c] = k));
+  const path = [];
+  let cur = id;
+  while (cur) { path.unshift(N[cur].kind === "pop" ? N[cur].name : N[cur].code); cur = parentOf[cur]; }
+  return path.join(" → ");
+}
+
+function assetBox(cls, title, list, emptyText) {
+  const items = list && list.length ? "<ul>" + list.map(a => `<li><span><b>${esc(a.item)}</b>${a.sn ? ` · <span class="mono">${esc(a.sn)}</span>` : ""}${a.qty ? ` · ${esc(a.qty)}` : ""}${a.lot ? ` · <span class="mono">roll ${esc(a.lot)}</span>` : ""}</span><span class="src">${esc(a.src)}</span></li>`).join("") + "</ul>"
+    : `<div class="empty">${emptyText}</div>`;
+  return `<div class="abox ${cls}"><h4>${title}</h4>${items}</div>`;
+}
+
+let selPort = null;
+function renderPanel() {
+  const id = selected, n = N[id];
+  const st = STATUS[n.status];
+  let h = `<div class="ph"><div class="line1"><span class="ty ${n.kind === "pop" ? "pop" : ""}">${esc(n.type)}</span><h2>${esc(n.code)}</h2>
+    <span class="chip" style="color:${st[1]}">${st[0]}</span>${n.phase ? `<span class="chip" style="color:var(--proposal)">◆ Fase ${n.phase}</span>` : ""}</div>
+    <div>${esc(n.name)}</div><div class="crumb">${esc(crumb(id))}</div></div>`;
+  if (n.cases && n.cases.length) {
+    h += `<div class="sec casebox">${n.cases.map(c => { const k = CASES[c], t = TONE[k.tone]; return `<div class="case" style="border-left-color:${t[1]}"><div class="ch"><b style="color:${t[1]}">${c}</b><strong>${esc(k.title)}</strong><span class="chip" style="color:${t[1]}">${t[0]}</span><span class="chip" style="color:var(--muted)">${k.real ? "Data nyata" : "Skenario"}</span></div><p>${esc(k.text)}</p></div>`; }).join("")}</div>`;
+  }
+
+  h += `<div class="sec"><div class="sec-h"><span class="eyebrow">Lapis 1 · Posisi</span></div>
+    <dl class="kv"><dt>Penempatan</dt><dd class="mono">${esc(n.place)}</dd>
+    ${n.kind === "pop" ? `<dt>Catatan</dt><dd>${esc(n.note)}</dd>` : `<dt>Cabang</dt><dd>${esc(cabangOf(id))} <span class="note">(diturunkan lewat resolvePop(), berhenti di POP bertipe cabang)</span></dd>`}</dl></div>`;
+
+  if (n.kind === "pop") {
+    h += `<div class="sec"><p class="note">POP bukan node, jadi tidak punya port atau barang langsung. ${n.children.length ? `Barang di lokasi ini dicatat di node yang ditambatkan ke POP ini: ${n.children.map(c => `<b>${esc(N[c].code)}</b>`).join(", ")}.` : "Belum ada node yang ditambatkan ke POP ini."}</p></div>`;
+    document.getElementById("panel").innerHTML = h;
+    return;
+  }
+
+  // Lapis 2
+  h += `<div class="sec"><div class="sec-h"><span class="eyebrow">Lapis 2 · Kapasitas</span>`;
+  if (n.ports) {
+    const u = used(n), t = n.ports.length, pct = Math.round(u / t * 100);
+    const unit = n.fiber ? "core" : n.type === "olt_card" ? "PON" : "port";
+    h += `<span class="mono">${u}/${t} ${unit} · ${pct}%${n.redZone && pct >= n.redZone ? ' · <b style="color:var(--danger)">RED ZONE</b>' : ""}</span></div>
+      <div class="bar"><i style="width:${pct}%;background:${utilColor(pct, n.redZone)}"></i></div>
+      <div class="ports" role="group" aria-label="Port">${n.ports.map(p => {
+        const fc = n.fiber ? FIBER[(p.n - 1) % 12] : null;
+        return `<button class="port ${p.use || ""} ${p.terminated ? "term" : ""} ${p.conflict ? "conf" : ""} ${selPort === p.n ? "on" : ""}" data-port="${p.n}" title="${fc ? "Core " + p.n + " · " + fc[0] : "Port " + p.n}">${p.n}${fc ? `<span class="fc" style="background:${fc[1]}"></span>` : ""}</button>`;
+      }).join("")}</div>`;
+    const sp = selPort ? n.ports[selPort - 1] : null;
+    let info = "Klik port untuk melihat isinya.";
+    if (sp) {
+      const fc = n.fiber ? ` · serat ${FIBER[(sp.n - 1) % 12][0]}, tube ${Math.floor((sp.n - 1) / 12) + 1}` : "";
+      const kinds = { customer: "Pelanggan", node: "Node hilir", manual: "Label manual", uplink: "Uplink antar-POP ◆" };
+      info = sp.use ? `<b>${n.fiber ? "Core" : "Port"} ${sp.n}</b>${fc} · ${kinds[sp.use]}: ${esc(sp.label)}${sp.use === "customer" ? ` · <span class="mono">${esc(sp.cid)}</span> · ONT <span class="mono">${esc(sp.sn)}</span>` : ""}`
+        : `<b>${n.fiber ? "Core" : "Port"} ${sp.n}</b>${fc} · kosong${n.status !== "active" ? " · tidak bisa dipakai selama status " + STATUS[n.status][0] : ""}`;
+    }
+    if (sp && sp.terminated) info += ` · <b style="color:var(--danger)">port masih dipegang pelanggan yang sudah putus (K5)</b>`;
+    if (sp && sp.conflict) info += ` · <b style="color:var(--danger)">konflik L6: node tujuan bukan anak node ini (K8)</b>`;
+    if (sp && sp.history) info += `<ol class="hist">${sp.history.map(x => `<li>${esc(x)}</li>`).join("")}</ol>`;
+    h += `<div class="pinfo">${info}</div>`;
+    if (n.ponLoad) {
+      h += `<div class="prop"><b>◆ Hitung berantai (Fase 3):</b> ${n.ponLoad.map(([p, c]) => `PON ${p}: <span class="mono">${c}/128 ONT</span>`).join(" · ")}. Dihitung dari pelanggan di seluruh hilir port, tidak disimpan.</div>`;
+    }
+  } else if (n.slots) {
+    h += `<span class="mono">${n.slots.filter(s => s.card).length}/${n.slots.length} slot terisi</span></div>
+      <div class="tw" style="border-radius:4px"><table style="min-width:0;width:100%"><thead><tr><th>Slot</th><th>Kartu (node anak)</th></tr></thead><tbody>
+      ${n.slots.map(s => `<tr><td class="mono">${s.s}</td><td>${s.card ? `<b class="mono">${esc(s.card)}</b>` : '<span class="note">Kosong · pasang kartu</span>'}</td></tr>`).join("")}</tbody></table></div>`;
+  } else if (n.gbps) {
+    h += `</div>`;
+  } else {
+    h += `<span class="note">Tidak ada port. Node ini hanya tempat barang.</span></div>`;
+  }
+  if (n.gbps) {
+    const pct = Math.round(n.gbps[0] / n.gbps[1] * 100);
+    h += `<div class="prop"><b>◆ Kapasitas link (Fase 4):</b> <span class="mono">${n.gbps[0]}/${n.gbps[1]} Gbps · ${pct}%</span>, diisi manual.</div>`;
+  }
+  h += `</div>`;
+
+  // Lapis 3
+  h += `<div class="sec"><div class="sec-h"><span class="eyebrow">Lapis 3 · Barang Gudang</span><span class="note">Item.effective_equipment_class</span></div>
+    <div class="assets">${assetBox("act", "Perangkat aktif · SN DEPLOYED", n.active, "Tidak ada perangkat aktif di posisi ini.")}
+    ${assetBox("pas", "Barang pasif · saldo qty/roll", n.passive, "Belum ada barang pasif tercatat.")}</div>`;
+  if (n.ontNote) {
+    const cust = n.ports.filter(p => p.use === "customer");
+    h += `<div class="ont"><h4>ONT pelanggan di hilir · ${cust.length} unit</h4><div class="tw" style="border:none;border-radius:0"><table style="min-width:0;width:100%"><thead><tr><th>Port</th><th>Pelanggan</th><th>ONT · SN INSTALLED</th></tr></thead><tbody>
+      ${cust.slice(0, 5).map(p => `<tr><td class="mono">${p.n}</td><td>${esc(p.label)}<br><span class="mono note">${esc(p.cid)}</span></td><td>${esc(p.ont)}<br><span class="mono">${esc(p.sn)}</span></td></tr>`).join("")}
+      ${cust.length > 5 ? `<tr><td colspan="3" class="note">+${cust.length - 5} pelanggan lain</td></tr>` : ""}</tbody></table></div>
+      <div class="note" style="padding:8px 10px">Dibaca lewat join port → pelanggan → <code>inventory_serials.customer_id</code>. ONT tidak pernah di-deploy ke node.</div></div>`;
+  }
+  h += `</div>`;
+
+  if (n.proposal) h += `<div class="sec"><div class="prop"><b>◆ Rancangan:</b> ${esc(n.proposal)}</div></div>`;
+  document.getElementById("panel").innerHTML = h;
+}
+
+/* ===== Tab Topologi (gaya peta-infrastruktur-isp.html) ===== */
+const TYPE_STYLE = {
+  "POP pusat": ["PUSAT", "var(--accent)"], "POP cabang": ["CABANG", "var(--accent)"], "Mini POP": ["MINI POP · OLT", "var(--accent)"],
+  "core_router": ["CORE", "var(--proposal)"], "service ◆": ["LAYANAN", "var(--proposal)"], "backbone": ["BACKBONE", "var(--proposal)"],
+  "aggregation_switch": ["AGGREGATION", "var(--active)"], "olt_chassis ◆": ["CHASSIS OLT", "var(--active)"], "olt_card": ["KARTU PON", "var(--active)"],
+  "feeder ◆": ["FEEDER", "var(--warn)"], "odc": ["ODC", "var(--passive)"], "odp": ["ODP", "var(--passive)"], "ont": ["ONT · PELANGGAN", "var(--accent)"]
+};
+const UPLINKS = [["bbJetis", "aggJetis"], ["bbSandya", "aggSandya"], ["aggJetis", "chsC1"], ["aggSandya", "chsD1"]];
+const CARD_W = 200, CARD_H = 58, COL_W = 250, ROW_H = 72, PAD = 24;
+let zoom = 1;
+let tab = "tree";
+const collapsed = new Set();
+
+function isOnt(id) { return id.startsWith("ont:"); }
+function ontInfo(id) { const [, odp, n] = id.split(":"); return { odp, port: N[odp].ports[+n - 1] }; }
+function topoKids(id) {
+  if (isOnt(id)) return [];
+  const n = N[id];
+  const kids = [...(n.children || [])];
+  if (n.ontNote) n.ports.filter(p => p.use === "customer").forEach(p => kids.push(`ont:${id}:${p.n}`));
+  return kids;
+}
+function metric(id) {
+  if (isOnt(id)) { const { port } = ontInfo(id); return { text: `${port.ont} · ${port.sn}`, pct: null }; }
+  const n = N[id];
+  if (n.ports) {
+    const u = used(n), t = n.ports.length;
+    const unit = n.fiber ? "core" : n.type === "olt_card" ? "PON" : "port";
+    return { text: `${u}/${t} ${unit}`, pct: Math.round(u / t * 100), used: u, total: t };
+  }
+  if (n.slots) { const f = n.slots.filter(s => s.card).length; return { text: `${f}/${n.slots.length} slot kartu`, pct: Math.round(f / n.slots.length * 100), used: f, total: n.slots.length }; }
+  if (n.gbps) return { text: `${n.gbps[0]}/${n.gbps[1]} Gbps`, pct: Math.round(n.gbps[0] / n.gbps[1] * 100) };
+  if (n.kind === "pop") {
+    const pops = (n.children || []).filter(c => N[c].kind === "pop").length;
+    return { text: n.type === "POP pusat" ? `${pops} cabang` : n.type === "POP cabang" ? `${pops} Mini POP · CID ${n.code}` : "OLT = Mini POP", pct: null };
+  }
+  return { text: n.active && n.active[0] ? n.active[0].item : "Tempat barang", pct: null };
+}
+function applyDepth(v) {
+  collapsed.clear();
+  const levelOf = { cabang: ["POP cabang"], minipop: ["Mini POP"], odp: ["odp"], all: [] }[v];
+  if (!levelOf) return;
+  Object.keys(N).forEach(id => { if (levelOf.includes(N[id].type)) collapsed.add(id); });
+}
+function layoutTopo() {
+  const pos = {}, edges = [], order = [];
+  let row = 0, maxDepth = 0;
+  const walk = (id, depth) => {
+    order.push(id);
+    maxDepth = Math.max(maxDepth, depth);
+    const kids = collapsed.has(id) ? [] : topoKids(id);
+    if (!kids.length) { pos[id] = { x: depth * COL_W, y: row * ROW_H }; row++; return; }
+    kids.forEach(k => { edges.push([id, k]); walk(k, depth + 1); });
+    pos[id] = { x: depth * COL_W, y: (pos[kids[0]].y + pos[kids[kids.length - 1]].y) / 2 };
+  };
+  ROOTS.forEach(r => walk(r, 0));
+  return { pos, edges, order, w: maxDepth * COL_W + CARD_W + 40 + PAD * 2, h: row * ROW_H + PAD * 2 };
+}
+function trunc(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+function renderTopo() {
+  const { pos, edges, order, w, h } = layoutTopo();
+  const selId = selected;
+  let svg = `<svg role="img" aria-label="Diagram topologi jaringan dari WHUSNET sampai pelanggan" width="${w * zoom}" height="${h * zoom}" viewBox="0 0 ${w} ${h}"><g transform="translate(${PAD},${PAD})">`;
+  edges.forEach(([a, b]) => {
+    const p = pos[a], q = pos[b], x1 = p.x + CARD_W, y1 = p.y + CARD_H / 2, x2 = q.x, y2 = q.y + CARD_H / 2;
+    svg += `<path d="M${x1} ${y1} H${x1 + (x2 - x1) / 2} V${y2} H${x2}" fill="none" style="stroke:var(--muted);opacity:.5" stroke-width="1.25"/>`;
+  });
+  UPLINKS.forEach(([a, b]) => {
+    if (!pos[a] || !pos[b]) return;
+    const p = pos[a], q = pos[b], x1 = p.x + CARD_W, y1 = p.y + CARD_H - 8, x2 = q.x, y2 = q.y + 8;
+    const mx = (x1 + x2) / 2;
+    svg += `<path d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" style="stroke:var(--proposal)" stroke-width="1.5" stroke-dasharray="5 4"><title>Uplink antar-POP ◆: ${esc(N[a].code)} → ${esc(N[b].code)}</title></path>`;
+  });
+  order.forEach(id => {
+    const p = pos[id];
+    const ont = isOnt(id);
+    const n = ont ? null : N[id];
+    const typeKey = ont ? "ont" : n.type;
+    const [tag, color] = TYPE_STYLE[typeKey] || [String(typeKey).toUpperCase(), "var(--muted)"];
+    const m = metric(id);
+    const name = ont ? ontInfo(id).port.label : (n.kind === "pop" ? n.name : `${n.code}`);
+    const isSel = ont ? (selId === ontInfo(id).odp && selPort === ontInfo(id).port.n) : id === selId;
+    const status = ont ? "active" : n.status;
+    const proposal = !ont && (n.type || "").includes("◆");
+    const crit = m.pct !== null && (m.pct >= 90 || (n && n.redZone && m.pct >= n.redZone));
+    const kids = topoKids(id);
+    const isCol = collapsed.has(id);
+    svg += `<g transform="translate(${p.x},${p.y})" opacity="${status === "inactive" ? .55 : 1}">
+      <g class="card" data-node="${esc(id)}" tabindex="0" role="button" aria-label="${esc(tag + ": " + name)}">
+        <title>${esc(tag)}: ${esc(ont ? name + " (dibaca dari pelanggan, bukan node)" : n.name)}</title>
+        <rect class="box" width="${CARD_W}" height="${CARD_H}" rx="3" style="fill:var(--surface);stroke:${isSel ? "var(--accent)" : ont ? "var(--accent)" : "var(--line)"}" stroke-width="${isSel ? 2 : 1}" ${status === "planned" || ont ? 'stroke-dasharray="4 3"' : ""}/>
+        <rect x="10" y="11" width="7" height="7" style="fill:${color}"/>
+        <text x="23" y="18.5" class="t-tag" style="fill:var(--muted);font-size:9.5px;letter-spacing:.08em">${esc(tag)}${proposal ? ' <tspan style="fill:var(--proposal)">◆</tspan>' : ""}</text>
+        ${status === "fault" ? `<text x="190" y="18.5" text-anchor="end" class="t-tag" style="fill:var(--danger);font-size:9.5px">GANGGUAN</text>` : ""}
+        ${status === "planned" ? `<text x="190" y="18.5" text-anchor="end" class="t-tag" style="fill:var(--proposal);font-size:9.5px">RENCANA</text>` : ""}
+        <text x="10" y="35" style="fill:var(--fg);font-size:12.5px;font-weight:600">${esc(trunc(name, 25))}</text>
+        <text x="10" y="49" class="t-mono" style="fill:var(--muted);font-size:10px">${esc(trunc(m.text, crit ? 22 : 31))}</text>
+        ${m.pct !== null ? `<rect x="0" y="55" width="${CARD_W}" height="3" style="fill:var(--surface-2)"/><rect x="0" y="55" width="${CARD_W * Math.min(1, m.pct / 100)}" height="3" style="fill:${utilColor(m.pct, n && n.redZone)}"/>` : ""}
+        ${!ont && n.cases && n.cases.length && !crit ? `<text x="190" y="49" text-anchor="end" class="t-mono" style="fill:${TONE[CASES[n.cases[0]].tone][1]};font-size:10px;font-weight:600">${n.cases.join(" ")}</text>` : ""}
+        ${crit ? `<text x="190" y="49" text-anchor="end" class="t-mono" style="fill:var(--danger);font-size:10px;font-weight:600">PENUH</text>` : ""}
+      </g>
+      ${kids.length ? `<g transform="translate(${CARD_W},${CARD_H / 2})" class="card" data-col="${esc(id)}" tabindex="0" role="button" aria-label="${isCol ? "Buka " + kids.length + " turunan" : "Ciutkan"}">
+        <title>${isCol ? `Buka ${kids.length} turunan langsung` : "Ciutkan"}</title>
+        <circle r="10" style="fill:var(--bg);stroke:var(--line)" stroke-width="1.25"/>
+        <text text-anchor="middle" dy="0.34em" class="t-mono" style="fill:var(--fg);font-size:${isCol ? 10 : 13}px">${isCol ? kids.length : "−"}</text>
+      </g>` : ""}
+    </g>`;
+  });
+  svg += `</g></svg>`;
+  const canvas = document.getElementById("canvas");
+  canvas.innerHTML = svg;
+  document.getElementById("zoom-val").textContent = Math.round(zoom * 100) + "%";
+  return pos;
+}
+function centerOn(id) {
+  const pos = layoutTopo().pos;
+  const p = pos[id];
+  if (!p) return;
+  const c = document.getElementById("canvas");
+  const left = (p.x + PAD + CARD_W / 2) * zoom - c.clientWidth / 2;
+  const top = (p.y + PAD + CARD_H / 2) * zoom - c.clientHeight / 2;
+  try { c.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); } catch (e) {}
+}
+
+/* ===== Tab Inventaris ===== */
+function topoOrder() { const out = []; const walk = id => { out.push(id); (N[id].children || []).forEach(walk); }; ROOTS.forEach(walk); return out; }
+function invRows() {
+  const type = document.getElementById("inv-type").value;
+  const q = document.getElementById("inv-q").value.trim().toLowerCase();
+  const sort = document.getElementById("inv-sort").value;
+  let rows = topoOrder().filter(id => N[id].kind !== "pop").map((id, i) => ({ id, i, n: N[id], m: metric(id) }));
+  if (type) rows = rows.filter(r => r.n.type === type);
+  if (q) rows = rows.filter(r => {
+    const hay = [r.n.code, r.n.name, ...(r.n.active || []).flatMap(a => [a.item, a.sn]), ...(r.n.passive || []).map(a => a.item),
+      ...(r.n.ports || []).flatMap(p => [p.label, p.cid, p.sn])].filter(Boolean).join(" ").toLowerCase();
+    return hay.includes(q);
+  });
+  if (sort === "util") rows.sort((a, b) => (b.m.pct ?? -1) - (a.m.pct ?? -1));
+  if (sort === "free") rows.sort((a, b) => ((b.m.total ?? 0) - (b.m.used ?? 0)) - ((a.m.total ?? 0) - (a.m.used ?? 0)));
+  return rows;
+}
+function renderInv() {
+  const sel = document.getElementById("inv-type");
+  if (!sel.options.length) {
+    const types = [...new Set(Object.values(N).filter(n => n.kind !== "pop").map(n => n.type))];
+    sel.innerHTML = `<option value="">Semua tipe</option>` + types.map(t => `<option value="${esc(t)}">${esc((TYPE_STYLE[t] || [t])[0])}</option>`).join("");
+  }
+  const rows = invRows();
+  const all = Object.values(N).filter(n => n.kind !== "pop");
+  const hot = Object.keys(N).filter(id => N[id].kind !== "pop" && (metric(id).pct ?? 0) >= 85).length;
+  const cust = all.reduce((s, n) => s + (n.ports || []).filter(p => p.use === "customer").length, 0);
+  const free = all.filter(n => n.type === "odp").reduce((s, n) => s + n.ports.filter(p => !p.use).length, 0);
+  const deployed = all.reduce((s, n) => s + (n.active || []).length, 0);
+  document.getElementById("inv-sum").innerHTML = `<b>${all.length}</b> node · <b>${hot}</b> utilisasi ≥ 85% · <b>${cust}</b> pelanggan di port ODP · <b>${free}</b> port ODP kosong · <b>${deployed}</b> SN aktif terpasang · menampilkan <b>${rows.length}</b>`;
+  document.getElementById("inv-body").innerHTML = rows.length ? rows.map(({ id, n, m }) => {
+    const st = STATUS[n.status];
+    return `<tr data-node="${esc(id)}" class="${id === selected ? "sel" : ""}" tabindex="0">
+      <td><b class="mono">${esc(n.code)}</b> ${(n.cases || []).map(c => `<span class="cb" style="color:${TONE[CASES[c].tone][1]}" title="${esc(CASES[c].title)}">${c}</span>`).join(" ")}<br><span class="note">${esc(n.name)}</span></td>
+      <td>${esc((TYPE_STYLE[n.type] || [n.type])[0])}${(n.type || "").includes("◆") ? ' <span class="mk">◆</span>' : ""}</td>
+      <td>${esc(cabangOf(id).replace(" (node Pusat, bukan milik cabang mana pun)", " (Pusat)"))}</td>
+      <td><span class="chip" style="color:${st[1]}">${st[0]}</span></td>
+      <td class="num">${esc(m.text)}</td>
+      <td>${m.pct !== null ? `<div class="mini"><div class="bar"><i style="width:${m.pct}%;background:${utilColor(m.pct, n.redZone)}"></i></div><span class="num">${m.pct}%</span></div>` : '<span class="note">—</span>'}</td>
+      <td class="num">${(n.active || []).length}</td>
+      <td class="num">${(n.passive || []).length}</td></tr>`;
+  }).join("") : `<tr><td colspan="8" class="note">Tidak ada node yang cocok. Ubah filter tipe atau kata pencarian.</td></tr>`;
+}
+
+/* ===== Navigasi bersama ===== */
+function reveal(id) {
+  const m = parentMap();
+  let c = m[id];
+  while (c) { open.add(c); c = m[c]; }
+}
+function revealTopo(id) {
+  const m = parentMap();
+  let c = m[id], changed = false;
+  while (c) { if (collapsed.delete(c)) changed = true; c = m[c]; }
+  if (changed) document.getElementById("depth").value = "custom";
+}
+function select(id, port) {
+  selected = id; selPort = port ?? null;
+  try { localStorage.setItem("infra-sel", selected); } catch (err) {}
+  reveal(id);
+  if (tab === "topo") { revealTopo(id); if (port) collapsed.delete(id); }
+  renderAll();
+  if (tab === "topo") centerOn(port ? `ont:${id}:${port}` : id);
+}
+function renderAll() {
+  renderTree();
+  if (tab === "topo") renderTopo();
+  if (tab === "inv") renderInv();
+  renderPanel();
+}
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll("[data-tab]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  document.getElementById("v-tree").hidden = t !== "tree";
+  document.getElementById("v-topo").hidden = t !== "topo";
+  document.getElementById("v-inv").hidden = t !== "inv";
+  document.getElementById("explorer").classList.toggle("wide", t !== "tree");
+  try { localStorage.setItem("infra-tab", t); } catch (err) {}
+  if (t === "topo") revealTopo(selected);
+  renderAll();
+  if (t === "topo") centerOn(selected);
+}
+function renderCases() {
+  const rows = Object.entries(CASES).map(([c, k]) => { const t = TONE[k.tone]; return `<tr><td class="mono" style="color:${t[1]};font-weight:600">${c}</td><td>${k.real ? "Data nyata" : "Skenario"}</td><td><b>${esc(k.title)}</b><br><span class="note">${esc(k.text)}</span></td><td><span class="chip" style="color:${t[1]}">${t[0]}</span></td><td><button class="jump" data-jump="${k.node}">${esc(N[k.node].code)}</button></td></tr>`; }).join("");
+  document.getElementById("caseRows").innerHTML = rows;
+}
+
+document.querySelector(".tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) setTab(b.dataset.tab); });
+document.getElementById("tree").addEventListener("click", e => {
+  const tg = e.target.closest("[data-tg]");
+  const sel = e.target.closest("[data-sel]");
+  if (tg) { const id = tg.dataset.tg; open.has(id) ? open.delete(id) : open.add(id); renderTree(); return; }
+  if (sel) select(sel.dataset.sel);
+});
+document.addEventListener("click", e => {
+  const j = e.target.closest("[data-jump]");
+  if (!j) return;
+  select(j.dataset.jump);
+  try { document.getElementById("explorer").scrollIntoView({ behavior: "smooth", block: "start" }); } catch (err) {}
+});
+function onCanvasActivate(e) {
+  const col = e.target.closest("[data-col]");
+  const card = e.target.closest("[data-node]");
+  if (col) {
+    const id = col.dataset.col;
+    collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id);
+    document.getElementById("depth").value = "custom";
+    renderTopo();
+    return;
+  }
+  if (card) {
+    const id = card.dataset.node;
+    if (isOnt(id)) { const { odp, port } = ontInfo(id); select(odp, port.n); } else select(id);
+  }
+}
+document.getElementById("canvas").addEventListener("click", onCanvasActivate);
+document.getElementById("canvas").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onCanvasActivate(e); } });
+document.getElementById("depth").addEventListener("change", e => { if (e.target.value !== "custom") { applyDepth(e.target.value); renderTopo(); centerOn(selected); } });
+document.getElementById("zoom-in").addEventListener("click", () => { zoom = Math.min(1.6, +(zoom + .1).toFixed(2)); renderTopo(); });
+document.getElementById("zoom-out").addEventListener("click", () => { zoom = Math.max(.4, +(zoom - .1).toFixed(2)); renderTopo(); });
+["inv-type", "inv-sort"].forEach(id => document.getElementById(id).addEventListener("change", renderInv));
+document.getElementById("inv-q").addEventListener("input", renderInv);
+document.getElementById("inv-body").addEventListener("click", e => { const r = e.target.closest("[data-node]"); if (r) select(r.dataset.node); });
+document.getElementById("inv-body").addEventListener("keydown", e => { const r = e.target.closest("[data-node]"); if (r && e.key === "Enter") select(r.dataset.node); });
+document.getElementById("panel").addEventListener("click", e => {
+  const p = e.target.closest("[data-port]");
+  if (p) { const v = +p.dataset.port; selPort = selPort === v ? null : v; renderPanel(); if (tab === "topo") renderTopo(); }
+});
+
+applyDepth("odp");
+reveal(selected);
+let startTab = "topo";
+try { const t = localStorage.getItem("infra-tab"); if (["tree", "topo", "inv"].includes(t)) startTab = t; } catch (e) {}
+setTab(startTab);
+renderCases();
+</script>
+
+<script>
+(function () {
+  const RAW = [{"id":"s1","type":"datacenter","parentId":null,"name":"Data Center Pusat","model":"Rack 42U","status":"aktif","note":"UPS, PDU, patch panel","capacity":42,"extraUsed":8},{"id":"s2","type":"core","parentId":"s1","name":"CORE-01","model":"Core router 100G","status":"aktif","note":"Port 1 untuk manajemen","capacity":16,"extraUsed":1,"ru":2},{"id":"s8","type":"transport","parentId":"s2","name":"BB-A Fiber 10G","status":"aktif","capacity":10,"usedGbps":6.4,"linkKind":"fiber","lengthM":12400},{"id":"s9","type":"transport","parentId":"s2","name":"BB-B Metro-E 2G","status":"aktif","capacity":2,"usedGbps":1.1,"linkKind":"metro-ethernet"},{"id":"s10","type":"transport","parentId":"s2","name":"BB-C Radio 1G","status":"rencana","capacity":1,"linkKind":"radio"},{"id":"s11","type":"pop","parentId":"s8","name":"POP Cabang A","status":"aktif","note":"ODF dan UPS","capacity":12,"extraUsed":2},{"id":"s12","type":"agg","parentId":"s11","name":"AGG-A-01","model":"Switch aggregation 10G","status":"aktif","capacity":24,"extraUsed":2,"ru":1},{"id":"s13","type":"olt","parentId":"s12","name":"OLT-A-01","model":"OLT chassis 4 slot","status":"aktif","capacity":4,"ru":4,"cards":{"1":{"model":"GPON C+ 16 port","ports":16},"2":{"model":"GPON C+ 16 port","ports":16}}},{"id":"s14","type":"pon","parentId":"s13","name":"PON 1/1/1","status":"aktif","capacity":128,"slot":1,"port":1},{"id":"s15","type":"feeder","parentId":"s14","name":"FDR-A01-1.1","status":"aktif","capacity":24,"lengthM":1800},{"id":"s16","type":"odp","parentId":"s15","name":"ODP-A01-001","model":"Splitter 1:16","status":"aktif","capacity":16},{"id":"s17","type":"drop","parentId":"s16","name":"DROP-001","status":"aktif","capacity":1,"lengthM":33},{"id":"s18","type":"ont","parentId":"s17","name":"Siti Nugroho","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DE1EEF","plan":"20 Mbps"},{"id":"s19","type":"drop","parentId":"s16","name":"DROP-002","status":"aktif","capacity":1,"lengthM":46},{"id":"s20","type":"ont","parentId":"s19","name":"Agus Riyadi","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DE3DDE","plan":"30 Mbps"},{"id":"s21","type":"drop","parentId":"s16","name":"DROP-003","status":"aktif","capacity":1,"lengthM":59},{"id":"s22","type":"ont","parentId":"s21","name":"Dewi Santoso","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DE5CCD","plan":"50 Mbps"},{"id":"s23","type":"drop","parentId":"s16","name":"DROP-004","status":"aktif","capacity":1,"lengthM":72},{"id":"s24","type":"ont","parentId":"s23","name":"Slamet Wulandari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DE7BBC","plan":"10 Mbps"},{"id":"s25","type":"drop","parentId":"s16","name":"DROP-005","status":"aktif","capacity":1,"lengthM":85},{"id":"s26","type":"ont","parentId":"s25","name":"Rina Aminah","model":"ONT dual-band","status":"gangguan","serial":"ZTEGC0DE9AAB","plan":"20 Mbps"},{"id":"s27","type":"drop","parentId":"s16","name":"DROP-006","status":"aktif","capacity":1,"lengthM":28},{"id":"s28","type":"ont","parentId":"s27","name":"Joko Susilo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DEB99A","plan":"30 Mbps"},{"id":"s29","type":"drop","parentId":"s16","name":"DROP-007","status":"aktif","capacity":1,"lengthM":41},{"id":"s30","type":"ont","parentId":"s29","name":"Ani Prasetyo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DED889","plan":"50 Mbps"},{"id":"s31","type":"drop","parentId":"s16","name":"DROP-008","status":"aktif","capacity":1,"lengthM":54},{"id":"s32","type":"ont","parentId":"s31","name":"Eko Rahayu","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DEF778","plan":"10 Mbps"},{"id":"s33","type":"drop","parentId":"s16","name":"DROP-009","status":"aktif","capacity":1,"lengthM":67},{"id":"s34","type":"ont","parentId":"s33","name":"Sri Lestari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DF1667","plan":"20 Mbps"},{"id":"s35","type":"odp","parentId":"s15","name":"ODP-A01-002","model":"Splitter 1:8","status":"aktif","capacity":8},{"id":"s36","type":"drop","parentId":"s35","name":"DROP-010","status":"aktif","capacity":1,"lengthM":80},{"id":"s37","type":"ont","parentId":"s36","name":"Hendra Nugroho","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DF3556","plan":"30 Mbps"},{"id":"s38","type":"drop","parentId":"s35","name":"DROP-011","status":"aktif","capacity":1,"lengthM":23},{"id":"s39","type":"ont","parentId":"s38","name":"Fitri Riyadi","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DF5445","plan":"50 Mbps"},{"id":"s40","type":"drop","parentId":"s35","name":"DROP-012","status":"aktif","capacity":1,"lengthM":36},{"id":"s41","type":"ont","parentId":"s40","name":"Budi Santoso","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DF7334","plan":"10 Mbps"},{"id":"s42","type":"drop","parentId":"s35","name":"DROP-013","status":"aktif","capacity":1,"lengthM":49},{"id":"s43","type":"ont","parentId":"s42","name":"Siti Wulandari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DF9223","plan":"20 Mbps"},{"id":"s44","type":"drop","parentId":"s35","name":"DROP-014","status":"aktif","capacity":1,"lengthM":62},{"id":"s45","type":"ont","parentId":"s44","name":"Agus Aminah","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DFB112","plan":"30 Mbps"},{"id":"s46","type":"drop","parentId":"s35","name":"DROP-015","status":"aktif","capacity":1,"lengthM":75},{"id":"s47","type":"ont","parentId":"s46","name":"Dewi Susilo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DFD001","plan":"50 Mbps"},{"id":"s48","type":"drop","parentId":"s35","name":"DROP-016","status":"aktif","capacity":1,"lengthM":88},{"id":"s49","type":"ont","parentId":"s48","name":"Slamet Prasetyo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0DFEEF0","plan":"10 Mbps"},{"id":"s50","type":"drop","parentId":"s35","name":"DROP-017","status":"aktif","capacity":1,"lengthM":31},{"id":"s51","type":"ont","parentId":"s50","name":"Rina Rahayu","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E00DDF","plan":"20 Mbps"},{"id":"s52","type":"odp","parentId":"s15","name":"ODP-A01-003","model":"Splitter 1:16","status":"aktif","capacity":16},{"id":"s53","type":"drop","parentId":"s52","name":"DROP-018","status":"aktif","capacity":1,"lengthM":44},{"id":"s54","type":"ont","parentId":"s53","name":"Joko Lestari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E02CCE","plan":"30 Mbps"},{"id":"s55","type":"drop","parentId":"s52","name":"DROP-019","status":"aktif","capacity":1,"lengthM":57},{"id":"s56","type":"ont","parentId":"s55","name":"Ani Nugroho","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E04BBD","plan":"50 Mbps"},{"id":"s57","type":"drop","parentId":"s52","name":"DROP-020","status":"aktif","capacity":1,"lengthM":70},{"id":"s58","type":"ont","parentId":"s57","name":"Eko Riyadi","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E06AAC","plan":"10 Mbps"},{"id":"s59","type":"drop","parentId":"s52","name":"DROP-021","status":"aktif","capacity":1,"lengthM":83},{"id":"s60","type":"ont","parentId":"s59","name":"Sri Santoso","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E0899B","plan":"20 Mbps"},{"id":"s61","type":"odp","parentId":"s15","name":"ODP-A01-004","model":"Splitter 1:8","status":"aktif","capacity":8},{"id":"s62","type":"drop","parentId":"s61","name":"DROP-022","status":"aktif","capacity":1,"lengthM":26},{"id":"s63","type":"ont","parentId":"s62","name":"Hendra Wulandari","model":"ONT dual-band","status":"gangguan","serial":"ZTEGC0E0A88A","plan":"30 Mbps"},{"id":"s64","type":"drop","parentId":"s61","name":"DROP-023","status":"aktif","capacity":1,"lengthM":39},{"id":"s65","type":"ont","parentId":"s64","name":"Fitri Aminah","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E0C779","plan":"50 Mbps"},{"id":"s66","type":"pon","parentId":"s13","name":"PON 1/1/2","status":"aktif","capacity":128,"slot":1,"port":2},{"id":"s67","type":"feeder","parentId":"s66","name":"FDR-A01-1.2","status":"aktif","capacity":12,"lengthM":2730},{"id":"s68","type":"odp","parentId":"s67","name":"ODP-A01-005","model":"Splitter 1:8","status":"aktif","capacity":8},{"id":"s69","type":"drop","parentId":"s68","name":"DROP-024","status":"aktif","capacity":1,"lengthM":52},{"id":"s70","type":"ont","parentId":"s69","name":"Budi Susilo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E0E668","plan":"10 Mbps"},{"id":"s71","type":"drop","parentId":"s68","name":"DROP-025","status":"aktif","capacity":1,"lengthM":65},{"id":"s72","type":"ont","parentId":"s71","name":"Siti Prasetyo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E10557","plan":"20 Mbps"},{"id":"s73","type":"drop","parentId":"s68","name":"DROP-026","status":"aktif","capacity":1,"lengthM":78},{"id":"s74","type":"ont","parentId":"s73","name":"Agus Rahayu","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E12446","plan":"30 Mbps"},{"id":"s75","type":"drop","parentId":"s68","name":"DROP-027","status":"aktif","capacity":1,"lengthM":21},{"id":"s76","type":"ont","parentId":"s75","name":"Dewi Lestari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E14335","plan":"50 Mbps"},{"id":"s77","type":"drop","parentId":"s68","name":"DROP-028","status":"aktif","capacity":1,"lengthM":34},{"id":"s78","type":"ont","parentId":"s77","name":"Slamet Nugroho","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E16224","plan":"10 Mbps"},{"id":"s79","type":"drop","parentId":"s68","name":"DROP-029","status":"aktif","capacity":1,"lengthM":47},{"id":"s80","type":"ont","parentId":"s79","name":"Rina Riyadi","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E18113","plan":"20 Mbps"},{"id":"s81","type":"odp","parentId":"s67","name":"ODP-A01-006","model":"Splitter 1:16","status":"aktif","capacity":16},{"id":"s82","type":"drop","parentId":"s81","name":"DROP-030","status":"aktif","capacity":1,"lengthM":60},{"id":"s83","type":"ont","parentId":"s82","name":"Joko Santoso","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E1A002","plan":"30 Mbps"},{"id":"s84","type":"drop","parentId":"s81","name":"DROP-031","status":"aktif","capacity":1,"lengthM":73},{"id":"s85","type":"ont","parentId":"s84","name":"Ani Wulandari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E1BEF1","plan":"50 Mbps"},{"id":"s86","type":"drop","parentId":"s81","name":"DROP-032","status":"aktif","capacity":1,"lengthM":86},{"id":"s87","type":"ont","parentId":"s86","name":"Eko Aminah","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E1DDE0","plan":"10 Mbps"},{"id":"s88","type":"pon","parentId":"s13","name":"PON 1/1/3","status":"aktif","capacity":128,"slot":1,"port":3},{"id":"s89","type":"feeder","parentId":"s88","name":"FDR-A01-1.3","status":"aktif","capacity":12,"lengthM":3040},{"id":"s90","type":"odp","parentId":"s89","name":"ODP-A01-007","model":"Splitter 1:8","status":"aktif","capacity":8},{"id":"s91","type":"drop","parentId":"s90","name":"DROP-033","status":"aktif","capacity":1,"lengthM":29},{"id":"s92","type":"ont","parentId":"s91","name":"Sri Susilo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E1FCCF","plan":"20 Mbps"},{"id":"s93","type":"drop","parentId":"s90","name":"DROP-034","status":"aktif","capacity":1,"lengthM":42},{"id":"s94","type":"ont","parentId":"s93","name":"Hendra Prasetyo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E21BBE","plan":"30 Mbps"},{"id":"s95","type":"pon","parentId":"s13","name":"PON 1/2/1","status":"aktif","capacity":128,"slot":2,"port":1},{"id":"s96","type":"feeder","parentId":"s95","name":"FDR-A01-2.1","status":"aktif","capacity":12,"lengthM":3040},{"id":"s97","type":"odp","parentId":"s96","name":"ODP-A01-008","model":"Splitter 1:16","status":"aktif","capacity":16},{"id":"s98","type":"drop","parentId":"s97","name":"DROP-035","status":"aktif","capacity":1,"lengthM":55},{"id":"s99","type":"ont","parentId":"s98","name":"Fitri Rahayu","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E23AAD","plan":"50 Mbps"},{"id":"s100","type":"drop","parentId":"s97","name":"DROP-036","status":"aktif","capacity":1,"lengthM":68},{"id":"s101","type":"ont","parentId":"s100","name":"Budi Lestari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E2599C","plan":"10 Mbps"},{"id":"s102","type":"drop","parentId":"s97","name":"DROP-037","status":"aktif","capacity":1,"lengthM":81},{"id":"s103","type":"ont","parentId":"s102","name":"Siti Nugroho","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E2788B","plan":"20 Mbps"},{"id":"s104","type":"drop","parentId":"s97","name":"DROP-038","status":"aktif","capacity":1,"lengthM":24},{"id":"s105","type":"ont","parentId":"s104","name":"Agus Riyadi","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E2977A","plan":"30 Mbps"},{"id":"s106","type":"drop","parentId":"s97","name":"DROP-039","status":"aktif","capacity":1,"lengthM":37},{"id":"s107","type":"ont","parentId":"s106","name":"Dewi Santoso","model":"ONT dual-band","status":"gangguan","serial":"ZTEGC0E2B669","plan":"50 Mbps"},{"id":"s108","type":"olt","parentId":"s12","name":"OLT-A-02 (Mini POP)","model":"OLT compact","status":"aktif","capacity":2,"ru":1,"cards":{"1":{"model":"GPON C+ 8 port","ports":8}}},{"id":"s109","type":"pon","parentId":"s108","name":"PON 1/1/1","status":"aktif","capacity":128,"slot":1,"port":1},{"id":"s110","type":"feeder","parentId":"s109","name":"FDR-A02-1.1","status":"aktif","capacity":12,"lengthM":3040},{"id":"s111","type":"odp","parentId":"s110","name":"ODP-A02-001","model":"Splitter 1:8","status":"aktif","capacity":8},{"id":"s112","type":"drop","parentId":"s111","name":"DROP-040","status":"aktif","capacity":1,"lengthM":50},{"id":"s113","type":"ont","parentId":"s112","name":"Slamet Wulandari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E2D558","plan":"10 Mbps"},{"id":"s114","type":"drop","parentId":"s111","name":"DROP-041","status":"aktif","capacity":1,"lengthM":63},{"id":"s115","type":"ont","parentId":"s114","name":"Rina Aminah","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E2F447","plan":"20 Mbps"},{"id":"s116","type":"drop","parentId":"s111","name":"DROP-042","status":"aktif","capacity":1,"lengthM":76},{"id":"s117","type":"ont","parentId":"s116","name":"Joko Susilo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E31336","plan":"30 Mbps"},{"id":"s118","type":"odp","parentId":"s110","name":"ODP-A02-002","model":"Splitter 1:8","status":"aktif","capacity":8},{"id":"s119","type":"drop","parentId":"s118","name":"DROP-043","status":"aktif","capacity":1,"lengthM":89},{"id":"s120","type":"ont","parentId":"s119","name":"Ani Prasetyo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E33225","plan":"50 Mbps"},{"id":"s121","type":"pop","parentId":"s9","name":"POP Cabang B","status":"aktif","capacity":8,"extraUsed":1},{"id":"s122","type":"agg","parentId":"s121","name":"AGG-B-01","model":"Switch aggregation 1G","status":"aktif","capacity":8,"extraUsed":1,"ru":1},{"id":"s123","type":"olt","parentId":"s122","name":"OLT-B-01","model":"OLT compact","status":"aktif","capacity":2,"ru":2,"cards":{"1":{"model":"GPON C+ 16 port","ports":16}}},{"id":"s124","type":"pon","parentId":"s123","name":"PON 1/1/1","status":"aktif","capacity":128,"slot":1,"port":1},{"id":"s125","type":"feeder","parentId":"s124","name":"FDR-B01-1.1","status":"aktif","capacity":12,"lengthM":3350},{"id":"s126","type":"odp","parentId":"s125","name":"ODP-B01-001","model":"Splitter 1:16","status":"aktif","capacity":16},{"id":"s127","type":"drop","parentId":"s126","name":"DROP-044","status":"aktif","capacity":1,"lengthM":32},{"id":"s128","type":"ont","parentId":"s127","name":"Eko Rahayu","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E35114","plan":"10 Mbps"},{"id":"s129","type":"drop","parentId":"s126","name":"DROP-045","status":"aktif","capacity":1,"lengthM":45},{"id":"s130","type":"ont","parentId":"s129","name":"Sri Lestari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E37003","plan":"20 Mbps"},{"id":"s131","type":"drop","parentId":"s126","name":"DROP-046","status":"aktif","capacity":1,"lengthM":58},{"id":"s132","type":"ont","parentId":"s131","name":"Hendra Nugroho","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E38EF2","plan":"30 Mbps"},{"id":"s133","type":"drop","parentId":"s126","name":"DROP-047","status":"aktif","capacity":1,"lengthM":71},{"id":"s134","type":"ont","parentId":"s133","name":"Fitri Riyadi","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E3ADE1","plan":"50 Mbps"},{"id":"s135","type":"drop","parentId":"s126","name":"DROP-048","status":"aktif","capacity":1,"lengthM":84},{"id":"s136","type":"ont","parentId":"s135","name":"Budi Santoso","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E3CCD0","plan":"10 Mbps"},{"id":"s137","type":"drop","parentId":"s126","name":"DROP-049","status":"aktif","capacity":1,"lengthM":27},{"id":"s138","type":"ont","parentId":"s137","name":"Siti Wulandari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E3EBBF","plan":"20 Mbps"},{"id":"s139","type":"drop","parentId":"s126","name":"DROP-050","status":"aktif","capacity":1,"lengthM":40},{"id":"s140","type":"ont","parentId":"s139","name":"Agus Aminah","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E40AAE","plan":"30 Mbps"},{"id":"s141","type":"pon","parentId":"s123","name":"PON 1/1/2","status":"aktif","capacity":128,"slot":1,"port":2},{"id":"s142","type":"feeder","parentId":"s141","name":"FDR-B01-1.2","status":"aktif","capacity":12,"lengthM":2110},{"id":"s143","type":"odp","parentId":"s142","name":"ODP-B01-002","model":"Splitter 1:8","status":"aktif","capacity":8},{"id":"s144","type":"drop","parentId":"s143","name":"DROP-051","status":"aktif","capacity":1,"lengthM":53},{"id":"s145","type":"ont","parentId":"s144","name":"Dewi Susilo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E4299D","plan":"50 Mbps"},{"id":"s146","type":"drop","parentId":"s143","name":"DROP-052","status":"aktif","capacity":1,"lengthM":66},{"id":"s147","type":"ont","parentId":"s146","name":"Slamet Prasetyo","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E4488C","plan":"10 Mbps"},{"id":"s148","type":"drop","parentId":"s143","name":"DROP-053","status":"aktif","capacity":1,"lengthM":79},{"id":"s149","type":"ont","parentId":"s148","name":"Rina Rahayu","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E4677B","plan":"20 Mbps"},{"id":"s150","type":"drop","parentId":"s143","name":"DROP-054","status":"aktif","capacity":1,"lengthM":22},{"id":"s151","type":"ont","parentId":"s150","name":"Joko Lestari","model":"ONT dual-band","status":"aktif","serial":"ZTEGC0E4866A","plan":"30 Mbps"},{"id":"s152","type":"pop","parentId":"s10","name":"POP Cabang C","status":"rencana","capacity":6},{"id":"s153","type":"agg","parentId":"s152","name":"AGG-C-01","status":"rencana","capacity":8,"ru":1},{"id":"s154","type":"olt","parentId":"s153","name":"OLT-C-01","model":"OLT compact","status":"rencana","capacity":2,"ru":2}];
+  const FIB = [["Biru","#1f6fd1"],["Jingga","#f08a24"],["Hijau","#2e9e4f"],["Coklat","#8a5a2b"],["Abu-abu","#8c939b"],["Putih","#e8e8e4"],["Merah","#d63a3a"],["Hitam","#1b1b1b"],["Kuning","#f2c81f"],["Ungu","#7b4bc4"],["Merah muda","#f08fb6"],["Aqua","#3cc6cf"]];
+  const STAT = { aktif: ["Aktif", "var(--ok)"], rencana: ["Rencana", "var(--proposal)"], gangguan: ["Gangguan", "var(--danger)"], nonaktif: ["Nonaktif", "var(--muted)"] };
+  const LABEL = { datacenter: "DATA CENTER", core: "CORE", transport: "BACKBONE", pop: "POP", agg: "AGGREGATION", olt: "OLT", pon: "PON", feeder: "FEEDER", odp: "ODP", drop: "DROP", ont: "ONT" };
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const fmt = v => (Math.round(v * 10) / 10).toLocaleString("id-ID");
+
+  const N = {};
+  RAW.forEach(n => { N[n.id] = Object.assign({ children: [] }, n); });
+  Object.values(N).forEach(n => { if (n.parentId && N[n.parentId]) N[n.parentId].children.push(n.id); });
+  const ROOTS = Object.values(N).filter(n => !n.parentId || !N[n.parentId]).map(n => n.id);
+  const parentOf = id => N[id].parentId && N[N[id].parentId] ? N[id].parentId : null;
+
+  function walk(id, fn, stop) {
+    N[id].children.forEach(c => { if (stop && stop.includes(N[c].type)) return; fn(N[c]); walk(c, fn, stop); });
+  }
+  function countType(id, t) { let k = 0; walk(id, n => { if (n.type === t) k++; }); return k; }
+  function ruUnder(id) { let s = 0; walk(id, n => { s += n.ru || 0; }, ["transport"]); return s; }
+  function cardPorts(n) { return Object.values(n.cards || {}).reduce((a, c) => a + (c.ports || 0), 0); }
+
+  function util(n) {
+    switch (n.type) {
+      case "datacenter": case "pop": return { used: ruUnder(n.id) + (n.extraUsed || 0), cap: n.capacity || 0, unit: "U" };
+      case "core": case "agg": return { used: n.children.length + (n.extraUsed || 0), cap: n.capacity || 0, unit: "port" };
+      case "transport": return { used: n.usedGbps || 0, cap: n.capacity || 0, unit: "Gbps" };
+      case "olt": return { used: n.children.filter(c => N[c].type === "pon").length, cap: cardPorts(n), unit: "PON" };
+      case "pon": return { used: countType(n.id, "ont"), cap: n.capacity || 128, unit: "ONT" };
+      case "feeder": return { used: n.children.length + (n.extraUsed || 0), cap: n.capacity || 0, unit: "core" };
+      case "odp": return { used: n.children.length + (n.extraUsed || 0), cap: n.capacity || 0, unit: "port" };
+      default: return null;
+    }
+  }
+  const pctOf = u => (u && u.cap ? u.used / u.cap * 100 : 0);
+  const colorOf = p => (p >= 90 ? "var(--danger)" : p >= 70 ? "var(--warn)" : "var(--ok)");
+
+  function popOf(id) { let c = parentOf(id); while (c && N[c].type !== "pop") c = parentOf(c); return c; }
+  function oltLabel(n) {
+    const pop = popOf(n.id);
+    if (!pop) return "OLT";
+    const olts = []; walk(pop, x => { if (x.type === "olt") olts.push(x.id); }, ["transport"]);
+    const i = olts.indexOf(n.id);
+    return i <= 0 ? "OLT utama" : "Mini POP #" + (i + 1);
+  }
+  function title(n) {
+    if (n.type === "olt") return n.name + " · " + oltLabel(n);
+    return n.name;
+  }
+
+  // ---------- Pemetaan ke rancangan Whusnet ----------
+  function mapping(n) {
+    switch (n.type) {
+      case "datacenter": return ["POP pusat (WHUSNET)", "Bukan node. Rack, UPS, PDU, patch panel dicatat sebagai barang Gudang di node yang ditambatkan ke WHUSNET. Kapasitas rack (U) dari atribut Item ◆ Fase 4."];
+      case "core": return ["Node core_router, anchor WHUSNET", "Port = network_node_ports. Router-nya SN DEPLOYED di node ini, bukan kolom model."];
+      case "transport": return ["Node backbone, anak core", "Port uplink menunjuk switch agregasi cabang ◆ (lintas POP, Fase 4). Kapasitas Gbps belum ada kolomnya ◆. Kabel = roll di infrastructure_balances."];
+      case "pop": return ["POP cabang (pops.type = cabang)", "Induknya di pops adalah Pusat, bukan backbone. Backbone yang menyuplai dicatat lewat port uplink. Rack U ◆ Fase 4."];
+      case "agg": return ["Node aggregation_switch, anchor cabang", "Port ke OLT = uplink antar-POP ◆ (OLT berada di Mini POP)."];
+      case "olt": return oltLabel(n) === "OLT utama"
+        ? ["OLT di Cabang: belum didukung", "Slot OLT sekarang hanya bisa di Mini POP (OltSlotController). Pertanyaan terbuka §6 Q2: dicatat sebagai Mini POP, atau Cabang boleh punya chassis sendiri?"]
+        : ["Mini POP + node olt_chassis ◆ (L1)", "Slot = olt_slots, kartu = node olt_card anak chassis. Chassis dan kartu = SN DEPLOYED."];
+      case "pon": return ["Bukan node: port milik node olt_card", "Label 1/slot/port = nomor slot + nomor port kartu. Batas 128 ONT dihitung berantai dari pelanggan di hilir ◆ Fase 3."];
+      case "feeder": return ["Node feeder ◆ Fase 3", "Port = core. Warna serat dihitung dari nomor core, tidak disimpan. Kabel = roll di infrastructure_balances."];
+      case "odp": return ["Node odp", "Port splitter = network_node_ports. Pelanggan menempati port lewat network_port_assignments. Box & splitter = barang pasif."];
+      case "drop": return ["Bukan node", "Kabel drop = roll yang dipakai saat instalasi, tercatat ke pelanggan. Panjang (m) dari pemakaian roll."];
+      case "ont": return ["Bukan node: pelanggan + SN INSTALLED", "Pelanggan menempati port ODP. ONT = inventory_serials berstatus INSTALLED dengan customer_id, tidak pernah di-deploy ke node."];
+    }
+    return ["-", ""];
+  }
+
+  // ---------- State ----------
+  const collapsed = new Set();
+  let selected = "s13";
+  const view = { k: 1, tx: 20, ty: 20 };
+  const W = 216, H = 60, COLW = 268, ROWH = 72;
+  let pos = {};
+
+  function applyDepth(v) {
+    collapsed.clear();
+    if (v === "custom" || v === "all") return;
+    Object.values(N).forEach(n => { if (n.type === v && n.children.length) collapsed.add(n.id); });
+  }
+
+  function layout() {
+    pos = {}; let row = 0;
+    function place(id, depth) {
+      const kids = collapsed.has(id) ? [] : N[id].children;
+      let y;
+      if (!kids.length) { y = row++ * ROWH; }
+      else { const ys = kids.map(k => place(k, depth + 1)); y = (ys[0] + ys[ys.length - 1]) / 2; }
+      pos[id] = { x: depth * COLW, y };
+      return y;
+    }
+    ROOTS.forEach(r => { place(r, 0); row += 0.5; });
+  }
+
+  function trunc(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+  function render() {
+    layout();
+    const hot = new Set(); let c = selected; while (c) { hot.add(c); c = parentOf(c); }
+    let links = "", nodes = "";
+    Object.keys(pos).forEach(id => {
+      const p = pos[id], n = N[id];
+      const pid = parentOf(id);
+      if (pid && pos[pid]) {
+        const a = pos[pid], x1 = a.x + W, y1 = a.y + H / 2, x2 = p.x, y2 = p.y + H / 2, mx = (x1 + x2) / 2;
+        links += `<path class="lnk ${hot.has(id) ? "hot" : ""}" d="M${x1 + 12},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+      }
+      const u = util(n), pc = pctOf(u), st = STAT[n.status] || STAT.aktif;
+      let use = "", bar = "";
+      if (u && u.cap) {
+        use = `${fmt(u.used)}/${fmt(u.cap)} ${u.unit}`;
+        bar = `<rect class="barbg" x="10" y="${H - 9}" width="${W - 20}" height="4" rx="2"/><rect x="10" y="${H - 9}" width="${Math.min(100, pc) / 100 * (W - 20)}" height="4" rx="2" style="fill:${colorOf(pc)}"/>`;
+      } else if (n.type === "ont") { use = [n.plan, n.serial].filter(Boolean).join(" · "); }
+      else if (n.type === "drop") { use = n.lengthM ? n.lengthM + " m" : ""; }
+      else if (n.type === "olt") { use = "0 PON · belum ada kartu"; }
+      const full = pc >= 90 ? `<rect class="full" x="${W - 50}" y="7" width="42" height="14" rx="3"/><text class="full-t" x="${W - 29}" y="17.5" text-anchor="middle">PENUH</text>` : "";
+      const tg = n.children.length ? `<g class="tgl" data-tgl="${id}" transform="translate(${W + 12},${H / 2})"><circle r="10"/><text text-anchor="middle" y="3.5">${collapsed.has(id) ? n.children.length : "−"}</text></g>` : "";
+      nodes += `<g class="nd ${id === selected ? "sel" : ""} ${n.status === "rencana" ? "plan" : ""}" data-id="${id}" transform="translate(${p.x},${p.y})">
+        <rect class="box" width="${W}" height="${H}" rx="6"/>
+        <circle cx="14" cy="14" r="4" style="fill:${st[1]}"/>
+        <text class="t-type" x="24" y="17.5">${LABEL[n.type] || n.type}${n.type === "olt" ? " · " + esc(oltLabel(n).toUpperCase()) : ""}</text>${full}
+        <text class="t-name" x="10" y="35">${esc(trunc(n.name, 26))}</text>
+        <text class="t-use" x="10" y="${u && u.cap ? 47 : 49}">${esc(trunc(use, 34))}</text>${bar}${tg}
+        <title>${esc(title(n))}</title></g>`;
+    });
+    document.getElementById("topoVp").innerHTML = links + nodes;
+    applyView();
+  }
+
+  function applyView() { document.getElementById("topoVp").setAttribute("transform", `translate(${view.tx},${view.ty}) scale(${view.k})`); }
+  function canvasSize() { const el = document.getElementById("topoCanvas"); return { w: el.clientWidth || 800, h: el.clientHeight || 600 }; }
+  function fit() {
+    const xs = Object.values(pos); if (!xs.length) return;
+    const maxX = Math.max(...xs.map(p => p.x)) + W + 30, maxY = Math.max(...xs.map(p => p.y)) + H;
+    const { w, h } = canvasSize();
+    view.k = Math.max(0.25, Math.min(1.1, Math.min((w - 40) / maxX, (h - 40) / maxY)));
+    view.tx = 20; view.ty = Math.max(20, (h - maxY * view.k) / 2); applyView();
+  }
+  function centerOn(id) {
+    const p = pos[id]; if (!p) return;
+    const { w, h } = canvasSize();
+    if (view.k < 0.7) view.k = 0.85;
+    view.tx = w / 2 - (p.x + W / 2) * view.k; view.ty = h / 2 - (p.y + H / 2) * view.k; applyView();
+  }
+  function zoom(f, cx, cy) {
+    const { w, h } = canvasSize(); cx = cx == null ? w / 2 : cx; cy = cy == null ? h / 2 : cy;
+    const k = Math.max(0.2, Math.min(2, view.k * f));
+    view.tx = cx - (cx - view.tx) * k / view.k; view.ty = cy - (cy - view.ty) * k / view.k; view.k = k; applyView();
+  }
+
+  // ---------- Panel ----------
+  function portGrid(cap, items, extra, cls) {
+    let h = '<div class="ports">';
+    for (let i = 1; i <= cap; i++) {
+      const it = items[i - 1];
+      if (it) h += `<span class="port ro ${cls}" title="${esc(it)}">${i}</span>`;
+      else if (i <= items.length + extra) h += `<span class="port ro extra" title="Terpakai, tidak dicatat sebagai node">${i}</span>`;
+      else h += `<span class="port ro" title="Kosong">${i}</span>`;
+    }
+    return h + "</div>";
+  }
+  function rack(n) {
+    const devs = [];
+    walk(n.id, x => { if (x.ru) devs.push([x.name + " (" + (LABEL[x.type] || x.type).toLowerCase() + ")", x.ru, "dev"]); }, ["transport"]);
+    if (n.extraUsed) devs.push(["Lain-lain (UPS, ODF, patch panel)", n.extraUsed, "ext"]);
+    const used = devs.reduce((a, d) => a + d[1], 0), free = Math.max(0, (n.capacity || 0) - used);
+    if (free) devs.push(["Kosong", free, "free"]);
+    let u = 1, h = '<div class="rack">';
+    devs.forEach(([name, ru, cls]) => { h += `<div class="ru"><span class="u">U${u}${ru > 1 ? "–" + (u + ru - 1) : ""}</span><span class="blk ${cls}">${esc(name)} · ${ru}U</span></div>`; u += ru; });
+    return h + "</div>";
+  }
+
+  function renderPanel() {
+    const n = N[selected], u = util(n), pc = pctOf(u), st = STAT[n.status] || STAT.aktif;
+    const path = []; let c = selected; while (c) { path.unshift(N[c].name); c = parentOf(c); }
+    let h = `<div class="ph"><div class="line1"><span class="ty">${LABEL[n.type]}</span><h2>${esc(n.name)}</h2><span class="chip" style="color:${st[1]}">${st[0]}</span></div>
+      ${n.type === "olt" ? `<div>${esc(oltLabel(n))}</div>` : ""}<div class="crumb">${esc(path.join(" → "))}</div></div>`;
+
+    const m = mapping(n);
+    h += `<div class="sec"><div class="map"><span><b>Di rancangan Whusnet:</b> ${esc(m[0])}</span><span>${esc(m[1])}</span></div></div>`;
+
+    const kv = [];
+    if (n.model) kv.push(["Model", n.model]);
+    if (n.type === "pon") kv.push(["Label", `1/${n.slot}/${n.port}`]);
+    if (n.linkKind && n.type === "transport") kv.push(["Jenis link", n.linkKind]);
+    if (n.lengthM) kv.push(["Panjang", n.lengthM.toLocaleString("id-ID") + " m"]);
+    if (n.ru) kv.push(["Tinggi rack", n.ru + "U"]);
+    if (n.serial) kv.push(["Serial ONT", n.serial]);
+    if (n.plan) kv.push(["Paket", n.plan]);
+    if (n.note) kv.push(["Catatan", n.note]);
+    if (kv.length) h += `<div class="sec"><dl class="kv">${kv.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join("")}</dl></div>`;
+
+    if (u && u.cap) {
+      h += `<div class="sec"><div class="sec-h"><span class="eyebrow">Kapasitas</span><span class="mono">${fmt(u.used)}/${fmt(u.cap)} ${u.unit} · ${Math.round(pc)}%${pc >= 90 ? ' · <b style="color:var(--danger)">PENUH</b>' : ""}</span></div>
+        <div class="bar"><i style="width:${Math.min(100, pc)}%;background:${colorOf(pc)}"></i></div>`;
+      const kids = n.children.map(k => N[k]);
+      if (n.type === "datacenter" || n.type === "pop") h += rack(n);
+      if (n.type === "core" || n.type === "agg") h += portGrid(n.capacity, kids.map(k => k.name), n.extraUsed || 0, "node");
+      if (n.type === "odp") h += portGrid(n.capacity, kids.map(k => { const o = N[k.children[0]]; return k.name + (o ? " → " + o.name : ""); }), n.extraUsed || 0, "customer");
+      if (n.type === "feeder") {
+        h += '<div class="cores">';
+        for (let i = 1; i <= n.capacity; i++) {
+          const f = FIB[(i - 1) % 12], kid = kids[i - 1];
+          h += `<div class="core"><span class="n">${i}</span><span class="dotc" style="background:${f[1]}" title="${f[0]}"></span><span>${f[0]}${n.capacity > 12 ? " · tube " + (Math.floor((i - 1) / 12) + 1) : ""}${kid ? ` · <b>${esc(kid.name)}</b>` : i <= kids.length + (n.extraUsed || 0) ? " · terpakai lain" : ' <span class="note">· kosong</span>'}</span></div>`;
+        }
+        h += "</div>";
+      }
+      if (n.type === "pon") h += `<p class="note">${countType(n.id, "odp")} ODP, ${countType(n.id, "ont")} ONT di hilir port ini.</p>`;
+      h += "</div>";
+    }
+
+    if (n.type === "olt") {
+      h += `<div class="sec"><div class="sec-h"><span class="eyebrow">Peta slot</span><span class="mono">${Object.keys(n.cards || {}).length}/${n.capacity} slot terpasang</span></div><div class="slotgrid">`;
+      for (let s = 1; s <= (n.capacity || 0); s++) {
+        const card = (n.cards || {})[s];
+        if (!card) { h += `<div class="slot empty">Slot ${s} · kosong</div>`; continue; }
+        h += `<div class="slot"><span><b>Slot ${s}</b> · ${esc(card.model)}</span><div class="ports">`;
+        for (let p = 1; p <= card.ports; p++) {
+          const pon = n.children.map(k => N[k]).find(k => k.type === "pon" && k.slot === s && k.port === p);
+          h += pon ? `<span class="port ro node" title="${esc(pon.name)} · ${countType(pon.id, "ont")} ONT">${p}</span>` : `<span class="port ro" title="1/${s}/${p} kosong">${p}</span>`;
+        }
+        h += "</div></div>";
+      }
+      h += "</div></div>";
+    }
+
+    if (n.type === "transport" || n.type === "drop" || n.type === "ont") {
+      if (n.type === "transport" && !(u && u.cap)) h += "";
+    }
+
+    if (n.children.length && !["core", "agg", "odp", "feeder"].includes(n.type)) {
+      h += `<div class="sec"><div class="sec-h"><span class="eyebrow">Anak langsung</span><span class="mono">${n.children.length}</span></div><ul class="kidlist">${n.children.map(k => `<li><button type="button" data-go="${k}">${esc(title(N[k]))}</button></li>`).join("")}</ul></div>`;
+    }
+    document.getElementById("topoPanel").innerHTML = h;
+  }
+
+  function select(id, center) {
+    selected = id;
+    let c = parentOf(id); while (c) { collapsed.delete(c); c = parentOf(c); }
+    render(); renderPanel();
+    if (mode === "inv") renderInv();
+    if (center && mode === "topo") centerOn(id);
+  }
+
+  function stats() {
+    const all = Object.values(N);
+    const onts = all.filter(n => n.type === "ont").length;
+    const olts = all.filter(n => n.type === "olt");
+    const ponTotal = olts.reduce((a, n) => a + cardPorts(n), 0), ponUsed = all.filter(n => n.type === "pon").length;
+    const slotFree = olts.reduce((a, n) => a + (n.capacity || 0) - Object.keys(n.cards || {}).length, 0);
+    const odpFree = all.filter(n => n.type === "odp").reduce((a, n) => { const u = util(n); return a + Math.max(0, u.cap - u.used); }, 0);
+    const hot = all.filter(n => { const u = util(n); return u && u.cap && pctOf(u) >= 85; }).length;
+    document.getElementById("topoStats").innerHTML = [
+      [onts, "pelanggan (ONT)"], [`${ponUsed}/${ponTotal}`, "port PON terpakai"], [slotFree, "slot OLT kosong"], [odpFree, "port ODP kosong"], [hot, "perangkat ≥ 85%"]
+    ].map(([v, l]) => `<div class="xstat"><b>${v}</b><span>${l}</span></div>`).join("");
+  }
+
+  // ---------- Daftar inventaris (pola prototipe: chip tipe, urutan, cari) ----------
+  const TYPE_ORDER = ["datacenter", "core", "transport", "pop", "agg", "olt", "pon", "feeder", "odp", "drop", "ont"];
+  const TYPE_COLOR = { datacenter: "var(--accent)", core: "var(--proposal)", transport: "var(--proposal)", pop: "var(--accent)", agg: "var(--active)", olt: "var(--active)", pon: "var(--ok)", feeder: "var(--warn)", odp: "var(--passive)", drop: "var(--muted)", ont: "var(--fg)" };
+  const SHORT = { datacenter: "Data Center", core: "Core", transport: "Backbone", pop: "POP", agg: "Aggregation", olt: "OLT", pon: "PON", feeder: "Feeder", odp: "ODP", drop: "Drop", ont: "ONT" };
+  let mode = "topo";
+  const invTypes = new Set(TYPE_ORDER);
+
+  function treeOrder() { const out = []; const go = id => { out.push(id); N[id].children.forEach(go); }; ROOTS.forEach(go); return out; }
+  function locationOf(id) {
+    let c = parentOf(id);
+    while (c && N[c].type !== "pop") c = parentOf(c);
+    if (c) return N[c].name;
+    c = parentOf(id);
+    while (c && N[c].type !== "datacenter") c = parentOf(c);
+    return c ? N[c].name : "-";
+  }
+  function matches(n, q) { return !q || [n.name, n.model, n.serial, n.plan, n.address, n.note].some(v => v && String(v).toLowerCase().includes(q)); }
+
+  function renderChips(q) {
+    const counts = {};
+    Object.values(N).forEach(n => { if (matches(n, q)) counts[n.type] = (counts[n.type] || 0) + 1; });
+    document.getElementById("invChips").innerHTML = TYPE_ORDER.map(t => `<button type="button" class="xchip" data-ity="${t}" aria-pressed="${invTypes.has(t)}"><i style="background:${TYPE_COLOR[t]}"></i>${SHORT[t]}<span class="c">${counts[t] || 0}</span></button>`).join("");
+  }
+
+  function renderInv() {
+    const q = document.getElementById("topoSearch").value.trim().toLowerCase();
+    const sort = document.getElementById("invSort").value;
+    renderChips(q);
+    let rows = treeOrder().map(id => N[id]).filter(n => invTypes.has(n.type) && matches(n, q)).map(n => {
+      const u = util(n);
+      const m = u && u.cap ? { used: u.used, cap: u.cap, unit: u.unit, free: Math.max(0, u.cap - u.used), pct: pctOf(u) } : null;
+      return { n, m };
+    });
+    if (sort === "pct") rows.sort((a, b) => (b.m ? b.m.pct : -1) - (a.m ? a.m.pct : -1));
+    if (sort === "free") rows.sort((a, b) => (b.m ? b.m.free : -1) - (a.m ? a.m.free : -1));
+    const total = rows.length;
+    rows = rows.slice(0, 400);
+    const full = rows.filter(r => r.m && r.m.free === 0).length;
+    document.getElementById("invSum").innerHTML = `Menampilkan <b>${total}</b> perangkat${total > 400 ? " (400 pertama)" : ""} · <b>${full}</b> penuh. Klik baris untuk detail.`;
+    document.getElementById("invBody").innerHTML = rows.length ? rows.map(({ n, m }) => {
+      const st = STAT[n.status] || STAT.aktif;
+      return `<tr data-inv="${n.id}" class="${n.id === selected ? "sel" : ""}" tabindex="0">
+        <td><div class="xdev"><i style="background:${TYPE_COLOR[n.type]}"></i><span class="tt">${LABEL[n.type]}</span><b>${esc(n.name)}</b></div>${n.type === "olt" ? `<span class="note">${esc(oltLabel(n))}</span>` : ""}</td>
+        <td>${esc(locationOf(n.id))}</td>
+        <td class="num">${m ? `${fmt(m.used)} / ${fmt(m.cap)} ${m.unit}` : '<span class="note">-</span>'}</td>
+        <td class="num">${m ? (m.free === 0 ? '<b style="color:var(--danger)">Penuh</b>' : `${fmt(m.free)} ${m.unit}`) : '<span class="note">-</span>'}</td>
+        <td>${m ? `<div class="xutil"><div class="bar"><i style="width:${Math.min(100, m.pct)}%;background:${colorOf(m.pct)}"></i></div><span style="color:${m.pct >= 70 ? colorOf(m.pct) : "inherit"}">${Math.round(m.pct)}%</span></div>` : '<span class="note">-</span>'}</td>
+        <td><span class="chip" style="color:${st[1]}">${st[0]}</span></td></tr>`;
+    }).join("") : '<tr><td colspan="6" class="note" style="text-align:center;padding:28px">Tidak ada perangkat yang cocok dengan filter ini.</td></tr>';
+  }
+
+  function setMode(v) {
+    mode = v;
+    document.querySelectorAll("[data-xv]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.xv === v)));
+    document.getElementById("xvTopo").hidden = v !== "topo";
+    document.getElementById("xvInv").hidden = v !== "inv";
+    document.getElementById("invSort").hidden = v !== "inv";
+    ["topoDepth", "zOut", "zIn", "zFit"].forEach(id => { document.getElementById(id).hidden = v !== "topo"; });
+    document.getElementById("topoSearch").placeholder = v === "inv" ? "Saring nama, model, serial ONT, paket…" : "Cari nama, model, serial ONT, paket… (Enter)";
+    try { localStorage.setItem("infra-sample-view", v); } catch (e) {}
+    if (v === "inv") renderInv(); else { render(); centerOn(selected); }
+  }
+  document.querySelector(".xseg").addEventListener("click", e => { const b = e.target.closest("[data-xv]"); if (b) setMode(b.dataset.xv); });
+  document.getElementById("invChips").addEventListener("click", e => {
+    const b = e.target.closest("[data-ity]"); if (!b) return;
+    const t = b.dataset.ity; invTypes.has(t) ? invTypes.delete(t) : invTypes.add(t); renderInv();
+  });
+  document.getElementById("invSort").addEventListener("change", renderInv);
+  document.getElementById("topoSearch").addEventListener("input", () => { if (mode === "inv") renderInv(); });
+  const invBody = document.getElementById("invBody");
+  invBody.addEventListener("click", e => { const r = e.target.closest("[data-inv]"); if (r) select(r.dataset.inv, false); });
+  invBody.addEventListener("keydown", e => { const r = e.target.closest("[data-inv]"); if (r && e.key === "Enter") select(r.dataset.inv, false); });
+
+  // ---------- Events ----------
+  const svg = document.getElementById("topoSvg"), canvas = document.getElementById("topoCanvas");
+  let drag = null, moved = false;
+  svg.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty }; moved = false; });
+  window.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) { moved = true; canvas.classList.add("drag"); }
+    if (moved) { view.tx = drag.tx + dx; view.ty = drag.ty + dy; applyView(); }
+  });
+  window.addEventListener("pointerup", () => { drag = null; canvas.classList.remove("drag"); });
+  svg.addEventListener("click", e => {
+    if (moved) return;
+    const t = e.target.closest("[data-tgl]");
+    if (t) { const id = t.dataset.tgl; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); document.getElementById("topoDepth").value = "custom"; render(); return; }
+    const nd = e.target.closest("[data-id]");
+    if (nd) select(nd.dataset.id, false);
+  });
+  svg.addEventListener("wheel", e => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const r = svg.getBoundingClientRect();
+    zoom(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  document.getElementById("zIn").onclick = () => zoom(1.2);
+  document.getElementById("zOut").onclick = () => zoom(1 / 1.2);
+  document.getElementById("zFit").onclick = fit;
+  document.getElementById("topoDepth").onchange = e => { applyDepth(e.target.value); render(); fit(); };
+  document.getElementById("topoSearch").addEventListener("keydown", e => {
+    if (e.key !== "Enter" || mode !== "topo") return;
+    const q = e.target.value.trim().toLowerCase(); if (!q) return;
+    const hit = Object.values(N).find(n => [n.name, n.model, n.serial, n.plan, n.address].some(v => v && String(v).toLowerCase().includes(q)));
+    if (hit) select(hit.id, true);
+  });
+  document.getElementById("topoPanel").addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) select(b.dataset.go, true); });
+
+  let shown = false;
+  window.__showTopo = function () {
+    if (shown) { applyView(); return; }
+    shown = true; applyDepth("odp"); render(); renderPanel(); stats(); fit();
+    let v = "topo";
+    try { v = localStorage.getItem("infra-sample-view") === "inv" ? "inv" : "topo"; } catch (e) {}
+    if (v === "inv") setMode("inv");
+  };
+  window.__topoTest = { N, util, render, renderPanel, select, stats, applyDepth, renderInv, setMode, invTypes };
+})();
+
+// ---------- Tab ----------
+(function () {
+  const tabs = [...document.querySelectorAll('[data-ptab]')];
+  function show(name) {
+    tabs.forEach(t => {
+      const on = t.dataset.ptab === name;
+      t.setAttribute("aria-selected", on);
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById("tab-" + t.dataset.ptab).hidden = !on;
+    });
+    if (name === "topologi" && window.__showTopo) window.__showTopo();
+    try { localStorage.setItem("infra-page", name); } catch (e) {}
+  }
+  tabs.forEach(t => t.addEventListener("click", () => show(t.dataset.ptab)));
+  let start = "rancangan";
+  if (location.hash === "#topologi") start = "topologi";
+  else { try { start = localStorage.getItem("infra-page") || start; } catch (e) {} }
+  show(start === "topologi" ? "topologi" : "rancangan");
+})();
+
+</script>
+
+</body></html>

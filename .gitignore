@@ -33,3 +33,6 @@ Thumbs.db
 # Artefak redirect `> NUL` dari shell Windows — bukan file project, kebentuk
 # tiap ada perintah yang nulis ke device NUL dari dalam WSL/bind mount.
 /NUL
+
+# Subagent-driven-development scratch workspace (per-plan, not project artifacts)
+/.superpowers/

@@ -77,6 +77,7 @@ class CollectorPaymentService
 
         $invoices = Invoice::query()
             ->applyUserScope($viewer)
+            ->applyUserScope($collector)
             ->with('customer')
             ->whereIn('id', array_column($rows, 'invoice_id'))
             ->get()
@@ -501,12 +502,17 @@ class CollectorPaymentService
             // jumlah baris yang benar-benar tercatat.
             $total = Money::sum($rowsInPop->pluck('amount'));
 
+            $isTechnician = $collector->isTechnician();
+            $sourceLabel = $isTechnician ? 'Teknisi' : 'Kolektor';
+
             $this->notifyRoleUsersInPop(
                 (int) $popId,
                 'pop_admin',
-                'Setoran Kolektor: '.$collector->name,
-                $rowsInPop->count().' pembayaran (total Rp'.number_format($total, 0, ',', '.').") dicatat kolektor {$collector->name}.",
-                route('collector-worksheet.show', $collector->id)
+                'Pembayaran '.$sourceLabel.': '.$collector->name,
+                $rowsInPop->count().' pembayaran (total Rp'.number_format($total, 0, ',', '.').") dicatat {$sourceLabel} {$collector->name}.",
+                $isTechnician
+                    ? route('collector-worksheet.technicians.show', $collector->id)
+                    : route('collector-worksheet.show', $collector->id)
             );
 
             // Notifikasi saja tidak cukup: ia mendarat di lonceng, sementara

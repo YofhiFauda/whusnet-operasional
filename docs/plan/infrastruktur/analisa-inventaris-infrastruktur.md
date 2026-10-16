@@ -1,6 +1,6 @@
 # Analisa: Inventaris Aset Gudang Terpasang sebagai Infrastruktur
 
-Status: **diimplementasi sebagai ADHOC-167** (`/network/inventaris`). Dibuat 2026-10-13.
+Status: **analisis historis ADHOC-167; implementasi `/network/inventaris` dibatalkan dan dihapus dari branch dev pada 2026-10-14 karena tidak sesuai prototipe peta-infrastruktur-isp.html**. Dibuat 2026-10-13.
 Dasar: `docs/superpowers/specs/2026-10-09-aset-infrastruktur-lokasi-design.md` (v3) dan
 prototipe `docs/plan/infrastruktur/peta-infrastruktur-isp.html` (mock, belum terhubung DB).
 
@@ -9,6 +9,86 @@ prototipe `docs/plan/infrastruktur/peta-infrastruktur-isp.html` (mock, belum ter
 Bukti bahwa barang gudang sudah terpasang di infrastruktur, sama seperti bukti modem
 terpasang di pelanggan. Tidak perlu menggambar topologi. Cukup daftar yang bisa dicari,
 difilter, dan diekspor.
+
+
+## HIPOTESIS AWAL
+• ## Review infrastruktur
+
+  Fondasinya sudah ada, tetapi peta HTML belum menjadi tampilan aplikasi. Peta Infrastruktur ISP (/home/yopi/whusnet/whusnet-operasional/docs/plan/infrastruktur/peta-infrastruktur-isp.html) adalah
+  prototipe yang menyimpan data di browser. Aplikasi memakai pohon network_nodes yang terhubung ke POP, port, dan ledger Gudang. Karena itu, tampilan Topologi dan Inventaris dari HTML dapat
+  dijadikan acuan visual, sementara datanya harus dibaca dari sistem yang sudah ada. Analisis perbedaan desain dan kode (/home/yopi/whusnet/whusnet-operasional/docs/plan/infrastruktur/analisa-gap-
+  peta-infrastruktur.md:9).
+
+  | Kebutuhan | Kondisi saat ini |
+  | :--- | :--- |
+  | Pohon lokasi yang dapat berbeda antar cabang | Sudah ada: tipe node dikelola sebagai master data, kedalaman pohon bebas, dan node dapat dipindah. |
+  | Barang Gudang yang terpasang | Sudah ada daftar `/network/inventaris`: SN, qty/roll, lokasi node, tanggal, teknisi, dan task dari ledger DEPLOY. Layanan inventaris (`/home/yopi/whusnet/whusnet-operasional/app/Services/NetworkInventoryService.php:13`). |
+  | Tampilan seperti tab Inventaris pada HTML | Daftar aset sudah ada, tetapi belum menjadi seluruh pengalaman peta HTML, termasuk kanvas topologi dan ringkasan utilisasi berantai. |
+  | Slot ODP dan kartu OLT | Ada pencatatan port ODP serta slot/kartu OLT secara manual. Pengisian port belum menyatu dengan laporan pemasangan pelanggan. Layanan port (`/home/yopi/whusnet/whusnet-operasional/app/Services/NetworkPortAssignmentService.php:15`), slot OLT (`/home/yopi/whusnet/whusnet-operasional/app/Http/Controllers/Network/OltSlotController.php:16`). |
+
+  ### Apakah barang dari Gudang bisa terlacak?
+
+  Bisa untuk barang yang dicatat melalui alur Gudang → custody teknisi → DEPLOY ke node. Dari barang dapat dicari lokasi terpasangnya; dari node dapat dilihat barang yang menempel. Saat SN dicabut,
+  status dan lokasi berubah melalui transaksi RETRIEVE_INFRA. Riwayat transaksi menyimpan cabang pada waktu kejadian, sehingga perpindahan node kemudian tidak mengubah catatan lama. Rancangan aset
+  infrastruktur (/home/yopi/whusnet/whusnet-operasional/docs/superpowers/specs/2026-10-09-aset-infrastruktur-lokasi-design.md:185).
+
+  Ada dua batas penting:
+
+  • Aset lama yang sudah berada di lapangan belum punya alur registrasi awal yang layak; alur DEPLOY saat ini mengharapkan task dan custody. Membuat task palsu akan mengaburkan riwayat. Analisis gap
+    aset lama (/home/yopi/whusnet/whusnet-operasional/docs/plan/infrastruktur/analisa-gap-peta-infrastruktur.md:227).
+
+  • Daftar inventaris memakai setiap kejadian DEPLOY untuk qty/roll karena jalur cabut qty/roll dari node belum lengkap. Jadi daftar itu adalah bukti pemasangan, tetapi laporan saldo fisik terkini
+    perlu dicocokkan dengan infrastructure_balances. Aturan daftar inventaris (/home/yopi/whusnet/whusnet-operasional/app/Services/NetworkInventoryService.php:13).
+
+  ### O-REQ dan INFR-REQ untuk berbagai kasus
+
+  Saat ini keduanya masih berbagi laporan maintenance. Form sudah dapat mencatat pemasangan SN, qty, roll, atau penggantian satu SN pada satu node; proses mutasinya berada dalam transaksi database.
+  Namun rancangan laporan khusus (/home/yopi/whusnet/whusnet-operasional/docs/superpowers/specs/2026-10-12-laporan-oreq-infr-req-design.md:1) masih berstatus belum diimplementasikan. Batas form saat
+  ini terlihat pada validasi laporan (/home/yopi/whusnet/whusnet-operasional/app/Http/Controllers/TaskMaintenanceController.php:571) dan eksekusi mutasi (/home/yopi/whusnet/whusnet-operasional/app/
+  Http/Controllers/TaskMaintenanceController.php:928).
+
+  | Kasus | Aturan yang saya sarankan |
+  | :--- | :--- |
+  | O-REQ pekerjaan kantor tanpa perubahan jaringan | Simpan tindakan, hasil, material, dan bukti; node jaringan tidak wajib. |
+  | INFR-REQ pemeriksaan saja | Simpan hasil pemeriksaan tanpa mutasi stok. |
+  | Pasang | Pilih node nyata dan barang dari custody; catat DEPLOY. |
+  | Ganti | Pastikan SN lama berada pada node yang dipilih, cabut lalu pasang SN baru dalam satu transaksi. |
+  | Cabut | Kembalikan aset ke custody dengan jejak lokasi asal. |
+  | Beberapa tindakan dalam satu kunjungan | Perlu baris aksi terpisah dengan identitas tetap, agar laporan yang ditolak FOP lalu dikirim ulang tidak menggandakan mutasi. |
+
+  Prioritas koreksi laporan adalah validasi SN lama terhadap node tujuan, penanganan task tanpa pelanggan yang belum memiliki FopTask, dan pencegahan barang yang sama tercatat pada dua seksi
+  material. Ketiganya sudah diidentifikasi dalam rancangan; saya tidak akan menganggapnya selesai hanya karena form infra_* telah tersedia. Rancangan kasus dan penerimaan (/home/yopi/whusnet/
+  whusnet-operasional/docs/superpowers/specs/2026-10-12-laporan-oreq-infr-req-design.md:30).
+
+  ### Bagaimana slot ODP dan OLT sebaiknya terisi?
+
+  Rekomendasi saya: catat dan verifikasi manual lebih dahulu, lalu integrasikan API sebagai jalur konfirmasi dan rekonsiliasi. Pengaturan OLT di lapangan masih manual. Menandai slot otomatis hanya
+  dari teks nomor port yang dikirim sistem lain berisiko membuat kapasitas tampak terpakai padahal sambungan fisiknya berbeda.
+
+  Alur yang dapat dipakai:
+
+  1. Admin/FOP membuat Mini POP, node OLT/kartu, ODC/ODP, dan nomor port fisiknya.
+  2. Saat pemasangan, teknisi memilih ODP dan port kosong yang benar-benar dipakai; sistem mengaitkan port itu dengan pelanggan dan menolak pemakaian ganda.
+  3. Nomor OLT, slot, dan PON port dicatat berdasarkan hasil pemasangan atau konfirmasi NOC. Sistem menampilkan kapasitas kartu/port dari master infrastruktur.
+  4. API sistem lain mengirim hasil konfigurasi dengan identitas pelanggan dan titik sambung yang dapat dicocokkan. Jika berbeda dari laporan lapangan, tampilkan selisih untuk verifikasi, bukan
+     langsung menimpa catatan fisik.
+
+  Pemisahan kapasitasnya perlu tegas: slot chassis menampung kartu; kartu memiliki port PON; satu port PON melayani banyak ONT sesuai batas desain; satu port ODP ditempati satu sambungan pelanggan.
+  Analisis saat ini menemukan angka 128 pada tipe kartu berpotensi tertukar dengan batas ONT per PON. Analisis semantik kartu dan port (/home/yopi/whusnet/whusnet-operasional/docs/plan/
+  infrastruktur/analisa-gap-peta-infrastruktur.md:120).
+
+  API yang sudah ada menerima olt_number, olt_slot, dan olt_port sebagai data perangkat pelanggan, tetapi field itu belum otomatis menjadi assignment pada pohon port infrastruktur. Endpoint network-
+  device (/home/yopi/whusnet/whusnet-operasional/app/Http/Controllers/Api/NetworkDeviceController.php:16). Pemisahan inventaris sumber daya dari data layanan pelanggan ini juga sejalan dengan tujuan
+  TM Forum Resource Inventory API; keselarasan tersebut adalah arahan desain, bukan klaim bahwa API proyek sudah mengikuti standar itu.
+
+  ### Agar dinamis di berbagai tempat
+
+  Gunakan POP sebagai wilayah akses, network_nodes sebagai posisi/fungsi fisik, dan ledger Gudang sebagai identitas serta riwayat barang. Cabang boleh mempunyai susunan berbeda: ada yang langsung
+  OLT → ODP, ada yang melalui ODC dan feeder. Tipe node dan aturan induk–anak dapat dikelola dari master data; jangan memaksa setiap cabang mengikuti seluruh tingkat pada contoh HTML. Ketika OLT
+  diganti, posisi node tetap dan SN barang yang berubah. Keputusan model dinamis (/home/yopi/whusnet/whusnet-operasional/docs/superpowers/specs/2026-10-09-aset-infrastruktur-lokasi-design.md:28).
+
+  Urutan kerja berikutnya yang paling masuk akal ialah menetapkan model chassis OLT versus Mini POP, membenahi aturan kapasitas port, menuntaskan laporan aksi fisik dan registrasi aset lama, lalu
+  menghubungkan pilihan port ke pemasangan. Setelah data dan alurnya konsisten, tab Topologi/Inventaris dapat mengikuti HTML dengan angka yang dapat dipercaya.
 
 ## 2. Yang sudah ada di sistem
 

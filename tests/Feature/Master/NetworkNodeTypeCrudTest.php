@@ -186,7 +186,7 @@ class NetworkNodeTypeCrudTest extends TestCase
         $this->assertSame(48, (int) $odp->max_ports);
         $this->assertSame('ODP Custom Admin', $odp->name);
         $this->assertSame(1, NetworkNodeType::where('code', 'odp')->count());
-        $this->assertSame(8, NetworkNodeType::count());
+        $this->assertSame(11, NetworkNodeType::count());
         $this->assertTrue(NetworkNodeType::where('code', 'olt_chassis')->exists());
         $this->assertDatabaseHas('network_node_type_rules', [
             'child_type_id' => $odp->id,

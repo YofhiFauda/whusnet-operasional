@@ -40,6 +40,7 @@ use App\Http\Controllers\FopTaskController;
 use App\Http\Controllers\ImportReportController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceReportController;
+use App\Http\Controllers\ManualBookController;
 use App\Http\Controllers\Master\BankAccountController;
 use App\Http\Controllers\Master\CustomerTerminationReasonController;
 use App\Http\Controllers\Master\DistributionController;
@@ -56,7 +57,7 @@ use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
 use App\Http\Controllers\Network\InfraAssetRegistrationController;
-use App\Http\Controllers\Network\NetworkInventoryController;
+use App\Http\Controllers\Network\InfrastructureMapController;
 use App\Http\Controllers\Network\NetworkNodeController;
 use App\Http\Controllers\Network\OltSlotController;
 use App\Http\Controllers\NocDashboardController;
@@ -180,6 +181,27 @@ Route::middleware('auth')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/panduan', [ManualBookController::class, 'index'])->name('manuals.index');
+    Route::get('/panduan/konteks', [ManualBookController::class, 'context'])->name('manuals.context');
+    Route::middleware('permission:manuals.create|manuals.update|manuals.publish')->group(function () {
+        Route::get('/panduan/kelola', [ManualBookController::class, 'manage'])->name('manuals.manage');
+    });
+    Route::middleware('permission:manuals.create')->group(function () {
+        Route::get('/panduan/baru', [ManualBookController::class, 'create'])->name('manuals.create');
+        Route::post('/panduan', [ManualBookController::class, 'store'])->name('manuals.store');
+    });
+    Route::middleware('permission:manuals.update')->group(function () {
+        Route::get('/panduan/{article}/ubah', [ManualBookController::class, 'edit'])->name('manuals.edit');
+        Route::get('/panduan/{article}/pratinjau', [ManualBookController::class, 'preview'])->name('manuals.preview');
+        Route::put('/panduan/{article}', [ManualBookController::class, 'update'])->name('manuals.update');
+        Route::post('/panduan/{article}/pulihkan/{revision}', [ManualBookController::class, 'restore'])->name('manuals.restore');
+    });
+    Route::middleware('permission:manuals.publish')->group(function () {
+        Route::post('/panduan/{article}/terbitkan', [ManualBookController::class, 'publish'])->name('manuals.publish');
+        Route::post('/panduan/{article}/tarik', [ManualBookController::class, 'unpublish'])->name('manuals.unpublish');
+    });
+    Route::get('/panduan/{slug}', [ManualBookController::class, 'show'])->name('manuals.show');
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -427,6 +449,7 @@ Route::middleware('auth')->group(function () {
     // di halaman Tagihan. Static routes dulu, dynamic ({collector}) belakangan.
     Route::middleware('permission:collector_worksheet.view')->group(function () {
         Route::get('/collector-worksheet', [CollectorWorksheetController::class, 'index'])->name('collector-worksheet.index');
+        Route::get('/collector-worksheet/technicians/{technician}', [CollectorWorksheetController::class, 'showTechnician'])->name('collector-worksheet.technicians.show');
         Route::get('/collector-worksheet/{collector}', [CollectorWorksheetController::class, 'show'])->name('collector-worksheet.show');
     });
 
@@ -450,6 +473,7 @@ Route::middleware('auth')->group(function () {
     // route parameter — aman karena digerbang `payments.create` (hak bayar
     // penuh, admin). Bandingkan dengan rute kolektor di bawah.
     Route::middleware('permission:payments.create')->group(function () {
+        Route::post('/payment-batches/technicians/{technician}', [PaymentBatchController::class, 'storeForTechnician'])->name('payment-batches.technicians.store');
         Route::post('/payment-batches/{collector}', [PaymentBatchController::class, 'store'])->name('payment-batches.store');
     });
 
@@ -486,6 +510,7 @@ Route::middleware('auth')->group(function () {
     // (digerbang permission-nya sendiri, terpisah dari `kolektor.deposit`
     // yang buat kolektor sendiri).
     Route::middleware('permission:collector_worksheet.deposit')->group(function () {
+        Route::post('/collector-worksheet/technicians/{technician}/deposit', [CollectorDepositController::class, 'storeForTechnician'])->name('collector-worksheet.technicians.deposit');
         Route::post('/collector-worksheet/{collector}/deposit', [CollectorDepositController::class, 'storeForCollector'])->name('collector-worksheet.deposit');
     });
 
@@ -1192,10 +1217,9 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('permission:network_nodes.view')->group(function () {
+        Route::get('/network/peta', [InfrastructureMapController::class, 'index'])->name('network.map.index');
+        Route::get('/network/peta/ekspor', [InfrastructureMapController::class, 'export'])->name('network.map.export');
         Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
-        // Static dulu, dinamis belakangan -- '/network/inventaris' wajib didaftar
-        // sebelum '/network/nodes/{node}' supaya tidak ditelan route dinamis.
-        Route::get('/network/inventaris', [NetworkInventoryController::class, 'index'])->name('network.inventaris.index');
         Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
         Route::get('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'create'])->name('network.nodes.register-asset.create');
     });
@@ -1210,6 +1234,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/node-ports/{port}/assign-node', [NetworkNodeController::class, 'assignNodePort'])->name('network.node-ports.assign-node');
         Route::post('/network/nodes/{chassis}/olt-slots', [OltSlotController::class, 'store'])->name('network.nodes.olt-slots.store');
         Route::post('/network/nodes/{chassis}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('network.nodes.olt-slots.card');
+    });
+    Route::middleware('permission:network_nodes.delete')->group(function () {
+        Route::delete('/network/nodes/{node}', [NetworkNodeController::class, 'destroy'])->name('network.nodes.destroy');
     });
     Route::middleware('permission:network_nodes.register_infra')->group(function () {
         Route::post('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'store'])->name('network.nodes.register-asset.store');

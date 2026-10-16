@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Enums\CollectorRole;
+use App\Enums\DepositStatus;
+use App\Enums\PaymentStatus;
 use App\Models\BankAccount;
+use App\Models\CollectorDeposit;
 use App\Models\Invoice;
 use App\Services\CollectorBalanceService;
 use App\Services\CollectorWorklistService;
+use App\Services\CustomerBalanceService;
+use App\Support\LikeSearch;
 use App\Traits\RecordsCollectorBatch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -18,14 +22,14 @@ use Illuminate\View\View;
  *
  * Beda dengan kolektor: pelanggan TIDAK harus di-assign admin lebih dulu.
  * Batasnya cuma POP scope teknisi (`applyUserScope`), dicek server di
- * `CollectorPaymentService::validateRows()` — bukan hanya di UI.
+ * `CollectorPaymentService::validateRows()` â€” bukan hanya di UI.
  *
  * Seperti `CollectorPaymentController`, identitas pencatat diambil dari
  * `auth()->user()`, tak pernah dari URL/body. Uang yang tercatat masuk saldo
  * teknisi (`CollectorBalanceService`) dan disetor lewat jalur setoran kolektor
  * yang sama, dengan badge sumber "Teknisi" (`payments.collected_by_role`).
  *
- * docs/plan/kolektor/rancangan-pembayaran-teknisi.md §4–§6.
+ * docs/plan/kolektor/rancangan-pembayaran-teknisi.md Â§4â€“Â§6.
  */
 class TechnicianPaymentController extends Controller
 {
@@ -34,7 +38,7 @@ class TechnicianPaymentController extends Controller
     /**
      * Halaman input pembayaran teknisi. Saldo & status setor ditampilkan di
      * atas form supaya teknisi tahu uang yang masih dipegangnya (peringatan
-     * "belum setor" — hanya informasi, tidak memblokir).
+     * "belum setor" â€” hanya informasi, tidak memblokir).
      */
     public function index(Request $request, CollectorBalanceService $balance): View
     {
@@ -42,16 +46,73 @@ class TechnicianPaymentController extends Controller
 
         abort_unless($technician->isTechnician(), 403, 'Halaman ini khusus teknisi.');
 
+        $search = LikeSearch::sanitize((string) $request->query('search', ''));
+        $invoices = Invoice::query()
+            ->applyUserScope($technician)
+            ->whereIn('invoice_status', CollectorWorklistService::OUTSTANDING_STATUSES)
+            ->where('billing_period', '<=', now()->format('Y-m'))
+            ->when(mb_strlen($search) < 3, fn ($query) => $query->whereRaw('1 = 0'))
+            ->when(mb_strlen($search) >= 3, fn ($query) => $query->where(function ($match) use ($search) {
+                $match->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhereHas('customer', fn ($customer) => $customer
+                        ->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('cid', 'like', "%{$search}%")
+                        ->orWhere('customer_code', 'like', "%{$search}%"));
+            }))
+            ->with('customer')
+            ->orderBy('customer_id')
+            ->orderBy('due_date')
+            ->orderBy('id')
+            ->paginate(150)
+            ->withQueryString();
+        $customerBalances = app(CustomerBalanceService::class)->balancesForCustomers(
+            collect($invoices->items())->pluck('customer_id')->all()
+        );
+
         $status = $balance->technicianSettlementStatus($technician)->firstWhere(fn (array $row) => $row['user']->id === $technician->id);
+        $tab = in_array($request->query('tab'), ['bayar', 'setoran'], true)
+            ? $request->query('tab')
+            : 'catat';
+        $unsettledCount = $balance->unsettledPaymentsQuery($technician)->count();
+        $unsettledPayments = $tab === 'bayar'
+            ? $balance->unsettledPaymentsQuery($technician)
+                ->with(['customer:id,full_name,cid,customer_code', 'invoice:id,billing_period'])
+                ->orderByDesc('id')
+                ->paginate(50, ['*'], 'unsettled_page')
+                ->withQueryString()
+            : null;
+
+        $deposits = $tab === 'setoran'
+            ? CollectorDeposit::query()
+                ->where('collector_id', $technician->id)
+                ->with(['payments' => fn ($query) => $query
+                    ->where('payment_status', PaymentStatus::VALID->value)
+                    ->with('customer:id,full_name,cid,customer_code')])
+                ->orderByDesc('submitted_at')
+                ->orderByDesc('id')
+                ->paginate(20, ['*'], 'deposit_page')
+                ->withQueryString()
+            : null;
 
         return view('technician-payments.index', [
+            'search' => $search,
+            'invoices' => $invoices,
+            'customerBalances' => $customerBalances,
+            'deposits' => $deposits,
+            'tab' => $tab,
+            'unsettledCount' => $unsettledCount,
+            'unsettledPayments' => $unsettledPayments,
+            'outstandingShortfall' => $balance->outstandingShortfall($technician),
+            'pendingDeposits' => CollectorDeposit::query()
+                ->where('collector_id', $technician->id)
+                ->whereIn('status', [DepositStatus::MENUNGGU_VERIFIKASI->value, DepositStatus::SELISIH->value])
+                ->orderByDesc('submitted_at')
+                ->limit(5)
+                ->get(),
             'bankAccounts' => BankAccount::activeOptions(),
             'saldo' => $balance->balance($technician),
             'belumSetor' => $status['overdue'] ?? false,
             'closeTime' => (string) config('billing.technician_close_time', '23:59'),
-            'idempotencyKey' => (string) Str::uuid(),
-            'searchUrl' => route('technician-payments.search'),
-            'storeUrl' => route('technician-payments.store'),
             'depositUrl' => route('collector-worklist.deposit'),
         ]);
     }

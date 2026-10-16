@@ -5,15 +5,14 @@
 
 @section('content')
 <div x-data="{
-    viewMode: 'explorer',
-    selectedNodeId: @js($nodes->first()?->id ?? ($parentOptions->first()?->id ?? null)),
+    typeFilter: 'all',
+    selectedNodeId: @js($nodes->first()?->id),
     showCreateModal: @js($errors->any() && !old('_method')),
     placement: @js(old('parent_id') ? 'node' : 'pop'),
     hasPorts: @js((bool) ($nodeTypes->firstWhere('id', (int) old('node_type_id'))?->has_ports ?? true)),
     selectNode(id) {
         this.selectedNodeId = id;
-        this.viewMode = 'explorer';
-        $nextTick(() => {
+        this.$nextTick(() => {
             const el = document.getElementById('inspector-node-' + id);
             if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -39,31 +38,11 @@
                     Infrastruktur Jaringan &amp; Manajemen ODN
                 </h1>
                 <p class="text-xs text-text-muted max-w-2xl leading-relaxed">
-                    Pemetaan topologi fisik hierarkis (Pusat &rarr; Cabang POP &rarr; OLT &rarr; ODC &rarr; ODP). Kelola kapasitas port splitter, lacak aset perangkat terpasang, dan pantau zona kritis (Red Zone) secara real-time.
+                    Susunan Pusat, Cabang/Mini POP, dan node jaringan. Periksa jalur serta penggunaan port, aset terpasang, dan titik yang mendekati kapasitas.
                 </p>
             </div>
 
             <div class="flex items-center gap-2.5 flex-wrap">
-                {{-- View Mode Switcher --}}
-                <div class="inline-flex items-center p-1 rounded-xl bg-surface border border-border shadow-2xs">
-                    <button type="button" @click="viewMode = 'explorer'"
-                            :class="viewMode === 'explorer' ? 'bg-sky-600 text-white shadow-xs font-bold' : 'text-text-secondary hover:text-text-main font-semibold'"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer">
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                        </svg>
-                        Topology Explorer
-                    </button>
-                    <button type="button" @click="viewMode = 'cards'"
-                            :class="viewMode === 'cards' ? 'bg-sky-600 text-white shadow-xs font-bold' : 'text-text-secondary hover:text-text-main font-semibold'"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer">
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                        </svg>
-                        All Cards View
-                    </button>
-                </div>
-
                 @can('network_nodes.create')
                 <button type="button" @click="showCreateModal = true"
                         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer">
@@ -73,9 +52,8 @@
                     + Tambah Node Baru
                 </button>
                 @endcan
-
-                <a href="{{ route('network.inventaris.index') }}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-border text-text-secondary hover:text-text-main hover:border-primary text-xs font-bold transition-all cursor-pointer">
-                    Inventaris Infrastruktur
+                <a href="{{ route('network.map.index') }}" class="inline-flex items-center gap-1.5 rounded border border-sky-300 bg-white px-4 py-2 text-xs font-semibold text-sky-800 hover:bg-sky-50 dark:border-sky-800 dark:bg-slate-800 dark:text-sky-300">
+                    Peta Infrastruktur ISP
                 </a>
             </div>
         </div>
@@ -104,7 +82,7 @@
             <div class="text-2xl font-black font-mono text-text-main">
                 {{ $totalPortsCount }} <span class="text-xs font-normal text-text-muted">Port</span>
             </div>
-            <p class="text-[11px] text-text-muted">Total slot splitter terpasang</p>
+            <p class="text-[11px] text-text-muted">Total port pada seluruh tipe node</p>
         </div>
 
         {{-- Stat 3: Port Terpakai & Persentase --}}
@@ -127,14 +105,14 @@
         {{-- Stat 4: Red Zone Warning --}}
         <div class="rounded-xl border border-border bg-surface p-4 shadow-2xs space-y-1">
             <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
-                <span>Titik Red Zone (&ge;80%)</span>
+                <span>Titik Red Zone</span>
                 <span class="w-2 h-2 rounded-full bg-rose-500 {{ $redZoneNodesCount > 0 ? 'animate-ping' : '' }}"></span>
             </span>
             <div class="text-2xl font-black font-mono {{ $redZoneNodesCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-text-main' }}">
                 {{ $redZoneNodesCount }} <span class="text-xs font-normal text-text-muted">Node</span>
             </div>
             <p class="text-[11px] text-text-muted">
-                {{ $redZoneNodesCount > 0 ? 'Mendekati kapasitas penuh!' : 'Semua titik masih aman' }}
+                {{ $redZoneNodesCount > 0 ? 'Menurut ambang tipe node' : 'Tidak ada node melewati ambang tipenya' }}
             </p>
         </div>
     </div>
@@ -170,6 +148,13 @@
 
             <form method="POST" action="{{ route('network.nodes.store') }}" class="p-6 overflow-y-auto space-y-4">
                 @csrf
+                <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+                    <p class="font-bold">Pusat / Server Utama, Cabang, dan Mini POP muncul otomatis dari Master POP.</p>
+                    <p class="mt-1">Tambahkan perangkat jaringan seperti router, OLT, ODC, atau ODP di form ini, lalu pilih POP tempatnya berada.</p>
+                    @can('pops.view')
+                        <a href="{{ route('master.pop.index') }}" class="mt-2 inline-flex font-bold underline underline-offset-2">Buka Master POP</a>
+                    @endcan
+                </div>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <label class="text-xs font-bold text-text-secondary">Tipe Node <span class="text-rose-500">*</span>
                         <select name="node_type_id" required x-on:change="hasPorts = $event.target.selectedOptions[0]?.dataset.hasPorts === '1'"
@@ -285,12 +270,12 @@
     @endcan
 
     {{-- ========================================================================= --}}
-    {{-- VIEW MODE 1: TOPOLOGY EXPLORER (Interactive Tree + Inspector)             --}}
+    {{-- POHON NODE DAN PANEL INSPEKSI                                            --}}
     {{-- ========================================================================= --}}
-    <div x-show="viewMode === 'explorer'" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-        {{-- KOLOM KIRI (lg:col-span-5 xl:col-span-4): Interactive Topology Tree --}}
-        <div class="lg:col-span-5 xl:col-span-4 space-y-4">
+        {{-- Pohon node membutuhkan ruang untuk kedalaman rantai. --}}
+        <div class="lg:col-span-6 xl:col-span-5 space-y-4">
             <section class="rounded-2xl border border-border bg-surface p-5 shadow-2xs space-y-4" aria-label="Pohon node jaringan">
                 <div class="flex items-center justify-between gap-2 border-b border-border pb-3">
                     <div>
@@ -305,40 +290,35 @@
                     </span>
                 </div>
 
-                {{-- Tree Roots Loop --}}
-                <div class="space-y-3 max-h-[75vh] overflow-y-auto pr-1">
-                    @forelse($treeChildren->get(0, collect())->groupBy('anchor_pop_id') as $roots)
-                    <details class="group/pop rounded-xl border border-sky-200/70 dark:border-sky-900/40 bg-sky-50/30 dark:bg-sky-950/20 p-3 shadow-2xs" open>
-                        <summary class="cursor-pointer text-xs font-bold text-text-main flex items-center justify-between gap-2 select-none">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <span class="p-1 rounded bg-sky-600 text-white shrink-0">
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                    </svg>
-                                </span>
-                                <span class="truncate font-black text-sky-700 dark:text-sky-300">{{ $roots->first()->anchorPop?->name ?? 'POP tidak tersedia' }}</span>
-                            </div>
-                            <span class="text-[10px] text-text-muted font-mono font-bold shrink-0">{{ $roots->count() }} root</span>
-                        </summary>
+                <label class="block text-[11px] font-semibold text-text-secondary">
+                    Sorot tipe node
+                    <select x-model="typeFilter" class="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-text-main">
+                        <option value="all">Semua tipe</option>
+                        @foreach($nodeTypes as $nodeType)
+                        <option value="{{ $nodeType->id }}">{{ $nodeType->name }}</option>
+                        @endforeach
+                    </select>
+                </label>
 
-                        <div class="mt-2.5 space-y-1.5 border-l-2 border-sky-300/60 dark:border-sky-800/60 ml-2.5 pl-2.5">
-                            @foreach($roots as $treeNode)
-                                @include('network.nodes._tree-node', ['treeNode' => $treeNode, 'treeChildren' => $treeChildren])
-                            @endforeach
-                        </div>
-                    </details>
+                {{-- POP adalah lokasi yang sudah ada; node perangkat menempel di bawahnya. --}}
+                <div class="max-h-[75vh] space-y-2 overflow-auto pr-1">
+                    @forelse($topologyPopChildren->get(0, collect()) as $treePop)
+                        @include('network.nodes._pop-tree')
                     @empty
-                    <div class="p-8 text-center rounded-xl border border-dashed border-border space-y-2">
-                        <p class="text-xs font-bold text-text-main">Belum ada node dalam scope Anda.</p>
-                        <p class="text-[11px] text-text-muted">Gunakan tombol di atas untuk mendaftarkan titik node pertama.</p>
-                    </div>
+                        <div class="rounded-xl border border-dashed border-border p-8 text-center">
+                            <p class="text-xs font-bold text-text-main">Belum ada POP dalam scope Anda.</p>
+                        </div>
                     @endforelse
+
+                    @foreach($rootNodesByPop->get(0, collect()) as $treeNode)
+                        @include('network.nodes._tree-node', ['treeNode' => $treeNode, 'treeChildren' => $treeChildren])
+                    @endforeach
                 </div>
             </section>
         </div>
 
-        {{-- KOLOM KANAN (lg:col-span-7 xl:col-span-8): Active Node Inspector & Command Panel --}}
-        <div class="lg:col-span-7 xl:col-span-8 space-y-4" id="node-inspector">
+        {{-- Detail node yang dipilih. --}}
+        <div class="lg:col-span-6 xl:col-span-7 space-y-4" id="node-inspector">
             @forelse($nodes as $node)
             @php
                 $usagePercent = $node->ports_count > 0 ? round($node->used_ports_count / $node->ports_count * 100) : 0;
@@ -463,9 +443,9 @@
                             <div>
                                 <h3 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
                                     <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-                                    PORT SPLITTER / PATCH PANEL MATRIX
+                                    PORT NODE · {{ $node->nodeType?->name }}
                                 </h3>
-                                <p class="text-[11px] text-text-muted">Klik pada port untuk toggle status koneksi (Terpakai / Kosong).</p>
+                                <p class="text-[11px] text-text-muted">Pilih port terpakai untuk melihat tujuan. Port kosong dapat ditandai terpakai secara manual.</p>
                             </div>
 
                             @can('network_nodes.update')
@@ -483,9 +463,15 @@
                         {{-- Ports Visual Grid --}}
                         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 pt-1">
                             @forelse($node->ports as $port)
+                                @php($assignment = $port->activeAssignment->first())
                                 @can('network_nodes.update')
                                 @if($port->is_used)
-                                <a href="{{ route('network.nodes.show', $node) }}" class="block w-full rounded-xl border border-rose-200 bg-rose-50/80 p-2.5 text-xs font-bold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">Port #{{ $port->number }} · Terpakai<br><span class="text-[10px] font-normal">Lihat penghuni / kelola</span></a>
+                                <a href="{{ route('network.nodes.show', $node) }}" class="block w-full rounded-xl border border-rose-200 bg-rose-50/80 p-2.5 text-xs font-bold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">Port #{{ $port->number }} · Terpakai<br><span class="text-[10px] font-normal">
+                                    @if($assignment?->customer) {{ $assignment->customer->full_name }}
+                                    @elseif($assignment?->targetNode) → {{ $assignment->targetNode->code }}
+                                    @elseif($assignment?->manual_label) {{ $assignment->manual_label }} · Belum diverifikasi
+                                    @else Belum diverifikasi @endif
+                                </span></a>
                                 @else
                                 <form method="POST" action="{{ route('network.node-ports.update', $port) }}" class="w-full">
                                     @csrf
@@ -496,13 +482,13 @@
                                             {{ $port->is_used
                                                 ? 'border-rose-200 dark:border-rose-900 bg-rose-50/80 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
                                                 : 'border-emerald-200 dark:border-emerald-900 bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100' }}"
-                                            title="Ubah status port {{ $port->number }}">
+                                            title="Tandai port {{ $port->number }} terpakai secara manual">
                                         <div class="flex items-center justify-between gap-1 mb-1">
                                             <span class="text-xs font-black font-mono">#{{ $port->number }}</span>
                                             <span class="w-2 h-2 rounded-full {{ $port->is_used ? 'bg-rose-500' : 'bg-emerald-500' }}"></span>
                                         </div>
                                         <div class="text-[11px] font-bold truncate">
-                                            Port {{ $port->number }} · {{ $port->is_used ? 'Terpakai' : 'Kosong' }}
+                                            {{ $port->is_used ? 'Terpakai' : 'Tandai terpakai' }}
                                         </div>
                                     </button>
                                 </form>
@@ -514,7 +500,10 @@
                                         <span class="w-2 h-2 rounded-full {{ $port->is_used ? 'bg-rose-500' : 'bg-emerald-500' }}"></span>
                                     </div>
                                     <div class="text-[11px] text-text-secondary truncate">
-                                        Port {{ $port->number }} · {{ $port->is_used ? 'Terpakai' : 'Kosong' }}
+                                        @if($assignment?->customer) Pelanggan: {{ $assignment->customer->full_name }}
+                                        @elseif($assignment?->targetNode) → {{ $assignment->targetNode->code }}
+                                        @elseif($assignment?->manual_label) {{ $assignment->manual_label }} · Belum diverifikasi
+                                        @else {{ $port->is_used ? 'Terpakai · belum diverifikasi' : 'Kosong' }} @endif
                                     </div>
                                 </div>
                                 @endcan
@@ -659,103 +648,6 @@
         </div>
     </div>
 
-    {{-- ========================================================================= --}}
-    {{-- VIEW MODE 2: ALL CARDS VIEW (Classic Grid for Batch Audit)                --}}
-    {{-- ========================================================================= --}}
-    <div x-show="viewMode === 'cards'" class="space-y-4">
-        @forelse($nodes as $node)
-        @php
-            $usagePercent = $node->ports_count > 0 ? round($node->used_ports_count / $node->ports_count * 100) : 0;
-            $isRedZone = $node->isInRedZone();
-        @endphp
-        <section class="rounded-2xl border border-border bg-surface p-5 shadow-2xs space-y-4" id="card-node-{{ $node->id }}">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h2 class="text-base font-bold text-text-main">
-                        <a class="hover:text-primary transition-colors" href="{{ route('network.nodes.show', $node) }}">
-                            {{ $node->code }} · {{ $node->name }}
-                        </a>
-                    </h2>
-                    <p class="text-xs text-text-muted mt-0.5">
-                        {{ $node->nodeType?->name }} · {{ $breadcrumbLabels[$node->id] ?? $node->name }} ·
-                        @if($node->nodeType?->has_ports)
-                            {{ $node->used_ports_count }}/{{ $node->ports_count }} port terpakai
-                        @else
-                            Kapasitas ringkasan: {{ $node->capacity ?? '-' }}
-                        @endif
-                    </p>
-                </div>
-
-                @if($node->nodeType?->has_ports)
-                <span class="rounded-lg border px-2.5 py-1 text-xs font-bold font-mono {{ $isRedZone ? 'border-rose-300 bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300' : 'border-border bg-surface-muted text-text-secondary' }}"
-                      data-red-zone="{{ $isRedZone ? '1' : '0' }}">
-                    {{ $isRedZone ? 'Red Zone · ' : '' }}{{ $usagePercent }}%
-                </span>
-                @endif
-            </div>
-
-            {{-- Port Buttons Grid --}}
-            <div class="flex flex-wrap gap-2">
-                @foreach($node->ports as $port)
-                @can('network_nodes.update')
-                @if($port->is_used)
-                <a href="{{ route('network.nodes.show', $node) }}" class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300">Port {{ $port->number }} · Terpakai · Kelola</a>
-                @else
-                <form method="POST" action="{{ route('network.node-ports.update', $port) }}">
-                    @csrf
-                    @method('PUT')
-                    <input type="hidden" name="is_used" value="{{ $port->is_used ? 0 : 1 }}">
-                    <button type="submit" class="rounded-lg border px-3 py-1.5 text-xs font-semibold cursor-pointer transition-colors {{ $port->is_used ? 'border-rose-300 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' }}"
-                            title="Ubah status port {{ $port->number }}">
-                        Port {{ $port->number }} · {{ $port->is_used ? 'Terpakai' : 'Kosong' }}
-                    </button>
-                </form>
-                @endif
-                @else
-                <span class="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary">
-                    Port {{ $port->number }} · {{ $port->is_used ? 'Terpakai' : 'Kosong' }}
-                </span>
-                @endcan
-                @endforeach
-            </div>
-
-            {{-- Aset Terpasang --}}
-            @if($node->deployedSerials->isNotEmpty() || $node->infrastructureBalances->isNotEmpty())
-            <div class="border-t border-border pt-3">
-                <p class="mb-2 text-xs font-bold text-text-secondary">Aset Terpasang</p>
-                <div class="flex flex-wrap gap-2">
-                    @foreach($node->deployedSerials as $serial)
-                    <a href="{{ route('warehouse.traceability.index', ['sn' => $serial->serial_number]) }}"
-                       class="rounded-lg border border-border bg-surface-muted px-2.5 py-1 text-xs text-text-secondary hover:border-primary transition-colors font-mono"
-                       title="Lihat riwayat SN {{ $serial->serial_number }}">
-                        SN {{ $serial->serial_number }} · {{ $serial->item?->name }}
-                    </a>
-                    @endforeach
-                    @foreach($node->infrastructureBalances as $balance)
-                    @if((float) $balance->qty > 0)
-                    <span class="rounded-lg border border-border bg-surface-muted px-2.5 py-1 text-xs text-text-secondary font-mono">
-                        {{ $balance->item?->name }}{{ $balance->lot_no ? ' ('.$balance->lot_no.')' : '' }} · {{ rtrim(rtrim(number_format((float) $balance->qty, 2, ',', '.'), '0'), ',') }} {{ $balance->item?->unit }}
-                    </span>
-                    @endif
-                    @endforeach
-                </div>
-            </div>
-            @endif
-
-            <div class="flex items-center justify-between gap-2 pt-2 border-t border-border text-xs">
-                <button type="button" @click="selectNode({{ $node->id }})" class="font-bold text-sky-600 hover:underline cursor-pointer">
-                    Buka di Topology Explorer &rarr;
-                </button>
-            </div>
-        </section>
-        @empty
-        <div class="rounded-2xl border border-border bg-surface p-12 text-center text-xs text-text-muted">
-            Belum ada node jaringan pada POP yang dapat Anda akses.
-        </div>
-        @endforelse
-
-        {{ $nodes->links() }}
-    </div>
 
 </div>
 @endsection

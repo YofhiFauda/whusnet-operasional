@@ -5,6 +5,7 @@ namespace App\Enums;
 enum ActionCode: string
 {
     case VIEW = 'view';
+    case PUBLISH = 'publish';
     case CREATE = 'create';
     case UPDATE = 'update';
     case DELETE = 'delete';

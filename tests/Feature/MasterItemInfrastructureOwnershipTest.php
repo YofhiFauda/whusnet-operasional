@@ -119,8 +119,54 @@ class MasterItemInfrastructureOwnershipTest extends TestCase
         $html = $this->actingAs($this->owner)->get(route('master.items.create'))->assertOk()->getContent();
 
         $this->assertDoesNotMatchRegularExpression('/<select name="ownership_mode"[^>]*:disabled/', $html);
-        $this->assertMatchesRegularExpression('/<option value="company_asset"[^>]*:disabled="trackingType !== \'serialized\'"/', $html);
-        $this->assertDoesNotMatchRegularExpression('/<option value="infrastructure_asset"[^>]*:disabled/', $html);
+        $this->assertMatchesRegularExpression('/<option value="company_asset"[^>]*:disabled=/', $html);
+        $this->assertMatchesRegularExpression('/<option value="infrastructure_asset"[^>]*:disabled=/', $html);
+        $this->assertStringContainsString('categoryId === modemCategoryId', $html);
+        $this->assertMatchesRegularExpression('/<select name="infrastructure_node_type_id"[^>]*:disabled="categoryId === modemCategoryId"/', $html);
+        $this->assertStringContainsString('Penjelasan Tipe Node Tujuan', $html);
+        $this->assertStringContainsString('bukan lokasi tertentu', $html);
+    }
+
+    #[Test]
+    public function modem_ont_harus_dipasang_ke_pelanggan_saat_dibuat(): void
+    {
+        $modemCategory = ItemCategory::where('code', 'modem_ont')->firstOrFail();
+        $data = [
+            'code' => 'ONT-PELANGGAN-01', 'name' => 'ONT Pelanggan',
+            'item_category_id' => $modemCategory->id, 'unit' => 'pcs',
+            'is_active' => 1, 'tracking_type' => 'serialized',
+            'auto_generate_serial' => 0,
+        ];
+
+        $this->actingAs($this->owner)->post(route('master.items.store'), [
+            ...$data, 'ownership_mode' => 'infrastructure_asset',
+        ])->assertSessionHasErrors('ownership_mode');
+        $this->assertDatabaseMissing('items', ['code' => 'ONT-PELANGGAN-01']);
+
+        $this->actingAs($this->owner)->post(route('master.items.store'), [
+            ...$data, 'ownership_mode' => 'installable',
+        ])->assertRedirect(route('master.items.index'));
+        $this->assertSame(OwnershipMode::INSTALLABLE, Item::where('code', 'ONT-PELANGGAN-01')->firstOrFail()->ownership_mode);
+    }
+
+    #[Test]
+    public function barang_infrastruktur_tidak_bisa_dipindah_ke_kategori_modem_ont(): void
+    {
+        $item = Item::create([
+            'code' => 'INF-KE-ONT', 'name' => 'Aset Infrastruktur',
+            'item_category_id' => $this->category->id, 'unit' => 'pcs',
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+        ]);
+        $modemCategory = ItemCategory::where('code', 'modem_ont')->firstOrFail();
+
+        $this->actingAs($this->owner)->put(route('master.items.update', $item), [
+            'code' => $item->code, 'name' => $item->name,
+            'item_category_id' => $modemCategory->id, 'unit' => 'pcs',
+            'is_active' => 1, 'tracking_type' => 'serialized',
+            'auto_generate_serial' => 0, 'ownership_mode' => 'infrastructure_asset',
+        ])->assertSessionHasErrors('ownership_mode');
+
+        $this->assertSame($this->category->id, $item->refresh()->item_category_id);
     }
 
     #[Test]

@@ -129,7 +129,7 @@
         <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 flex flex-col justify-between shadow-2xs">
             <div>
                 <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    ONT / Router Siap Pasang
+                   Serial Number Tersedia
                 </span>
                 <div class="mt-1.5 flex items-baseline gap-1.5">
                     <span class="text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400 tracking-tight">

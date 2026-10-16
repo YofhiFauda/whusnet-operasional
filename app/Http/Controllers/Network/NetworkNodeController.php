@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Network;
 
+use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\CustomerTechnicalDetail;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
+use App\Services\MasterRecordRemovalService;
 use App\Services\NetworkNodeService;
 use App\Services\NetworkPortAssignmentService;
 use Illuminate\Http\RedirectResponse;
@@ -33,28 +37,47 @@ class NetworkNodeController extends Controller
 {
     public function __construct(private readonly EffectiveAccessService $access) {}
 
-    public function index(Request $request): View
+    public function index(): View
     {
         $user = auth()->user();
         $nodes = NetworkNode::query()
-            ->when(! $this->access->hasAllPopAccess($user), function ($query) use ($user) {
-                $query->inPops($this->access->getAllowedPopIds($user));
-            })
-            ->with('nodeType', 'ports', 'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item')
+            ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
+            ->with(
+                'nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode',
+                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item'
+            )
             ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
-            ->when($request->filled('node_type_id'), fn ($query) => $query->where('node_type_id', $request->integer('node_type_id')))
             ->orderBy('code')
-            ->paginate(10)
-            ->withQueryString();
+            ->get();
         $pops = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
         $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
-        $parentOptions = NetworkNode::query()
-            ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
-            ->with('nodeType', 'anchorPop.parent')
-            ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
-            ->orderBy('code')->get();
+        $parentOptions = $nodes;
         $treeChildren = $parentOptions->groupBy(fn (NetworkNode $node) => $node->parent_id ?? 0);
         $nodesById = $parentOptions->keyBy('id');
+        $topologyPops = Pop::forUser($user)
+            ->whereIn('type', ['pusat', 'cabang', 'mini_pop'])
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+        $visiblePopIds = $topologyPops->pluck('id')->all();
+        $visiblePopsById = $topologyPops->keyBy('id');
+        $uplinkPopChildren = $topologyPops
+            ->filter(function (Pop $pop) use ($nodesById, $visiblePopsById): bool {
+                $uplink = $nodesById->get($pop->uplink_node_id);
+                $parentPop = $visiblePopsById->get($pop->parent_id);
+
+                return $uplink !== null && $parentPop !== null
+                    && $uplink->resolvePop()?->id === $parentPop->id;
+            })
+            ->groupBy('uplink_node_id');
+        $linkedPopIds = $uplinkPopChildren->flatten()->pluck('id')->all();
+        $topologyPopChildren = $topologyPops
+            ->reject(fn (Pop $pop): bool => in_array($pop->id, $linkedPopIds, true))
+            ->groupBy(fn (Pop $pop): int => in_array($pop->parent_id, $visiblePopIds, true) ? $pop->parent_id : 0);
+        $rootNodesByPop = $parentOptions
+            ->filter(fn (NetworkNode $node): bool => $node->parent_id === null || ! $nodesById->has($node->parent_id))
+            ->groupBy(fn (NetworkNode $node): int => (int) $node->anchor_pop_id);
+
         $breadcrumbLabels = [];
         $labelFor = function (NetworkNode $node) use (&$labelFor, &$breadcrumbLabels, $nodesById): string {
             if (isset($breadcrumbLabels[$node->id])) {
@@ -78,7 +101,8 @@ class NetworkNodeController extends Controller
 
         return view('network.nodes.index', compact(
             'nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels',
-            'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount'
+            'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount',
+            'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop'
         ));
     }
 
@@ -151,11 +175,20 @@ class NetworkNodeController extends Controller
     public function show(NetworkNode $node): View
     {
         $this->authorizeNodeScope($node);
-        $node->load(
-            'nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode',
-            'children.nodeType', 'deployedSerials.item', 'infrastructureBalances.item',
-            'oltSlots.cardNode.deployedSerials', 'oltSlots.cardNode.ports',
-        );
+        $node->load([
+            'nodeType',
+            'ports.activeAssignment.customer.customerTechnicalDetail',
+            'ports.activeAssignment.customer.customerDevice',
+            'ports.activeAssignment.customer.inventorySerials' => fn ($query) => $query
+                ->where('status', SerialStatus::INSTALLED->value)
+                ->with('item.category'),
+            'ports.activeAssignment.targetNode',
+            'children.nodeType',
+            'deployedSerials.item',
+            'infrastructureBalances.item',
+            'oltSlots.cardNode.deployedSerials',
+            'oltSlots.cardNode.ports',
+        ]);
 
         // Opsi kartu bebas: anak langsung chassis ini bertipe `olt_card` yang
         // belum terpasang di slot manapun — kartu selalu anak chassis lewat
@@ -166,25 +199,84 @@ class NetworkNodeController extends Controller
                 ->whereDoesntHave('oltSlot')->orderBy('code')->get()
             : collect();
 
+        $user = auth()->user();
+
         return view('network.nodes.show', [
             'node' => $node,
+            'nodeTypes' => NetworkNodeType::query()->where('is_active', true)->orWhere('id', $node->node_type_id)->orderBy('sort_order')->get(),
             'location' => $node->effectiveLocation(),
             'cardOptions' => $cardOptions,
+            'canViewDeviceSerials' => $user->hasPermission('customers.detail.devices.view_sensitive'),
+            'allowedCustomerPopIds' => $this->access->hasAllPopAccess($user) ? null : $this->access->getAllowedPopIds($user),
         ]);
     }
 
-    public function update(Request $request, NetworkNode $node): RedirectResponse
+    public function update(Request $request, NetworkNode $node, NetworkNodeService $service, MasterRecordRemovalService $removal): RedirectResponse
     {
         $this->authorizeNodeScope($node);
+        if ($request->exists('code')) {
+            $request->merge(['code' => strtoupper(trim((string) $request->input('code')))]);
+        }
+
         $validated = $request->validate([
+            'code' => ['sometimes', 'required', 'string', 'max:50', Rule::unique('network_nodes', 'code')->ignore($node)],
+            'node_type_id' => ['sometimes', 'required', 'integer', Rule::exists('network_node_types', 'id')],
             'name' => ['required', 'string', 'max:150'],
             'status' => ['sometimes', Rule::in(['active', 'inactive'])],
             ...$this->locationRules(),
         ]);
 
+        $typeChanged = isset($validated['node_type_id']) && (int) $validated['node_type_id'] !== $node->node_type_id;
+        $codeChanged = isset($validated['code']) && $validated['code'] !== $node->code;
+        if ($typeChanged && $removal->hasDependents($node)) {
+            throw ValidationException::withMessages([
+                'node_type_id' => 'Tipe node yang sudah memiliki relasi tidak dapat diubah.',
+            ]);
+        }
+        if ($codeChanged && CustomerTechnicalDetail::query()->where('odp_number', $node->code)->exists()) {
+            throw ValidationException::withMessages([
+                'code' => 'Kode node masih dipakai sebagai rujukan ODP pelanggan dan tidak dapat diubah.',
+            ]);
+        }
+
+        if ($typeChanged) {
+            $nodeType = NetworkNodeType::findOrFail($validated['node_type_id']);
+            if (! $nodeType->is_active) {
+                throw ValidationException::withMessages(['node_type_id' => 'Tipe node tidak aktif.']);
+            }
+
+            try {
+                $service->assertTypePlacement($nodeType, $node->parent, $node->anchorPop);
+            } catch (InvalidArgumentException $exception) {
+                throw ValidationException::withMessages(['node_type_id' => $exception->getMessage()]);
+            }
+        }
+
+        $oldValues = $node->only(array_keys($validated));
         $node->update($validated);
+        if ($node->wasChanged()) {
+            AuditLog::log($node, 'update', $oldValues, $node->only(array_keys($validated)));
+        }
 
         return redirect()->route('network.nodes.show', $node)->with('success', 'Detail node berhasil diperbarui.');
+    }
+
+    public function destroy(NetworkNode $node, MasterRecordRemovalService $removal): RedirectResponse
+    {
+        $this->authorizeNodeScope($node);
+        $deleted = DB::transaction(function () use ($node, $removal): bool {
+            $lockedNode = NetworkNode::query()->whereKey($node->id)->lockForUpdate()->firstOrFail();
+            $oldValues = $lockedNode->only(['code', 'name', 'node_type_id', 'status']);
+            $deleted = $removal->remove($lockedNode, ['status' => 'inactive']);
+            AuditLog::log($lockedNode, $deleted ? 'delete' : 'deactivate', $oldValues, $deleted ? null : $lockedNode->only(['code', 'name', 'node_type_id', 'status']));
+
+            return $deleted;
+        });
+
+        return redirect()->route('network.nodes.index')->with(
+            'success',
+            $deleted ? 'Node kosong berhasil dihapus.' : 'Node memiliki relasi dan telah dinonaktifkan.'
+        );
     }
 
     private function locationRules(): array

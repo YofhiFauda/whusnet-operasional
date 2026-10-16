@@ -1,14 +1,14 @@
 {{--
-    Skrip batch bayar kolektor — dipakai dua halaman berbeda audiens
+    Skrip batch bayar kolektor â€” dipakai dua halaman berbeda audiens
     (Worksheet Admin & Worklist Kolektor) dengan markup tabel yang sama.
     Yang beda cuma URL tujuan, karena jalur kolektor SENGAJA tanpa parameter
-    {collector} (docs/plan/kolektor/analisa-alur-kolektor-2.0.md §9).
+    {collector} (docs/plan/kolektor/analisa-alur-kolektor-2.0.md Â§9).
 
     Variabel yang wajib dikirim pemanggil:
-      $storeUrl     — endpoint POST batch
-      $keyPrefix    — awalan idempotency_key (biar jejaknya kebaca di DB)
-      $colspan      — jumlah kolom tabel, untuk baris "kosong"
-      $emptyMessage — teks saat semua baris habis dibayar
+      $storeUrl     â€” endpoint POST batch
+      $keyPrefix    â€” awalan idempotency_key (biar jejaknya kebaca di DB)
+      $colspan      â€” jumlah kolom tabel, untuk baris "kosong"
+      $emptyMessage â€” teks saat semua baris habis dibayar
 --}}
 <script>
     {{-- JSON_UNESCAPED_SLASHES supaya URL-nya terbaca apa adanya di sumber
@@ -19,25 +19,26 @@
     const CB_KEY_PREFIX = @json($keyPrefix);
     const CB_COLSPAN = {{ $colspan }};
     const CB_EMPTY_MESSAGE = @json($emptyMessage);
+    const CB_RELOAD_ON_SUCCESS = @json($reloadOnSuccess ?? false);
 
     // Idempotency key melekat pada ISI KIRIMAN, bukan pada tab.
     //
     // Dua kesalahan yang pernah terjadi, dan kenapa bentuknya sekarang begini:
     //
     //  1. Awalnya tiap panggilan mint key baru. Retry setelah kegagalan jadi
-    //     batch BARU — untuk kegagalan sesudah commit, pelanggan terkredit dua
+    //     batch BARU â€” untuk kegagalan sesudah commit, pelanggan terkredit dua
     //     kali.
     //  2. Lalu key dibuat satu dan dipakai ulang sampai sukses. Itu memperbaiki
     //     (1) tapi melahirkan yang lebih buruk: kolektor menekan Bayar di baris
-    //     A lalu baris B sebelum jawaban A tiba — keduanya mengirim key yang
+    //     A lalu baris B sebelum jawaban A tiba â€” keduanya mengirim key yang
     //     sama, server menjawab `already_processed` untuk B, muncul toast
     //     hijau, dan UANG BARIS B TAK PERNAH TERCATAT.
     //
     // Sekarang key diturunkan dari tanda tangan barisnya. Retry kiriman yang
     // sama memakai key yang sama (aman dari (1)); kiriman baris lain punya key
     // sendiri (aman dari (2)). Begitu sukses, tanda tangannya dibuang supaya
-    // pembayaran berikutnya dengan angka identik — cicilan 50rb dua kali di
-    // hari yang sama — tetap dianggap kiriman baru.
+    // pembayaran berikutnya dengan angka identik â€” cicilan 50rb dua kali di
+    // hari yang sama â€” tetap dianggap kiriman baru.
     const cbPendingKeys = new Map();
 
     function cbSignature(rows) {
@@ -98,7 +99,7 @@
             cbUpdateCount();
         }
 
-        // "Pakai saldo" dicentang/dilepas → hitung ulang pelanggan itu saja.
+        // "Pakai saldo" dicentang/dilepas â†’ hitung ulang pelanggan itu saja.
         if (e.target.classList.contains('cb-use-saldo')) {
             const tr = e.target.closest('tr');
             cbAutoFillSaldo(tr ? tr.dataset.customerId : null);
@@ -107,7 +108,7 @@
     });
 
     // Pakai komponen Toast global (resources/views/components/toast.blade.php),
-    // bukan div buatan sendiri — hasil bayar adalah umpan balik sesaat, dan
+    // bukan div buatan sendiri â€” hasil bayar adalah umpan balik sesaat, dan
     // dua halaman ini harus terlihat sama dengan sisa aplikasi. Fallback ke
     // panel statis cuma untuk jaga-jaga kalau Toast belum termuat.
     function cbShowAlert(message, isError) {
@@ -141,16 +142,16 @@
         return {
             invoice_id: parseInt(tr.querySelector('.cb-row-checkbox').value, 10),
             // Kolom nominal bermasking ribuan (data-rupiah): parseFloat langsung
-            // atas "150.000" menghasilkan 150 — pembayaran 1.000× lebih kecil,
+            // atas "150.000" menghasilkan 150 â€” pembayaran 1.000Ã— lebih kecil,
             // tanpa error. Server tetap menormalkan ulang (RupiahInput).
             amount: window.Rupiah.angka(tr.querySelector('.cb-amount').value),
             use_balance_amount: cbSaldoOf(tr),
             payment_method: method,
-            // Hanya dikirim untuk Transfer — rekening tujuan dari master.
+            // Hanya dikirim untuk Transfer â€” rekening tujuan dari master.
             bank_account_id: method === 'transfer' && bankInput && bankInput.value ? parseInt(bankInput.value, 10) : null,
             sender_name: method === 'transfer' && senderInput ? senderInput.value.trim() : '',
             collected_date: tr.querySelector('.cb-collected-date').value,
-            // Wajib untuk metode Lainnya — dicek cbBarisValid() sebelum
+            // Wajib untuk metode Lainnya â€” dicek cbBarisValid() sebelum
             // submit, dan lagi di CollectorPaymentService (server otoritatif).
             note: noteInput ? noteInput.value.trim() : '',
         };
@@ -184,7 +185,7 @@
     }
 
     // Pratinjau di bawah input, sama maknanya dengan form Bayar admin:
-    // lunas / cicilan (sisa) / lebih bayar. Tanpa nomor cicilan — jalur batch
+    // lunas / cicilan (sisa) / lebih bayar. Tanpa nomor cicilan â€” jalur batch
     // tidak punya urutan cicilan seperti form admin.
     function cbRefreshHint(tr) {
         if (!tr) return;
@@ -205,7 +206,7 @@
             hint.title = 'Tidak bisa diproses di sini. Kelebihan hanya bisa dicatat lewat Tagihan admin.';
             hint.classList.add('text-rose-700', 'bg-rose-50');
         } else if (total < remaining) {
-            hint.textContent = 'Cicilan · sisa ' + fmt(remaining - total);
+            hint.textContent = 'Cicilan Â· sisa ' + fmt(remaining - total);
             hint.title = 'Tagihan jadi Sebagian, sisa setelah ini ' + fmt(remaining - total) + '.';
             hint.classList.add('text-amber-800', 'bg-amber-50');
         } else {
@@ -257,7 +258,7 @@
         });
     }
 
-    // Saldo diubah kasir → nominal tunai ikut menyesuaikan sisa tagihan.
+    // Saldo diubah kasir â†’ nominal tunai ikut menyesuaikan sisa tagihan.
     function cbOnSaldoChange(saldoInput) {
         const tr = saldoInput.closest('tr');
         if (!tr) return;
@@ -267,7 +268,7 @@
         cbSetRupiah(tr.querySelector('.cb-amount'), cbRemainingOf(tr) - saldo);
     }
 
-    // Konfirmasi lebih bayar sebelum kiriman dikirim — modal yang sama
+    // Konfirmasi lebih bayar sebelum kiriman dikirim â€” modal yang sama
     // maksudnya dengan form Bayar admin. `submit` baru jalan kalau kasir
     // menekan Lanjutkan; Batal membiarkan baris tetap bisa diubah.
     let cbPendingSubmit = null;
@@ -343,7 +344,7 @@
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok || !data.success) {
                     const detail = (data.failures || []).map(f => f.reason).filter(Boolean).join(' | ');
-                    throw new Error((data.message || 'Gagal diproses.') + (detail ? ' — ' + detail : ''));
+                    throw new Error((data.message || 'Gagal diproses.') + (detail ? ' â€” ' + detail : ''));
                 }
                 return data;
             })
@@ -353,7 +354,7 @@
                 // dianggap kiriman baru, bukan pengulangan.
                 cbPendingKeys.delete(signature);
                 cbShowAlert(data.message, false);
-                // Daftar cuma nampilin tagihan yang masih ada sisa — patch/hapus
+                // Daftar cuma nampilin tagihan yang masih ada sisa â€” patch/hapus
                 // baris pakai data.results (per-invoice, dari
                 // Invoice::recalculateFromPayments()) daripada reload.
                 cbApplyResults(data.results || []);
@@ -362,7 +363,7 @@
                 // tersisa tak ikut dikirim server per baris), jadi halaman
                 // disegarkan supaya "maks saldo" & pratinjau tak basi. Toast
                 // sempat tampil dulu.
-                if (rows.some(r => r.use_balance_amount > 0)) {
+                if (CB_RELOAD_ON_SUCCESS || rows.some(r => r.use_balance_amount > 0)) {
                     setTimeout(() => window.location.reload(), 1500);
                 }
             })
@@ -375,8 +376,8 @@
             });
     }
 
-    // Lunas/batal → baris hilang (bukan tujuan penagihan lagi). Masih ada sisa
-    // (cicilan sebagian) → sisa & input nominal disegarkan biar bisa lanjut
+    // Lunas/batal â†’ baris hilang (bukan tujuan penagihan lagi). Masih ada sisa
+    // (cicilan sebagian) â†’ sisa & input nominal disegarkan biar bisa lanjut
     // menagih sisanya tanpa reload.
     function cbApplyResults(results) {
         results.forEach(function (result) {
@@ -398,7 +399,7 @@
                 amountInput.dataset.max = result.remaining_amount;
                 // TIDAK dibulatkan: `data-max` membawa nilai eksak, jadi sisa
                 // ber-sen yang dibulatkan naik langsung ditolak cbBarisValid()
-                // — baris yang tak disentuh siapa pun jadi tak bisa dibayar.
+                // â€” baris yang tak disentuh siapa pun jadi tak bisa dibayar.
                 amountInput.value = window.Rupiah.formatDariServer(String(result.remaining_amount));
             }
 
@@ -433,8 +434,8 @@
     }
 
     /**
-     * Nominal boleh melebihi `data-max` (sisa tagihan baris itu) — ADHOC-84
-     * §2.5/§4.4: kelebihannya otomatis dipisah jadi overpay & masuk saldo
+     * Nominal boleh melebihi `data-max` (sisa tagihan baris itu) â€” ADHOC-84
+     * Â§2.5/Â§4.4: kelebihannya otomatis dipisah jadi overpay & masuk saldo
      * pelanggan di server (`CollectorPaymentService::record()`, pola sama
      * `PaymentService::record()` jalur admin), bukan ditolak. Cuma batas
      * bawah (minimal Rp 1) yang masih ditegakkan di sini.
@@ -442,7 +443,7 @@
      * @return {boolean} true kalau semua baris valid.
      */
     function cbBarisValid(trs) {
-        // Saldo satu pelanggan dibagi antar tagihannya — total yang dipakai
+        // Saldo satu pelanggan dibagi antar tagihannya â€” total yang dipakai
         // tidak boleh melebihi saldo yang ada (server mengecek ulang juga).
         const saldoPerCustomer = {};
         for (const tr of trs) {
@@ -474,7 +475,7 @@
                 return false;
             }
 
-            // Tunai boleh 0 kalau saldo menutup — yang wajib minimal Rp 1 total.
+            // Tunai boleh 0 kalau saldo menutup â€” yang wajib minimal Rp 1 total.
             if (cbTotalOf(tr) < 1) {
                 cbShowAlert('Nominal wajib diisi minimal Rp 1, atau pakai Saldo Pelanggan.', true);
                 input.focus();
@@ -507,7 +508,7 @@
         return true;
     }
 
-    // Bayar 1-by-1 — langsung submit satu baris, tanpa perlu centang.
+    // Bayar 1-by-1 â€” langsung submit satu baris, tanpa perlu centang.
     function cbSubmitSingle(invoiceId) {
         const tr = document.querySelector('tr[data-invoice-row="' + invoiceId + '"]');
         if (!tr) return;
@@ -524,7 +525,7 @@
         });
     }
 
-    // Bayar massal — semua baris yang dicentang.
+    // Bayar massal â€” semua baris yang dicentang.
     function cbSubmitBatch() {
         const trs = Array.from(document.querySelectorAll('.cb-row-checkbox:checked'))
             .map(checkbox => checkbox.closest('tr'));
@@ -544,7 +545,7 @@
         });
     }
 
-    // Ketik nominal/saldo → pratinjau baris itu ikut berubah.
+    // Ketik nominal/saldo â†’ pratinjau baris itu ikut berubah.
     document.addEventListener('input', function (e) {
         if (e.target.classList.contains('cb-saldo')) {
             cbOnSaldoChange(e.target);

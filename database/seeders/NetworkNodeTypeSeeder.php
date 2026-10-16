@@ -50,6 +50,7 @@ class NetworkNodeTypeSeeder extends Seeder
         app(PermissionGeneratorService::class)->generate();
 
         $types = [
+            ['code' => 'server', 'name' => 'Server Utama', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'core_router', 'name' => 'Core Router/Switch', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'backbone', 'name' => 'Backbone/Transport', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'aggregation_switch', 'name' => 'Router/Switch Agregasi POP', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
@@ -59,10 +60,11 @@ class NetworkNodeTypeSeeder extends Seeder
             ['code' => 'feeder', 'name' => 'Kabel Feeder', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'odc', 'name' => 'ODC', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
             ['code' => 'odp', 'name' => 'ODP', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
+            ['code' => 'drop_cable', 'name' => 'Drop Cable', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
         ];
 
         // firstOrCreate, BUKAN updateOrCreate (beda dari dua Feature di atas,
-        // yang memang harus terus direkonsiliasi): delapan tipe ini master data
+        // yang memang harus terus direkonsiliasi): tipe ini master data
         // yang boleh diubah admin lewat halaman Master Tipe Node (spec §3.1 —
         // "nilai awal, bisa diubah admin"). updateOrCreate bakal mereset
         // red_zone_threshold/max_ports/dst hasil edit admin tiap kali seeder
@@ -88,6 +90,7 @@ class NetworkNodeTypeSeeder extends Seeder
         }
 
         $defaultRules = [
+            'server' => ['pops' => ['pusat'], 'nodes' => []],
             'core_router' => ['pops' => ['pusat', 'cabang'], 'nodes' => []],
             'backbone' => ['pops' => ['pusat', 'cabang'], 'nodes' => ['core_router']],
             'aggregation_switch' => ['pops' => ['cabang'], 'nodes' => ['backbone', 'core_router']],
@@ -102,8 +105,28 @@ class NetworkNodeTypeSeeder extends Seeder
             'feeder' => ['pops' => ['mini_pop'], 'nodes' => ['olt_chassis']],
             'odc' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card', 'pon_port', 'feeder']],
             'odp' => ['pops' => ['cabang', 'mini_pop'], 'nodes' => ['odc']],
+            'drop_cable' => ['pops' => [], 'nodes' => []],
         ];
+        NetworkNodeType::query()->where('code', 'ont')
+            ->whereNotIn('id', DB::table('network_nodes')->select('node_type_id'))
+            ->update(['is_active' => false]);
+
         $ids = NetworkNodeType::query()->pluck('id', 'code');
+        foreach ([
+            ['backbone', 'server'],
+            ['olt_chassis', 'aggregation_switch'],
+            ['pon_port', 'olt_chassis'],
+            ['feeder', 'pon_port'],
+            ['odp', 'feeder'],
+            ['drop_cable', 'odp'],
+        ] as [$childCode, $parentCode]) {
+            DB::table('network_node_type_rules')->insertOrIgnore([
+                'child_type_id' => $ids[$childCode],
+                'parent_type_id' => $ids[$parentCode],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
         foreach ($createdCodes as $code) {
             foreach ($defaultRules[$code]['pops'] as $popType) {
                 DB::table('network_node_type_rules')->insert([
