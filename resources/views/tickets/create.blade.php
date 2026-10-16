@@ -48,7 +48,7 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100 translate-y-0 translate-x-0 scale-100"
          x-transition:leave-end="opacity-0 -translate-y-2 translate-x-2 scale-95"
-         class="fixed top-4 right-4 sm:top-5 sm:right-6 z-[9999] max-w-sm sm:max-w-md w-auto rounded-xl shadow-2xl border px-4 py-3 flex items-start justify-between gap-3 backdrop-blur-md pointer-events-auto"
+         class="fixed top-4 right-4 sm:top-5 sm:right-6 z-[9999] max-w-sm sm:max-w-md w-auto rounded-lg shadow-md border px-4 py-3 flex items-start justify-between gap-3 backdrop-blur-md pointer-events-auto"
          :class="toast.type === 'error'
              ? 'bg-rose-50/95 dark:bg-rose-900/90 border-rose-200 dark:border-rose-700 text-rose-800 dark:text-rose-100'
              : 'bg-emerald-50/95 dark:bg-emerald-900/90 border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-100'">
@@ -75,7 +75,7 @@
     <div x-show="batchModal.open" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-slate-950/70"
          @keydown.escape.window="closeBatchModal()">
-        <div @click.outside="closeBatchModal()" class="w-full max-w-md rounded-xl bg-surface border border-border shadow-2xl overflow-hidden">
+        <div @click.outside="closeBatchModal()" class="w-full max-w-md rounded-lg bg-surface border border-border shadow-md overflow-hidden">
             <div class="px-4 py-3 border-b border-border flex items-center justify-between">
                 <h3 class="text-sm font-bold text-text-main">Tambah Pelanggan Terdampak</h3>
                 <button type="button" @click="closeBatchModal()" class="text-text-muted hover:text-text-main cursor-pointer">
@@ -97,7 +97,7 @@
                         Ganti
                     </button>
                     <div x-show="batchModal.results.length > 0 && !batchModal.selected" x-cloak
-                         class="absolute z-10 mt-1 w-full bg-surface border border-border rounded-lg shadow-xl max-h-48 overflow-y-auto divide-y divide-border">
+                         class="absolute z-10 mt-1 w-full bg-surface border border-border rounded-lg shadow-md max-h-48 overflow-y-auto divide-y divide-border">
                         <template x-for="r in batchModal.results" :key="r.id">
                             <button type="button" @click="pickBatchCustomer(r)" class="w-full text-left px-3 py-2 text-sm hover:bg-sky-50 dark:hover:bg-slate-800 cursor-pointer">
                                 <div class="font-bold text-text-main" x-text="r.nama"></div>
@@ -206,7 +206,7 @@
                  : '-translate-x-full opacity-0 lg:translate-x-0 lg:w-0',
              animReady ? '' : 'panel-motion-off',
          ]">
-    <div class="w-full lg:w-[380px] xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col min-w-0 bg-surface border-r border-border shadow-xl z-10">
+    <div class="w-full lg:w-[380px] xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col min-w-0 bg-surface border-r border-border shadow-md z-10">
 
         {{-- Header Panel --}}
         <div class="shrink-0 px-4 sm:px-5 py-3 border-b border-border bg-surface flex items-center justify-between gap-3">
@@ -316,7 +316,7 @@
                              x-transition:enter="transition ease-out duration-150"
                              x-transition:enter-start="opacity-0 -translate-y-1 scale-98"
                              x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                             class="absolute z-30 mt-1 w-full bg-surface border border-border rounded-xl shadow-2xl max-h-56 overflow-y-auto custom-scrollbar divide-y divide-border/30">
+                             class="absolute z-30 mt-1 w-full bg-surface border border-border rounded-lg shadow-md max-h-56 overflow-y-auto custom-scrollbar divide-y divide-border/30">
                             <div class="px-2.5 py-1 text-[9px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50/70 dark:bg-sky-950/40 uppercase tracking-wider flex items-center justify-between">
                                 <span>Hasil Pencarian:</span>
                                 <span class="font-normal font-mono text-[9px]">Tekan Enter atau Klik</span>
@@ -348,7 +348,7 @@
 
                     {{-- Sleek Compact Verified Customer Summary Card --}}
                     <div x-show="selected" x-cloak
-                         class="rounded-xl border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/20 dark:bg-sky-950/15 p-2.5 space-y-2 text-xs transition-all shadow-2xs">
+                         class="rounded-lg border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/20 dark:bg-sky-950/15 p-2.5 space-y-2 text-xs transition-all shadow-2xs">
                         {{-- Row 1: Nama, CID, and Ganti button --}}
                         <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -457,7 +457,7 @@
                                  x-transition:enter="transition ease-out duration-150"
                                  x-transition:enter-start="opacity-0 translate-y-1 scale-98"
                                  x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                                 class="absolute z-40 top-full left-0 right-0 mt-1 rounded-xl border border-border bg-surface p-2 space-y-1.5 shadow-2xl ring-1 ring-black/5 dark:ring-white/10">
+                                 class="absolute z-40 top-full left-0 right-0 mt-1 rounded-lg border border-border bg-surface p-2 space-y-1.5 shadow-md ring-1 ring-black/5 dark:ring-white/10">
                                 
                                 <div class="space-y-1.5">
                                     <div class="relative">
@@ -816,7 +816,7 @@
         <div class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <template x-if="filteredTasks.length === 0">
                 <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
-                    <div class="w-14 h-14 rounded-2xl bg-surface-muted dark:bg-slate-800/80 border border-border flex items-center justify-center text-text-muted mb-3 shadow-2xs">
+                    <div class="w-14 h-14 rounded-lg bg-surface-muted dark:bg-slate-800/80 border border-border flex items-center justify-center text-text-muted mb-3 shadow-2xs">
                         <svg class="h-7 w-7 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" />
                         </svg>
@@ -1075,7 +1075,7 @@
                                                 {{-- 1-Baris List Roster Pelanggan Terdampak (CID, Nama, No HP / WhatsApp) --}}
                                                 <div class="space-y-1.5 pt-0.5" x-show="task.batch_members && task.batch_members.length > 0">
                                                     <template x-for="(m, idx) in task.batch_members" :key="m.id">
-                                                        <div class="p-2 px-3 rounded-xl border border-border bg-surface hover:bg-violet-50/40 dark:hover:bg-violet-950/30 transition-colors flex items-center justify-between gap-3 shadow-2xs">
+                                                        <div class="p-2 px-3 rounded-lg border border-border bg-surface hover:bg-violet-50/40 dark:hover:bg-violet-950/30 transition-colors flex items-center justify-between gap-3 shadow-2xs">
                                                             <div class="flex items-center gap-2.5 min-w-0 flex-1">
                                                                 <span class="text-[10px] font-mono font-bold text-text-muted w-4 text-center shrink-0" x-text="idx + 1"></span>
                                                                 
@@ -1350,7 +1350,7 @@
                             </div>
                             <div class="space-y-1.5 pt-0.5" x-show="task.batch_members && task.batch_members.length > 0">
                                 <template x-for="(m, idx) in task.batch_members" :key="m.id">
-                                    <div class="p-2 px-3 rounded-xl border border-border bg-surface hover:bg-violet-50/40 dark:hover:bg-violet-950/30 transition-colors flex items-center justify-between gap-3 shadow-2xs">
+                                    <div class="p-2 px-3 rounded-lg border border-border bg-surface hover:bg-violet-50/40 dark:hover:bg-violet-950/30 transition-colors flex items-center justify-between gap-3 shadow-2xs">
                                         <div class="flex items-center gap-2.5 min-w-0 flex-1">
                                             <span class="text-[10px] font-mono font-bold text-text-muted w-4 text-center shrink-0" x-text="idx + 1"></span>
                                             
