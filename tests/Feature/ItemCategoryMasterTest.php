@@ -16,10 +16,12 @@ use App\Models\Task;
 use App\Models\TaskMaterial;
 use App\Models\User;
 use App\Services\TaskMaterialService;
+use Database\Seeders\ItemCategorySeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -289,6 +291,31 @@ class ItemCategoryMasterTest extends TestCase
         $response->assertSessionHasNoErrors();
 
         $this->assertSame('pigtail', $this->customer->fresh()->customerTechnicalDetail->passive_device_type);
+    }
+
+    #[Test]
+    public function it_casts_is_customer_extra_device_as_boolean(): void
+    {
+        $category = ItemCategory::create([
+            'code' => 'penanda_test',
+            'name' => 'Penanda Test',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+            'is_customer_extra_device' => true,
+        ]);
+
+        $this->assertTrue($category->refresh()->is_customer_extra_device);
+    }
+
+    #[Test]
+    public function seeder_menandai_access_point_dan_stb_sebagai_perangkat_tambahan_pelanggan(): void
+    {
+        $this->seed(ItemCategorySeeder::class);
+
+        $this->assertTrue(ItemCategory::where('code', ItemCategorySeeder::CODE_ACCESS_POINT)->value('is_customer_extra_device'));
+        $this->assertTrue(ItemCategory::where('code', ItemCategorySeeder::CODE_STB)->value('is_customer_extra_device'));
+        $this->assertFalse(ItemCategory::where('code', ItemCategorySeeder::CODE_MODEM_ONT)->value('is_customer_extra_device'));
+        $this->assertFalse(ItemCategory::where('code', ItemCategorySeeder::CODE_ROUTER_GATEWAY)->value('is_customer_extra_device'));
     }
 
     public function test_halaman_master_kategori_butuh_permission(): void

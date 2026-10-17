@@ -21,6 +21,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'serial_number',
     'mac_address',
     'technical_note',
+    'inventory_serial_id',
+    'status',
+    'retrieved_at',
 ])]
 class CustomerAdditionalDevice extends Model
 {
@@ -31,10 +34,28 @@ class CustomerAdditionalDevice extends Model
     protected array $auditEvents = ['created', 'updated', 'deleted'];
 
     /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'retrieved_at' => 'datetime',
+        ];
+    }
+
+    /**
      * @return BelongsTo<Customer, $this>
      */
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * @return BelongsTo<InventorySerial, $this>
+     */
+    public function inventorySerial(): BelongsTo
+    {
+        return $this->belongsTo(InventorySerial::class);
     }
 }

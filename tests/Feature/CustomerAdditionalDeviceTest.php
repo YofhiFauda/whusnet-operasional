@@ -2,21 +2,28 @@
 
 namespace Tests\Feature;
 
+use App\Enums\SerialStatus;
 use App\Models\Customer;
+use App\Models\CustomerAdditionalDevice;
 use App\Models\CustomerService;
 use App\Models\InternetPackage;
+use App\Models\InventorySerial;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Services\EffectiveAccessService;
+use Carbon\CarbonInterface;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CustomerAdditionalDeviceTest extends TestCase
@@ -45,6 +52,61 @@ class CustomerAdditionalDeviceTest extends TestCase
         $helpdeskRole = Role::where('name', 'Helpdesk')->firstOrFail();
         $this->attachPermission($helpdeskRole, 'customers.view');
         $this->attachPermission($helpdeskRole, 'customers.detail.devices.view');
+    }
+
+    #[Test]
+    public function it_defaults_status_to_terpasang_and_links_inventory_serial(): void
+    {
+        $pop = $this->createPop('ADDSN');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-SN-001');
+        $category = ItemCategory::create([
+            'code' => 'ap_test_sn',
+            'name' => 'AP Test SN',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+            'is_customer_extra_device' => true,
+        ]);
+        $item = Item::create([
+            'code' => 'AP-TEST-SN',
+            'name' => 'AP Test SN',
+            'item_category_id' => $category->id,
+            'unit' => 'pcs',
+        ]);
+        $serial = InventorySerial::create([
+            'item_id' => $item->id,
+            'serial_number' => 'ADD-SN-0001',
+            'status' => SerialStatus::DEPLOYED,
+        ]);
+
+        $device = CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'AP',
+            'inventory_serial_id' => $serial->id,
+        ]);
+
+        $device->refresh();
+        $this->assertSame('terpasang', $device->status);
+        $this->assertInstanceOf(InventorySerial::class, $device->inventorySerial);
+        $this->assertSame($serial->id, $device->inventorySerial->id);
+    }
+
+    #[Test]
+    public function it_casts_retrieved_at_as_datetime(): void
+    {
+        $pop = $this->createPop('ADDRT');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-RT-001');
+
+        $device = CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'STB',
+            'status' => 'ditarik',
+            'retrieved_at' => '2026-10-17 09:30:00',
+        ]);
+
+        $device->refresh();
+        $this->assertInstanceOf(CarbonInterface::class, $device->retrieved_at);
+        $this->assertSame('2026-10-17 09:30:00', $device->retrieved_at->format('Y-m-d H:i:s'));
+        $this->assertSame('ditarik', $device->status);
     }
 
     private function attachPermission(Role $role, string $code): void
