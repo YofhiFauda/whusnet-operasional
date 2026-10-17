@@ -67,16 +67,23 @@ class CustomerInstallationAdditionalDeviceController extends Controller
         $validated = $request->validate([
             'decisions' => ['nullable', 'array'],
             'decisions.*.inventory_serial_id' => ['required', 'integer', 'distinct', Rule::in($eligibleSerials->keys())],
-            'decisions.*.outcome' => ['required', Rule::in(array_keys(self::OUTCOME_LABELS))],
+            // NULLABLE, bukan required (review fix 2): daftar custody berisi
+            // SEMUA AP/STB yang dibawa tim, bisa termasuk barang untuk
+            // pelanggan LAIN di hari yang sama. Kalau wajib diisi, teknisi
+            // dipaksa mencatat status palsu ("kembali gudang") untuk barang
+            // yang sebenarnya masih mau dipasang di lokasi berikutnya. Baris
+            // kosong = belum ada keputusan → dibuang sebelum hitung agregat.
+            'decisions.*.outcome' => ['nullable', Rule::in(array_keys(self::OUTCOME_LABELS))],
             'kekurangan_perangkat' => ['nullable', 'boolean'],
             'kekurangan_perangkat_alasan' => ['nullable', 'required_if:kekurangan_perangkat,1', 'string', 'max:500'],
         ], [
             'decisions.*.inventory_serial_id.in' => 'SN perangkat tambahan yang dipilih bukan bagian dari custody tim Anda saat ini.',
-            'decisions.*.outcome.required' => 'Pilih status akhir (Terpasang / Kembali ke Gudang / Rusak / Hilang) untuk setiap perangkat.',
             'kekurangan_perangkat_alasan.required_if' => 'Alasan kekurangan perangkat wajib diisi.',
         ]);
 
-        $decisions = collect($validated['decisions'] ?? []);
+        $decisions = collect($validated['decisions'] ?? [])
+            ->filter(fn (array $decision) => filled($decision['outcome'] ?? null))
+            ->values();
         $shortage = (bool) ($validated['kekurangan_perangkat'] ?? false);
         $required = (int) ($customer->customerService?->internetPackage?->max_additional_devices ?? 0);
 
@@ -166,6 +173,9 @@ class CustomerInstallationAdditionalDeviceController extends Controller
 
                     $installation->extra_device_shortage = $shortage;
                     $installation->extra_device_shortage_reason = $shortage ? $validated['kekurangan_perangkat_alasan'] : null;
+                    // Penanda gerbang storeSpeedtest() — cuma diset kalau
+                    // cek kelengkapan di atas sudah lolos.
+                    $installation->extra_devices_reported_at = now();
                     $installation->save();
                 }
             });

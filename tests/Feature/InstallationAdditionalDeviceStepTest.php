@@ -26,6 +26,8 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -216,14 +218,16 @@ class InstallationAdditionalDeviceStepTest extends TestCase
         $this->givePackage(1);
         $ap = $this->issueAp('SN-ADS-AP-031');
 
-        // Tanpa outcome → ditolak (status akhir wajib dipilih).
+        // Baris tanpa outcome = belum ada keputusan, gak dihitung → paket
+        // butuh 1 keputusan, jadi submit ditolak lewat cek agregat.
         $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
                 'decisions' => [
-                    ['inventory_serial_id' => $ap->id],
+                    ['inventory_serial_id' => $ap->id, 'outcome' => ''],
                 ],
             ])
-            ->assertSessionHasErrors('decisions.0.outcome');
+            ->assertSessionHasErrors('decisions');
+        $this->assertNull($this->customer->installations()->latest()->first()->extra_devices_reported_at);
 
         $response = $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
@@ -279,6 +283,91 @@ class InstallationAdditionalDeviceStepTest extends TestCase
             ->assertSessionHasErrors('selected_inventory_serial_id');
     }
 
+    /**
+     * Review fix 2 — custody tim bisa memuat AP untuk pelanggan LAIN di hari
+     * yang sama. Baris yang dibiarkan kosong bukan keputusan: tidak dihitung,
+     * tidak dicatat, SN-nya tetap utuh di custody.
+     */
+    #[Test]
+    public function unrelated_custody_devices_left_blank_do_not_block_submit(): void
+    {
+        $this->givePackage(1);
+        $mine = $this->issueAp('SN-ADS-AP-081');
+        $otherCustomers = $this->issueAp('SN-ADS-AP-082');
+
+        $response = $this->actingAs($this->technician)
+            ->post(route('customers.installation.additional-devices.store', $this->customer), [
+                'decisions' => [
+                    ['inventory_serial_id' => $mine->id, 'outcome' => 'terpasang'],
+                    ['inventory_serial_id' => $otherCustomers->id, 'outcome' => ''],
+                ],
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+        $this->assertSame(SerialStatus::INSTALLED, $mine->refresh()->status);
+        $this->assertSame(SerialStatus::ISSUED, $otherCustomers->refresh()->status);
+        $this->assertSame($this->technician->id, $otherCustomers->current_technician_id);
+        $this->assertSame(1, CustomerAdditionalDevice::where('customer_id', $this->customer->id)->count());
+        $this->assertStringNotContainsString('SN-ADS-AP-082', (string) $this->customer->installations()->latest()->first()->installation_note);
+    }
+
+    /**
+     * Review fix 1 — spec §4.2 berlaku ke Laporan Pemasangan utuh, titik
+     * selesainya storeSpeedtest(): langkah Perangkat Tambahan gak boleh
+     * dilewati begitu saja.
+     */
+    #[Test]
+    public function speedtest_rejected_when_extra_device_step_never_submitted(): void
+    {
+        $this->givePackage(1);
+        $this->issueAp('SN-ADS-AP-091');
+        $this->makeReadyForSpeedtest();
+
+        $response = $this->actingAs($this->technician)
+            ->post(route('customers.installation.speedtest', $this->customer), $this->speedtestPayload());
+
+        $response->assertSessionHasErrors('extra_devices');
+        $this->assertSame('installation_in_progress', $this->customer->refresh()->status);
+    }
+
+    #[Test]
+    public function speedtest_passes_extra_device_gate_once_step_was_submitted(): void
+    {
+        Storage::fake('public');
+        $this->givePackage(1);
+        $ap = $this->issueAp('SN-ADS-AP-101');
+        $this->makeReadyForSpeedtest();
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.additional-devices.store', $this->customer), [
+                'decisions' => [['inventory_serial_id' => $ap->id, 'outcome' => 'terpasang']],
+            ])
+            ->assertSessionHasNoErrors();
+        $this->assertNotNull($this->customer->installations()->latest()->first()->extra_devices_reported_at);
+
+        $response = $this->actingAs($this->technician)
+            ->post(route('customers.installation.speedtest', $this->customer), $this->speedtestPayload());
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+        $this->assertSame('verification_admin', $this->customer->refresh()->status);
+    }
+
+    #[Test]
+    public function speedtest_not_gated_when_package_has_no_extra_devices(): void
+    {
+        Storage::fake('public');
+        $this->givePackage(0);
+        $this->makeReadyForSpeedtest();
+
+        $response = $this->actingAs($this->technician)
+            ->post(route('customers.installation.speedtest', $this->customer), $this->speedtestPayload());
+
+        $response->assertSessionHasNoErrors();
+        $this->assertSame('verification_admin', $this->customer->refresh()->status);
+    }
+
     #[Test]
     public function report_page_shows_step_only_when_package_requires_extra_devices(): void
     {
@@ -302,6 +391,28 @@ class InstallationAdditionalDeviceStepTest extends TestCase
             ->get(route('customers.installation.report', $this->customer))
             ->assertOk()
             ->assertDontSee('form-additional-devices', false);
+    }
+
+    /**
+     * Gerbang foto storeSpeedtest() cukup dicek dari kolom tersimpan —
+     * path diisi langsung, file fisiknya tidak dibaca di jalur ini.
+     */
+    private function makeReadyForSpeedtest(): void
+    {
+        $this->customer->installations()->latest()->first()->update([
+            'installation_photo' => 'installations/foto.jpg',
+            'contract_photo' => 'installations/kontrak.jpg',
+            'signature_photo' => 'installations/ttd.jpg',
+        ]);
+    }
+
+    private function speedtestPayload(): array
+    {
+        return [
+            'test_upload' => 20,
+            'test_download' => 20,
+            'speedtest_photo' => UploadedFile::fake()->image('speedtest.jpg'),
+        ];
     }
 
     private function givePackage(int $maxAdditionalDevices): void

@@ -19,9 +19,15 @@
             <label class="block font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">
                 Perangkat Tambahan (AP / STB) — Wajib {{ $requiredExtraDevices }} Perangkat
             </label>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Beri status akhir untuk setiap perangkat tambahan yang dibawa tim Anda dari Gudang. Disimpan terpisah dari Laporan Pemasangan di atas.</p>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Beri status akhir untuk perangkat tambahan pelanggan ini. Perangkat yang dibawa untuk pelanggan lain biarkan kosong. Wajib disimpan sebelum Laporan Speedtest.</p>
         </div>
 
+        @if($installation?->extra_devices_reported_at)
+            <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">✓ Sudah dilaporkan {{ $installation->extra_devices_reported_at->format('d/m/Y H:i') }}.</p>
+        @endif
+        @error('extra_devices')
+            <p class="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">{{ $message }}</p>
+        @enderror
         @error('decisions')
             <p class="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">{{ $message }}</p>
         @enderror
@@ -50,7 +56,7 @@
                         </div>
                         <input type="hidden" name="decisions[{{ $index }}][inventory_serial_id]" value="{{ $serial->id }}">
                         <select name="decisions[{{ $index }}][outcome]" class="text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500">
-                            <option value="">— Pilih status —</option>
+                            <option value="">— Bukan untuk pelanggan ini —</option>
                             @foreach($outcomeOptions as $value => $label)
                                 <option value="{{ $value }}" @selected($selectedOutcome === $value)>{{ $label }}</option>
                             @endforeach

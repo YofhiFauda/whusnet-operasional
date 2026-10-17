@@ -1079,6 +1079,9 @@
                             </div>
                         @else
                         <!-- Form Speedtest Active -->
+                        @error('extra_devices')
+                            <p class="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">{{ $message }}</p>
+                        @enderror
                         <form id="form-speedtest" action="{{ route('customers.installation.speedtest', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
                             @csrf
                             <input type="hidden" name="return_to" value="{{ $returnTo }}">

@@ -32,6 +32,13 @@ class AdditionalDeviceCustodyService
      * eligibleSerialsForTeam()` — SN yang `issued_from_pop_id`-nya null
      * (data legacy / belum pernah tercatat asalnya) TETAP dihitung tersedia,
      * cuma SN yang asal cabangnya BEDA dari task ini yang dikecualikan.
+     *
+     * Keterbatasan v1 (ADHOC-190 task 4): SN yang dilaporkan rusak/hilang di
+     * langkah Perangkat Tambahan TETAP terhitung tersedia (masih ISSUED) di
+     * sini maupun di `eligibleSerialsForTask()` sampai Gudang memprosesnya
+     * manual lewat alur intake rusak/hilang yang sudah ada — keputusannya
+     * cuma tercatat di `customer_installations.installation_note`, lihat
+     * task-4-report.md.
      */
     public function countAvailable(Collection $technicianIds, ?int $cabangId): int
     {
