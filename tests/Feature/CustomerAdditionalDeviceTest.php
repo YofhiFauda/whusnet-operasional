@@ -110,6 +110,51 @@ class CustomerAdditionalDeviceTest extends TestCase
         $this->assertSame('ditarik', $device->status);
     }
 
+    #[Test]
+    public function additional_device_from_warehouse_shows_source_label_and_status(): void
+    {
+        $this->loginAsAdmin();
+        $pop = $this->createPop('ADDLBL');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-LBL-001');
+        $category = ItemCategory::create([
+            'code' => 'ap_test_lbl',
+            'name' => 'AP Test LBL',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+            'is_customer_extra_device' => true,
+        ]);
+        $item = Item::create([
+            'code' => 'AP-TEST-LBL',
+            'name' => 'AP Test LBL',
+            'item_category_id' => $category->id,
+            'unit' => 'pcs',
+        ]);
+        $serial = InventorySerial::create([
+            'item_id' => $item->id,
+            'serial_number' => 'ADD-LBL-GD-0001',
+            'status' => SerialStatus::DEPLOYED,
+        ]);
+
+        // Baris v1: free-text, belum terhubung ke stok Gudang.
+        CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'AP',
+            'serial_number' => 'SN-V1-LAMA',
+        ]);
+        // Baris dari Gudang yang sudah ditarik.
+        CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'STB',
+            'serial_number' => 'SN-GUDANG-BARU',
+            'inventory_serial_id' => $serial->id,
+            'status' => 'ditarik',
+        ]);
+
+        $this->get(route('customers.show', $customer->id))
+            ->assertOk()
+            ->assertSeeInOrder(['SN-V1-LAMA', 'Tanpa Stok', 'SN-GUDANG-BARU', 'Gudang', 'Ditarik']);
+    }
+
     private function attachPermission(Role $role, string $code): void
     {
         $permission = Permission::firstOrCreate(

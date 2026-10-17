@@ -789,7 +789,7 @@ class CustomerController extends Controller
         // eager-load: Model::preventLazyLoading() aktif di luar production
         // (AppServiceProvider), akses $customer->customerDevice tanpa ini
         // meledak di test & lokal.
-        $customer->load(['customerDevice', 'customerTechnicalDetail', 'additionalDevices']);
+        $customer->load(['customerDevice', 'customerTechnicalDetail', 'additionalDevices.inventorySerial']);
 
         // Nilai awal step 7 = nilai yang tampil di Detail Pelanggan (urutan
         // cadangan Gudang → customer_devices → detail teknis → kolom lama),
@@ -1380,7 +1380,9 @@ class CustomerController extends Controller
             'installations.technician2',
             'installations.technician3',
             'customerDevice',
-            'additionalDevices',
+            // inventorySerial ikut dimuat: badge "Gudang"/"Tanpa Stok" per baris
+            // perangkat tambahan membacanya; tanpa ini Detail jadi N+1 per device.
+            'additionalDevices.inventorySerial',
             'documents.uploader',
             'invoices' => function ($query) {
                 $query->with('creator')->orderBy('billing_period', 'desc');
