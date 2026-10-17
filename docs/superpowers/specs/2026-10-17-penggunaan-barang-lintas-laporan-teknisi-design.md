@@ -66,15 +66,15 @@ Status task/pekerjaan fisik, review FOP, rekonsiliasi Gudang, verifikasi harga, 
 
 ## 7. Contoh gabungan C-REQ
 
-Pelanggan meminta CCTV dari perusahaan, AP sewa, dan kabel. Gudang meng-issue ketiganya. Teknisi memasang CCTV dan AP, memakai kabel, serta mencatat hasil aktual pada baris berbeda. CCTV menjadi milik pelanggan; AP tetap milik kantor; kabel menjadi material terpakai. Bila modem lama juga dicabut, hasilnya menjadi baris lain dan masuk transit retur.
+Pelanggan meminta CCTV dari perusahaan, AP sewa, dan kabel. Gudang meng-issue ketiganya. Teknisi memasang CCTV dan AP, memakai kabel, serta mencatat hasil aktual pada baris berbeda. CCTV tercatat terpasang dan diserahkan dengan niat jual; status kepemilikan final menunggu keputusan komersial. AP tetap milik kantor; kabel menjadi material terpakai. Bila modem lama juga dicabut, hasilnya menjadi baris lain dan masuk transit retur.
 
-Pekerjaan fisik selesai tanpa menunggu harga. Verifikator biaya kemudian menetapkan harga CCTV dan jasa yang relevan serta menerbitkan invoice dengan rincian yang merujuk tepat sekali ke tiap penjualan. AP sewa yang sudah termasuk paket tidak otomatis dijual. DEAC kelak menarik AP, bukan CCTV. Penolakan atau koreksi biaya tidak menghapus pemasangan.
+Pekerjaan fisik selesai tanpa menunggu harga. Verifikator biaya kemudian menetapkan harga CCTV dan jasa yang relevan serta menerbitkan invoice dengan rincian yang mencakup tiap penjualan tepat sekali. AP sewa yang sudah termasuk paket tidak otomatis dijual. Jika jual CCTV disahkan, DEAC kelak menarik AP, bukan CCTV; bila transaksi belum disahkan atau ditolak, kewajiban pengembalian mengikuti penyelesaian kasus komersial. Penolakan atau koreksi biaya tidak menghapus pemasangan.
 
-Hubungan InventorySerialSale ke task/verifikasi harus mendukung banyak penjualan, bukan first() satu sale. Setiap sale yang ditagih muncul tepat satu kali pada rincian invoice. Barang tambahan tidak boleh menimpa profil perangkat utama pelanggan.
+Hubungan InventorySerialSale ke task/verifikasi harus mendukung banyak penjualan, bukan first() satu sale. Setiap unit atau jumlah barang yang ditagih harus dapat ditelusuri ke tepat satu cakupan penagihan. Beberapa unit boleh dijual sebagai satu paket/rincian invoice, tetapi sistem tetap harus tahu unit dan jumlah mana yang sudah ditagih agar koreksi, retur, dan garansi tidak menggandakan biaya. Barang tambahan tidak boleh menimpa profil perangkat utama pelanggan.
 
 ## 8. Selisih lapangan dan kelanjutan operasional — rekomendasi menunggu keputusan
 
-Rekomendasi: **pisahkan “pekerjaan fisik selesai” dari “barang terekonsiliasi”.** Bila teknisi benar-benar memasang/memakai barang tetapi sistem tidak menemukan custody yang cocok, teknisi memilih alasan selisih, mencatat item/SN/qty fisik, asal yang diketahui, waktu, dan bukti. Task dapat selesai secara fisik agar teknisi lanjut bekerja. Sistem membuka antrean rekonsiliasi untuk FOP/Gudang. Klaim tersebut belum menjadi mutasi stok, status SN terpasang resmi, atau aset node/pelanggan yang terverifikasi.
+Rekomendasi: **pisahkan “pekerjaan fisik selesai” dari “barang terekonsiliasi”.** Bila teknisi benar-benar memasang/memakai barang tetapi sistem tidak menemukan custody yang cocok, teknisi memilih alasan selisih, mencatat item/SN/qty fisik, asal yang diketahui, waktu, dan bukti. Task dapat selesai secara fisik agar teknisi lanjut bekerja. Sistem membuka antrean rekonsiliasi untuk FOP/Gudang. Klaim tersebut belum menjadi mutasi stok, status SN terpasang resmi, atau aset node/pelanggan yang terverifikasi. SN/roll atau lot yang dapat dikenali harus ditahan dari pemakaian ulang selama rekonsiliasi; rinciannya ada di §14–15.
 
 Penyelesaian antrean harus memilih hasil yang terlacak: cocokkan ke issue/custody/SN sah lalu mutasikan stok; koreksi identitas atau jumlah dengan audit; pastikan barang milik pelanggan dan tidak menggunakan stok kantor; atau nyatakan konflik untuk investigasi. Klaim awal tidak dihapus. Penjualan barang yang asalnya belum terbukti belum menjadi invoice final; pekerjaan fisiknya tetap tercatat. Status antrean, penanggung jawab, dan umur kasus harus tampak, agar jalur pengecualian tidak menjadi tempat selisih terlupakan.
 
@@ -133,3 +133,52 @@ Setiap langkah memerlukan task implementasi tersendiri. Tidak ada perubahan kode
 4. Bila satu task berisi barang jual yang belum terekonsiliasi dan jasa yang sudah pasti, apakah seluruh invoice menunggu atau jasa boleh ditagih terpisah? Harus mencegah tagihan ganda saat barang kemudian disahkan.
 
 Pertanyaan tersebut tidak mengubah keputusan yang telah dibuat pada ADHOC-190 dan alur O-REQ/INFR-REQ.
+
+## 14. Audit ulang: celah yang belum cukup ditutup
+
+Audit ini membandingkan rancangan dengan jalur kode saat ini dan rancangan ADHOC-190 yang sudah disetujui. Temuan di bawah adalah risiko desain yang harus diuji atau ditutup sebelum implementasi lintas laporan, bukan pernyataan bahwa seluruh akibatnya sudah terjadi di produksi.
+
+| Prioritas | Temuan dan bukti | Koreksi rancangan |
+| --- | --- | --- |
+| Kritis | `InventoryService::installSerial()` menerima `returnExistingSerial=true` secara default. Dalam mode itu, query mengambil seluruh SN perusahaan yang `INSTALLED` pada pelanggan dan mengembalikannya; fungsi juga mengganti `ont_sn`, `router_or_ont_serial`, dan `customer_devices` utama. Pemanggil Maintenance hanya mematikan pengembalian otomatis untuk kategori TAMBAH_MODEM. | Tambah CCTV/AP tidak boleh memakai mode ganti. Setiap tindakan harus menyebut `tambah` atau `ganti`; bila ganti, wajib menyebut SN lama yang tepat. Jangan mengembalikan semua perangkat perusahaan dalam satu pelanggan. Perangkat tambahan memakai relasi perangkat tambahan, bukan profil ONT utama. Ini juga harus diperiksa dalam rencana implementasi ADHOC-190 sebelum memakai `installSerial()`. |
+| Kritis | `recordSerialSale()` menolak harga kosong atau ≤0, sedangkan form Maintenance mewajibkan `modem_sale_price` untuk `beli_gudang`. `TaskCreqBillingController::approve()` baru menetapkan harga final saat membuat invoice. | Pisahkan niat/serah terima jual dari penjualan final. Baris fisik dapat tersimpan tanpa harga final; persetujuan biaya melengkapi harga dan baru membuat/mengesahkan hubungan penjualan ke invoice. Harga perkiraan teknisi boleh ada, tetapi tidak menjadi prasyarat laporan fisik. Transisi kepemilikan tidak boleh diasumsikan selesai hanya karena pemasangan. |
+| Kritis | Verifikasi C-REQ/MTN mengambil `InventorySerialSale::where('fop_task_id', ...)->first()`, lalu mensyaratkan tepat satu rincian untuk sale tersebut. | Seluruh sale dalam task harus dibaca dan masing-masing ditautkan tepat sekali ke rincian invoice yang benar. Tambah constraint unik dan pemeriksaan transaksi agar sale sama tidak ditagih ulang pada submit, review, atau invoice berikutnya. |
+| Tinggi | Pengecualian §8 membiarkan posisi stok resmi tetap di custody, padahal barang diklaim sudah terpasang. Tanpa penguncian, barang itu dapat dipilih lagi untuk task lain. | Klaim belum terbukti tetap tidak menambah atau mengurangi saldo resmi, tetapi identitas SN/roll atau kuantitas dari lot yang diketahui harus diberi `hold` operasional dan dikeluarkan dari pilihan issue/pasang sampai kasus selesai. Untuk barang tanpa identitas master, buat klaim sementara yang tidak dihitung sebagai stok. Audit pembukaan dan pelepasan hold. |
+| Tinggi | ADHOC-190 memeriksa jumlah perangkat tambahan dalam custody tim saat assign/jadwal. Jumlah yang sama berpotensi memenuhi dua task yang dijadwalkan bersamaan. | Bedakan `tersedia di custody` dari `dialokasikan untuk task`. Alokasikan SN/qty per task ketika dijadwalkan, cegah alokasi ganda, dan lepas/alihkan alokasi dengan jejak saat batal atau reassign. Jika paket mensyaratkan jenis tertentu, periksa jenisnya; angka `max_additional_devices` sendiri hanya menyatakan jumlah. |
+| Tinggi | `OwnershipMode::INSTALLABLE` pada master item adalah izin untuk status terpasang, sedangkan `DeviceOwnership` pada unit adalah pemilik. Dua konsep bernama mirip ini dapat tercampur. | Modelkan terpisah: jenis pelacakan, izin penempatan, lokasi fisik, pemilik saat ini, dan tujuan komersial. CCTV yang berada di rumah pelanggan sebelum harga disetujui harus tampil sebagai `terpasang fisik / komersial tertunda`; aturan kapan hak milik berpindah perlu keputusan bisnis. |
+| Tinggi | Satu task dapat berisi pemasangan benar, barang selisih, pengembalian, dan biaya yang ditolak. Status `selesai` tunggal tidak menjawab mana yang sah untuk stok, layanan, atau tagihan. | Tetapkan hasil per baris dan gerbang terpisah. Penyelesaian pekerjaan lapangan tidak otomatis mengesahkan seluruh stok, menyelesaikan kewajiban retur, mengaktifkan layanan, atau menerbitkan invoice. Jalur aktivasi Pemasangan yang ada tetap melalui verifikasi pelanggan, bukan review task biasa. |
+
+**Celah tambahan pada barang non-serial dan harga paket.** InventorySerialSale hanya mewakili unit ber-SN. Material QUANTITY atau ROLL yang memang dijual atau dibebankan ke pelanggan perlu tautan pemakaian/serah terima sendiri ke rincian biaya; pemakaian teknis internal, barang pelanggan sendiri, dan barang gratis/garansi tidak otomatis menjadi penjualan. Satu rincian biaya dapat berupa paket beberapa unit dan jasa, sehingga hubungan fisik-ke-biaya harus menyimpan cakupan jumlah yang sudah ditagih, bukan mengasumsikan satu SN selalu sama dengan satu baris invoice. Bila biaya paket tidak dapat dipilah untuk retur sebagian, aturan koreksi harga dan kredit harus diputuskan sebelum paket itu diterbitkan.
+
+## 15. Kontrak operasional yang direvisi
+
+Untuk setiap unit/baris, simpan **apa yang direncanakan**, **apa yang terjadi**, **aset mana yang terlibat**, dan **apa tindak lanjutnya**. Identitas baris harus stabil pada draf, resubmit, review, koreksi, dan penagihan. Tindakan `tambah`, `ganti SN X dengan SN Y`, `cabut`, `pakai`, `kembali`, `jual/serah`, `sewa`, serta `tidak ditemukan` tidak dapat disimpulkan dari nama barang saja.
+
+| Kondisi baris | Laporan fisik | Posisi stok resmi | Ketersediaan untuk task lain | Keuangan |
+| --- | --- | --- | --- | --- |
+| Estimasi Survey | Rencana | Tidak berubah | Tidak memesan stok | Belum ada tagihan |
+| Di-issue dan dialokasikan, belum dipakai | Belum terpasang | Custody teknisi | Tidak tersedia untuk task lain | Belum ada tagihan |
+| Terpasang dengan custody sah | Fakta terpasang | Mutasi lewat service dan ledger yang sah | Tidak tersedia | Kandidat biaya bila jual/jasa |
+| Terpasang tetapi asal belum cocok | Fakta lapangan, verifikasi tertunda | Jangan buat mutasi fiktif | SN/lot terkait dalam hold; klaim baru tidak dihitung stok | Item terkait tidak masuk invoice final |
+| Diambil dari pelanggan, menunggu inspeksi | Fakta cabut dan transit | Belum menjadi stok tersedia Gudang | Tidak tersedia | Tidak otomatis menjadi pengurang tagihan |
+| Harga ditolak setelah barang dipasang | Fakta fisik tetap ada | Posisi fisik tetap tercatat | Tidak boleh terbit ulang sebagai stok bebas | Kasus komersial terbuka: revisi harga, pengembalian, atau keputusan lain yang sah |
+
+Tiga gerbang wajib dibedakan: **laporan lapangan lengkap**, **rekonsiliasi aset selesai**, dan **biaya layak ditagih**. Untuk Pemasangan, ada gerbang keempat: **aktivasi pelanggan** menurut alur verifikasi pelanggan yang sudah ada. Status task selesai tidak boleh dipakai sebagai bukti otomatis bahwa semua gerbang tersebut lulus.
+
+Bila satu kunjungan berisi jasa yang pasti dan barang jual yang masih disengketakan, rekomendasi saya adalah mengizinkan rincian jasa yang sah diproses terpisah hanya jika sistem mencatat cakupan invoice per baris dan mencegah tagihan ganda. Jika infrastruktur invoice saat ini belum mendukung pemisahan aman, tahan penerbitan invoice task itu sampai pemisahan tersedia. Jangan menerbitkan invoice parsial lewat catatan bebas.
+
+## 16. Keputusan operasional yang saya rekomendasikan
+
+1. **Pekerjaan fisik dapat selesai dengan rekonsiliasi terbuka**, tetapi setiap barang terkait diblokir untuk pemakaian ulang dan tampak pada antrean. FOP memimpin triase laporan; Gudang menyelesaikan asal/kondisi/stok; petugas biaya menangani konsekuensi invoice. Kewenangan tetap mengikuti role dan POP scope yang ada.
+2. **Pengecualian hanya untuk kejadian yang benar-benar sudah terjadi.** FOP tetap memeriksa dan mengalokasikan stok sebelum task; teknisi tidak boleh memakai fitur selisih sebagai cara merencanakan pemasangan tanpa issue. Berlaku pada semua laporan fisik yang relevan, dengan alasan dan bukti sesuai tindakan.
+3. **Kepemilikan jual beli perlu keputusan eksplisit.** Rekomendasi awal: catat `niat jual` serta serah terima fisik saat pemasangan, lalu tetapkan status komersial final setelah persetujuan harga. Kebijakan apakah hak milik berpindah saat serah terima, persetujuan harga, atau pembayaran harus ditetapkan perusahaan; DEAC dan laporan aset harus mengikuti kebijakan itu.
+4. **Mulai perubahan pada batas yang sempit:** tutup dahulu risiko tambah/ganti serial dan banyak sale dalam satu C-REQ/MTN. Setelah itu perluas pola baris dan gerbang ke laporan lain. ADHOC-190 yang telah disetujui tetap menjadi keputusan produk, tetapi pemakaian `installSerial()` serta pemeriksaan custody pada rencana implementasinya harus disesuaikan dengan dua temuan kritis di atas.
+
+### Skenario penerimaan tambahan
+
+- Pelanggan mempunyai ONT kantor dan AP kantor; memasang CCTV tambahan tidak mengubah ONT utama, tidak mencabut AP, dan tidak membuat retur fiktif.
+- Dua task yang waktunya tumpang tindih tidak dapat mengalokasikan SN/qty custody yang sama.
+- Satu task menjual dua CCTV; tiap SN mempunyai satu catatan serah terima, satu keputusan harga, dan paling banyak satu rincian invoice final.
+- Laporan selisih yang menyebut SN custody menahan SN itu dari pemakaian ulang sampai FOP/Gudang menutup kasus.
+- Harga ditolak setelah serah terima: fakta pemasangan tetap ada, invoice tidak terbit untuk barang itu, dan keputusan pengembalian/koreksi tercatat.
+- Pemasangan fisik selesai tetapi aktivasi pelanggan masih menunggu verifikasi; keduanya tampil berbeda.
