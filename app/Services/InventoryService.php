@@ -250,6 +250,15 @@ class InventoryService
                     // ikut diretur, SN-nya balik ke stok padahal `InventorySerialSale`
                     // masih mencatatnya terjual ke pelanggan ini.
                     ->where('ownership', '!=', DeviceOwnership::CUSTOMER->value)
+                    // Perangkat tambahan (AP/STB, `is_customer_extra_device`)
+                    // BUKAN "modem lama" yang digantikan — ADHOC-190: Laporan
+                    // Pemasangan memasang AP di step 5, lalu ONT utama baru
+                    // di-install di step 6 (storeSpeedtest(), flag ini true).
+                    // Tanpa pengecualian ini AP yang baru terpasang langsung
+                    // ke-RETURN diam-diam sementara `customer_additional_devices`
+                    // masih bilang "terpasang". Dijaga di service (bukan di
+                    // pemanggil) supaya berlaku apa pun urutan pemasangannya.
+                    ->whereDoesntHave('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
                     ->lockForUpdate()
                     ->get()
                 : collect();

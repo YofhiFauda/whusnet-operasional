@@ -1043,6 +1043,9 @@
                             </div>
                         </div>
                     </form>
+
+                    <!-- Section: Perangkat Tambahan (ADHOC-190) — form sendiri, saudara form-pemasangan -->
+                    @include('installations.partials._additional_devices_step')
                     </div>
 
                     <!-- STEP 6 PANEL: Laporan Uji Koneksi (Speedtest) -->

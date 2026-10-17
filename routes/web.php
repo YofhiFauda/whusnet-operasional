@@ -22,6 +22,7 @@ use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\CustomerDocumentController;
 use App\Http\Controllers\CustomerFailedController;
 use App\Http\Controllers\CustomerFieldworkController;
+use App\Http\Controllers\CustomerInstallationAdditionalDeviceController;
 use App\Http\Controllers\CustomerInstallationController;
 use App\Http\Controllers\CustomerNetworkAssignmentController;
 use App\Http\Controllers\CustomerPackageController;
@@ -1114,6 +1115,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/{customer}/installation', [CustomerInstallationController::class, 'store'])->name('customers.installation.store');
         Route::post('/customers/{customer}/installation/pemasangan', [CustomerInstallationController::class, 'storePemasangan'])->name('customers.installation.pemasangan');
         Route::post('/customers/{customer}/installation/speedtest', [CustomerInstallationController::class, 'storeSpeedtest'])->name('customers.installation.speedtest');
+        Route::post('/customers/{customer}/installation/additional-devices', [CustomerInstallationAdditionalDeviceController::class, 'store'])->name('customers.installation.additional-devices.store');
         Route::put('/customers/{customer}/installation/identity', [CustomerInstallationController::class, 'updateIdentity'])->name('customers.installation.update-identity');
         Route::put('/customers/{customer}/installation/package', [CustomerInstallationController::class, 'updatePackage'])->name('customers.installation.update-package');
         Route::put('/customers/{customer}/installation/survey', [CustomerInstallationController::class, 'updateSurveyData'])->name('customers.installation.update-survey');

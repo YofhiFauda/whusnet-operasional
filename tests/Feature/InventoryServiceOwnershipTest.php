@@ -166,4 +166,43 @@ class InventoryServiceOwnershipTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         app(InventoryService::class)->recordSerialSale($serial, $this->customer, null, -100.0, $this->actor);
     }
+
+    /**
+     * ADHOC-190 task 4 — Laporan Pemasangan memasang AP di step 5, ONT utama
+     * baru di-install di step 6 (storeSpeedtest(), returnExistingSerial=true).
+     * Retire SN lama wajib cuma menyentuh perangkat UTAMA: AP/STB
+     * (`is_customer_extra_device`) yang sudah INSTALLED tidak boleh ikut
+     * di-RETURN, sedangkan ONT lama tetap di-RETURN seperti biasa.
+     */
+    #[Test]
+    public function install_serial_ganti_utama_tidak_meretur_perangkat_tambahan(): void
+    {
+        $apCategory = ItemCategory::create(['code' => 'ap_own_test', 'name' => 'AP Ownership Test', 'default_unit' => 'pcs', 'is_customer_extra_device' => true]);
+        $apItem = Item::create([
+            'code' => 'AP-OWN-TEST', 'name' => 'AP Ownership Test', 'unit' => 'pcs',
+            'item_category_id' => $apCategory->id, 'tracking_type' => 'serialized', 'ownership_mode' => 'installable',
+        ]);
+
+        $service = app(InventoryService::class);
+
+        $oldOnt = $this->createIssuedSerial('SN-OWN-ONT-OLD');
+        $service->installSerial($oldOnt, $this->customer, $this->fopTask, [$this->technician], $this->actor);
+
+        $ap = InventorySerial::create([
+            'item_id' => $apItem->id,
+            'serial_number' => 'SN-OWN-AP-001',
+            'status' => SerialStatus::ISSUED->value,
+            'current_technician_id' => $this->technician->id,
+            'issued_from_pop_id' => $this->pop->id,
+        ]);
+        $service->installSerial($ap, $this->customer, $this->fopTask, [$this->technician], $this->actor, false);
+
+        $newOnt = $this->createIssuedSerial('SN-OWN-ONT-NEW');
+        $service->installSerial($newOnt, $this->customer, $this->fopTask, [$this->technician], $this->actor, true);
+
+        $this->assertSame(SerialStatus::INSTALLED, $ap->refresh()->status, 'AP tidak boleh di-retur saat ONT utama diganti');
+        $this->assertSame($this->customer->id, $ap->customer_id);
+        $this->assertSame(SerialStatus::RETURNED, $oldOnt->refresh()->status, 'ONT lama tetap di-retur seperti sebelumnya');
+        $this->assertSame(SerialStatus::INSTALLED, $newOnt->refresh()->status);
+    }
 }
