@@ -19,6 +19,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Services\AdditionalDeviceCustodyService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskProvisioningService;
@@ -548,251 +549,264 @@ class FopTaskController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membatalkan Task FOP.');
         }
 
-        return DB::transaction(function () use ($validated, $fopTask, $request) {
-            $oldValues = $fopTask->load('technicians')->toArray();
-            $oldTaskDate = $fopTask->task_date ? $fopTask->task_date->copy() : null;
-            $oldTechnicianIds = collect($oldValues['technicians'] ?? [])->pluck('id')->sort()->values()->all();
+        try {
+            return DB::transaction(function () use ($validated, $fopTask, $request) {
+                $oldValues = $fopTask->load('technicians')->toArray();
+                $oldTaskDate = $fopTask->task_date ? $fopTask->task_date->copy() : null;
+                $oldTechnicianIds = collect($oldValues['technicians'] ?? [])->pluck('id')->sort()->values()->all();
 
-            // Ditangkap SEBELUM field apa pun diubah — dipakai belakangan buat
-            // deteksi transisi Draft→Terjadwal akibat assign teknisi (lihat blok
-            // technicians di bawah). $oldStatus di blok status hanya keisi kalau
-            // request kirim 'status', sedangkan modal Edit SELALU ngirim 'status'
-            // = nilai lama (form itu gak punya pilihan ubah status manual), jadi
-            // gak bisa dipakai buat bedain "status beneran mau diubah user" vs
-            // "cuma echo balik nilai existing".
-            $originalStatus = $fopTask->status instanceof TaskStatus ? $fopTask->status->value : $fopTask->status;
+                // Ditangkap SEBELUM field apa pun diubah — dipakai belakangan buat
+                // deteksi transisi Draft→Terjadwal akibat assign teknisi (lihat blok
+                // technicians di bawah). $oldStatus di blok status hanya keisi kalau
+                // request kirim 'status', sedangkan modal Edit SELALU ngirim 'status'
+                // = nilai lama (form itu gak punya pilihan ubah status manual), jadi
+                // gak bisa dipakai buat bedain "status beneran mau diubah user" vs
+                // "cuma echo balik nilai existing".
+                $originalStatus = $fopTask->status instanceof TaskStatus ? $fopTask->status->value : $fopTask->status;
 
-            if (isset($validated['category'])) {
-                $fopTask->category = $validated['category'];
-            }
-            if (isset($validated['task_date'])) {
-                $fopTask->task_date = $validated['task_date'];
-            }
-            if (isset($validated['tugas'])) {
-                $fopTask->tugas = $validated['tugas'];
-            }
-            if (array_key_exists('village_id', $validated)) {
-                $fopTask->village_id = $validated['village_id'];
-            }
-            if (array_key_exists('pop_id', $validated)) {
-                $fopTask->pop_id = $validated['pop_id'];
-            }
-            if (array_key_exists('customer_id', $validated)) {
-                $fopTask->customer_id = $validated['customer_id'];
-            }
-            if (array_key_exists('issue', $validated)) {
-                $fopTask->issue = $validated['issue'];
-            }
-            if (array_key_exists('notes', $validated)) {
-                $fopTask->notes = $validated['notes'];
-            }
-            if (isset($validated['priority'])) {
-                $fopTask->priority = $validated['priority'];
-            }
+                if (isset($validated['category'])) {
+                    $fopTask->category = $validated['category'];
+                }
+                if (isset($validated['task_date'])) {
+                    $fopTask->task_date = $validated['task_date'];
+                }
+                if (isset($validated['tugas'])) {
+                    $fopTask->tugas = $validated['tugas'];
+                }
+                if (array_key_exists('village_id', $validated)) {
+                    $fopTask->village_id = $validated['village_id'];
+                }
+                if (array_key_exists('pop_id', $validated)) {
+                    $fopTask->pop_id = $validated['pop_id'];
+                }
+                if (array_key_exists('customer_id', $validated)) {
+                    $fopTask->customer_id = $validated['customer_id'];
+                }
+                if (array_key_exists('issue', $validated)) {
+                    $fopTask->issue = $validated['issue'];
+                }
+                if (array_key_exists('notes', $validated)) {
+                    $fopTask->notes = $validated['notes'];
+                }
+                if (isset($validated['priority'])) {
+                    $fopTask->priority = $validated['priority'];
+                }
 
-            if (isset($validated['status'])) {
-                $oldStatus = $fopTask->status->value ?? $fopTask->status;
-                $fopTask->status = $validated['status'];
+                if (isset($validated['status'])) {
+                    $oldStatus = $fopTask->status->value ?? $fopTask->status;
+                    $fopTask->status = $validated['status'];
 
-                if ($validated['status'] === TaskStatus::PENDING->value) {
-                    $fopTask->pending_reason = $validated['pending_reason'] ?? $fopTask->pending_reason;
-                    $fopTask->client_request_date = $validated['client_request_date'] ?? $fopTask->client_request_date;
-                    $fopTask->cancelled_at = null;
-                } elseif ($validated['status'] === TaskStatus::DIBATALKAN->value || $validated['status'] === TaskStatus::SELESAI->value) {
-                    if ($oldStatus !== TaskStatus::DIBATALKAN->value && $validated['status'] === TaskStatus::DIBATALKAN->value) {
-                        $fopTask->cancelled_at = now();
-                        $fopTask->cancel_reason = $validated['cancel_reason'] ?? null;
-                    }
-                    if ($validated['status'] === TaskStatus::SELESAI->value && $oldStatus === TaskStatus::DIBATALKAN->value) {
+                    if ($validated['status'] === TaskStatus::PENDING->value) {
+                        $fopTask->pending_reason = $validated['pending_reason'] ?? $fopTask->pending_reason;
+                        $fopTask->client_request_date = $validated['client_request_date'] ?? $fopTask->client_request_date;
                         $fopTask->cancelled_at = null;
-                        $fopTask->cancel_reason = null;
+                    } elseif ($validated['status'] === TaskStatus::DIBATALKAN->value || $validated['status'] === TaskStatus::SELESAI->value) {
+                        if ($oldStatus !== TaskStatus::DIBATALKAN->value && $validated['status'] === TaskStatus::DIBATALKAN->value) {
+                            $fopTask->cancelled_at = now();
+                            $fopTask->cancel_reason = $validated['cancel_reason'] ?? null;
+                        }
+                        if ($validated['status'] === TaskStatus::SELESAI->value && $oldStatus === TaskStatus::DIBATALKAN->value) {
+                            $fopTask->cancelled_at = null;
+                            $fopTask->cancel_reason = null;
+                        }
+                        $fopTask->pending_reason = null;
+                        $fopTask->client_request_date = null;
+                    } else { // draft/terjadwal/in_progress
+                        $fopTask->pending_reason = null;
+                        $fopTask->client_request_date = null;
+                        $fopTask->cancelled_at = null;
                     }
-                    $fopTask->pending_reason = null;
-                    $fopTask->client_request_date = null;
-                } else { // draft/terjadwal/in_progress
-                    $fopTask->pending_reason = null;
-                    $fopTask->client_request_date = null;
-                    $fopTask->cancelled_at = null;
-                }
-            }
-
-            $fopTask->save();
-
-            // Riwayat status sisi FOP buat cancel manual HARUS ditulis di sini.
-            // TaskObserver — yang biasanya nulis fop_task_status_history — udah
-            // keburu early-return begitu FopTask berstatus `dibatalkan`
-            // (TaskObserver.php baris 42, guard biar cancel manual gak
-            // ke-overwrite sync otomatis), jadi sebelum ini pembatalan gak
-            // ninggalin jejak sama sekali di riwayat, termasuk buat tiket yang
-            // belum punya Task eksekusi (tiket Ticketing yang masih Draft).
-            if (isset($validated['status'])
-                && $validated['status'] === TaskStatus::DIBATALKAN->value
-                && $oldStatus !== TaskStatus::DIBATALKAN->value
-            ) {
-                FopTaskStatusHistory::create([
-                    'fop_task_id' => $fopTask->id,
-                    'from_status' => $oldStatus,
-                    'to_status' => TaskStatus::DIBATALKAN->value,
-                    'changed_by' => auth()->id(),
-                    'changed_at' => now(),
-                ]);
-            }
-
-            // Cancel dari sisi FOP harus nembus ke Task eksekusi teknisi juga —
-            // kalau enggak, Task tetap Terjadwal/Sedang Dikerjakan di Riwayat
-            // Task & /tasks-saya walau tiket FOP-nya udah Cancel.
-            if (isset($validated['status'])
-                && $validated['status'] === TaskStatus::DIBATALKAN->value
-                && $oldStatus !== TaskStatus::DIBATALKAN->value
-                && $fopTask->task_id
-            ) {
-                $linkedTask = $fopTask->task;
-                if ($linkedTask && ! in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])) {
-                    // Cascade ke Task eksekusi tetap harus nembus policy, bukan
-                    // main panggil TaskService langsung. Guard SRV/PSB di atas
-                    // baca `FopTask.category`; yang dibatalin di sini `Task`,
-                    // jadi tipenya dicek ulang terhadap Task-nya sendiri —
-                    // lihat TaskPolicy::cancelViaFopTask().
-                    $this->authorize('cancelViaFopTask', $linkedTask);
-
-                    app(TaskService::class)->cancel($linkedTask, auth()->user(), $validated['cancel_reason'] ?? "Dibatalkan dari Task FOP {$fopTask->task_number}.");
-                }
-            }
-
-            // Pending dari sisi FOP juga harus nembus ke Task eksekusi teknisi —
-            // sebelumnya cuma DIBATALKAN yang di-cascade (lihat blok di atas), PENDING
-            // enggak, jadi Task tetap Terjadwal/Sedang Dikerjakan walau FopTask-nya
-            // sudah Pending, dan teknisi yang sama gagal mulai task LAIN karena guard
-            // "sedang mengerjakan task lain" di TaskService::start() masih nemu task
-            // ini seolah IN_PROGRESS.
-            if (isset($validated['status'])
-                && $validated['status'] === TaskStatus::PENDING->value
-                && $oldStatus !== TaskStatus::PENDING->value
-                && $fopTask->task_id
-            ) {
-                $linkedTask = $fopTask->task;
-                if ($linkedTask && ! in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::PENDING])) {
-                    // Otoritasnya `fopPending` — ability yang sama dipakai tombol
-                    // "Pending" FOP di halaman Task (TaskController::pending()), cuma
-                    // beda entry point (papan /fop-tasks vs halaman Task).
-                    $this->authorize('fopPending', $linkedTask);
-
-                    app(TaskService::class)->syncPendingFromFopTask($linkedTask, auth()->user(), $validated['pending_reason']);
-                }
-            }
-
-            if ($request->has('technicians')) {
-                $technicians = $validated['technicians'] ?? [];
-                $newTechnicianIds = collect($technicians)->sort()->values()->all();
-
-                if ($newTechnicianIds !== $oldTechnicianIds) {
-                    $fopTask->team_id = null;
-                    if ($fopTask->manual_override_at !== null) {
-                        $fopTask->manual_override_at = null;
-                    }
-                    $fopTask->save();
                 }
 
-                $fopTask->technicians()->sync($technicians);
+                $fopTask->save();
 
-                // BUG FIX: tiket yang asalnya Draft (biasanya dari Ticketing —
-                // belum ada teknisi/Task eksekusi) dan baru di-assign teknisi di
-                // SINI (lewat modal Edit di tabel, bukan form Create) sebelumnya
-                // status-nya gak pernah ikut naik ke Terjadwal — modal Edit
-                // ngirim 'status' hidden = nilai lama ('draft'), dan blok status
-                // di atas cuma nulis ulang nilai yang sama. Akibatnya Task
-                // eksekusi kebuat + teknisi ke-assign beneran, tapi
-                // fop_tasks.status nyangkut 'draft' selamanya, dan Ticket yang
-                // nyambung ke tiket ini macet di bucket "Ticket Masuk"
-                // (Ticket::scopeInBucket() baca kolom ini apa adanya).
-                if ($originalStatus === TaskStatus::DRAFT->value
-                    && $fopTask->status === TaskStatus::DRAFT
-                    && ! empty($technicians)
+                // Riwayat status sisi FOP buat cancel manual HARUS ditulis di sini.
+                // TaskObserver — yang biasanya nulis fop_task_status_history — udah
+                // keburu early-return begitu FopTask berstatus `dibatalkan`
+                // (TaskObserver.php baris 42, guard biar cancel manual gak
+                // ke-overwrite sync otomatis), jadi sebelum ini pembatalan gak
+                // ninggalin jejak sama sekali di riwayat, termasuk buat tiket yang
+                // belum punya Task eksekusi (tiket Ticketing yang masih Draft).
+                if (isset($validated['status'])
+                    && $validated['status'] === TaskStatus::DIBATALKAN->value
+                    && $oldStatus !== TaskStatus::DIBATALKAN->value
                 ) {
-                    $fopTask->status = TaskStatus::TERJADWAL;
-                    $fopTask->save();
-
                     FopTaskStatusHistory::create([
                         'fop_task_id' => $fopTask->id,
-                        'from_status' => TaskStatus::DRAFT->value,
-                        'to_status' => TaskStatus::TERJADWAL->value,
+                        'from_status' => $oldStatus,
+                        'to_status' => TaskStatus::DIBATALKAN->value,
                         'changed_by' => auth()->id(),
                         'changed_at' => now(),
                     ]);
                 }
 
-                if (! empty($technicians) || $fopTask->task_id) {
-                    // Title dibuat polos — prefix "[Nama Team]" diisi oleh
-                    // FopTaskTeamService::rebuildTeamsForDate() setelah ini (bukan ditebak di sini).
-                    //
-                    // description CUMA dari issue — lihat komentar senada di store()
-                    // di atas soal kenapa fop_task->notes gak boleh ikut digabung.
-                    $taskData = [
-                        'customer_id' => $fopTask->customer_id,
-                        'pop_id' => $fopTask->pop_id,
-                        'task_type' => $fopTask->category->value,
-                        'title' => 'FOP: '.$fopTask->tugas,
-                        'description' => $fopTask->issue,
-                        'team_member_ids' => $technicians,
-                        'scheduled_at' => $fopTask->task_date,
-                        'conflict_override' => true,
-                    ];
+                // Cancel dari sisi FOP harus nembus ke Task eksekusi teknisi juga —
+                // kalau enggak, Task tetap Terjadwal/Sedang Dikerjakan di Riwayat
+                // Task & /tasks-saya walau tiket FOP-nya udah Cancel.
+                if (isset($validated['status'])
+                    && $validated['status'] === TaskStatus::DIBATALKAN->value
+                    && $oldStatus !== TaskStatus::DIBATALKAN->value
+                    && $fopTask->task_id
+                ) {
+                    $linkedTask = $fopTask->task;
+                    if ($linkedTask && ! in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])) {
+                        // Cascade ke Task eksekusi tetap harus nembus policy, bukan
+                        // main panggil TaskService langsung. Guard SRV/PSB di atas
+                        // baca `FopTask.category`; yang dibatalin di sini `Task`,
+                        // jadi tipenya dicek ulang terhadap Task-nya sendiri —
+                        // lihat TaskPolicy::cancelViaFopTask().
+                        $this->authorize('cancelViaFopTask', $linkedTask);
 
-                    if (! $fopTask->task_id && ! empty($technicians)) {
-                        // createForFopTask(), bukan create(): Survey/PSB memakai
-                        // Task antrean yang sudah ada — lihat docblock-nya.
-                        $task = app(TaskService::class)->createForFopTask($fopTask, $taskData, auth()->user());
-                        $fopTask->task_id = $task->id;
-                        $fopTask->save();
-                    } elseif ($fopTask->task_id) {
-                        app(TaskService::class)->update($fopTask->task, $taskData, auth()->user());
+                        app(TaskService::class)->cancel($linkedTask, auth()->user(), $validated['cancel_reason'] ?? "Dibatalkan dari Task FOP {$fopTask->task_number}.");
                     }
                 }
-            }
 
-            $newValues = $fopTask->load('technicians')->toArray();
+                // Pending dari sisi FOP juga harus nembus ke Task eksekusi teknisi —
+                // sebelumnya cuma DIBATALKAN yang di-cascade (lihat blok di atas), PENDING
+                // enggak, jadi Task tetap Terjadwal/Sedang Dikerjakan walau FopTask-nya
+                // sudah Pending, dan teknisi yang sama gagal mulai task LAIN karena guard
+                // "sedang mengerjakan task lain" di TaskService::start() masih nemu task
+                // ini seolah IN_PROGRESS.
+                if (isset($validated['status'])
+                    && $validated['status'] === TaskStatus::PENDING->value
+                    && $oldStatus !== TaskStatus::PENDING->value
+                    && $fopTask->task_id
+                ) {
+                    $linkedTask = $fopTask->task;
+                    if ($linkedTask && ! in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::PENDING])) {
+                        // Otoritasnya `fopPending` — ability yang sama dipakai tombol
+                        // "Pending" FOP di halaman Task (TaskController::pending()), cuma
+                        // beda entry point (papan /fop-tasks vs halaman Task).
+                        $this->authorize('fopPending', $linkedTask);
 
-            if (class_exists(AuditLog::class)) {
-                AuditLog::log($fopTask, 'update', $oldValues, $newValues);
-            }
-
-            $conflicts = [];
-            if ($fopTask->task_date) {
-                if ($oldTaskDate && ! $oldTaskDate->isSameDay($fopTask->task_date)) {
-                    app(FopTaskTeamService::class)->rebuildTeamsForDate($oldTaskDate);
+                        app(TaskService::class)->syncPendingFromFopTask($linkedTask, auth()->user(), $validated['pending_reason']);
+                    }
                 }
 
-                $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
-                $technicianCount = $request->has('technicians') ? count($validated['technicians'] ?? []) : $fopTask->technicians()->count();
-                if ($technicianCount > 1) {
-                    $conflicts = $teamResult['conflicts'];
+                if ($request->has('technicians')) {
+                    $technicians = $validated['technicians'] ?? [];
+                    $newTechnicianIds = collect($technicians)->sort()->values()->all();
+
+                    if ($newTechnicianIds !== $oldTechnicianIds) {
+                        $fopTask->team_id = null;
+                        if ($fopTask->manual_override_at !== null) {
+                            $fopTask->manual_override_at = null;
+                        }
+                        $fopTask->save();
+                    }
+
+                    $fopTask->technicians()->sync($technicians);
+
+                    // BUG FIX: tiket yang asalnya Draft (biasanya dari Ticketing —
+                    // belum ada teknisi/Task eksekusi) dan baru di-assign teknisi di
+                    // SINI (lewat modal Edit di tabel, bukan form Create) sebelumnya
+                    // status-nya gak pernah ikut naik ke Terjadwal — modal Edit
+                    // ngirim 'status' hidden = nilai lama ('draft'), dan blok status
+                    // di atas cuma nulis ulang nilai yang sama. Akibatnya Task
+                    // eksekusi kebuat + teknisi ke-assign beneran, tapi
+                    // fop_tasks.status nyangkut 'draft' selamanya, dan Ticket yang
+                    // nyambung ke tiket ini macet di bucket "Ticket Masuk"
+                    // (Ticket::scopeInBucket() baca kolom ini apa adanya).
+                    if ($originalStatus === TaskStatus::DRAFT->value
+                        && $fopTask->status === TaskStatus::DRAFT
+                        && ! empty($technicians)
+                    ) {
+                        $fopTask->status = TaskStatus::TERJADWAL;
+                        $fopTask->save();
+
+                        FopTaskStatusHistory::create([
+                            'fop_task_id' => $fopTask->id,
+                            'from_status' => TaskStatus::DRAFT->value,
+                            'to_status' => TaskStatus::TERJADWAL->value,
+                            'changed_by' => auth()->id(),
+                            'changed_at' => now(),
+                        ]);
+                    }
+
+                    if (! empty($technicians) || $fopTask->task_id) {
+                        // Title dibuat polos — prefix "[Nama Team]" diisi oleh
+                        // FopTaskTeamService::rebuildTeamsForDate() setelah ini (bukan ditebak di sini).
+                        //
+                        // description CUMA dari issue — lihat komentar senada di store()
+                        // di atas soal kenapa fop_task->notes gak boleh ikut digabung.
+                        $taskData = [
+                            'customer_id' => $fopTask->customer_id,
+                            'pop_id' => $fopTask->pop_id,
+                            'task_type' => $fopTask->category->value,
+                            'title' => 'FOP: '.$fopTask->tugas,
+                            'description' => $fopTask->issue,
+                            'team_member_ids' => $technicians,
+                            'scheduled_at' => $fopTask->task_date,
+                            'conflict_override' => true,
+                        ];
+
+                        if (! $fopTask->task_id && ! empty($technicians)) {
+                            // createForFopTask(), bukan create(): Survey/PSB memakai
+                            // Task antrean yang sudah ada — lihat docblock-nya.
+                            $task = app(TaskService::class)->createForFopTask($fopTask, $taskData, auth()->user());
+                            $fopTask->task_id = $task->id;
+                            $fopTask->save();
+                        } elseif ($fopTask->task_id) {
+                            app(TaskService::class)->update($fopTask->task, $taskData, auth()->user());
+                        }
+                    }
                 }
-            }
 
-            FopTaskUpdated::dispatch($fopTask->fresh());
+                $newValues = $fopTask->load('technicians')->toArray();
 
-            if ($request->wantsJson()) {
+                if (class_exists(AuditLog::class)) {
+                    AuditLog::log($fopTask, 'update', $oldValues, $newValues);
+                }
+
+                $conflicts = [];
+                if ($fopTask->task_date) {
+                    if ($oldTaskDate && ! $oldTaskDate->isSameDay($fopTask->task_date)) {
+                        app(FopTaskTeamService::class)->rebuildTeamsForDate($oldTaskDate);
+                    }
+
+                    $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
+                    $technicianCount = $request->has('technicians') ? count($validated['technicians'] ?? []) : $fopTask->technicians()->count();
+                    if ($technicianCount > 1) {
+                        $conflicts = $teamResult['conflicts'];
+                    }
+                }
+
+                FopTaskUpdated::dispatch($fopTask->fresh());
+
+                if ($request->wantsJson()) {
+                    if (! empty($conflicts)) {
+                        session()->flash('fop_team_conflicts', $conflicts);
+                    }
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => "Task FOP {$fopTask->task_number} berhasil diperbarui.",
+                        'task' => $fopTask,
+                        'team_conflicts' => $conflicts,
+                    ]);
+                }
+
+                $redirect = redirect()->route('fop-tasks.index')
+                    ->with('success', "Task FOP {$fopTask->task_number} berhasil diperbarui.");
+
                 if (! empty($conflicts)) {
-                    session()->flash('fop_team_conflicts', $conflicts);
+                    $redirect = $redirect->with('fop_team_conflicts', $conflicts);
                 }
 
-                return response()->json([
-                    'success' => true,
-                    'message' => "Task FOP {$fopTask->task_number} berhasil diperbarui.",
-                    'task' => $fopTask,
-                    'team_conflicts' => $conflicts,
-                ]);
+                return $redirect;
+            });
+        } catch (\RuntimeException $e) {
+            // AdditionalDeviceCustodyService::assertSufficientForTask()
+            // (dipanggil dari TaskService::createForFopTask()/update() di
+            // blok technicians di atas) menolak — tim yang baru diassign
+            // belum pegang custody perangkat tambahan yang cukup buat paket
+            // Pemasangan pelanggan ini. Transaksi sudah di-rollback.
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
             }
 
-            $redirect = redirect()->route('fop-tasks.index')
-                ->with('success', "Task FOP {$fopTask->task_number} berhasil diperbarui.");
-
-            if (! empty($conflicts)) {
-                $redirect = $redirect->with('fop_team_conflicts', $conflicts);
-            }
-
-            return $redirect;
-        });
+            return back()->withErrors(['technicians' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -874,82 +888,95 @@ class FopTaskController extends Controller
             return back()->withErrors(['team_id' => 'Task ini belum punya tanggal jadwal.']);
         }
 
-        return DB::transaction(function () use ($validated, $fopTask, $request) {
-            $workDate = $fopTask->task_date->toDateString();
-            $workDateStart = $fopTask->task_date->copy()->startOfDay();
-            $workDateEnd = $fopTask->task_date->copy()->endOfDay();
+        try {
+            return DB::transaction(function () use ($validated, $fopTask, $request) {
+                $workDate = $fopTask->task_date->toDateString();
+                $workDateStart = $fopTask->task_date->copy()->startOfDay();
+                $workDateEnd = $fopTask->task_date->copy()->endOfDay();
 
-            if (! empty($validated['team_id'])) {
-                $team = FopTaskTeam::findOrFail($validated['team_id']);
+                if (! empty($validated['team_id'])) {
+                    $team = FopTaskTeam::findOrFail($validated['team_id']);
 
-                if ($team->work_date->toDateString() !== $workDate) {
-                    return back()->withErrors([
-                        'team_id' => "Team \"{$team->name}\" bukan untuk tanggal {$workDate}, gak bisa dipakai buat task ini.",
+                    if ($team->work_date->toDateString() !== $workDate) {
+                        return back()->withErrors([
+                            'team_id' => "Team \"{$team->name}\" bukan untuk tanggal {$workDate}, gak bisa dipakai buat task ini.",
+                        ]);
+                    }
+                } else {
+                    $team = FopTaskTeam::create([
+                        'name' => app(FopTaskTeamService::class)->nextTeamName($fopTask->task_date->copy()),
+                        'work_date' => $workDate,
+                        'created_by' => auth()->id(),
+                    ]);
+                    $team->members()->sync($fopTask->technicians->pluck('id'));
+                }
+
+                $oldValues = $fopTask->toArray();
+                $fopTask->team_id = $team->id;
+                $fopTask->manual_override_at = now();
+                $fopTask->save();
+
+                // Bersihkan teknisi dari task lain di tanggal yang sama yang berada di team yang berbeda
+                foreach ($fopTask->technicians as $tech) {
+                    // task_date bertipe datetime (bukan date) — rentang eksplisit
+                    // supaya index task_date bisa dipakai; whereDate() membungkusnya
+                    // jadi DATE(task_date) dan membuat index itu tidak pernah terpilih.
+                    $otherTasks = FopTask::where('id', '!=', $fopTask->id)
+                        ->whereBetween('task_date', [$workDateStart, $workDateEnd])
+                        ->whereHas('technicians', fn ($q) => $q->where('users.id', $tech->id))
+                        ->whereNotNull('team_id')
+                        ->where('team_id', '!=', $team->id)
+                        ->get();
+
+                    foreach ($otherTasks as $otherTask) {
+                        $otherTask->technicians()->detach($tech->id);
+
+                        // Update execution task (tabel tasks) jika ada
+                        if ($otherTask->task_id && $otherTask->task) {
+                            $remainingTechs = $otherTask->technicians()->pluck('users.id')->all();
+                            app(TaskService::class)->update($otherTask->task, [
+                                'team_member_ids' => $remainingTechs,
+                            ], auth()->user());
+                        }
+
+                        FopTaskUpdated::dispatch($otherTask->fresh());
+                    }
+                }
+
+                if (class_exists(AuditLog::class)) {
+                    AuditLog::log($fopTask, 'assign_to_team', $oldValues, $fopTask->toArray());
+                }
+
+                $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate($fopTask->task_date->copy());
+                $team->refresh();
+
+                FopTaskUpdated::dispatch($fopTask->fresh());
+
+                $conflicts = [];
+
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => "Task berhasil dimasukkan ke Team \"{$team->name}\".",
+                        'team_conflicts' => $conflicts,
                     ]);
                 }
-            } else {
-                $team = FopTaskTeam::create([
-                    'name' => app(FopTaskTeamService::class)->nextTeamName($fopTask->task_date->copy()),
-                    'work_date' => $workDate,
-                    'created_by' => auth()->id(),
-                ]);
-                $team->members()->sync($fopTask->technicians->pluck('id'));
-            }
 
-            $oldValues = $fopTask->toArray();
-            $fopTask->team_id = $team->id;
-            $fopTask->manual_override_at = now();
-            $fopTask->save();
-
-            // Bersihkan teknisi dari task lain di tanggal yang sama yang berada di team yang berbeda
-            foreach ($fopTask->technicians as $tech) {
-                // task_date bertipe datetime (bukan date) — rentang eksplisit
-                // supaya index task_date bisa dipakai; whereDate() membungkusnya
-                // jadi DATE(task_date) dan membuat index itu tidak pernah terpilih.
-                $otherTasks = FopTask::where('id', '!=', $fopTask->id)
-                    ->whereBetween('task_date', [$workDateStart, $workDateEnd])
-                    ->whereHas('technicians', fn ($q) => $q->where('users.id', $tech->id))
-                    ->whereNotNull('team_id')
-                    ->where('team_id', '!=', $team->id)
-                    ->get();
-
-                foreach ($otherTasks as $otherTask) {
-                    $otherTask->technicians()->detach($tech->id);
-
-                    // Update execution task (tabel tasks) jika ada
-                    if ($otherTask->task_id && $otherTask->task) {
-                        $remainingTechs = $otherTask->technicians()->pluck('users.id')->all();
-                        app(TaskService::class)->update($otherTask->task, [
-                            'team_member_ids' => $remainingTechs,
-                        ], auth()->user());
-                    }
-
-                    FopTaskUpdated::dispatch($otherTask->fresh());
-                }
-            }
-
-            if (class_exists(AuditLog::class)) {
-                AuditLog::log($fopTask, 'assign_to_team', $oldValues, $fopTask->toArray());
-            }
-
-            $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate($fopTask->task_date->copy());
-            $team->refresh();
-
-            FopTaskUpdated::dispatch($fopTask->fresh());
-
-            $conflicts = [];
-
+                return redirect()->route('fop-tasks.index')
+                    ->with('success', "Task berhasil dimasukkan ke Team \"{$team->name}\".");
+            });
+        } catch (\RuntimeException $e) {
+            // AdditionalDeviceCustodyService::assertSufficientForTask() —
+            // lihat komentar sama di update(). Di sini bisa kena karena
+            // tech yang di-detach dari task LAIN (blok di atas) bikin sisa
+            // tim task itu gak cukup custody-nya, bukan cuma task yang
+            // sedang di-assign-to-team.
             if ($request->wantsJson()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => "Task berhasil dimasukkan ke Team \"{$team->name}\".",
-                    'team_conflicts' => $conflicts,
-                ]);
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
             }
 
-            return redirect()->route('fop-tasks.index')
-                ->with('success', "Task berhasil dimasukkan ke Team \"{$team->name}\".");
-        });
+            return back()->withErrors(['team_id' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -1003,11 +1030,31 @@ class FopTaskController extends Controller
                     continue;
                 }
 
+                $teamMemberIds = $team->members->pluck('id')->all();
+
+                // ADHOC-190 task 3 — dicek SEBELUM baris FopTask ini
+                // disentuh sama sekali. TaskService::update() di bawah
+                // (bungkus transaction-nya sendiri) JUGA menjalankan guard
+                // yang sama, tapi kalau dicek di sana doang, FopTask sudah
+                // kepalanjur ke-save (team_id/technicians/status) duluan —
+                // begitu guard nolak, state-nya nyangkut separuh jalan
+                // (FopTask ke-assign, Task eksekusi enggak). Dicek di sini
+                // dulu, gagal = skip task ini, lanjut ke task lain di batch
+                // (konsisten sama pola error per-task method ini).
+                if (! empty($teamMemberIds) && $task->task_id && $task->task) {
+                    try {
+                        app(AdditionalDeviceCustodyService::class)->assertSufficientForTask($task->task, $teamMemberIds);
+                    } catch (\RuntimeException $e) {
+                        $errors[] = "Task {$task->task_number}: {$e->getMessage()}";
+
+                        continue;
+                    }
+                }
+
                 $oldValues = $task->toArray();
                 $task->team_id = $team->id;
                 $task->manual_override_at = now();
 
-                $teamMemberIds = $team->members->pluck('id')->all();
                 if (! empty($teamMemberIds)) {
                     $task->technicians()->sync($teamMemberIds);
 

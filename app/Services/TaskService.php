@@ -43,6 +43,25 @@ class TaskService
                 ? TaskStatus::TERJADWAL->value
                 : TaskStatus::PENDING->value;
 
+            // ADHOC-190 task 3 — begitu task ini LANGSUNG lahir TERJADWAL
+            // (tim + jadwal sudah diisi bareng), cek dulu custody perangkat
+            // tambahan tim sebelum baris Task-nya benar-benar ditulis. Task
+            // belum ada row-nya di titik ini — dibuat instance SEMENTARA
+            // (tidak disimpan) cuma buat kasih AdditionalDeviceCustodyService
+            // konteks customer/task_type/pop yang dibutuhkan; kalau guard
+            // lempar exception, transaction ini rollback dan Task::create()
+            // di bawah gak pernah jalan.
+            if ($status === TaskStatus::TERJADWAL->value) {
+                app(AdditionalDeviceCustodyService::class)->assertSufficientForTask(
+                    new Task([
+                        'customer_id' => $data['customer_id'] ?? null,
+                        'pop_id' => $data['pop_id'],
+                        'task_type' => $taskType->value,
+                    ]),
+                    $memberIds
+                );
+            }
+
             $task = Task::create([
                 'task_number' => app(NumberSequenceService::class)->taskNumber(),
                 'customer_id' => $data['customer_id'] ?? null,
@@ -194,9 +213,23 @@ class TaskService
             // Ambil roster lama SEBELUM disync ulang — dipakai buat deteksi
             // teknisi yang di-drop, yang gak akan pernah ke-notify lewat
             // notifyTeam() karena method itu iterasi tim BARU.
-            $oldMemberIds = isset($data['team_member_ids'])
-                ? $task->teamMembers()->pluck('user_id')->all()
-                : [];
+            $oldMemberIds = $task->teamMembers()->pluck('user_id')->all();
+
+            // ADHOC-190 task 3 — update() TIDAK pernah mengubah kolom status
+            // (lihat $data yang dikirim FopTaskController/FopDashboardController:
+            // gak ada key 'status'), jadi "tetap TERJADWAL" di sini berarti
+            // statusnya SUDAH TERJADWAL dari create()/createForFopTask()
+            // sebelumnya. Guard cuma relevan kalau roster tim atau jadwal
+            // beneran berubah lewat panggilan ini — reassignTeam()/cancel()/dll
+            // yang gak sentuh dua field itu gak perlu dicek ulang di sini.
+            if ($task->status === TaskStatus::TERJADWAL
+                && (isset($data['team_member_ids']) || $rescheduled)
+            ) {
+                app(AdditionalDeviceCustodyService::class)->assertSufficientForTask(
+                    $task,
+                    $data['team_member_ids'] ?? $oldMemberIds
+                );
+            }
 
             $task->update(array_merge($data, ['updated_by' => $actor->id]));
 
