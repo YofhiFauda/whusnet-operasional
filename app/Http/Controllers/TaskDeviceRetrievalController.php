@@ -152,7 +152,11 @@ class TaskDeviceRetrievalController extends Controller
                     // Pelanggan tidak terus bilang AP itu masih terpasang
                     // padahal fisiknya sudah balik ke gudang. SN modem utama
                     // tidak akan punya baris yang cocok — diamkan saja.
+                    // Dibatasi ke pelanggan task ini juga (defense-in-depth):
+                    // baris pelanggan lain yang kebetulan menunjuk SN sama
+                    // (data kotor/legacy) tidak boleh ikut ditandai ditarik.
                     CustomerAdditionalDevice::where('inventory_serial_id', $serial->id)
+                        ->where('customer_id', $task->customer_id)
                         ->where('status', 'terpasang')
                         ->update(['status' => 'ditarik', 'retrieved_at' => now()]);
                 }

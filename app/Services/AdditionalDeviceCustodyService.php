@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
 use App\Enums\TaskType;
+use App\Exceptions\InsufficientExtraDeviceCustodyException;
 use App\Models\InventorySerial;
 use App\Models\Pop;
 use App\Models\Task;
@@ -49,6 +50,12 @@ class AdditionalDeviceCustodyService
         return InventorySerial::query()
             ->whereIn('current_technician_id', $technicianIds)
             ->where('status', SerialStatus::ISSUED->value)
+            // Wajib sama dengan `eligibleSerialsForTask()`: SN item
+            // company_asset gak akan pernah bisa di-install
+            // (`InventoryService::installSerial()` menolaknya), jadi kalau
+            // ikut dihitung di sini guard lolos padahal teknisi gak bisa
+            // memasang apa-apa di lapangan.
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
             ->whereHas('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
             ->when($cabangId !== null, fn ($q) => $q->where(function ($q2) use ($cabangId) {
                 $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $cabangId);
@@ -94,14 +101,23 @@ class AdditionalDeviceCustodyService
      * SENGAJA tidak menyentuh task_type lain (MTN, C-REQ, dst.) karena
      * perangkat tambahan cuma relevan saat instalasi baru.
      *
-     * Lempar langsung `\RuntimeException` (tidak ditangkap di sini) —
-     * pemanggil (controller assign FOP) yang menangkapnya dan redirect
-     * dengan pesan error, pola yang sama dipakai
-     * `CustomerPackageService::assertAdditionalDevicesWithinLimit()`.
+     * Kebutuhan dikurangi perangkat tambahan dari Gudang yang SUDAH
+     * terpasang di pelanggan (`CustomerAdditionalDevice::installedFromWarehouse()`,
+     * definisi sama dengan langkah Perangkat Tambahan Laporan Pemasangan).
+     * Begitu AP di-install, SN-nya pindah ISSUED → INSTALLED dan keluar dari
+     * hitungan custody — tanpa kredit ini reassign tim / jadwal ulang
+     * revisi pemasangan setelahnya selalu ditolak "butuh 1, tersedia 0"
+     * padahal pelanggan sudah punya perangkatnya.
+     *
+     * Lempar `InsufficientExtraDeviceCustodyException` (tidak ditangkap di
+     * sini) — pemanggil (controller assign FOP / edit task) yang
+     * menangkapnya dan redirect dengan pesan error. Sengaja kelas khusus,
+     * bukan `\RuntimeException` polos, supaya catch di controller tidak ikut
+     * menelan `ModelNotFoundException` & kawan-kawan.
      *
      * @param  array<int>  $technicianIds  Teknisi yang (akan) diassign ke task ini.
      *
-     * @throws \RuntimeException
+     * @throws InsufficientExtraDeviceCustodyException
      */
     public function assertSufficientForTask(Task $task, array $technicianIds): void
     {
@@ -109,7 +125,15 @@ class AdditionalDeviceCustodyService
             return;
         }
 
-        $required = (int) ($task->customer?->customerService?->internetPackage?->max_additional_devices ?? 0);
+        $customer = $task->customer;
+        $packageLimit = (int) ($customer?->customerService?->internetPackage?->max_additional_devices ?? 0);
+
+        if ($packageLimit === 0) {
+            return;
+        }
+
+        $alreadyInstalled = $customer->additionalDevices()->installedFromWarehouse()->count();
+        $required = max(0, $packageLimit - $alreadyInstalled);
 
         if ($required === 0) {
             return;
@@ -119,7 +143,7 @@ class AdditionalDeviceCustodyService
         $available = $this->countAvailable(collect($technicianIds), $cabangId);
 
         if ($available < $required) {
-            throw new \RuntimeException(
+            throw new InsufficientExtraDeviceCustodyException(
                 "Barang perangkat tambahan belum di-issue cukup — teknisi butuh {$required}, tersedia {$available}. Issue dulu dari Gudang."
             );
         }

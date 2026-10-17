@@ -91,10 +91,7 @@ class CustomerInstallationAdditionalDeviceController extends Controller
         // ikut dihitung — SN-nya sudah INSTALLED jadi tidak muncul lagi di
         // daftar custody; tanpa ini submit ulang (mis. revisi) bakal selalu
         // dianggap kurang.
-        $alreadyInstalled = $customer->additionalDevices()
-            ->whereNotNull('inventory_serial_id')
-            ->where('status', 'terpasang')
-            ->count();
+        $alreadyInstalled = $customer->additionalDevices()->installedFromWarehouse()->count();
 
         // Spec §4.2: keputusan wajib untuk SETIAP perangkat yang diatur paket
         // (apa pun outcome-nya), bukan cuma minimal satu. Jalur kekurangan +

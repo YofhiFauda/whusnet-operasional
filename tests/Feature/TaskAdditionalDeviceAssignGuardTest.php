@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Enums\SerialStatus;
 use App\Enums\TaskType;
+use App\Exceptions\InsufficientExtraDeviceCustodyException;
 use App\Models\Customer;
+use App\Models\CustomerAdditionalDevice;
 use App\Models\CustomerService;
 use App\Models\InternetPackage;
 use App\Models\InventorySerial;
@@ -56,7 +58,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
         $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-001', 1));
 
         // Teknisi SENGAJA tanpa custody AP sama sekali.
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(InsufficientExtraDeviceCustodyException::class);
         $this->expectExceptionMessage('Barang perangkat tambahan belum di-issue cukup');
 
         app(TaskService::class)->create([
@@ -161,7 +163,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
             'scheduled_at' => now()->addDay(),
         ], $fop);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(InsufficientExtraDeviceCustodyException::class);
         $this->expectExceptionMessage('Barang perangkat tambahan belum di-issue cukup');
 
         // Teknisi baru belum pegang custody AP sama sekali.
@@ -201,7 +203,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
             'scheduled_at' => now()->addDay(),
         ], $fop);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(InsufficientExtraDeviceCustodyException::class);
         $this->expectExceptionMessage('Barang perangkat tambahan belum di-issue cukup');
 
         // Teknisi baru belum pegang custody AP sama sekali.
@@ -268,6 +270,154 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
         app(TaskService::class)->reassignTeam($task, $teknisiLama->id, $teknisiBaru->id, $fop->id);
 
         $this->assertTrue($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
+    }
+
+    /**
+     * Final review ADHOC-190 (Important 3): AP pelanggan SUDAH terpasang
+     * (SN-nya INSTALLED, keluar dari hitungan custody ISSUED). Reassign tim
+     * setelahnya ke teknisi tanpa custody AP sama sekali harus TETAP jalan —
+     * dulu ditolak "butuh 1, tersedia 0" padahal tidak ada yang perlu
+     * di-issue lagi.
+     */
+    #[Test]
+    public function reassign_team_succeeds_when_customer_already_has_required_extra_device_installed(): void
+    {
+        $pop = $this->createPop('ADG9');
+        $fop = $this->createFopUser($pop);
+        $teknisiLama = $this->createTeknisi();
+        $teknisiBaru = $this->createTeknisi();
+        $customer = $this->createCustomer($pop, 'TEST-ADG-009');
+        $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-009', 1));
+
+        $serial = $this->issueExtraDeviceSerial($teknisiLama, 'ADG-SN-009', $pop->id);
+
+        $task = app(TaskService::class)->create([
+            'task_type' => TaskType::PEMASANGAN->value,
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'title' => 'Pemasangan Pelanggan',
+            'team_member_ids' => [$teknisiLama->id],
+            'scheduled_at' => now()->addDay(),
+        ], $fop);
+
+        // Simulasi hasil langkah Perangkat Tambahan: SN terpasang ke pelanggan.
+        $serial->update([
+            'status' => SerialStatus::INSTALLED,
+            'current_technician_id' => null,
+            'customer_id' => $customer->id,
+        ]);
+        CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'inventory_serial_id' => $serial->id,
+            'device_type' => 'AP Guard Test',
+            'serial_number' => $serial->serial_number,
+            'status' => 'terpasang',
+        ]);
+
+        app(TaskService::class)->reassignTeam($task, $teknisiLama->id, $teknisiBaru->id, $fop->id);
+
+        $this->assertTrue($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
+    }
+
+    /**
+     * Baris perangkat tambahan v1 (teks bebas, tanpa `inventory_serial_id`)
+     * TIDAK dihitung sebagai kredit — definisinya sama dengan langkah
+     * Perangkat Tambahan Laporan Pemasangan.
+     */
+    #[Test]
+    public function legacy_free_text_additional_device_is_not_credited_by_guard(): void
+    {
+        $pop = $this->createPop('ADG10');
+        $fop = $this->createFopUser($pop);
+        $teknisi = $this->createTeknisi();
+        $customer = $this->createCustomer($pop, 'TEST-ADG-010');
+        $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-010', 1));
+
+        CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'AP',
+            'serial_number' => 'LEGACY-AP-010',
+            'status' => 'terpasang',
+        ]);
+
+        $this->expectException(InsufficientExtraDeviceCustodyException::class);
+
+        app(TaskService::class)->create([
+            'task_type' => TaskType::PEMASANGAN->value,
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'title' => 'Pemasangan Pelanggan',
+            'team_member_ids' => [$teknisi->id],
+            'scheduled_at' => now()->addDay(),
+        ], $fop);
+    }
+
+    /**
+     * SN item company_asset gak akan pernah bisa di-install
+     * (`InventoryService::installSerial()` menolaknya) — jadi gak boleh
+     * memenuhi guard. Dulu `countAvailable()` lupa filter ownership_mode
+     * yang dipakai `eligibleSerialsForTask()`.
+     */
+    #[Test]
+    public function company_asset_extra_device_serial_does_not_satisfy_guard(): void
+    {
+        $pop = $this->createPop('ADG11');
+        $fop = $this->createFopUser($pop);
+        $teknisi = $this->createTeknisi();
+        $customer = $this->createCustomer($pop, 'TEST-ADG-011');
+        $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-011', 1));
+
+        $serial = $this->issueExtraDeviceSerial($teknisi, 'ADG-SN-011', $pop->id);
+        $serial->item->update(['ownership_mode' => 'company_asset']);
+
+        $this->expectException(InsufficientExtraDeviceCustodyException::class);
+
+        app(TaskService::class)->create([
+            'task_type' => TaskType::PEMASANGAN->value,
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'title' => 'Pemasangan Pelanggan',
+            'team_member_ids' => [$teknisi->id],
+            'scheduled_at' => now()->addDay(),
+        ], $fop);
+    }
+
+    /**
+     * Final review ADHOC-190 (Important 4): edit task generik
+     * (`PUT tasks.update`) ganti tim task Pemasangan TERJADWAL ke teknisi
+     * tanpa custody — harus jadi error form, bukan 500.
+     */
+    #[Test]
+    public function task_edit_form_shows_error_instead_of_500_when_custody_insufficient(): void
+    {
+        $pop = $this->createPop('ADG12');
+        $fop = $this->createFopUser($pop);
+        $teknisiLama = $this->createTeknisi();
+        $teknisiBaru = $this->createTeknisi();
+        $customer = $this->createCustomer($pop, 'TEST-ADG-012');
+        $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-012', 1));
+
+        $this->issueExtraDeviceSerial($teknisiLama, 'ADG-SN-012', $pop->id);
+
+        $task = app(TaskService::class)->create([
+            'task_type' => TaskType::PEMASANGAN->value,
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'title' => 'Pemasangan Pelanggan',
+            'team_member_ids' => [$teknisiLama->id],
+            'scheduled_at' => now()->addDay(),
+        ], $fop);
+
+        $this->loginAsAdmin();
+
+        $this->from(route('tasks.edit', $task))
+            ->put(route('tasks.update', $task), ['team_member_ids' => [$teknisiBaru->id]])
+            ->assertRedirect(route('tasks.edit', $task))
+            ->assertSessionHasErrors('team_member_ids');
+
+        // Tim lama tetap — update() rollback.
+        $this->assertTrue($task->teamMembers()->where('user_id', $teknisiLama->id)->exists());
+        $this->assertFalse($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
     }
 
     private function createPop(string $code): Pop

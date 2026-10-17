@@ -9,6 +9,7 @@ use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Events\FopTaskUpdated;
 use App\Events\TaskScheduled;
+use App\Exceptions\InsufficientExtraDeviceCustodyException;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
@@ -795,7 +796,7 @@ class FopTaskController extends Controller
 
                 return $redirect;
             });
-        } catch (\RuntimeException $e) {
+        } catch (InsufficientExtraDeviceCustodyException $e) {
             // AdditionalDeviceCustodyService::assertSufficientForTask()
             // (dipanggil dari TaskService::createForFopTask()/update() di
             // blok technicians di atas) menolak — tim yang baru diassign
@@ -965,7 +966,7 @@ class FopTaskController extends Controller
                 return redirect()->route('fop-tasks.index')
                     ->with('success', "Task berhasil dimasukkan ke Team \"{$team->name}\".");
             });
-        } catch (\RuntimeException $e) {
+        } catch (InsufficientExtraDeviceCustodyException $e) {
             // AdditionalDeviceCustodyService::assertSufficientForTask() —
             // lihat komentar sama di update(). Di sini bisa kena karena
             // tech yang di-detach dari task LAIN (blok di atas) bikin sisa
@@ -1044,7 +1045,7 @@ class FopTaskController extends Controller
                 if (! empty($teamMemberIds) && $task->task_id && $task->task) {
                     try {
                         app(AdditionalDeviceCustodyService::class)->assertSufficientForTask($task->task, $teamMemberIds);
-                    } catch (\RuntimeException $e) {
+                    } catch (InsufficientExtraDeviceCustodyException $e) {
                         $errors[] = "Task {$task->task_number}: {$e->getMessage()}";
 
                         continue;

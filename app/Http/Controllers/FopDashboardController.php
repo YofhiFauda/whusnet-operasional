@@ -7,6 +7,7 @@ use App\Enums\MaterialKind;
 use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Exceptions\InsufficientExtraDeviceCustodyException;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
@@ -502,7 +503,7 @@ class FopDashboardController extends Controller
 
                 return redirect()->route('fop.dashboard')->with('success', "Task berhasil dipindah ke \"{$toTeam->name}\".");
             });
-        } catch (\RuntimeException $e) {
+        } catch (InsufficientExtraDeviceCustodyException $e) {
             // AdditionalDeviceCustodyService::assertSufficientForTask()
             // (dipanggil dari TaskService::update() di atas) menolak —
             // teknisi baru belum pegang custody perangkat tambahan yang

@@ -44,6 +44,20 @@ class CustomerAdditionalDevice extends Model
     }
 
     /**
+     * Perangkat tambahan dari stok Gudang yang SEDANG terpasang di pelanggan
+     * (ADHOC-190). Satu definisi dipakai dua tempat yang harus sepakat:
+     * hitung "sudah terpenuhi berapa" di langkah Perangkat Tambahan Laporan
+     * Pemasangan (`CustomerInstallationAdditionalDeviceController`) dan
+     * kredit di guard penjadwalan (`AdditionalDeviceCustodyService::
+     * assertSufficientForTask()`). Baris v1 teks bebas (tanpa
+     * `inventory_serial_id`) sengaja tidak dihitung.
+     */
+    public function scopeInstalledFromWarehouse($query)
+    {
+        return $query->whereNotNull('inventory_serial_id')->where('status', 'terpasang');
+    }
+
+    /**
      * @return BelongsTo<Customer, $this>
      */
     public function customer(): BelongsTo

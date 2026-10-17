@@ -202,9 +202,16 @@ class CustomerInstallationController extends Controller
             // installSerial() — beda dari ONT utama yang baru dieksekusi di
             // storeSpeedtest()) TIDAK ikut direvert di sini kalau pemasangan
             // dibatalkan. SN-nya tetap INSTALLED ke pelanggan ini & baris
-            // customer_additional_devices tetap "terpasang" — butuh pemulihan
-            // manual lewat WarehouseWarehouseCustomerReturnController, atau follow-up
-            // task kalau ini jadi masalah berulang.
+            // customer_additional_devices tetap "terpasang". SAAT INI BELUM ADA
+            // jalur pemulihan lewat UI untuk kasus ini: cancel() memindah
+            // pelanggan ke REJECTED, sedangkan alur retur pelanggan
+            // (`Warehouse\WarehouseCustomerReturnController::scopedTerminatedCustomers()`)
+            // cuma menerima pelanggan berstatus `terminated`. Pemulihannya
+            // butuh penyesuaian data/inventori manual (SN dikembalikan ke
+            // gudang + baris perangkat tambahan ditandai ditarik). Revert
+            // otomatis sengaja tidak dibuat di sini — retur SN wajib lewat
+            // transit + konfirmasi gudang (ADHOC-108), bukan langsung ditulis.
+            // Follow-up task kalau ini jadi masalah berulang.
 
             $installation = $customer->installations()->latest()->first();
             if ($installation) {
