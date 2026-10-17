@@ -73,6 +73,15 @@ class TaskMaintenanceController extends Controller
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->where('status', SerialStatus::ISSUED->value)
             ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
+            // AP/STB (`is_customer_extra_device`) bukan pengganti modem — kalau
+            // dipilih di sini, installSerial(returnExistingSerial: true)
+            // meretur ONT asli dan AP-nya menyamar jadi ONT (ADHOC-190, final
+            // review). Sama pengecualian dengan
+            // `CustomerInstallationController::eligibleSerialsForTeam()`;
+            // penegakan sebenarnya tetap di `InventoryService::installSerial()`.
+            // whereDoesntHave (bukan whereHas is_extra=false) supaya item tanpa
+            // kategori tetap muncul.
+            ->whereDoesntHave('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
             ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
                 $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
             }))

@@ -7,6 +7,7 @@ use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
+use App\Exceptions\InsufficientExtraDeviceCustodyException;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
@@ -331,7 +332,14 @@ class TaskController extends Controller
             }
         }
 
-        $this->taskService->update($task, $validated, auth()->user());
+        try {
+            $this->taskService->update($task, $validated, auth()->user());
+        } catch (InsufficientExtraDeviceCustodyException $e) {
+            // Edit task TERJADWAL Pemasangan (ganti tim/jadwal) juga lewat
+            // guard custody perangkat tambahan (ADHOC-190) — tanpa catch ini
+            // FOP dapat 500, bukan pesan form. Transaksi update() sudah rollback.
+            return back()->withInput()->withErrors(['team_member_ids' => $e->getMessage()]);
+        }
 
         return redirect()
             ->route('tasks.show', $task)

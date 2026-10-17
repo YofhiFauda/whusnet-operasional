@@ -21,6 +21,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'serial_number',
     'mac_address',
     'technical_note',
+    'inventory_serial_id',
+    'status',
+    'retrieved_at',
 ])]
 class CustomerAdditionalDevice extends Model
 {
@@ -31,10 +34,42 @@ class CustomerAdditionalDevice extends Model
     protected array $auditEvents = ['created', 'updated', 'deleted'];
 
     /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'retrieved_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * Perangkat tambahan dari stok Gudang yang SEDANG terpasang di pelanggan
+     * (ADHOC-190). Satu definisi dipakai dua tempat yang harus sepakat:
+     * hitung "sudah terpenuhi berapa" di langkah Perangkat Tambahan Laporan
+     * Pemasangan (`CustomerInstallationAdditionalDeviceController`) dan
+     * kredit di guard penjadwalan (`AdditionalDeviceCustodyService::
+     * assertSufficientForTask()`). Baris v1 teks bebas (tanpa
+     * `inventory_serial_id`) sengaja tidak dihitung.
+     */
+    public function scopeInstalledFromWarehouse($query)
+    {
+        return $query->whereNotNull('inventory_serial_id')->where('status', 'terpasang');
+    }
+
+    /**
      * @return BelongsTo<Customer, $this>
      */
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * @return BelongsTo<InventorySerial, $this>
+     */
+    public function inventorySerial(): BelongsTo
+    {
+        return $this->belongsTo(InventorySerial::class);
     }
 }

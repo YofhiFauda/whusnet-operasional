@@ -72,8 +72,13 @@ class CustomerDeviceProfileService
     {
         $device = $customer->customerDevice;
         $tech = $customer->customerTechnicalDetail;
+        // Perangkat tambahan (AP, STB) bukan perangkat utama — jangan sampai
+        // AP yang dipasang belakangan tampil sebagai "perangkat utama" di Detail.
+        // whereDoesntHave (bukan whereHas is_extra=false): `items.item_category_id`
+        // nullable — modem tanpa kategori tetap harus dianggap perangkat utama.
         $installedInventorySerial = InventorySerial::where('customer_id', $customer->id)
             ->where('status', SerialStatus::INSTALLED->value)
+            ->whereDoesntHave('item.category', fn ($query) => $query->where('is_customer_extra_device', true))
             ->with('item')
             ->latest('installed_at')
             ->first();

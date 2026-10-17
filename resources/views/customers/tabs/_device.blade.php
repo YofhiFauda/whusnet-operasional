@@ -343,6 +343,16 @@
                 <span class="text-slate-700 dark:text-slate-200 searchable-text">
                     <span class="font-semibold text-slate-900 dark:text-slate-100 uppercase">{{ $additional->device_type }}</span>
                     — {{ $additional->brand }} {{ $additional->model }} ({{ $additional->serial_number ?: 'tanpa SN' }})
+                    @if($additional->inventory_serial_id === null)
+                        <span class="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Tanpa Stok</span>
+                    @else
+                        <span class="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold border bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800">Gudang</span>
+                        @if($additional->status === 'ditarik')
+                            <span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800">Ditarik</span>
+                        @else
+                            <span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800">Terpasang</span>
+                        @endif
+                    @endif
                 </span>
                 @can('customers.detail.devices.update')
                     <form method="POST" action="{{ route('customers.additional-device.destroy', [$customer, $additional]) }}" onsubmit="return confirm('Hapus perangkat tambahan ini?');">

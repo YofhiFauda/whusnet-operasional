@@ -211,7 +211,7 @@ class InventoryService
             // buat SN yang sama sebelumnya bisa dua-duanya lolos cek ISSUED
             // lalu dua-duanya nulis INSTALL, satu nimpa customer_id/fop_task_id
             // punya yang lain diam-diam (ketauan audit 2026-09-02).
-            $serial = InventorySerial::query()->with('item')->lockForUpdate()->findOrFail($serial->id);
+            $serial = InventorySerial::query()->with('item.category')->lockForUpdate()->findOrFail($serial->id);
 
             if ($serial->status !== SerialStatus::ISSUED) {
                 throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan ISSUED — gak bisa diinstall.");
@@ -223,6 +223,19 @@ class InventoryService
 
             if ($serial->item?->ownership_mode !== OwnershipMode::INSTALLABLE) {
                 throw new InvalidArgumentException("Item {$serial->item?->name} berstatus aset perusahaan (company_asset) — gak boleh diinstall ke pelanggan.");
+            }
+
+            // ADHOC-190 (final review) — `$returnExistingSerial=true` artinya
+            // SN ini jadi PERANGKAT UTAMA: ONT lama diretur, `ont_sn` &
+            // `customer_devices` (device_type ONT) ditimpa. AP/STB
+            // (`is_customer_extra_device`) yang lewat jalur ini menyamar jadi
+            // ONT dan ONT asli pelanggan ikut tercabut diam-diam — tanpa baris
+            // `customer_additional_devices` sama sekali. Filter dropdown
+            // Maintenance cuma UX; ini penegakan sebenarnya untuk SEMUA
+            // pemanggil. Dicek SEBELUM retur modem lama di bawah. Jalur sah
+            // perangkat tambahan (langkah Perangkat Tambahan, `false`) tetap lolos.
+            if ($returnExistingSerial && $serial->item?->category?->is_customer_extra_device) {
+                throw new InvalidArgumentException('Perangkat tambahan (AP/STB) tidak bisa dipasang sebagai perangkat utama — gunakan langkah Perangkat Tambahan di Laporan Pemasangan.');
             }
 
             // Barang yang diissue dari Cabang A gak boleh dipasang di Task
@@ -250,6 +263,15 @@ class InventoryService
                     // ikut diretur, SN-nya balik ke stok padahal `InventorySerialSale`
                     // masih mencatatnya terjual ke pelanggan ini.
                     ->where('ownership', '!=', DeviceOwnership::CUSTOMER->value)
+                    // Perangkat tambahan (AP/STB, `is_customer_extra_device`)
+                    // BUKAN "modem lama" yang digantikan — ADHOC-190: Laporan
+                    // Pemasangan memasang AP di step 5, lalu ONT utama baru
+                    // di-install di step 6 (storeSpeedtest(), flag ini true).
+                    // Tanpa pengecualian ini AP yang baru terpasang langsung
+                    // ke-RETURN diam-diam sementara `customer_additional_devices`
+                    // masih bilang "terpasang". Dijaga di service (bukan di
+                    // pemanggil) supaya berlaku apa pun urutan pemasangannya.
+                    ->whereDoesntHave('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
                     ->lockForUpdate()
                     ->get()
                 : collect();

@@ -2,21 +2,29 @@
 
 namespace Tests\Feature;
 
+use App\Enums\SerialStatus;
 use App\Models\Customer;
+use App\Models\CustomerAdditionalDevice;
 use App\Models\CustomerService;
 use App\Models\InternetPackage;
+use App\Models\InventorySerial;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
+use App\Services\CustomerDeviceProfileService;
 use App\Services\EffectiveAccessService;
+use Carbon\CarbonInterface;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CustomerAdditionalDeviceTest extends TestCase
@@ -45,6 +53,106 @@ class CustomerAdditionalDeviceTest extends TestCase
         $helpdeskRole = Role::where('name', 'Helpdesk')->firstOrFail();
         $this->attachPermission($helpdeskRole, 'customers.view');
         $this->attachPermission($helpdeskRole, 'customers.detail.devices.view');
+    }
+
+    #[Test]
+    public function it_defaults_status_to_terpasang_and_links_inventory_serial(): void
+    {
+        $pop = $this->createPop('ADDSN');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-SN-001');
+        $category = ItemCategory::create([
+            'code' => 'ap_test_sn',
+            'name' => 'AP Test SN',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+            'is_customer_extra_device' => true,
+        ]);
+        $item = Item::create([
+            'code' => 'AP-TEST-SN',
+            'name' => 'AP Test SN',
+            'item_category_id' => $category->id,
+            'unit' => 'pcs',
+        ]);
+        $serial = InventorySerial::create([
+            'item_id' => $item->id,
+            'serial_number' => 'ADD-SN-0001',
+            'status' => SerialStatus::DEPLOYED,
+        ]);
+
+        $device = CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'AP',
+            'inventory_serial_id' => $serial->id,
+        ]);
+
+        $device->refresh();
+        $this->assertSame('terpasang', $device->status);
+        $this->assertInstanceOf(InventorySerial::class, $device->inventorySerial);
+        $this->assertSame($serial->id, $device->inventorySerial->id);
+    }
+
+    #[Test]
+    public function it_casts_retrieved_at_as_datetime(): void
+    {
+        $pop = $this->createPop('ADDRT');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-RT-001');
+
+        $device = CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'STB',
+            'status' => 'ditarik',
+            'retrieved_at' => '2026-10-17 09:30:00',
+        ]);
+
+        $device->refresh();
+        $this->assertInstanceOf(CarbonInterface::class, $device->retrieved_at);
+        $this->assertSame('2026-10-17 09:30:00', $device->retrieved_at->format('Y-m-d H:i:s'));
+        $this->assertSame('ditarik', $device->status);
+    }
+
+    #[Test]
+    public function additional_device_from_warehouse_shows_source_label_and_status(): void
+    {
+        $this->loginAsAdmin();
+        $pop = $this->createPop('ADDLBL');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-LBL-001');
+        $category = ItemCategory::create([
+            'code' => 'ap_test_lbl',
+            'name' => 'AP Test LBL',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+            'is_customer_extra_device' => true,
+        ]);
+        $item = Item::create([
+            'code' => 'AP-TEST-LBL',
+            'name' => 'AP Test LBL',
+            'item_category_id' => $category->id,
+            'unit' => 'pcs',
+        ]);
+        $serial = InventorySerial::create([
+            'item_id' => $item->id,
+            'serial_number' => 'ADD-LBL-GD-0001',
+            'status' => SerialStatus::DEPLOYED,
+        ]);
+
+        // Baris v1: free-text, belum terhubung ke stok Gudang.
+        CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'AP',
+            'serial_number' => 'SN-V1-LAMA',
+        ]);
+        // Baris dari Gudang yang sudah ditarik.
+        CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'STB',
+            'serial_number' => 'SN-GUDANG-BARU',
+            'inventory_serial_id' => $serial->id,
+            'status' => 'ditarik',
+        ]);
+
+        $this->get(route('customers.show', $customer->id))
+            ->assertOk()
+            ->assertSeeInOrder(['SN-V1-LAMA', 'Tanpa Stok', 'SN-GUDANG-BARU', 'Gudang', 'Ditarik']);
     }
 
     private function attachPermission(Role $role, string $code): void
@@ -234,6 +342,58 @@ class CustomerAdditionalDeviceTest extends TestCase
 
         $response->assertStatus(403);
         $this->assertDatabaseHas('customer_additional_devices', ['id' => $device->id]);
+    }
+
+    #[Test]
+    public function resolve_ignores_installed_serial_from_extra_device_category(): void
+    {
+        $pop = $this->createPop('PROFAP');
+        $customer = $this->createCustomer($pop, 'TEST-PROF-AP-001');
+
+        $ontCategory = ItemCategory::create([
+            'code' => 'ont_test_profile',
+            'name' => 'ONT Test Profile',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+        ]);
+        $ontItem = Item::create([
+            'code' => 'ONT-TEST-PROFILE',
+            'name' => 'ONT Test Profile',
+            'item_category_id' => $ontCategory->id,
+            'unit' => 'pcs',
+        ]);
+        $ontSerial = InventorySerial::create([
+            'item_id' => $ontItem->id,
+            'serial_number' => 'PROF-ONT-0001',
+            'status' => SerialStatus::INSTALLED,
+            'customer_id' => $customer->id,
+            'installed_at' => now()->subHour(),
+        ]);
+
+        $apCategory = ItemCategory::create([
+            'code' => 'ap_test_profile',
+            'name' => 'AP Test Profile',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+            'is_customer_extra_device' => true,
+        ]);
+        $apItem = Item::create([
+            'code' => 'AP-TEST-PROFILE',
+            'name' => 'AP Test Profile',
+            'item_category_id' => $apCategory->id,
+            'unit' => 'pcs',
+        ]);
+        InventorySerial::create([
+            'item_id' => $apItem->id,
+            'serial_number' => 'PROF-AP-0001',
+            'status' => SerialStatus::INSTALLED,
+            'customer_id' => $customer->id,
+            'installed_at' => now(),
+        ]);
+
+        $profile = CustomerDeviceProfileService::resolve($customer);
+
+        $this->assertSame($ontSerial->id, $profile['installedInventorySerial']?->id);
     }
 
     private function createActiveCustomerService(Customer $customer, InternetPackage $package): CustomerService

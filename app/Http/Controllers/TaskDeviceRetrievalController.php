@@ -9,6 +9,7 @@ use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
 use App\Enums\TaskType;
 use App\Enums\TrackingType;
+use App\Models\CustomerAdditionalDevice;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\Task;
@@ -142,7 +143,22 @@ class TaskDeviceRetrievalController extends Controller
                 foreach ($rows as $row) {
                     $item = ! empty($row['item_id']) ? Item::find($row['item_id']) : null;
 
-                    $inventory->pickupSerialFromCustomer($row['serial_number'], $item, $task->customer, $task, $technician);
+                    $serial = $inventory->pickupSerialFromCustomer($row['serial_number'], $item, $task->customer, $task, $technician);
+
+                    // SN ini mungkin perangkat tambahan (AP/STB) yang dipasang
+                    // lewat langkah Perangkat Tambahan (ADHOC-190 task 4) —
+                    // kalau ada baris `customer_additional_devices` yang masih
+                    // 'terpasang' untuk SN ini, tandai 'ditarik' supaya Detail
+                    // Pelanggan tidak terus bilang AP itu masih terpasang
+                    // padahal fisiknya sudah balik ke gudang. SN modem utama
+                    // tidak akan punya baris yang cocok — diamkan saja.
+                    // Dibatasi ke pelanggan task ini juga (defense-in-depth):
+                    // baris pelanggan lain yang kebetulan menunjuk SN sama
+                    // (data kotor/legacy) tidak boleh ikut ditandai ditarik.
+                    CustomerAdditionalDevice::where('inventory_serial_id', $serial->id)
+                        ->where('customer_id', $task->customer_id)
+                        ->where('status', 'terpasang')
+                        ->update(['status' => 'ditarik', 'retrieved_at' => now()]);
                 }
 
                 // Foto diunggah SETELAH gerak inventori: kegagalan yang paling

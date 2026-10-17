@@ -30,6 +30,7 @@ use App\Models\Task;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
+use App\Services\AdditionalDeviceCustodyService;
 use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
@@ -196,6 +197,22 @@ class CustomerInstallationController extends Controller
                 app(TaskService::class)->cancel($task, auth()->user(), $validated['reason']);
             }
 
+            // Celah yang DISADARI (ADHOC-190 task 4): perangkat tambahan yang
+            // sudah di-install di langkah Perangkat Tambahan (step 5, langsung
+            // installSerial() — beda dari ONT utama yang baru dieksekusi di
+            // storeSpeedtest()) TIDAK ikut direvert di sini kalau pemasangan
+            // dibatalkan. SN-nya tetap INSTALLED ke pelanggan ini & baris
+            // customer_additional_devices tetap "terpasang". SAAT INI BELUM ADA
+            // jalur pemulihan lewat UI untuk kasus ini: cancel() memindah
+            // pelanggan ke REJECTED, sedangkan alur retur pelanggan
+            // (`Warehouse\WarehouseCustomerReturnController::scopedTerminatedCustomers()`)
+            // cuma menerima pelanggan berstatus `terminated`. Pemulihannya
+            // butuh penyesuaian data/inventori manual (SN dikembalikan ke
+            // gudang + baris perangkat tambahan ditandai ditarik). Revert
+            // otomatis sengaja tidak dibuat di sini — retur SN wajib lewat
+            // transit + konfirmasi gudang (ADHOC-108), bukan langsung ditulis.
+            // Follow-up task kalau ini jadi masalah berulang.
+
             $installation = $customer->installations()->latest()->first();
             if ($installation) {
                 $installation->installation_status = 'failed';
@@ -241,11 +258,28 @@ class CustomerInstallationController extends Controller
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->where('status', SerialStatus::ISSUED->value)
             ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
+            // AP/STB (`is_customer_extra_device`) punya langkahnya sendiri
+            // (ADHOC-190, eligibleExtraDeviceSerialsForTeam()) — kalau ikut
+            // ditawarkan di sini, AP bisa terpilih jadi perangkat UTAMA dan
+            // ditimpa ke customer_devices/ont_sn lewat installSerial(true).
+            ->whereDoesntHave('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
             ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
                 $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
             }))
             ->with('item')
             ->get();
+    }
+
+    /**
+     * Padanan `eligibleSerialsForTeam()` khusus perangkat tambahan (AP/STB,
+     * ADHOC-190) — query-nya tinggal di AdditionalDeviceCustodyService supaya
+     * dropdown di report() dan validasi `Rule::in` di
+     * CustomerInstallationAdditionalDeviceController::store() pakai sumber
+     * yang sama persis.
+     */
+    private function eligibleExtraDeviceSerialsForTeam(?Task $task)
+    {
+        return app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task);
     }
 
     /**
@@ -413,6 +447,11 @@ class CustomerInstallationController extends Controller
         // INDIVIDUAL (bukan agregat) yang lagi di custody tim ini.
         $eligibleRolls = $this->eligibleRollsForTeam($task);
 
+        // Langkah Perangkat Tambahan (ADHOC-190) — partial cuma tampil kalau
+        // paket mengatur perangkat tambahan (limit > 0).
+        $eligibleExtraDeviceSerials = $this->eligibleExtraDeviceSerialsForTeam($task);
+        $requiredExtraDevices = (int) ($customer->customerService?->internetPackage?->max_additional_devices ?? 0);
+
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
         // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
         // Tanpa prefill teknisi cenderung mengosongkan seksi ini, dan
@@ -498,7 +537,7 @@ class CustomerInstallationController extends Controller
         $odpPortOptions = $this->odpPortsFor($customer);
         $currentOdpPortId = $odpPortOptions->first(fn (NetworkNodePort $port) => $port->activeAssignment->first()?->customer_id === $customer->id)?->id;
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif', 'odpPortOptions', 'currentOdpPortId', 'hasManagedOdp'));
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif', 'odpPortOptions', 'currentOdpPortId', 'hasManagedOdp', 'eligibleExtraDeviceSerials', 'requiredExtraDevices'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -1532,6 +1571,20 @@ class CustomerInstallationController extends Controller
             422,
             'Selesaikan dan simpan Laporan Pemasangan & Perangkat (tekan Aktivasi) terlebih dahulu sebelum mengisi Laporan Speedtest.'
         );
+
+        // Langkah Perangkat Tambahan (ADHOC-190, spec §4.2) WAJIB sudah
+        // disubmit kalau paket mengatur perangkat tambahan — titik selesai
+        // Laporan Pemasangan itu di sini, jadi kalau gak dijaga, teknisi bisa
+        // melewati langkah itu sama sekali dan AP/STB yang dibawa gak pernah
+        // diputuskan nasibnya. Kelengkapan per perangkat sudah dicek di
+        // CustomerInstallationAdditionalDeviceController::store(); di sini
+        // cukup penandanya.
+        $requiredExtraDevices = (int) ($customer->customerService?->internetPackage?->max_additional_devices ?? 0);
+        if ($requiredExtraDevices > 0 && $installation->extra_devices_reported_at === null) {
+            return redirect()->back()->withInput()->withErrors([
+                'extra_devices' => "Paket pelanggan ini mengatur {$requiredExtraDevices} perangkat tambahan — simpan langkah Perangkat Tambahan di Step 5 terlebih dahulu.",
+            ]);
+        }
 
         $validated = $request->validate([
             'test_upload' => 'required|numeric',

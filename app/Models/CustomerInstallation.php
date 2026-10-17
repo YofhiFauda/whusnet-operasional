@@ -35,6 +35,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'manual_device_model',
     'manual_device_serial_number',
     'modem_sale_price',
+    'extra_device_shortage',
+    'extra_device_shortage_reason',
+    'extra_devices_reported_at',
 ])]
 class CustomerInstallation extends Model
 {
@@ -58,6 +61,8 @@ class CustomerInstallation extends Model
             'completed_at' => 'datetime',
             'roll_meters_used' => 'decimal:2',
             'modem_sale_price' => 'decimal:2',
+            'extra_device_shortage' => 'boolean',
+            'extra_devices_reported_at' => 'datetime',
         ];
     }
 
