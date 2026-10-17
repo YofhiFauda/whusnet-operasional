@@ -170,6 +170,106 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
         ], $fop);
     }
 
+    /**
+     * Review follow-up ADHOC-190 task 3: `reassignTeam()` TIDAK lewat
+     * `create()`/`update()` sama sekali — dia nulis langsung ke
+     * `teamMembers()` lewat query builder-nya sendiri. Precondition method
+     * ini (`status` harus TERJADWAL/IN_PROGRESS) justru bikin dia SATU-
+     * SATUNYA jalur lain yang bisa nukar teknisi di Task Pemasangan yang
+     * SUDAH lolos guard custody di create() — tanpa guard di sini, FOP bisa
+     * swap teknisi lama (custody cukup) ke teknisi baru (custody nol) dan
+     * lolos begitu saja.
+     */
+    #[Test]
+    public function reassign_team_is_rejected_when_new_technician_lacks_custody(): void
+    {
+        $pop = $this->createPop('ADG6');
+        $fop = $this->createFopUser($pop);
+        $teknisiLama = $this->createTeknisi();
+        $teknisiBaru = $this->createTeknisi();
+        $customer = $this->createCustomer($pop, 'TEST-ADG-006');
+        $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-006', 1));
+
+        $this->issueExtraDeviceSerial($teknisiLama, 'ADG-SN-006', $pop->id);
+
+        $task = app(TaskService::class)->create([
+            'task_type' => TaskType::PEMASANGAN->value,
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'title' => 'Pemasangan Pelanggan',
+            'team_member_ids' => [$teknisiLama->id],
+            'scheduled_at' => now()->addDay(),
+        ], $fop);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Barang perangkat tambahan belum di-issue cukup');
+
+        // Teknisi baru belum pegang custody AP sama sekali.
+        app(TaskService::class)->reassignTeam($task, $teknisiLama->id, $teknisiBaru->id, $fop->id);
+    }
+
+    /**
+     * Padanan sukses dari test di atas: teknisi baru PUNYA custody yang
+     * cukup → reassign tetap jalan normal, guard gak nge-block yang
+     * seharusnya lolos.
+     */
+    #[Test]
+    public function reassign_team_succeeds_when_new_technician_has_sufficient_custody(): void
+    {
+        $pop = $this->createPop('ADG7');
+        $fop = $this->createFopUser($pop);
+        $teknisiLama = $this->createTeknisi();
+        $teknisiBaru = $this->createTeknisi();
+        $customer = $this->createCustomer($pop, 'TEST-ADG-007');
+        $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-007', 1));
+
+        $this->issueExtraDeviceSerial($teknisiLama, 'ADG-SN-007A', $pop->id);
+        $this->issueExtraDeviceSerial($teknisiBaru, 'ADG-SN-007B', $pop->id);
+
+        $task = app(TaskService::class)->create([
+            'task_type' => TaskType::PEMASANGAN->value,
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'title' => 'Pemasangan Pelanggan',
+            'team_member_ids' => [$teknisiLama->id],
+            'scheduled_at' => now()->addDay(),
+        ], $fop);
+
+        app(TaskService::class)->reassignTeam($task, $teknisiLama->id, $teknisiBaru->id, $fop->id);
+
+        $this->assertTrue($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
+        $this->assertFalse($task->teamMembers()->where('user_id', $teknisiLama->id)->exists());
+    }
+
+    /**
+     * Guard no-op buat task_type non-Pemasangan — reassign MAINTENANCE tetap
+     * jalan normal walau teknisi barunya gak pegang custody apa pun.
+     */
+    #[Test]
+    public function reassign_team_succeeds_for_non_pemasangan_task_regardless_of_custody(): void
+    {
+        $pop = $this->createPop('ADG8');
+        $fop = $this->createFopUser($pop);
+        $teknisiLama = $this->createTeknisi();
+        $teknisiBaru = $this->createTeknisi();
+        $customer = $this->createCustomer($pop, 'TEST-ADG-008');
+        // Paket butuh perangkat tambahan, tapi task-nya MAINTENANCE — guard harus no-op.
+        $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-008', 1));
+
+        $task = app(TaskService::class)->create([
+            'task_type' => TaskType::MAINTENANCE->value,
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'title' => 'Maintenance Pelanggan',
+            'team_member_ids' => [$teknisiLama->id],
+            'scheduled_at' => now()->addDay(),
+        ], $fop);
+
+        app(TaskService::class)->reassignTeam($task, $teknisiLama->id, $teknisiBaru->id, $fop->id);
+
+        $this->assertTrue($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
+    }
+
     private function createPop(string $code): Pop
     {
         return Pop::create([

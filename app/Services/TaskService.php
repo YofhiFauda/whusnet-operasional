@@ -701,6 +701,18 @@ class TaskService
             throw new \Exception("Teknisi memiliki jadwal yang bentrok: {$taskNum} pada {$sched}.");
         }
 
+        // ADHOC-190 task 3 (lanjutan review) — reassignTeam() cuma bisa dipanggil
+        // pas task TERJADWAL/IN_PROGRESS (guard di baris atas), artinya method ini
+        // SATU-SATUNYA jalur lain (selain create()/update()) yang bisa menukar
+        // teknisi di task Pemasangan yang sudah lolos guard custody di create().
+        // Tanpa dicek ulang di sini, FOP/admin bisa swap teknisi lama (yang
+        // custody-nya cukup) ke teknisi baru yang custody-nya nol — guard
+        // preventif di create()/update() jadi gak ada gunanya buat path ini.
+        // Dicek pakai TIM BARU (teknisi lama diganti teknisi baru), BUKAN tim
+        // lama, dan SEBELUM transaction di bawah menyentuh baris mana pun.
+        $newTeamIds = array_merge($otherUserIds, [$newUserId]);
+        app(AdditionalDeviceCustodyService::class)->assertSufficientForTask($task, $newTeamIds);
+
         // Update the team member ID + task, dibungkus transaction sendiri biar
         // service ini self-contained gak gantung transaction dari caller.
         DB::transaction(function () use ($task, $oldUserId, $newUserId, $reassignerId, $scheduleChanged, $targetScheduledAt) {
