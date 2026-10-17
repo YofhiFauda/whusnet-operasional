@@ -15,6 +15,7 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
+use App\Services\CustomerDeviceProfileService;
 use App\Services\EffectiveAccessService;
 use Carbon\CarbonInterface;
 use Database\Seeders\ActionSeeder;
@@ -296,6 +297,58 @@ class CustomerAdditionalDeviceTest extends TestCase
 
         $response->assertStatus(403);
         $this->assertDatabaseHas('customer_additional_devices', ['id' => $device->id]);
+    }
+
+    #[Test]
+    public function resolve_ignores_installed_serial_from_extra_device_category(): void
+    {
+        $pop = $this->createPop('PROFAP');
+        $customer = $this->createCustomer($pop, 'TEST-PROF-AP-001');
+
+        $ontCategory = ItemCategory::create([
+            'code' => 'ont_test_profile',
+            'name' => 'ONT Test Profile',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+        ]);
+        $ontItem = Item::create([
+            'code' => 'ONT-TEST-PROFILE',
+            'name' => 'ONT Test Profile',
+            'item_category_id' => $ontCategory->id,
+            'unit' => 'pcs',
+        ]);
+        $ontSerial = InventorySerial::create([
+            'item_id' => $ontItem->id,
+            'serial_number' => 'PROF-ONT-0001',
+            'status' => SerialStatus::INSTALLED,
+            'customer_id' => $customer->id,
+            'installed_at' => now()->subHour(),
+        ]);
+
+        $apCategory = ItemCategory::create([
+            'code' => 'ap_test_profile',
+            'name' => 'AP Test Profile',
+            'default_unit' => 'pcs',
+            'is_active' => true,
+            'is_customer_extra_device' => true,
+        ]);
+        $apItem = Item::create([
+            'code' => 'AP-TEST-PROFILE',
+            'name' => 'AP Test Profile',
+            'item_category_id' => $apCategory->id,
+            'unit' => 'pcs',
+        ]);
+        InventorySerial::create([
+            'item_id' => $apItem->id,
+            'serial_number' => 'PROF-AP-0001',
+            'status' => SerialStatus::INSTALLED,
+            'customer_id' => $customer->id,
+            'installed_at' => now(),
+        ]);
+
+        $profile = CustomerDeviceProfileService::resolve($customer);
+
+        $this->assertSame($ontSerial->id, $profile['installedInventorySerial']?->id);
     }
 
     private function createActiveCustomerService(Customer $customer, InternetPackage $package): CustomerService

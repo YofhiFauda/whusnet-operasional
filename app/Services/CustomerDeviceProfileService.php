@@ -72,8 +72,11 @@ class CustomerDeviceProfileService
     {
         $device = $customer->customerDevice;
         $tech = $customer->customerTechnicalDetail;
+        // Perangkat tambahan (AP, STB) bukan perangkat utama — jangan sampai
+        // AP yang dipasang belakangan tampil sebagai "perangkat utama" di Detail.
         $installedInventorySerial = InventorySerial::where('customer_id', $customer->id)
             ->where('status', SerialStatus::INSTALLED->value)
+            ->whereHas('item.category', fn ($query) => $query->where('is_customer_extra_device', false))
             ->with('item')
             ->latest('installed_at')
             ->first();
