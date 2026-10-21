@@ -619,7 +619,7 @@
                         <div>
                             <label class="block text-xs font-semibold text-text-secondary mb-1">Tipe Task <span class="text-error">*</span></label>
                             <select name="category" x-model="modal.data.category"
-                                    @change="onCategoryChange(); resetInfraScope(); if (isInfraCategory && modal.data.pop_id) loadInfraScopeLevel('mini_pop', modal.data.pop_id)"
+                                    @change="onCategoryChange(); resetInfraScope(); infraScope.ready = true; if (isInfraCategory && modal.data.pop_id) loadInfraScopeLevel('mini_pop', modal.data.pop_id)"
                                     :disabled="isEditingLockedSurveyPsb || isEditingLinkedTicket || (modal.isEdit && !canEditCategory)"
                                     required
                                     class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
@@ -648,7 +648,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="!isTicketMode">
                         <div>
                             <label class="block text-xs font-semibold text-text-secondary mb-1">POP / Cabang <span class="text-error">*</span></label>
-                            <select name="pop_id" x-model="modal.data.pop_id" @change="resetInfraScope(); if (isInfraCategory) loadInfraScopeLevel('mini_pop', modal.data.pop_id)" :disabled="isEditingLockedSurveyPsb" :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                            <select name="pop_id" x-model="modal.data.pop_id" @change="resetInfraScope(); infraScope.ready = true; if (isInfraCategory) loadInfraScopeLevel('mini_pop', modal.data.pop_id)" :disabled="isEditingLockedSurveyPsb" :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                 <option value="">Pilih Cabang</option>
                                 @foreach($pops as $p)
                                     <option value="{{ $p->id }}">{{ $p->name }}</option>
@@ -688,7 +688,11 @@
                                 </label>
                             </template>
                         </div>
-                        <template x-if="isInfraCategory && !isTicketMode">
+                        {{-- Hidden scope HANYA dikirim setelah dropdown selesai dimuat
+                             (infraScope.ready). Tanpa ini, simpan cepat di modal Edit
+                             sebelum fetch async selesai mengirim semua tingkat kosong dan
+                             server melebarkan akar scope ke POP Cabang diam-diam. --}}
+                        <template x-if="isInfraCategory && !isTicketMode && infraScope.ready">
                             <div>
                                 <template x-for="level in infraScopeLevels" :key="'hidden-'+level">
                                     <input type="hidden" :name="'scope_' + level + '_id'" :value="infraScope.values[level]">
@@ -1554,6 +1558,7 @@
             infraScopeLevels: ['mini_pop', 'device', 'slot', 'port', 'odp'],
             infraScopeNames: { mini_pop: 'Mini POP', device: 'OLT/Switch', slot: 'Slot', port: 'PON/Port', odp: 'ODP' },
             infraScope: {
+                ready: false,
                 values: { mini_pop: '', device: '', slot: '', port: '', odp: '' },
                 states: {
                     mini_pop: { options: [], disabled: false }, device: { options: [], disabled: false },
@@ -1591,6 +1596,7 @@
             },
 
             infraScopeChanged(level) {
+                this.infraScope.ready = true;
                 const index = this.infraScopeLevels.indexOf(level);
                 this.resetInfraScope(index + 1);
                 const value = this.infraScope.values[level];
@@ -1602,7 +1608,19 @@
             // diturunkan dari jenis leluhur, bukan dari label.
             async initInfraScope(snapshot) {
                 this.resetInfraScope();
+                this.infraScope.ready = false;
                 if (!this.isInfraCategory || !this.modal.data.pop_id) return;
+                try {
+                    await this.restoreInfraScope(snapshot);
+                    this.infraScope.ready = true;
+                } catch (error) {
+                    // Gagal memuat: scope lama TIDAK dikirim (ready tetap false),
+                    // server mempertahankan akar yang tersimpan.
+                    this.showToast?.('error', 'Gagal memuat lokasi kerja; akar scope lama dipertahankan.');
+                }
+            },
+
+            async restoreInfraScope(snapshot) {
                 const chosen = {};
                 let afterPort = false;
                 (snapshot?.ancestors || []).forEach((ancestor) => {
@@ -2139,6 +2157,7 @@
                 this.searchTech = '';
                 this.techFilter = 'all';
                 this.resetInfraScope();
+                this.infraScope.ready = true;
                 this.modal.open = true;
                 this.fetchTechAvailability(nowIso.slice(0, 10));
             },

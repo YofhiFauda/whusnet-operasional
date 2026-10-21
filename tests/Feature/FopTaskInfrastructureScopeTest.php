@@ -364,6 +364,23 @@ class FopTaskInfrastructureScopeTest extends TestCase
     }
 
     #[Test]
+    public function edit_tanpa_field_scope_mempertahankan_akar_lama(): void
+    {
+        // Modal Edit baru mengirim hidden scope setelah dropdown selesai
+        // dimuat (infraScope.ready); tanpa field itu server WAJIB
+        // mempertahankan akar tersimpan, bukan melebarkannya ke POP.
+        $task = $this->scopedTask(['scope_mini_pop_id' => $this->miniA1->id, 'scope_device_id' => $this->oltA->id]);
+
+        $this->actingAs($this->owner)->put(route('fop-tasks.update', $task), ['issue' => 'Ubah keterangan'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($this->oltA->id, $task->fresh()->scope_network_node_id);
+        $this->withoutVite();
+        $this->actingAs($this->owner)->get(route('fop-tasks.index'))->assertOk()
+            ->assertSee('isInfraCategory && !isTicketMode && infraScope.ready', false);
+    }
+
+    #[Test]
     public function form_fop_menolak_scope_untuk_kategori_non_infrastruktur(): void
     {
         $task = $this->fopTask($this->cabangA, 'MTN');
