@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\InfrastructurePortKind;
+use App\Enums\InfrastructureSlotKind;
 use App\Enums\SerialStatus;
 use App\Models\Customer;
 use App\Models\InfrastructureBalance;
@@ -57,6 +58,8 @@ class InfrastructureHierarchyService
         $slots = InfrastructureSlot::query()->whereIn('network_node_id', $nodes->pluck('id'))->orderBy('number')->get();
         $ports = InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slots->pluck('id'))->orderBy('number')->get();
         $portIds = $ports->pluck('id')->all();
+        $filledSlotIds = InventorySerial::query()->where('status', SerialStatus::DEPLOYED->value)
+            ->whereIn('current_infrastructure_slot_id', $slots->pluck('id'))->distinct()->pluck('current_infrastructure_slot_id')->all();
         $activeConnections = InfrastructureConnection::query()->active()
             ->whereIn('source_infrastructure_port_id', $portIds)->with('targetNode', 'targetPort')->get();
         $uplinkByTarget = $activeConnections->filter(fn (InfrastructureConnection $connection): bool => $connection->target_network_node_id !== null
@@ -103,12 +106,24 @@ class InfrastructureHierarchyService
                     'relation' => $uplink !== null ? 'connection' : 'location',
                     'verified' => $uplink !== null ? $uplink->isVerified() : ($isOdp ? false : null),
                     'uplink_unverified' => $isOdp && ($uplink === null || ! $uplink->isVerified()),
-                    'capacity' => $node->nodeType?->has_ports ? [
-                        'used' => (int) $node->used_ports_count,
-                        'capacity' => (int) $node->ports_count,
-                        'unit_label' => 'port pelanggan',
-                        'red_zone' => $node->isInRedZone(),
-                    ] : null,
+                    'capacity' => match (true) {
+                        // OLT/Switch: kapasitas = slot chassis terisi kartu/modul
+                        // (keputusan user 21-10-2026). Total = kapasitas tercatat
+                        // di node atau jumlah slot yang didata, mana yang lebih besar.
+                        InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) !== null => [
+                            'used' => $slots->where('network_node_id', $node->id)->whereIn('id', $filledSlotIds)->count(),
+                            'capacity' => max((int) $node->capacity, $slots->where('network_node_id', $node->id)->count()),
+                            'unit_label' => 'slot terisi kartu',
+                            'red_zone' => null,
+                        ],
+                        (bool) $node->nodeType?->has_ports => [
+                            'used' => (int) $node->used_ports_count,
+                            'capacity' => (int) $node->ports_count,
+                            'unit_label' => 'port pelanggan',
+                            'red_zone' => $node->isInRedZone(),
+                        ],
+                        default => null,
+                    },
                     'url' => route('network.nodes.show', $node),
                 ]);
         }

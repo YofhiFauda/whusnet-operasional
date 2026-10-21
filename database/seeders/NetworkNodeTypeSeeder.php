@@ -52,7 +52,9 @@ class NetworkNodeTypeSeeder extends Seeder
         $types = [
             ['code' => 'server', 'name' => 'Server Utama', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'core_router', 'name' => 'Core Router/Switch', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
-            ['code' => 'backbone', 'name' => 'Backbone/Transport', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
+            // backbone/feeder/drop_cable DIHAPUS (keputusan user 21-10-2026,
+            // migration 2026_10_21_000008): bukan tingkat pohon lagi — uplink POP,
+            // koneksi PON → ODP, dan assignment port ODP + pemakaian roll kabel.
             // Tipe lama (§16.2) — tetap dibuat supaya histori/audit yang merujuk
             // kode ini terbaca, tapi nonaktif: Switch operasional baru memakai
             // `switch_mini_pop` di bawah.
@@ -61,10 +63,8 @@ class NetworkNodeTypeSeeder extends Seeder
             ['code' => 'pon_port', 'name' => 'PON Port/Card', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'olt_chassis', 'name' => 'Chassis OLT', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'olt_card', 'name' => 'Kartu OLT', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => 128, 'red_zone_threshold' => null],
-            ['code' => 'feeder', 'name' => 'Kabel Feeder', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'odc', 'name' => 'ODC', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
             ['code' => 'odp', 'name' => 'ODP', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
-            ['code' => 'drop_cable', 'name' => 'Drop Cable', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
         ];
 
         // firstOrCreate, BUKAN updateOrCreate (beda dari dua Feature di atas,
@@ -96,8 +96,7 @@ class NetworkNodeTypeSeeder extends Seeder
         $defaultRules = [
             'server' => ['pops' => ['pusat'], 'nodes' => []],
             'core_router' => ['pops' => ['pusat', 'cabang'], 'nodes' => []],
-            'backbone' => ['pops' => ['pusat', 'cabang'], 'nodes' => ['core_router']],
-            'aggregation_switch' => ['pops' => ['cabang'], 'nodes' => ['backbone', 'core_router']],
+            'aggregation_switch' => ['pops' => ['cabang'], 'nodes' => ['core_router']],
             'switch_mini_pop' => ['pops' => ['mini_pop'], 'nodes' => []],
             // Mini POP sekarang sebuah LOKASI fisik, bisa menaungi beberapa
             // chassis OLT sekaligus — jadi chassis boleh anchor Mini POP ATAU
@@ -107,10 +106,8 @@ class NetworkNodeTypeSeeder extends Seeder
             'olt_chassis' => ['pops' => ['mini_pop', 'cabang'], 'nodes' => []],
             'olt_card' => ['pops' => [], 'nodes' => ['olt_chassis']],
             'pon_port' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card']],
-            'feeder' => ['pops' => ['mini_pop'], 'nodes' => ['olt_chassis']],
-            'odc' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card', 'pon_port', 'feeder']],
+            'odc' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card', 'pon_port']],
             'odp' => ['pops' => ['cabang', 'mini_pop'], 'nodes' => ['odc']],
-            'drop_cable' => ['pops' => [], 'nodes' => []],
         ];
         NetworkNodeType::query()->where('code', 'ont')
             ->whereNotIn('id', DB::table('network_nodes')->select('node_type_id'))
@@ -118,12 +115,8 @@ class NetworkNodeTypeSeeder extends Seeder
 
         $ids = NetworkNodeType::query()->pluck('id', 'code');
         foreach ([
-            ['backbone', 'server'],
             ['olt_chassis', 'aggregation_switch'],
             ['pon_port', 'olt_chassis'],
-            ['feeder', 'pon_port'],
-            ['odp', 'feeder'],
-            ['drop_cable', 'odp'],
         ] as [$childCode, $parentCode]) {
             DB::table('network_node_type_rules')->insertOrIgnore([
                 'child_type_id' => $ids[$childCode],

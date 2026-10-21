@@ -217,6 +217,24 @@ class InfrastructureHierarchyTest extends TestCase
     }
 
     #[Test]
+    public function olt_menampilkan_kapasitas_slot_chassis_terisi_kartu(): void
+    {
+        // Keputusan user 21-10-2026: Slot = lubang kartu fisik di chassis,
+        // tampil sebagai baris pohon; OLT cukup menampilkan angka slot terisi.
+        $item = Item::create(['code' => 'KARTU-KAP', 'name' => 'Kartu GPON', 'unit' => 'pcs', 'item_category_id' => ItemCategory::where('code', 'olt_module')->value('id'),
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset', 'infrastructure_location_kind' => 'slot']);
+        InventorySerial::create(['item_id' => $item->id, 'serial_number' => 'SN-KAP-1', 'status' => SerialStatus::DEPLOYED->value, 'current_infrastructure_slot_id' => $this->pon->infrastructure_slot_id]);
+        $this->olt1->update(['capacity' => 16]);
+
+        $capacity = $this->projection()['items']['node:'.$this->olt1->id]['capacity'];
+
+        $this->assertSame(1, $capacity['used']);
+        $this->assertSame(16, $capacity['capacity']);
+        $this->assertSame('slot terisi kartu', $capacity['unit_label']);
+        $this->assertSame(1, $this->projection()['items']['node:'.$this->switch->id]['capacity']['capacity']);
+    }
+
+    #[Test]
     public function semua_ont_satu_pelanggan_terlihat_dan_tanpa_sn_diberi_label(): void
     {
         $p = $this->projection();

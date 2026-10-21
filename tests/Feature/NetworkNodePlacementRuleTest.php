@@ -62,18 +62,26 @@ class NetworkNodePlacementRuleTest extends TestCase
         app(NetworkNodeService::class)->assertTypePlacement($chassisType, null, $branch);
     }
 
-    public function test_feeder_boleh_jadi_anak_chassis_dan_odc_boleh_jadi_anak_feeder(): void
+    public function test_backbone_feeder_dan_drop_cable_bukan_tipe_node_lagi(): void
     {
+        // Keputusan user 21-10-2026: ketiganya kini uplink POP, koneksi
+        // PON → ODP, dan assignment port ODP + pemakaian roll — bukan node.
         $this->seed(NetworkNodeTypeSeeder::class);
-        $mini = Pop::factory()->create(['type' => 'mini_pop']);
-        $chassisType = NetworkNodeType::where('code', 'olt_chassis')->firstOrFail();
-        $feederType = NetworkNodeType::where('code', 'feeder')->firstOrFail();
-        $odcType = NetworkNodeType::where('code', 'odc')->firstOrFail();
-        $chassis = NetworkNode::factory()->create(['anchor_pop_id' => $mini->id, 'node_type_id' => $chassisType->id]);
-        $feeder = NetworkNode::factory()->create(['parent_id' => $chassis->id, 'node_type_id' => $feederType->id]);
+        $this->seed(NetworkNodeTypeSeeder::class);
 
-        app(NetworkNodeService::class)->assertTypePlacement($feederType, $chassis, null);
-        app(NetworkNodeService::class)->assertTypePlacement($odcType, $feeder, null);
+        $this->assertSame(0, NetworkNodeType::whereIn('code', ['backbone', 'feeder', 'drop_cable'])->count());
+        $this->assertTrue(NetworkNodeType::where('code', 'odp')->exists());
+    }
+
+    public function test_migrasi_penghapusan_tipe_lama_menolak_bila_masih_dipakai_node(): void
+    {
+        $migration = require database_path('migrations/2026_10_21_000008_remove_backbone_feeder_drop_cable_node_types.php');
+        $migration->down();
+        $feeder = NetworkNodeType::where('code', 'feeder')->firstOrFail();
+        NetworkNode::factory()->create(['node_type_id' => $feeder->id]);
+
+        $this->expectException(\RuntimeException::class);
+        $migration->up();
     }
 
     public function test_satu_mini_pop_boleh_menaungi_beberapa_chassis(): void

@@ -81,7 +81,7 @@ class InfrastructureReconciliationTest extends TestCase
     #[Test]
     public function rekonsiliasi_menghitung_port_aktif_feeder_lama_juga(): void
     {
-        $feeder = $this->node('feeder', $this->miniPop, 'FDR-REKON');
+        $feeder = $this->node('odc', $this->miniPop, 'FDR-REKON');
         NetworkNodePort::create(['network_node_id' => $feeder->id, 'number' => 1, 'is_used' => true]);
 
         $row = app(InfrastructureReconciliationService::class)->run('2026-10')->firstWhere('pop_id', $this->cabang->id);
@@ -147,7 +147,7 @@ class InfrastructureReconciliationTest extends TestCase
     #[Test]
     public function reset_dummy_hanya_menghapus_node_terdaftar_yang_bersih(): void
     {
-        $dummy = $this->node('feeder', $this->miniPop, 'DUMMY-FDR');
+        $dummy = $this->node('odc', $this->miniPop, 'DUMMY-FDR');
         AuditLog::where('auditable_type', NetworkNode::class)->where('auditable_id', $dummy->id)->delete();
         NetworkNodePort::create(['network_node_id' => $dummy->id, 'number' => 1]);
         $assignments = NetworkPortAssignment::count();
@@ -168,7 +168,7 @@ class InfrastructureReconciliationTest extends TestCase
     #[Test]
     public function reset_dummy_menolak_node_dengan_keputusan_mapping_legacy(): void
     {
-        $dummy = $this->node('feeder', $this->miniPop, 'DUMMY-MAPPED');
+        $dummy = $this->node('odc', $this->miniPop, 'DUMMY-MAPPED');
         AuditLog::where('auditable_type', NetworkNode::class)->where('auditable_id', $dummy->id)->delete();
         InfrastructureLegacyMapping::create([
             'legacy_type' => 'odp_uplink', 'legacy_id' => $dummy->id,
@@ -185,7 +185,7 @@ class InfrastructureReconciliationTest extends TestCase
     #[Test]
     public function reset_dummy_menolak_node_dengan_riwayat_audit(): void
     {
-        $dummy = $this->node('feeder', $this->miniPop, 'DUMMY-AUDIT');
+        $dummy = $this->node('odc', $this->miniPop, 'DUMMY-AUDIT');
         AuditLog::create([
             'user_id' => $this->operator->id, 'module' => 'Node Jaringan', 'action' => 'create',
             'auditable_type' => NetworkNode::class, 'auditable_id' => $dummy->id,
@@ -200,7 +200,7 @@ class InfrastructureReconciliationTest extends TestCase
     #[Test]
     public function reset_dummy_menolak_node_dengan_anak_yang_tidak_terdaftar(): void
     {
-        $parent = $this->node('feeder', $this->miniPop, 'DUMMY-INDUK');
+        $parent = $this->node('odc', $this->miniPop, 'DUMMY-INDUK');
         NetworkNode::factory()->child($parent)->create(['code' => 'ANAK-NYATA']);
 
         $this->expectException(RuntimeException::class);

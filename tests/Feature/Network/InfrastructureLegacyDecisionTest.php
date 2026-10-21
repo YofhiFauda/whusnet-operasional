@@ -52,7 +52,7 @@ class InfrastructureLegacyDecisionTest extends TestCase
         $this->chassis = $this->node('olt_chassis', ['anchor_pop_id' => $this->miniPop->id]);
         OltSlot::create(['chassis_node_id' => $this->chassis->id, 'number' => 1]);
         $this->pon = $this->node('pon_port', ['parent_id' => $this->chassis->id]);
-        $feeder = $this->node('feeder', ['parent_id' => $this->pon->id]);
+        $feeder = $this->node('odc', ['parent_id' => $this->pon->id]);
         $this->odp = $this->node('odp', ['parent_id' => $feeder->id]);
         $this->agg = $this->node('aggregation_switch', ['anchor_pop_id' => $this->cabang->id]);
         app(InfrastructureLegacyBackfillService::class)->run();
@@ -113,7 +113,7 @@ class InfrastructureLegacyDecisionTest extends TestCase
         $this->assertTrue($connection->isVerified());
         $this->assertSame($this->odp->id, $connection->target_network_node_id);
         $this->assertSame('mapped', $this->mapping('odp_uplink', $this->odp->id)->status);
-        $this->assertSame($this->odp->fresh()->parent_id, NetworkNode::where('node_type_id', NetworkNodeType::where('code', 'feeder')->value('id'))->value('id'),
+        $this->assertSame($this->odp->fresh()->parent_id, NetworkNode::where('node_type_id', NetworkNodeType::where('code', 'odc')->value('id'))->value('id'),
             'Parent lama tidak diubah — koneksi terpisah dari lokasi.');
     }
 

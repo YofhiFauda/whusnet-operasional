@@ -63,7 +63,7 @@ class InfrastructureLegacyMappingTest extends TestCase
         OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 1]);
         OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 2]);
         $pon = $this->node('pon_port', ['parent_id' => $chassis->id]);
-        $feeder = $this->node('feeder', ['parent_id' => $pon->id]);
+        $feeder = $this->node('odc', ['parent_id' => $pon->id]);
         $odp = $this->node('odp', ['parent_id' => $feeder->id]);
         $agg = $this->node('aggregation_switch', ['anchor_pop_id' => $this->cabang->id]);
 

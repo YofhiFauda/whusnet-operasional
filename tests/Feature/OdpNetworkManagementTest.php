@@ -453,17 +453,25 @@ class OdpNetworkManagementTest extends TestCase
             'capacity' => 4,
         ])->assertSessionHasErrors('parent_id');
 
-        $backboneTypeId = NetworkNodeType::where('code', 'backbone')->value('id');
+        // Backbone bukan tipe node lagi (migration 000008) — anak bertingkat
+        // tanpa port diuji lewat PON lama di bawah chassis OLT.
         $this->actingAs($owner)->post(route('network.nodes.store'), [
-            'node_type_id' => $backboneTypeId,
-            'parent_id' => $core->id,
-            'code' => 'BACKBONE-CHILD-1',
-            'name' => 'Backbone Anak',
+            'node_type_id' => NetworkNodeType::where('code', 'olt_chassis')->value('id'),
+            'anchor_pop_id' => $pop->id,
+            'code' => 'OLT-TREE-1',
+            'name' => 'OLT Pohon',
+        ])->assertRedirect(route('network.nodes.index'));
+        $olt = NetworkNode::where('code', 'OLT-TREE-1')->firstOrFail();
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => NetworkNodeType::where('code', 'pon_port')->value('id'),
+            'parent_id' => $olt->id,
+            'code' => 'PON-CHILD-1',
+            'name' => 'PON Anak',
             'capacity' => 4,
         ])->assertRedirect(route('network.nodes.index'));
 
-        $child = NetworkNode::where('code', 'BACKBONE-CHILD-1')->firstOrFail();
-        $this->assertSame($core->id, $child->parent_id);
+        $child = NetworkNode::where('code', 'PON-CHILD-1')->firstOrFail();
+        $this->assertSame($olt->id, $child->parent_id);
         $this->assertNull($child->anchor_pop_id);
         $this->assertSame(0, $child->ports()->count());
     }
@@ -512,34 +520,26 @@ class OdpNetworkManagementTest extends TestCase
             ->assertSee('Node Anak');
     }
 
-    public function test_index_menempatkan_cabang_dan_mini_pop_di_bawah_uplink_node(): void
+    public function test_index_menampilkan_server_di_atas_pop_lalu_cabang_mini_pop_dan_olt(): void
     {
+        // Hierarki baru (§1): Server → POP → Mini POP → OLT/Switch. Backbone dan
+        // agregasi bukan tingkat pohon lagi.
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
         $pusat = Pop::create(['code' => 'TREE-P', 'name' => 'WHUSNET', 'type' => 'pusat', 'status' => 'active']);
         $cabang = Pop::create(['code' => 'TREE-C', 'name' => 'Cabang Pohon', 'type' => 'cabang', 'parent_id' => $pusat->id, 'status' => 'active']);
         $mini = Pop::create(['code' => 'TREE-M', 'name' => 'C1', 'type' => 'mini_pop', 'parent_id' => $cabang->id, 'status' => 'active']);
-        $server = NetworkNode::create([
+        NetworkNode::create([
             'anchor_pop_id' => $pusat->id, 'node_type_id' => NetworkNodeType::where('code', 'server')->value('id'),
             'code' => 'TREE-SERVER', 'name' => 'Server Utama', 'status' => 'active',
-        ]);
-        $backbone = NetworkNode::create([
-            'parent_id' => $server->id, 'node_type_id' => NetworkNodeType::where('code', 'backbone')->value('id'),
-            'code' => 'TREE-BB', 'name' => 'Backbone', 'status' => 'active',
-        ]);
-        $aggregation = NetworkNode::create([
-            'anchor_pop_id' => $cabang->id, 'node_type_id' => NetworkNodeType::where('code', 'aggregation_switch')->value('id'),
-            'code' => 'TREE-AGG', 'name' => 'Agregasi', 'status' => 'active',
         ]);
         NetworkNode::create([
             'anchor_pop_id' => $mini->id, 'node_type_id' => NetworkNodeType::where('code', 'olt_chassis')->value('id'),
             'code' => 'TREE-OLT', 'name' => 'OLT', 'status' => 'active',
         ]);
-        $cabang->update(['uplink_node_id' => $backbone->id]);
-        $mini->update(['uplink_node_id' => $aggregation->id]);
 
         $this->actingAs($owner)->get(route('network.nodes.index'))
             ->assertOk()
-            ->assertSeeInOrder(['TREE-SERVER', 'TREE-BB', 'Cabang Pohon', 'TREE-AGG', 'C1', 'TREE-OLT']);
+            ->assertSeeInOrder(['TREE-SERVER', 'WHUSNET', 'Cabang Pohon', 'C1', 'TREE-OLT']);
     }
 
     public function test_tipe_tanpa_port_tidak_bisa_diberi_port_melalui_endpoint(): void
