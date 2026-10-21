@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Enums\SerialStatus;
 use App\Models\AuditLog;
 use App\Models\InfrastructureBalance;
+use App\Models\InfrastructureConnection;
+use App\Models\InfrastructurePort;
+use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
@@ -199,7 +202,20 @@ class NetworkNodeService
         $hasBalances = InfrastructureBalance::query()->whereIn('network_node_id', $nodeIds)
             ->where('qty', '>', 0)->exists();
 
-        if ($hasAssignments || $hasSerials || $hasBalances) {
+        // Koneksi kanonis (Task 3): node jadi tujuan sambungan aktif (mis. ODP
+        // ber-uplink PON), atau PON/Port milik slot node ini masih tersambung.
+        // Memindah lintas cabang tanpa rekonsiliasi membuat uplink menunjuk
+        // lintas Cabang dan merusak scope laporan.
+        $portIds = InfrastructurePort::query()
+            ->whereIn('infrastructure_slot_id', InfrastructureSlot::query()->whereIn('network_node_id', $nodeIds)->select('id'))
+            ->pluck('id');
+        $hasConnections = InfrastructureConnection::query()->active()
+            ->where(fn ($query) => $query->whereIn('target_network_node_id', $nodeIds)
+                ->orWhereIn('source_infrastructure_port_id', $portIds)
+                ->orWhereIn('target_infrastructure_port_id', $portIds))
+            ->exists();
+
+        if ($hasAssignments || $hasSerials || $hasBalances || $hasConnections) {
             throw new InvalidArgumentException(
                 'Node dengan koneksi pelanggan, sambungan jaringan, atau aset terpasang tidak boleh dipindah lintas cabang.'
             );
