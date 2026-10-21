@@ -6,6 +6,8 @@ use App\Enums\CustodyStatus;
 use App\Enums\DeviceAcquisitionSource;
 use App\Enums\DeviceOwnership;
 use App\Enums\DeviceRetrievalSource;
+use App\Enums\InfrastructureLocationKind;
+use App\Enums\InfrastructureSlotKind;
 use App\Enums\InventoryTransactionType;
 use App\Enums\ItemCondition;
 use App\Enums\MaterialKind;
@@ -19,6 +21,8 @@ use App\Models\CustomerDevice;
 use App\Models\DeviceRetrievalLog;
 use App\Models\FopTask;
 use App\Models\InfrastructureBalance;
+use App\Models\InfrastructurePort;
+use App\Models\InfrastructureSlot;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventorySerialSale;
@@ -29,6 +33,7 @@ use App\Models\Pop;
 use App\Models\TaskMaterial;
 use App\Models\TechnicianCustody;
 use App\Models\User;
+use App\Support\InfrastructureLocation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -543,10 +548,28 @@ class InventoryService
      */
     public function deploySerial(InventorySerial $serial, NetworkNode $node, FopTask $fopTask, iterable $technicians, User $actor): InventoryTransaction
     {
+        return $this->deploySerialAt($serial, $this->locations()->forNode($node), $fopTask, $technicians, $actor);
+    }
+
+    /**
+     * Pasang SN dari custody tim ke posisi TEPAT (§16.1): Mini POP, node,
+     * Slot, atau PON/Port — bukan sekadar node induknya. Kartu di Slot 1
+     * tersimpan di ID Slot 1, SFP di Port 4 tersimpan di ID Port 4.
+     *
+     * Satu-satunya pintu ke `SerialStatus::DEPLOYED` dari custody. Guard
+     * kompatibilitas SKU ↔ posisi ada di `assertSerialItemFitsLocation()`;
+     * POP scope aktor & subtree task dicek pemanggil (laporan, Task 8).
+     *
+     * `to_pop_id` tetap snapshot Cabang SAAT transaksi (makna lama).
+     *
+     * @param  iterable<User>  $technicians
+     */
+    public function deploySerialAt(InventorySerial $serial, InfrastructureLocation $location, FopTask $fopTask, iterable $technicians, User $actor): InventoryTransaction
+    {
         $technicianIds = Collection::make($technicians)->pluck('id')->all();
 
-        return DB::transaction(function () use ($serial, $node, $fopTask, $technicianIds, $actor) {
-            $serial = InventorySerial::query()->with('item')->lockForUpdate()->findOrFail($serial->id);
+        return DB::transaction(function () use ($serial, $location, $fopTask, $technicianIds, $actor) {
+            $serial = InventorySerial::query()->with('item.category')->lockForUpdate()->findOrFail($serial->id);
 
             if ($serial->status !== SerialStatus::ISSUED) {
                 throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan ISSUED — gak bisa di-deploy.");
@@ -554,13 +577,6 @@ class InventoryService
 
             if (! in_array($serial->current_technician_id, $technicianIds, true)) {
                 throw new InvalidArgumentException("SN {$serial->serial_number} bukan custody tim ini.");
-            }
-
-            // Kebalikan guard `installSerial()`: modem pelanggan (INSTALLABLE)
-            // yang ke-deploy ke ODC bakal hilang dari jalur install/retur
-            // pelanggan, alat kerja (COMPANY_ASSET) gak pernah boleh netap.
-            if ($serial->item?->ownership_mode !== OwnershipMode::INFRASTRUCTURE_ASSET) {
-                throw new InvalidArgumentException("Item {$serial->item?->name} bukan aset infrastruktur (ownership_mode) — gak bisa di-deploy ke titik jaringan.");
             }
 
             // Sama guard lintas-cabang dengan `installSerial()` — SN yang
@@ -571,18 +587,22 @@ class InventoryService
                 throw new InvalidArgumentException("SN {$serial->serial_number} berasal dari cabang lain — gak bisa di-deploy untuk task di cabang ini.");
             }
 
-            $node = $this->freshNode($node);
-            $this->assertNodeAcceptsSerialItem($serial->item, $node);
-            $toPopId = $node->resolvePop()?->id;
-            if ($targetCabangId !== null && $toPopId !== $targetCabangId) {
-                throw new InvalidArgumentException('Node tujuan berada di cabang berbeda dari task.');
+            // Resolve ulang dari DB di dalam transaksi — lokasi dari pemanggil
+            // bisa basi (node dipindah cabang setelah resolve).
+            $location = $this->locations()->resolve($location->kind, $location->id);
+            $this->lockLocation($location);
+            $this->assertSerialItemFitsLocation($serial->item, $location);
+            if ($targetCabangId !== null && $location->cabangId !== $targetCabangId) {
+                throw new InvalidArgumentException('Lokasi tujuan berada di cabang berbeda dari task.');
             }
             $fromTechnicianId = $serial->current_technician_id;
 
             $serial->update([
                 'status' => SerialStatus::DEPLOYED,
-                'current_network_node_id' => $node->id,
+                'current_pop_id' => null,
                 'current_technician_id' => null,
+                'customer_id' => null,
+                ...$this->serialLocationColumns($location),
             ]);
 
             return InventoryTransaction::create([
@@ -592,13 +612,132 @@ class InventoryService
                 'serial_id' => $serial->id,
                 'qty' => 1,
                 'from_technician_id' => $fromTechnicianId,
-                'to_network_node_id' => $node->id,
-                'to_pop_id' => $toPopId,
+                ...$this->transactionLocationColumns('to', $location),
+                'to_pop_id' => $location->cabangId,
                 'fop_task_id' => $fopTask->id,
-                'notes' => "SN {$serial->serial_number} dipasang netap di {$node->breadcrumbLabel()} (Task {$fopTask->task_number}).",
+                'notes' => "SN {$serial->serial_number} dipasang netap di {$location->breadcrumb()} (Task {$fopTask->task_number}).",
                 'created_by' => $actor->id,
             ]);
         });
+    }
+
+    /**
+     * Lokasi terpasang SN DEPLOYED saat ini, dibaca dari kolom FK yang tepat.
+     * Null bila SN tidak sedang terpasang di jaringan.
+     */
+    public function currentLocationOf(InventorySerial $serial): ?InfrastructureLocation
+    {
+        return match (true) {
+            $serial->current_infrastructure_port_id !== null => $this->locations()->resolve(InfrastructureLocation::PORT, $serial->current_infrastructure_port_id),
+            $serial->current_infrastructure_slot_id !== null => $this->locations()->resolve(InfrastructureLocation::SLOT, $serial->current_infrastructure_slot_id),
+            $serial->current_network_node_id !== null => $this->locations()->resolve(InfrastructureLocation::NODE, $serial->current_network_node_id),
+            $serial->current_mini_pop_id !== null => $this->locations()->resolve(InfrastructureLocation::MINI_POP, $serial->current_mini_pop_id),
+            default => null,
+        };
+    }
+
+    /**
+     * Kolom lokasi SN — SELALU keempatnya ditulis sekaligus supaya satu SN
+     * tidak pernah aktif di dua posisi.
+     *
+     * @return array{current_mini_pop_id: ?int, current_network_node_id: ?int, current_infrastructure_slot_id: ?int, current_infrastructure_port_id: ?int}
+     */
+    public function serialLocationColumns(?InfrastructureLocation $location): array
+    {
+        return [
+            'current_mini_pop_id' => $location?->kind === InfrastructureLocation::MINI_POP ? $location->id : null,
+            'current_network_node_id' => $location?->kind === InfrastructureLocation::NODE ? $location->id : null,
+            'current_infrastructure_slot_id' => $location?->kind === InfrastructureLocation::SLOT ? $location->id : null,
+            'current_infrastructure_port_id' => $location?->kind === InfrastructureLocation::PORT ? $location->id : null,
+        ];
+    }
+
+    /**
+     * @return array<string, ?int>
+     */
+    public function transactionLocationColumns(string $direction, ?InfrastructureLocation $location): array
+    {
+        return [
+            "{$direction}_mini_pop_id" => $location?->kind === InfrastructureLocation::MINI_POP ? $location->id : null,
+            "{$direction}_network_node_id" => $location?->kind === InfrastructureLocation::NODE ? $location->id : null,
+            "{$direction}_infrastructure_slot_id" => $location?->kind === InfrastructureLocation::SLOT ? $location->id : null,
+            "{$direction}_infrastructure_port_id" => $location?->kind === InfrastructureLocation::PORT ? $location->id : null,
+        ];
+    }
+
+    /**
+     * Kompatibilitas SKU ↔ posisi akhir (§10.4 poin 3, §15).
+     *
+     * - INSTALLABLE (modem pelanggan) tidak pernah netap di jaringan.
+     * - INFRASTRUCTURE_ASSET: posisi mengikuti `infrastructure_location_kind`
+     *   (null = node, perilaku lama).
+     * - COMPANY_ASSET (Switch/SFP): HANYA bila Master Barang menyatakan posisi
+     *   eksplisit — tanpa itu alat kerja tidak boleh tercatat netap.
+     * - POP Cabang/Pusat bukan lokasi aset berserial (hanya lokasi kerja kabel).
+     */
+    public function assertSerialItemFitsLocation(?Item $item, InfrastructureLocation $location): void
+    {
+        if ($item === null) {
+            throw new InvalidArgumentException('Barang SN tidak ditemukan.');
+        }
+
+        $declared = $item->infrastructure_location_kind;
+        $allowed = $item->ownership_mode === OwnershipMode::INFRASTRUCTURE_ASSET
+            || ($item->ownership_mode === OwnershipMode::COMPANY_ASSET && $declared !== null);
+        if (! $allowed) {
+            throw new InvalidArgumentException($item->ownership_mode === OwnershipMode::COMPANY_ASSET
+                ? "Item {$item->name} aset perusahaan tanpa posisi pemasangan di Master Barang — gak bisa di-deploy."
+                : "Item {$item->name} bukan aset infrastruktur (ownership_mode) — gak bisa di-deploy ke titik jaringan.");
+        }
+
+        if ($location->kind === InfrastructureLocation::POP) {
+            throw new InvalidArgumentException('POP Cabang bukan lokasi pemasangan aset berserial — pilih Mini POP atau perangkat.');
+        }
+
+        $kind = $declared ?? InfrastructureLocationKind::NODE;
+        if (! $kind->matchesLocation($location)) {
+            throw new InvalidArgumentException("SKU {$item->name} dipasang pada {$kind->label()}, bukan {$location->label()}.");
+        }
+
+        switch ($location->kind) {
+            case InfrastructureLocation::NODE:
+                $this->assertNodeAcceptsSerialItem($item, NetworkNode::query()->with('nodeType')->findOrFail($location->id));
+                break;
+            case InfrastructureLocation::SLOT:
+                $slot = InfrastructureSlot::query()->findOrFail($location->id);
+                if ($slot->kind === InfrastructureSlotKind::OLT && $item->category?->code !== 'olt_module') {
+                    throw new InvalidArgumentException('Slot OLT hanya menerima modul/kartu OLT.');
+                }
+                if ($slot->deployedSerials()->where('status', SerialStatus::DEPLOYED->value)->exists()) {
+                    throw new InvalidArgumentException("{$slot->displayName()} sudah memiliki satu aset terpasang.");
+                }
+                break;
+            case InfrastructureLocation::PORT:
+                $port = InfrastructurePort::query()->findOrFail($location->id);
+                if ($port->deployedSerials()->where('status', SerialStatus::DEPLOYED->value)->exists()) {
+                    throw new InvalidArgumentException("{$port->displayName()} sudah memiliki satu aset terpasang.");
+                }
+                break;
+        }
+    }
+
+    private function locations(): InfrastructureLocationResolver
+    {
+        return app(InfrastructureLocationResolver::class);
+    }
+
+    /**
+     * Kunci baris posisi tujuan — dua pemasangan bersamaan ke Slot/Port yang
+     * sama harus berurutan supaya guard "satu aset per posisi" tidak kebobolan.
+     */
+    private function lockLocation(InfrastructureLocation $location): void
+    {
+        match ($location->kind) {
+            InfrastructureLocation::NODE => NetworkNode::query()->whereKey($location->id)->lockForUpdate()->first(),
+            InfrastructureLocation::SLOT => InfrastructureSlot::query()->whereKey($location->id)->lockForUpdate()->first(),
+            InfrastructureLocation::PORT => InfrastructurePort::query()->whereKey($location->id)->lockForUpdate()->first(),
+            default => Pop::query()->whereKey($location->id)->lockForUpdate()->first(),
+        };
     }
 
     /**
@@ -865,26 +1004,33 @@ class InventoryService
      * terpasang di suatu tempat balik ke tangan teknisi, gak ada "tujuan
      * cabang yang salah" kayak deploy.
      */
-    public function retrieveSerialFromLocation(InventorySerial $serial, FopTask $fopTask, User $actor, ?NetworkNode $expectedNode = null): InventoryTransaction
-    {
-        return DB::transaction(function () use ($serial, $fopTask, $actor, $expectedNode) {
+    public function retrieveSerialFromLocation(
+        InventorySerial $serial,
+        FopTask $fopTask,
+        User $actor,
+        ?NetworkNode $expectedNode = null,
+        ?InfrastructureLocation $expectedLocation = null,
+    ): InventoryTransaction {
+        return DB::transaction(function () use ($serial, $fopTask, $actor, $expectedNode, $expectedLocation) {
             $serial = InventorySerial::query()->with('item')->lockForUpdate()->findOrFail($serial->id);
 
             if ($serial->status !== SerialStatus::DEPLOYED) {
                 throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan DEPLOYED — gak bisa dicabut dari lokasi.");
             }
 
-            if ($expectedNode !== null && $serial->current_network_node_id !== $expectedNode->id) {
-                throw new InvalidArgumentException('SN lama tidak terpasang pada node yang dilaporkan.');
-            }
+            $from = $this->currentLocationOf($serial);
+            $expectedKey = $expectedLocation?->key() ?? ($expectedNode !== null ? InfrastructureLocation::NODE.':'.$expectedNode->id : null);
 
-            $fromNodeId = $serial->current_network_node_id;
-            $fromPopId = $serial->currentNetworkNode?->resolvePop()?->id;
+            // Posisi TEPAT, bukan induk/saudara: SN di Slot 1 tidak boleh
+            // dicabut lewat aksi Slot 2 atau lewat OLT induknya (§15).
+            if ($expectedKey !== null && $from?->key() !== $expectedKey) {
+                throw new InvalidArgumentException('SN lama tidak terpasang pada lokasi yang dilaporkan.');
+            }
 
             $serial->update([
                 'status' => SerialStatus::ISSUED,
                 'current_technician_id' => $actor->id,
-                'current_network_node_id' => null,
+                ...$this->serialLocationColumns(null),
             ]);
 
             return InventoryTransaction::create([
@@ -893,8 +1039,8 @@ class InventoryService
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
-                'from_network_node_id' => $fromNodeId,
-                'from_pop_id' => $fromPopId,
+                ...$this->transactionLocationColumns('from', $from),
+                'from_pop_id' => $from?->cabangId,
                 'to_technician_id' => $actor->id,
                 'fop_task_id' => $fopTask->id,
                 'notes' => "SN {$serial->serial_number} dicabut dari lokasi, kembali ke custody {$actor->name} (Task {$fopTask->task_number}).",

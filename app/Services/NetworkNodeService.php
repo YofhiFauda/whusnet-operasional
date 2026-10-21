@@ -197,8 +197,14 @@ class NetworkNodeService
                 $query->whereIn('network_node_port_id', $portIds)
                     ->orWhereIn('target_node_id', $nodeIds);
             })->exists();
-        $hasSerials = InventorySerial::query()->whereIn('current_network_node_id', $nodeIds)
-            ->where('status', SerialStatus::DEPLOYED)->exists();
+        // Termasuk aset di Slot/Port milik node ini (posisi kanonis Task 6) —
+        // kartu di Slot 1 OLT ikut pindah cabang kalau OLT-nya dipindah.
+        $slotIds = InfrastructureSlot::query()->whereIn('network_node_id', $nodeIds)->pluck('id');
+        $hasSerials = InventorySerial::query()->where('status', SerialStatus::DEPLOYED)
+            ->where(fn ($query) => $query->whereIn('current_network_node_id', $nodeIds)
+                ->orWhereIn('current_infrastructure_slot_id', $slotIds)
+                ->orWhereIn('current_infrastructure_port_id', InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slotIds)->select('id')))
+            ->exists();
         $hasBalances = InfrastructureBalance::query()->whereIn('network_node_id', $nodeIds)
             ->where('qty', '>', 0)->exists();
 

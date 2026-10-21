@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Master;
 
+use App\Enums\InfrastructureLocationKind;
 use App\Enums\OwnershipMode;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
@@ -148,6 +149,7 @@ class ItemController extends Controller
             'unit' => ['required', 'string', 'max:20'],
             'is_active' => 'required|boolean',
             'infrastructure_node_type_id' => ['nullable', 'integer', Rule::exists('network_node_types', 'id')],
+            'infrastructure_location_kind' => ['nullable', Rule::enum(InfrastructureLocationKind::class)],
         ];
 
         if (! $locked) {
@@ -209,6 +211,27 @@ class ItemController extends Controller
         if ($item && $item->infrastructure_node_type_id !== $nodeTypeId
             && $item->inventorySerials()->where('status', 'deployed')->exists()) {
             throw ValidationException::withMessages(['infrastructure_node_type_id' => 'Tipe node tidak dapat diganti selama ada SN terpasang.']);
+        }
+
+        // Posisi Pemasangan (Task 6 rancangan hierarki §10.4): hanya aset
+        // infrastruktur atau aset perusahaan (Switch/SFP) bernomor seri. Untuk
+        // aset perusahaan, kolom inilah satu-satunya izin eksplisit untuk netap
+        // di jaringan (InventoryService::assertSerialItemFitsLocation()).
+        if ($item && ! $request->exists('infrastructure_location_kind')) {
+            $validated['infrastructure_location_kind'] = $item->infrastructure_location_kind?->value;
+        }
+        $locationKind = ($validated['infrastructure_location_kind'] ?? null) ?: null;
+        $validated['infrastructure_location_kind'] = $locationKind;
+        $effectiveTracking = $locked ? $item->tracking_type->value : ($validated['tracking_type'] ?? null);
+        if ($locationKind !== null && (
+            ! in_array($effectiveOwnership, [OwnershipMode::INFRASTRUCTURE_ASSET->value, OwnershipMode::COMPANY_ASSET->value], true)
+            || $effectiveTracking !== TrackingType::SERIALIZED->value
+        )) {
+            throw ValidationException::withMessages(['infrastructure_location_kind' => 'Posisi pemasangan hanya untuk aset infrastruktur/aset perusahaan bernomor seri.']);
+        }
+        if ($item && $item->infrastructure_location_kind?->value !== $locationKind
+            && $item->inventorySerials()->where('status', 'deployed')->exists()) {
+            throw ValidationException::withMessages(['infrastructure_location_kind' => 'Posisi pemasangan tidak dapat diganti selama ada SN terpasang.']);
         }
         // Server-side, jangan cuma percaya field `unit` disabled di klien
         // (bisa diakalin lewat devtools) — roll SELALU meter, gak ada jalan

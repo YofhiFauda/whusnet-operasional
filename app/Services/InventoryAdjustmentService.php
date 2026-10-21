@@ -249,13 +249,19 @@ class InventoryAdjustmentService
             // gak muncul di riwayat Gudang yang memfilter per `from_pop_id`.
             // Cabang di-resolve SAAT transaksi (pola sama snapshot ledger
             // DEPLOY/RETRIEVE_INFRA) — node dipindah belakangan, histori tetap.
-            $fromNetworkNodeId = null;
+            //
+            // Posisi kanonis (Task 6, §16.1): SN DEPLOYED bisa berada di Mini
+            // POP, node, Slot, atau Port — semua kolom lokasi dilepas dan
+            // posisi asal dicatat dengan FK yang sama di ledger.
             $fromNetworkNodePopId = null;
+            $fromLocationColumns = [];
 
             if ($serial->status === SerialStatus::DEPLOYED) {
-                $fromNetworkNodeId = $serial->current_network_node_id;
-                $fromNetworkNodePopId = $serial->currentNetworkNode?->resolvePop()?->id;
-                $updates['current_network_node_id'] = null;
+                $inventory = app(InventoryService::class);
+                $fromLocation = $inventory->currentLocationOf($serial);
+                $fromNetworkNodePopId = $fromLocation?->cabangId;
+                $fromLocationColumns = $inventory->transactionLocationColumns('from', $fromLocation);
+                $updates = [...$updates, ...$inventory->serialLocationColumns(null)];
             }
 
             $serial->update($updates);
@@ -268,7 +274,7 @@ class InventoryAdjustmentService
                 'qty' => -1,
                 'from_pop_id' => $serial->current_pop_id ?? $fromNetworkNodePopId,
                 'from_technician_id' => $serial->current_technician_id,
-                'from_network_node_id' => $fromNetworkNodeId,
+                ...$fromLocationColumns,
                 'reason' => $reason,
                 'notes' => $notes,
                 'evidence_file_path' => $evidenceFilePath,

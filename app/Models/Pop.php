@@ -171,6 +171,18 @@ class Pop extends Model
         return $this->hasMany(Pop::class, 'parent_id');
     }
 
+    /**
+     * Aset berserial DEPLOYED langsung di Mini POP ini (tanpa OLT/Switch
+     * tujuan) — pasangan `NetworkNode::deployedSerials()` (§16.1). Bukan stok
+     * Gudang (`current_pop_id`).
+     *
+     * @return HasMany<InventorySerial, $this>
+     */
+    public function deployedSerials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class, 'current_mini_pop_id');
+    }
+
     public function userRoleScopeTargets(): HasMany
     {
         return $this->hasMany(UserRoleScopeTarget::class);

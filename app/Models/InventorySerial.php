@@ -36,6 +36,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'ownership',
     'current_pop_id',
     'current_network_node_id',
+    'current_mini_pop_id',
+    'current_infrastructure_slot_id',
+    'current_infrastructure_port_id',
     'current_technician_id',
     'issued_from_pop_id',
     'customer_id',
@@ -55,7 +58,30 @@ class InventorySerial extends Model
             'ownership' => DeviceOwnership::class,
             'condition_checked_at' => 'datetime',
             'installed_at' => 'datetime',
+            'current_network_node_id' => 'integer',
+            'current_mini_pop_id' => 'integer',
+            'current_infrastructure_slot_id' => 'integer',
+            'current_infrastructure_port_id' => 'integer',
         ];
+    }
+
+    /**
+     * Mini POP tempat SN ini DEPLOYED langsung (tanpa OLT/Switch tujuan).
+     * Bukan `currentPop` — itu Gudang (§16.1).
+     */
+    public function currentMiniPop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'current_mini_pop_id');
+    }
+
+    public function currentInfrastructureSlot(): BelongsTo
+    {
+        return $this->belongsTo(InfrastructureSlot::class, 'current_infrastructure_slot_id');
+    }
+
+    public function currentInfrastructurePort(): BelongsTo
+    {
+        return $this->belongsTo(InfrastructurePort::class, 'current_infrastructure_port_id');
     }
 
     public function item(): BelongsTo

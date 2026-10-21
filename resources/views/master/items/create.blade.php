@@ -154,6 +154,7 @@
             
             @error('infrastructure_node_type_id')<p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>@enderror
         </div>
+        @include('master.items.partials.infrastructure-location-kind', ['selectedLocationKind' => old('infrastructure_location_kind')])
         <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Sumber Serial Number</label>
             <select name="auto_generate_serial" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
