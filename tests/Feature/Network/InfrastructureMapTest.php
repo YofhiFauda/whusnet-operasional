@@ -12,6 +12,8 @@ use App\Models\CustomerDevice;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\FopTask;
 use App\Models\InfrastructureBalance;
+use App\Models\InfrastructurePort;
+use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -81,7 +83,16 @@ class InfrastructureMapTest extends TestCase
         $this->assertSame(-$jetis->id, $topology[-$mini->id]['parent_id']);
         $this->assertSame(-$mini->id, $topology[$olt->id]['parent_id']);
         $this->assertSame(-$mini->id, $topology[NetworkNode::where('code', 'SW-JETIS-01')->value('id')]['parent_id']);
-        $this->assertSame($olt->id, $topology[NetworkNode::where('code', 'ODP-JETIS-01')->value('id')]['parent_id']);
+
+        // Keputusan user 21-10-2026: Slot dan PON instance kanvas sendiri,
+        // bukan diringkas ke panel perangkat — rantai lengkap OLT→Slot→PON→ODP.
+        $slot = InfrastructureSlot::where('network_node_id', $olt->id)->orderBy('number')->first();
+        $pon = InfrastructurePort::where('infrastructure_slot_id', $slot->id)->orderBy('number')->first();
+        $slotCanvasId = -2_000_000_000 - $slot->id;
+        $ponCanvasId = -3_000_000_000 - $pon->id;
+        $this->assertSame($olt->id, $topology[$slotCanvasId]['parent_id']);
+        $this->assertSame($slotCanvasId, $topology[$ponCanvasId]['parent_id']);
+        $this->assertSame($ponCanvasId, $topology[NetworkNode::where('code', 'ODP-JETIS-01')->value('id')]['parent_id']);
 
         $fopRole = Role::where('code', 'fop')->firstOrFail();
         $scopedUser = User::factory()->create(['role_id' => $fopRole->id, 'status' => 'active']);

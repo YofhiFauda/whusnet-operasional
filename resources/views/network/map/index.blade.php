@@ -233,8 +233,22 @@
             if (t.includes('odc')) {
                 return { tag: 'ODC', color: '#b45309', border: '#d97706', bg: 'rgba(254, 249, 195, 0.4)' };
             }
+            // Slot/PON/Port: instance sendiri (keputusan user 21-10-2026), beda
+            // warna dari kartu device-nya supaya kelihatan sebagai lapisan terpisah.
+            if (t === 'slot_olt' || t === 'slot_switch') {
+                return { tag: 'SLOT', color: '#0e7490', border: '#22d3ee', bg: 'rgba(207, 250, 254, 0.4)' };
+            }
+            if (t === 'port_pon') {
+                return { tag: 'PON', color: '#166534', border: '#4ade80', bg: 'rgba(220, 252, 231, 0.4)' };
+            }
+            if (t === 'port_switch') {
+                return { tag: 'PORT', color: '#3730a3', border: '#818cf8', bg: 'rgba(224, 231, 255, 0.4)' };
+            }
             if (t.includes('olt') || t.includes('pon')) {
                 return { tag: 'OLT', color: '#047857', border: '#10b981', bg: 'rgba(209, 250, 229, 0.4)' };
+            }
+            if (t.includes('switch')) {
+                return { tag: 'SWITCH', color: '#4338ca', border: '#6366f1', bg: 'rgba(224, 231, 255, 0.4)' };
             }
             if (t.includes('pop') || t.includes('cabang') || t.includes('pusat')) {
                 return { tag: t.includes('pusat') ? 'PUSAT' : (t.includes('mini') ? 'MINI POP' : 'CABANG'), color: '#0f766e', border: '#14b8a6', bg: 'rgba(204, 251, 241, 0.4)' };

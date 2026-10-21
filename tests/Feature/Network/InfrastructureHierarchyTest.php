@@ -366,13 +366,20 @@ class InfrastructureHierarchyTest extends TestCase
         $this->withoutVite();
         $map = app(InfrastructureMapService::class)->build($this->owner, null, 'path');
 
-        $this->assertSame($this->olt1->id, $map['topologyDetails'][$this->odpVerified->id]['parent_id']);
+        // Keputusan user 21-10-2026: Slot dan PON instance kanvas sendiri
+        // (ID dinamespace negatif), rantai lengkap OLT→Slot→PON→ODP.
+        $ponCanvasId = -3_000_000_000 - $this->pon->id;
+        $slotCanvasId = -2_000_000_000 - $this->pon->infrastructure_slot_id;
+        $slotKosongCanvasId = -2_000_000_000 - $this->slotKosong->id;
+        $this->assertSame($ponCanvasId, $map['topologyDetails'][$this->odpVerified->id]['parent_id']);
         $this->assertSame('connection', $map['topologyDetails'][$this->odpVerified->id]['relation']);
         $this->assertFalse($map['topologyDetails'][$this->odpUnverified->id]['verified']);
         $this->assertSame($this->server->id, $map['topologyDetails'][-$this->pusat->id]['parent_id']);
         $this->assertSame('PON 1', $map['topologyDetails'][$this->odpVerified->id]['via_port']);
         $this->assertSame(['Slot 1', 'Slot 2'], array_column($map['topologyDetails'][$this->olt1->id]['slots'], 'label'));
-        $this->assertArrayNotHasKey('slot:'.$this->slotKosong->id, $map['topologyDetails'], 'Slot tidak menjadi kartu/pin sendiri.');
+        $this->assertSame($this->olt1->id, $map['topologyDetails'][$slotCanvasId]['parent_id']);
+        $this->assertSame($slotCanvasId, $map['topologyDetails'][$ponCanvasId]['parent_id']);
+        $this->assertSame($this->olt1->id, $map['topologyDetails'][$slotKosongCanvasId]['parent_id']);
     }
 
     #[Test]
@@ -385,7 +392,11 @@ class InfrastructureHierarchyTest extends TestCase
 
         $map = app(InfrastructureMapService::class)->build($this->owner, null, 'path');
 
-        $oltAsset = collect($map['topologyDetails'][$this->olt1->id]['assets'])->firstWhere('reference', 'SN-KARTU-1');
+        // Aset di Slot kini tampil di kartu Slot itu sendiri (bukan diringkas
+        // ke panel perangkat) — Slot instance kanvas sendiri sejak keputusan
+        // user 21-10-2026.
+        $slotCanvasId = -2_000_000_000 - $this->pon->infrastructure_slot_id;
+        $oltAsset = collect($map['topologyDetails'][$slotCanvasId]['assets'])->firstWhere('reference', 'SN-KARTU-1');
         $this->assertSame('Jetis → C1 → OLT-1 → Slot 1', $oltAsset['position']);
         $this->assertSame('SN-RAK-1', collect($map['topologyDetails'][-$this->miniA->id]['assets'])->first()['reference']);
         $this->assertSame(2, app(InfrastructureHierarchyService::class)->metricsByCabang($this->owner)[$this->cabangA->id]['assets']);
