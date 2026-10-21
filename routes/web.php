@@ -59,6 +59,7 @@ use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
 use App\Http\Controllers\Network\InfraAssetRegistrationController;
 use App\Http\Controllers\Network\InfrastructureMapController;
+use App\Http\Controllers\Network\InfrastructurePortController;
 use App\Http\Controllers\Network\NetworkNodeController;
 use App\Http\Controllers\Network\OltSlotController;
 use App\Http\Controllers\NocDashboardController;
@@ -1241,6 +1242,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/node-ports/{port}/assign-customer', [NetworkNodeController::class, 'assignCustomerPort'])->name('network.node-ports.assign-customer');
         Route::post('/network/nodes/{chassis}/olt-slots', [OltSlotController::class, 'store'])->name('network.nodes.olt-slots.store');
         Route::post('/network/nodes/{chassis}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('network.nodes.olt-slots.card');
+        Route::patch('/network/infrastructure-ports/{port}/capacity', [InfrastructurePortController::class, 'updateCapacity'])->name('network.infrastructure-ports.capacity');
     });
     Route::middleware('permission:network_nodes.delete')->group(function () {
         Route::delete('/network/nodes/{node}', [NetworkNodeController::class, 'destroy'])->name('network.nodes.destroy');
