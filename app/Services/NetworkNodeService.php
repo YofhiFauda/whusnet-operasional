@@ -205,7 +205,10 @@ class NetworkNodeService
                 ->orWhereIn('current_infrastructure_slot_id', $slotIds)
                 ->orWhereIn('current_infrastructure_port_id', InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slotIds)->select('id')))
             ->exists();
-        $hasBalances = InfrastructureBalance::query()->whereIn('network_node_id', $nodeIds)
+        $hasBalances = InfrastructureBalance::query()
+            ->where(fn ($query) => $query->whereIn('network_node_id', $nodeIds)
+                ->orWhereIn('infrastructure_slot_id', $slotIds)
+                ->orWhereIn('infrastructure_port_id', InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slotIds)->select('id')))
             ->where('qty', '>', 0)->exists();
 
         // Koneksi kanonis (Task 3): node jadi tujuan sambungan aktif (mis. ODP

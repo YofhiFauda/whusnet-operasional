@@ -11,7 +11,10 @@ use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\OltSlot;
 use App\Models\Pop;
+use App\Models\User;
+use App\Services\InfrastructureConnectionService;
 use App\Services\InfrastructureLegacyBackfillService;
+use App\Services\InfrastructureLegacyDecisionService;
 use App\Services\InfrastructurePositionService;
 use Database\Seeders\NetworkNodeTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -205,5 +208,51 @@ class InfrastructureLegacyMappingTest extends TestCase
 
         $migration->up();
         $this->assertSame(2, InfrastructureSlot::count());
+    }
+
+    #[Test]
+    public function rollback_preserves_operator_rejections(): void
+    {
+        $nodes = $this->legacyFixture();
+        $this->backfill()->run();
+        $mapping = InfrastructureLegacyMapping::where('legacy_type', 'odp_uplink')->where('legacy_id', $nodes['odp']->id)->sole();
+        app(InfrastructureLegacyDecisionService::class)->reject($mapping, User::factory()->create(), 'Preserve decision');
+        try {
+            $this->backfill()->rollback();
+            $this->fail('Decisions must block rollback.');
+        } catch (RuntimeException) {
+            $this->assertSame('rejected', $mapping->fresh()->status);
+            $this->assertSame(2, InfrastructureSlot::count());
+            $this->assertDatabaseHas('audit_logs', ['action' => 'legacy_rollback_snapshot']);
+        }
+    }
+
+    #[Test]
+    public function backfill_syncs_card_added_after_slot_mapping(): void
+    {
+        $nodes = $this->legacyFixture();
+        $this->backfill()->run();
+        $legacy = OltSlot::where('chassis_node_id', $nodes['chassis']->id)->firstOrFail();
+        $card = $this->node('olt_card', ['parent_id' => $nodes['chassis']->id]);
+        $legacy->update(['card_node_id' => $card->id]);
+        $this->backfill()->run();
+        $this->backfill()->run();
+        $this->assertSame(2, InfrastructureSlot::count());
+        $this->assertDatabaseHas('infrastructure_legacy_mappings', ['legacy_type' => 'olt_card_node', 'legacy_id' => $card->id, 'new_id' => InfrastructureSlot::where('legacy_olt_slot_id', $legacy->id)->sole()->id]);
+    }
+
+    #[Test]
+    public function rollback_refuses_connections_even_without_operator_mapping(): void
+    {
+        $nodes = $this->legacyFixture();
+        $this->backfill()->run();
+        $chassis = $this->node('olt_chassis', ['anchor_pop_id' => $this->miniPop->id]);
+        $slot = app(InfrastructurePositionService::class)->createSlot($chassis, 1);
+        $pon = app(InfrastructurePositionService::class)->createPort($slot, 1, InfrastructurePortKind::PON);
+        app(InfrastructureConnectionService::class)->connect($pon, User::factory()->create(), targetNode: $nodes['odp']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('koneksi kanonis');
+        $this->backfill()->rollback();
     }
 }

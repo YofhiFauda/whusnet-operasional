@@ -16,12 +16,13 @@
     };
     $capacity = $item['capacity'];
 @endphp
+@unless(in_array($item['type'], ['pon_port', 'olt_card', 'aggregation_switch', 'backbone', 'feeder', 'drop_cable'], true))
 <div class="tree-line select-none my-0.5"
      data-hierarchy-key="{{ $hierarchyKey }}"
+     x-show="matchesHierarchyFilter(@js($hierarchyKey))"
      @if($isNode)
          data-tree-node-id="{{ $item['id'] }}"
          @if(str_starts_with((string) $item['parent'], 'node:')) data-tree-parent-id="{{ substr($item['parent'], 5) }}" @endif
-         x-show="matchesTreeFilter({{ $item['id'] }}, '{{ $item['type_id'] ?? '' }}', @js(strtolower($item['label'].' '.($item['name'] ?? ''))))"
      @endif
      x-data="{ isOpen: true }"
      @tree-toggle-all.window="isOpen = $event.detail.open">
@@ -66,9 +67,9 @@
             @if($item['direct_assets'] !== [])
                 <span class="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700" title="Aset terpasang langsung">{{ count($item['direct_assets']) }} aset</span>
             @endif
-            @if($capacity && ($capacity['capacity'] ?? null))
+            @if($capacity)
                 <span class="rounded-full border px-1.5 py-0.5 font-mono text-[10px] font-bold {{ ($capacity['red_zone'] ?? false) ? 'border-rose-300 bg-rose-100 text-rose-700' : 'border-slate-200 bg-slate-100 text-slate-700' }}"
-                      title="{{ $capacity['unit_label'] ?? '' }}">{{ $capacity['used'] }}/{{ $capacity['capacity'] }}</span>
+                      title="{{ ($capacity['capacity'] ?? null) === null ? 'kapasitas belum didata' : ($capacity['unit_label'] ?? '') }}">{{ $capacity['used'] }} / {{ $capacity['capacity'] ?? '?' }} {{ $capacity['unit_label'] ?? '' }}</span>
             @endif
         </div>
     </div>
@@ -80,3 +81,4 @@
         </div>
     @endif
 </div>
+@endunless

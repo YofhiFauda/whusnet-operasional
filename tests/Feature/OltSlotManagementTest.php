@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\OltSlot;
@@ -54,11 +55,17 @@ class OltSlotManagementTest extends TestCase
         $this->actingAs($owner)->post(route('network.nodes.olt-slots.store', $chassis), ['slot_count' => 2])
             ->assertRedirect(route('network.nodes.show', $chassis));
         $this->assertSame([1, 2], $chassis->oltSlots()->orderBy('number')->pluck('number')->all());
+        $this->assertSame(2, InfrastructureSlot::where('network_node_id', $chassis->id)->count());
 
         $slot = OltSlot::where('chassis_node_id', $chassis->id)->where('number', 1)->firstOrFail();
         $this->actingAs($owner)->post(route('network.nodes.olt-slots.card', [$chassis, $slot]), ['network_node_id' => $card->id])
             ->assertRedirect(route('network.nodes.show', $chassis));
         $this->assertSame($card->id, $slot->fresh()->card_node_id);
+        $canonical = InfrastructureSlot::where('legacy_olt_slot_id', $slot->id)->sole();
+        $this->assertDatabaseHas('infrastructure_legacy_mappings', ['legacy_type' => 'olt_card_node', 'legacy_id' => $card->id, 'new_id' => $canonical->id]);
+        $this->actingAs($owner)->post(route('network.nodes.olt-slots.card', [$chassis, $slot]), ['network_node_id' => $card->id])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(2, InfrastructureSlot::where('network_node_id', $chassis->id)->count());
     }
 
     public function test_kartu_yang_bukan_anak_chassis_ini_ditolak(): void

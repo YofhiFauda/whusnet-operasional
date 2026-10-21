@@ -41,12 +41,15 @@
 
 @section('content')
 <div x-data="networkNodeManager({
-    selectedNodeId: @js($nodes->first()?->id),
+    selectedNodeId: @js($nodes->first(fn ($candidate) => ! in_array($candidate->nodeType?->code, ['pon_port', 'olt_card', 'aggregation_switch', 'backbone', 'feeder', 'drop_cable'], true))?->id),
     showCreateModal: @js($errors->any() && !old('_method')),
     placement: @js(old('parent_id') ? 'node' : 'pop'),
     createParentId: @js(old('parent_id') ? (int) old('parent_id') : null),
     hasPorts: @js((bool) ($nodeTypes->firstWhere('id', (int) old('node_type_id'))?->has_ports ?? true)),
+    hasDeviceSlots: @js(in_array($nodeTypes->firstWhere('id', (int) old('node_type_id'))?->code, ['olt_chassis', 'switch_mini_pop'], true)),
     availableCustomers: @js($availableCustomers),
+    hierarchyItems: @js(collect($hierarchy['items'])->map(fn ($item) => collect($item)->only(['label', 'name', 'type_id', 'parent']))),
+    hierarchyChildren: @js($hierarchy['children']),
 })" class="mx-auto space-y-5 pb-6">
 
     {{-- Layer 1: Naked Page Header (tanpa card container / tanpa gradien) --}}
@@ -211,6 +214,23 @@
                     </div>
                 @endforelse
             </div>
+            @php
+                $legacyNodes = $nodes->filter(fn ($candidate) => in_array($candidate->nodeType?->code, ['pon_port', 'olt_card', 'aggregation_switch', 'backbone', 'feeder', 'drop_cable'], true));
+            @endphp
+            @if($legacyNodes->isNotEmpty())
+            <details class="border-t border-border bg-amber-50/50 p-3 dark:bg-amber-950/20">
+                <summary class="cursor-pointer text-xs font-semibold text-amber-700 dark:text-amber-400">Menunggu pemetaan legacy · {{ $legacyNodes->count() }} referensi lama</summary>
+                <p class="mt-2 text-xs text-text-muted">Referensi dan histori lama tetap tersimpan. Hubungan Slot/PON yang belum terbukti tidak dimasukkan ke pohon operasional.</p>
+                <ul class="mt-2 space-y-1">
+                    @foreach($legacyNodes as $legacyNode)
+                    <li data-legacy-node="{{ $legacyNode->id }}" class="text-xs">
+                        <a href="{{ route('network.nodes.show', $legacyNode) }}" class="font-mono text-text-secondary hover:underline">{{ $legacyNode->code }}</a>
+                        <span class="text-text-muted">· {{ $legacyNode->nodeType?->name }}</span>
+                    </li>
+                    @endforeach
+                </ul>
+            </details>
+            @endif
         </section>
 
         {{-- ========================================================================= --}}
@@ -263,6 +283,9 @@
 
                         {{-- Primary Action Buttons --}}
                         <div class="flex items-center gap-2">
+                            @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
+                            <a href="#device-components-{{ $node->id }}" class="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-primary">Slot / {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port' }}</a>
+                            @else
                             @can('network_nodes.create')
                             <button type="button" @click="openAddChildModal({{ $node->id }}, @js($node->code), @js($node->name))"
                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm cursor-pointer">
@@ -272,6 +295,7 @@
                                 <span>+ Sub-Node</span>
                             </button>
                             @endcan
+                            @endif
 
                             @can('network_nodes.update')
                             <button type="button" @click="openEditModal({{ $node->id }}, @js($node->code), @js($node->name), {{ $node->node_type_id }}, @js($node->status), @js($location['address'] ?? ''), @js($location['village'] ?? ''), @js($location['district'] ?? ''), @js($location['city'] ?? ''), @js($location['latitude'] ?? ''), @js($location['longitude'] ?? ''))"
@@ -340,7 +364,7 @@
                             </div>
 
                             {{-- Visual Utilization Meter (Goal-Gradient Effect) --}}
-                            @if($node->nodeType?->has_ports)
+                            @if($node->nodeType?->has_ports && ! in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
                             <div class="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-3.5 border border-slate-200/80 dark:border-slate-700 min-w-[260px] sm:min-w-[300px]">
                                 <div class="flex items-center justify-between mb-1.5">
                                     <span class="text-xs font-semibold text-slate-600 dark:text-slate-400">Okupansi Port</span>
@@ -361,6 +385,10 @@
                             </div>
                             @endif
                         </div>
+
+                        @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
+                            <div class="px-4 pb-5 sm:px-6">@include('network.nodes._device-slots', ['device' => $node])</div>
+                        @endif
 
                         {{-- 2. Physical Location & Coordinates Section --}}
                         <div class="bg-slate-50/70 dark:bg-slate-900/40 rounded-xl border border-slate-200/80 dark:border-slate-700 p-4">
@@ -408,7 +436,7 @@
                         </div>
 
                         {{-- 3. Port Management Section & Hardware Patch Panel Grid --}}
-                        @if($node->nodeType?->has_ports || $node->ports->isNotEmpty())
+                        @if(! in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true) && ($node->nodeType?->has_ports || $node->ports->isNotEmpty()))
                         <div class="space-y-4">
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div>
@@ -772,11 +800,11 @@
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div class="space-y-1">
                         <label class="text-xs font-bold text-slate-700 dark:text-slate-300">Tipe Perangkat <span class="text-rose-500">*</span></label>
-                        <select name="node_type_id" required x-on:change="hasPorts = $event.target.selectedOptions[0]?.dataset.hasPorts === '1'"
+                        <select name="node_type_id" required x-on:change="hasPorts = $event.target.selectedOptions[0]?.dataset.hasPorts === '1'; hasDeviceSlots = $event.target.selectedOptions[0]?.dataset.hasDeviceSlots === '1'"
                                 class="block w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-800 dark:text-slate-100 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none transition cursor-pointer">
                             <option value="">Pilih Tipe Perangkat</option>
                             @foreach($nodeTypes as $nodeType)
-                            <option value="{{ $nodeType->id }}" data-has-ports="{{ $nodeType->has_ports ? '1' : '0' }}"
+                            <option value="{{ $nodeType->id }}" data-has-ports="{{ $nodeType->has_ports ? '1' : '0' }}" data-has-device-slots="{{ in_array($nodeType->code, ['olt_chassis', 'switch_mini_pop'], true) ? '1' : '0' }}"
                                     @selected(old('node_type_id') == $nodeType->id)>{{ $nodeType->name }} @if($nodeType->has_ports)(Ada Port)@endif</option>
                             @endforeach
                         </select>
@@ -832,11 +860,11 @@
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div class="space-y-1">
                         <label class="text-xs font-bold text-slate-700 dark:text-slate-300">
-                            <span x-text="hasPorts ? 'Kapasitas Port Awal' : 'Kapasitas / Keterangan (Opsional)'"></span>
+                            <span x-text="hasDeviceSlots ? 'Kapasitas perangkat (slot)' : (hasPorts ? 'Kapasitas Port Awal' : 'Kapasitas (Opsional)')"></span>
                         </label>
                         <input id="create-modal-capacity-input" type="number" name="capacity" value="{{ old('capacity', 8) }}" min="0" max="1000"
                                class="block w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-800 dark:text-slate-100 text-xs font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none transition">
-                        <div x-show="hasPorts" class="flex items-center gap-1.5 pt-1">
+                        <div x-show="hasPorts && !hasDeviceSlots" class="flex items-center gap-1.5 pt-1">
                             <span class="text-[10px] text-slate-400">Preset:</span>
                             <button type="button" @click="quickCapacity(8)" class="px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] font-mono hover:bg-slate-50 cursor-pointer">8</button>
                             <button type="button" @click="quickCapacity(12)" class="px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] font-mono hover:bg-slate-50 cursor-pointer">12</button>
@@ -1193,7 +1221,10 @@ function networkNodeManager(config) {
         placement: config.placement,
         createParentId: config.createParentId || null,
         hasPorts: config.hasPorts,
+        hasDeviceSlots: config.hasDeviceSlots,
         availableCustomers: config.availableCustomers || [],
+        hierarchyItems: config.hierarchyItems || {},
+        hierarchyChildren: config.hierarchyChildren || {},
 
         editModal: {
             open: false,
@@ -1318,6 +1349,16 @@ function networkNodeManager(config) {
 
         expandAll(open) {
             window.dispatchEvent(new CustomEvent('tree-toggle-all', { detail: { open } }));
+        },
+
+        matchesHierarchyFilter(key) {
+            const item = this.hierarchyItems[key];
+            if (!item) return false;
+            const query = this.treeSearchQuery.toLowerCase().trim();
+            const matchesType = this.typeFilter === 'all' || String(item.type_id) === String(this.typeFilter);
+            const matchesText = !query || ((item.label || '') + ' ' + (item.name || '')).toLowerCase().includes(query);
+            return (matchesType && matchesText) ||
+                (this.hierarchyChildren[key] || []).some(child => this.matchesHierarchyFilter(child));
         },
 
         matchesTreeFilter(id, typeId, searchableText) {

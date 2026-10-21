@@ -5,6 +5,7 @@ namespace Tests\Feature\Network;
 use App\Enums\InfrastructurePortKind;
 use App\Enums\SerialStatus;
 use App\Models\Customer;
+use App\Models\InfrastructureConnection;
 use App\Models\InfrastructurePort;
 use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
@@ -231,7 +232,7 @@ class InfrastructureHierarchyTest extends TestCase
         $this->assertSame(1, $capacity['used']);
         $this->assertSame(16, $capacity['capacity']);
         $this->assertSame('slot terisi kartu', $capacity['unit_label']);
-        $this->assertSame(1, $this->projection()['items']['node:'.$this->switch->id]['capacity']['capacity']);
+        $this->assertNull($this->projection()['items']['node:'.$this->switch->id]['capacity']['capacity']);
     }
 
     #[Test]
@@ -388,5 +389,139 @@ class InfrastructureHierarchyTest extends TestCase
         $this->assertSame('Jetis → C1 → OLT-1 → Slot 1', $oltAsset['position']);
         $this->assertSame('SN-RAK-1', collect($map['topologyDetails'][-$this->miniA->id]['assets'])->first()['reference']);
         $this->assertSame(2, app(InfrastructureHierarchyService::class)->metricsByCabang($this->owner)[$this->cabangA->id]['assets']);
+    }
+
+    #[Test]
+    public function inspector_olt_memuat_komponen_slot_dan_pon_bersama_kapasitas(): void
+    {
+        $this->withoutVite();
+        $slot = $this->pon->slot;
+        $slot->update(['capacity' => 16]);
+        $this->olt1->update(['capacity' => 8]);
+
+        $this->actingAs($this->owner)->get(route('network.nodes.index'))->assertOk()
+            ->assertSee('id="device-components-'.$this->olt1->id.'"', false)
+            ->assertSee('data-component-slot="'.$slot->id.'"', false)
+            ->assertSee('data-component-port="'.$this->pon->id.'"', false)
+            ->assertSee('Kapasitas perangkat (slot)')
+            ->assertSee('PON per slot')
+            ->assertSee('pelanggan aktif');
+        $this->get(route('network.nodes.show', $this->olt1))
+            ->assertOk()->assertDontSee('OLT · Slot dan Kartu');
+    }
+
+    #[Test]
+    public function kapasitas_belum_didata_tetap_terlihat_dan_filter_mempertahankan_leluhur(): void
+    {
+        $this->withoutVite();
+        $this->actingAs($this->owner)->get(route('network.nodes.index'))->assertOk()
+            ->assertSee('kapasitas belum didata')
+            ->assertSee('matchesHierarchyFilter', false);
+    }
+
+    #[Test]
+    public function pembuatan_switch_tidak_membuat_port_odp_legacy(): void
+    {
+        $this->actingAs($this->owner)->post(route('network.nodes.store'), [
+            'node_type_id' => NetworkNodeType::where('code', 'switch_mini_pop')->value('id'),
+            'anchor_pop_id' => $this->miniA->id, 'code' => 'SW-KANONIS', 'name' => 'Switch baru', 'capacity' => 2,
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $switch = NetworkNode::where('code', 'SW-KANONIS')->sole();
+        $this->assertSame(2, $switch->capacity);
+        $this->assertSame(0, $switch->ports()->count());
+    }
+
+    #[Test]
+    public function perubahan_kapasitas_olt_dan_slot_diaudit_dan_tidak_boleh_di_bawah_posisi_tercatat(): void
+    {
+        $this->actingAs($this->owner)->patch('/network/nodes/'.$this->olt1->id.'/capacity', ['capacity' => 8])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertSame(8, $this->olt1->fresh()->capacity);
+        $this->assertDatabaseHas('audit_logs', ['auditable_type' => NetworkNode::class, 'auditable_id' => $this->olt1->id, 'action' => 'capacity_change']);
+        $this->patch('/network/nodes/'.$this->olt1->id.'/capacity', ['capacity' => 1])->assertSessionHasErrors('capacity');
+        $this->assertSame(8, $this->olt1->fresh()->capacity);
+
+        $slot = $this->pon->slot;
+        $this->patch('/network/infrastructure-slots/'.$slot->id.'/capacity', ['capacity' => 16])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertSame(16, $slot->fresh()->capacity);
+        $this->assertDatabaseHas('audit_logs', ['auditable_type' => InfrastructureSlot::class, 'auditable_id' => $slot->id, 'action' => 'capacity_change']);
+        app(InfrastructurePositionService::class)->createPort($slot, 3, InfrastructurePortKind::PON);
+        $this->patch('/network/infrastructure-slots/'.$slot->id.'/capacity', ['capacity' => 2])->assertSessionHasErrors('capacity');
+        $this->assertSame(16, $slot->fresh()->capacity);
+    }
+
+    #[Test]
+    public function kapasitas_membatasi_nomor_slot_dan_port_baru(): void
+    {
+        $this->olt2->update(['capacity' => 2]);
+        $this->actingAs($this->owner)->post(route('network.nodes.infrastructure-slots.store', $this->olt2), ['number' => 3])
+            ->assertSessionHasErrors('number');
+        $slot = app(InfrastructurePositionService::class)->createSlot($this->olt2, 1, ['capacity' => 2]);
+        $this->post(route('network.infrastructure-slots.ports.store', $slot), ['number' => 3])
+            ->assertSessionHasErrors('number');
+        $this->assertSame(0, $slot->ports()->count());
+    }
+
+    #[Test]
+    public function perubahan_kapasitas_cabang_lain_dan_tanpa_permission_ditolak(): void
+    {
+        $user = $this->cabangUser($this->cabangB, 'fop');
+        $this->actingAs($user)->patch('/network/nodes/'.$this->olt1->id.'/capacity', ['capacity' => 8])->assertForbidden();
+        $this->patch('/network/infrastructure-slots/'.$this->pon->infrastructure_slot_id.'/capacity', ['capacity' => 16])->assertForbidden();
+        $this->actingAs($this->cabangUser($this->cabangA, 'sales'))
+            ->patch('/network/nodes/'.$this->olt1->id.'/capacity', ['capacity' => 8])->assertForbidden();
+    }
+
+    #[Test]
+    public function pohon_operasional_tidak_menjadikan_pon_legacy_sejajar_slot(): void
+    {
+        $legacy = $this->node('pon_port', $this->miniA, 'PON-LEGACY');
+        $legacy->update(['parent_id' => $this->olt1->id, 'anchor_pop_id' => null]);
+        $this->withoutVite();
+        $this->actingAs($this->owner)->get(route('network.nodes.index'))->assertOk()
+            ->assertDontSee('data-hierarchy-key="node:'.$legacy->id.'"', false)
+            ->assertSee('data-legacy-node="'.$legacy->id.'"', false)
+            ->assertSee('Menunggu pemetaan legacy');
+    }
+
+    #[Test]
+    public function switch_tidak_boleh_menerima_port_legacy_lewat_request_lama(): void
+    {
+        $this->actingAs($this->owner)->post(route('network.nodes.ports.add', $this->switch), ['additional_capacity' => 4])
+            ->assertUnprocessable();
+        $this->assertSame(0, $this->switch->ports()->count());
+    }
+
+    #[Test]
+    public function target_switch_luar_scope_tidak_bocor_di_pohon(): void
+    {
+        $sibling = Pop::factory()->create(['type' => 'mini_pop', 'parent_id' => $this->cabangA->id]);
+        $outside = $this->node('core_router', $sibling, 'RAHASIA-MINI-LAIN');
+        app(InfrastructureConnectionService::class)->release(
+            InfrastructureConnection::where('source_infrastructure_port_id', $this->switchPort->id)->sole(),
+            $this->owner, 'Ubah tujuan',
+        );
+        app(InfrastructureConnectionService::class)->connect($this->switchPort, $this->owner, targetNode: $outside);
+        $p = $this->projection($this->cabangUser($this->miniA));
+        $this->assertSame('Tujuan di luar scope', $p['items']['port:'.$this->switchPort->id]['connection_label']);
+    }
+
+    #[Test]
+    public function peta_merender_pohon_kanonis_dan_komponen_per_perangkat(): void
+    {
+        $this->withoutVite();
+        $this->actingAs($this->owner)->get(route('network.map.index', ['tab' => 'pohon']))->assertOk()
+            ->assertSee('data-map-hierarchy-key="slot:'.$this->pon->infrastructure_slot_id.'"', false)
+            ->assertSee('data-map-hierarchy-key="port:'.$this->pon->id.'"', false)
+            ->assertSee('data-map-hierarchy-key="customer:'.$this->customerTanpaSn->id.'"', false)
+            ->assertSee('Pemakaian / Kapasitas')
+            ->assertSee('currentSelectedNode.slots', false)
+            ->assertDontSee('slots[currentSelectedNode.anchor_pop_id]', false);
+        $map = app(InfrastructureMapService::class)->build($this->owner, null, 'path');
+        $this->assertArrayHasKey('hierarchy', $map);
+        $this->assertArrayHasKey('capacity', $map['topologyDetails'][$this->olt1->id]);
+        $this->assertArrayHasKey('capacity', $map['topologyDetails'][$this->olt1->id]['slots'][0]);
+        $this->assertArrayHasKey(-1000000000 - $this->customerTanpaSn->id, $map['topologyDetails']);
     }
 }

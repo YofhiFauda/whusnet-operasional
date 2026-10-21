@@ -16,10 +16,20 @@
         <p class="text-xs text-text-muted">Jalur: <span class="font-semibold text-text-main">{{ $location->breadcrumb() }}</span></p>
         <dl class="grid gap-3 pt-2 text-xs sm:grid-cols-3">
             <div><dt class="text-text-muted">Status data</dt><dd class="font-semibold text-text-main">{{ $slot->status->label() }}</dd></div>
-            <div><dt class="text-text-muted">Kapasitas</dt><dd class="font-semibold text-text-main">{{ $ports->count() }}{{ $slot->capacity ? ' / '.$slot->capacity : '' }} {{ $slot->capacity_unit?->label() }}</dd></div>
+            <div><dt class="text-text-muted">Kapasitas</dt><dd class="font-semibold text-text-main">{{ $ports->count() }} / {{ $slot->capacity ?? '?' }} {{ $slot->capacity_unit?->label() }}</dd></div>
             <div><dt class="text-text-muted">Koordinat</dt><dd class="text-text-secondary">Mengikuti perangkat {{ $slot->device->code }}</dd></div>
         </dl>
     </section>
+
+    @if($canManage)
+    <form method="POST" action="{{ route('network.infrastructure-slots.capacity', $slot) }}" class="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4">
+        @csrf @method('PATCH')
+        <label class="text-xs text-text-secondary">Kapasitas ({{ $slot->capacity_unit?->label() }})
+            <input type="number" name="capacity" min="1" max="9999" required value="{{ $slot->capacity }}" placeholder="Belum didata" class="mt-1 block w-40 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+        </label>
+        <button type="submit" class="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-white">Simpan kapasitas slot</button>
+    </form>
+    @endif
 
     <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-3">
         <h2 class="text-sm font-black uppercase tracking-wider text-text-main">{{ $slot->kind->portKind()->label() }} pada slot ini</h2>

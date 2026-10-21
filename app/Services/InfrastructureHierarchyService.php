@@ -109,10 +109,11 @@ class InfrastructureHierarchyService
                     'capacity' => match (true) {
                         // OLT/Switch: kapasitas = slot chassis terisi kartu/modul
                         // (keputusan user 21-10-2026). Total = kapasitas tercatat
-                        // di node atau jumlah slot yang didata, mana yang lebih besar.
+                        // di node; null berarti kapasitas belum didata.
                         InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) !== null => [
                             'used' => $slots->where('network_node_id', $node->id)->whereIn('id', $filledSlotIds)->count(),
-                            'capacity' => max((int) $node->capacity, $slots->where('network_node_id', $node->id)->count()),
+                            'capacity' => $node->capacity,
+                            'documented' => $slots->where('network_node_id', $node->id)->count(),
                             'unit_label' => 'slot terisi kartu',
                             'red_zone' => null,
                         ],
@@ -150,7 +151,10 @@ class InfrastructureHierarchyService
                     'status_label' => $this->connections->occupancyOf($port)->label(),
                     'capacity' => $summary,
                     'connection_label' => $switchTarget === null ? null
-                        : ($switchTarget->target_label ?? $switchTarget->targetNode?->code ?? $switchTarget->targetPort?->displayName()),
+                        : ($switchTarget->target_network_node_id !== null && ! $nodesById->has($switchTarget->target_network_node_id)
+                            || $switchTarget->target_infrastructure_port_id !== null && ! in_array($switchTarget->target_infrastructure_port_id, $portIds, true)
+                            ? 'Tujuan di luar scope'
+                            : ($switchTarget->target_label ?? $switchTarget->targetNode?->code ?? $switchTarget->targetPort?->displayName())),
                     'connection_verified' => $switchTarget?->isVerified(),
                     'url' => route('network.infrastructure-ports.show', $port),
                 ]);

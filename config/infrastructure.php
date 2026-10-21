@@ -13,9 +13,13 @@ return [
     | termasuk selisih rekonsiliasi nol selama satu siklus tutup periode
     | penuh (`php artisan infrastructure:reconcile`).
     |
-    | false = jalur lama ditolak; baris & histori lama tetap terbaca.
+    | Penutupan normal: infrastructure:close-legacy-writes dengan tujuh bukti.
+    | false di env hanya fallback darurat; alasan dan status bukan-cutover
+    | dicatat saat saklar dibaca. Baris & histori lama tetap terbaca.
     |
     */
+
+    'legacy_emergency_reason' => env('INFRA_LEGACY_EMERGENCY_REASON', 'Alasan darurat belum dicatat di konfigurasi'),
 
     'legacy_writes_enabled' => (bool) env('INFRA_LEGACY_WRITES', true),
 ];

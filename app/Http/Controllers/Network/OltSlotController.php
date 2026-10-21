@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\NetworkNode;
 use App\Models\OltSlot;
 use App\Services\EffectiveAccessService;
+use App\Services\InfrastructureLegacyBackfillService;
 use App\Support\InfrastructureCutover;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,7 +35,8 @@ class OltSlotController extends Controller
             NetworkNode::query()->whereKey($chassis->id)->lockForUpdate()->firstOrFail();
             $highest = (int) $chassis->oltSlots()->max('number');
             for ($number = $highest + 1; $number <= $validated['slot_count']; $number++) {
-                $chassis->oltSlots()->create(['number' => $number]);
+                $legacy = $chassis->oltSlots()->create(['number' => $number]);
+                app(InfrastructureLegacyBackfillService::class)->syncOltSlot($legacy);
             }
         });
 
@@ -55,12 +57,13 @@ class OltSlotController extends Controller
             $card = NetworkNode::query()->whereKey($validated['network_node_id'])->lockForUpdate()->firstOrFail();
             // Kartu sekarang anak chassis lewat `parent_id` (bukan `anchor_pop_id`
             // langsung ke Mini POP) — chassis-nya yang ditambatkan ke POP.
-            if ($slot->card_node_id !== null || $card->parent_id !== $chassis->id
+            if (($slot->card_node_id !== null && $slot->card_node_id !== $card->id) || $card->parent_id !== $chassis->id
                 || $card->nodeType?->code !== 'olt_card'
-                || OltSlot::query()->where('card_node_id', $card->id)->exists()) {
+                || OltSlot::query()->where('card_node_id', $card->id)->whereKeyNot($slot->id)->exists()) {
                 throw ValidationException::withMessages(['network_node_id' => 'Kartu harus berupa node kartu OLT yang bebas dan merupakan anak Chassis ini.']);
             }
             $slot->update(['card_node_id' => $card->id]);
+            app(InfrastructureLegacyBackfillService::class)->syncOltSlot($slot);
         });
 
         return redirect()->route('network.nodes.show', $chassis)->with('success', 'Kartu OLT ditempatkan pada slot.');

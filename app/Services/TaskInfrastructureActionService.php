@@ -335,5 +335,6 @@ class TaskInfrastructureActionService
             throw new InvalidArgumentException('Kartu sudah terpasang di slot lain.');
         }
         $slot->update(['card_node_id' => $card->id]);
+        app(InfrastructureLegacyBackfillService::class)->syncOltSlot($slot);
     }
 }

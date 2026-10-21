@@ -44,7 +44,8 @@
         sort: @js($sort),
         index: @js($topologyIndex),
         nodes: @js($topologyDetails),
-        slots: @js($slotsData),
+        hierarchyItems: @js(collect($hierarchy['items'])->map(fn ($item) => collect($item)->only(['label', 'name', 'type', 'parent']))),
+        hierarchyChildren: @js($hierarchy['children']),
         visibleIds: {},
         collapsedIds: new Set(),
         layout: null,
@@ -84,6 +85,15 @@
 
         visibleNode(id) {
             return !this.query.trim() && this.typeFilter === 'all' ? true : !!this.visibleIds[id];
+        },
+
+        matchesHierarchyFilter(key) {
+            const item = this.hierarchyItems[key];
+            if (!item) return false;
+            const query = this.query.toLowerCase().trim();
+            const matches = (this.typeFilter === 'all' || item.type === this.typeFilter) &&
+                (!query || ((item.label || '') + ' ' + (item.name || '')).toLowerCase().includes(query));
+            return matches || (this.hierarchyChildren[key] || []).some(child => this.matchesHierarchyFilter(child));
         },
 
         matchesNode(id) {
@@ -621,11 +631,8 @@
                     </div>
                 @else
                     <div class="space-y-4">
-                        @foreach($topologyPopChildren->get(0, collect()) as $treePop)
-                            @include('network.map._pop-tree')
-                        @endforeach
-                        @foreach($rootsByPop->get(0, collect()) as $treeNode)
-                            @include('network.map._tree-node')
+                        @foreach($hierarchy['roots'] as $hierarchyKey)
+                            @include('network.map._hierarchy-item', ['hierarchyKey' => $hierarchyKey])
                         @endforeach
                     </div>
                 @endif
@@ -676,7 +683,7 @@
                                 <tr>
                                     <th class="px-4 py-3">Perangkat</th>
                                     <th class="px-4 py-3">Lokasi / Jalur</th>
-                                    <th class="px-4 py-3">Port Terpakai</th>
+                                    <th class="px-4 py-3">Pemakaian / Kapasitas</th>
                                     <th class="px-4 py-3">Kosong</th>
                                     <th class="px-4 py-3">Utilisasi</th>
                                     <th class="px-4 py-3">Status & Aset</th>
@@ -685,8 +692,9 @@
                             <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                                 @forelse($inventoryNodes as $node)
                                     @php
-                                        $total = (int) $node->ports_count;
-                                        $used = (int) $node->used_ports_count;
+                                        $positionCapacity = $topologyDetails[$node->id]['capacity'] ?? null;
+                                        $total = $positionCapacity ? ($positionCapacity['capacity'] ?? null) : (int) $node->ports_count;
+                                        $used = $positionCapacity ? $positionCapacity['used'] : (int) $node->used_ports_count;
                                         $percent = $total > 0 ? round(100 * $used / $total) : null;
                                         $nodeAssets = $assetsByNode[$node->id] ?? [];
                                     @endphp
@@ -703,7 +711,8 @@
                                             {{ $pathsByNode[$node->id] }}
                                         </td>
                                         <td class="font-mono px-4 py-3 font-medium">
-                                            {{ $total > 0 ? $used.'/'.$total : ($node->capacity ?? '—') }}
+                                            {{ $used }} / {{ $total ?? '?' }}
+                                            <span class="text-[10px] font-normal text-slate-500">{{ $positionCapacity['unit_label'] ?? 'port' }}</span>
                                         </td>
                                         <td class="font-mono px-4 py-3 font-medium text-slate-500">
                                             {{ $total > 0 ? $total - $used : '—' }}
@@ -968,21 +977,33 @@
                             </div>
                         </template>
 
-                        <!-- SLOTS GRID IF ANCHORED POP HAS OLT CHASSIS SLOTS -->
-                        <template x-if="currentSelectedNode.anchor_pop_id && slots[currentSelectedNode.anchor_pop_id]">
-                            <div class="mt-4 border-t border-slate-200 pt-3 dark:border-slate-800">
-                                <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Slot Chassis OLT:</p>
-                                <div class="space-y-1">
-                                    <template x-for="slot in slots[currentSelectedNode.anchor_pop_id]" :key="slot.number">
-                                        <div class="flex items-center justify-between rounded border border-slate-200 px-2 py-1 text-xs dark:border-slate-800">
-                                            <span class="font-mono text-[11px] font-bold" x-text="`SLOT ${slot.number}`"></span>
-                                            <span class="font-mono text-[10px]"
-                                                  :class="slot.card_node_id ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : 'text-slate-400'"
-                                                  x-text="slot.card_code ? `${slot.card_code} (${slot.card_name || 'Kartu'})` : 'KOSONG'">
-                                            </span>
+                        <template x-if="currentSelectedNode.capacity">
+                            <p class="mt-3 text-xs text-slate-600 dark:text-slate-300" x-text="currentSelectedNode.capacity.used + ' / ' + (currentSelectedNode.capacity.capacity ?? '?') + ' ' + currentSelectedNode.capacity.unit_label"></p>
+                        </template>
+                        <template x-if="currentSelectedNode.slots && currentSelectedNode.slots.length">
+                            <div class="mt-4 space-y-2 border-t border-slate-200 pt-3 dark:border-slate-800" data-map-device-components>
+                                <p class="text-xs font-semibold text-slate-700 dark:text-slate-300">Komponen perangkat: Slot dan PON/Port</p>
+                                <template x-for="slot in currentSelectedNode.slots" :key="slot.url">
+                                    <details class="rounded-lg border border-slate-200 p-2 dark:border-slate-700" :open="slot.ports.length > 0">
+                                        <summary class="cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                            <span x-text="slot.label"></span>
+                                            <span class="font-normal text-slate-500" x-text="slot.capacity ? ' · ' + slot.capacity.used + ' / ' + (slot.capacity.capacity ?? '?') + ' ' + slot.capacity.unit_label : ''"></span>
+                                        </summary>
+                                        <div class="mt-2 space-y-2 border-l-2 border-slate-200 pl-2 dark:border-slate-700">
+                                            <a :href="slot.url" class="text-[11px] text-sky-700 hover:underline dark:text-sky-300">Detail Slot / kapasitas</a>
+                                            <template x-for="port in slot.ports" :key="port.url">
+                                                <div class="text-xs">
+                                                    <a :href="port.url" class="font-semibold text-sky-700 hover:underline dark:text-sky-300" x-text="port.label"></a>
+                                                    <span class="text-slate-500" x-text="port.capacity ? ' · ' + port.capacity.used + ' / ' + (port.capacity.capacity ?? '?') + ' ' + port.capacity.unit_label : ' · ' + port.status"></span>
+                                                    <template x-for="odp in port.odps" :key="odp.url">
+                                                        <a :href="odp.url" class="mt-1 block border-l border-slate-200 pl-3 text-[11px] text-slate-600 hover:underline dark:border-slate-700 dark:text-slate-300" x-text="odp.label + (odp.verified ? '' : ' · uplink belum terverifikasi')"></a>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <p x-show="!slot.ports.length" class="text-[11px] text-slate-500">Belum ada PON/Port didata.</p>
                                         </div>
-                                    </template>
-                                </div>
+                                    </details>
+                                </template>
                             </div>
                         </template>
                     </section>

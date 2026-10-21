@@ -67,7 +67,8 @@ class InfrastructurePositionController extends Controller
         $port->load('slot.device');
         $connections = InfrastructureConnection::query()
             ->where(fn ($query) => $query->where('source_infrastructure_port_id', $port->id)->orWhere('target_infrastructure_port_id', $port->id))
-            ->with('targetNode', 'targetPort.slot.device', 'sourcePort.slot.device')->orderByDesc('active_key')->latest('id')->get();
+            ->with('targetNode', 'targetPort.slot.device', 'sourcePort.slot.device')->orderByDesc('active_key')->latest('id')->get()
+            ->filter(fn (InfrastructureConnection $connection): bool => $this->canAccessConnection($connection))->values();
         $cabangId = $location->cabangId;
 
         return view('network.positions.port', [
@@ -80,7 +81,15 @@ class InfrastructurePositionController extends Controller
             'odpCandidates' => $port->kind === InfrastructurePortKind::PON
                 ? NetworkNode::query()->whereHas('nodeType', fn ($query) => $query->where('code', 'odp'))
                     ->whereNotIn('id', InfrastructureConnection::query()->active()->whereNotNull('target_network_node_id')->select('target_network_node_id'))
-                    ->orderBy('code')->get()->filter(fn (NetworkNode $node): bool => $this->resolver->forNode($node)->cabangId === $cabangId)->values()
+                    ->orderBy('code')->get()->filter(function (NetworkNode $node) use ($cabangId): bool {
+                        try {
+                            $candidate = $this->resolver->forNode($node);
+                        } catch (InvalidArgumentException) {
+                            return false;
+                        }
+
+                        return $candidate->cabangId === $cabangId && $this->canAccessLocation($candidate);
+                    })->values()
                 : collect(),
             'directAssets' => $this->directSerials('current_infrastructure_port_id', $port->id),
             'history' => $this->history('infrastructure_port_id', $port->id),
@@ -111,6 +120,24 @@ class InfrastructurePositionController extends Controller
         return redirect()->route('network.nodes.show', $node)->with('success', "Slot {$validated['number']} ditambahkan.");
     }
 
+    public function updateDeviceCapacity(Request $request, NetworkNode $node, InfrastructurePositionService $positions): RedirectResponse
+    {
+        $this->authorizeLocation($this->resolver->forNode($node));
+        $validated = $request->validate(['capacity' => ['required', 'integer', 'min:1', 'max:1000']]);
+        $positions->updateDeviceCapacity($node, (int) $validated['capacity'], $request->user());
+
+        return redirect()->route('network.nodes.show', $node)->with('success', 'Kapasitas slot perangkat diperbarui.');
+    }
+
+    public function updateSlotCapacity(Request $request, InfrastructureSlot $slot, InfrastructurePositionService $positions): RedirectResponse
+    {
+        $this->authorizeLocation($this->resolver->forSlot($slot));
+        $validated = $request->validate(['capacity' => ['required', 'integer', 'min:1', 'max:9999']]);
+        $positions->updateSlotCapacity($slot, (int) $validated['capacity'], $request->user());
+
+        return redirect()->route('network.infrastructure-slots.show', $slot)->with('success', 'Kapasitas slot diperbarui.');
+    }
+
     public function storePort(Request $request, InfrastructureSlot $slot, InfrastructurePositionService $positions): RedirectResponse
     {
         $this->authorizeLocation($this->resolver->forSlot($slot));
@@ -137,6 +164,7 @@ class InfrastructurePositionController extends Controller
         $this->authorizeLocation($this->resolver->forPort($port));
         $validated = $request->validate([
             'target_network_node_id' => [Rule::requiredIf($port->kind === InfrastructurePortKind::PON), 'nullable', 'integer', Rule::exists('network_nodes', 'id')],
+            'target_infrastructure_port_id' => ['nullable', 'integer', Rule::exists('infrastructure_ports', 'id')],
             'target_label' => ['nullable', 'string', 'max:150'],
             'verified' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:500'],
@@ -146,7 +174,12 @@ class InfrastructurePositionController extends Controller
             $this->authorizeLocation($this->resolver->forNode($target));
         }
 
-        $this->domain(fn () => $connections->connect($port, $request->user(), targetNode: $target,
+        $targetPort = isset($validated['target_infrastructure_port_id']) ? InfrastructurePort::findOrFail($validated['target_infrastructure_port_id']) : null;
+        if ($targetPort !== null) {
+            $this->authorizeLocation($this->resolver->forPort($targetPort));
+        }
+
+        $this->domain(fn () => $connections->connect($port, $request->user(), targetNode: $target, targetPort: $targetPort,
             targetLabel: $validated['target_label'] ?? null, verified: (bool) ($validated['verified'] ?? false), notes: $validated['notes'] ?? null),
             'target_network_node_id');
 
@@ -155,7 +188,7 @@ class InfrastructurePositionController extends Controller
 
     public function verifyConnection(Request $request, InfrastructureConnection $connection, InfrastructureConnectionService $connections): RedirectResponse
     {
-        $this->authorizeLocation($this->resolver->forPort($connection->sourcePort));
+        abort_unless($this->canAccessConnection($connection), 403);
         $this->domain(fn () => $connections->verify($connection, $request->user()), 'connection');
 
         return redirect()->route('network.infrastructure-ports.show', $connection->source_infrastructure_port_id)->with('success', 'Sambungan diverifikasi.');
@@ -163,7 +196,7 @@ class InfrastructurePositionController extends Controller
 
     public function releaseConnection(Request $request, InfrastructureConnection $connection, InfrastructureConnectionService $connections): RedirectResponse
     {
-        $this->authorizeLocation($this->resolver->forPort($connection->sourcePort));
+        abort_unless($this->canAccessConnection($connection), 403);
         $validated = $request->validate(['reason' => ['required', 'string', 'max:500']]);
         $this->domain(fn () => $connections->release($connection, $request->user(), $validated['reason']), 'reason');
 
@@ -172,13 +205,33 @@ class InfrastructurePositionController extends Controller
 
     private function authorizeLocation(InfrastructureLocation $location): InfrastructureLocation
     {
-        $user = auth()->user();
-        if (! $this->access->hasAllPopAccess($user)) {
-            $popId = $location->deepestPopId();
-            abort_unless($popId !== null && in_array($popId, $this->access->getAllowedPopIds($user), true), 403);
-        }
+        abort_unless($this->canAccessLocation($location), 403);
 
         return $location;
+    }
+
+    private function canAccessLocation(InfrastructureLocation $location): bool
+    {
+        $user = auth()->user();
+        if ($this->access->hasAllPopAccess($user)) {
+            return true;
+        }
+
+        $popId = $location->deepestPopId();
+
+        return $popId !== null && in_array($popId, $this->access->getAllowedPopIds($user), true);
+    }
+
+    private function canAccessConnection(InfrastructureConnection $connection): bool
+    {
+        if (! $this->canAccessLocation($this->resolver->forPort($connection->sourcePort))) {
+            return false;
+        }
+        if ($connection->targetNode !== null && ! $this->canAccessLocation($this->resolver->forNode($connection->targetNode))) {
+            return false;
+        }
+
+        return $connection->targetPort === null || $this->canAccessLocation($this->resolver->forPort($connection->targetPort));
     }
 
     /**

@@ -13,6 +13,7 @@ use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\InfrastructureBalance;
+use App\Models\InfrastructureSlot;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
@@ -29,6 +30,7 @@ use App\Models\Task;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\UserRoleScopeTarget;
+use App\Services\InfrastructureLegacyBackfillService;
 use App\Services\InfrastructureMaterialService;
 use App\Services\InventoryService;
 use App\Services\TaskService;
@@ -251,6 +253,7 @@ class TaskInfrastructureDeployReportTest extends TestCase
         $chassis = NetworkNode::factory()->create(['anchor_pop_id' => $this->pop->id, 'node_type_id' => $chassisType->id]);
         $card = NetworkNode::factory()->child($chassis)->create(['node_type_id' => $cardType->id]);
         $slot = OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 1]);
+        app(InfrastructureLegacyBackfillService::class)->syncOltSlot($slot);
         $category = ItemCategory::where('code', 'olt_module')->firstOrFail();
         $item = $this->makeItem('OLT-CARD-REPORT', 'serialized');
         $item->update(['item_category_id' => $category->id, 'infrastructure_node_type_id' => $cardType->id]);
@@ -286,6 +289,8 @@ class TaskInfrastructureDeployReportTest extends TestCase
 
         $this->assertSame($card->id, $slot->refresh()->card_node_id);
         $this->assertSame($card->id, $serial->refresh()->current_network_node_id);
+        $canonical = InfrastructureSlot::where('legacy_olt_slot_id', $slot->id)->sole();
+        $this->assertDatabaseHas('infrastructure_legacy_mappings', ['legacy_type' => 'olt_card_node', 'legacy_id' => $card->id, 'new_id' => $canonical->id]);
     }
 
     #[Test]

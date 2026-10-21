@@ -1246,6 +1246,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/node-ports/{port}/assign-customer', [NetworkNodeController::class, 'assignCustomerPort'])->name('network.node-ports.assign-customer');
         Route::post('/network/nodes/{chassis}/olt-slots', [OltSlotController::class, 'store'])->name('network.nodes.olt-slots.store');
         Route::post('/network/nodes/{chassis}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('network.nodes.olt-slots.card');
+        Route::patch('/network/nodes/{node}/capacity', [InfrastructurePositionController::class, 'updateDeviceCapacity'])->name('network.nodes.capacity');
+        Route::patch('/network/infrastructure-slots/{slot}/capacity', [InfrastructurePositionController::class, 'updateSlotCapacity'])->name('network.infrastructure-slots.capacity');
         Route::patch('/network/infrastructure-ports/{port}/capacity', [InfrastructurePortController::class, 'updateCapacity'])->name('network.infrastructure-ports.capacity');
         Route::post('/network/nodes/{node}/infrastructure-slots', [InfrastructurePositionController::class, 'storeSlot'])->name('network.nodes.infrastructure-slots.store');
         Route::post('/network/infrastructure-slots/{slot}/ports', [InfrastructurePositionController::class, 'storePort'])->name('network.infrastructure-slots.ports.store');

@@ -24,6 +24,7 @@ use App\Models\UserRoleScopeTarget;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskInfrastructureScopeService;
 use App\Services\InfrastructureConnectionService;
+use App\Services\InfrastructureLocationOptionsService;
 use App\Services\InfrastructurePositionService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
@@ -33,6 +34,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\WorkflowTransitionPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -305,5 +307,86 @@ class InfrastructureLocationOptionsTest extends TestCase
             ->assertSee('data-location-options-url="'.route('tasks.infrastructure.location-options', $task).'"', false)
             ->assertSee('Dikosongkan')
             ->assertSee('C1-M1');
+    }
+
+    #[Test]
+    public function assets_at_counts_200_serials_with_bounded_queries_and_never_loads_outside_serials(): void
+    {
+        $category = ItemCategory::firstOrCreate(['code' => 'olt_module'], ['name' => 'OLT', 'default_unit' => 'pcs']);
+        $item = Item::create(['code' => 'PERF-ASSET', 'name' => 'Aset', 'unit' => 'pcs', 'item_category_id' => $category->id,
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset']);
+        $direct = InventorySerial::create(['item_id' => $item->id, 'serial_number' => 'DIRECT', 'status' => 'deployed', 'current_mini_pop_id' => $this->miniA1->id]);
+        $rows = [];
+        for ($i = 0; $i < 200; $i++) {
+            $rows[] = ['item_id' => $item->id, 'serial_number' => 'INSIDE-'.$i, 'status' => 'deployed', 'current_infrastructure_slot_id' => $this->slotA1->id, 'current_mini_pop_id' => null];
+            $rows[] = ['item_id' => $item->id, 'serial_number' => 'OUTSIDE-'.$i, 'status' => 'deployed', 'current_mini_pop_id' => $this->miniLain->id, 'current_infrastructure_slot_id' => null];
+        }
+        InventorySerial::insert($rows);
+        $fopTask = FopTask::where('task_id', $this->task()->id)->sole();
+        $loaded = [];
+        InventorySerial::retrieved(function (InventorySerial $serial) use (&$loaded): void {
+            $loaded[] = $serial->serial_number;
+        });
+
+        DB::enableQueryLog();
+        $result = app(InfrastructureLocationOptionsService::class)
+            ->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA1->id);
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame([$direct->id], array_column($result['direct'], 'id'));
+        $this->assertSame(200, $result['descendant_count']);
+        $this->assertSame([], array_values(array_filter($loaded, fn (string $sn): bool => str_starts_with($sn, 'OUTSIDE-'))));
+        $this->assertLessThanOrEqual(40, $queries, 'Asset query count must not grow per deployed serial; actual: '.$queries);
+    }
+
+    #[Test]
+    public function assets_at_follows_active_pon_uplink_and_ignores_released_connections(): void
+    {
+        $category = ItemCategory::firstOrCreate(['code' => 'olt_module'], ['name' => 'OLT', 'default_unit' => 'pcs']);
+        $item = Item::create(['code' => 'PON-ASSET', 'name' => 'Aset', 'unit' => 'pcs', 'item_category_id' => $category->id,
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset']);
+        InventorySerial::create(['item_id' => $item->id, 'serial_number' => 'ON-ODP', 'status' => 'deployed', 'current_network_node_id' => $this->odpA->id]);
+        $fopTask = FopTask::where('task_id', $this->task()->id)->sole();
+        $service = app(InfrastructureLocationOptionsService::class);
+        $this->assertSame(1, $service->assetsAt($fopTask, $this->technician, 'port', $this->ponA11->id)['descendant_count']);
+        $this->assertSame(0, $service->assetsAt($fopTask, $this->technician, 'port', $this->switchPort->id)['descendant_count']);
+
+        $connections = app(InfrastructureConnectionService::class);
+        $connections->release($connections->activeUplinkFor($this->odpA), $this->technician, 'Uji pelepasan');
+
+        $this->assertSame(0, $service->assetsAt($fopTask, $this->technician, 'port', $this->ponA11->id)['descendant_count']);
+        $this->assertSame(['ON-ODP'], array_column($service->assetsAt($fopTask, $this->technician, 'node', $this->odpA->id)['direct'], 'serial_number'));
+    }
+
+    #[Test]
+    public function assets_at_keeps_slot_and_port_direct_and_uses_canonical_pon_instead_of_stale_anchor(): void
+    {
+        $category = ItemCategory::firstOrCreate(['code' => 'olt_module'], ['name' => 'OLT', 'default_unit' => 'pcs']);
+        $item = Item::create(['code' => 'EXACT-ASSET', 'name' => 'Aset', 'unit' => 'pcs', 'item_category_id' => $category->id,
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset']);
+        foreach (['AT-SLOT' => ['current_infrastructure_slot_id' => $this->slotA1->id],
+            'AT-PON' => ['current_infrastructure_port_id' => $this->ponA11->id],
+            'AT-ODP' => ['current_network_node_id' => $this->odpA->id]] as $sn => $position) {
+            InventorySerial::create(['item_id' => $item->id, 'serial_number' => $sn, 'status' => 'deployed', ...$position]);
+        }
+        $this->odpA->update(['anchor_pop_id' => $this->miniA2->id]);
+        $fopTask = FopTask::where('task_id', $this->task()->id)->sole();
+        $service = app(InfrastructureLocationOptionsService::class);
+
+        $slot = $service->assetsAt($fopTask, $this->technician, 'slot', $this->slotA1->id);
+        $this->assertSame(['AT-SLOT'], array_column($slot['direct'], 'serial_number'));
+        $this->assertSame(2, $slot['descendant_count']);
+        $port = $service->assetsAt($fopTask, $this->technician, 'port', $this->ponA11->id);
+        $this->assertSame(['AT-PON'], array_column($port['direct'], 'serial_number'));
+        $this->assertSame(1, $port['descendant_count']);
+        $this->assertSame(3, $service->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA1->id)['descendant_count']);
+        $this->assertSame(0, $service->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA2->id)['descendant_count']);
+
+        $connections = app(InfrastructureConnectionService::class);
+        $connections->release($connections->activeUplinkFor($this->odpA), $this->technician, 'Uji anchor lama');
+
+        $this->assertSame(2, $service->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA1->id)['descendant_count']);
+        $this->assertSame(1, $service->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA2->id)['descendant_count']);
     }
 }

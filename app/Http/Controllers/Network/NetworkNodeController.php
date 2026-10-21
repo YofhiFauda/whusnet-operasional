@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Network;
 
+use App\Enums\InfrastructureSlotKind;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
@@ -47,7 +48,7 @@ class NetworkNodeController extends Controller
             ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
             ->with(
                 'nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode',
-                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item', 'children.nodeType'
+                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item', 'children.nodeType', 'infrastructureSlots.ports'
             )
             ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
             ->orderBy('code')
@@ -170,9 +171,11 @@ class NetworkNodeController extends Controller
         } catch (InvalidArgumentException $exception) {
             throw ValidationException::withMessages(['parent_id' => $exception->getMessage()]);
         }
-        $portCount = $nodeType->has_ports ? (int) ($validated['capacity'] ?? 0) : 0;
+        $isDevice = InfrastructureSlotKind::forDeviceTypeCode($nodeType->code) !== null;
+        $hasLegacyPorts = $nodeType->has_ports && ! $isDevice;
+        $portCount = $hasLegacyPorts ? (int) ($validated['capacity'] ?? 0) : 0;
 
-        if ($nodeType->has_ports && $portCount < 1) {
+        if ($hasLegacyPorts && $portCount < 1) {
             throw ValidationException::withMessages(['capacity' => 'Kapasitas port wajib minimal satu.']);
         }
 
@@ -180,14 +183,14 @@ class NetworkNodeController extends Controller
             throw ValidationException::withMessages(['capacity' => "Kapasitas maksimal {$nodeType->max_ports} port."]);
         }
 
-        DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount): void {
+        DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount, $hasLegacyPorts): void {
             $node = NetworkNode::create([
                 'parent_id' => $parent?->id,
                 'anchor_pop_id' => $anchor?->id,
                 'node_type_id' => $nodeType->id,
                 'code' => $validated['code'],
                 'name' => trim($validated['name']),
-                'capacity' => $nodeType->has_ports ? null : ($validated['capacity'] ?? null),
+                'capacity' => $hasLegacyPorts ? null : ($validated['capacity'] ?? null),
                 'status' => 'active',
                 ...array_intersect_key($validated, array_flip(['address', 'village', 'district', 'city', 'latitude', 'longitude'])),
             ]);
@@ -217,7 +220,7 @@ class NetworkNodeController extends Controller
             'infrastructureBalances.item',
             'oltSlots.cardNode.deployedSerials',
             'oltSlots.cardNode.ports',
-            'infrastructureSlots' => fn ($query) => $query->withCount('ports'),
+            'infrastructureSlots' => fn ($query) => $query->with('ports')->withCount('ports'),
         ]);
 
         // Opsi kartu bebas: anak langsung chassis ini bertipe `olt_card` yang
@@ -245,6 +248,7 @@ class NetworkNodeController extends Controller
 
         return view('network.nodes.show', [
             'node' => $node,
+            'hierarchy' => app(InfrastructureHierarchyService::class)->build($user),
             'nodeTypes' => NetworkNodeType::query()->where('is_active', true)->orWhere('id', $node->node_type_id)->orderBy('sort_order')->get(),
             'location' => $node->effectiveLocation(),
             'cardOptions' => $cardOptions,
@@ -366,6 +370,9 @@ class NetworkNodeController extends Controller
         DB::transaction(function () use ($node, $validated): void {
             $lockedNode = NetworkNode::query()->whereKey($node->id)->lockForUpdate()->firstOrFail();
             abort_unless($lockedNode->nodeType?->has_ports, 422, 'Tipe node ini tidak memiliki port.');
+            abort_if(InfrastructureSlotKind::forDeviceTypeCode($lockedNode->nodeType?->code) !== null,
+                422, 'Port OLT/Switch harus dibuat pada Slot perangkat, bukan sebagai port node lama.');
+
             $lastNumber = (int) $lockedNode->ports()->max('number');
             // max_ports null = tipe tanpa batas — cek dilewati, bukan dianggap 0.
             $maxPorts = $lockedNode->nodeType?->max_ports;

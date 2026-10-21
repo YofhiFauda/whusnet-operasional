@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\InfrastructureLegacyMapping;
 use App\Models\InfrastructureReconciliationRun;
+use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -14,9 +15,12 @@ use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
 use App\Models\NetworkPortAssignment;
+use App\Models\OltSlot;
 use App\Models\Pop;
 use App\Models\User;
 use App\Services\InfrastructureDummyResetService;
+use App\Services\InfrastructureLegacyBackfillService;
+use App\Services\InfrastructurePositionService;
 use App\Services\InfrastructureReconciliationService;
 use App\Services\NetworkPortAssignmentService;
 use Database\Seeders\NetworkNodeTypeSeeder;
@@ -45,6 +49,7 @@ class InfrastructureReconciliationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->travelTo(now()->setDate(2026, 12, 1));
         $this->seed(NetworkNodeTypeSeeder::class);
         $this->operator = User::factory()->create();
         $this->cabang = Pop::factory()->create(['type' => 'cabang']);
@@ -72,10 +77,10 @@ class InfrastructureReconciliationTest extends TestCase
         $run = app(InfrastructureReconciliationService::class)->run('2026-10');
 
         $row = $run->firstWhere('pop_id', $this->cabang->id);
-        $this->assertSame(['odp' => 1, 'customers' => 1, 'used_ports' => 1, 'assets' => 1], $row->legacy_metrics);
+        $this->assertSame(['odp' => 1, 'customers' => 1, 'used_ports' => 1, 'assets' => 1, 'legacy_slots' => 0, 'legacy_cards' => 0], $row->legacy_metrics);
         $this->assertSame($row->legacy_metrics, $row->projection_metrics);
         $this->assertTrue($row->is_zero);
-        $this->assertTrue(app(InfrastructureReconciliationService::class)->zeroForPeriod('2026-10'));
+        $this->assertFalse(app(InfrastructureReconciliationService::class)->zeroForPeriod('2026-10'), 'Satu snapshot manual tidak membuktikan satu siklus.');
     }
 
     #[Test]
@@ -148,7 +153,6 @@ class InfrastructureReconciliationTest extends TestCase
     public function reset_dummy_hanya_menghapus_node_terdaftar_yang_bersih(): void
     {
         $dummy = $this->node('odc', $this->miniPop, 'DUMMY-FDR');
-        AuditLog::where('auditable_type', NetworkNode::class)->where('auditable_id', $dummy->id)->delete();
         NetworkNodePort::create(['network_node_id' => $dummy->id, 'number' => 1]);
         $assignments = NetworkPortAssignment::count();
 
@@ -169,7 +173,6 @@ class InfrastructureReconciliationTest extends TestCase
     public function reset_dummy_menolak_node_dengan_keputusan_mapping_legacy(): void
     {
         $dummy = $this->node('odc', $this->miniPop, 'DUMMY-MAPPED');
-        AuditLog::where('auditable_type', NetworkNode::class)->where('auditable_id', $dummy->id)->delete();
         InfrastructureLegacyMapping::create([
             'legacy_type' => 'odp_uplink', 'legacy_id' => $dummy->id,
             'status' => InfrastructureLegacyMapping::REJECTED,
@@ -187,7 +190,7 @@ class InfrastructureReconciliationTest extends TestCase
     {
         $dummy = $this->node('odc', $this->miniPop, 'DUMMY-AUDIT');
         AuditLog::create([
-            'user_id' => $this->operator->id, 'module' => 'Node Jaringan', 'action' => 'create',
+            'user_id' => $this->operator->id, 'module' => 'Node Jaringan', 'action' => 'move',
             'auditable_type' => NetworkNode::class, 'auditable_id' => $dummy->id,
             'old_values' => null, 'new_values' => ['code' => $dummy->code],
             'created_at' => now(),
@@ -205,5 +208,64 @@ class InfrastructureReconciliationTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         app(InfrastructureDummyResetService::class)->reset(['DUMMY-INDUK'], $this->operator, dryRun: false);
+    }
+
+    #[Test]
+    public function reset_dummy_card_preserves_real_chassis_slot_and_canonical_mapping(): void
+    {
+        $chassis = $this->node('olt_chassis', $this->miniPop, 'REAL-CHASSIS');
+        $card = NetworkNode::factory()->create([
+            'node_type_id' => NetworkNodeType::where('code', 'olt_card')->sole()->id,
+            'parent_id' => $chassis->id, 'anchor_pop_id' => null, 'code' => 'DUMMY-CARD',
+        ]);
+        $legacy = OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 1, 'card_node_id' => $card->id]);
+        app(InfrastructureLegacyBackfillService::class)->run();
+        $canonical = InfrastructureSlot::where('legacy_olt_slot_id', $legacy->id)->sole();
+
+        app(InfrastructureDummyResetService::class)->reset(['DUMMY-CARD'], $this->operator, dryRun: false);
+
+        $this->assertNull($card->fresh());
+        $this->assertNull($legacy->fresh()->card_node_id);
+        $this->assertNotNull($canonical->fresh());
+        $this->assertDatabaseHas('infrastructure_legacy_mappings', ['legacy_type' => 'olt_slot', 'legacy_id' => $legacy->id]);
+        $this->assertDatabaseMissing('infrastructure_legacy_mappings', ['legacy_type' => 'olt_card_node', 'legacy_id' => $card->id]);
+    }
+
+    #[Test]
+    public function reset_dummy_chassis_cleans_automatic_slot_mapping(): void
+    {
+        $chassis = $this->node('olt_chassis', $this->miniPop, 'DUMMY-CHASSIS');
+        $legacy = OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 1]);
+        app(InfrastructureLegacyBackfillService::class)->run();
+
+        app(InfrastructureDummyResetService::class)->reset(['DUMMY-CHASSIS'], $this->operator, dryRun: false);
+
+        $this->assertNull($chassis->fresh());
+        $this->assertDatabaseMissing('infrastructure_legacy_mappings', ['legacy_type' => 'olt_slot', 'legacy_id' => $legacy->id]);
+    }
+
+    #[Test]
+    public function reset_refuses_legacy_slot_linked_to_other_canonical_chassis(): void
+    {
+        $dummy = $this->node('olt_chassis', $this->miniPop, 'DUMMY-CROSS');
+        $real = $this->node('olt_chassis', $this->miniPop, 'REAL-CROSS');
+        $legacy = OltSlot::create(['chassis_node_id' => $dummy->id, 'number' => 1]);
+        InfrastructureSlot::create(['network_node_id' => $real->id, 'number' => 1, 'kind' => 'olt', 'legacy_olt_slot_id' => $legacy->id, 'capacity_unit' => 'pon', 'status' => 'belum_didata']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Slot lama dirujuk posisi kanonis di luar reset');
+        app(InfrastructureDummyResetService::class)->reset(['DUMMY-CROSS'], $this->operator, dryRun: false);
+    }
+
+    #[Test]
+    public function reset_preserves_audited_capacity_history_on_canonical_slot(): void
+    {
+        $dummy = $this->node('olt_chassis', $this->miniPop, 'DUMMY-SLOT-AUDIT');
+        $slot = app(InfrastructurePositionService::class)->createSlot($dummy, 1);
+        app(InfrastructurePositionService::class)->updateSlotCapacity($slot, 8, $this->operator);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('riwayat audit posisi');
+        app(InfrastructureDummyResetService::class)->reset(['DUMMY-SLOT-AUDIT'], $this->operator, dryRun: false);
     }
 }

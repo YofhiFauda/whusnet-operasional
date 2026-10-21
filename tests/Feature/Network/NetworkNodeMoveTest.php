@@ -5,6 +5,11 @@ namespace Tests\Feature\Network;
 use App\Enums\ScopeType;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\InfrastructureBalance;
+use App\Models\InfrastructurePort;
+use App\Models\InfrastructureSlot;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
@@ -271,6 +276,34 @@ class NetworkNodeMoveTest extends TestCase
         } catch (InvalidArgumentException) {
             $this->assertSame($cabangA->id, $node->fresh()->anchor_pop_id);
             $this->assertSame($customer->id, $port->assignments()->where('active_key', 1)->firstOrFail()->customer_id);
+        }
+    }
+
+    #[Test]
+    public function move_across_branches_rejects_positive_balance_on_descendant_slot_and_port(): void
+    {
+        $cabangA = Pop::factory()->create(['type' => 'cabang']);
+        $cabangB = Pop::factory()->create(['type' => 'cabang']);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabangA->id, 'parent_id' => null]);
+        $child = NetworkNode::factory()->child($node)->create();
+        $slot = InfrastructureSlot::create(['network_node_id' => $child->id, 'kind' => 'olt', 'number' => 1]);
+        $port = InfrastructurePort::create(['infrastructure_slot_id' => $slot->id, 'kind' => 'pon', 'number' => 1]);
+        $category = ItemCategory::firstOrCreate(['code' => 'move-test'], ['name' => 'Move', 'default_unit' => 'pcs']);
+        $item = Item::create(['code' => 'MOVE-QTY', 'name' => 'Qty', 'unit' => 'pcs', 'item_category_id' => $category->id,
+            'tracking_type' => 'quantity', 'ownership_mode' => 'infrastructure_asset']);
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'owner')->sole()->id]);
+
+        foreach (['infrastructure_slot_id' => $slot->id, 'infrastructure_port_id' => $port->id] as $column => $id) {
+            $balance = InfrastructureBalance::create(['item_id' => $item->id, $column => $id, 'qty' => 1]);
+            try {
+                app(NetworkNodeService::class)->move($node, null, $cabangB, $actor);
+                $this->fail('Positive stock on descendant '.$column.' must block branch relocation.');
+            } catch (InvalidArgumentException) {
+                $this->assertSame($cabangA->id, $node->fresh()->anchor_pop_id);
+                $this->assertSame('1.00', $balance->fresh()->qty);
+                $this->assertDatabaseMissing('audit_logs', ['auditable_type' => NetworkNode::class, 'auditable_id' => $node->id, 'action' => 'move']);
+            }
+            $balance->delete();
         }
     }
 }

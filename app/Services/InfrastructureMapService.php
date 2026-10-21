@@ -381,7 +381,8 @@ class InfrastructureMapService
             $topologyIndex[$node->id] = [...$nodeIndex[$node->id], 'parent' => $parentId];
         }
 
-        $this->applyHierarchyProjection($user, $selectedPopId, $topologyDetails, $topologyIndex);
+        $hierarchy = app(InfrastructureHierarchyService::class)->build($user, $selectedPopId);
+        $this->applyHierarchyProjection($hierarchy, $topologyDetails, $topologyIndex);
 
         foreach ($nodes as $node) {
             foreach ($node->ports as $port) {
@@ -391,10 +392,6 @@ class InfrastructureMapService
                 }
 
                 $modems = $customer->networkPortModems();
-                if ($modems === []) {
-                    continue;
-                }
-
                 $id = -1000000000 - $customer->id;
                 $drop = $nodes->firstWhere('code', "CUST-{$customer->id}-DC")
                     ?? $nodes->firstWhere('code', "TOPO-CUST-{$customer->id}-DC");
@@ -406,7 +403,7 @@ class InfrastructureMapService
                     'code' => $cid,
                     'name' => $customer->full_name,
                     'type' => 'customer_ont',
-                    'typeName' => 'ONT dipasang ke pelanggan',
+                    'typeName' => $modems === [] ? 'ONT belum tercatat' : 'ONT dipasang ke pelanggan',
                     'parent_id' => $parentId,
                     'anchor_pop_id' => null,
                     'anchor_pop_name' => $nodeDetails[$node->id]['anchor_pop_name'],
@@ -443,6 +440,7 @@ class InfrastructureMapService
             'pathsByNode' => $paths,
             'nodeIndex' => $nodeIndex,
             'nodeDetails' => $nodeDetails,
+            'hierarchy' => $hierarchy,
             'topologyDetails' => $topologyDetails,
             'topologyIndex' => $topologyIndex,
             'topologyPops' => $topologyPops,
@@ -473,9 +471,8 @@ class InfrastructureMapService
      * @param  array<int, array<string, mixed>>  $topologyDetails
      * @param  array<int, array<string, mixed>>  $topologyIndex
      */
-    private function applyHierarchyProjection(User $user, ?int $selectedPopId, array &$topologyDetails, array &$topologyIndex): void
+    private function applyHierarchyProjection(array $projection, array &$topologyDetails, array &$topologyIndex): void
     {
-        $projection = app(InfrastructureHierarchyService::class)->build($user, $selectedPopId);
         $items = $projection['items'];
 
         foreach ($items as $key => $item) {
@@ -486,6 +483,8 @@ class InfrastructureMapService
             $topologyDetails[$nodeId]['verified'] = $item['verified'];
             $topologyDetails[$nodeId]['uplink_unverified'] = $item['uplink_unverified'];
             $topologyDetails[$nodeId]['breadcrumb'] = $item['breadcrumb'];
+            $topologyDetails[$nodeId]['path'] = $item['breadcrumb'];
+            $topologyDetails[$nodeId]['capacity'] = $item['capacity'];
 
             if ($item['relation'] === 'connection') {
                 $port = $items[$item['parent']] ?? null;
@@ -507,6 +506,7 @@ class InfrastructureMapService
                 }
                 $slots[] = [
                     'label' => $items[$childKey]['label'],
+                    'capacity' => $items[$childKey]['capacity'],
                     'status' => $items[$childKey]['status_label'],
                     'url' => $items[$childKey]['url'],
                     'ports' => array_map(fn (string $portKey): array => [
@@ -515,6 +515,11 @@ class InfrastructureMapService
                         'capacity' => $items[$portKey]['capacity'],
                         'connection' => $items[$portKey]['connection_label'] ?? null,
                         'url' => $items[$portKey]['url'],
+                        'odps' => array_map(fn (string $odpKey): array => [
+                            'label' => $items[$odpKey]['label'], 'url' => $items[$odpKey]['url'],
+                            'verified' => $items[$odpKey]['verified'],
+                        ], array_values(array_filter($projection['children'][$portKey] ?? [],
+                            fn (string $child): bool => $items[$child]['type'] === 'odp'))),
                     ], array_values(array_filter($projection['children'][$childKey] ?? [], fn (string $child): bool => $items[$child]['kind'] === 'port'))),
                 ];
             }

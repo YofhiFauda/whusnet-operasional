@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Satu baris bukti rekonsiliasi cutover per Cabang per eksekusi (§16.4 #6).
  */
-#[Fillable(['run_key', 'period', 'pop_id', 'legacy_metrics', 'projection_metrics', 'diff', 'is_zero', 'created_by'])]
+#[Fillable(['run_key', 'period', 'pop_id', 'legacy_metrics', 'projection_metrics', 'diff', 'is_zero', 'created_by', 'trigger', 'kind', 'observed_at', 'evidence_version'])]
 class InfrastructureReconciliationRun extends Model
 {
     /**
@@ -19,6 +19,8 @@ class InfrastructureReconciliationRun extends Model
     {
         return [
             'pop_id' => 'integer',
+            'observed_at' => 'immutable_datetime',
+            'evidence_version' => 'integer',
             'legacy_metrics' => 'array',
             'projection_metrics' => 'array',
             'diff' => 'array',

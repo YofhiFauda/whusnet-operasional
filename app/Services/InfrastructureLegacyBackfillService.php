@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\InfrastructureCapacityUnit;
 use App\Enums\InfrastructureRecordStatus;
 use App\Enums\InfrastructureSlotKind;
+use App\Models\AuditLog;
 use App\Models\InfrastructureConnection;
 use App\Models\InfrastructureLegacyMapping;
 use App\Models\InfrastructureSlot;
@@ -69,6 +70,21 @@ class InfrastructureLegacyBackfillService
         return $summary;
     }
 
+    public function syncOltSlot(OltSlot $legacy): InfrastructureSlot
+    {
+        return DB::transaction(function () use ($legacy): InfrastructureSlot {
+            $legacy = OltSlot::query()->lockForUpdate()->findOrFail($legacy->id);
+            $summary = ['slots_created' => 0, 'slots_linked' => 0, 'ambiguous' => 0];
+            $this->mapOltSlot($legacy, $summary);
+            $mapping = InfrastructureLegacyMapping::query()->where('legacy_type', 'olt_slot')->where('legacy_id', $legacy->id)->firstOrFail();
+            if ($mapping->status !== InfrastructureLegacyMapping::MAPPED || $mapping->new_type !== 'infrastructure_slot') {
+                throw new RuntimeException('Slot lama belum memiliki pemetaan kanonis yang terverifikasi.');
+            }
+
+            return InfrastructureSlot::query()->findOrFail($mapping->new_id);
+        });
+    }
+
     /**
      * Membatalkan hasil backfill. Ditolak bila slot hasil backfill sudah
      * dipakai (punya port, koneksi, atau aset) — menghapusnya akan memutus
@@ -76,7 +92,27 @@ class InfrastructureLegacyBackfillService
      */
     public function rollback(): void
     {
+        AuditLog::create([
+            'user_id' => auth()->id(), 'module' => 'Pemetaan Infrastruktur', 'action' => 'legacy_rollback_snapshot',
+            'auditable_type' => InfrastructureLegacyMapping::class, 'auditable_id' => 0,
+            'old_values' => ['mappings' => InfrastructureLegacyMapping::query()->get()->toArray()],
+            'new_values' => null, 'created_at' => now(),
+        ]);
+
         DB::transaction(function (): void {
+            if (InfrastructureConnection::query()->exists()) {
+                throw new RuntimeException('Rollback ditolak: koneksi kanonis harus dipertahankan.');
+            }
+            $all = InfrastructureLegacyMapping::query()->lockForUpdate()->get();
+            foreach ($all as $mapping) {
+                $automatic = $mapping->status === InfrastructureLegacyMapping::AMBIGUOUS
+                    || ($mapping->status === InfrastructureLegacyMapping::MAPPED
+                        && (($mapping->legacy_type === 'olt_slot' && array_key_exists('created', $mapping->evidence ?? []))
+                            || ($mapping->legacy_type === 'olt_card_node' && isset($mapping->evidence['olt_slot_id']))));
+                if (! $automatic || $mapping->decided_by !== null || $mapping->decided_at !== null || $mapping->decision !== null) {
+                    throw new RuntimeException('Rollback ditolak: keputusan operator atau hasil pemetaan manual harus dipertahankan.');
+                }
+            }
             $mappings = InfrastructureLegacyMapping::query()->where('legacy_type', 'olt_slot')
                 ->where('new_type', 'infrastructure_slot')->get();
             $createdIds = $mappings->filter(fn (InfrastructureLegacyMapping $mapping): bool => (bool) ($mapping->evidence['created'] ?? false))
@@ -98,7 +134,12 @@ class InfrastructureLegacyBackfillService
      */
     private function mapOltSlot(OltSlot $legacy, array &$summary): void
     {
-        if (InfrastructureLegacyMapping::query()->where('legacy_type', 'olt_slot')->where('legacy_id', $legacy->id)->exists()) {
+        $mapped = InfrastructureLegacyMapping::query()->where('legacy_type', 'olt_slot')->where('legacy_id', $legacy->id)->first();
+        if ($mapped !== null) {
+            if ($mapped->status === InfrastructureLegacyMapping::MAPPED && $mapped->new_type === 'infrastructure_slot') {
+                $this->syncCardMapping($legacy, InfrastructureSlot::query()->findOrFail($mapped->new_id), $mapped->pop_id);
+            }
+
             return;
         }
 
@@ -147,8 +188,13 @@ class InfrastructureLegacyBackfillService
             'evidence' => ['created' => $created, 'chassis_node_id' => $chassis->id, 'number' => $legacy->number],
         ]);
 
+        $this->syncCardMapping($legacy, $existing, $popId);
+    }
+
+    private function syncCardMapping(OltSlot $legacy, InfrastructureSlot $existing, ?int $popId): void
+    {
         if ($legacy->card_node_id !== null) {
-            InfrastructureLegacyMapping::query()->firstOrCreate(
+            $mapping = InfrastructureLegacyMapping::query()->firstOrCreate(
                 ['legacy_type' => 'olt_card_node', 'legacy_id' => $legacy->card_node_id],
                 [
                     'new_type' => 'infrastructure_slot',
@@ -159,6 +205,9 @@ class InfrastructureLegacyBackfillService
                     'evidence' => ['olt_slot_id' => $legacy->id],
                 ],
             );
+            if ($mapping->status !== InfrastructureLegacyMapping::MAPPED || $mapping->new_type !== 'infrastructure_slot' || $mapping->new_id !== $existing->id) {
+                throw new RuntimeException('Kartu lama sudah memiliki pemetaan lain; keputusan operator tidak ditimpa.');
+            }
         }
     }
 

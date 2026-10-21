@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\InfrastructurePort;
+use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +41,11 @@ class InfrastructureDummyResetService
                 throw new RuntimeException('Node memiliki anak yang tidak terdaftar untuk reset: '.$foreignChildren->implode(', '));
             }
 
+            $legacySlotIds = DB::table('olt_slots')->whereIn('chassis_node_id', $nodeIds)->lockForUpdate()->pluck('id');
+            if (DB::table('infrastructure_slots')->whereIn('legacy_olt_slot_id', $legacySlotIds)->whereNotIn('network_node_id', $nodeIds)->exists()) {
+                throw new RuntimeException('Slot lama dirujuk posisi kanonis di luar reset.');
+            }
+
             $nodePortIds = DB::table('network_node_ports')->whereIn('network_node_id', $nodeIds)->pluck('id');
             $slotIds = DB::table('infrastructure_slots')->whereIn('network_node_id', $nodeIds)->pluck('id');
             $portIds = DB::table('infrastructure_ports')->whereIn('infrastructure_slot_id', $slotIds)->pluck('id');
@@ -59,11 +66,21 @@ class InfrastructureDummyResetService
                     ->orWhereIn('work_infrastructure_slot_id', $slotIds)->orWhereIn('work_infrastructure_port_id', $portIds))->exists(),
                 'uplink POP' => DB::table('pops')->whereIn('uplink_node_id', $nodeIds)->exists(),
                 'keputusan mapping legacy' => DB::table('infrastructure_legacy_mappings')
-                    ->whereIn('legacy_type', ['pon_port_node', 'aggregation_switch_node', 'odp_uplink', 'olt_card_node'])
-                    ->whereIn('legacy_id', $nodeIds)
-                    ->where(fn ($query) => $query->whereIn('status', ['mapped', 'rejected'])->orWhereNotNull('decided_at'))->exists(),
+                    ->where(fn ($query) => $query
+                        ->where(fn ($nodes) => $nodes->whereIn('legacy_type', ['pon_port_node', 'aggregation_switch_node', 'odp_uplink', 'olt_card_node'])->whereIn('legacy_id', $nodeIds))
+                        ->orWhere(fn ($slots) => $slots->where('legacy_type', 'olt_slot')->whereIn('legacy_id', $legacySlotIds)))
+                    ->where(fn ($query) => $query->whereNotNull('decision')->orWhereNotNull('decided_by')->orWhereNotNull('decided_at')
+                        ->orWhere('status', 'rejected')
+                        ->orWhere(fn ($manual) => $manual->where('status', 'mapped')->whereNotIn('legacy_type', ['olt_card_node', 'olt_slot'])))
+                    ->exists(),
                 'riwayat audit node' => DB::table('audit_logs')
-                    ->where('auditable_type', NetworkNode::class)->whereIn('auditable_id', $nodeIds)->exists(),
+                    ->where('auditable_type', NetworkNode::class)->whereIn('auditable_id', $nodeIds)
+                    ->whereNotIn('action', ['create', 'created'])->exists(),
+                'riwayat audit posisi' => DB::table('audit_logs')
+                    ->where(fn ($query) => $query
+                        ->where(fn ($slots) => $slots->where('auditable_type', InfrastructureSlot::class)->whereIn('auditable_id', $slotIds))
+                        ->orWhere(fn ($ports) => $ports->where('auditable_type', InfrastructurePort::class)->whereIn('auditable_id', $portIds)))
+                    ->whereNotIn('action', ['create', 'created'])->exists(),
                 'ujung koneksi laporan' => DB::table('task_infrastructure_actions')->where(fn ($query) => $query
                     ->whereIn('end_from_network_node_id', $nodeIds)->orWhereIn('end_to_network_node_id', $nodeIds)
                     ->orWhereIn('end_from_infrastructure_port_id', $portIds)->orWhereIn('end_to_infrastructure_port_id', $portIds))->exists(),
@@ -82,7 +99,9 @@ class InfrastructureDummyResetService
 
             DB::table('infrastructure_ports')->whereIn('id', $portIds)->delete();
             DB::table('infrastructure_slots')->whereIn('id', $slotIds)->delete();
-            DB::table('olt_slots')->whereIn('chassis_node_id', $nodeIds)->orWhereIn('card_node_id', $nodeIds)->delete();
+            DB::table('olt_slots')->whereIn('card_node_id', $nodeIds)->update(['card_node_id' => null]);
+            DB::table('olt_slots')->whereIn('id', $legacySlotIds)->delete();
+            DB::table('infrastructure_legacy_mappings')->where('legacy_type', 'olt_slot')->whereIn('legacy_id', $legacySlotIds)->delete();
             DB::table('network_node_ports')->whereIn('id', $nodePortIds)->delete();
             DB::table('infrastructure_legacy_mappings')->whereIn('legacy_id', $nodeIds)
                 ->whereIn('legacy_type', ['pon_port_node', 'aggregation_switch_node', 'odp_uplink', 'olt_card_node'])->delete();

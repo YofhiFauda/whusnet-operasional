@@ -6,11 +6,15 @@ use App\Enums\InfrastructureCapacityUnit;
 use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureRecordStatus;
 use App\Enums\InfrastructureSlotKind;
+use App\Models\AuditLog;
 use App\Models\InfrastructurePort;
 use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
+use App\Models\OltSlot;
+use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
@@ -47,6 +51,19 @@ class InfrastructurePositionService
 
             if (($attributes['is_logical'] ?? false) && $kind !== InfrastructureSlotKind::SWITCH) {
                 throw new InvalidArgumentException('Slot internal/logis hanya untuk Switch.');
+            }
+
+            if ($device->capacity !== null && $number > $device->capacity) {
+                throw new InvalidArgumentException("Nomor slot melebihi kapasitas perangkat {$device->capacity} slot.");
+            }
+            if (! isset($attributes['legacy_olt_slot_id'])) {
+                $legacy = OltSlot::query()->where('chassis_node_id', $device->id)->where('number', $number)->first();
+                if ($legacy !== null && ! InfrastructureSlot::query()->where('network_node_id', $device->id)->where('number', $number)->exists()) {
+                    $slot = app(InfrastructureLegacyBackfillService::class)->syncOltSlot($legacy);
+                    $slot->update(array_intersect_key($attributes, array_flip(['code', 'label', 'capacity', 'status', 'notes'])));
+
+                    return $slot;
+                }
             }
 
             if (InfrastructureSlot::query()->where('network_node_id', $device->id)->where('number', $number)->exists()) {
@@ -113,6 +130,10 @@ class InfrastructurePositionService
                     : 'Port Switch hanya boleh berada di Slot Switch.');
             }
 
+            if ($slot->capacity !== null && $number > $slot->capacity) {
+                throw new InvalidArgumentException("Nomor port melebihi kapasitas slot {$slot->capacity}.");
+            }
+
             if (InfrastructurePort::query()->where('infrastructure_slot_id', $slot->id)->where('number', $number)->exists()) {
                 throw new InvalidArgumentException("{$kind->label()} {$number} sudah ada pada slot ini.");
             }
@@ -145,6 +166,55 @@ class InfrastructurePositionService
                 'notes' => $attributes['notes'] ?? null,
             ]));
         });
+    }
+
+    public function updateDeviceCapacity(NetworkNode $device, int $capacity, User $actor): NetworkNode
+    {
+        return DB::transaction(function () use ($device, $capacity, $actor): NetworkNode {
+            $device = NetworkNode::query()->with('nodeType')->lockForUpdate()->findOrFail($device->id);
+            if (InfrastructureSlotKind::forDeviceTypeCode($device->nodeType?->code) === null) {
+                throw ValidationException::withMessages(['capacity' => 'Kapasitas slot hanya untuk OLT atau Switch.']);
+            }
+            $highest = max((int) $device->infrastructureSlots()->max('number'), (int) $device->oltSlots()->max('number'));
+            if ($capacity < 1 || $capacity < $highest) {
+                throw ValidationException::withMessages(['capacity' => "Kapasitas tidak boleh di bawah posisi slot tertinggi {$highest}."]);
+            }
+            $old = $device->capacity;
+            if ($old !== $capacity) {
+                $device->forceFill(['capacity' => $capacity])->saveQuietly();
+                $this->auditCapacity($device, $old, $capacity, $actor);
+            }
+
+            return $device;
+        });
+    }
+
+    public function updateSlotCapacity(InfrastructureSlot $slot, int $capacity, User $actor): InfrastructureSlot
+    {
+        return DB::transaction(function () use ($slot, $capacity, $actor): InfrastructureSlot {
+            $slot = InfrastructureSlot::query()->lockForUpdate()->findOrFail($slot->id);
+            $highest = (int) $slot->ports()->max('number');
+            if ($capacity < 1 || $capacity < $highest) {
+                throw ValidationException::withMessages(['capacity' => "Kapasitas tidak boleh di bawah nomor port tertinggi {$highest}."]);
+            }
+            $old = $slot->capacity;
+            if ($old !== $capacity) {
+                $slot->forceFill(['capacity' => $capacity])->saveQuietly();
+                $this->auditCapacity($slot, $old, $capacity, $actor);
+            }
+
+            return $slot;
+        });
+    }
+
+    private function auditCapacity(NetworkNode|InfrastructureSlot $position, ?int $old, int $capacity, User $actor): void
+    {
+        AuditLog::create([
+            'user_id' => $actor->id, 'module' => 'Kapasitas Infrastruktur', 'action' => 'capacity_change',
+            'auditable_type' => $position::class, 'auditable_id' => $position->id,
+            'old_values' => ['capacity' => $old], 'new_values' => ['capacity' => $capacity],
+            'ip_address' => request()?->ip(), 'user_agent' => request()?->userAgent(), 'created_at' => now(),
+        ]);
     }
 
     private function normalizeCode(?string $code): ?string

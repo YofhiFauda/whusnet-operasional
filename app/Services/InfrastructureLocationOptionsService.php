@@ -15,6 +15,7 @@ use App\Models\Pop;
 use App\Models\User;
 use App\Support\InfrastructureLocation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -99,23 +100,22 @@ class InfrastructureLocationOptionsService
         $direct = $column === null ? collect() : InventorySerial::query()->with('item')
             ->where('status', SerialStatus::DEPLOYED->value)->where($column, $id)->orderBy('serial_number')->get();
 
-        $descendants = InventorySerial::query()->where('status', SerialStatus::DEPLOYED->value)
+        $subtree = $this->subtreeIds($location);
+        $descendantCount = InventorySerial::query()->where('status', SerialStatus::DEPLOYED->value)
             ->whereNotIn('id', $direct->pluck('id'))
-            ->where(fn ($query) => $query->whereNotNull('current_mini_pop_id')->orWhereNotNull('current_network_node_id')
-                ->orWhereNotNull('current_infrastructure_slot_id')->orWhereNotNull('current_infrastructure_port_id'))
-            ->get()
-            ->filter(function (InventorySerial $serial) use ($location): bool {
-                $at = $this->inventory->currentLocationOf($serial);
-
-                return $at !== null && $at->cabangId === $location->cabangId && $location->contains($at);
-            });
+            ->where(function ($query) use ($subtree): void {
+                $query->whereIn('current_mini_pop_id', $subtree[InfrastructureLocation::MINI_POP] ?? [])
+                    ->orWhereIn('current_network_node_id', $subtree[InfrastructureLocation::NODE] ?? [])
+                    ->orWhereIn('current_infrastructure_slot_id', $subtree[InfrastructureLocation::SLOT] ?? [])
+                    ->orWhereIn('current_infrastructure_port_id', $subtree[InfrastructureLocation::PORT] ?? []);
+            })->count();
 
         return [
             'breadcrumb' => $location->breadcrumb(),
             'direct' => $direct->map(fn (InventorySerial $serial): array => [
                 'id' => $serial->id, 'serial_number' => $serial->serial_number, 'item' => $serial->item?->name,
             ])->values()->all(),
-            'descendant_count' => $descendants->count(),
+            'descendant_count' => $descendantCount,
         ];
     }
 
@@ -157,6 +157,57 @@ class InfrastructureLocationOptionsService
             'path' => array_filter($path, static fn (string $level): bool => self::LEVEL_DEPTH[$level] <= $depth, ARRAY_FILTER_USE_KEY),
             'levels' => $levels,
         ];
+    }
+
+    /**
+     * Resolve the canonical subtree once, then count deployed assets in SQL.
+     * Active PON uplinks replace legacy node placement; Switch links are not
+     * hierarchy edges. UNION deduplicates paths and terminates corrupt cycles.
+     *
+     * @return array<string, list<int>>
+     */
+    private function subtreeIds(InfrastructureLocation $location): array
+    {
+        $rows = DB::select(<<<'SQL'
+            WITH RECURSIVE pon_links AS (
+                SELECT connection.target_network_node_id AS node_id,
+                    connection.source_infrastructure_port_id AS port_id
+                FROM infrastructure_connections connection
+                JOIN infrastructure_ports port ON port.id = connection.source_infrastructure_port_id
+                WHERE connection.active_key = 1 AND port.kind = 'pon'
+                    AND connection.target_network_node_id IS NOT NULL
+            ), edges AS (
+                SELECT CASE WHEN parent.type = 'mini_pop' THEN 'mini_pop' ELSE 'pop' END AS parent_kind,
+                    parent.id AS parent_id,
+                    CASE WHEN child.type = 'mini_pop' THEN 'mini_pop' ELSE 'pop' END AS kind, child.id AS id
+                FROM pops child JOIN pops parent ON parent.id = child.parent_id
+                UNION ALL
+                SELECT CASE WHEN node.parent_id IS NOT NULL THEN 'node'
+                        WHEN pop.type = 'mini_pop' THEN 'mini_pop' ELSE 'pop' END,
+                    COALESCE(node.parent_id, node.anchor_pop_id), 'node', node.id
+                FROM network_nodes node LEFT JOIN pops pop ON pop.id = node.anchor_pop_id
+                WHERE NOT EXISTS (SELECT 1 FROM pon_links WHERE pon_links.node_id = node.id)
+                UNION ALL
+                SELECT 'node', network_node_id, 'slot', id FROM infrastructure_slots
+                UNION ALL
+                SELECT 'slot', infrastructure_slot_id, 'port', id FROM infrastructure_ports
+                UNION ALL
+                SELECT 'port', port_id, 'node', node_id FROM pon_links
+            ), subtree (kind, id) AS (
+                SELECT CAST(? AS CHAR(16)), ?
+                UNION
+                SELECT edge.kind, edge.id FROM edges edge
+                    JOIN subtree parent ON edge.parent_kind = parent.kind AND edge.parent_id = parent.id
+            )
+            SELECT kind, id FROM subtree
+            SQL, [$location->kind, $location->id]);
+
+        $ids = [];
+        foreach ($rows as $row) {
+            $ids[$row->kind][] = (int) $row->id;
+        }
+
+        return $ids;
     }
 
     private function depth(string $level): int

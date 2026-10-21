@@ -422,7 +422,8 @@ class InfrastructureMapTest extends TestCase
         $this->assertSame($node->id, $payload['topologyDetails'][$virtualOntId]['parent_id']);
         $this->assertSame(1, $payload['summary']['nodes']);
         $this->assertSame(0, NetworkNode::whereHas('nodeType', fn ($query) => $query->where('code', 'ont'))->count());
-        $this->assertArrayNotHasKey(-1000000000 - $withoutModem->id, $payload['topologyDetails']);
+        $this->assertArrayHasKey(-1000000000 - $withoutModem->id, $payload['topologyDetails']);
+        $this->assertSame('ONT belum tercatat', $payload['topologyDetails'][-1000000000 - $withoutModem->id]['typeName']);
         $this->get(route('network.nodes.show', $node))
             ->assertOk()->assertSee('ONT-SN-A')->assertSee('ONT-SN-B')
             ->assertSee('ONT Huawei')->assertSee('DEVICE-SN')->assertSee('ZTE F660')
