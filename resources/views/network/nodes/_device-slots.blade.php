@@ -51,22 +51,52 @@
                     <button type="submit" class="min-h-9 rounded-lg border border-border px-3 text-xs font-semibold text-text-main hover:bg-surface-muted">Simpan kapasitas slot</button>
                 </form>
                 @endcan
-                <div class="space-y-2 border-l-2 border-border pl-3">
+                {{-- Patch panel port/PON — visual sama seperti Manajemen Port Node ODP
+                     (warna status + badge kapasitas), TAPI klik kartu TIDAK pindah
+                     halaman: connect PON→ODP perlu pilih ODP+verified+notes (mutasi
+                     kompleks), jadi tombol "Detail" eksplisit sesuai pola 2 CLAUDE.md
+                     (mutasi kompleks = halaman sendiri, bukan modal). --}}
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     @forelse($componentSlot->ports->sortBy('number') as $componentPort)
                     @php
                         $portItem = $hierarchy['items']['port:'.$componentPort->id] ?? null;
                         $portCapacity = $portItem['capacity'] ?? null;
+                        $statusLabel = $portItem['status_label'] ?? $componentPort->status->label();
+                        $isTerpakai = str_starts_with($statusLabel, 'Terpakai');
+                        $isTerverifikasi = str_contains($statusLabel, 'terverifikasi') && ! str_contains($statusLabel, 'belum');
+                        $isRusak = str_starts_with($statusLabel, 'Rusak');
+                        $cardClass = match (true) {
+                            $isRusak => 'bg-surface-muted border-border opacity-70',
+                            $isTerpakai && $isTerverifikasi => 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700',
+                            $isTerpakai => 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-300/80 dark:border-amber-800',
+                            default => 'bg-white dark:bg-slate-800 border-2 border-dashed border-emerald-300/90 dark:border-emerald-700/80',
+                        };
+                        $badgeClass = match (true) {
+                            $isRusak => 'text-text-muted bg-surface-muted border-border',
+                            $isTerpakai && $isTerverifikasi => 'text-rose-700 bg-rose-50 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900',
+                            $isTerpakai => 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-900',
+                            default => 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800',
+                        };
                     @endphp
-                    <a data-component-port="{{ $componentPort->id }}" href="{{ route('network.infrastructure-ports.show', $componentPort) }}" class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-muted px-3 py-2 text-xs hover:text-primary">
-                        <span class="font-mono font-semibold">{{ $componentPort->displayName() }}</span>
-                        @if($portCapacity)
-                            <span>{{ $portCapacity['used'] }} / {{ $portCapacity['capacity'] ?? '?' }} {{ $portCapacity['unit_label'] }}</span>
-                        @else
-                            <span class="text-text-muted">{{ $portItem['status_label'] ?? $componentPort->status->label() }}</span>
-                        @endif
-                    </a>
+                    <div data-component-port="{{ $componentPort->id }}" class="rounded-xl border p-3 {{ $cardClass }} flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-bold font-mono text-text-main">{{ $componentPort->displayName() }}</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border {{ $badgeClass }}">{{ $statusLabel }}</span>
+                        </div>
+                        <div class="mt-2 min-w-0 flex items-end justify-between gap-2">
+                            <div class="min-w-0">
+                                @if($portCapacity)
+                                    <div class="text-xs font-semibold text-text-main">{{ $portCapacity['used'] }} / {{ $portCapacity['capacity'] ?? '?' }} {{ $portCapacity['unit_label'] }}</div>
+                                @endif
+                                @if($portItem['connection_label'] ?? null)
+                                    <div class="text-[11px] text-text-muted truncate" title="{{ $portItem['connection_label'] }}">&rarr; {{ $portItem['connection_label'] }}</div>
+                                @endif
+                            </div>
+                            <a href="{{ route('network.infrastructure-ports.show', $componentPort) }}" class="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-primary hover:bg-surface-muted">Detail &rarr;</a>
+                        </div>
+                    </div>
                     @empty
-                    <p class="text-xs text-text-muted">Belum ada {{ $portLabel }} pada Slot ini.</p>
+                    <p class="col-span-full text-xs text-text-muted">Belum ada {{ $portLabel }} pada Slot ini.</p>
                     @endforelse
                 </div>
                 @can('network_nodes.update')
