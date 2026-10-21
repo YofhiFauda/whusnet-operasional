@@ -99,3 +99,13 @@ Hasil read-only ini menjadi masukan Task 2–3: hanya `olt_slots` yang dibackfil
 - Tujuh mapping menunggu keputusan operator: PON node #25/#31 (Slot dan nomor PON), switch #23/#29 (Mini POP fisik), uplink ODP #27/#33/#37 (PON tujuan). Tidak dipetakan otomatis. Lihat perintah infrastructure:legacy-mappings.
 - Reset dummy tetap ditolak untuk node yang memiliki assignment pelanggan, audit node, ledger/aset, aksi atau ujung koneksi laporan, maupun relasi lain. Topologi aplikasi mengandung assignment nyata; reset tidak dijalankan.
 - Migration 000005 sudah berstatus Ran pada database aplikasi. Perubahan nama FK di worktree adalah perbaikan untuk bootstrap skema baru/rollback; migration tidak dijalankan ulang pada database yang sudah ada.
+
+### 7.1 Perbaikan 10 temuan review (21 Oktober 2026, commit `e928a84`)
+
+`docs/plan/infrastruktur/rancangan-perbaikan-review-hierarki-infrastruktur.md` ditutup. Ringkas dampak ke bukti cutover
+di atas: bukti #6 (snapshot nol) sekarang terikat ke periode tertutup + saklar legacy ditutup lewat
+`infrastructure:close-legacy-writes` (tujuh bukti, tercatat audit) — env `INFRA_LEGACY_WRITES=false` hanya fallback
+darurat yang juga tercatat. Migration 000005 (FK >64 karakter) diperbaiki lewat migration susulan idempoten
+`2026_10_21_150332_repair_infrastructure_action_endpoint_foreign_keys`, bukan edit migration yang sudah Ran. Rollback
+backfill, reset dummy, dan tiga `mapXxx()` keputusan operator sekarang menjaga data nyata (lihat rancangan perbaikan
+§3-#9 untuk detail). `assetsAt()` tidak lagi N+1.

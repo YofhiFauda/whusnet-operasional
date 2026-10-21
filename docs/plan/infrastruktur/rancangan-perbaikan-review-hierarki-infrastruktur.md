@@ -4,8 +4,9 @@ Tanggal: 21 Oktober 2026
 Sumber: `/code-review high` atas branch `feat/hierarki-infrastruktur` (commit `531653b^..HEAD`, ADHOC-202) terhadap
 `docs/plan/infrastruktur/rancangan-hierarki-infrastruktur-server-pop-mini-pop.md` (§16 mengikat) dan
 `docs/plan/infrastruktur/audit-transisi-hierarki-infrastruktur.md`.
-Status: rancangan perbaikan — belum dikerjakan. Temuan belum diverifikasi ulang dengan tes; setiap perbaikan wajib
-diawali tes merah yang mereproduksi temuan.
+Status: **selesai dikerjakan** (commit `e928a84`, 2026-10-21). Semua 10 temuan diperbaiki, diverifikasi tes
+(`tests/Feature/Network/` + `InfrastructureLocationOptionsTest` + `OltSlotManagementTest` +
+`TaskInfrastructureDeployReportTest` → 244/244). Rincian per temuan tetap di bawah sebagai referensi arsip.
 
 ## Ringkasan prioritas
 
