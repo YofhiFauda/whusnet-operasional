@@ -819,6 +819,18 @@ class InventoryService
      */
     public function deployQuantity(iterable $technicians, Item $item, float $qtyUsed, NetworkNode $node, FopTask $fopTask, User $actor): array
     {
+        return $this->deployQuantityAt($technicians, $item, $qtyUsed, $this->locations()->forNode($node), $fopTask, $actor);
+    }
+
+    /**
+     * Varian lokasi-tepat `deployQuantity()` (Task 7): saldo qty non-kabel
+     * tercatat di POP/Mini POP, node, Slot, atau Port sesuai lokasi akhir aksi.
+     *
+     * @param  iterable<User>  $technicians
+     * @return list<array{custody_id:int, lot_no:?string, qty:float, transaction_id:int}>
+     */
+    public function deployQuantityAt(iterable $technicians, Item $item, float $qtyUsed, InfrastructureLocation $location, FopTask $fopTask, User $actor): array
+    {
         if ($qtyUsed <= 0) {
             throw new InvalidArgumentException('Qty yang di-deploy harus lebih besar dari nol.');
         }
@@ -833,7 +845,11 @@ class InventoryService
             throw new InvalidArgumentException('Daftar teknisi (anggota tim) tidak boleh kosong.');
         }
 
-        return DB::transaction(function () use ($technicianIds, $item, $qtyUsed, $node, $fopTask, $actor) {
+        if ($item->ownership_mode !== OwnershipMode::INFRASTRUCTURE_ASSET) {
+            throw new InvalidArgumentException("Item {$item->name} bukan aset infrastruktur (ownership_mode) — gak bisa di-deploy ke titik jaringan.");
+        }
+
+        return DB::transaction(function () use ($technicianIds, $item, $qtyUsed, $location, $fopTask, $actor) {
             // Lot dari cabang lain di-skip dari FIFO (bukan dilempar) — alasan
             // & perilaku fail-open NULL sama dengan `consumeFromCustody()`.
             $targetCabangId = Pop::resolveCabangId($fopTask->pop_id);
@@ -860,9 +876,12 @@ class InventoryService
                 throw new InsufficientCustodyException($technicianIds, $item, $qtyUsed, $available);
             }
 
-            $node = $this->freshNode($node);
-            $toPopId = $node->resolvePop()?->id;
-            $location = $node->breadcrumbLabel();
+            $location = $this->locations()->resolve($location->kind, $location->id);
+            $this->lockLocation($location);
+            if ($targetCabangId !== null && $location->cabangId !== $targetCabangId) {
+                throw new InvalidArgumentException('Lokasi tujuan berada di cabang berbeda dari task.');
+            }
+            $label = $location->breadcrumb();
 
             $remaining = $qtyUsed;
             $deployed = [];
@@ -888,10 +907,10 @@ class InventoryService
                     'unit_price_snapshot' => $lot->unit_price_snapshot,
                     'from_technician_id' => $lot->technician_id,
                     'source_custody_id' => $lot->id,
-                    'to_network_node_id' => $node->id,
-                    'to_pop_id' => $toPopId,
+                    ...$this->transactionLocationColumns('to', $location),
+                    'to_pop_id' => $location->cabangId,
                     'fop_task_id' => $fopTask->id,
-                    'notes' => "{$take} {$item->unit} {$item->name} dipasang netap di {$location} (Task {$fopTask->task_number}).",
+                    'notes' => "{$take} {$item->unit} {$item->name} dipasang netap di {$label} (Task {$fopTask->task_number}).",
                     'created_by' => $actor->id,
                 ]);
 
@@ -905,7 +924,7 @@ class InventoryService
                 $remaining -= $take;
             }
 
-            $this->incrementInfrastructureBalance($item->id, $node->id, '', $qtyUsed);
+            $this->adjustInfrastructureBalance($item->id, $location, '', $qtyUsed);
 
             return $deployed;
         });
@@ -928,13 +947,41 @@ class InventoryService
      */
     public function deployRoll(InventoryRoll $roll, float $metersUsed, NetworkNode $node, iterable $technicians, FopTask $fopTask, User $actor, ?InventoryTransaction $correctedSource = null, ?string $actionKey = null, ?string $actionFingerprint = null): InventoryTransaction
     {
-        if ($metersUsed <= 0) {
+        return $this->consumeInfrastructureRoll($roll, $metersUsed, $this->locations()->forNode($node), $technicians, $fopTask, $actor, $correctedSource, $actionKey, $actionFingerprint);
+    }
+
+    /**
+     * Pemakaian kabel infrastruktur (§11.2, §16.4 #2): HANYA mengurangi sisa
+     * roll lewat satu baris ledger DEPLOY (append-only) yang mencatat lokasi
+     * KERJA terdalam. TIDAK membuat `infrastructure_balances` — kabel tidak
+     * punya "saldo terpasang" di node/Slot/PON/Port/POP; saldo kabel yang sah
+     * cuma sisa roll. Harga per meter disalin dari snapshot intake roll, tidak
+     * pernah dihitung ulang.
+     *
+     * Lokasi kerja boleh POP Cabang (kabel langsung di POP, §10.1). Ujung
+     * sambungan sumber/tujuan & koordinat dicatat di baris aksi laporan, bukan
+     * di sini.
+     *
+     * @param  iterable<User>  $technicians
+     */
+    public function consumeInfrastructureRoll(
+        InventoryRoll $roll,
+        float $metersUsed,
+        InfrastructureLocation $location,
+        iterable $technicians,
+        FopTask $fopTask,
+        User $actor,
+        ?InventoryTransaction $correctedSource = null,
+        ?string $actionKey = null,
+        ?string $actionFingerprint = null,
+    ): InventoryTransaction {
+        if ($metersUsed <= 0 || ! is_finite($metersUsed)) {
             throw new InvalidArgumentException('Meter yang di-deploy harus lebih besar dari nol.');
         }
 
         $technicianIds = Collection::make($technicians)->pluck('id')->all();
 
-        return DB::transaction(function () use ($roll, $metersUsed, $node, $technicianIds, $fopTask, $actor, $correctedSource, $actionKey, $actionFingerprint) {
+        return DB::transaction(function () use ($roll, $metersUsed, $location, $technicianIds, $fopTask, $actor, $correctedSource, $actionKey, $actionFingerprint) {
             $roll = InventoryRoll::query()->with('item')->lockForUpdate()->findOrFail($roll->id);
 
             if (! in_array($roll->status, [RollStatus::ISSUED, RollStatus::IN_USE], true)) {
@@ -955,20 +1002,27 @@ class InventoryService
                 throw new InvalidArgumentException("Roll {$roll->roll_code} berasal dari cabang lain — gak bisa di-deploy untuk task di cabang ini.");
             }
 
-            if ($metersUsed > (float) $roll->length_remaining) {
+            $location = $this->locations()->resolve($location->kind, $location->id);
+            if ($targetCabangId !== null && $location->cabangId !== $targetCabangId) {
+                throw new InvalidArgumentException('Lokasi kerja kabel berada di cabang berbeda dari task.');
+            }
+
+            // Bandingkan dalam satuan sentimeter integer — float meter bisa
+            // meleset di desimal kedua dan mengizinkan sisa negatif tipis.
+            $requestedUnits = (int) round($metersUsed * 100);
+            $remainingUnits = (int) round((float) $roll->length_remaining * 100);
+            if ($requestedUnits > $remainingUnits) {
                 throw new InvalidArgumentException("Roll {$roll->roll_code} sisa ".$roll->length_remaining." meter, diminta {$metersUsed} meter.");
             }
 
-            $newRemaining = (float) $roll->length_remaining - $metersUsed;
+            $newRemaining = ($remainingUnits - $requestedUnits) / 100;
 
             $roll->update([
                 'length_remaining' => $newRemaining,
                 'status' => $newRemaining <= 0 ? RollStatus::DEPLETED : RollStatus::IN_USE,
             ]);
 
-            $node = $this->freshNode($node);
-
-            $this->incrementInfrastructureBalance($roll->item_id, $node->id, $roll->roll_code, $metersUsed);
+            $label = $location->breadcrumb();
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::DEPLOY,
@@ -976,22 +1030,81 @@ class InventoryService
                 'item_id' => $roll->item_id,
                 'roll_id' => $roll->id,
                 'lot_no' => $roll->roll_code,
-                'qty' => $metersUsed,
+                'qty' => $requestedUnits / 100,
                 'unit_price_snapshot' => $roll->unit_price_snapshot,
                 'from_technician_id' => $roll->current_technician_id,
-                'to_network_node_id' => $node->id,
-                'to_pop_id' => $node->resolvePop()?->id,
+                ...$this->transactionLocationColumns('to', $location),
+                'to_pop_id' => $location->cabangId,
                 'fop_task_id' => $fopTask->id,
                 'source_inventory_transaction_id' => $correctedSource?->id,
                 'action_key' => $actionKey,
                 'action_fingerprint' => $actionFingerprint,
-                'reason' => $correctedSource ? 'infra_record_correction' : null,
+                'reason' => $correctedSource ? 'infra_record_correction' : 'infra_cable_consumption',
                 'notes' => $correctedSource
-                    ? "Koreksi {$metersUsed} meter dari transaksi {$correctedSource->reference_number} ke roll {$roll->roll_code} di {$node->breadcrumbLabel()}."
-                    : "{$metersUsed} meter dari roll {$roll->roll_code} dipasang netap di {$node->breadcrumbLabel()} (Task {$fopTask->task_number}).",
+                    ? "Koreksi {$metersUsed} meter dari transaksi {$correctedSource->reference_number} ke roll {$roll->roll_code} di {$label}."
+                    : "{$metersUsed} meter dari roll {$roll->roll_code} dipakai di {$label} (Task {$fopTask->task_number}).",
                 'created_by' => $actor->id,
             ]);
         });
+    }
+
+    /**
+     * Lokasi yang dicatat baris ledger (arah `to`/`from`) — posisi terdalam
+     * yang terisi; bila tidak ada kolom posisi tapi `{arah}_pop_id` terisi,
+     * lokasinya POP itu sendiri (kabel/qty langsung di POP Cabang).
+     */
+    public function transactionLocation(InventoryTransaction $transaction, string $direction): ?InfrastructureLocation
+    {
+        $value = fn (string $column): ?int => $transaction->{"{$direction}_{$column}"} !== null ? (int) $transaction->{"{$direction}_{$column}"} : null;
+
+        return match (true) {
+            $value('infrastructure_port_id') !== null => $this->locations()->resolve(InfrastructureLocation::PORT, $value('infrastructure_port_id')),
+            $value('infrastructure_slot_id') !== null => $this->locations()->resolve(InfrastructureLocation::SLOT, $value('infrastructure_slot_id')),
+            $value('network_node_id') !== null => $this->locations()->resolve(InfrastructureLocation::NODE, $value('network_node_id')),
+            $value('mini_pop_id') !== null => $this->locations()->resolve(InfrastructureLocation::MINI_POP, $value('mini_pop_id')),
+            $value('pop_id') !== null => $this->locations()->resolve(InfrastructureLocation::POP, $value('pop_id')),
+            default => null,
+        };
+    }
+
+    /**
+     * Ubah saldo qty NON-kabel pada lokasi tepat; menolak saldo negatif. Satu
+     * baris per (item, lokasi, lot) — dikunci di transaksi yang sama dengan
+     * baris ledger-nya.
+     */
+    public function adjustInfrastructureBalance(int $itemId, InfrastructureLocation $location, string $lotNo, float $delta): InfrastructureBalance
+    {
+        $columns = $this->balanceLocationColumns($location);
+        $balance = InfrastructureBalance::query()->where('item_id', $itemId)->where('lot_no', $lotNo)
+            ->where($columns)->lockForUpdate()->first()
+            ?? InfrastructureBalance::create(['item_id' => $itemId, 'lot_no' => $lotNo, 'qty' => 0, ...$columns]);
+
+        $newUnits = (int) round((float) $balance->qty * 100) + (int) round($delta * 100);
+        if ($newUnits < 0) {
+            throw new InvalidArgumentException('Saldo lokasi tidak cukup untuk koreksi atau cabut.');
+        }
+        $balance->update(['qty' => $newUnits / 100]);
+
+        return $balance;
+    }
+
+    public function infrastructureBalanceAt(int $itemId, InfrastructureLocation $location, string $lotNo): float
+    {
+        return (float) (InfrastructureBalance::query()->where('item_id', $itemId)->where('lot_no', $lotNo)
+            ->where($this->balanceLocationColumns($location))->value('qty') ?? 0);
+    }
+
+    /**
+     * @return array{network_node_id: ?int, pop_id: ?int, infrastructure_slot_id: ?int, infrastructure_port_id: ?int}
+     */
+    private function balanceLocationColumns(InfrastructureLocation $location): array
+    {
+        return [
+            'network_node_id' => $location->kind === InfrastructureLocation::NODE ? $location->id : null,
+            'pop_id' => in_array($location->kind, [InfrastructureLocation::POP, InfrastructureLocation::MINI_POP], true) ? $location->id : null,
+            'infrastructure_slot_id' => $location->kind === InfrastructureLocation::SLOT ? $location->id : null,
+            'infrastructure_port_id' => $location->kind === InfrastructureLocation::PORT ? $location->id : null,
+        ];
     }
 
     /**
@@ -1089,24 +1202,6 @@ class InventoryService
             && $item->infrastructure_node_type_id !== $node->node_type_id) {
             throw new InvalidArgumentException('SKU aset hanya dapat dipasang pada tipe node yang ditetapkan di Master Barang.');
         }
-    }
-
-    /**
-     * Satu baris proyeksi per (item, node, lot_no) — keunikan ditegakkan di
-     * sini (lock + firstOrCreate), bukan unique index, lihat migration
-     * `create_infrastructure_balances_table`. Selalu dipanggil di dalam
-     * transaction yang SAMA dengan penulisan baris ledger DEPLOY-nya.
-     */
-    private function incrementInfrastructureBalance(int $itemId, int $nodeId, string $lotNo, float $qty): void
-    {
-        $balance = InfrastructureBalance::query()
-            ->lockForUpdate()
-            ->firstOrCreate(
-                ['item_id' => $itemId, 'network_node_id' => $nodeId, 'lot_no' => $lotNo],
-                ['qty' => 0],
-            );
-
-        $balance->increment('qty', $qty);
     }
 
     /**

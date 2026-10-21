@@ -7,7 +7,6 @@ use App\Enums\InventoryTransactionType;
 use App\Enums\RollStatus;
 use App\Enums\TaskType;
 use App\Models\FopTask;
-use App\Models\InfrastructureBalance;
 use App\Models\InfrastructureRecovery;
 use App\Models\InventoryRoll;
 use App\Models\InventoryTransaction;
@@ -15,26 +14,51 @@ use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Models\TechnicianCustody;
 use App\Models\User;
+use App\Support\InfrastructureLocation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
+/**
+ * Koreksi administratif & cabut fisik material qty/roll yang sudah dicatat
+ * terpasang lewat laporan O-REQ/INFR-REQ. Semua mutasi append-only ke
+ * ledger, idempoten lewat `action_key` + `action_fingerprint`.
+ *
+ * Lokasi asal/tujuan memakai posisi tepat (`InfrastructureLocation`: POP,
+ * Mini POP, node, Slot, Port — Task 6/7). Dua jenis barang, dua aturan:
+ *
+ * - QTY non-kabel: punya saldo lokasi (`infrastructure_balances`) yang ikut
+ *   berpindah/berkurang.
+ * - KABEL (roll): TIDAK punya saldo terpasang (§16.4 #2). Koreksi hanya
+ *   memulihkan sisa roll dan memindah lokasi KERJA di ledger; cabut fisik
+ *   membuat hasil cabut menunggu inspeksi Gudang.
+ *
+ * Lokasi tujuan koreksi wajib lolos irisan scope task (§10.3); inspeksi
+ * Gudang hanya memeriksa Cabang + POP scope pemeriksa.
+ */
 class InfrastructureMaterialService
 {
-    public function __construct(private readonly EffectiveAccessService $access, private readonly InventoryService $inventory) {}
+    public function __construct(
+        private readonly EffectiveAccessService $access,
+        private readonly InventoryService $inventory,
+        private readonly InfrastructureLocationResolver $locations,
+        private readonly FopTaskInfrastructureScopeService $scopes,
+    ) {}
 
     public function correct(
         InventoryTransaction $source,
-        NetworkNode $target,
+        NetworkNode|InfrastructureLocation $target,
         float $correctQty,
         FopTask $fopTask,
         User $actor,
         string $reason,
         string $actionKey,
     ): InventoryTransaction {
+        $target = $this->toLocation($target);
         $correctUnits = $this->units($correctQty, allowZero: true);
         $this->assertReasonAndKey($reason, $actionKey);
-        $fingerprint = $this->fingerprint('correct', $source->id, $target->id, $correctUnits, $fopTask->id, $reason);
+        $fingerprint = $this->fingerprint('correct', $source->id, $target->key(), $correctUnits, $fopTask->id, $reason);
 
         return DB::transaction(function () use ($source, $target, $correctUnits, $fopTask, $actor, $reason, $actionKey, $fingerprint): InventoryTransaction {
             $source = InventoryTransaction::query()->lockForUpdate()->findOrFail($source->id);
@@ -43,19 +67,18 @@ class InfrastructureMaterialService
             if ($existing !== null) {
                 return $existing;
             }
-            $this->assertNode($target, $fopTask, $actor);
+            $this->assertLocationInTask($target, $fopTask, $actor);
             $placement = $this->currentPlacement($source);
-            $sourceNode = NetworkNode::findOrFail($placement['node_id']);
-            $this->assertNode($sourceNode, $fopTask, $actor);
-            $this->lockNodes($sourceNode, $target);
+            $sourceLocation = $placement['location'];
+            $this->assertLocationInTask($sourceLocation, $fopTask, $actor);
             $remainingUnits = $placement['remaining_units'];
 
             if ($correctUnits > $remainingUnits) {
                 throw new InvalidArgumentException('Penambahan jumlah harus melalui aksi DEPLOY baru dari custody.');
             }
 
-            if ($correctUnits === $remainingUnits && $sourceNode->id === $target->id) {
-                throw new InvalidArgumentException('Koreksi tidak mengubah jumlah maupun node.');
+            if ($correctUnits === $remainingUnits && $sourceLocation->key() === $target->key()) {
+                throw new InvalidArgumentException('Koreksi tidak mengubah jumlah maupun lokasi.');
             }
 
             $decreaseUnits = $remainingUnits - $correctUnits;
@@ -63,7 +86,9 @@ class InfrastructureMaterialService
                 $this->restoreUnusedSource($source, $decreaseUnits);
             }
 
-            $this->reduceBalance($source, $sourceNode, $remainingUnits);
+            if ($this->hasLocationBalance($source)) {
+                $this->inventory->adjustInfrastructureBalance($source->item_id, $sourceLocation, $this->balanceLot($source), -$remainingUnits / 100);
+            }
             $reference = 'ICR-'.Str::upper(Str::random(12));
             $negative = InventoryTransaction::create([
                 'type' => InventoryTransactionType::ADJUSTMENT,
@@ -73,8 +98,8 @@ class InfrastructureMaterialService
                 'roll_id' => $source->roll_id,
                 'qty' => -$remainingUnits / 100,
                 'unit_price_snapshot' => $source->unit_price_snapshot,
-                'from_network_node_id' => $sourceNode->id,
-                'from_pop_id' => $sourceNode->resolvePop()?->id,
+                ...$this->inventory->transactionLocationColumns('from', $this->positionOnly($sourceLocation)),
+                'from_pop_id' => $sourceLocation->cabangId,
                 'fop_task_id' => $fopTask->id,
                 'source_inventory_transaction_id' => $source->id,
                 'source_custody_id' => $source->source_custody_id,
@@ -86,7 +111,9 @@ class InfrastructureMaterialService
             ]);
 
             if ($correctUnits > 0) {
-                $this->increaseBalance($source->item_id, $target->id, $this->balanceLot($source), $correctUnits);
+                if ($this->hasLocationBalance($source)) {
+                    $this->inventory->adjustInfrastructureBalance($source->item_id, $target, $this->balanceLot($source), $correctUnits / 100);
+                }
                 InventoryTransaction::create([
                     'type' => InventoryTransactionType::ADJUSTMENT,
                     'reference_number' => $reference,
@@ -95,8 +122,8 @@ class InfrastructureMaterialService
                     'roll_id' => $source->roll_id,
                     'qty' => $correctUnits / 100,
                     'unit_price_snapshot' => $source->unit_price_snapshot,
-                    'to_network_node_id' => $target->id,
-                    'to_pop_id' => $target->resolvePop()?->id,
+                    ...$this->inventory->transactionLocationColumns('to', $this->positionOnly($target)),
+                    'to_pop_id' => $target->cabangId,
                     'fop_task_id' => $fopTask->id,
                     'source_inventory_transaction_id' => $source->id,
                     'source_custody_id' => $source->source_custody_id,
@@ -113,16 +140,17 @@ class InfrastructureMaterialService
     public function correctRoll(
         InventoryTransaction $source,
         InventoryRoll $replacementRoll,
-        NetworkNode $target,
+        NetworkNode|InfrastructureLocation $target,
         float $correctQty,
         FopTask $fopTask,
         User $actor,
         string $reason,
         string $actionKey,
     ): InventoryTransaction {
+        $target = $this->toLocation($target);
         $correctUnits = $this->units($correctQty);
         $this->assertReasonAndKey($reason, $actionKey);
-        $fingerprint = $this->fingerprint('correct_roll', $source->id, $replacementRoll->id, $target->id, $correctUnits, $fopTask->id, $reason);
+        $fingerprint = $this->fingerprint('correct_roll', $source->id, $replacementRoll->id, $target->key(), $correctUnits, $fopTask->id, $reason);
 
         return DB::transaction(function () use ($source, $replacementRoll, $target, $correctUnits, $fopTask, $actor, $reason, $actionKey, $fingerprint): InventoryTransaction {
             $source = InventoryTransaction::query()->lockForUpdate()->findOrFail($source->id);
@@ -141,10 +169,11 @@ class InfrastructureMaterialService
                 throw new InvalidArgumentException('Roll asal sudah pernah dicabut secara fisik; perlu rekonsiliasi Gudang.');
             }
 
+            $this->assertLocationInTask($target, $fopTask, $actor);
             $technicians = User::query()->whereIn('id', $fopTask->task->teamMembers()->pluck('user_id'))->get();
             $this->correct($source, $target, 0, $fopTask, $actor, $reason, hash('sha256', $actionKey.'|reverse'));
 
-            return $this->inventory->deployRoll(
+            return $this->inventory->consumeInfrastructureRoll(
                 $replacementRoll, $correctUnits / 100, $target, $technicians, $fopTask, $actor,
                 $source, $actionKey, $fingerprint,
             );
@@ -175,9 +204,15 @@ class InfrastructureMaterialService
                 throw new InvalidArgumentException('Jumlah cabut melebihi sisa yang terpasang dari transaksi asal.');
             }
 
-            $node = NetworkNode::query()->lockForUpdate()->findOrFail($placement['node_id']);
-            $this->assertNode($node, $fopTask, $actor);
-            $this->reduceBalance($source, $node, $requestedUnits);
+            $location = $placement['location'];
+            $this->assertLocationInTask($location, $fopTask, $actor);
+            if ($this->hasLocationBalance($source)) {
+                $this->inventory->adjustInfrastructureBalance($source->item_id, $location, $this->balanceLot($source), -$requestedUnits / 100);
+            }
+
+            if ($fopTask->task_id === null) {
+                throw new InvalidArgumentException('Task FOP belum terhubung ke Task pekerjaan.');
+            }
 
             $transaction = InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETRIEVE_INFRA,
@@ -187,8 +222,8 @@ class InfrastructureMaterialService
                 'lot_no' => $source->lot_no,
                 'qty' => $requestedUnits / 100,
                 'unit_price_snapshot' => $source->unit_price_snapshot,
-                'from_network_node_id' => $node->id,
-                'from_pop_id' => $node->resolvePop()?->id,
+                ...$this->inventory->transactionLocationColumns('from', $this->positionOnly($location)),
+                'from_pop_id' => $location->cabangId,
                 'to_technician_id' => $actor->id,
                 'fop_task_id' => $fopTask->id,
                 'source_inventory_transaction_id' => $source->id,
@@ -198,10 +233,6 @@ class InfrastructureMaterialService
                 'reason' => $reason,
                 'created_by' => $actor->id,
             ]);
-
-            if ($fopTask->task_id === null) {
-                throw new InvalidArgumentException('Task FOP belum terhubung ke Task pekerjaan.');
-            }
 
             return InfrastructureRecovery::create([
                 'source_transaction_id' => $source->id,
@@ -234,9 +265,10 @@ class InfrastructureMaterialService
             }
 
             $source = InventoryTransaction::query()->findOrFail($recovery->source_transaction_id);
-            $node = NetworkNode::query()->findOrFail($source->to_network_node_id);
+            $location = $this->inventory->transactionLocation($source, 'to')
+                ?? throw new InvalidArgumentException('Transaksi asal tidak memiliki lokasi.');
             $fopTask = FopTask::query()->findOrFail($recovery->retrieveTransaction->fop_task_id);
-            $this->assertNode($node, $fopTask, $inspector);
+            $this->assertLocationReach($location, $fopTask, $inspector);
 
             if ($recovery->status !== 'pending_inspection') {
                 if ($recovery->status === $outcome && $recovery->inspection_note === $note && $recovery->inspected_by === $inspector->id) {
@@ -309,6 +341,27 @@ class InfrastructureMaterialService
         }, 3);
     }
 
+    private function toLocation(NetworkNode|InfrastructureLocation $target): InfrastructureLocation
+    {
+        return $target instanceof NetworkNode ? $this->locations->forNode($target) : $target;
+    }
+
+    /**
+     * Kolom posisi ledger untuk lokasi POP Cabang dibiarkan kosong — POP-nya
+     * sudah tercatat di `{arah}_pop_id` (snapshot Cabang), lihat
+     * `InventoryService::transactionLocation()`.
+     */
+    private function positionOnly(InfrastructureLocation $location): ?InfrastructureLocation
+    {
+        return $location->kind === InfrastructureLocation::POP ? null : $location;
+    }
+
+    private function hasLocationBalance(InventoryTransaction $source): bool
+    {
+        // Kabel tidak punya saldo terpasang (§16.4 #2) — hanya qty non-kabel.
+        return $source->roll_id === null;
+    }
+
     private function units(float $qty, bool $allowZero = false): int
     {
         if (! is_finite($qty) || $qty < 0 || (! $allowZero && $qty <= 0) || abs($qty * 100 - round($qty * 100)) > 0.00001) {
@@ -343,34 +396,47 @@ class InfrastructureMaterialService
 
     private function assertSource(InventoryTransaction $source, FopTask $fopTask, User $actor): void
     {
+        $location = $this->inventory->transactionLocation($source, 'to');
+
         if ($source->type !== InventoryTransactionType::DEPLOY || $source->serial_id !== null
-            || $source->to_network_node_id === null || $source->qty <= 0
+            || $location === null || $source->qty <= 0
             || ! in_array($fopTask->category, [TaskType::OREQ, TaskType::INFR], true)
             || $fopTask->task_id === null) {
             throw new InvalidArgumentException('Transaksi asal bukan pemasangan qty/roll pada Task O-REQ/INFR-REQ.');
         }
 
-        $node = NetworkNode::findOrFail($source->to_network_node_id);
-        $this->assertNode($node, $fopTask, $actor);
+        $this->assertLocationReach($location, $fopTask, $actor);
     }
 
-    private function assertNode(NetworkNode $node, FopTask $fopTask, User $actor): void
+    /**
+     * Irisan penuh scope task (§10.3) — untuk lokasi yang DIPILIH pada laporan
+     * (tujuan koreksi, lokasi cabut).
+     */
+    private function assertLocationInTask(InfrastructureLocation $location, FopTask $fopTask, User $actor): void
+    {
+        try {
+            $this->scopes->assertLocationInTaskScope($fopTask, $location, $actor);
+        } catch (ValidationException $exception) {
+            throw new InvalidArgumentException(collect($exception->errors())->flatten()->first() ?? 'Lokasi di luar scope task.');
+        }
+    }
+
+    /**
+     * Cabang task + POP scope aktor saja — untuk transaksi asal & inspeksi
+     * Gudang (pemeriksa bukan anggota subtree pekerjaan).
+     */
+    private function assertLocationReach(InfrastructureLocation $location, FopTask $fopTask, User $actor): void
     {
         $taskCabang = Pop::resolveCabangId($fopTask->pop_id);
-        $nodeCabang = Pop::resolveCabangId($node->resolvePop()?->id);
-        if ($taskCabang === null || $taskCabang !== $nodeCabang) {
-            throw new InvalidArgumentException('Node berada di luar cabang Task.');
+        if ($taskCabang === null || $taskCabang !== $location->cabangId) {
+            throw new InvalidArgumentException('Lokasi berada di luar cabang Task.');
         }
 
-        if (! $this->access->hasAllPopAccess($actor)
-            && ! NetworkNode::query()->inPops($this->access->getAllowedPopIds($actor))->whereKey($node->id)->exists()) {
-            throw new InvalidArgumentException('Node berada di luar scope aktor.');
+        try {
+            $this->scopes->assertActorCanReach($location, $actor, 'infra_material_action');
+        } catch (ValidationException) {
+            throw new InvalidArgumentException('Lokasi berada di luar scope aktor.');
         }
-    }
-
-    private function lockNodes(NetworkNode $first, NetworkNode $second): void
-    {
-        NetworkNode::query()->whereKey(array_unique([$first->id, $second->id]))->orderBy('id')->lockForUpdate()->get();
     }
 
     private function balanceLot(InventoryTransaction $source): string
@@ -379,7 +445,11 @@ class InfrastructureMaterialService
     }
 
     /**
-     * @return array{node_id: int, remaining_units: int}
+     * Posisi aktif + sisa unit dari transaksi asal, diturunkan dari ledger:
+     * koreksi terakhir (pasangan negatif/positif ber-reference sama) lalu
+     * dikurangi cabut fisik sesudahnya.
+     *
+     * @return array{location: InfrastructureLocation, remaining_units: int}
      */
     private function currentPlacement(InventoryTransaction $source): array
     {
@@ -387,7 +457,7 @@ class InfrastructureMaterialService
             ->where('source_inventory_transaction_id', $source->id)
             ->where('type', InventoryTransactionType::ADJUSTMENT->value)
             ->where('reason', 'infra_record_correction')
-            ->whereNotNull('from_network_node_id')
+            ->where('qty', '<', 0)
             ->orderByDesc('id')
             ->first();
 
@@ -396,7 +466,7 @@ class InfrastructureMaterialService
             : InventoryTransaction::query()
                 ->where('reference_number', $lastCorrection->reference_number)
                 ->where('source_inventory_transaction_id', $source->id)
-                ->whereNotNull('to_network_node_id')
+                ->where('qty', '>', 0)
                 ->first();
 
         $activeUnits = $active === null ? 0 : $this->units((float) $active->qty, allowZero: true);
@@ -411,35 +481,14 @@ class InfrastructureMaterialService
             throw new InvalidArgumentException('Riwayat transaksi melebihi jumlah pemasangan aktif.');
         }
 
+        $location = $active !== null
+            ? $this->inventory->transactionLocation($active, 'to')
+            : $this->inventory->transactionLocation($lastCorrection, 'from');
+
         return [
-            'node_id' => (int) ($active?->to_network_node_id ?? $lastCorrection?->from_network_node_id ?? $source->to_network_node_id),
+            'location' => $location ?? throw new InvalidArgumentException('Lokasi transaksi asal tidak terbaca.'),
             'remaining_units' => $activeUnits - $retrievedUnits,
         ];
-    }
-
-    private function reduceBalance(InventoryTransaction $source, NetworkNode $node, int $units): void
-    {
-        $balance = InfrastructureBalance::query()
-            ->where('item_id', $source->item_id)
-            ->where('network_node_id', $node->id)
-            ->where('lot_no', $this->balanceLot($source))
-            ->lockForUpdate()
-            ->first();
-
-        if ($balance === null || $this->units((float) $balance->qty, allowZero: true) < $units) {
-            throw new InvalidArgumentException('Saldo node tidak cukup untuk koreksi atau cabut.');
-        }
-
-        $balance->update(['qty' => ($this->units((float) $balance->qty, allowZero: true) - $units) / 100]);
-    }
-
-    private function increaseBalance(int $itemId, int $nodeId, string $lotNo, int $units): void
-    {
-        $balance = InfrastructureBalance::query()->lockForUpdate()->firstOrCreate(
-            ['item_id' => $itemId, 'network_node_id' => $nodeId, 'lot_no' => $lotNo],
-            ['qty' => 0],
-        );
-        $balance->increment('qty', $units / 100);
     }
 
     private function restoreUnusedSource(InventoryTransaction $source, int $units): void

@@ -148,6 +148,19 @@ class TaskInfrastructureDeployReportTest extends TestCase
         ]);
     }
 
+    /**
+     * Kabel tidak punya saldo terpasang (rancangan hierarki §16.4 #2) — lokasi
+     * kerja aktif dibaca dari ledger: koreksi positif terakhir atau transaksi
+     * asal.
+     */
+    private function cableWorkNodeId(InventoryTransaction $source): ?int
+    {
+        $positive = InventoryTransaction::where('source_inventory_transaction_id', $source->id)
+            ->where('reason', 'infra_record_correction')->where('qty', '>', 0)->latest('id')->first();
+
+        return $positive?->to_network_node_id ?? $source->to_network_node_id;
+    }
+
     private function issuedSerial(Item $item, string $serialNumber): InventorySerial
     {
         return InventorySerial::create([
@@ -505,7 +518,7 @@ class TaskInfrastructureDeployReportTest extends TestCase
     }
 
     #[Test]
-    public function oreq_potong_roll_infrastruktur_menambah_infrastructure_balance_per_roll(): void
+    public function oreq_potong_roll_infrastruktur_hanya_mengurangi_sisa_roll_tanpa_saldo_terpasang(): void
     {
         $task = $this->makeTask(TaskType::OREQ);
         $kabel = $this->makeItem('INF-FEEDER', 'roll', 'meter');
@@ -530,9 +543,10 @@ class TaskInfrastructureDeployReportTest extends TestCase
         $response->assertSessionMissing('error');
 
         $this->assertEquals(60, $roll->refresh()->length_remaining);
-        $balance = InfrastructureBalance::where('item_id', $kabel->id)->where('network_node_id', $this->node->id)->sole();
-        $this->assertEquals(40, $balance->qty);
-        $this->assertSame('ROLL-INF-001', $balance->lot_no);
+        $this->assertSame(0, InfrastructureBalance::count());
+        $deploy = InventoryTransaction::where('roll_id', $roll->id)->sole();
+        $this->assertEquals(40, $deploy->qty);
+        $this->assertSame($this->node->id, $deploy->to_network_node_id);
     }
 
     #[Test]
@@ -687,8 +701,8 @@ class TaskInfrastructureDeployReportTest extends TestCase
         $service->correct($original, $actualNode, 40, $anchor, $this->technician, 'Node laporan salah', 'fix-roll-node-01');
         $service->correct($original, $actualNode, 40, $anchor, $this->technician, 'Node laporan salah', 'fix-roll-node-01');
 
-        $this->assertEquals(0, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $this->node->id)->value('qty'));
-        $this->assertEquals(40, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $actualNode->id)->value('qty'));
+        $this->assertSame(0, InfrastructureBalance::count());
+        $this->assertSame($actualNode->id, $this->cableWorkNodeId($original));
         $this->assertEquals(60, $roll->refresh()->length_remaining);
         $this->assertSame(0, InventoryTransaction::where('type', InventoryTransactionType::RETRIEVE_INFRA->value)->count());
         $this->assertSame(2, InventoryTransaction::where('type', InventoryTransactionType::ADJUSTMENT->value)->count());
@@ -712,7 +726,7 @@ class TaskInfrastructureDeployReportTest extends TestCase
         $sameRecovery = $service->retrieve($original, 10, $anchor, $this->technician, 'Cabut feeder rusak', 'retrieve-roll-01');
 
         $this->assertSame($recovery->id, $sameRecovery->id);
-        $this->assertEquals(30, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $this->node->id)->value('qty'));
+        $this->assertSame(0, InfrastructureBalance::count());
         $this->assertEquals(60, $roll->refresh()->length_remaining);
         $this->assertSame('pending_inspection', $recovery->status);
         $this->assertSame(1, InventoryTransaction::where('type', InventoryTransactionType::RETRIEVE_INFRA->value)->count());
@@ -741,8 +755,10 @@ class TaskInfrastructureDeployReportTest extends TestCase
         $service->retrieve($original, 10, $anchor, $this->technician, 'Cabut sepuluh meter', 'repeat-retrieve-1');
         $service->correct($original, $thirdNode, 30, $anchor, $this->technician, 'Salah node kedua', 'repeat-correct-2');
 
-        $this->assertEquals(0, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $secondNode->id)->value('qty'));
-        $this->assertEquals(30, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $thirdNode->id)->value('qty'));
+        $this->assertSame(0, InfrastructureBalance::count());
+        $this->assertSame($thirdNode->id, $this->cableWorkNodeId($original));
+        $this->assertEquals(30, InventoryTransaction::where('source_inventory_transaction_id', $original->id)
+            ->where('reason', 'infra_record_correction')->where('qty', '>', 0)->latest('id')->value('qty'));
         $this->assertEquals(60, $roll->refresh()->length_remaining);
 
         try {
@@ -752,7 +768,7 @@ class TaskInfrastructureDeployReportTest extends TestCase
             $this->assertStringContainsString('Kunci aksi', $exception->getMessage());
         }
 
-        $this->assertEquals(30, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $thirdNode->id)->value('qty'));
+        $this->assertSame($thirdNode->id, $this->cableWorkNodeId($original));
         $this->assertSame(4, InventoryTransaction::where('type', InventoryTransactionType::ADJUSTMENT->value)->count());
         $this->assertSame(1, InventoryTransaction::where('type', InventoryTransactionType::RETRIEVE_INFRA->value)->count());
     }
@@ -808,8 +824,9 @@ class TaskInfrastructureDeployReportTest extends TestCase
         $this->assertSame($source->id, $replacement->source_inventory_transaction_id);
         $this->assertEquals(100, $wrongRoll->refresh()->length_remaining);
         $this->assertEquals(60, $rightRoll->refresh()->length_remaining);
-        $this->assertEquals(0, InfrastructureBalance::where('network_node_id', $this->node->id)->where('lot_no', $wrongRoll->roll_code)->value('qty'));
-        $this->assertEquals(40, InfrastructureBalance::where('network_node_id', $actualNode->id)->where('lot_no', $rightRoll->roll_code)->value('qty'));
+        $this->assertSame(0, InfrastructureBalance::count());
+        $this->assertSame($actualNode->id, $replacement->to_network_node_id);
+        $this->assertSame($rightRoll->id, $replacement->roll_id);
         $this->assertSame(0, InventoryTransaction::where('type', InventoryTransactionType::RETRIEVE_INFRA->value)->count());
     }
 
@@ -900,7 +917,7 @@ class TaskInfrastructureDeployReportTest extends TestCase
             'infra_material_reason' => 'Feeder lama rusak',
         ])->assertSessionHas('success')->assertSessionHasNoErrors()->assertSessionMissing('error');
 
-        $this->assertEquals(30, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $this->node->id)->value('qty'));
+        $this->assertSame(0, InfrastructureBalance::count());
         $this->assertEquals(60, $roll->refresh()->length_remaining);
         $this->assertDatabaseHas('infrastructure_recoveries', ['source_transaction_id' => $source->id, 'qty' => 10, 'status' => 'pending_inspection']);
     }
@@ -932,8 +949,8 @@ class TaskInfrastructureDeployReportTest extends TestCase
 
         $this->assertEquals(100, $wrong->refresh()->length_remaining);
         $this->assertEquals(60, $right->refresh()->length_remaining);
-        $this->assertEquals(0, InfrastructureBalance::where('network_node_id', $this->node->id)->where('lot_no', $wrong->roll_code)->value('qty'));
-        $this->assertEquals(40, InfrastructureBalance::where('network_node_id', $this->node->id)->where('lot_no', $right->roll_code)->value('qty'));
+        $this->assertSame(0, InfrastructureBalance::count());
+        $this->assertSame($this->node->id, InventoryTransaction::where('roll_id', $right->id)->sole()->to_network_node_id);
     }
 
     #[Test]
@@ -959,8 +976,8 @@ class TaskInfrastructureDeployReportTest extends TestCase
             'infra_target_network_node_id' => $actualNode->id,
         ])->assertSessionHas('success')->assertSessionHasNoErrors()->assertSessionMissing('error');
 
-        $this->assertEquals(0, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $this->node->id)->value('qty'));
-        $this->assertEquals(40, InfrastructureBalance::where('item_id', $item->id)->where('network_node_id', $actualNode->id)->value('qty'));
+        $this->assertSame(0, InfrastructureBalance::count());
+        $this->assertSame($actualNode->id, $this->cableWorkNodeId($source));
         $this->assertSame(0, InventoryTransaction::where('type', InventoryTransactionType::RETRIEVE_INFRA->value)->count());
     }
 

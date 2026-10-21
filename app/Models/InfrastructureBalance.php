@@ -25,6 +25,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'item_id',
     'lot_no',
     'network_node_id',
+    'pop_id',
+    'infrastructure_slot_id',
+    'infrastructure_port_id',
     'qty',
 ])]
 class InfrastructureBalance extends Model
@@ -47,5 +50,23 @@ class InfrastructureBalance extends Model
     public function networkNode(): BelongsTo
     {
         return $this->belongsTo(NetworkNode::class);
+    }
+
+    /**
+     * POP Cabang atau Mini POP tempat saldo qty non-kabel terpasang langsung.
+     */
+    public function pop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class);
+    }
+
+    public function infrastructureSlot(): BelongsTo
+    {
+        return $this->belongsTo(InfrastructureSlot::class);
+    }
+
+    public function infrastructurePort(): BelongsTo
+    {
+        return $this->belongsTo(InfrastructurePort::class);
     }
 }

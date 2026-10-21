@@ -218,7 +218,7 @@ class InventoryServiceDeployTest extends TestCase
     }
 
     #[Test]
-    public function deploy_roll_memotong_sisa_menambah_balance_per_roll_dan_roll_tetap_di_custody(): void
+    public function deploy_roll_hanya_memotong_sisa_tanpa_saldo_terpasang_dan_roll_tetap_di_custody(): void
     {
         $kabel = $this->makeItem('DPL-FEEDER', 'roll', 'infrastructure_asset', 'meter');
 
@@ -240,9 +240,10 @@ class InventoryServiceDeployTest extends TestCase
         $this->assertSame(RollStatus::IN_USE, $roll->status);
         $this->assertSame($this->technician->id, (int) $roll->current_technician_id);
 
-        $balance = InfrastructureBalance::where('item_id', $kabel->id)->where('network_node_id', $this->odc->id)->sole();
-        $this->assertSame('ROLL-DPL-001', $balance->lot_no);
-        $this->assertEquals(40, $balance->qty);
+        // Rancangan hierarki §16.4 #2: kabel tidak punya saldo terpasang —
+        // saldo kabel yang sah hanya sisa roll; lokasi kerja ada di ledger.
+        $this->assertSame(0, InfrastructureBalance::count());
+        $this->assertSame($this->odc->id, $transaction->to_network_node_id);
 
         $this->assertSame(InventoryTransactionType::DEPLOY, $transaction->type);
         $this->assertEquals(40, $transaction->qty);
@@ -255,8 +256,7 @@ class InventoryServiceDeployTest extends TestCase
         $roll->refresh();
         $this->assertEquals(0, $roll->length_remaining);
         $this->assertSame(RollStatus::DEPLETED, $roll->status);
-        $this->assertEquals(100, $balance->refresh()->qty);
-        $this->assertSame(1, InfrastructureBalance::count());
+        $this->assertSame(0, InfrastructureBalance::count());
     }
 
     #[Test]
@@ -289,6 +289,10 @@ class InventoryServiceDeployTest extends TestCase
         $serial = $this->issuedSerial($splitter, 'SN-DPL-004');
 
         $transaction = app(InventoryService::class)->deploySerial($serial, $this->odc, $this->fopTask, [$this->technician], $this->actor);
+        // Node ber-aset aktif tidak boleh pindah lintas cabang
+        // (NetworkNodeService::assertCrossBranchSubtreeIsEmpty) — aset dicabut
+        // dulu; yang diuji di sini snapshot ledger lama tetap Cabang A.
+        app(InventoryService::class)->retrieveSerialFromLocation($serial, $this->fopTask, $this->actor, $this->odc);
 
         $this->seed(RoleSeeder::class);
         $this->actor->update(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
