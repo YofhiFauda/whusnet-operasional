@@ -17,6 +17,8 @@ use App\Enums\TaskType;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\FopTask;
+use App\Models\InfrastructurePort;
+use App\Models\InfrastructureSlot;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
@@ -34,8 +36,11 @@ use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
+use App\Services\FopTaskInfrastructureScopeService;
 use App\Services\FopTaskProvisioningService;
+use App\Services\InfrastructureLocationResolver;
 use App\Services\InfrastructureMaterialService;
+use App\Services\InfrastructureReportLocationParser;
 use App\Services\InventoryService;
 use App\Services\NumberSequenceService;
 use App\Services\TaskInfrastructureActionService;
@@ -200,7 +205,11 @@ class TaskMaintenanceController extends Controller
         return InventorySerial::query()
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->where('status', SerialStatus::ISSUED->value)
-            ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INFRASTRUCTURE_ASSET->value))
+            // Aset perusahaan (Switch/SFP) ikut HANYA bila Master Barang
+            // menyatakan posisi pemasangan — aturan sama dengan
+            // InventoryService::assertSerialItemFitsLocation().
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INFRASTRUCTURE_ASSET->value)
+                ->orWhere(fn ($q2) => $q2->where('ownership_mode', OwnershipMode::COMPANY_ASSET->value)->whereNotNull('infrastructure_location_kind')))
             ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
                 $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
             }))
@@ -325,10 +334,22 @@ class TaskMaintenanceController extends Controller
             return collect();
         }
 
+        // Posisi kanonis (Task 6): SN bisa terpasang di Mini POP, node, Slot,
+        // atau Port — semua posisi dalam Cabang task ikut kandidat. Filter
+        // ke lokasi TEPAT aksi tetap ditegakkan service saat simpan.
+        $nodeIds = $nodeQuery->pluck('id');
+        $cabangId = Pop::resolveCabangId($task->pop_id);
+        $popIds = Pop::query()->where('parent_id', $cabangId)->pluck('id');
+        $slotIds = InfrastructureSlot::query()->whereIn('network_node_id', $nodeIds)->pluck('id');
+        $portIds = InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slotIds)->pluck('id');
+
         return InventorySerial::query()
             ->where('status', SerialStatus::DEPLOYED->value)
-            ->whereIn('current_network_node_id', $nodeQuery->pluck('id'))
-            ->with('item', 'currentNetworkNode')
+            ->where(fn ($query) => $query->whereIn('current_network_node_id', $nodeIds)
+                ->orWhereIn('current_mini_pop_id', $popIds)
+                ->orWhereIn('current_infrastructure_slot_id', $slotIds)
+                ->orWhereIn('current_infrastructure_port_id', $portIds))
+            ->with('item', 'currentNetworkNode', 'currentMiniPop', 'currentInfrastructureSlot.device', 'currentInfrastructurePort.slot.device')
             ->get();
     }
 
@@ -634,6 +655,17 @@ class TaskMaintenanceController extends Controller
             $rules['infra_actions.*.target_node_id'] = ['nullable', 'integer', 'exists:network_nodes,id'];
             $rules['infra_actions.*.target_port_id'] = ['nullable', 'integer', 'exists:network_node_ports,id'];
             $rules['infra_actions.*.result_note'] = ['nullable', 'string', 'max:1000'];
+            // Dropdown lokasi bertingkat (§10.2): ID angka, `none`
+            // (Dikosongkan), atau kosong (Belum dipilih). Hubungan induk–anak
+            // & scope divalidasi InfrastructureReportLocationParser — `regex`
+            // di sini hanya menolak bentuk nilai asing.
+            foreach (InfrastructureReportLocationParser::LEVELS as $level) {
+                $rules["infra_actions.*.{$level}"] = ['nullable', 'regex:/^(\d+|none)$/'];
+            }
+            $rules['infra_actions.*.end_from'] = ['nullable', 'string', 'max:40'];
+            $rules['infra_actions.*.end_to'] = ['nullable', 'string', 'max:40'];
+            $rules['infra_actions.*.work_latitude'] = ['nullable', 'numeric', 'between:-90,90'];
+            $rules['infra_actions.*.work_longitude'] = ['nullable', 'numeric', 'between:-180,180'];
 
             $eligibleInfraSerialIds = $this->eligibleInfraSerialsForTeam($task)->pluck('id');
             $eligibleInfraRetrievableSerialIds = $this->eligibleInfraRetrievableSerialsForTeam($task)->pluck('id');
@@ -665,7 +697,7 @@ class TaskMaintenanceController extends Controller
                 // sebagai error field (redirect back + old input), bukan
                 // halaman 403 mentah yang membuang seluruh isian laporan.
                 // JANGAN panggil method itu lagi di luar closure ini.
-                function ($attribute, $value, $fail) use ($taskCabangId, $access, $actor) {
+                function ($attribute, $value, $fail) use ($taskCabangId, $access, $actor, $task) {
                     $node = NetworkNode::find($value);
 
                     if (! $node) {
@@ -682,6 +714,24 @@ class TaskMaintenanceController extends Controller
                         $this->assertNetworkNodeInScope($node, $actor, $access);
                     } catch (HttpException $e) {
                         $fail($e->getMessage() ?: 'Titik jaringan yang dipilih di luar scope POP Anda.');
+
+                        return;
+                    }
+
+                    // Form tunggal lama memakai guard yang SAMA dengan baris
+                    // aksi (Task 8): node wajib di subtree akar scope task.
+                    // Task tanpa anchor FopTask belum punya akar — anchor
+                    // dibuat saat simpan dengan akar = Cabang task, yang
+                    // sudah dicek di atas.
+                    $anchor = FopTask::query()->where('task_id', $task->id)->first();
+                    if ($anchor !== null) {
+                        try {
+                            app(FopTaskInfrastructureScopeService::class)->assertLocationInTaskScope(
+                                $anchor, app(InfrastructureLocationResolver::class)->forNode($node), $actor, $attribute
+                            );
+                        } catch (ValidationException $e) {
+                            $fail(collect($e->errors())->flatten()->first());
+                        }
                     }
                 },
             ];
