@@ -13,12 +13,12 @@ class TaskInfrastructureAction extends Model
 
     protected $fillable = [
         'task_id', 'fop_task_id', 'action_key', 'action_type', 'network_node_id',
-        'mutation_hash', 'mutation', 'result_note', 'performed_by', 'performed_at',
+        'mutation_hash', 'mutation', 'scope_snapshot', 'result_note', 'performed_by', 'performed_at',
     ];
 
     protected function casts(): array
     {
-        return ['mutation' => 'array', 'performed_at' => 'datetime'];
+        return ['mutation' => 'array', 'scope_snapshot' => 'array', 'performed_at' => 'datetime'];
     }
 
     public function node(): BelongsTo

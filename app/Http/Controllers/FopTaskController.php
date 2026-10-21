@@ -21,6 +21,7 @@ use App\Models\Village;
 use App\Notifications\AppNotification;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
+use App\Services\FopTaskInfrastructureScopeService;
 use App\Services\FopTaskProvisioningService;
 use App\Services\FopTaskTeamService;
 use App\Services\NumberSequenceService;
@@ -34,6 +35,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class FopTaskController extends Controller
 {
@@ -387,6 +389,7 @@ class FopTaskController extends Controller
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
             'technicians' => ['required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
+            ...$this->infrastructureScopeRules(),
         ], [
             'pending_reason.required_if' => 'Alasan pending wajib diisi jika status Pending.',
             'client_request_date.required_if' => 'Tanggal request client wajib diisi jika status Pending.',
@@ -417,6 +420,8 @@ class FopTaskController extends Controller
 
             $fopTask->save();
 
+            $this->applyInfrastructureScope($fopTask, $validated, isCreate: true);
+
             if (! empty($validated['technicians'])) {
                 $technicians = $validated['technicians'];
                 $fopTask->technicians()->sync($technicians);
@@ -441,7 +446,13 @@ class FopTaskController extends Controller
                     'conflict_override' => true,
                 ];
 
-                $task = app(TaskService::class)->create($taskData, auth()->user());
+                // FopTask ini WAJIB diteruskan sebagai sumber: untuk O-REQ/INFR,
+                // create() tanpa sumber membuatkan anchor FopTask KEDUA lewat
+                // FopTaskProvisioningService::ensureForTask(), lalu baris di
+                // bawah menabrak UNIQUE fop_tasks.task_id (500 saat membuat
+                // Task FOP infrastruktur dari papan FOP — regresi
+                // FopTaskInfraCreateDuplicateAnchorTest).
+                $task = app(TaskService::class)->create($taskData, auth()->user(), $fopTask);
                 $fopTask->task_id = $task->id;
                 $fopTask->save();
             }
@@ -499,6 +510,7 @@ class FopTaskController extends Controller
             'cancel_reason' => ReasonValidationRule::requiredIf('status', 'dibatalkan', 500),
             'technicians' => ['sometimes', 'required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
+            ...$this->infrastructureScopeRules(),
         ], [
             'pending_reason.required_if' => 'Alasan pending wajib diisi jika status Pending.',
             'client_request_date.required_if' => 'Tanggal request client wajib diisi jika status Pending.',
@@ -616,7 +628,12 @@ class FopTaskController extends Controller
                 }
             }
 
+            $popChanged = array_key_exists('pop_id', $validated) && (string) $validated['pop_id'] !== (string) ($oldValues['pop_id'] ?? '');
             $fopTask->save();
+
+            if ($popChanged || FopTaskInfrastructureScopeService::hasScopeInput($validated) || $request->has('scope_mini_pop_id')) {
+                $this->applyInfrastructureScope($fopTask, $validated, isCreate: false);
+            }
 
             // Riwayat status sisi FOP buat cancel manual HARUS ditulis di sini.
             // TaskObserver — yang biasanya nulis fop_task_status_history — udah
@@ -1742,5 +1759,47 @@ class FopTaskController extends Controller
             ->sortBy(fn (FopTaskPriority $p) => $p->sortOrder())
             ->map(fn (FopTaskPriority $p) => $p->value)
             ->all();
+    }
+
+    /**
+     * Dropdown akar scope O-REQ/INFR-REQ (§10.3). Relasi induk–anak divalidasi
+     * `FopTaskInfrastructureScopeService::resolveRequestedRoot()`, bukan di
+     * sini — `exists` saja tidak cukup karena ID global yang sah tetap
+     * ditolak bila bukan anak induk terpilih.
+     *
+     * @return array<string, list<string>>
+     */
+    private function infrastructureScopeRules(): array
+    {
+        return collect(FopTaskInfrastructureScopeService::INPUT_LEVELS)
+            ->mapWithKeys(fn (string $key): array => [$key => ['nullable', 'integer']])
+            ->all();
+    }
+
+    /**
+     * Simpan akar scope terdalam untuk Task O-REQ/INFR-REQ. Kategori lain
+     * menolak input scope (supaya scope tidak "nyangkut" diam-diam).
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function applyInfrastructureScope(FopTask $fopTask, array $validated, bool $isCreate): void
+    {
+        $scopes = app(FopTaskInfrastructureScopeService::class);
+        $hasInput = FopTaskInfrastructureScopeService::hasScopeInput($validated);
+
+        if (! FopTaskInfrastructureScopeService::supportsCategory($fopTask->category)) {
+            if ($hasInput) {
+                throw ValidationException::withMessages(['scope_mini_pop_id' => 'Akar scope infrastruktur hanya untuk Task O-REQ/INFR-REQ.']);
+            }
+
+            return;
+        }
+
+        $root = $scopes->resolveRequestedRoot($fopTask->pop()->firstOrFail(), $validated);
+        $scopes->applyScope($fopTask, $root, auth()->user());
+
+        if (! $isCreate) {
+            $fopTask->refresh();
+        }
     }
 }

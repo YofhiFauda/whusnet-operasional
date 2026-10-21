@@ -23,6 +23,11 @@ use Illuminate\Support\Carbon;
     'tugas',
     'village_id',
     'pop_id',
+    'scope_pop_id',
+    'scope_network_node_id',
+    'scope_infrastructure_slot_id',
+    'scope_infrastructure_port_id',
+    'scope_snapshot',
     'customer_id',
     'issue',
     'notes',
@@ -50,6 +55,11 @@ class FopTask extends Model
             'status' => TaskStatus::class,
             'priority' => FopTaskPriority::class,
             'category' => TaskType::class,
+            'scope_pop_id' => 'integer',
+            'scope_network_node_id' => 'integer',
+            'scope_infrastructure_slot_id' => 'integer',
+            'scope_infrastructure_port_id' => 'integer',
+            'scope_snapshot' => 'array',
         ];
     }
 
