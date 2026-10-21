@@ -100,7 +100,7 @@ class TaskMaintenanceController extends Controller
             ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
                 $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
             }))
-            ->with('item')
+            ->with('item.infrastructureNodeType')
             ->get();
     }
 
@@ -215,7 +215,7 @@ class TaskMaintenanceController extends Controller
             ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
                 $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
             }))
-            ->with('item')
+            ->with('item.infrastructureNodeType')
             ->get();
     }
 
