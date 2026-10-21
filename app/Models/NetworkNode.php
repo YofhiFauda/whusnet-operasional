@@ -163,6 +163,17 @@ class NetworkNode extends Model
         return $this->hasMany(OltSlot::class, 'chassis_node_id');
     }
 
+    /**
+     * Slot kanonis (OLT/Switch) — pengganti `oltSlots()` untuk struktur baru.
+     * `oltSlots()` tetap dibaca untuk histori/migrasi.
+     *
+     * @return HasMany<InfrastructureSlot, $this>
+     */
+    public function infrastructureSlots(): HasMany
+    {
+        return $this->hasMany(InfrastructureSlot::class)->orderBy('number');
+    }
+
     public function nodeType(): BelongsTo
     {
         return $this->belongsTo(NetworkNodeType::class);

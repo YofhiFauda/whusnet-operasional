@@ -53,7 +53,11 @@ class NetworkNodeTypeSeeder extends Seeder
             ['code' => 'server', 'name' => 'Server Utama', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'core_router', 'name' => 'Core Router/Switch', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'backbone', 'name' => 'Backbone/Transport', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
-            ['code' => 'aggregation_switch', 'name' => 'Router/Switch Agregasi POP', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
+            // Tipe lama (§16.2) — tetap dibuat supaya histori/audit yang merujuk
+            // kode ini terbaca, tapi nonaktif: Switch operasional baru memakai
+            // `switch_mini_pop` di bawah.
+            ['code' => 'aggregation_switch', 'name' => 'Router/Switch Agregasi POP', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null, 'is_active' => false],
+            ['code' => 'switch_mini_pop', 'name' => 'Switch Mini POP', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'pon_port', 'name' => 'PON Port/Card', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'olt_chassis', 'name' => 'Chassis OLT', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'olt_card', 'name' => 'Kartu OLT', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => 128, 'red_zone_threshold' => null],
@@ -80,7 +84,7 @@ class NetworkNodeTypeSeeder extends Seeder
                     'monitors_capacity' => $type['monitors_capacity'],
                     'max_ports' => $type['max_ports'],
                     'red_zone_threshold' => $type['red_zone_threshold'],
-                    'is_active' => true,
+                    'is_active' => $type['is_active'] ?? true,
                     'sort_order' => $index + 1,
                 ]
             );
@@ -94,6 +98,7 @@ class NetworkNodeTypeSeeder extends Seeder
             'core_router' => ['pops' => ['pusat', 'cabang'], 'nodes' => []],
             'backbone' => ['pops' => ['pusat', 'cabang'], 'nodes' => ['core_router']],
             'aggregation_switch' => ['pops' => ['cabang'], 'nodes' => ['backbone', 'core_router']],
+            'switch_mini_pop' => ['pops' => ['mini_pop'], 'nodes' => []],
             // Mini POP sekarang sebuah LOKASI fisik, bisa menaungi beberapa
             // chassis OLT sekaligus — jadi chassis boleh anchor Mini POP ATAU
             // Cabang langsung (bukan 1:1 lagi). Kartu OLT WAJIB jadi anak
@@ -129,7 +134,7 @@ class NetworkNodeTypeSeeder extends Seeder
         }
         foreach ($createdCodes as $code) {
             foreach ($defaultRules[$code]['pops'] as $popType) {
-                DB::table('network_node_type_rules')->insert([
+                DB::table('network_node_type_rules')->insertOrIgnore([
                     'child_type_id' => $ids[$code],
                     'anchor_pop_type' => $popType,
                     'created_at' => now(),
@@ -137,7 +142,7 @@ class NetworkNodeTypeSeeder extends Seeder
                 ]);
             }
             foreach ($defaultRules[$code]['nodes'] as $parentCode) {
-                DB::table('network_node_type_rules')->insert([
+                DB::table('network_node_type_rules')->insertOrIgnore([
                     'child_type_id' => $ids[$code],
                     'parent_type_id' => $ids[$parentCode],
                     'created_at' => now(),
