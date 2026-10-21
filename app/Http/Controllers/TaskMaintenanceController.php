@@ -48,6 +48,7 @@ use App\Services\TaskInfrastructureActionService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
+use App\Support\InfrastructureCutover;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -707,6 +708,12 @@ class TaskMaintenanceController extends Controller
                 // halaman 403 mentah yang membuang seluruh isian laporan.
                 // JANGAN panggil method itu lagi di luar closure ini.
                 function ($attribute, $value, $fail) use ($taskCabangId, $access, $actor, $task) {
+                    if (! InfrastructureCutover::legacyWritesEnabled()) {
+                        $fail('Form laporan node tunggal sudah ditutup. Gunakan dropdown lokasi bertingkat.');
+
+                        return;
+                    }
+
                     $node = NetworkNode::find($value);
 
                     if (! $node) {

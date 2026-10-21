@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\NetworkNode;
 use App\Models\OltSlot;
 use App\Services\EffectiveAccessService;
+use App\Support\InfrastructureCutover;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ class OltSlotController extends Controller
     public function store(Request $request, NetworkNode $chassis): RedirectResponse
     {
         $this->authorizeNodeScope($chassis);
+        InfrastructureCutover::assertLegacyWriteAllowed('slot_count', 'Slot OLT lama (olt_slots)');
         $validated = $request->validate(['slot_count' => ['required', 'integer', 'min:1', 'max:64']]);
         if ($chassis->nodeType?->code !== 'olt_chassis') {
             throw ValidationException::withMessages(['slot_count' => 'Slot OLT hanya dapat dibuat pada node Chassis OLT.']);
@@ -42,6 +44,7 @@ class OltSlotController extends Controller
     public function attachCard(Request $request, NetworkNode $chassis, OltSlot $slot): RedirectResponse
     {
         $this->authorizeNodeScope($chassis);
+        InfrastructureCutover::assertLegacyWriteAllowed('network_node_id', 'Kartu OLT sebagai node');
         $validated = $request->validate(['network_node_id' => ['required', 'integer', 'exists:network_nodes,id']]);
         if ($chassis->nodeType?->code !== 'olt_chassis' || $slot->chassis_node_id !== $chassis->id) {
             throw ValidationException::withMessages(['network_node_id' => 'Slot bukan milik Chassis OLT ini.']);

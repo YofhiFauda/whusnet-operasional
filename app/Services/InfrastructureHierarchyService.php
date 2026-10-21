@@ -48,7 +48,7 @@ class InfrastructureHierarchyService
     /**
      * @return array{items: array<string, array<string, mixed>>, children: array<string, list<string>>, roots: list<string>}
      */
-    public function build(User $user, ?int $cabangId = null): array
+    public function build(?User $user, ?int $cabangId = null): array
     {
         $pops = $this->visiblePops($user, $cabangId);
         $popIds = $pops->pluck('id')->all();
@@ -62,7 +62,9 @@ class InfrastructureHierarchyService
         $uplinkByTarget = $activeConnections->filter(fn (InfrastructureConnection $connection): bool => $connection->target_network_node_id !== null
             && $ports->firstWhere('id', $connection->source_infrastructure_port_id)?->kind === InfrastructurePortKind::PON)
             ->keyBy('target_network_node_id');
-        $canSeeSerials = $user->hasPermission('customers.detail.devices.view_sensitive');
+        // $user null = proyeksi sistem (rekonsiliasi terjadwal), tanpa
+        // pembatasan POP — TIDAK pernah dipakai untuk tampilan pengguna.
+        $canSeeSerials = $user === null || $user->hasPermission('customers.detail.devices.view_sensitive');
 
         $items = [];
 
@@ -75,7 +77,7 @@ class InfrastructureHierarchyService
                     'type_label' => match ($pop->type) {
                         'pusat' => 'POP Pusat', 'cabang' => 'POP Cabang', default => 'Mini POP'
                     },
-                    'url' => $user->hasPermission('pops.view') ? route('master.pop.show', $pop) : null,
+                    'url' => $user?->hasPermission('pops.view') ? route('master.pop.show', $pop) : null,
                 ]);
         }
 
@@ -92,6 +94,7 @@ class InfrastructureHierarchyService
                 $node->code, $parent, [
                     'name' => $node->name,
                     'type_id' => $node->node_type_id,
+                    'anchor_pop_id' => $node->anchor_pop_id,
                     'type_label' => $node->nodeType?->name ?? 'Node',
                     'has_pin' => true,
                     'latitude' => $node->latitude,
@@ -161,17 +164,17 @@ class InfrastructureHierarchyService
     }
 
     /**
-     * Empat metrik rekonsiliasi per Cabang (Task 1/11, §16.4 #6): ODP,
+     * Empat metrik rekonsiliasi per POP Pusat/Cabang (Task 1/11, §16.4 #6): ODP,
      * pelanggan terhubung, port pelanggan terpakai, aset DEPLOYED.
      *
      * @return array<int, array{odp: int, customers: int, used_ports: int, assets: int}>
      */
-    public function metricsByCabang(User $user): array
+    public function metricsByCabang(?User $user): array
     {
         $projection = $this->build($user);
         $metrics = [];
         foreach ($projection['items'] as $item) {
-            if ($item['kind'] === 'pop' && $item['type'] === 'pop_cabang') {
+            if ($item['kind'] === 'pop' && in_array($item['type'], ['pop_pusat', 'pop_cabang'], true)) {
                 $metrics[$item['id']] = ['odp' => 0, 'customers' => 0, 'used_ports' => 0, 'assets' => 0];
             }
         }
@@ -181,8 +184,10 @@ class InfrastructureHierarchyService
             if ($cabangId === null || ! isset($metrics[$cabangId])) {
                 continue;
             }
-            if ($item['kind'] === 'node' && $item['type'] === 'odp') {
-                $metrics[$cabangId]['odp']++;
+            if ($item['kind'] === 'node') {
+                if ($item['type'] === 'odp') {
+                    $metrics[$cabangId]['odp']++;
+                }
                 $metrics[$cabangId]['used_ports'] += $item['capacity']['used'] ?? 0;
             }
             if ($item['kind'] === 'customer') {
@@ -197,9 +202,9 @@ class InfrastructureHierarchyService
     /**
      * @return Collection<int, Pop>
      */
-    private function visiblePops(User $user, ?int $cabangId): Collection
+    private function visiblePops(?User $user, ?int $cabangId): Collection
     {
-        return Pop::forUser($user)
+        return ($user === null ? Pop::query() : Pop::forUser($user))
             ->whereIn('type', ['pusat', 'cabang', 'mini_pop'])
             ->where('status', 'active')
             ->when($cabangId !== null, fn ($query) => $query->where(fn ($scope) => $scope->where('id', $cabangId)->orWhere('parent_id', $cabangId)))
@@ -245,7 +250,7 @@ class InfrastructureHierarchyService
      * @param  Collection<int, NetworkNode>  $nodes
      * @param  list<int>  $popIds
      */
-    private function attachCustomers(array &$items, Collection $nodes, array $popIds, bool $canSeeSerials, User $user): void
+    private function attachCustomers(array &$items, Collection $nodes, array $popIds, bool $canSeeSerials, ?User $user): void
     {
         foreach ($nodes as $node) {
             if ($node->nodeType?->code !== 'odp') {
@@ -270,7 +275,7 @@ class InfrastructureHierarchyService
                         'onts' => $onts,
                         'onts_hidden' => ! $canSeeSerials,
                         'ont_label' => $canSeeSerials && $onts === [] ? 'ONT belum tercatat' : null,
-                        'url' => $user->hasPermission('customers.view') ? route('customers.show', $customer) : null,
+                        'url' => $user?->hasPermission('customers.view') ? route('customers.show', $customer) : null,
                     ]);
             }
         }
@@ -408,13 +413,23 @@ class InfrastructureHierarchyService
     {
         $current = $key;
         $guard = 0;
+        $pusatId = null;
         while ($current !== null && isset($items[$current]) && $guard++ < 32) {
-            if ($items[$current]['kind'] === 'pop' && $items[$current]['type'] === 'pop_cabang') {
-                return $items[$current]['id'];
+            $item = $items[$current];
+            if ($item['kind'] === 'pop' && $item['type'] === 'pop_cabang') {
+                return $item['id'];
             }
-            $current = $items[$current]['parent'];
+            if ($item['kind'] === 'pop' && $item['type'] === 'pop_pusat') {
+                $pusatId = $item['id'];
+            }
+            if ($item['kind'] === 'node' && $item['type'] === 'server' && $item['anchor_pop_id'] !== null
+                && isset($items['pop:'.$item['anchor_pop_id']])
+                && $items['pop:'.$item['anchor_pop_id']]['type'] === 'pop_pusat') {
+                $pusatId = $item['anchor_pop_id'];
+            }
+            $current = $item['parent'];
         }
 
-        return null;
+        return $pusatId;
     }
 }

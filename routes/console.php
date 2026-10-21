@@ -26,6 +26,9 @@ Schedule::command('billing:close-period')->monthlyOn(1, '00:10');
 // bulan lalu — tapi tetap dijadwalkan sesudahnya supaya snapshot bulan lalu
 // dipastikan sudah selesai dibuat sebelum data invoice berubah.
 Schedule::command('billing:write-off-terminated')->monthlyOn(1, '00:20');
+// Bukti cutover hierarki infrastruktur (§16.4 #6): rekonsiliasi data lama vs
+// proyeksi baru untuk periode yang baru ditutup. Hanya membaca & mencatat.
+Schedule::command('infrastructure:reconcile')->monthlyOn(1, '00:40');
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
 Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();
 // '01:15' — hindari bentrok dgn billing:generate-monthly-invoices (01:00,

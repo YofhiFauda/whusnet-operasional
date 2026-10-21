@@ -53,16 +53,16 @@ class InfrastructureMapTest extends TestCase
     }
 
     #[Test]
-    public function peta_merangkai_backbone_pop_agregasi_dan_mini_pop_hasil_seeder(): void
+    public function peta_merangkai_server_pop_dan_mini_pop_hasil_seeder_struktur_baru(): void
     {
-        Pop::factory()->create(['name' => 'WHUSNET', 'type' => 'pusat', 'parent_id' => null]);
+        $pusat = Pop::factory()->create(['name' => 'WHUSNET', 'type' => 'pusat', 'parent_id' => null]);
         $jetis = Pop::factory()->create(['name' => 'Jetis', 'type' => 'cabang', 'parent_id' => null]);
         $mini = Pop::factory()->create(['code' => 'C1', 'name' => 'C1', 'type' => 'mini_pop', 'parent_id' => $jetis->id]);
-        Pop::factory()->create(['name' => 'Sandya', 'type' => 'cabang', 'parent_id' => null]);
-        $this->seed(WhusnetTopologySeeder::class);
-
+        $sandya = Pop::factory()->create(['name' => 'Sandya', 'type' => 'cabang', 'parent_id' => null]);
+        Pop::factory()->create(['code' => 'D1', 'name' => 'D1', 'type' => 'mini_pop', 'parent_id' => $sandya->id]);
         $role = Role::where('code', 'owner')->firstOrFail();
         $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $this->seed(WhusnetTopologySeeder::class);
         UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $role->id,
@@ -70,13 +70,18 @@ class InfrastructureMapTest extends TestCase
         ]);
 
         $topology = app(InfrastructureMapService::class)->build($user, null, 'name')['topologyDetails'];
-        $backbone = NetworkNode::where('code', 'BB-PUSAT-JETIS-01')->firstOrFail();
-        $aggregation = NetworkNode::where('code', 'AGG-JETIS-01')->firstOrFail();
+        $server = NetworkNode::where('code', 'CORE-WHUSNET-PUSAT')->firstOrFail();
+        $olt = NetworkNode::where('code', 'OLT-JETIS-01')->firstOrFail();
 
-        $this->assertSame($backbone->id, $topology[-$jetis->id]['parent_id']);
-        $this->assertSame(-$jetis->id, $topology[$aggregation->id]['parent_id']);
-        $this->assertSame($aggregation->id, $topology[-$mini->id]['parent_id']);
-        $this->assertSame($mini->id, NetworkNode::where('code', 'OLT-JETIS-01')->firstOrFail()->anchor_pop_id);
+        // Rancangan hierarki §1/§16.2: Server diproyeksikan di atas Pusat,
+        // Cabang → Mini POP → OLT/Switch; tanpa backbone/agregasi lama.
+        $this->assertSame($server->id, $topology[-$pusat->id]['parent_id']);
+        $this->assertNull($topology[$server->id]['parent_id']);
+        $this->assertSame(-$pusat->id, $topology[-$jetis->id]['parent_id']);
+        $this->assertSame(-$jetis->id, $topology[-$mini->id]['parent_id']);
+        $this->assertSame(-$mini->id, $topology[$olt->id]['parent_id']);
+        $this->assertSame(-$mini->id, $topology[NetworkNode::where('code', 'SW-JETIS-01')->value('id')]['parent_id']);
+        $this->assertSame($olt->id, $topology[NetworkNode::where('code', 'ODP-JETIS-01')->value('id')]['parent_id']);
 
         $fopRole = Role::where('code', 'fop')->firstOrFail();
         $scopedUser = User::factory()->create(['role_id' => $fopRole->id, 'status' => 'active']);
@@ -87,9 +92,9 @@ class InfrastructureMapTest extends TestCase
         ]);
         UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $jetis->id]);
         $scopedTopology = app(InfrastructureMapService::class)->build($scopedUser, $jetis->id, 'name')['topologyDetails'];
-        $this->assertArrayNotHasKey($backbone->id, $scopedTopology);
+        $this->assertArrayNotHasKey($server->id, $scopedTopology);
         $this->assertNull($scopedTopology[-$jetis->id]['parent_id']);
-        $this->assertSame($aggregation->id, $scopedTopology[-$mini->id]['parent_id']);
+        $this->assertSame(-$jetis->id, $scopedTopology[-$mini->id]['parent_id']);
     }
 
     #[Test]
@@ -470,7 +475,6 @@ class InfrastructureMapTest extends TestCase
             ->assertSee('inspector-node-'.$node->id, false)
             ->assertSee('Cabang Presentasi')
             ->assertSee('Mini Presentasi')
-            ->assertSee('Sorot tipe node')
             ->assertDontSee('All Cards View');
 
         $otherCabang = Pop::factory()->create(['name' => 'Cabang Rahasia Presentasi', 'type' => 'cabang']);

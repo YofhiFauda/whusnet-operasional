@@ -90,3 +90,12 @@ Baseline rekonsiliasi (dipakai Task 10/11):
 ## 6. Status review
 
 Hasil read-only ini menjadi masukan Task 2–3: hanya `olt_slots` yang dibackfill otomatis; PON node, Switch di Cabang, dan uplink ODP lama masuk daftar manual.
+
+
+## 7. Task 11 - audit cutover sementara (21 Oktober 2026)
+
+- Migration aditif 000007 diterapkan pada database aplikasi. Rekonsiliasi terakhir untuk 2026-10 mencatat selisih nol: WHUSNET 0/0/0/0, Jetis 2 ODP/5 pelanggan/7 port aktif/0 aset, Sandya 1/0/0/0. Eksekusi pertama yang menghitung hanya 5 port ODP di Jetis tidak dipakai sebagai bukti karena 2 port feeder aktif terlewat; tes regresi dan perhitungan diperbaiki sebelum eksekusi kedua.
+- Tujuh bukti cutover bagian 16.4: (1) guard tulis legacy tersedia, saklar tetap terbuka untuk data nyata; (2) serial/kabel diuji pada Task 6-8; (3) proyeksi Master Node/Peta diuji pada Task 10; (4) dropdown bertingkat diuji, form legacy tetap terbuka; (5) seeder baru tidak membuat node legacy, seeder contoh lama dinonaktifkan; (6) snapshot saat ini nol, tetapi belum satu siklus tutup periode penuh; (7) histori legacy tetap dibaca, bukti cutover akhir belum ada. Cutover belum selesai.
+- Tujuh mapping menunggu keputusan operator: PON node #25/#31 (Slot dan nomor PON), switch #23/#29 (Mini POP fisik), uplink ODP #27/#33/#37 (PON tujuan). Tidak dipetakan otomatis. Lihat perintah infrastructure:legacy-mappings.
+- Reset dummy tetap ditolak untuk node yang memiliki assignment pelanggan, audit node, ledger/aset, aksi atau ujung koneksi laporan, maupun relasi lain. Topologi aplikasi mengandung assignment nyata; reset tidak dijalankan.
+- Migration 000005 sudah berstatus Ran pada database aplikasi. Perubahan nama FK di worktree adalah perbaikan untuk bootstrap skema baru/rollback; migration tidak dijalankan ulang pada database yang sudah ada.

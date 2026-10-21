@@ -16,6 +16,7 @@ use App\Services\InfrastructureHierarchyService;
 use App\Services\MasterRecordRemovalService;
 use App\Services\NetworkNodeService;
 use App\Services\NetworkPortAssignmentService;
+use App\Support\InfrastructureCutover;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -161,6 +162,9 @@ class NetworkNodeController extends Controller
         }
 
         $nodeType = NetworkNodeType::findOrFail($validated['node_type_id']);
+        if (in_array($nodeType->code, InfrastructureCutover::LEGACY_NODE_TYPES, true)) {
+            InfrastructureCutover::assertLegacyWriteAllowed('node_type_id', "Node {$nodeType->name}");
+        }
         try {
             $service->assertTypePlacement($nodeType, $parent, $anchor);
         } catch (InvalidArgumentException $exception) {
@@ -280,6 +284,9 @@ class NetworkNodeController extends Controller
 
         if ($typeChanged) {
             $nodeType = NetworkNodeType::findOrFail($validated['node_type_id']);
+            if (in_array($nodeType->code, InfrastructureCutover::LEGACY_NODE_TYPES, true)) {
+                InfrastructureCutover::assertLegacyWriteAllowed('node_type_id', "Node {$nodeType->name}");
+            }
             if (! $nodeType->is_active) {
                 throw ValidationException::withMessages(['node_type_id' => 'Tipe node tidak aktif.']);
             }

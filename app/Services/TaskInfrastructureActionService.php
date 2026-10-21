@@ -13,6 +13,7 @@ use App\Models\OltSlot;
 use App\Models\Task;
 use App\Models\TaskInfrastructureAction;
 use App\Models\User;
+use App\Support\InfrastructureCutover;
 use App\Support\InfrastructureLocation;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -201,6 +202,8 @@ class TaskInfrastructureActionService
         }
 
         // Format baris lama (satu node) — guard scope SAMA dengan dropdown.
+        // Ditutup bersama jalur lama lain setelah cutover (§16.4 #4).
+        InfrastructureCutover::assertLegacyWriteAllowed('infra_actions', 'Lokasi berupa titik jaringan tunggal');
         $node = NetworkNode::query()->lockForUpdate()->findOrFail($mutation['network_node_id']);
         $location = $this->resolver->forNode($node);
         $this->scopes->assertLocationInTaskScope($fopTask, $location, $actor);

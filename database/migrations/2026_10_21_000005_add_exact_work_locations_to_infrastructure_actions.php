@@ -25,23 +25,40 @@ return new class extends Migration
             $table->json('work_location_snapshot')->nullable()->after('work_longitude');
             $table->foreignId('end_from_pop_id')->nullable()->constrained('pops')->restrictOnDelete();
             $table->foreignId('end_from_network_node_id')->nullable()->constrained('network_nodes')->restrictOnDelete();
-            $table->foreignId('end_from_infrastructure_port_id')->nullable()->constrained('infrastructure_ports')->restrictOnDelete();
+            $table->foreignId('end_from_infrastructure_port_id')->nullable()->constrained('infrastructure_ports', indexName: 'tia_end_from_port_foreign')->restrictOnDelete();
             $table->foreignId('end_to_pop_id')->nullable()->constrained('pops')->restrictOnDelete();
             $table->foreignId('end_to_network_node_id')->nullable()->constrained('network_nodes')->restrictOnDelete();
-            $table->foreignId('end_to_infrastructure_port_id')->nullable()->constrained('infrastructure_ports')->restrictOnDelete();
+            $table->foreignId('end_to_infrastructure_port_id')->nullable()->constrained('infrastructure_ports', indexName: 'tia_end_to_port_foreign')->restrictOnDelete();
         });
     }
 
     public function down(): void
     {
-        $foreign = ['work_pop_id', 'work_infrastructure_slot_id', 'work_infrastructure_port_id', 'end_from_pop_id', 'end_from_network_node_id',
-            'end_from_infrastructure_port_id', 'end_to_pop_id', 'end_to_network_node_id', 'end_to_infrastructure_port_id'];
+        $defaultForeignColumns = [
+            'work_pop_id',
+            'work_infrastructure_slot_id',
+            'work_infrastructure_port_id',
+            'end_from_pop_id',
+            'end_from_network_node_id',
+            'end_to_pop_id',
+            'end_to_network_node_id',
+        ];
 
-        Schema::table('task_infrastructure_actions', function (Blueprint $table) use ($foreign) {
-            foreach ($foreign as $column) {
+        Schema::table('task_infrastructure_actions', function (Blueprint $table) use ($defaultForeignColumns) {
+            foreach ($defaultForeignColumns as $column) {
                 $table->dropForeign([$column]);
             }
-            $table->dropColumn([...$foreign, 'work_latitude', 'work_longitude', 'work_location_snapshot']);
+            $table->dropForeign('tia_end_from_port_foreign');
+            $table->dropForeign('tia_end_to_port_foreign');
+
+            $table->dropColumn([
+                ...$defaultForeignColumns,
+                'end_from_infrastructure_port_id',
+                'end_to_infrastructure_port_id',
+                'work_latitude',
+                'work_longitude',
+                'work_location_snapshot',
+            ]);
         });
     }
 };
