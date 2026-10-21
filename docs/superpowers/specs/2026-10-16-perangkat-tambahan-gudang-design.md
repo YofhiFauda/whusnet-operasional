@@ -22,7 +22,7 @@ Perangkat tambahan (AP, STB, dan sejenisnya) milik kantor, disewakan ke pelangga
 | Perangkat dibawa tapi tidak terpasang | Teknisi wajib memilih status akhir: kembali ke Gudang, rusak, atau hilang. |
 | Permission | Pakai permission yang sudah ada: `customers.detail.devices.create` dan `customers.detail.devices.update`. Tidak ada permission baru. |
 | Putus langganan | Perangkat tambahan wajib ditarik. Ikut alur "Ambil Alat" (DEAC), diperluas dari perangkat utama ke semua perangkat tambahan. |
-| Kontrol kecukupan barang | **Dua lapis.** Lapis 1 (preventif, §4.1): FOP tidak bisa assign/jadwalkan Task Pemasangan kalau barang `is_customer_extra_device` yang di-issue ke teknisi belum sejumlah `max_additional_devices` paket. Lapis 2 (jalur keluar, §4.2): kalau di lapangan tetap kurang (rusak di jalan, dll — bukan kelalaian issue), teknisi tetap bisa submit laporan lewat jalur "lapor kekurangan + alasan wajib", ditandai `kekurangan_perangkat = true` untuk ditindaklanjuti FOP/Gudang. |
+| Kontrol kecukupan barang | **Revisi 2026-10-20:** FOP boleh assign/jadwalkan Task Pemasangan sebelum Gudang issue perangkat tambahan. Issue dilakukan sebelum perangkat dipasang; laporan hanya menerima SN yang benar-benar berstatus ISSUED pada custody tim dan sesuai cabang. Jika jumlah keputusan kurang dari batas paket, teknisi harus memakai jalur lapor kekurangan dengan alasan wajib. |
 | Langkah di Laporan Pemasangan | Langkah sendiri, terpisah dari Material Terpakai (ADHOC-165). Alasan: Material Terpakai = barang konsumsi, perangkat tambahan = barang ber-SN yang statusnya dilacak individual — beda logic wajib/opsional, nyampur bikin ambigu. |
 | Nama penanda kategori | Tetap `is_customer_extra_device`. Diganti hanya kalau muncul istilah baku kantor yang lebih cocok. |
 
@@ -43,19 +43,19 @@ Baris lama dari v1 (free-text, `inventory_serial_id` null) dibiarkan. Tidak dimi
 
 ## 4. Alur
 
-### 4.1 Issue dari Gudang (form tunggal) + kontrol FOP preventif
+### 4.1 Assign FOP lebih dulu, lalu issue dari Gudang
 - Gudang membuat issue ke teknisi seperti biasa, lewat `InventoryIssueService`.
 - Barang perangkat tambahan (kategori `is_customer_extra_device = true`) ikut dipilih di form yang sama dengan modem, kabel, dan pasif.
 - Tidak ada form baru. Hanya kategori baru yang ikut daftar.
-- **Kontrol kecukupan, bukan cuma tanggung jawab teknisi di lapangan.** Teknisi gak mungkin masang perangkat yang gak dia terima dari Gudang — jadi kontrolnya harus di titik assign/jadwal, dipegang FOP. Saat FOP mau assign/jadwalkan Task Pemasangan untuk pelanggan paket Bisnis (`max_additional_devices > 0`), sistem cross-check: jumlah barang `is_customer_extra_device` di custody teknisi itu (hasil issue yang belum dipakai) harus **≥** `max_additional_devices` paket pelanggan tersebut. Kalau kurang, assign/jadwal **ditolak** dengan pesan jelas ("Barang AP belum di-issue cukup, issue dulu dari Gudang"). Ini mencegah teknisi berangkat dengan barang kurang dari awal — bukan ketahuan belakangan pas sudah di lokasi.
-- Kalau Gudang sendiri stoknya kosong (bukan salah FOP/teknisi), assign tetap ditolak di titik ini — itu sinyal ke Gudang buat restock, bukan dilempar ke teknisi buat diselesaikan di lapangan.
+- FOP dapat assign/jadwalkan atau mengganti tim Task Pemasangan meskipun custody perangkat tambahan tim masih kosong atau kurang. Ini memungkinkan penugasan teknisi dilakukan sebelum Gudang menyerahkan barang.
+- Gudang tetap meng-issue perangkat tambahan ke teknisi melalui form issue yang ada sebelum pemasangan fisik. Stok kosong tidak membatalkan penugasan; kekurangan harus ditindaklanjuti dan tercatat bila pekerjaan dilaporkan belum lengkap.
 
 ### 4.2 Laporan Pemasangan
 - Di langkah laporan yang sesuai (lihat catatan §8), sistem menampilkan daftar perangkat tambahan yang sedang dibawa teknisi (custody).
 - Teknisi memilih setiap perangkat yang dipasang. Untuk setiap perangkat yang dipilih, dibuat baris `customer_additional_devices` dengan `inventory_serial_id` dan status `terpasang`. `InventorySerial` ditandai `INSTALLED` ke pelanggan itu lewat `InventoryService::installSerial()`.
 - Perangkat yang dibawa tapi tidak dipasang: teknisi memilih status akhir per barang (kembali ke Gudang, rusak, atau hilang). Keputusan ini dicatat, tidak dibiarkan menggantung.
 - Validasi wajib: kalau `max_additional_devices` paket > 0, laporan **tidak bisa disubmit** sampai teknisi memberi keputusan (dipasang / kembali Gudang / rusak / hilang) untuk **setiap perangkat tambahan yang diatur di paket itu** — jumlahnya mengikuti `max_additional_devices`, bukan cuma "minimal satu dari yang dibawa". Kalau paket limitnya 0, bagian ini tidak tampil sama sekali (opsional).
-- **Jalur kekurangan (pengecualian, bukan jalur normal).** Kontrol utama kecukupan barang ada di §4.1 (FOP gak bisa assign kalau issue belum cukup) — jadi normalnya teknisi di lapangan selalu bawa jumlah yang pas. Tapi kalau tetap kurang karena kejadian di luar kendali (barang rusak di jalan, hilang sebelum sampai lokasi, dll), teknisi boleh submit laporan dengan jumlah kurang dari `max_additional_devices`, **asal** mengisi field alasan wajib (`kekurangan_perangkat_alasan`) dan sistem menandai laporan itu `kekurangan_perangkat = true` untuk ditindaklanjuti FOP/Gudang. Jalur ini tidak membebaskan dari kontrol §4.1 — cuma jaring pengaman supaya teknisi gak macet total di lapangan untuk kondisi yang memang di luar kendalinya.
+- **Jalur kekurangan:** bila perangkat belum cukup saat laporan pemasangan, submit tanpa alasan tetap ditolak. Teknisi dapat mencatat kekurangan dengan alasan wajib; laporan ditandai `kekurangan_perangkat = true` untuk tindak lanjut FOP/Gudang. SN yang tidak di-issue ke tim tidak pernah boleh dicatat terpasang.
 
 ### 4.3 Putus langganan (DEAC)
 - Alur "Ambil Alat" yang sudah ada tetap dipakai.
@@ -78,14 +78,14 @@ Baris lama dari v1 (free-text, `inventory_serial_id` null) dibiarkan. Tidak dimi
 - `InventoryIssueService` dan form issue Gudang: hanya menampilkan kategori baru, tanpa logika baru.
 - `InventoryService::installSerial()`: dipakai ulang. Guard cabang (ADHOC-159) tetap berlaku.
 - `CustomerInstallationController` (laporan pemasangan): langkah baru untuk perangkat tambahan, termasuk field `kekurangan_perangkat` + `kekurangan_perangkat_alasan`.
-- Titik assign/jadwal Task Pemasangan (FOP) — kemungkinan `TaskService::create()`/`update()` atau `FopTaskController`, perlu dicek saat `writing-plans`: tambah guard cross-check jumlah custody `is_customer_extra_device` vs `max_additional_devices` paket sebelum assign/jadwal boleh jalan.
+- Titik assign/jadwal Task Pemasangan (FOP): guard kecukupan custody lama dihapus dari create, edit, reassign, switch team, dan bulk assign. Aturan pemilihan SN di laporan tetap berlaku.
 - Alur DEAC / `TaskDeviceRetrievalController` dan `DeviceRetrievalLog`: diperluas ke banyak perangkat.
 - `CustomerDeviceProfileService::resolve()`: filter perangkat utama.
 - `CustomerAdditionalDeviceController` (v1): store tetap ada untuk jalur lama, tapi perangkat baru wajib lewat stok.
 
 ## 7. Testing
 - Issue: barang kategori tambahan muncul di form Gudang bersama kategori lain.
-- Assign/jadwal Task Pemasangan: ditolak kalau custody teknisi belum sejumlah `max_additional_devices` paket; lolos kalau sudah cukup; tidak ada guard kalau paket limitnya 0.
+- Assign/jadwal Task Pemasangan: berhasil sebelum issue Gudang; issue setelah assign membuat SN muncul di laporan; reassign juga berhasil tanpa custody.
 - Laporan pemasangan: paket limit > 0 memaksa keputusan untuk setiap perangkat yang dibawa. Paket limit 0 tidak memaksa.
 - Laporan pemasangan — jalur kekurangan: submit ditolak tanpa alasan kalau jumlah kurang dari limit; submit lolos dengan alasan terisi dan `kekurangan_perangkat = true` tercatat.
 - Perangkat yang dipasang: `InventorySerial` berstatus `INSTALLED` ke pelanggan, baris `customer_additional_devices` terbuat dengan `inventory_serial_id`.
@@ -101,7 +101,7 @@ Baris lama dari v1 (free-text, `inventory_serial_id` null) dibiarkan. Tidak dimi
 
 **Sprint** — masuk sebagai Ad-Hoc Improvement baru, **ADHOC-190**, dicatat di `docs/TASKS.md`. Tidak menunggu sprint S8.10-T003 selesai.
 
-**Kekurangan jumlah** — kontrol utama dipindah ke titik assign/jadwal Task Pemasangan, dipegang FOP (§4.1): FOP tidak bisa assign/jadwalkan task Bisnis kalau barang belum cukup di-issue ke teknisi. Teknisi gak realistis masang barang yang gak dia terima, jadi kontrolnya di hulu, bukan dibebankan ke teknisi di lapangan. Jalur "lapor kekurangan + alasan wajib" (§4.2) tetap ada tapi jadi pengecualian (barang rusak/hilang di luar kendali setelah issue), bukan jalur normal buat nutupin kelalaian issue.
+**Kekurangan jumlah — revisi 2026-10-20:** FOP boleh assign/jadwalkan Task Pemasangan sebelum Gudang issue. Kontrol SN berlaku saat laporan pemasangan: hanya custody tim yang dapat dipilih dan dipasang. Jumlah kurang dari batas paket memerlukan alasan pada jalur lapor kekurangan.
 
 **Langkah laporan pemasangan** — langkah sendiri, terpisah dari Material Terpakai (ADHOC-165), karena beda logic wajib/opsional dan beda jenis barang (konsumsi vs ber-SN individual).
 

@@ -7,6 +7,7 @@ use App\Enums\CReqVerificationStatus;
 use App\Enums\DeviceOwnership;
 use App\Enums\EquipmentClass;
 use App\Enums\FopTaskPriority;
+use App\Enums\InventoryTransactionType;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
 use App\Enums\RollStatus;
@@ -18,9 +19,12 @@ use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\FopTask;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
+use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
+use App\Models\OltSlot;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TaskCreqDetail;
@@ -30,13 +34,17 @@ use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
+use App\Services\FopTaskProvisioningService;
+use App\Services\InfrastructureMaterialService;
 use App\Services\InventoryService;
 use App\Services\NumberSequenceService;
+use App\Services\TaskInfrastructureActionService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -389,6 +397,28 @@ class TaskMaintenanceController extends Controller
         $infraNodeOptions = $infraNodeQuery
             ? $infraNodeQuery->with(['nodeType', 'anchorPop.parent', 'parent.anchorPop.parent'])->orderBy('code')->get()
             : collect();
+        $infraMaterialSources = $showsInfraSection
+            ? InventoryTransaction::query()
+                ->where('type', InventoryTransactionType::DEPLOY->value)
+                ->whereNull('serial_id')
+                ->whereNotNull('to_network_node_id')
+                ->whereIn('to_network_node_id', $infraNodeOptions->pluck('id'))
+                ->with(['item', 'toNetworkNode'])
+                ->orderByDesc('id')
+                ->get()
+            : collect();
+
+        $infraNodeIds = $infraNodeOptions->pluck('id');
+        $infraPortOptions = $showsInfraSection
+            ? NetworkNodePort::query()->whereIn('network_node_id', $infraNodeIds)
+                ->orderBy('network_node_id')->orderBy('number')->get()
+            : collect();
+        $infraSlotOptions = $showsInfraSection
+            ? OltSlot::query()->whereIn('chassis_node_id', $infraNodeIds)
+                ->orderBy('chassis_node_id')->orderBy('number')->get()
+            : collect();
+
+        $infraMaterialActionKey = (string) Str::uuid();
 
         // Dropdown Kategori C-REQ (docs/plan/task-teknisi/
         // rancangan-biaya-creq-verifikasi-cs.md §2) — cuma dipakai view kalau
@@ -401,7 +431,7 @@ class TaskMaintenanceController extends Controller
         $cabangPops = Pop::query()->where('type', 'cabang')->where('status', 'active')
             ->orderBy('name')->get(['id', 'name']);
 
-        return view('tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions'));
+        return view($showsInfraSection ? 'tasks.infrastructure-report' : 'tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions', 'infraPortOptions', 'infraSlotOptions', 'infraMaterialSources', 'infraMaterialActionKey'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
@@ -589,6 +619,22 @@ class TaskMaintenanceController extends Controller
         // blok eksekusi di bawah (yang cuma membaca `$validated`) gak pernah
         // jalan buat tipe lain.
         if (in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true)) {
+            $rules['infra_actions'] = ['nullable', 'array', 'max:30'];
+            $rules['infra_actions.*.action_key'] = ['required', 'uuid'];
+            $rules['infra_actions.*.action_type'] = ['required', Rule::in(['inspect', 'install', 'retrieve', 'replace', 'port_connect', 'port_release'])];
+            $rules['infra_actions.*.network_node_id'] = ['nullable', 'integer', 'exists:network_nodes,id'];
+            $rules['infra_actions.*.serial_id'] = ['nullable', 'integer', 'exists:inventory_serials,id'];
+            $rules['infra_actions.*.old_serial_id'] = ['nullable', 'integer', 'exists:inventory_serials,id'];
+            $rules['infra_actions.*.item_id'] = ['nullable', 'integer', 'exists:items,id'];
+            $rules['infra_actions.*.qty'] = ['nullable', 'numeric', 'min:0.01'];
+            $rules['infra_actions.*.roll_id'] = ['nullable', 'integer', 'exists:inventory_rolls,id'];
+            $rules['infra_actions.*.meters'] = ['nullable', 'numeric', 'min:0.01'];
+            $rules['infra_actions.*.slot_id'] = ['nullable', 'integer', 'exists:olt_slots,id'];
+            $rules['infra_actions.*.port_id'] = ['nullable', 'integer', 'exists:network_node_ports,id'];
+            $rules['infra_actions.*.target_node_id'] = ['nullable', 'integer', 'exists:network_nodes,id'];
+            $rules['infra_actions.*.target_port_id'] = ['nullable', 'integer', 'exists:network_node_ports,id'];
+            $rules['infra_actions.*.result_note'] = ['nullable', 'string', 'max:1000'];
+
             $eligibleInfraSerialIds = $this->eligibleInfraSerialsForTeam($task)->pluck('id');
             $eligibleInfraRetrievableSerialIds = $this->eligibleInfraRetrievableSerialsForTeam($task)->pluck('id');
             $eligibleInfraCustodyItemIds = $this->eligibleInfraCustodyForTeam($task)->pluck('item_id');
@@ -604,7 +650,7 @@ class TaskMaintenanceController extends Controller
             $actor = $request->user();
 
             $rules['infra_target_network_node_id'] = [
-                Rule::requiredIf($anyInfraFieldFilled),
+                Rule::requiredIf($anyInfraFieldFilled || $request->input('infra_material_action') === 'correct'),
                 'nullable',
                 'integer',
                 Rule::exists('network_nodes', 'id'),
@@ -642,11 +688,48 @@ class TaskMaintenanceController extends Controller
             $rules['infra_selected_serial_id'] = ['nullable', 'integer', Rule::in($eligibleInfraSerialIds)];
             // Sumber BEDA dari SN pasang: kandidat cabut = SN yang sudah
             // DEPLOYED di titik jaringan cabang ini, bukan custody tim.
-            $rules['infra_retrieve_old_serial_id'] = ['nullable', 'integer', Rule::in($eligibleInfraRetrievableSerialIds)];
+            $rules['infra_retrieve_old_serial_id'] = [
+                'nullable', 'integer', Rule::in($eligibleInfraRetrievableSerialIds),
+                function ($attribute, $value, $fail) use ($request): void {
+                    if ($value !== null && $value !== '' && ! InventorySerial::query()
+                        ->whereKey($value)->where('current_network_node_id', $request->input('infra_target_network_node_id'))
+                        ->where('status', SerialStatus::DEPLOYED->value)->exists()) {
+                        $fail('SN lama tidak terpasang pada titik jaringan yang dipilih.');
+                    }
+                },
+            ];
             $rules['infra_quantity_item_id'] = ['nullable', 'integer', Rule::in($eligibleInfraCustodyItemIds)];
             $rules['infra_quantity_qty'] = ['nullable', 'numeric', 'min:0.01', 'required_with:infra_quantity_item_id'];
             $rules['infra_selected_roll_id'] = ['nullable', 'integer', Rule::in($eligibleInfraRollIds)];
             $rules['infra_roll_meters_used'] = ['nullable', 'numeric', 'min:0.01', 'required_with:infra_selected_roll_id'];
+            $rules['infra_material_action_key'] = ['nullable', 'uuid'];
+            $rules['infra_material_action'] = [
+                'nullable',
+                Rule::in(['correct', 'retrieve']),
+                function ($attribute, $value, $fail) use ($anyInfraFieldFilled): void {
+                    if ($anyInfraFieldFilled && $value !== null && $value !== '') {
+                        $fail('Koreksi atau cabut qty/roll harus dilaporkan terpisah dari pemasangan barang baru.');
+                    }
+                },
+            ];
+            $rules['infra_material_correct_roll_id'] = [
+                'nullable', 'integer', Rule::in($eligibleInfraRollIds),
+                function ($attribute, $value, $fail) use ($request): void {
+                    if ($value !== null && $value !== '' && $request->input('infra_material_action') !== 'correct') {
+                        $fail('Roll pengganti hanya berlaku untuk koreksi administratif.');
+                    }
+                },
+            ];
+            $rules['infra_material_source_transaction_id'] = ['nullable', 'integer', 'exists:inventory_transactions,id', 'required_with:infra_material_action'];
+            $rules['infra_material_qty'] = [
+                'nullable', 'numeric', 'min:0', 'required_with:infra_material_action',
+                function ($attribute, $value, $fail) use ($request): void {
+                    if ($request->input('infra_material_action') === 'retrieve' && (float) $value <= 0) {
+                        $fail('Jumlah cabut harus lebih besar dari nol.');
+                    }
+                },
+            ];
+            $rules['infra_material_reason'] = ['nullable', 'string', 'max:500', 'required_with:infra_material_action'];
 
             $messages['infra_target_network_node_id.required'] = 'Pilih titik jaringan tujuan kalau mengisi Pasang/Ganti Infrastruktur.';
             $messages['infra_selected_serial_id.in'] = 'SN infrastruktur yang dipilih bukan bagian dari custody tim Anda saat ini.';
@@ -658,6 +741,35 @@ class TaskMaintenanceController extends Controller
         }
 
         $validated = $request->validate($rules, $messages);
+
+        if (! empty($validated['infra_actions']) && (
+            ! empty($validated['infra_selected_serial_id'])
+            || ! empty($validated['infra_retrieve_old_serial_id'])
+            || ! empty($validated['infra_quantity_item_id'])
+            || ! empty($validated['infra_selected_roll_id'])
+            || ! empty($validated['infra_material_action'])
+        )) {
+            throw ValidationException::withMessages(['infra_actions' => 'Pilih satu jalur laporan Infrastruktur: baris aksi atau form lama.']);
+        }
+
+        if (in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true)) {
+            $infraRows = collect($validated['infra_actions'] ?? []);
+            $infraItemIds = $infraRows->pluck('item_id')->filter()
+                ->merge(array_filter([$validated['infra_quantity_item_id'] ?? null]))->map(fn ($id) => (int) $id);
+            $genericItemIds = collect($validated['materials'] ?? [])->pluck('item_id')->filter()->map(fn ($id) => (int) $id);
+            $infraSerialIds = $infraRows->pluck('serial_id')->filter()
+                ->merge(array_filter([$validated['infra_selected_serial_id'] ?? null]))->map(fn ($id) => (int) $id);
+            $infraRollIds = $infraRows->pluck('roll_id')->filter()
+                ->merge(array_filter([$validated['infra_selected_roll_id'] ?? null]))->map(fn ($id) => (int) $id);
+
+            if ($infraItemIds->intersect($genericItemIds)->isNotEmpty()
+                || $infraSerialIds->contains((int) ($validated['selected_inventory_serial_id'] ?? 0))
+                || $infraRollIds->contains((int) ($validated['selected_inventory_roll_id'] ?? 0))) {
+                throw ValidationException::withMessages([
+                    'infra_actions' => 'Barang, SN, atau roll yang sama tidak boleh dicatat melalui seksi material umum dan Infrastruktur.',
+                ]);
+            }
+        }
 
         // Default 'tidak_ganti' kalau field kosong (SN gak dipilih) — perilaku
         // lama (ownership modem sewa/beli, 2026-10-09). Dipakai di dua titik
@@ -696,7 +808,9 @@ class TaskMaintenanceController extends Controller
         try {
             DB::beginTransaction();
 
-            $task->loadMissing('customer');
+            $task = Task::query()->lockForUpdate()->findOrFail($task->id);
+            $this->authorize('statusComplete', $task);
+            $task->loadMissing('teamMembers', 'customer');
             $opmPhotoPath = null;
             if ($request->hasFile('opm_photo')) {
                 $opmPhotoPath = FileUploadService::uploadMaintenancePhoto($request->file('opm_photo'), $task->customer, 'opm');
@@ -812,6 +926,10 @@ class TaskMaintenanceController extends Controller
             $workToolService = app(TaskWorkToolService::class);
             $fopTask = $workToolService->resolveTaskFor($task);
 
+            if (! $fopTask && in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true)) {
+                $fopTask = app(FopTaskProvisioningService::class)->ensureForTask($task);
+            }
+
             if (! $fopTask && $task->customer) {
                 $fopTask = FopTask::create([
                     'task_number' => app(NumberSequenceService::class)->fopTaskNumber(),
@@ -898,6 +1016,13 @@ class TaskMaintenanceController extends Controller
                     }
                 }
 
+                if (! empty($validated['infra_actions'])) {
+                    $infraTechnicians = $teamTechnicians ?? User::whereIn('id', $task->teamMembers->pluck('user_id'))->get();
+                    app(TaskInfrastructureActionService::class)->record(
+                        $task, $fopTask, $validated['infra_actions'], $infraTechnicians, auth()->user()
+                    );
+                }
+
                 // Pasang/Ganti Infrastruktur (O-REQ/INFR REQ) — SENGAJA di luar
                 // blok `if ($task->customer && ...)` di atas: INFR REQ lazimnya
                 // pekerjaan jaringan murni TANPA pelanggan, dan deploy ke titik
@@ -907,11 +1032,34 @@ class TaskMaintenanceController extends Controller
                 // mengira aset sudah tercatat terpasang, padahal SN masih di
                 // custody-nya. `$teamTechnicians` dipakai ulang kalau blok di
                 // atas sudah me-resolve-nya.
-                if (! empty($validated['infra_target_network_node_id'])) {
+                if (! empty($validated['infra_target_network_node_id']) && empty($validated['infra_material_action'])) {
                     $infraTechnicians = $teamTechnicians ?? User::whereIn('id', $task->teamMembers->pluck('user_id'))->get();
                     $this->deployInfrastructure($validated, $fopTask, $infraTechnicians);
                 }
-            } elseif (! empty($validated['infra_target_network_node_id'])) {
+
+                if (! empty($validated['infra_material_action'])) {
+                    $source = InventoryTransaction::findOrFail($validated['infra_material_source_transaction_id']);
+                    $materialService = app(InfrastructureMaterialService::class);
+                    $actionKey = hash('sha256', implode('|', [
+                        'task-infra-material', $task->id,
+                        $validated['infra_material_action_key'] ?? implode(':', [$source->id, $validated['infra_material_action']]),
+                    ]));
+                    $reason = $validated['infra_material_reason'];
+                    $qty = (float) $validated['infra_material_qty'];
+
+                    if ($validated['infra_material_action'] === 'correct') {
+                        $target = NetworkNode::findOrFail($validated['infra_target_network_node_id']);
+                        if (! empty($validated['infra_material_correct_roll_id'])) {
+                            $replacementRoll = InventoryRoll::findOrFail($validated['infra_material_correct_roll_id']);
+                            $materialService->correctRoll($source, $replacementRoll, $target, $qty, $fopTask, auth()->user(), $reason, $actionKey);
+                        } else {
+                            $materialService->correct($source, $target, $qty, $fopTask, auth()->user(), $reason, $actionKey);
+                        }
+                    } else {
+                        $materialService->retrieve($source, $qty, $fopTask, auth()->user(), $reason, $actionKey);
+                    }
+                }
+            } elseif (! empty($validated['infra_target_network_node_id']) || ! empty($validated['infra_material_action'])) {
                 // Gak ada FopTask (task manual tanpa pelanggan & tanpa anchor)
                 // — semua method deploy butuh FopTask buat ledger. Gagal keras
                 // (rollback seluruh laporan) lebih baik daripada laporan
@@ -926,6 +1074,10 @@ class TaskMaintenanceController extends Controller
 
             return redirect()->route('tasks.show', $task)->with('success', 'Laporan maintenance berhasil disimpan dan task diselesaikan.');
 
+        } catch (ValidationException $e) {
+            DB::rollBack();
+
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -953,7 +1105,7 @@ class TaskMaintenanceController extends Controller
 
         if (! empty($validated['infra_retrieve_old_serial_id'])) {
             $oldSerial = InventorySerial::findOrFail($validated['infra_retrieve_old_serial_id']);
-            $inventory->retrieveSerialFromLocation($oldSerial, $fopTask, $actor);
+            $inventory->retrieveSerialFromLocation($oldSerial, $fopTask, $actor, $node);
         }
 
         if (! empty($validated['infra_selected_serial_id'])) {

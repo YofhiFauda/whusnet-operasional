@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\FopTask;
+use App\Models\Task;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -86,6 +87,44 @@ class FopTaskProvisioningService
                     ? $customer->latestSurvey?->requested_installation_date
                     : null,
             ]);
+        });
+    }
+
+    /**
+     * Satu anchor ledger untuk Task O-REQ/INFR-REQ, termasuk tanpa pelanggan.
+     * Kunci baris Task agar dua laporan bersamaan tidak membuat FopTask ganda.
+     */
+    public function ensureForTask(Task $task): FopTask
+    {
+        if (! in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true)) {
+            throw new \InvalidArgumentException('Anchor infrastruktur hanya untuk O-REQ/INFR-REQ.');
+        }
+
+        return DB::transaction(function () use ($task): FopTask {
+            $task = Task::query()->lockForUpdate()->findOrFail($task->id);
+            $existing = FopTask::query()->where('task_id', $task->id)->lockForUpdate()->first();
+
+            if ($existing !== null) {
+                return $existing;
+            }
+
+            $anchor = FopTask::create([
+                'task_number' => app(NumberSequenceService::class)->fopTaskNumber(),
+                'task_id' => $task->id,
+                'task_date' => $task->scheduled_at ?? now(),
+                'category' => $task->task_type,
+                'tugas' => $task->title,
+                'village_id' => $task->customer?->village_id,
+                'pop_id' => $task->pop_id,
+                'customer_id' => $task->customer_id,
+                'issue' => $task->description ?? $task->title,
+                'status' => $task->status,
+                'priority' => FopTaskPriority::MEDIUM,
+            ]);
+
+            $anchor->technicians()->sync($task->teamMembers()->pluck('user_id')->all());
+
+            return $anchor;
         });
     }
 

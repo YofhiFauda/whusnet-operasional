@@ -9,6 +9,7 @@ use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
+use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -574,5 +575,42 @@ class CollectorWorksheetTest extends TestCase
         $response->assertOk();
         $response->assertSee('App.Models.User.'.$admin->id, false);
         $response->assertSee('id="live-content"', false);
+    }
+
+    /**
+     * ADHOC-191 & UI Redesign: Aksi Setor Seluruh Saldo tetap terlihat pada
+     * posisi yang baru disepakati, termasuk saat saldo nol dan tanpa izin setor.
+     */
+    public function test_show_renders_setor_action_with_balance_zero_and_without_permission(): void
+    {
+        $pop = $this->createPop('HUBSETOR');
+        $admin = $this->createAdmin($pop);
+
+        $kolektorRole = Role::where('code', 'kolektor')->firstOrFail();
+        $kolektor = User::factory()->create(['role_id' => $kolektorRole->id, 'status' => 'active']);
+
+        // 1. Saldo 0 dengan izin setor: tombol disabled & keterangan saldo nol
+        $responseZero = $this->actingAs($admin)->get(route('collector-worksheet.show', $kolektor->id));
+        $responseZero->assertOk();
+        $responseZero->assertSee('Setor Atas Nama Kolektor');
+        $responseZero->assertSee('Belum ada saldo yang dapat disetor.');
+
+        // 2. User tanpa izin collector_worksheet.deposit: muncul keterangan tidak berizin
+        $helpdeskRole = Role::where('code', 'helpdesk')->firstOrFail();
+        $userTanpaIzin = User::factory()->create([
+            'role_id' => $helpdeskRole->id,
+            'status' => 'active',
+        ]);
+        UserRoleScope::create([
+            'user_id' => $userTanpaIzin->id,
+            'role_id' => $helpdeskRole->id,
+            'scope_type' => ScopeType::ALL_POP,
+        ]);
+        $permission = Permission::firstOrCreate(['code' => 'collector_worksheet.view'], ['name' => 'View Worksheet']);
+        $helpdeskRole->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $responseTanpaIzin = $this->actingAs($userTanpaIzin)->get(route('collector-worksheet.show', $kolektor->id));
+        $responseTanpaIzin->assertOk();
+        $responseTanpaIzin->assertSee('Anda tidak memiliki izin menyetor saldo Kolektor.');
     }
 }

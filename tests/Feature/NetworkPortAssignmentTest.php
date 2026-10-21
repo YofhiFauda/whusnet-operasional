@@ -188,4 +188,28 @@ class NetworkPortAssignmentTest extends TestCase
         $this->actingAs($owner)->post(route('network.node-ports.assign-node', $second), ['target_node_id' => $unrelated->id])
             ->assertSessionHasErrors('target_node_id');
     }
+
+    public function test_admin_dapat_menyambungkan_pelanggan_langsung_ke_port_odp_lewat_form(): void
+    {
+        $branch = Pop::factory()->create(['type' => 'cabang']);
+        $odpType = NetworkNodeType::create(['code' => 'odp', 'name' => 'ODP', 'has_ports' => true]);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $branch->id, 'node_type_id' => $odpType->id]);
+        $port = $node->ports()->create(['number' => 1]);
+        $customer = Customer::factory()->create(['pop_id' => $branch->id, 'full_name' => 'Budi Santoso']);
+        $owner = User::factory()->create(['role_id' => Role::create(['code' => 'owner', 'name' => 'Owner'])->id]);
+
+        $this->actingAs($owner)
+            ->post(route('network.node-ports.assign-customer', $port), ['customer_id' => $customer->id])
+            ->assertRedirect(route('network.nodes.show', $node))
+            ->assertSessionHas('success');
+
+        $this->assertTrue($port->fresh()->is_used);
+        $this->assertSame($customer->id, $port->assignments()->where('active_key', 1)->firstOrFail()->customer_id);
+
+        // Menolak jika pelanggan yang sama disambungkan lagi ke port lain
+        $secondPort = $node->ports()->create(['number' => 2]);
+        $this->actingAs($owner)
+            ->post(route('network.node-ports.assign-customer', $secondPort), ['customer_id' => $customer->id])
+            ->assertSessionHasErrors('customer_id');
+    }
 }

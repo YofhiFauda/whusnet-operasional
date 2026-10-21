@@ -57,6 +57,7 @@ class InfrastructureMapService
                     ->where('status', SerialStatus::INSTALLED->value)
                     ->with('item.category'),
                 'ports.activeAssignment.targetNode',
+                'ports.activeAssignment.targetPort',
                 'deployedSerials' => fn ($query) => $query
                     ->where('status', SerialStatus::DEPLOYED->value)
                     ->with('item'),
@@ -85,7 +86,7 @@ class InfrastructureMapService
 
             $serialEvents = InventoryTransaction::query()
                 ->whereIn('id', $latest)
-                ->with('fromTechnician', 'fopTask')
+                ->with('fromTechnician', 'fopTask.task')
                 ->get()
                 ->keyBy('serial_id');
         }
@@ -93,19 +94,25 @@ class InfrastructureMapService
         if ($nodeIds !== []) {
             $latest = InventoryTransaction::query()
                 ->selectRaw('MAX(id)')
-                ->where('type', InventoryTransactionType::DEPLOY->value)
+                ->where(function ($query): void {
+                    $query->where('type', InventoryTransactionType::DEPLOY->value)
+                        ->orWhere(function ($correction): void {
+                            $correction->where('type', InventoryTransactionType::ADJUSTMENT->value)
+                                ->where('reason', 'infra_record_correction');
+                        });
+                })
                 ->whereIn('to_network_node_id', $nodeIds)
                 ->whereNull('serial_id')
-                ->groupBy('to_network_node_id', 'item_id', 'lot_no');
+                ->groupBy('to_network_node_id', 'item_id', DB::raw("CASE WHEN roll_id IS NULL THEN '' ELSE COALESCE(lot_no, '') END"));
 
             $quantityEvents = InventoryTransaction::query()
                 ->whereIn('id', $latest)
-                ->with('fromTechnician', 'fopTask')
+                ->with('fromTechnician', 'createdBy', 'fopTask.task')
                 ->get()
                 ->keyBy(fn (InventoryTransaction $event): string => $this->balanceKey(
                     $event->to_network_node_id,
                     $event->item_id,
-                    $event->lot_no
+                    $event->roll_id === null ? '' : $event->lot_no
                 ));
         }
 
@@ -130,7 +137,7 @@ class InfrastructureMapService
                     'amount' => '1 '.$serial->item?->unit,
                     'installed_at' => $event?->created_at?->format('d M Y H:i'),
                     'technician' => $event?->fromTechnician?->name,
-                    'task' => $event?->fopTask?->task_number,
+                    'task' => $event?->fopTask?->task?->task_number ?? $event?->fopTask?->task_number,
                     'trace_url' => route('warehouse.traceability.index', ['sn' => $serial->serial_number]),
                 ];
             }
@@ -149,8 +156,8 @@ class InfrastructureMapService
                     'reference' => $lot,
                     'amount' => rtrim(rtrim(number_format((float) $balance->qty, 2, '.', ''), '0'), '.').' '.$balance->item?->unit,
                     'installed_at' => $event?->created_at?->format('d M Y H:i'),
-                    'technician' => $event?->fromTechnician?->name,
-                    'task' => $event?->fopTask?->task_number,
+                    'technician' => $event?->fromTechnician?->name ?? $event?->createdBy?->name,
+                    'task' => $event?->fopTask?->task?->task_number ?? $event?->fopTask?->task_number,
                     'trace_url' => $lot ? route('warehouse.traceability.index', ['roll' => $lot]) : null,
                 ];
             }
@@ -243,7 +250,8 @@ class InfrastructureMapService
                         $targetNodeId = $assignment->targetNode->id;
                         $targetNodeCode = $assignment->targetNode->code;
                         $targetNodeName = $assignment->targetNode->name;
-                        $label = $targetNodeCode.' ('.$targetNodeName.')';
+                        $label = $targetNodeCode.' ('.$targetNodeName.')'
+                            .($assignment->targetPort ? ' · port '.$assignment->targetPort->number : '');
                     } elseif ($assignment->manual_label) {
                         $kind = 'manual';
                         $label = $assignment->manual_label;
@@ -266,6 +274,7 @@ class InfrastructureMapService
                     'target_node_id' => $targetNodeId,
                     'target_node_code' => $targetNodeCode,
                     'target_node_name' => $targetNodeName,
+                    'target_port_number' => $assignment?->targetPort?->number,
                 ];
             }
 

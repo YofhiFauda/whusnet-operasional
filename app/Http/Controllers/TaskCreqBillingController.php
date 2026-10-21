@@ -360,7 +360,7 @@ class TaskCreqBillingController extends Controller
         $detailModelClass = $task->task_type === TaskType::CREQ ? TaskCreqDetail::class : TaskMaintenanceBillingDetail::class;
         $detailId = $task->task_type === TaskType::CREQ ? $task->creqDetail->id : $task->maintenanceBillingDetail->id;
 
-        DB::transaction(function () use ($task, $validated, $request, $detailModelClass, $detailId) {
+        DB::transaction(function () use ($validated, $request, $detailModelClass, $detailId) {
             // Sama alasan lockForUpdate() di approve() — cegah reject
             // menimpa approve (atau sebaliknya) yang diproses bersamaan.
             $detail = $detailModelClass::whereKey($detailId)->lockForUpdate()->firstOrFail();

@@ -453,6 +453,16 @@ class Customer extends Model
     }
 
     /**
+     * Penempatan port jaringan (ODP) pelanggan ini.
+     *
+     * @return HasMany<NetworkPortAssignment, $this>
+     */
+    public function portAssignments(): HasMany
+    {
+        return $this->hasMany(NetworkPortAssignment::class);
+    }
+
+    /**
      * @return list<array{name:string,serial_number:string,source:string}>
      */
     public function networkPortModems(): array

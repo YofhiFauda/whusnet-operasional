@@ -3,7 +3,7 @@
 @section('title', 'Laporan Maintenance — ' . $task->task_number)
 
 @section('content')
-<div class="mx-auto px-2 py-4 sm:px-4" style="max-width:960px">
+<div class="mx-auto px-2 py-4 sm:px-4 pb-28 sm:pb-8" style="max-width:960px">
 
     {{-- ══ Page Header — naked, no card ══════════════════════════════════ --}}
     <div class="mb-5">
@@ -58,7 +58,7 @@
     </div>
 
     <form id="maintenance-form" action="{{ route('tasks.maintenance.store', $task) }}" method="POST" enctype="multipart/form-data" class="no-confirm"
-          x-data="{ modemOwnership: @js(old('modem_ownership_choice', 'tidak_ganti')) }">
+          x-data="{ modemOwnership: @js(old('modem_ownership_choice', 'tidak_ganti')), infraRows: @js(old('infra_actions', [])), addInfraRow() { this.infraRows.push({ action_key: window.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.floor(Math.random() * 16); return (c === 'x' ? r : (r & 3 | 8)).toString(16); }), action_type: 'inspect', network_node_id: '' }); } }">
         @csrf
 
         {{-- ══ Main Form Panel — satu card utama ══════════════════════════ --}}
@@ -417,6 +417,8 @@
                     Isi kalau pekerjaan ini memasang/mengganti aset infrastruktur (ODC/ODP/splitter/kabel feeder/dll) secara netap di titik jaringan — bukan ke pelanggan. Kalau tidak, biarkan kosong.
                 </p>
 
+                @include('tasks.partials.infra-action-rows')
+                <fieldset :disabled="infraRows.length > 0" x-show="infraRows.length === 0">
                 @if($infraNodeOptions->isEmpty())
                     <p class="text-[11px] mb-2 font-semibold" style="color:var(--color-warning,#d97706)">⚠ Belum ada titik jaringan terdaftar di cabang task ini — pemasangan infrastruktur belum bisa dicatat.</p>
                 @else
@@ -521,7 +523,61 @@
                         @error('infra_selected_roll_id')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
                         @error('infra_roll_meters_used')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
                     @endif
+
+                    <div class="mt-5 border-t border-border pt-4">
+                        <p class="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Koreksi atau cabut material terpasang</p>
+                        <p class="mb-3 text-xs leading-relaxed text-text-secondary">Pilih transaksi DEPLOY asal. Koreksi memperbaiki catatan tanpa cabut fisik; Cabut mencatat material yang benar-benar dilepas dan menahannya untuk pemeriksaan.</p>
+                        @if($infraMaterialSources->isEmpty())
+                            <p class="text-xs text-text-muted">Belum ada transaksi material infrastruktur pada node yang dapat Anda akses.</p>
+                        @else
+                            <input type="hidden" name="infra_material_action_key" value="{{ old('infra_material_action_key', $infraMaterialActionKey) }}">
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label for="infra_material_action" class="mb-1.5 block text-xs font-medium text-text-secondary">Tindakan</label>
+                                    <select id="infra_material_action" name="infra_material_action" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                        <option value="">Tidak ada koreksi/cabut</option>
+                                        <option value="correct" @selected(old('infra_material_action') === 'correct')>Koreksi catatan</option>
+                                        <option value="retrieve" @selected(old('infra_material_action') === 'retrieve')>Cabut fisik</option>
+                                    </select>
+                                    @error('infra_material_action')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="infra_material_source_transaction_id" class="mb-1.5 block text-xs font-medium text-text-secondary">Transaksi DEPLOY asal</label>
+                                    <select id="infra_material_source_transaction_id" name="infra_material_source_transaction_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                        <option value="">Pilih transaksi</option>
+                                        @foreach($infraMaterialSources as $source)
+                                            <option value="{{ $source->id }}" @selected((string) old('infra_material_source_transaction_id') === (string) $source->id)>{{ $source->reference_number }} · {{ $source->item?->name }} · {{ $source->qty }} {{ $source->item?->unit }} · {{ $source->toNetworkNode?->breadcrumbLabel() }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('infra_material_source_transaction_id')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="infra_material_correct_roll_id" class="mb-1.5 block text-xs font-medium text-text-secondary">Roll sebenarnya (khusus koreksi kode roll)</label>
+                                    <select id="infra_material_correct_roll_id" name="infra_material_correct_roll_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                        <option value="">Roll pada transaksi asal sudah benar</option>
+                                        @foreach($eligibleInfraRolls as $roll)
+                                            <option value="{{ $roll->id }}" @selected((string) old('infra_material_correct_roll_id') === (string) $roll->id)>{{ $roll->roll_code }} · sisa {{ $roll->length_remaining }} meter</option>
+                                        @endforeach
+                                    </select>
+                                    @error('infra_material_correct_roll_id')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="infra_material_qty" class="mb-1.5 block text-xs font-medium text-text-secondary">Jumlah akhir / jumlah dicabut</label>
+                                    <input id="infra_material_qty" type="number" step="0.01" min="0" name="infra_material_qty" value="{{ old('infra_material_qty') }}" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                    <p class="mt-1 text-xs text-text-muted">Koreksi: jumlah yang masih terpasang. Cabut: jumlah yang dilepas.</p>
+                                    @error('infra_material_qty')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="infra_material_reason" class="mb-1.5 block text-xs font-medium text-text-secondary">Alasan dan kondisi fisik</label>
+                                    <input id="infra_material_reason" type="text" maxlength="500" name="infra_material_reason" value="{{ old('infra_material_reason') }}" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main" placeholder="Contoh: feeder rusak, 10 m dicabut">
+                                    @error('infra_material_reason')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                            </div>
+                            <p class="mt-3 text-xs leading-relaxed text-text-muted">Untuk koreksi node, pilih Lokasi (Titik Jaringan) di atas. Cabut fisik memakai node pada transaksi asal yang masih aktif. Koreksi/cabut tidak dapat digabung dengan pemasangan barang baru dalam satu submit saat ini.</p>
+                        @endif
+                    </div>
                 @endif
+                </fieldset>
             </div>
             @endif
 
@@ -618,14 +674,11 @@
                 </div>
             </div>
 
-            {{-- ── Form Footer: Actions ────────────────────────────────── --}}
-            <div class="px-6 py-4 flex items-center justify-between gap-3" style="background:var(--color-background);border-radius:0 0 0.5rem 0.5rem">
+            {{-- ── Form Footer: Actions (Fixed on mobile, static on desktop) ── --}}
+            <div class="fixed sm:static bottom-0 inset-x-0 z-30 px-4 sm:px-6 py-2.5 sm:py-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2.5 shrink-0 sm:rounded-b-lg shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.3)] sm:shadow-none pb-[calc(env(safe-area-inset-bottom)+0.625rem)] sm:pb-3.5">
                 <a href="{{ route('tasks.show', $task) }}"
-                   class="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md transition-colors"
-                   style="border:1px solid var(--color-border);color:var(--color-text-secondary);background:var(--color-surface)"
-                   onmouseover="this.style.background='var(--color-surface-muted,#F1F5F9)'"
-                   onmouseout="this.style.background='var(--color-surface)'">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                   class="hidden sm:inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                     Batal
@@ -633,14 +686,11 @@
 
                 <button type="submit"
                         id="submit-btn"
-                        class="inline-flex items-center gap-2 text-sm font-semibold px-6 py-2 rounded-md text-white transition-colors"
-                        style="background:var(--color-success);cursor:pointer"
-                        onmouseover="this.style.opacity='0.9'"
-                        onmouseout="this.style.opacity='1'">
+                        class="w-full sm:w-auto min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-2 text-xs font-semibold px-6 py-2.5 sm:py-2 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 transition-colors shadow-xs cursor-pointer whitespace-nowrap ml-auto">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    Simpan Laporan
+                    <span>Simpan Laporan</span>
                 </button>
             </div>
 

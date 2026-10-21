@@ -1863,6 +1863,8 @@ unset($__errorArgs, $__bag); ?>
     function closeTestReportModal() { closeModal('test-report-modal'); }
     function openDeviceModal() { openModal('device-modal'); }
     function closeDeviceModal() { closeModal('device-modal'); }
+    function openAdditionalDeviceModal() { openModal('additional-device-modal'); }
+    function closeAdditionalDeviceModal() { closeModal('additional-device-modal'); }
 
 </script>
 <?php $__env->stopSection(); ?>

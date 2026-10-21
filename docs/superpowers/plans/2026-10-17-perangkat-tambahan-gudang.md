@@ -1,5 +1,6 @@
 # Perangkat Tambahan dari Gudang (ADHOC-190) Implementation Plan
 
+> **Revisi 2026-10-20:** Task 3 tentang penolakan assign karena custody kurang sudah diganti oleh keputusan user: FOP assign dahulu, Gudang issue kemudian. Bagian Task 3 di bawah adalah riwayat implementasi awal; ikuti spesifikasi yang telah direvisi dan tes terbaru untuk perilaku aktif.
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Perangkat tambahan (AP/STB) jadi stok Gudang ber-SN — diissue ke teknisi lewat form issue yang sudah ada, dipasang lewat langkah sendiri di Laporan Pemasangan (bukan diketik ulang), dan ditarik balik otomatis lewat alur DEAC yang sudah ada — dengan kontrol kecukupan barang di titik FOP assign/jadwal task, bukan dibebankan ke teknisi di lapangan.

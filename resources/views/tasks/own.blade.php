@@ -5,133 +5,167 @@
 @section('content')
 <div x-data="taskWorksheet()" class="max-w-4xl mx-auto space-y-5">
 
-    {{-- ══ LAYER 1: NAKED PAGE HEADER ════════════════════════════════════════════ --}}
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    {{-- ══ Naked Page Header (Design.md §1.4 Layer 1) ═══════════════════════════════ --}}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 select-none">
         <div>
-            <div class="flex items-center gap-1.5 text-xs text-text-muted mb-1 font-ui">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="font-semibold text-emerald-600 dark:text-emerald-400">Status Aktif &middot; GPS Terhubung</span>
-                <span class="text-text-disabled">&bull;</span>
-                <span>{{ now()->translatedFormat('l, d F Y') }}</span>
+            <div class="flex items-center gap-1.5 text-sky-600 dark:text-sky-400 text-[10px] font-bold uppercase tracking-wider mb-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Status Aktif &middot; GPS Terhubung</span>
             </div>
             <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-text-main font-ui">Halo, {{ auth()->user()->name }} 👋</h1>
-            <p class="text-xs text-text-muted mt-0.5 font-ui">Pusat kendali tugas lapangan, jadwal rute, dan aksi eksekusi teknisi.</p>
+            <p class="text-xs text-text-muted mt-0.5 font-medium font-ui">
+                {{ now()->translatedFormat('l, d F Y') }} &middot; Jadwal Tugas Lapangan
+            </p>
         </div>
 
-        <div class="flex items-center gap-2">
-            <a href="{{ route('tasks.own.history') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-xs font-semibold text-text-main transition-colors shadow-2xs">
-                <svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
+        <div class="flex items-center gap-2 self-start sm:self-auto">
+            <a href="{{ route('tasks.own.history') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-xs font-semibold text-text-main hover:text-primary transition-colors font-ui shadow-2xs">
                 <span>Riwayat Selesai</span>
+                <svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
             </a>
         </div>
     </div>
 
-    {{-- ══ LAYER 2: FLAT SUMMARY STRIP (Design.md Standard) ═════════════════════════ --}}
-    <div class="bg-surface border border-border rounded-lg shadow-2xs divide-y sm:divide-y-0 sm:divide-x divide-border grid grid-cols-1 sm:grid-cols-3">
-        <div class="p-3.5 sm:p-4 text-center sm:text-left flex items-center justify-between sm:justify-start gap-4">
-            <div>
+    {{-- ══ Flat Summary Strip (Design.md Type A §1.3) ════════════════════════════════ --}}
+    <div class="bg-surface border border-border rounded-lg p-3 sm:p-4 shadow-2xs">
+        <div class="grid grid-cols-3 divide-x divide-border">
+            <div class="text-center px-2">
                 <p class="text-[10px] uppercase tracking-wider text-text-muted font-bold font-ui">Total Tugas</p>
-                <p class="text-xl font-bold font-mono text-text-main mt-0.5" x-text="getTaskCount('all')"></p>
+                <p class="text-lg sm:text-xl font-bold font-mono text-text-main mt-0.5" x-text="getTaskCount('all')"></p>
             </div>
-        </div>
-        <div class="p-3.5 sm:p-4 text-center sm:text-left flex items-center justify-between sm:justify-start gap-4">
-            <div>
-                <p class="text-[10px] uppercase tracking-wider text-rose-500 font-bold font-ui">Terlewat / Overdue</p>
-                <p class="text-xl font-bold font-mono text-rose-600 dark:text-rose-400 mt-0.5" x-text="getTaskCount('overdue')"></p>
+            <div class="text-center px-2">
+                <p class="text-[10px] uppercase tracking-wider text-rose-600 dark:text-rose-400 font-bold font-ui">Terlewat</p>
+                <p class="text-lg sm:text-xl font-bold font-mono text-rose-600 dark:text-rose-400 mt-0.5" x-text="getTaskCount('overdue')"></p>
             </div>
-        </div>
-        <div class="p-3.5 sm:p-4 text-center sm:text-left flex items-center justify-between sm:justify-start gap-4">
-            <div>
-                <p class="text-[10px] uppercase tracking-wider text-emerald-500 font-bold font-ui">Selesai Hari Ini</p>
-                <p class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5" x-text="getTaskCount('completed')"></p>
+            <div class="text-center px-2">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold font-ui">Selesai</p>
+                <p class="text-lg sm:text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5" x-text="getTaskCount('completed')"></p>
             </div>
         </div>
     </div>
 
-    {{-- ══ Stok Saya (ADHOC-54, rancangan-ui.md §2.5) — barang yang lagi
-         dipegang, belum dipasang/dikembalikan. Embedded, bukan halaman/menu
-         terpisah — cuma punya sendiri, gak digerbangi permission. ═════ --}}
+    {{-- ══ Stok Saya (ADHOC-54, Expandable Drawer/Accordion for Mobile) ═══════════════ --}}
     @if($myCustodies->isNotEmpty() || $mySerials->isNotEmpty())
-    <div class="bg-surface border border-border rounded-lg p-3.5 sm:p-4 shadow-2xs">
-        <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2.5 font-ui flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-            </svg>
-            Stok Saya
-        </h3>
-        <div class="flex flex-wrap gap-2">
-            @foreach($mySerials as $serial)
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/60 text-[11px] font-ui">
-                <span class="font-semibold text-sky-700 dark:text-sky-300">{{ $serial->item->name }}</span>
-                <span class="font-mono text-sky-600 dark:text-sky-400">SN {{ $serial->serial_number }}</span>
-            </span>
-            @endforeach
-            @foreach($myCustodies as $custody)
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-muted border border-border text-[11px] font-ui">
-                <span class="font-semibold text-text-main">{{ $custody->item->name }}</span>
-                <span class="font-mono text-text-secondary">{{ rtrim(rtrim(number_format((float) $custody->qty_remaining, 2, ',', '.'), '0'), ',') }} {{ $custody->item->unit }}</span>
-                <span class="text-text-muted">· {{ $custody->ageLabel() }}</span>
-            </span>
-            @endforeach
+    <div x-data="{ openStock: false }" class="bg-surface border border-border rounded-lg overflow-hidden shadow-2xs transition-colors">
+        {{-- Slim trigger row --}}
+        <button type="button" 
+                @click="openStock = !openStock"
+                class="w-full px-3.5 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-surface-muted/50 transition-colors cursor-pointer select-none">
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="w-6 h-6 rounded-md bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 flex items-center justify-center shrink-0">
+                    <svg class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                </div>
+                <span class="text-xs font-bold text-text-main font-ui">Stok Saya</span>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    @if($mySerials->isNotEmpty())
+                    <span class="px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-mono text-[10px] font-semibold border border-sky-200 dark:border-sky-800/60">
+                        {{ $mySerials->count() }} unit SN
+                    </span>
+                    @endif
+                    @if($myCustodies->isNotEmpty())
+                    <span class="px-2 py-0.5 rounded-md bg-surface-muted text-text-secondary font-mono text-[10px] font-medium border border-border">
+                        {{ $myCustodies->count() }} item
+                    </span>
+                    @endif
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 text-text-muted shrink-0">
+                <span class="text-[11px] font-medium font-ui hidden sm:inline" x-text="openStock ? 'Tutup' : 'Lihat Detail'">Lihat Detail</span>
+                <svg class="w-4 h-4 transition-transform duration-200" :class="openStock ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+        </button>
+
+        {{-- Expandable Content / Drawer --}}
+        <div x-show="openStock" x-collapse style="display: none;" class="border-t border-border px-3.5 py-3 bg-surface space-y-3">
+            @if($mySerials->isNotEmpty())
+            <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2 font-ui">Perangkat Ber-Serial Number ({{ $mySerials->count() }})</p>
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach($mySerials as $serial)
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/60 text-[11px] font-ui">
+                        <span class="font-semibold text-sky-700 dark:text-sky-300">{{ $serial->item->name }}</span>
+                        <span class="font-mono text-sky-600 dark:text-sky-400 font-medium">SN {{ $serial->serial_number }}</span>
+                    </span>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+            @if($myCustodies->isNotEmpty())
+            <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2 font-ui">Material & Sparepart ({{ $myCustodies->count() }})</p>
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach($myCustodies as $custody)
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-muted border border-border text-[11px] font-ui">
+                        <span class="font-semibold text-text-main">{{ $custody->item->name }}</span>
+                        <span class="font-mono text-text-secondary font-medium">{{ rtrim(rtrim(number_format((float) $custody->qty_remaining, 2, ',', '.'), '0'), ',') }} {{ $custody->item->unit }}</span>
+                        <span class="text-text-muted">&middot; {{ $custody->ageLabel() }}</span>
+                    </span>
+                    @endforeach
+                </div>
+            </div>
+            @endif
         </div>
     </div>
     @endif
 
-    {{-- ══ Mobile Search and Sorting controls ════════════════════════ --}}
-    <div class="flex flex-col sm:flex-row items-center gap-3">
-        {{-- Search input --}}
-        <div class="relative w-full">
-            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"></path>
-            </svg>
-            <input type="text" x-model="searchQuery" placeholder="Cari nama, alamat, nomor task..." 
-                class="w-full h-9.5 pl-9.5 pr-9 rounded-lg border border-border bg-surface text-xs text-text-main placeholder-text-disabled focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-ui shadow-2xs">
-            <button x-show="searchQuery" @click="searchQuery = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main transition-colors cursor-pointer">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
+    {{-- ══ Search Input (Design.md §2.1) ════════════════════════════ --}}
+    <div class="relative w-full">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"></path>
+        </svg>
+        <input type="text" x-model="searchQuery" placeholder="Cari nama pelanggan, alamat, atau nomor task..." 
+            class="w-full h-10 pl-9 pr-8 rounded-lg border border-border bg-surface text-xs text-text-main placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-ui shadow-2xs">
+        <button x-show="searchQuery" @click="searchQuery = ''" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main transition-colors cursor-pointer p-0.5">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
     </div>
 
-    {{-- ══ Horizontal slider filter tabs ═════════════════════════════ --}}
-    <div class="flex items-center gap-1.5 overflow-x-auto pb-1.5 -mx-4 px-4 scrollbar-none select-none">
+    {{-- ══ Horizontal Filter Tabs ════════════════════════════════════ --}}
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none select-none">
         <button @click="activeTab = 'all'" 
-            :class="activeTab === 'all' ? 'bg-primary text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'all' ? 'bg-primary text-white font-semibold' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3.5 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer font-ui shadow-2xs">
             Semua (<span x-text="getTaskCount('all')"></span>)
         </button>
 
         <button @click="activeTab = 'overdue'" 
-            :class="activeTab === 'overdue' ? 'bg-rose-600 text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'overdue' ? 'bg-rose-600 text-white font-semibold' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3.5 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer font-ui shadow-2xs">
             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
             <span>Terlewat</span>
             <span x-text="getTaskCount('overdue')" class="text-[10px] bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold px-1.5 py-0.2 rounded-md"></span>
         </button>
 
         <button @click="activeTab = 'survey'" 
-            :class="activeTab === 'survey' ? 'bg-primary text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'survey' ? 'bg-primary text-white font-semibold' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3.5 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer font-ui shadow-2xs">
             Survey
         </button>
 
         <button @click="activeTab = 'psb'" 
-            :class="activeTab === 'psb' ? 'bg-primary text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'psb' ? 'bg-primary text-white font-semibold' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3.5 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer font-ui shadow-2xs">
             Pemasangan
         </button>
 
         <button @click="activeTab = 'maintenance'" 
-            :class="activeTab === 'maintenance' ? 'bg-primary text-white font-semibold shadow-2xs' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
-            class="px-3 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer active:scale-95 font-ui">
+            :class="activeTab === 'maintenance' ? 'bg-primary text-white font-semibold' : 'bg-surface border border-border text-text-secondary hover:bg-surface-muted hover:text-text-main font-medium'"
+            class="px-3.5 py-1.5 rounded-lg text-xs transition duration-150 whitespace-nowrap cursor-pointer font-ui shadow-2xs">
             Maintenance
         </button>
     </div>
 
     {{-- ══ Task Hari Ini Container ════════════════════════════════════════════ --}}
-    <div x-data="technicianNotifier()" class="space-y-3">
-        <div class="space-y-3" id="today-task-list">
+    <div x-data="technicianNotifier()" class="space-y-3.5">
+        <div class="space-y-3.5" id="today-task-list">
             @foreach($tasks as $task)
                 @include('tasks.partials.own-card', ['task' => $task])
             @endforeach
@@ -139,39 +173,37 @@
 
         {{-- Empty State Card --}}
         <div id="empty-state-card"
-             class="bg-surface border border-border rounded-lg flex flex-col items-center justify-center py-8 px-4 gap-2.5 select-none text-center shadow-2xs transition-all duration-200"
+             class="bg-surface border border-border rounded-lg flex flex-col items-center justify-center py-14 px-4 gap-2.5 select-none text-center shadow-2xs transition-all duration-200"
              style="{{ $tasks->count() > 0 ? 'display: none;' : '' }}">
-            <div class="w-10 h-10 rounded-lg bg-surface-muted border border-border flex items-center justify-center text-text-muted opacity-70">
+            <div class="w-10 h-10 rounded-lg bg-surface-muted border border-border flex items-center justify-center text-text-muted">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
             </div>
-            <div>
-                <p class="text-xs text-text-main font-bold font-ui">Tidak ada task yang ditemukan</p>
-                <p class="text-[11px] text-text-muted font-ui mt-0.5">Coba ubah filter atau kata kunci pencarian Anda.</p>
-            </div>
-            <button type="button" @click="searchQuery = ''; activeTab = 'all'" class="text-xs font-semibold text-primary hover:underline font-ui cursor-pointer">Reset Filter</button>
+            <p class="text-xs font-bold text-text-main font-ui">Tidak ada task yang ditemukan</p>
+            <p class="text-[11px] text-text-muted font-ui">Coba ubah filter atau kata kunci pencarian Anda.</p>
+            <button type="button" @click="searchQuery = ''; activeTab = 'all'" class="text-xs font-semibold text-primary hover:underline mt-0.5 font-ui cursor-pointer">Reset Filter</button>
         </div>
     </div>
 
     {{-- ══ Task Mendatang ════════════════════════════════════════════ --}}
     @if($upcomingTasks->count() > 0)
-    <div data-section="mendatang" class="pt-4 border-t border-border/85 select-none">
-        <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-3 font-ui">Jadwal Mendatang</h3>
-        <div class="space-y-3">
+    <div data-section="mendatang" class="pt-4 border-t border-border select-none">
+        <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2.5 font-ui">Jadwal Mendatang</h3>
+        <div class="space-y-2.5">
             @foreach($upcomingTasks as $task)
             <a href="{{ route('tasks.show', $task) }}"
-               class="relative flex items-center justify-between bg-surface border border-border rounded-xl pl-5 pr-4 py-3.5 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all duration-200 group">
+               class="relative flex items-center justify-between bg-surface border border-border rounded-lg pl-5 pr-4 py-3 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group shadow-2xs">
                 
                 {{-- Left accent strip --}}
-                <div class="absolute left-0 top-0 bottom-0 w-1 bg-slate-300 dark:bg-slate-700 rounded-l-xl"></div>
+                <div class="absolute left-0 top-0 bottom-0 w-1 bg-slate-300 dark:bg-slate-700 rounded-l-lg"></div>
 
                 <div class="flex items-center gap-3">
-                    <span class="text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border {{ $task->task_type->cardClasses() }} shrink-0">
+                    <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border {{ $task->task_type->cardClasses() }} shrink-0">
                         {{ $task->task_type->label() }}
                     </span>
                     <div class="min-w-0">
-                        <p class="text-sm font-semibold text-text-main truncate group-hover:text-primary transition-colors font-ui">{{ $task->customer?->full_name ?? $task->title }}</p>
+                        <p class="text-xs sm:text-sm font-semibold text-text-main truncate group-hover:text-primary transition-colors font-ui">{{ $task->customer?->full_name ?? $task->title }}</p>
                         <p class="text-[11px] text-text-muted mt-0.5 font-ui">
                             {{ $task->scheduled_at?->translatedFormat('l, d M') }} &middot;
                             <span class="font-mono">{{ $task->scheduled_at?->format('H:i') }}</span>

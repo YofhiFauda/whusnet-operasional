@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'network_node_port_id', 'customer_id', 'target_node_id', 'manual_label',
+    'network_node_port_id', 'customer_id', 'target_node_id', 'target_port_id', 'manual_label',
     'active_key', 'assigned_by', 'released_by', 'assigned_at', 'released_at', 'release_note',
 ])]
 class NetworkPortAssignment extends Model
@@ -36,6 +36,11 @@ class NetworkPortAssignment extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function targetPort(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNodePort::class, 'target_port_id');
     }
 
     public function targetNode(): BelongsTo

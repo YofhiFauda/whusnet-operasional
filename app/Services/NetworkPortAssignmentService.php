@@ -18,9 +18,9 @@ class NetworkPortAssignmentService
         return $this->assign($port, $actor, customer: $customer);
     }
 
-    public function assignNode(NetworkNodePort $port, NetworkNode $target, User $actor): NetworkPortAssignment
+    public function assignNode(NetworkNodePort $port, NetworkNode $target, User $actor, ?NetworkNodePort $targetPort = null): NetworkPortAssignment
     {
-        return $this->assign($port, $actor, target: $target);
+        return $this->assign($port, $actor, target: $target, targetPort: $targetPort);
     }
 
     public function assignManual(NetworkNodePort $port, string $label, User $actor): NetworkPortAssignment
@@ -47,6 +47,9 @@ class NetworkPortAssignmentService
                 ]);
             }
 
+            if ($active?->target_port_id !== null) {
+                NetworkNodePort::query()->whereKey($active->target_port_id)->update(['is_used' => false]);
+            }
             $port->update(['is_used' => false]);
         });
     }
@@ -56,9 +59,10 @@ class NetworkPortAssignmentService
         User $actor,
         ?Customer $customer = null,
         ?NetworkNode $target = null,
+        ?NetworkNodePort $targetPort = null,
         ?string $label = null,
     ): NetworkPortAssignment {
-        return DB::transaction(function () use ($port, $actor, $customer, $target, $label): NetworkPortAssignment {
+        return DB::transaction(function () use ($port, $actor, $customer, $target, $targetPort, $label): NetworkPortAssignment {
             $port = NetworkNodePort::query()->with('node.nodeType')->lockForUpdate()->findOrFail($port->id);
 
             $active = $port->assignments()->where('active_key', 1)->lockForUpdate()->first();
@@ -101,15 +105,28 @@ class NetworkPortAssignmentService
                 }
             }
 
+            if ($targetPort !== null) {
+                if ($target === null || $targetPort->network_node_id !== $target->id) {
+                    throw new InvalidArgumentException('Port tujuan bukan milik node tujuan.');
+                }
+                $targetPort = NetworkNodePort::query()->lockForUpdate()->findOrFail($targetPort->id);
+                if ($targetPort->is_used || NetworkPortAssignment::query()
+                    ->where('target_port_id', $targetPort->id)->where('active_key', 1)->exists()) {
+                    throw new InvalidArgumentException('Port tujuan sudah terpakai.');
+                }
+            }
+
             $assignment = $port->assignments()->create([
                 'customer_id' => $customer?->id,
                 'target_node_id' => $target?->id,
+                'target_port_id' => $targetPort?->id,
                 'manual_label' => $label,
                 'active_key' => 1,
                 'assigned_at' => now(),
                 'assigned_by' => $actor->id,
             ]);
             $port->update(['is_used' => true]);
+            $targetPort?->update(['is_used' => true]);
 
             return $assignment;
         });

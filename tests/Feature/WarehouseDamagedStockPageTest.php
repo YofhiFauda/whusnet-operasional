@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\ItemCondition;
 use App\Enums\ScopeType;
 use App\Enums\SerialStatus;
-use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Permission;

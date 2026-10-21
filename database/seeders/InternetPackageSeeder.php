@@ -58,7 +58,7 @@ class InternetPackageSeeder extends Seeder
             $this->businessBroadband('NetSo200', '200 Mbps 1:4', 200, 4, 1350000, ['Unlimited', '1 AP & 1 Router'], '1 Public Static', 2500000),
             $this->businessBroadband('NetSo300', '300 Mbps 1:4', 300, 4, 2150000, ['Unlimited', '1 AP & 1 Router'], '1 Public Static', 2500000),
             $this->businessBroadband('NetSo500', '500 Mbps 1:4', 500, 4, 3200000, ['Unlimited', '2 AP & 1 Router'], '2 Public Static', 2500000),
-            $this->businessBroadband('NetSo1G', '1 Gbps 1:4', 1000, 4, 5900000, ['Unlimited', '3 AP & 1 Router'], '2 Public Static', 2500000),
+            array_merge($this->businessBroadband('NetSo1G', '1 Gbps 1:4', 1000, 4, 5900000, ['Unlimited', '3 AP & 1 Router'], '2 Public Static', 2500000), ['max_additional_devices' => 4]),
 
             $this->sme('NetBLite25', 'Up To 35 Mbps', 35, 200000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6'], 5, 150000),
             $this->sme('NetBLite55', 'Up To 55 Mbps', 55, 250000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6'], 7, 150000),

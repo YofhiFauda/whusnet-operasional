@@ -92,6 +92,26 @@ class CustomerInstallationAdditionalDeviceController extends Controller
         // daftar custody; tanpa ini submit ulang (mis. revisi) bakal selalu
         // dianggap kurang.
         $alreadyInstalled = $customer->additionalDevices()->installedFromWarehouse()->count();
+        $requirements = $customer->customerService?->internetPackage?->additionalDeviceRequirements() ?? [];
+        if ($requirements !== []) {
+            $selectedByCategory = $decisions->countBy(
+                fn (array $decision) => $eligibleSerials[(int) $decision['inventory_serial_id']]->item?->category?->code
+            );
+            $installedByCategory = $customer->additionalDevices()
+                ->installedFromWarehouse()
+                ->with('inventorySerial.item.category')
+                ->get()
+                ->countBy(fn (CustomerAdditionalDevice $device) => $device->inventorySerial?->item?->category?->code);
+
+            foreach ($requirements as $categoryCode => $count) {
+                $reported = ($selectedByCategory[$categoryCode] ?? 0) + ($installedByCategory[$categoryCode] ?? 0);
+                if ($reported > $count || (! $shortage && $reported < $count)) {
+                    throw ValidationException::withMessages([
+                        'decisions' => 'Paket ini membutuhkan '.($requirements['access_point'] ?? 0).' AP dan '.($requirements['customer_router'] ?? 0).' router pelanggan sebagai perangkat tambahan.',
+                    ]);
+                }
+            }
+        }
 
         // Spec §4.2: keputusan wajib untuk SETIAP perangkat yang diatur paket
         // (apa pun outcome-nya), bukan cuma minimal satu. Jalur kekurangan +

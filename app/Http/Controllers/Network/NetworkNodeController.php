@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Network;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
@@ -44,7 +45,7 @@ class NetworkNodeController extends Controller
             ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
             ->with(
                 'nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode',
-                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item'
+                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item', 'children.nodeType'
             )
             ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
             ->orderBy('code')
@@ -99,10 +100,30 @@ class NetworkNodeController extends Controller
         $totalUsedPortsCount = (int) $parentOptions->sum('used_ports_count');
         $redZoneNodesCount = $parentOptions->filter(fn ($n) => $n->isInRedZone())->count();
 
+        $customerCabangMap = [];
+        foreach ($topologyPops as $pop) {
+            $customerCabangMap[$pop->id] = Pop::resolveCabangId($pop->id);
+        }
+        $availableCustomers = ! empty($visiblePopIds)
+            ? Customer::query()
+                ->whereIn('pop_id', $visiblePopIds)
+                ->whereDoesntHave('portAssignments', fn ($q) => $q->where('active_key', 1))
+                ->orderBy('full_name')
+                ->limit(500)
+                ->get(['id', 'full_name', 'customer_code', 'cid', 'pop_id'])
+                ->map(fn ($cust) => [
+                    'id' => $cust->id,
+                    'full_name' => $cust->full_name,
+                    'customer_code' => $cust->customer_code ?: ($cust->cid ?: '#'.$cust->id),
+                    'pop_id' => $cust->pop_id,
+                    'cabang_id' => $customerCabangMap[$cust->pop_id] ?? $cust->pop_id,
+                ])->values()
+            : collect();
+
         return view('network.nodes.index', compact(
             'nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels',
             'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount',
-            'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop'
+            'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop', 'availableCustomers'
         ));
     }
 
@@ -183,6 +204,7 @@ class NetworkNodeController extends Controller
                 ->where('status', SerialStatus::INSTALLED->value)
                 ->with('item.category'),
             'ports.activeAssignment.targetNode',
+            'ports.activeAssignment.targetPort',
             'children.nodeType',
             'deployedSerials.item',
             'infrastructureBalances.item',
@@ -200,12 +222,25 @@ class NetworkNodeController extends Controller
             : collect();
 
         $user = auth()->user();
+        $cabangPopId = Pop::resolveCabangId($node->resolvePop()?->id);
+        $popIds = $cabangPopId !== null
+            ? Pop::query()->where('id', $cabangPopId)->orWhere('parent_id', $cabangPopId)->pluck('id')->all()
+            : [];
+        $availableCustomers = $node->nodeType?->code === 'odp' && ! empty($popIds)
+            ? Customer::query()
+                ->whereIn('pop_id', $popIds)
+                ->whereDoesntHave('portAssignments', fn ($q) => $q->where('active_key', 1))
+                ->orderBy('full_name')
+                ->limit(200)
+                ->get(['id', 'full_name', 'customer_code', 'cid', 'pop_id'])
+            : collect();
 
         return view('network.nodes.show', [
             'node' => $node,
             'nodeTypes' => NetworkNodeType::query()->where('is_active', true)->orWhere('id', $node->node_type_id)->orderBy('sort_order')->get(),
             'location' => $node->effectiveLocation(),
             'cardOptions' => $cardOptions,
+            'availableCustomers' => $availableCustomers,
             'canViewDeviceSerials' => $user->hasPermission('customers.detail.devices.view_sensitive'),
             'allowedCustomerPopIds' => $this->access->hasAllPopAccess($user) ? null : $this->access->getAllowedPopIds($user),
         ]);
@@ -355,7 +390,7 @@ class NetworkNodeController extends Controller
 
         $assignments->release($port, $request->user(), $validated['release_note']);
 
-        return redirect()->route('network.nodes.show', $port->node)->with('success', 'Port berhasil dilepas dengan catatan fisik.');
+        return redirect()->back(fallback: route('network.nodes.show', $port->node))->with('success', 'Port berhasil dilepas dengan catatan fisik.');
     }
 
     public function assignNodePort(Request $request, NetworkNodePort $port, NetworkPortAssignmentService $assignments): RedirectResponse
@@ -374,7 +409,25 @@ class NetworkNodeController extends Controller
             throw ValidationException::withMessages(['target_node_id' => $exception->getMessage()]);
         }
 
-        return redirect()->route('network.nodes.show', $port->node)->with('success', 'Anak node terhubung ke port.');
+        return redirect()->back(fallback: route('network.nodes.show', $port->node))->with('success', 'Anak node terhubung ke port.');
+    }
+
+    public function assignCustomerPort(Request $request, NetworkNodePort $port, NetworkPortAssignmentService $assignments): RedirectResponse
+    {
+        $port->load('node');
+        $this->authorizeNodeScope($port->node);
+        $validated = $request->validate([
+            'customer_id' => ['required', 'integer', Rule::exists('customers', 'id')],
+        ]);
+        $customer = Customer::findOrFail($validated['customer_id']);
+
+        try {
+            $assignments->assignCustomer($port, $customer, $request->user());
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['customer_id' => $exception->getMessage()]);
+        }
+
+        return redirect()->back(fallback: route('network.nodes.show', $port->node))->with('success', "Pelanggan {$customer->full_name} berhasil disambungkan ke port #{$port->number}.");
     }
 
     /**

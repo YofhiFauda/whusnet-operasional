@@ -32,9 +32,9 @@ class TaskService
      * @param  array  $data  Validated data dari TaskRequest
      * @param  User  $actor  User yang membuat task (FOP)
      */
-    public function create(array $data, User $actor): Task
+    public function create(array $data, User $actor, ?FopTask $sourceFopTask = null): Task
     {
-        $task = DB::transaction(function () use ($data, $actor) {
+        $task = DB::transaction(function () use ($data, $actor, $sourceFopTask) {
             $taskType = TaskType::from($data['task_type']);
 
             $memberIds = $data['team_member_ids'] ?? [];
@@ -42,25 +42,6 @@ class TaskService
             $status = (! empty($memberIds) && ! empty($scheduledAt))
                 ? TaskStatus::TERJADWAL->value
                 : TaskStatus::PENDING->value;
-
-            // ADHOC-190 task 3 — begitu task ini LANGSUNG lahir TERJADWAL
-            // (tim + jadwal sudah diisi bareng), cek dulu custody perangkat
-            // tambahan tim sebelum baris Task-nya benar-benar ditulis. Task
-            // belum ada row-nya di titik ini — dibuat instance SEMENTARA
-            // (tidak disimpan) cuma buat kasih AdditionalDeviceCustodyService
-            // konteks customer/task_type/pop yang dibutuhkan; kalau guard
-            // lempar exception, transaction ini rollback dan Task::create()
-            // di bawah gak pernah jalan.
-            if ($status === TaskStatus::TERJADWAL->value) {
-                app(AdditionalDeviceCustodyService::class)->assertSufficientForTask(
-                    new Task([
-                        'customer_id' => $data['customer_id'] ?? null,
-                        'pop_id' => $data['pop_id'],
-                        'task_type' => $taskType->value,
-                    ]),
-                    $memberIds
-                );
-            }
 
             $task = Task::create([
                 'task_number' => app(NumberSequenceService::class)->taskNumber(),
@@ -85,6 +66,14 @@ class TaskService
                     'user_id' => $userId,
                     'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
                 ]);
+            }
+
+            if (in_array($taskType, [TaskType::OREQ, TaskType::INFR], true)) {
+                if ($sourceFopTask !== null) {
+                    $sourceFopTask->update(['task_id' => $task->id]);
+                } else {
+                    app(FopTaskProvisioningService::class)->ensureForTask($task);
+                }
             }
 
             // Pencatatan pembuatan TIDAK ditulis di sini. Model Task memakai trait
@@ -128,7 +117,7 @@ class TaskService
         $queuedTask = $this->findQueuedTaskFor($fopTask);
 
         if (! $queuedTask) {
-            return $this->create($data, $actor);
+            return $this->create($data, $actor, $fopTask);
         }
 
         $task = DB::transaction(function () use ($queuedTask, $data, $actor) {
@@ -137,17 +126,6 @@ class TaskService
             $status = (! empty($memberIds) && ! empty($scheduledAt))
                 ? TaskStatus::TERJADWAL->value
                 : TaskStatus::PENDING->value;
-
-            // ADHOC-190 (final review) — INI jalur utama penjadwalan PSB di
-            // produksi: Task antrean lahir dari CustomerWorkflowService, lalu
-            // FOP assign tim lewat /fop-tasks dan masuk ke sini, bukan ke
-            // `create()`. Guard custody perangkat tambahan WAJIB dicek di sini
-            // juga — tanpa ini guard di `create()` cuma melindungi jalur
-            // cadangan. Dicek SEBELUM update apa pun; lempar = transaction
-            // (punya service ini & punya controller pemanggil) rollback.
-            if ($status === TaskStatus::TERJADWAL->value) {
-                app(AdditionalDeviceCustodyService::class)->assertSufficientForTask($queuedTask, $memberIds);
-            }
 
             // Kolom yang di-set sama persis dengan `create()` — Task antrean
             // lahir tanpa fop_id & sla_minutes (bukan lewat service ini), dan
@@ -226,22 +204,6 @@ class TaskService
             // teknisi yang di-drop, yang gak akan pernah ke-notify lewat
             // notifyTeam() karena method itu iterasi tim BARU.
             $oldMemberIds = $task->teamMembers()->pluck('user_id')->all();
-
-            // ADHOC-190 task 3 — update() TIDAK pernah mengubah kolom status
-            // (lihat $data yang dikirim FopTaskController/FopDashboardController:
-            // gak ada key 'status'), jadi "tetap TERJADWAL" di sini berarti
-            // statusnya SUDAH TERJADWAL dari create()/createForFopTask()
-            // sebelumnya. Guard cuma relevan kalau roster tim atau jadwal
-            // beneran berubah lewat panggilan ini — reassignTeam()/cancel()/dll
-            // yang gak sentuh dua field itu gak perlu dicek ulang di sini.
-            if ($task->status === TaskStatus::TERJADWAL
-                && (isset($data['team_member_ids']) || $rescheduled)
-            ) {
-                app(AdditionalDeviceCustodyService::class)->assertSufficientForTask(
-                    $task,
-                    $data['team_member_ids'] ?? $oldMemberIds
-                );
-            }
 
             $task->update(array_merge($data, ['updated_by' => $actor->id]));
 
@@ -712,18 +674,6 @@ class TaskService
             $sched = $conflict?->task?->scheduled_at ?? $targetScheduledAt;
             throw new \Exception("Teknisi memiliki jadwal yang bentrok: {$taskNum} pada {$sched}.");
         }
-
-        // ADHOC-190 task 3 (lanjutan review) — reassignTeam() cuma bisa dipanggil
-        // pas task TERJADWAL/IN_PROGRESS (guard di baris atas), artinya method ini
-        // SATU-SATUNYA jalur lain (selain create()/update()) yang bisa menukar
-        // teknisi di task Pemasangan yang sudah lolos guard custody di create().
-        // Tanpa dicek ulang di sini, FOP/admin bisa swap teknisi lama (yang
-        // custody-nya cukup) ke teknisi baru yang custody-nya nol — guard
-        // preventif di create()/update() jadi gak ada gunanya buat path ini.
-        // Dicek pakai TIM BARU (teknisi lama diganti teknisi baru), BUKAN tim
-        // lama, dan SEBELUM transaction di bawah menyentuh baris mana pun.
-        $newTeamIds = array_merge($otherUserIds, [$newUserId]);
-        app(AdditionalDeviceCustodyService::class)->assertSufficientForTask($task, $newTeamIds);
 
         // Update the team member ID + task, dibungkus transaction sendiri biar
         // service ini self-contained gak gantung transaction dari caller.

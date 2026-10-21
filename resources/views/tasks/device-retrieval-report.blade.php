@@ -36,7 +36,7 @@
     $checkedAccessories = old('accessories', $existing?->accessories ?? []);
 @endphp
 
-<div class="max-w-4xl mx-auto space-y-4 pb-8">
+<div class="max-w-4xl mx-auto space-y-4 pb-28 sm:pb-8">
 
     {{-- ══ Breadcrumb (Design.md §13) ════════════════════════════════════════ --}}
     <nav class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -278,18 +278,18 @@
             </div>
         </div>
 
-        {{-- ══ Submit Actions (Design.md §9 & §15: Solid Sky Blue, rounded-lg 8px) ══ --}}
-        <div class="mt-4 flex items-center justify-end gap-3">
+        {{-- ══ Submit Actions (Fixed on mobile, static on desktop) ══ --}}
+        <div class="fixed sm:static bottom-0 inset-x-0 z-30 px-4 sm:px-0 py-2.5 sm:py-0 bg-white dark:bg-slate-900 sm:bg-transparent border-t sm:border-t-0 border-slate-200 dark:border-slate-800 flex items-center justify-between sm:justify-end gap-2.5 shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.3)] sm:shadow-none pb-[calc(env(safe-area-inset-bottom)+0.625rem)] sm:pb-0 sm:mt-4">
             <a href="{{ route('tasks.show', $task) }}"
-               class="px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg transition-colors font-ui">
+               class="hidden sm:inline-flex items-center px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg transition-colors font-ui shadow-xs">
                 Batal
             </a>
             <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 active:bg-sky-800 rounded-lg transition-colors shadow-xs font-ui cursor-pointer">
+                    class="w-full sm:w-auto min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 active:bg-sky-800 rounded-lg transition-colors shadow-xs font-ui cursor-pointer whitespace-nowrap">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
-                Simpan Laporan &amp; Selesaikan Task
+                <span>Simpan Laporan &amp; Selesaikan Task</span>
             </button>
         </div>
     </form>

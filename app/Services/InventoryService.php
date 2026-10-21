@@ -748,6 +748,7 @@ class InventoryService
                     'qty' => $take,
                     'unit_price_snapshot' => $lot->unit_price_snapshot,
                     'from_technician_id' => $lot->technician_id,
+                    'source_custody_id' => $lot->id,
                     'to_network_node_id' => $node->id,
                     'to_pop_id' => $toPopId,
                     'fop_task_id' => $fopTask->id,
@@ -786,7 +787,7 @@ class InventoryService
      *
      * @param  iterable<User>  $technicians
      */
-    public function deployRoll(InventoryRoll $roll, float $metersUsed, NetworkNode $node, iterable $technicians, FopTask $fopTask, User $actor): InventoryTransaction
+    public function deployRoll(InventoryRoll $roll, float $metersUsed, NetworkNode $node, iterable $technicians, FopTask $fopTask, User $actor, ?InventoryTransaction $correctedSource = null, ?string $actionKey = null, ?string $actionFingerprint = null): InventoryTransaction
     {
         if ($metersUsed <= 0) {
             throw new InvalidArgumentException('Meter yang di-deploy harus lebih besar dari nol.');
@@ -794,7 +795,7 @@ class InventoryService
 
         $technicianIds = Collection::make($technicians)->pluck('id')->all();
 
-        return DB::transaction(function () use ($roll, $metersUsed, $node, $technicianIds, $fopTask, $actor) {
+        return DB::transaction(function () use ($roll, $metersUsed, $node, $technicianIds, $fopTask, $actor, $correctedSource, $actionKey, $actionFingerprint) {
             $roll = InventoryRoll::query()->with('item')->lockForUpdate()->findOrFail($roll->id);
 
             if (! in_array($roll->status, [RollStatus::ISSUED, RollStatus::IN_USE], true)) {
@@ -842,7 +843,13 @@ class InventoryService
                 'to_network_node_id' => $node->id,
                 'to_pop_id' => $node->resolvePop()?->id,
                 'fop_task_id' => $fopTask->id,
-                'notes' => "{$metersUsed} meter dari roll {$roll->roll_code} dipasang netap di {$node->breadcrumbLabel()} (Task {$fopTask->task_number}).",
+                'source_inventory_transaction_id' => $correctedSource?->id,
+                'action_key' => $actionKey,
+                'action_fingerprint' => $actionFingerprint,
+                'reason' => $correctedSource ? 'infra_record_correction' : null,
+                'notes' => $correctedSource
+                    ? "Koreksi {$metersUsed} meter dari transaksi {$correctedSource->reference_number} ke roll {$roll->roll_code} di {$node->breadcrumbLabel()}."
+                    : "{$metersUsed} meter dari roll {$roll->roll_code} dipasang netap di {$node->breadcrumbLabel()} (Task {$fopTask->task_number}).",
                 'created_by' => $actor->id,
             ]);
         });
@@ -858,13 +865,17 @@ class InventoryService
      * terpasang di suatu tempat balik ke tangan teknisi, gak ada "tujuan
      * cabang yang salah" kayak deploy.
      */
-    public function retrieveSerialFromLocation(InventorySerial $serial, FopTask $fopTask, User $actor): InventoryTransaction
+    public function retrieveSerialFromLocation(InventorySerial $serial, FopTask $fopTask, User $actor, ?NetworkNode $expectedNode = null): InventoryTransaction
     {
-        return DB::transaction(function () use ($serial, $fopTask, $actor) {
+        return DB::transaction(function () use ($serial, $fopTask, $actor, $expectedNode) {
             $serial = InventorySerial::query()->with('item')->lockForUpdate()->findOrFail($serial->id);
 
             if ($serial->status !== SerialStatus::DEPLOYED) {
                 throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan DEPLOYED — gak bisa dicabut dari lokasi.");
+            }
+
+            if ($expectedNode !== null && $serial->current_network_node_id !== $expectedNode->id) {
+                throw new InvalidArgumentException('SN lama tidak terpasang pada node yang dilaporkan.');
             }
 
             $fromNodeId = $serial->current_network_node_id;

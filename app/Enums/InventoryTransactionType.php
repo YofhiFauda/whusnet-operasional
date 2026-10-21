@@ -73,9 +73,9 @@ enum InventoryTransactionType: string
     case DEPLOY = 'deploy';
 
     /**
-     * Pencabutan balik dari titik infrastruktur ke custody teknisi (mis. saat
-     * ODP dibongkar). Kebalikan DEPLOY — tidak menyentuh `inventory_balances`
-     * gudang, sama seperti alur RETURN ke custody.
+     * Pencabutan dari titik infrastruktur oleh teknisi (mis. saat ODP dibongkar).
+     * Hasil cabut ditahan untuk pemeriksaan Gudang sebelum masuk custody baru;
+     * tidak menyentuh saldo gudang atau menambah panjang roll asal.
      */
     case RETRIEVE_INFRA = 'retrieve_infra';
 

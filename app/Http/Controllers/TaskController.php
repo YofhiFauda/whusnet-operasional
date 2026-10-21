@@ -7,13 +7,16 @@ use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
-use App\Exceptions\InsufficientExtraDeviceCustodyException;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\InventorySerial;
+use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
+use App\Models\OltSlot;
 use App\Models\Pop;
 use App\Models\Task;
+use App\Models\TaskInfrastructureAction;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Notifications\AppNotification;
@@ -248,7 +251,23 @@ class TaskController extends Controller
         // adanya satu klik user tampil dua baris. Lihat App\Support\TaskAuditTimeline.
         $statusTimeline = TaskAuditTimeline::for($task);
 
-        return view('tasks.show', compact('task', 'recentMaintenanceTasks', 'statusTimeline'));
+        $infraActions = in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true)
+            ? TaskInfrastructureAction::query()->where('task_id', $task->id)
+                ->with(['node', 'technician', 'transactions.serial.item', 'transactions.item'])
+                ->orderBy('id')->get()
+            : collect();
+
+        $targetNodeIds = $infraActions->pluck('mutation.target_node_id')->filter()->unique();
+        $portIds = $infraActions->flatMap(fn ($action) => [
+            $action->mutation['port_id'] ?? null,
+            $action->mutation['target_port_id'] ?? null,
+        ])->filter()->unique();
+        $slotIds = $infraActions->pluck('mutation.slot_id')->filter()->unique();
+        $infraTargetNodes = NetworkNode::query()->whereIn('id', $targetNodeIds)->get()->keyBy('id');
+        $infraPorts = NetworkNodePort::query()->whereIn('id', $portIds)->get()->keyBy('id');
+        $infraSlots = OltSlot::query()->whereIn('id', $slotIds)->get()->keyBy('id');
+
+        return view('tasks.show', compact('task', 'recentMaintenanceTasks', 'statusTimeline', 'infraActions', 'infraTargetNodes', 'infraPorts', 'infraSlots'));
     }
 
     /**
@@ -332,14 +351,7 @@ class TaskController extends Controller
             }
         }
 
-        try {
-            $this->taskService->update($task, $validated, auth()->user());
-        } catch (InsufficientExtraDeviceCustodyException $e) {
-            // Edit task TERJADWAL Pemasangan (ganti tim/jadwal) juga lewat
-            // guard custody perangkat tambahan (ADHOC-190) — tanpa catch ini
-            // FOP dapat 500, bukan pesan form. Transaksi update() sudah rollback.
-            return back()->withInput()->withErrors(['team_member_ids' => $e->getMessage()]);
-        }
+        $this->taskService->update($task, $validated, auth()->user());
 
         return redirect()
             ->route('tasks.show', $task)

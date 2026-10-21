@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\CustodyStatus;
 use App\Enums\DeviceAcquisitionSource;
 use App\Enums\DeviceOwnership;
-use App\Enums\FopTaskPriority;
 use App\Enums\OwnershipMode;
 use App\Enums\ScopeType;
 use App\Enums\SerialStatus;

@@ -1,0 +1,407 @@
+
+                
+                <!-- Sticky Top Bar: Breadcrumb Path & Quick Actions -->
+                <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+                    <!-- Hierarchy Path Breadcrumb (Solves "Where is this node located?" context issue) -->
+                    <div id="nodeBreadcrumb" class="flex items-center flex-wrap gap-1.5 text-xs text-slate-500">
+                    <button onclick="selectNode('POP-WHUSNET')" class="hover:text-blue-600 transition ">
+                        WHUSNET
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('CORE-WHUSNET-PUSAT')" class="hover:text-blue-600 transition ">
+                        CORE-WHUSNET-PUSAT
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('BB-PUSAT-JETIS-01')" class="hover:text-blue-600 transition ">
+                        BB-PUSAT-JETIS-01
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('POP-JETIS')" class="hover:text-blue-600 transition ">
+                        Jetis
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('AGG-JETIS-01')" class="hover:text-blue-600 transition ">
+                        AGG-JETIS-01
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('MPOP-C1')" class="hover:text-blue-600 transition ">
+                        C1
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('OLT-JETIS-01')" class="hover:text-blue-600 transition ">
+                        OLT-JETIS-01
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('PON-JETIS-01')" class="hover:text-blue-600 transition ">
+                        PON-JETIS-01
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('FDR-JETIS-01')" class="hover:text-blue-600 transition ">
+                        FDR-JETIS-01
+                    </button>
+                    <i class="ph ph-caret-right text-slate-400 text-[10px]"></i>
+                
+                    <button onclick="selectNode('ODP-JETIS-01')" class="hover:text-blue-600 transition font-bold text-slate-800 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                        ODP-JETIS-01
+                    </button>
+                    
+                </div>
+
+                    <!-- Primary Action Buttons (Repositioned from cropped top-left to clean top-right) -->
+                    <div class="flex items-center gap-2">
+                        <button onclick="openAddChildModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-sm">
+                            <i class="ph ph-git-branch text-sm text-blue-600"></i>
+                            <span>+ Sub-Node</span>
+                        </button>
+                        <button onclick="openEditModal()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm shadow-blue-600/10">
+                            <i class="ph ph-pencil-simple text-sm"></i>
+                            <span>Edit Detail Node</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Scrollable Inspector Body -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                    
+                    <!-- Node Identity & Capacity Utilization Card -->
+                    <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+                        <div class="space-y-2">
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <span id="detailBadge" class="px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider border bg-emerald-50 text-emerald-700 border-emerald-200">ODP</span>
+                                <h1 id="detailCode" class="text-xl sm:text-2xl font-bold font-mono text-slate-900 tracking-tight">ODP-JETIS-01</h1>
+                                <span class="text-slate-300 text-xl font-light">•</span>
+                                <span id="detailName" class="text-base sm:text-lg font-medium text-slate-600">ODP Gang Mawar Jetis</span>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Active
+                                </span>
+                            </div>
+                            <p id="detailSubtitle" class="text-xs text-slate-500 flex items-center gap-2">
+                <i class="ph ph-info text-slate-400"></i>
+                <span>Tipe Perangkat: <strong>Optical Distribution Point (ODP)</strong></span>
+            </p>
+                        </div>
+
+                        <!-- Visual Utilization Meter (Goal-Gradient Effect) -->
+                        <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 min-w-[260px] sm:min-w-[300px]">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-semibold text-slate-600">Okupansi Port</span>
+                                <span id="detailOccupancyBadge" class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-800">8% Terpakai</span>
+                            </div>
+                            <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden mb-2">
+                                <div id="detailProgressBar" class="h-full transition-all duration-300 bg-emerald-500" style="width: 8%;"></div>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-slate-500">
+                                <span id="detailUsedCount"><strong class="text-slate-800">1</strong> dari <strong class="text-slate-800">12</strong> port terpakai</span>
+                                <span id="detailFreeCount" class="text-emerald-600 font-medium">11 slot tersedia</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Physical Location & Coordinates Section -->
+                    <div class="bg-slate-50/70 rounded-xl border border-slate-200/80 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-lg bg-blue-100/80 text-blue-600 flex items-center justify-center">
+                                    <i class="ph-fill ph-map-pin text-base"></i>
+                                </div>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Lokasi Fisik &amp; Koordinat</h3>
+                            </div>
+                            <span id="locationInheritanceBadge" class="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 rounded-full"><i class="ph ph-map-pin-line text-xs"></i> Titik Koordinat Mandiri</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                            <div class="bg-white p-3 rounded-lg border border-slate-200/60">
+                                <div class="text-[11px] text-slate-400 font-medium mb-1">Alamat / Patokan Tiang</div>
+                                <div id="locAddress" class="text-xs font-medium text-slate-700 flex items-center justify-between">Gg. Mawar RT 02 / RW 01 (Tiang T-09)</div>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg border border-slate-200/60">
+                                <div class="text-[11px] text-slate-400 font-medium mb-1">Wilayah / Coverage Area</div>
+                                <div id="locRegion" class="text-xs font-medium text-slate-700">Kec. Jetis, Kab. Ponorogo</div>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg border border-slate-200/60 flex items-center justify-between">
+                                <div>
+                                    <div class="text-[11px] text-slate-400 font-medium mb-1">Koordinat Maps</div>
+                                    <div id="locCoords" class="text-xs font-mono font-medium text-slate-700">-7.931800, 111.482200</div>
+                                </div>
+                                <button onclick="showToast('Membuka titik koordinat di Google Maps...')" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Buka di Google Maps">
+                                    <i class="ph ph-arrow-square-out text-base"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PORT MANAGEMENT SECTION -->
+                    <div class="space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                                        Manajemen Port Node • <span id="portSectionNodeType" class="text-blue-600">ODP</span>
+                                    </h3>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Klik pada port untuk menghubungkan pelanggan, melihat redaman optik, atau menandai port rusak.
+                                </p>
+                            </div>
+
+                            <!-- Add Port Controls -->
+                            <div class="flex items-center gap-2 self-start sm:self-auto">
+                                <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
+                                    <button onclick="setPortFilter('ALL')" id="filterPortAll" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-slate-800 shadow-sm transition">
+                                        Semua
+                                    </button>
+                                    <button onclick="setPortFilter('AVAILABLE')" id="filterPortAvail" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition">
+                                        Tersedia
+                                    </button>
+                                    <button onclick="setPortFilter('USED')" id="filterPortUsed" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition">
+                                        Terpakai
+                                    </button>
+                                </div>
+
+                                <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+                                <div class="flex items-center">
+                                    <input id="addPortQtyInput" type="number" min="1" max="64" value="4" class="w-14 px-2.5 py-1.5 text-xs font-mono font-semibold text-center bg-white border border-r-0 border-slate-300 rounded-l-lg focus:border-blue-500 outline-none" title="Jumlah Port Baru">
+                                    <button onclick="addMorePorts()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-r-lg transition flex items-center gap-1.5 shadow-sm">
+                                        <i class="ph ph-plus-bold"></i>
+                                        <span>Tambah Port</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hardware Patch Panel Container -->
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/90">
+                            <div id="portsGridContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    <div onclick="openPortModal(0)" class="group bg-white hover:bg-blue-50/30 border border-slate-200 hover:border-blue-400 rounded-xl p-3.5 cursor-pointer transition-all shadow-2xs flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-blue-700">Port 1</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                                <i class="ph-fill ph-plugs-connected text-xs"></i>
+                                -19.2 dBm
+                            </span>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-xs font-semibold text-slate-800 truncate" title="H. Суparno (Paket 30 Mbps)">
+                                H. Суparno (Paket 30 Mbps)
+                            </div>
+                            <div class="text-[11px] font-mono text-slate-400 flex items-center justify-between mt-0.5">
+                                <span>CID-20411</span>
+                                <span class="text-blue-600 opacity-0 group-hover:opacity-100 font-sans font-medium text-[10px]">Edit →</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(1)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 2</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(2)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 3</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(3)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 4</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(4)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 5</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(5)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 6</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(6)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 7</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(7)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 8</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(8)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 9</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(9)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 10</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(10)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 11</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div>
+                    <div onclick="openPortModal(11)" class="group bg-white hover:bg-emerald-50/50 border-2 border-dashed border-emerald-300/90 hover:border-emerald-500 rounded-xl p-3.5 cursor-pointer transition-all flex flex-col justify-between min-h-[88px]">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold font-mono text-slate-800 group-hover:text-emerald-900">Port 12</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Tersedia
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-emerald-700 font-medium">
+                            <span class="flex items-center gap-1">
+                                <i class="ph-bold ph-plus text-xs"></i> Hubungkan Tujuan
+                            </span>
+                            <i class="ph ph-arrow-up-right opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                    </div></div>
+                        </div>
+                    </div>
+
+                    <!-- Node Relocation / Danger Zone Accordion -->
+                    <div class="pt-4 border-t border-slate-100">
+                        <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                            <button onclick="toggleRelocationPanel()" class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center">
+                                        <i class="ph ph-arrows-left-right text-base"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-bold text-slate-800">Relokasi / Pindah Posisi Induk Node (Uplink)</div>
+                                        <div class="text-[11px] text-slate-500">Pindahkan node ini beserta seluruh turunannya ke POP, OLT, atau Feeder lain</div>
+                                    </div>
+                                </div>
+                                <i id="relocationCaret" class="ph ph-caret-down text-slate-400 transition-transform duration-200"></i>
+                            </button>
+                            
+                            <div id="relocationBody" class="hidden px-4 pb-4 pt-2 border-t border-slate-100 bg-slate-50/50">
+                                <div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+                                    <div class="flex-1">
+                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Node Induk (Uplink) Tujuan:</label>
+                                        <select id="relocateTargetSelect" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-medium focus:border-blue-500 outline-none">
+                                            <option value="FDR-JETIS-01">FDR-JETIS-01 — Feeder Jetis 01 (Sisa 26 Port)</option>
+                                            <option value="BB-PUSAT-SANDYA-01" selected="">BB-PUSAT-SANDYA-01 — Backbone WHUSNET ke Sandya</option>
+                                            <option value="PON-JETIS-01">PON-JETIS-01 — PON Jetis 01</option>
+                                        </select>
+                                    </div>
+                                    <button onclick="showToast('Posisi Induk Node berhasil diperbarui!')" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition shadow-sm shrink-0">
+                                        Simpan Relokasi
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            

@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Enums\RollStatus;
 use App\Enums\ScopeType;
 use App\Enums\SerialStatus;
+use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
-use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Permission;
@@ -112,7 +112,7 @@ class WarehouseDamagedStockTabsTest extends TestCase
         $pusat = Pop::create(['code' => 'DMG4-PUSAT', 'pop_code' => 'DM4', 'registration_prefix' => 'C', 'cid_prefix' => 'G', 'name' => 'Pusat Balance Test', 'type' => 'pusat', 'status' => 'active']);
         $cat = ItemCategory::where('equipment_class', 'material')->first() ?? ItemCategory::first();
         $rj45 = Item::create(['code' => 'DMG4-RJ45', 'name' => 'RJ45 Balance Test', 'item_category_id' => $cat->id, 'unit' => 'pcs', 'tracking_type' => 'quantity', 'ownership_mode' => 'installable']);
-        \App\Models\InventoryBalance::create(['pop_id' => $pusat->id, 'item_id' => $rj45->id, 'lot_no' => '', 'qty' => 20]);
+        InventoryBalance::create(['pop_id' => $pusat->id, 'item_id' => $rj45->id, 'lot_no' => '', 'qty' => 20]);
 
         app(InventoryAdjustmentService::class)->adjustPopBalance($pusat, $rj45->id, -5.0, 'rusak_kelembaban', $owner);
 

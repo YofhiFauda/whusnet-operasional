@@ -41,6 +41,8 @@ class InternetPackageSeederTest extends TestCase
         $this->assertSame('1000.00', $businessPackage->download_speed_mbps);
         $this->assertSame(4, $businessPackage->contention_ratio);
         $this->assertSame('2 Public Static', $businessPackage->ip_address_type);
+        $this->assertSame(4, $businessPackage->max_additional_devices);
+        $this->assertSame(['access_point' => 3, 'customer_router' => 1], $businessPackage->additionalDeviceRequirements());
 
         $this->assertSame(15, $smePackage->max_users);
         $this->assertSame(['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi5'], $smePackage->features);

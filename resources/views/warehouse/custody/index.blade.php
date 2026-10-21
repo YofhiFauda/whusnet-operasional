@@ -11,6 +11,10 @@
     subtitle="Pusat pemantauan perangkat aktif, material pasif, roll kabel, dan modem retur di tangan teknisi lapangan."
 />
 
+@if(auth()->user()->hasPermission('warehouse_reassign.create'))
+<div class="mb-4 flex justify-end"><a href="{{ route('warehouse.infrastructure-recoveries.index') }}" class="text-sm font-medium text-primary hover:underline">Periksa hasil cabut infrastruktur</a></div>
+@endif
+
 @php
     $hasActiveFilter = (bool) ($technicianFilter || $popFilter || $search);
     $activeFilterCount = ($technicianFilter ? 1 : 0) + ($popFilter ? 1 : 0) + ($search ? 1 : 0);

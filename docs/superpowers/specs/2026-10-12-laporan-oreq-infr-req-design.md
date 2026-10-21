@@ -1,6 +1,6 @@
 # Rancangan Laporan O-REQ dan INFR-REQ: FOP, Gudang, Infrastruktur
 
-Status: **Fondasi dan seksi laporan dasar sudah diimplementasikan pada kode lokal; alur laporan lengkap belum. Keputusan lanjutan 2026-10-15 tentang baris aksi, slot/port, dan jejak Peta Infrastruktur (dulu disebut "Inventaris" — halaman itu sudah dihapus dan digabung ke Peta Infrastruktur) telah disetujui sebagai rancangan, belum sebagai fitur terimplementasi. Audit di §0 adalah acuan status kode terbaru.**
+Status: **Fondasi laporan, anchor FopTask, koreksi/cabut material, inspeksi Gudang, dan nomor Task pada Peta sudah ada. Lanjutan kode lokal 2026-10-17: baris aksi jamak, validasi SN pada node, slot kartu OLT, port asal/tujuan, serta review FOP dan pencegahan stok ganda sudah diimplementasikan. Rekonsiliasi selisih fisik Gudang dan penerapan migrasi pada database target masih perlu tindak lanjut. Audit di §0 tetap acuan batas desain.**
 
 ## 0. Audit relevansi 2026-10-15 — acuan status terbaru
 
@@ -15,17 +15,17 @@ Status: **Fondasi dan seksi laporan dasar sudah diimplementasikan pada kode loka
 | Port dan slot | Port assignment (`NetworkPortAssignmentService`) serta slot chassis (`OltSlot`) dikelola tersendiri; Peta Infrastruktur membacanya. | DEPLOY barang pada node tidak otomatis membuktikan port tersambung, slot terisi, atau pelanggan menempati port. Perubahan port/slot butuh aksi dan verifikasi terpisah. |
 | Penempatan tipe node vs kompatibilitas SKU — **dua guard terpisah, jangan dicampur** | `network_node_type_rules` (dibaca `NetworkNodeService::assertTypePlacement()`) mengatur topologi: anak boleh ke parent-type/anchor-pop-type mana. **Bukan** aturan SKU. Kompatibilitas SKU↔node barang/aset ditegakkan terpisah di `InventoryService::assertNodeAcceptsSerialItem()` — cek `item.infrastructure_node_type_id` vs `node.node_type_id`, dan untuk `olt_chassis`/`olt_card` wajib kategori `olt_module` + slot/komponen belum terisi. Dipanggil dari `deploySerial()` dan `registerExistingInfraSerial()`. | Audit 2026-10-12 sebelumnya menyebut keduanya seolah satu aturan "kompatibilitas SKU OLT di registrasi aset lama" — itu salah sumber. Baris aksi Pasang/Ganti kartu OLT yang dibangun di rancangan laporan ini (§6, §10 poin 7) **memanggil `InventoryService::deploySerial()`**, yang menjalankan `assertNodeAcceptsSerialItem()` secara internal (`private`); jangan memanggil guard itu langsung atau menulis ulang cek SKU di controller laporan — satu sumber kebenaran untuk kompatibilitas barang, terpisah dari aturan penempatan node. |
 
-**Yang sudah ditangani sebagian:** pilihan SN lama sekarang berasal dari serial DEPLOYED dalam cabang task, bukan custody; mutasi Ganti berlangsung dalam satu transaksi. Task tanpa pelanggan yang mempunyai anchor FopTask dapat deploy; bila anchor tidak ada, submit dengan isian infra gagal keras. Barang infrastruktur ROLL dipisah dari picker roll pelanggan.
+**Yang sudah ditangani sebagian:** pilihan SN lama berasal dari serial DEPLOYED dalam cabang task, bukan custody; mutasi Ganti berlangsung dalam satu transaksi. Task O-REQ/INFR-REQ tanpa pelanggan dibuatkan tepat satu anchor FopTask, termasuk fallback task lama. Koreksi qty/node/identitas roll dan cabut qty/roll memakai transaksi terpisah; hasil cabut menunggu inspeksi Gudang dan potongan roll layak memakai identitas baru. Barang infrastruktur ROLL dipisah dari picker roll pelanggan.
 
-**Yang masih harus diselesaikan sebelum rancangan laporan dianggap terpenuhi:**
+**Update implementasi kode lokal 2026-10-17:**
 
-1. SN lama harus dibatasi ke **node terpilih**, bukan hanya salah satu node di cabang task. Periksa lagi setelah lock saat transaksi cabut; saat ini retrieveSerialFromLocation menerima SN tanpa parameter node yang diharapkan.
-2. Satu kunjungan dapat memiliki beberapa aksi dan lokasi. Form sekarang hanya memiliki satu paket field infra dan satu node. Diperlukan identitas aksi persisten agar kirim ulang sesudah FOP reject tidak mengulang DEPLOY.
-3. Tentukan alur koreksi/pembalik yang menjaga ledger append-only, termasuk cabut atau koreksi qty/roll dan feeder. Belum ada jalur retrieve qty/roll dari saldo node.
-4. Pastikan task non-pelanggan tanpa anchor bisa memperoleh anchor valid sebelum laporan atau gagal jelas sebelum pekerjaan dicatat; fallback membuat FopTask saat ini masih bergantung pada pelanggan.
-5. Tegakkan satu jalur pemakaian per item/SN/roll antara seksi generik dan infrastruktur, dan tampilkan aksi serta transaksi pada review FOP.
-6. Terapkan keputusan: pemeriksaan pada node/port mencatat lokasi yang diperiksa tanpa mutasi stok; slot/port diisi dan diverifikasi hanya bila pekerjaan mengubah hubungan fisik. Jangan menyimpulkan perubahan port/slot dari keberadaan SN atau teks laporan.
-7. Migrasi dan seeder Infrastruktur pada database target perlu diverifikasi tersendiri. Status kode lokal dalam docs/TASKS.md tidak membuktikan database target sudah siap.
+1. SN lama kini wajib berada pada node aksi yang dipilih; pemeriksaan diulang setelah lock saat cabut. Node Mini POP dibandingkan melalui cabang induknya.
+2. Laporan dapat memiliki beberapa baris aksi dengan kunci persisten. Pengiriman ulang dengan kunci dan mutasi sama tidak membuat ledger baru; kunci sama dengan mutasi berbeda ditolak. Seluruh baris satu laporan dibatalkan bila satu gagal.
+3. Jalur material umum dan Infrastruktur menolak item/SN/roll yang sama. Detail Task untuk review FOP menampilkan tindakan, lokasi, pelaksana, waktu, dan nomor transaksi.
+4. Pemeriksaan node/port tidak mengubah stok. Kartu OLT mensyaratkan SN dan slot pada chassis induk. Sambung kabel mensyaratkan port asal serta port tujuan yang valid; lepas membebaskan keduanya. Ganti SN tanpa tindakan port tidak mengubah assignment.
+5. Koreksi administratif dan cabut fisik qty/roll, inspeksi Gudang, serta satu anchor FopTask untuk Task tanpa pelanggan sudah tersedia. Nomor Task tampil pada Peta; port tujuan tampil pada Peta dan detail node.
+
+**Masih terbuka:** selisih jumlah fisik saat inspeksi Gudang ditahan untuk keputusan rekonsiliasi tersendiri; audit data lama sebelum unique migration dan penerapan/verifikasi migrasi serta seeder pada database target perlu dilakukan. Status kode lokal tidak menyatakan database target sudah siap.
 
 Rujukan status terbaru: docs/superpowers/specs/2026-10-09-aset-infrastruktur-lokasi-design.md §10–11, docs/plan/infrastruktur/rancangan-operasional-infrastruktur-dinamis.md, docs/plan/infrastruktur/analisa-gap-peta-infrastruktur.md §6, dan docs/TASKS.md ADHOC-168/170/173/178. Fitur API konfigurasi otomatis tetap di luar rancangan ini.
 
@@ -98,6 +98,19 @@ DEPLOY ke node tidak otomatis mengisi slot atau menghubungkan port. Khusus kartu
 
 Implementasi awal sudah mengambil kandidat infra_retrieve_old_serial_id dari SN DEPLOYED dalam cabang task, dan SN baru dari custody. Namun kandidat SN lama belum dibatasi ke node yang dipilih; retrieveSerialFromLocation() juga belum menerima node yang diharapkan. Validasi node SN lama harus ditegakkan ulang dengan lock saat transaksi. Qty/meter harus positif dan tidak melebihi custody. Cabut balik saldo qty/roll dari node belum didukung; rancang transaksi tersendiri sebelum menampilkan aksi tersebut.
 
+### Koreksi pencatatan dan pencabutan fisik qty/roll — keputusan 2026-10-16
+
+Keduanya adalah kejadian berbeda. Form wajib memilih alasan dan jenis kejadian; satu baris aksi tidak boleh mengubahnya diam-diam saat kirim ulang.
+
+| Kejadian | Catatan dan efek saldo |
+|---|---|
+| Salah catat qty, roll, atau node; barang tidak berpindah secara fisik | Aksi koreksi administratif merujuk transaksi DEPLOY asal dan membuat catatan pembalik serta catatan yang benar. Kurangi proyeksi node yang salah; pulihkan custody/length yang terpotong hanya jika barang memang belum dipakai, atau tempatkan efeknya pada node yang benar tanpa mengarang pencabutan fisik. Jangan memakai RETRIEVE_INFRA untuk kejadian yang tidak terjadi. |
+| Barang benar-benar dicabut | Aksi cabut merujuk node, item, jumlah, dan transaksi asal; tulis RETRIEVE_INFRA dan kurangi saldo node. RETRIEVE_INFRA mengembalikan hasil cabut ke custody pelaksana untuk pemeriksaan; tandai sebagai menunggu pemeriksaan dan cegah issue/deploy ulang sampai kondisi diputuskan. Setelah kondisi dan jumlah fisik diverifikasi, barang layak pakai mengikuti alur retur/pemakaian yang berlaku; barang rusak/sisa tak layak mengikuti alur penyesuaian atau afkir beralasan. |
+
+Untuk QUANTITY, saldo node saat ini digabung per item (bukan per lot custody), sementara DEPLOY mencatat lot sumber per transaksi. Karena itu koreksi/cabut harus merujuk transaksi asal dan membatasi jumlah kumulatif per transaksi serta per saldo node; jangan menebak lot dari saldo agregat. Untuk ROLL, saldo node dibedakan menurut kode roll. Kabel yang telah dipotong tidak otomatis menambah panjang roll asal; bila potongan layak pakai, catat sebagai potongan/identitas fisik tersendiri sebelum menjadi stok tersedia.
+
+Ledger tetap append-only. Simpan alasan, aktor, waktu, aksi asal, transaksi asal, dan aksi pengganti bila ada. Jalankan validasi saldo, penguncian, pembalik, dan mutasi pengganti dalam satu transaksi; tolak koreksi/cabut yang melebihi jumlah bersih yang masih terpasang. Setiap aksi koreksi/cabut punya identitas idempoten sendiri. Jalur layanan dan bentuk ledger koreksi administratif perlu dibangun; ini keputusan perilaku, bukan klaim bahwa kode saat ini sudah mendukungnya.
+
 ### Jejak pemasangan di Peta Infrastruktur dan Gudang
 
 **Koreksi 2026-10-15: tidak ada halaman "Inventaris" berdiri sendiri.** Halaman itu sudah dihapus dari kode (`NetworkInventoryController`, `NetworkInventoryService`, view `network/inventaris/index.blade.php`); fungsinya digabung ke **Peta Infrastruktur** (`InfrastructureMapController`/`InfrastructureMapService`, route `/network/peta`). Setiap sebutan "Inventaris" di bawah ini dan di §10 poin 8 dibaca sebagai Peta Infrastruktur.
@@ -110,7 +123,11 @@ Peta Infrastruktur menampilkan status dan node aktif dari data aset, lalu mengam
 
 ## 7. Task tanpa pelanggan
 
-O-REQ/INFR-REQ dapat mempunyai customer_id kosong. Semua mutasi aset tetap wajib tertaut ke nomor task, aktor, tim, waktu, dan lokasi. TaskWorkToolService::resolveTaskFor() bisa mengembalikan null, sedangkan fallback TaskMaintenanceController sekarang hanya membuat FopTask untuk task yang punya pelanggan. Implementasi harus menjamin anchor FopTask bagi task non-pelanggan atau memilih relasi task langsung yang konsisten di ledger. Jika anchor tidak tersedia, submit gagal jelas dan atomik; task tidak boleh selesai sementara aset yang dilaporkan terlewat.
+**Keputusan 2026-10-16:** setiap Task O-REQ/INFR-REQ mempunyai tepat satu FopTask sebagai anchor ledger, walaupun customer_id kosong. FopTask memakai task_id, kategori, POP, jadwal, dan tim dari Task yang sebenarnya; tidak membuat pelanggan palsu. InventoryTransaction tetap menyimpan fop_task_id, dan Peta Infrastruktur menampilkan nomor Task pekerjaan melalui relasi FopTask -> Task (nomor FopTask boleh tetap ada sebagai referensi internal). Semua mutasi tetap menautkan aktor, tim, waktu, dan node.
+
+Untuk task baru, buat/pastikan anchor pada alur pembuatan Task. Untuk task lama tanpa anchor, buat sebelum laporan pertama dalam transaksi yang mengunci Task. Cari FopTask yang sudah tertaut berdasarkan task_id; jangan membuat yang kedua. Audit data duplikat sebelum menegakkan keunikan task_id pada FopTask; keunikan database serta penguncian mencegah dua submit bersamaan membuat anchor ganda. Jika anchor tidak bisa dibuat/ditemukan, tolak seluruh submit sebelum laporan atau aset berubah. Fallback TaskMaintenanceController saat ini hanya membuat FopTask ketika ada pelanggan, sehingga belum memenuhi keputusan ini.
+
+Aset lama yang diregistrasi melalui REGISTER_INFRA tetap pengecualian: tidak mempunyai Task/FopTask pemasangan fiktif (§6).
 
 ## 8. Chassis OLT
 
@@ -134,8 +151,8 @@ Seksi dasar laporan O-REQ/INFR-REQ dan plan v3 Task 12 sudah ada pada kode lokal
 
 1. Validasi SN yang dicabut berada pada node yang dipilih, termasuk pemeriksaan ulang di dalam transaksi.
 2. Baris aksi persisten dengan lokasi per aksi, dukungan beberapa aksi satu kunjungan, dan idempotensi kirim ulang setelah FOP reject.
-3. Koreksi/pembalik yang menjaga ledger, serta cabut atau koreksi saldo qty/roll dan feeder.
-4. Anchor transaksi yang pasti untuk task tanpa pelanggan; gagal jelas jika tidak tersedia.
+3. **Sebagian selesai (2026-10-16):** koreksi qty/node/identitas roll dan cabut fisik qty/roll terpisah, ledger append-only, referensi transaksi asal, batas saldo, serta disposisi hasil cabut tersedia. Lanjutkan rekonsiliasi selisih fisik.
+4. **Selesai (2026-10-16):** satu FopTask unik per Task O-REQ/INFR-REQ, termasuk tanpa pelanggan; task lama dipastikan memiliki anchor sebelum laporan dalam transaksi.
 5. Satu jalur pemakaian tiap item/SN/roll antara seksi generik dan Infrastruktur.
 6. Hasil aksi dan transaksi terlihat di detail task saat FOP meninjau laporan.
 7. Field dan validasi slot/port kondisional per baris aksi; perubahan assignment hanya untuk tindakan fisik yang dilaporkan dan diverifikasi.
@@ -154,7 +171,9 @@ Rancangan operasional lebih baru berada di docs/plan/infrastruktur/rancangan-ope
 - Periksa port tanpa mutasi tidak mengurangi stok; pasang kartu memakai slot yang valid; sambung kabel memakai port yang valid; ganti SN tanpa mengubah koneksi tidak mengubah assignment.
 - Peta Infrastruktur dan Gudang menampilkan SN hasil DEPLOY, teknisi, waktu, nomor task, node, serta jejak ledger yang sama; histori tetap ada setelah retrieve. Aset lama REGISTER_INFRA menampilkan petugas pendata, waktu observasi, node, dan alasan tanpa task pemasangan fiktif.
 - Pasang/ganti kartu OLT menghubungkan chassis, nomor slot, node kartu anak chassis, dan SN pada node kartu; alur laporan memakai `InventoryService::deploySerial()` agar guard SKU yang sama berlaku.
-- Koreksi barang/lokasi membuat transaksi pembalik dan aksi baru tanpa menghapus riwayat.
+- Koreksi administratif qty/roll pada node atau jumlah yang salah merujuk DEPLOY asal, membalik efek catatan, dan mencatat hasil benar tanpa RETRIEVE_INFRA fisik fiktif; ledger lama tidak dihapus.
+- Cabut fisik qty/roll mengurangi saldo node dan mencatat RETRIEVE_INFRA serta disposisi hasil cabut; jumlah di atas saldo atau sisa transaksi asal ditolak, dan panjang roll asal tidak otomatis bertambah.
+- Task O-REQ/INFR-REQ tanpa pelanggan memperoleh tepat satu FopTask melalui task_id; dua submit bersamaan tidak menduplikasi anchor, nomor Task tampil di Peta Infrastruktur, dan kegagalan anchor membatalkan seluruh submit.
 - Beberapa chassis OLT dapat dipasang pada node fisik yang ber-anchor ke satu Mini POP, atau langsung ke Cabang bila berada di gedung Cabang, tanpa membuat POP duplikat atau mengubah CID/RBAC pelanggan.
 - Duplikasi item/roll di dua seksi ditolak sebelum stok berubah; node di luar POP/scope juga ditolak.
 - Snapshot cabang ledger lama tetap setelah node dipindah.

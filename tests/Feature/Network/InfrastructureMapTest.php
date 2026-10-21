@@ -2,11 +2,15 @@
 
 namespace Tests\Feature\Network;
 
+use App\Enums\FopTaskPriority;
 use App\Enums\ScopeType;
 use App\Enums\SerialStatus;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\FopTask;
 use App\Models\InfrastructureBalance;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
@@ -18,6 +22,7 @@ use App\Models\NetworkPortAssignment;
 use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
@@ -131,6 +136,23 @@ class InfrastructureMapTest extends TestCase
             'current_network_node_id' => $node->id,
         ]);
         $technician = User::factory()->create(['name' => 'Teknisi Peta']);
+        $task = Task::create([
+            'task_number' => 'TASK-PETA-001',
+            'task_type' => TaskType::INFR,
+            'title' => 'Pasang splitter peta',
+            'pop_id' => $cabang->id,
+            'status' => TaskStatus::DRAFT,
+        ]);
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-PETA-001',
+            'task_id' => $task->id,
+            'task_date' => now(),
+            'category' => TaskType::INFR,
+            'tugas' => 'Pasang splitter peta',
+            'pop_id' => $cabang->id,
+            'status' => TaskStatus::DRAFT,
+            'priority' => FopTaskPriority::MEDIUM,
+        ]);
         InventoryTransaction::create([
             'type' => 'deploy',
             'reference_number' => 'PETA-DEPLOY-001',
@@ -140,6 +162,7 @@ class InfrastructureMapTest extends TestCase
             'to_network_node_id' => $node->id,
             'to_pop_id' => $cabang->id,
             'from_technician_id' => $technician->id,
+            'fop_task_id' => $fopTask->id,
             'created_by' => $technician->id,
         ]);
 
@@ -158,6 +181,27 @@ class InfrastructureMapTest extends TestCase
             'qty' => 3,
         ]);
 
+        $originalNode = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'code' => 'NODE-ASAL-KOREKSI']);
+        $originalDeployment = InventoryTransaction::create([
+            'type' => 'deploy', 'reference_number' => 'PETA-DEPLOY-OLD',
+            'item_id' => $qtyItem->id, 'qty' => 3,
+            'to_network_node_id' => $originalNode->id, 'to_pop_id' => $cabang->id,
+            'fop_task_id' => $fopTask->id, 'created_by' => $technician->id,
+        ]);
+        InventoryTransaction::create([
+            'type' => 'adjustment', 'reference_number' => 'PETA-CORRECTION-001',
+            'item_id' => $qtyItem->id, 'qty' => 3, 'reason' => 'infra_record_correction',
+            'source_inventory_transaction_id' => $originalDeployment->id,
+            'to_network_node_id' => $node->id, 'to_pop_id' => $cabang->id,
+            'fop_task_id' => $fopTask->id, 'created_by' => $technician->id,
+        ]);
+
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $owner->roleScopes()->create(['role_id' => $owner->role_id, 'scope_type' => ScopeType::ALL_POP]);
+        $asset = collect(app(InfrastructureMapService::class)->build($owner, null, 'name')['assetsByNode'][$node->id])
+            ->firstWhere('name', 'Closure Peta');
+        $this->assertSame('TASK-PETA-001', $asset['task']);
+
         $this->loginAsAdmin();
         $response = $this->get(route('network.map.index'));
 
@@ -170,6 +214,8 @@ class InfrastructureMapTest extends TestCase
             ->assertSee('Splitter Peta')
             ->assertSee('Closure Peta')
             ->assertSee('Teknisi Peta')
+            ->assertSee('TASK-PETA-001')
+            ->assertDontSee('TFOP-PETA-001')
             ->assertSee('1/2');
 
         $document = new \DOMDocument;

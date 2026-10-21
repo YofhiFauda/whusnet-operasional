@@ -43,6 +43,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'evidence_file_path',
     'resulting_status',
     'created_by',
+    'source_inventory_transaction_id',
+    'source_custody_id',
+    'action_key',
+    'action_fingerprint',
 ])]
 class InventoryTransaction extends Model
 {

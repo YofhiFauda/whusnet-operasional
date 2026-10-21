@@ -30,6 +30,7 @@ import './bootstrap';
 import Alpine from 'alpinejs';
 import collapse from '@alpinejs/collapse';
 import focus from '@alpinejs/focus';
+import { infrastructureReport } from './task-infrastructure-report';
 
 /* ── Chart.js — dibundel lokal lewat Vite, sama alasan Alpine di bawah:
    aplikasi operasional internal, jangan tergantung CDN pihak ketiga buat
@@ -57,4 +58,5 @@ Alpine.plugin(collapse);
 Alpine.plugin(focus);
 
 window.Alpine = Alpine;
+Alpine.data('infrastructureReport', infrastructureReport);
 Alpine.start();

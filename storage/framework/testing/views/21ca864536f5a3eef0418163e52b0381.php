@@ -306,6 +306,55 @@
     </div>
 <?php endif; ?>
 
+
+<?php
+    $additionalLimit = $customer->customerService?->internetPackage?->max_additional_devices ?? 0;
+    $additionalCount = $customer->additionalDevices->count();
+?>
+<div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+    <div class="px-5 py-3 bg-teal-50/50 dark:bg-teal-950/20 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 items-center justify-between">
+        <span class="text-xs font-bold text-teal-700 dark:text-teal-300 uppercase tracking-wider">
+            <i class="fa-solid fa-wifi mr-1.5"></i> PERANGKAT TAMBAHAN
+        </span>
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.devices.update')): ?>
+            <button
+                type="button"
+                onclick="openAdditionalDeviceModal()"
+                <?php if($additionalCount >= $additionalLimit): ?> disabled <?php endif; ?>
+                class="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-sm shrink-0 cursor-pointer"
+            >
+                <i class="fa-solid fa-plus mr-1"></i> Tambah Perangkat (<?php echo e($additionalCount); ?>/<?php echo e($additionalLimit); ?>)
+            </button>
+        <?php endif; ?>
+    </div>
+    <div class="p-5">
+        <?php if($additionalLimit === 0): ?>
+            <p class="text-[11px] text-slate-500 mb-3">Paket pelanggan saat ini tidak punya jatah perangkat tambahan.</p>
+        <?php endif; ?>
+        <?php $__empty_1 = true; $__currentLoopData = $customer->additionalDevices; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $additional): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+            <div class="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-2 text-xs last:border-b-0">
+                <span class="text-slate-700 dark:text-slate-200 searchable-text">
+                    <span class="font-semibold text-slate-900 dark:text-slate-100 uppercase"><?php echo e($additional->device_type); ?></span>
+                    — <?php echo e($additional->brand); ?> <?php echo e($additional->model); ?> (<?php echo e($additional->serial_number ?: 'tanpa SN'); ?>)
+                </span>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.devices.update')): ?>
+                    <form method="POST" action="<?php echo e(route('customers.additional-device.destroy', [$customer, $additional])); ?>" onsubmit="return confirm('Hapus perangkat tambahan ini?');">
+                        <?php echo csrf_field(); ?>
+                        <?php echo method_field('DELETE'); ?>
+                        <button type="submit" class="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer">
+                            <i class="fa-solid fa-trash mr-1"></i> Hapus
+                        </button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+            <p class="text-[11px] text-slate-400 text-center py-3">Belum ada perangkat tambahan.</p>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php echo $__env->make('customers.partials._additional_device_modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('fill_device')): ?>
 <div id="device-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">

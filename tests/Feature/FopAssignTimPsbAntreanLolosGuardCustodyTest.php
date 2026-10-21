@@ -21,6 +21,7 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
+use App\Services\AdditionalDeviceCustodyService;
 use App\Services\CustomerWorkflowService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,13 +30,9 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Final review ADHOC-190 (Critical 1): jalur UTAMA penjadwalan PSB Bisnis —
- * pelanggan masuk antrean pemasangan (CustomerWorkflowService bikin Task
- * `pending` antrean + FopTaskProvisioningService bikin FopTask Draft), lalu
- * FOP assign tim lewat modal Edit `/fop-tasks` — masuk ke cabang "Task
- * antrean" `TaskService::createForFopTask()`, BUKAN `create()`. Dulu cabang
- * itu langsung `update()` ke TERJADWAL tanpa guard custody perangkat tambahan,
- * jadi semua test guard (yang manggil `create()` langsung) gak pernah nangkep.
+ * Jalur FOP assign tim ke Task Pemasangan yang berasal dari antrean PSB.
+ * Assign boleh sebelum Gudang issue, sementara laporan hanya menerima SN
+ * yang kemudian benar-benar masuk custody tim.
  */
 class FopAssignTimPsbAntreanLolosGuardCustodyTest extends TestCase
 {
@@ -74,25 +71,19 @@ class FopAssignTimPsbAntreanLolosGuardCustodyTest extends TestCase
     }
 
     #[Test]
-    public function assign_tim_ke_psb_antrean_ditolak_kalau_custody_perangkat_tambahan_kurang(): void
+    public function assign_tim_ke_psb_antrean_berhasil_sebelum_perangkat_tambahan_di_issue(): void
     {
         [$customer, $fopTask, $queuedTask] = $this->bisnisCustomerInInstallationQueue();
 
-        // Teknisi SENGAJA tanpa custody AP sama sekali.
-        $response = $this->assignTeknisi($fopTask);
+        $this->assignTeknisi($fopTask)->assertOk();
 
-        $response->assertStatus(422);
-        $this->assertStringContainsString('Barang perangkat tambahan belum di-issue cukup', $response->json('message'));
+        $this->assertSame($queuedTask->id, $fopTask->refresh()->task_id);
+        $this->assertSame(TaskStatus::TERJADWAL, $queuedTask->refresh()->status);
+        $this->assertTrue($queuedTask->teamMembers()->where('user_id', $this->teknisi->id)->exists());
 
-        // Transaksi rollback total — Task antrean tetap pending tanpa tim,
-        // FopTask tetap Draft dan belum menunjuk Task mana pun.
-        $queuedTask->refresh();
-        $this->assertSame(TaskStatus::PENDING, $queuedTask->status);
-        $this->assertSame(0, $queuedTask->teamMembers()->count());
-
-        $fopTask->refresh();
-        $this->assertSame(TaskStatus::DRAFT, $fopTask->status);
-        $this->assertNull($fopTask->task_id);
+        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($queuedTask));
+        $this->issueExtraDeviceSerial($this->teknisi, 'GQA-AP-SETELAH-ASSIGN');
+        $this->assertCount(1, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($queuedTask->fresh()));
     }
 
     #[Test]

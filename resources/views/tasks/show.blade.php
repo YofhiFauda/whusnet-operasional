@@ -999,7 +999,7 @@
                 $workToolsDipakai = $maintenanceFopTask ? $maintenanceFopTask->workTools()->orderBy('id')->get() : collect();
                 $creqDetailReport = $task->task_type === \App\Enums\TaskType::CREQ ? $task->creqDetail : null;
             @endphp
-            @if($maintenanceReport || $materialsTerpakai->isNotEmpty() || $installedSerials->isNotEmpty() || $creqDetailReport)
+            @if($maintenanceReport || $materialsTerpakai->isNotEmpty() || $installedSerials->isNotEmpty() || $creqDetailReport || $infraActions->isNotEmpty())
             <div class="pt-5 border-t border-border space-y-4 select-text">
                 <div class="flex items-center gap-2 mb-1 select-none">
                     <svg class="h-4.5 w-4.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1014,11 +1014,13 @@
                         <svg class="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
-                        <span class="text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui">Kendala &amp; Solusi</span>
+                        <span class="text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui">{{ in_array($task->task_type, [\App\Enums\TaskType::OREQ, \App\Enums\TaskType::INFR], true) ? 'Ringkasan pekerjaan' : 'Kendala & Solusi' }}</span>
                     </div>
                     <p class="text-xs text-text-main leading-relaxed font-ui whitespace-pre-line break-words [word-break:break-word] min-w-0 font-medium">{{ $maintenanceReport->kendala_teknis }}</p>
                 </div>
                 @endif
+
+                @include('tasks.partials.infra-action-review')
 
                 @if($creqDetailReport)
                 @include('tasks.partials.creq-detail', ['task' => $task])

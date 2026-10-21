@@ -17,8 +17,11 @@
 
         <div>
             <label class="block font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">
-                Perangkat Tambahan (AP / STB) — Wajib {{ $requiredExtraDevices }} Perangkat
+                Perangkat Tambahan (AP / Router / STB) — Wajib {{ $requiredExtraDevices }} Perangkat
             </label>
+            @if($additionalDeviceRequirements !== [])
+                <p class="text-[11px] font-semibold text-sky-700 dark:text-sky-300">Kebutuhan paket: 1 modem utama + {{ $additionalDeviceRequirements['access_point'] ?? 0 }} AP + {{ $additionalDeviceRequirements['customer_router'] ?? 0 }} router pelanggan.</p>
+            @endif
             <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Beri status akhir untuk perangkat tambahan pelanggan ini. Perangkat yang dibawa untuk pelanggan lain biarkan kosong. Wajib disimpan sebelum Laporan Speedtest.</p>
         </div>
 

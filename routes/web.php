@@ -88,6 +88,7 @@ use App\Http\Controllers\TicketDibatalkanController;
 use App\Http\Controllers\TicketHistoryController;
 use App\Http\Controllers\TicketSelesaiController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Warehouse\InfrastructureRecoveryController;
 use App\Http\Controllers\Warehouse\WarehouseAdjustmentController;
 use App\Http\Controllers\Warehouse\WarehouseController;
 use App\Http\Controllers\Warehouse\WarehouseCustodyController;
@@ -974,6 +975,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:warehouse_reassign.create')->group(function () {
         // Terima Retur (ADHOC-86) — konfirmasi gudang atas modem hasil DEAC.
         // Static `/warehouse/returns` sebelum yang ber-{serial}.
+        Route::get('/warehouse/infrastructure-recoveries', [InfrastructureRecoveryController::class, 'index'])->name('warehouse.infrastructure-recoveries.index');
+        Route::get('/warehouse/infrastructure-recoveries/{recovery}', [InfrastructureRecoveryController::class, 'show'])->name('warehouse.infrastructure-recoveries.show');
+        Route::post('/warehouse/infrastructure-recoveries/{recovery}', [InfrastructureRecoveryController::class, 'store'])->name('warehouse.infrastructure-recoveries.store');
         Route::get('/warehouse/returns', [WarehouseReturnReceiveController::class, 'index'])->name('warehouse.returns.index');
         // Modem diantar pelanggan tanpa task (ADHOC-88) — static, sebelum {serial}.
         Route::get('/warehouse/returns/from-customer', [WarehouseCustomerReturnController::class, 'create'])->name('warehouse.returns.from-customer.create');
@@ -1234,6 +1238,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/nodes/{node}/ports', [NetworkNodeController::class, 'addPorts'])->name('network.nodes.ports.add');
         Route::put('/network/node-ports/{port}', [NetworkNodeController::class, 'updatePort'])->name('network.node-ports.update');
         Route::post('/network/node-ports/{port}/assign-node', [NetworkNodeController::class, 'assignNodePort'])->name('network.node-ports.assign-node');
+        Route::post('/network/node-ports/{port}/assign-customer', [NetworkNodeController::class, 'assignCustomerPort'])->name('network.node-ports.assign-customer');
         Route::post('/network/nodes/{chassis}/olt-slots', [OltSlotController::class, 'store'])->name('network.nodes.olt-slots.store');
         Route::post('/network/nodes/{chassis}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('network.nodes.olt-slots.card');
     });

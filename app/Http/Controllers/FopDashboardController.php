@@ -7,7 +7,6 @@ use App\Enums\MaterialKind;
 use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
-use App\Exceptions\InsufficientExtraDeviceCustodyException;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
@@ -470,47 +469,38 @@ class FopDashboardController extends Controller
             );
         }
 
-        try {
-            return DB::transaction(function () use ($fopTask, $toTeam, $technicianIds, $request) {
-                $oldValues = $fopTask->toArray();
+        return DB::transaction(function () use ($fopTask, $toTeam, $technicianIds, $request) {
+            $oldValues = $fopTask->toArray();
 
-                $fopTask->team_id = $toTeam->id;
-                $fopTask->manual_override_at = now();
-                $fopTask->save();
+            $fopTask->team_id = $toTeam->id;
+            $fopTask->manual_override_at = now();
+            $fopTask->save();
 
-                $fopTask->technicians()->sync($technicianIds->all());
+            $fopTask->technicians()->sync($technicianIds->all());
 
-                if ($fopTask->task_id && $fopTask->task) {
-                    app(TaskService::class)->update($fopTask->task, [
-                        'team_member_ids' => $technicianIds->all(),
-                    ], $request->user());
-                }
+            if ($fopTask->task_id && $fopTask->task) {
+                app(TaskService::class)->update($fopTask->task, [
+                    'team_member_ids' => $technicianIds->all(),
+                ], $request->user());
+            }
 
-                if (class_exists(AuditLog::class)) {
-                    AuditLog::log($fopTask, 'switch_team', $oldValues, $fopTask->fresh(['technicians', 'team'])->toArray());
-                }
+            if (class_exists(AuditLog::class)) {
+                AuditLog::log($fopTask, 'switch_team', $oldValues, $fopTask->fresh(['technicians', 'team'])->toArray());
+            }
 
-                app(FopTaskTeamService::class)->rebuildTeamsForDate($fopTask->task_date->copy());
+            app(FopTaskTeamService::class)->rebuildTeamsForDate($fopTask->task_date->copy());
 
-                $toTeam->refresh();
+            $toTeam->refresh();
 
-                if ($request->wantsJson()) {
-                    return response()->json([
-                        'success' => true,
-                        'message' => "Task {$fopTask->task_number} berhasil dipindah ke \"{$toTeam->name}\".",
-                    ]);
-                }
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Task {$fopTask->task_number} berhasil dipindah ke \"{$toTeam->name}\".",
+                ]);
+            }
 
-                return redirect()->route('fop.dashboard')->with('success', "Task berhasil dipindah ke \"{$toTeam->name}\".");
-            });
-        } catch (InsufficientExtraDeviceCustodyException $e) {
-            // AdditionalDeviceCustodyService::assertSufficientForTask()
-            // (dipanggil dari TaskService::update() di atas) menolak —
-            // teknisi baru belum pegang custody perangkat tambahan yang
-            // cukup. Transaksi sudah di-rollback (team_id/technicians belum
-            // ke-save permanen).
-            return $this->switchTeamError($request, 'technician_ids', $e->getMessage());
-        }
+            return redirect()->route('fop.dashboard')->with('success', "Task berhasil dipindah ke \"{$toTeam->name}\".");
+        });
     }
 
     /**

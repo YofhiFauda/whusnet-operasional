@@ -451,6 +451,7 @@ class CustomerInstallationController extends Controller
         // paket mengatur perangkat tambahan (limit > 0).
         $eligibleExtraDeviceSerials = $this->eligibleExtraDeviceSerialsForTeam($task);
         $requiredExtraDevices = (int) ($customer->customerService?->internetPackage?->max_additional_devices ?? 0);
+        $additionalDeviceRequirements = $customer->customerService?->internetPackage?->additionalDeviceRequirements() ?? [];
 
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
         // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
@@ -537,7 +538,7 @@ class CustomerInstallationController extends Controller
         $odpPortOptions = $this->odpPortsFor($customer);
         $currentOdpPortId = $odpPortOptions->first(fn (NetworkNodePort $port) => $port->activeAssignment->first()?->customer_id === $customer->id)?->id;
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif', 'odpPortOptions', 'currentOdpPortId', 'hasManagedOdp', 'eligibleExtraDeviceSerials', 'requiredExtraDevices'));
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif', 'odpPortOptions', 'currentOdpPortId', 'hasManagedOdp', 'eligibleExtraDeviceSerials', 'requiredExtraDevices', 'additionalDeviceRequirements'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)

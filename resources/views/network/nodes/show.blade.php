@@ -102,7 +102,11 @@
                 @foreach($node->deployedSerials as $serial)
                     <div class="rounded-xl border border-border bg-surface-muted/60 p-3 text-xs">
                         <p class="font-semibold text-text-main">{{ $serial->item?->name ?: 'Barang tanpa nama' }}</p>
-                        <p class="mt-1 font-mono text-sky-700 dark:text-sky-300">SN {{ $serial->serial_number }}</p>
+                        <a href="{{ route('warehouse.traceability.index', ['sn' => $serial->serial_number]) }}"
+                           class="mt-1 font-mono text-sky-700 dark:text-sky-300 font-bold hover:underline inline-flex items-center gap-1"
+                           title="Lihat riwayat pergerakan barang">
+                            SN {{ $serial->serial_number }} &nearr;
+                        </a>
                     </div>
                 @endforeach
                 @foreach($node->infrastructureBalances->where('qty', '>', 0) as $balance)
@@ -161,78 +165,179 @@
     </section>
     @endif
     @if($node->ports->isNotEmpty())
-    <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <h2 class="text-sm font-black uppercase tracking-wider text-text-main">Port &amp; Penghuni</h2>
-            <span class="text-xs text-text-muted">{{ $node->ports->where('is_used', true)->count() }} / {{ $node->ports->count() }} terpakai</span>
+    <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-5">
+        {{-- Header & Kapasitas Ringkas --}}
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+            <div>
+                <h2 class="text-sm font-black uppercase tracking-wider text-text-main flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+                    Port &amp; Penghuni
+                </h2>
+                <p class="text-xs text-text-muted mt-0.5">Visual soket port splitter/ODP. Klik atau gunakan form pada port kosong untuk menyambungkan pelanggan.</p>
+            </div>
+            @php
+                $usedPortsCount = $node->ports->where('is_used', true)->count();
+                $totalPortsCount = $node->ports->count();
+                $freePortsCount = $totalPortsCount - $usedPortsCount;
+                $usedPercent = $totalPortsCount > 0 ? round(($usedPortsCount / $totalPortsCount) * 100) : 0;
+            @endphp
+            <div class="flex items-center gap-2 text-xs flex-wrap">
+                <span class="px-2.5 py-1 rounded-lg bg-surface-muted border border-border font-bold text-text-main">
+                    Total: {{ $totalPortsCount }} Port
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 font-bold">
+                    {{ $usedPortsCount }} / {{ $totalPortsCount }} terpakai ({{ $usedPercent }}%)
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold">
+                    {{ $freePortsCount }} Kosong
+                </span>
+            </div>
         </div>
-        <div class="overflow-x-auto rounded-xl border border-border">
-            <table class="w-full text-left text-xs">
-                <thead class="bg-surface-muted text-text-secondary uppercase text-[10px] tracking-wider">
-                    <tr><th class="px-4 py-3">Port</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Penghuni / Tujuan</th><th class="px-4 py-3">Tindakan</th></tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @foreach($node->ports->sortBy('number') as $port)
-                    @php($assignment = $port->activeAssignment->first())
-                    <tr>
-                        <td class="px-4 py-3 font-mono font-bold text-text-main">{{ $port->number }}</td>
-                        <td class="px-4 py-3">{{ $port->is_used ? 'Terpakai' : 'Kosong' }}</td>
-                        <td class="px-4 py-3 text-text-main">
-                            @if($assignment?->customer)
-                                <span class="font-semibold">Pelanggan: {{ $assignment->customer->full_name }}</span>
-                                @if($canViewDeviceSerials && ($allowedCustomerPopIds === null || in_array($assignment->customer->pop_id, $allowedCustomerPopIds)))
-                                @forelse($assignment->customer->networkPortModems() as $modem)
-                                    <span class="block mt-1 text-[11px] text-text-secondary">Modem/ONT: {{ $modem['name'] }} · SN {{ $modem['serial_number'] }} <span class="text-text-muted">({{ $modem['source'] }})</span></span>
-                                @empty
-                                    <span class="block mt-1 text-[11px] text-amber-700 dark:text-amber-400">Modem belum tercatat</span>
-                                @endforelse
-                                @else
-                                    <span class="block mt-1 text-[11px] text-text-muted">SN modem dibatasi oleh izin perangkat pelanggan</span>
-                                @endif
-                            @elseif($assignment?->targetNode)
-                                Node: {{ $assignment->targetNode->code }} · {{ $assignment->targetNode->name }}
-                            @elseif($assignment?->manual_label)
-                                {{ $assignment->manual_label }} <span class="ml-2 text-amber-700 dark:text-amber-400">Belum terverifikasi</span>
-                            @elseif($port->is_used)
-                                <span class="text-amber-700 dark:text-amber-400">Belum terverifikasi</span>
-                            @else
-                                —
+
+        {{-- Visual Grid Port Matrix --}}
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+            @foreach($node->ports->sortBy('number') as $port)
+            @php($assignment = $port->activeAssignment->first())
+            <div class="rounded-xl border transition-all shadow-2xs flex flex-col justify-between
+                        {{ $port->is_used
+                            ? ($assignment?->customer
+                                ? 'border-sky-300/80 bg-sky-50/40 dark:border-sky-900/80 dark:bg-sky-950/20'
+                                : ($assignment?->targetNode
+                                    ? 'border-amber-300/80 bg-amber-50/40 dark:border-amber-900/80 dark:bg-amber-950/20'
+                                    : 'border-rose-300/80 bg-rose-50/40 dark:border-rose-900/80 dark:bg-rose-950/20'))
+                            : 'border-emerald-200 bg-emerald-50/20 dark:border-emerald-900/60 dark:bg-emerald-950/10' }} p-3.5 space-y-3">
+
+                {{-- Header Socket --}}
+                <div class="flex items-center justify-between gap-1.5 border-b border-border/60 pb-2">
+                    <span class="font-mono font-bold text-xs text-text-main flex items-center gap-1">
+                        Port {{ $port->number }}
+                        <span class="text-[10px] text-text-muted font-normal">(#{{ $port->number }})</span>
+                    </span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                                {{ $port->is_used
+                                    ? ($assignment?->customer
+                                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300'
+                                        : ($assignment?->targetNode
+                                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
+                                            : 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300'))
+                                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' }}">
+                        {{ $port->is_used ? 'Terpakai' : 'Kosong' }}
+                    </span>
+                </div>
+
+                {{-- Body Info Socket --}}
+                <div class="text-xs space-y-1.5 flex-1">
+                    @if($assignment?->customer)
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Penghuni Port</span>
+                            <span class="font-bold text-text-main">Pelanggan: {{ $assignment->customer->full_name }}</span>
+                            @if($assignment->customer->customer_code || $assignment->customer->cid)
+                                <span class="block text-[11px] font-mono text-text-muted">{{ $assignment->customer->customer_code ?: $assignment->customer->cid }}</span>
                             @endif
-                        </td>
-                        <td class="px-4 py-3">
-                            @can('network_nodes.update')
-                            @if($port->is_used)
-                            <form method="POST" action="{{ route('network.node-ports.update', $port) }}" class="space-y-2 min-w-56">
+                        </div>
+                        @if($canViewDeviceSerials && ($allowedCustomerPopIds === null || in_array($assignment->customer->pop_id, $allowedCustomerPopIds)))
+                            <div class="pt-1 border-t border-border/40">
+                            @forelse($assignment->customer->networkPortModems() as $modem)
+                                <div class="mt-1 p-1.5 rounded bg-surface/80 border border-border/60 text-[11px] text-text-secondary">
+                                    <span class="font-semibold text-text-main">Modem/ONT: {{ $modem['name'] }}</span>
+                                    <span class="block font-mono text-[10px] text-sky-700 dark:text-sky-300">SN {{ $modem['serial_number'] }}</span>
+                                    <span class="text-[9px] text-text-muted">({{ $modem['source'] }})</span>
+                                </div>
+                            @empty
+                                <span class="block text-[11px] text-amber-700 dark:text-amber-400 font-medium">Modem belum tercatat</span>
+                            @endforelse
+                            </div>
+                        @else
+                            <span class="block text-[11px] text-text-muted italic">SN modem dibatasi oleh izin perangkat pelanggan</span>
+                        @endif
+                    @elseif($assignment?->targetNode)
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Jalur Uplink / Turunan</span>
+                            <span class="font-bold text-text-main">Node: {{ $assignment->targetNode->code }} · {{ $assignment->targetNode->name }}</span>
+                            @if($assignment->targetPort)
+                                <span class="block text-[11px] font-mono text-text-secondary">port {{ $assignment->targetPort->number }}</span>
+                            @endif
+                        </div>
+                    @elseif($assignment?->manual_label)
+                        <div class="text-text-main">
+                            <span class="font-semibold">{{ $assignment->manual_label }}</span>
+                            <span class="block text-[11px] text-amber-700 dark:text-amber-400 font-medium">Belum terverifikasi</span>
+                        </div>
+                    @elseif($port->is_used)
+                        <span class="text-amber-700 dark:text-amber-400 text-xs font-medium">Belum terverifikasi</span>
+                    @else
+                        <div class="py-2 text-center text-emerald-700 dark:text-emerald-400 font-medium text-xs">
+                            Port siap disambungkan
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Action Panel Socket --}}
+                @can('network_nodes.update')
+                <div class="pt-2 border-t border-border/60">
+                    @if($port->is_used)
+                        <details class="group text-xs">
+                            <summary class="flex items-center justify-between cursor-pointer text-rose-600 dark:text-rose-400 hover:text-rose-700 font-bold py-1">
+                                <span>Kosongkan port</span>
+                                <span class="text-[10px] group-open:rotate-180 transition-transform">&darr;</span>
+                            </summary>
+                            <form method="POST" action="{{ route('network.node-ports.update', $port) }}" class="mt-2 space-y-2 p-2.5 rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50/60 dark:bg-rose-950/40">
                                 @csrf
                                 @method('PUT')
                                 <input type="hidden" name="is_used" value="0">
-                                <label class="flex items-start gap-2 text-text-secondary">
-                                    <input type="checkbox" name="physical_removal_confirmed" value="1" required>
+                                <label class="flex items-start gap-1.5 text-text-secondary text-[11px]">
+                                    <input type="checkbox" name="physical_removal_confirmed" value="1" required checked>
                                     Pelepasan fisik sudah dilakukan
                                 </label>
-                                <input name="release_note" required maxlength="500" placeholder="Catatan pelepasan fisik" class="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-text-main">
-                                <button type="submit" class="rounded-lg border border-rose-300 px-2 py-1 font-semibold text-rose-700 dark:text-rose-300">Kosongkan port</button>
+                                <input name="release_note" required maxlength="500" value="Pelepasan port kabel fisik" placeholder="Catatan pelepasan fisik" class="w-full rounded-md border border-border bg-background px-2 py-1 text-xs text-text-main">
+                                <button type="submit" class="w-full rounded-md bg-rose-600 hover:bg-rose-700 text-white font-bold py-1.5 text-xs shadow-2xs cursor-pointer">
+                                    Konfirmasi Lepas Port
+                                </button>
                             </form>
-                            @elseif($node->children->isNotEmpty())
-                            <form method="POST" action="{{ route('network.node-ports.assign-node', $port) }}" class="flex flex-wrap items-center gap-2 min-w-56">
+                        </details>
+                    @else
+                        {{-- Opsi Sambung Pelanggan Langsung (jika ODP dan ada pelanggan tersedia) --}}
+                        @if($node->nodeType?->code === 'odp' && $availableCustomers->isNotEmpty())
+                            <form method="POST" action="{{ route('network.node-ports.assign-customer', $port) }}" class="space-y-1.5">
                                 @csrf
-                                <select name="target_node_id" required class="min-w-40 rounded-lg border border-border bg-background px-2 py-1.5 text-text-main">
+                                <select name="customer_id" required class="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-text-main focus:ring-2 focus:ring-emerald-500/30">
+                                    <option value="">Pilih Pelanggan...</option>
+                                    @foreach($availableCustomers as $cust)
+                                        <option value="{{ $cust->id }}">{{ $cust->full_name }} ({{ $cust->customer_code ?: ($cust->cid ?: '#'.$cust->id) }})</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="w-full rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 text-xs shadow-2xs transition-colors cursor-pointer">
+                                    + Sambung Pelanggan
+                                </button>
+                            </form>
+                        @elseif($node->children->isNotEmpty())
+                            <form method="POST" action="{{ route('network.node-ports.assign-node', $port) }}" class="space-y-1.5">
+                                @csrf
+                                <select name="target_node_id" required class="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-text-main">
                                     <option value="">Pilih anak langsung</option>
                                     @foreach($node->children as $child)
                                     <option value="{{ $child->id }}">{{ $child->code }} · {{ $child->name }}</option>
                                     @endforeach
                                 </select>
-                                <button type="submit" class="rounded-lg border border-sky-300 px-2 py-1.5 font-semibold text-sky-700 dark:text-sky-300">Hubungkan</button>
+                                <button type="submit" class="w-full rounded-md bg-sky-600 hover:bg-sky-700 text-white font-bold py-1.5 text-xs shadow-2xs transition-colors cursor-pointer">
+                                    Hubungkan
+                                </button>
                             </form>
-                            @else
-                            —
-                            @endif
-                            @endcan
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                        @else
+                            <form method="POST" action="{{ route('network.node-ports.update', $port) }}">
+                                @csrf
+                                @method('PUT')
+                                <input type="hidden" name="is_used" value="1">
+                                <button type="submit" class="w-full rounded-md border border-border bg-surface hover:bg-surface-muted text-text-main font-semibold py-1.5 text-xs transition-colors cursor-pointer">
+                                    Tandai Terpakai Manual
+                                </button>
+                            </form>
+                        @endif
+                    @endif
+                </div>
+                @endcan
+            </div>
+            @endforeach
         </div>
     </section>
     @endif

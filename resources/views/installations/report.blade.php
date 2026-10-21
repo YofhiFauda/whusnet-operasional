@@ -6,20 +6,54 @@
 @section('breadcrumb_parent_url', route('verifications.queue'))
 
 @section('content')
-<div class="max-w-6xl mx-auto space-y-4 sm:space-y-6 pb-20 sm:pb-8">
+<style>
+    @keyframes stepFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    .step-panel.is-active {
+        animation: stepFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .step-panel.is-active {
+            animation: none;
+            opacity: 1;
+            transform: none;
+        }
+    }
+    /* Tab button reset: prevent black outline / focus ring flash when switching tabs */
+    button[id^="mobile-step-btn-"],
+    button[id^="step-nav-"] {
+        outline: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+    }
+    button[id^="mobile-step-btn-"]:focus,
+    button[id^="mobile-step-btn-"]:focus-visible,
+    button[id^="step-nav-"]:focus,
+    button[id^="step-nav-"]:focus-visible {
+        outline: none !important;
+        box-shadow: none;
+    }
+</style>
+<div class="max-w-6xl mx-auto space-y-4 pb-28 sm:pb-16">
 
-    <!-- LAYER 1: NAKED PAGE HEADER & MOBILE HERO CUSTOMER CARD -->
     <!-- LAYER 1: NAKED PAGE HEADER & CUSTOMER CONTEXT (Card Budget = 1 Principle) -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div class="flex items-center gap-3">
-            <a href="{{ $returnTo }}" class="p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs bg-white dark:bg-slate-800 shrink-0">
-                <x-ui.icon name="arrow-left" class="w-4 h-4" />
+            <a href="{{ $returnTo }}" class="p-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-xs bg-white dark:bg-slate-900 shrink-0">
+                <x-ui.icon name="arrow-left" class="w-3.5 h-3.5" />
                 <span class="hidden sm:inline">Kembali</span>
             </a>
             <div class="min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                    <h1 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 truncate">{{ $customer->full_name }}</h1>
-                    <span class="px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    <h1 class="text-base sm:text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100 truncate">{{ $customer->full_name }}</h1>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                         {{ $customer->display_id }}
                     </span>
                 </div>
@@ -30,167 +64,174 @@
         </div>
     </div>
 
-    <div id="wizard-container" class="space-y-4 sm:space-y-6">
+    <div id="wizard-container" class="space-y-4">
 
-        <!-- TOP PANEL: Dynamic Completeness Progress Bar -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-lg p-4 sm:p-5 shadow-2xs space-y-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800/60">
-                        <x-ui.icon name="wrench" class="w-4 h-4" />
-                    </div>
-                    <div>
-                        <h3 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">Kelengkapan Laporan Pemasangan</h3>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Data teknis, perangkat, foto bukti &amp; speedtest</p>
-                    </div>
+        <!-- ENTERPRISE METRIC & PROGRESS STRIP (Card Budget = 1 Principle) -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden">
+            <div class="px-3.5 py-2.5 sm:px-4 sm:py-2.5 flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0 animate-pulse"></span>
+                    <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 tracking-tight">Kelengkapan Laporan Pemasangan</span>
+                    <span class="text-[11px] text-slate-400 dark:text-slate-500 hidden sm:inline">&bull; Data teknis, perangkat, foto bukti &amp; speedtest</span>
                 </div>
-                <div class="text-right">
-                    <span id="progress-percentage" class="text-base sm:text-lg font-black text-sky-600 dark:text-sky-400 data-text">0%</span>
-                    <span class="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 block">
-                        <span id="filled-fields-count" class="data-text font-bold text-slate-800 dark:text-slate-200">0</span>/<span id="total-fields-count" class="data-text font-bold">12</span> field wajib
+                <div class="flex items-center gap-2.5 shrink-0">
+                    <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                        <strong id="filled-fields-count" class="font-semibold text-slate-800 dark:text-slate-200 data-text">0</strong>/<span id="total-fields-count" class="data-text">12</span> field wajib
                     </span>
+                    <span id="progress-percentage" class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 data-text">0%</span>
                 </div>
             </div>
-
-            <!-- Progress Bar Fill Strip -->
-            <div class="w-full bg-slate-100 dark:bg-slate-700/60 rounded-full h-2.5 overflow-hidden border border-slate-200/60 dark:border-slate-700">
-                <div id="progress-bar-fill" class="bg-sky-600 h-full w-0 transition-all duration-500 ease-out" style="width: 0%;"></div>
+            <!-- Hairline Flush Progress Fill Strip -->
+            <div class="w-full bg-slate-100 dark:bg-slate-800 h-1 overflow-hidden">
+                <div id="progress-bar-fill" class="bg-sky-600 dark:bg-sky-500 h-full w-0 transition-all duration-300 ease-out" style="width: 0%;"></div>
             </div>
         </div>
 
-        <!-- MOBILE SEGMENTED STEPPER (Optimized for Touch on Mobile) -->
-        <div class="lg:hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-lg p-2 shadow-2xs">
-            <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-center">
-                <!-- Step 1 -->
-                <button type="button" onclick="goToStep(1)" id="mobile-step-btn-1" class="py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 shadow-2xs">
-                    <span class="w-5 h-5 rounded-full bg-sky-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
-                    <span class="text-[10px] font-bold tracking-tight truncate max-w-full">Data Diri</span>
+        <!-- MOBILE SEGMENTED STEPPER (WCAG 2.5.5 Touch Target & High Contrast) -->
+        <div class="lg:hidden bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 shadow-xs space-y-1.5">
+            <!-- Active Step Contextual Banner -->
+            <div class="flex items-center justify-between px-1 text-xs">
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <span id="mobile-step-pill" class="text-[10px] font-mono font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/70 border border-sky-200 dark:border-sky-800 px-1.5 py-0.5 rounded shrink-0">Langkah 1/6</span>
+                    <span id="mobile-active-step-title" class="font-semibold text-slate-800 dark:text-slate-100 truncate text-xs">Data Diri Pelanggan</span>
+                </div>
+                <span id="mobile-active-step-status" class="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">Lengkap</span>
+            </div>
+
+            <!-- 6-Step Touch Grid (min-h-[44px] touch target) -->
+            <div class="grid grid-cols-6 gap-1 bg-white/60 dark:bg-slate-900/40 p-1 rounded-md border border-slate-200/60 dark:border-slate-700/60 text-center">
+                <!-- Step 1: Diri -->
+                <button type="button" onclick="goToStep(1)" id="mobile-step-btn-1" class="min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 shadow-xs border border-slate-200 dark:border-slate-700">
+                    <span id="mobile-step-badge-1" class="w-5 h-5 rounded-full bg-sky-600 text-white text-[10px] font-mono font-bold flex items-center justify-center shrink-0 shadow-xs">1</span>
+                    <span id="mobile-step-label-1" class="text-[11px] font-bold tracking-tight text-sky-700 dark:text-sky-300 leading-none">Diri</span>
                 </button>
 
-                <!-- Step 2 -->
-                <button type="button" onclick="goToStep(2)" id="mobile-step-btn-2" class="py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
-                    <span class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">✓</span>
-                    <span class="text-[10px] font-bold tracking-tight truncate max-w-full">Dokumen</span>
+                <!-- Step 2: Dok -->
+                <button type="button" onclick="goToStep(2)" id="mobile-step-btn-2" class="min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-transparent">
+                    <span id="mobile-step-badge-2" class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">✓</span>
+                    <span id="mobile-step-label-2" class="text-[11px] font-semibold tracking-tight text-slate-700 dark:text-slate-300 leading-none">Dok</span>
                 </button>
 
-                <!-- Step 3 -->
-                <button type="button" onclick="goToStep(3)" id="mobile-step-btn-3" class="py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
-                    <span class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">✓</span>
-                    <span class="text-[10px] font-bold tracking-tight truncate max-w-full">Paket</span>
+                <!-- Step 3: Paket -->
+                <button type="button" onclick="goToStep(3)" id="mobile-step-btn-3" class="min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-transparent">
+                    <span id="mobile-step-badge-3" class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">✓</span>
+                    <span id="mobile-step-label-3" class="text-[11px] font-semibold tracking-tight text-slate-700 dark:text-slate-300 leading-none">Paket</span>
                 </button>
 
-                <!-- Step 4 -->
-                <button type="button" onclick="goToStep(4)" id="mobile-step-btn-4" class="py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
-                    <span class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">✓</span>
-                    <span class="text-[10px] font-bold tracking-tight truncate max-w-full">Survey</span>
+                <!-- Step 4: Survey -->
+                <button type="button" onclick="goToStep(4)" id="mobile-step-btn-4" class="min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-transparent">
+                    <span id="mobile-step-badge-4" class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">✓</span>
+                    <span id="mobile-step-label-4" class="text-[11px] font-semibold tracking-tight text-slate-700 dark:text-slate-300 leading-none">Survey</span>
                 </button>
 
-                <!-- Step 5 -->
-                <button type="button" onclick="goToStep(5)" id="mobile-step-btn-5" class="py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40">
-                    <span class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0">5</span>
-                    <span class="text-[10px] font-bold tracking-tight truncate max-w-full">Perangkat</span>
+                <!-- Step 5: Alat -->
+                <button type="button" onclick="goToStep(5)" id="mobile-step-btn-5" class="min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-transparent">
+                    <span id="mobile-step-badge-5" class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-mono font-bold flex items-center justify-center shrink-0">5</span>
+                    <span id="mobile-step-label-5" class="text-[11px] font-semibold tracking-tight text-slate-700 dark:text-slate-300 leading-none">Alat</span>
                 </button>
 
-                <!-- Step 6 -->
-                <button type="button" onclick="goToStep(6)" id="mobile-step-btn-6" class="py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40">
-                    <span class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0">6</span>
-                    <span class="text-[10px] font-bold tracking-tight truncate max-w-full">Speedtest</span>
+                <!-- Step 6: Uji -->
+                <button type="button" onclick="goToStep(6)" id="mobile-step-btn-6" class="min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none text-slate-500 dark:text-slate-400 border border-transparent">
+                    <span id="mobile-step-badge-6" class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
+                        <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </span>
+                    <span id="mobile-step-label-6" class="text-[11px] font-semibold tracking-tight text-slate-500 dark:text-slate-400 leading-none">Uji</span>
                 </button>
             </div>
         </div>
 
         <!-- MAIN GRID LAYOUT -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
             <!-- LEFT COLUMN: Desktop 6-Step Checklist (Visible on >= lg screens) -->
-            <div class="hidden lg:block lg:col-span-4 space-y-4 sticky top-6">
-                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-lg p-5 shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between">
+            <div class="hidden lg:block lg:col-span-4 space-y-3 sticky top-6">
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3.5 shadow-xs space-y-2.5">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                         <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tahapan Laporan</h4>
-                        <span class="text-[10px] font-semibold text-slate-400">6 Langkah</span>
+                        <span class="text-[10px] font-mono text-slate-400">6 Langkah</span>
                     </div>
 
-                    <div class="space-y-2.5">
+                    <div class="space-y-1.5">
                         <!-- Step 1 Navigation Card -->
-                        <button type="button" onclick="goToStep(1)" id="step-nav-1" class="w-full text-left p-3 rounded-lg border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-2xs">
-                            <div class="flex items-center gap-3">
-                                <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0 shadow-2xs">
+                        <button type="button" onclick="goToStep(1)" id="step-nav-1" class="w-full text-left p-2.5 rounded-md border border-sky-500 bg-sky-50/50 dark:bg-sky-950/30 transition-colors group focus:outline-none">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shrink-0">
                                     <x-ui.icon name="check" class="w-2.5 h-2.5" />
                                 </span>
-                                <div class="min-w-0">
-                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">1. Data Diri Pelanggan</span>
-                                    <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 block uppercase tracking-wider">Lengkap</span>
+                                <div class="min-w-0 flex-1">
+                                    <span class="block text-xs font-semibold text-slate-900 dark:text-slate-100">1. Data Diri Pelanggan</span>
+                                    <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 block">Lengkap</span>
                                 </div>
                             </div>
                         </button>
 
                         <!-- Step 2 Navigation Card -->
-                        <button type="button" onclick="goToStep(2)" id="step-nav-2" class="w-full text-left p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all group focus:outline-none">
-                            <div class="flex items-center gap-3">
-                                <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0 shadow-2xs">
+                        <button type="button" onclick="goToStep(2)" id="step-nav-2" class="w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group focus:outline-none">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shrink-0">
                                     <x-ui.icon name="check" class="w-2.5 h-2.5" />
                                 </span>
-                                <div class="min-w-0">
-                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">2. Dokumen Lampiran</span>
-                                    <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 block uppercase tracking-wider">Lengkap</span>
+                                <div class="min-w-0 flex-1">
+                                    <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">2. Dokumen Lampiran</span>
+                                    <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 block">Lengkap</span>
                                 </div>
                             </div>
                         </button>
 
                         <!-- Step 3 Navigation Card -->
-                        <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all group focus:outline-none">
-                            <div class="flex items-center gap-3">
-                                <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0 shadow-2xs">
+                        <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group focus:outline-none">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shrink-0">
                                     <x-ui.icon name="check" class="w-2.5 h-2.5" />
                                 </span>
-                                <div class="min-w-0">
-                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">3. Layanan &amp; Paket</span>
-                                    <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 block uppercase tracking-wider">Lengkap</span>
+                                <div class="min-w-0 flex-1">
+                                    <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">3. Layanan &amp; Paket</span>
+                                    <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 block">Lengkap</span>
                                 </div>
                             </div>
                         </button>
 
                         <!-- Step 4 Navigation Card -->
-                        <button type="button" onclick="goToStep(4)" id="step-nav-4" class="w-full text-left p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all group focus:outline-none">
-                            <div class="flex items-center gap-3">
-                                <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0 shadow-2xs">
+                        <button type="button" onclick="goToStep(4)" id="step-nav-4" class="w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group focus:outline-none">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shrink-0">
                                     <x-ui.icon name="check" class="w-2.5 h-2.5" />
                                 </span>
-                                <div class="min-w-0">
-                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">4. Laporan Survey Lapangan</span>
-                                    <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 block uppercase tracking-wider">Lengkap</span>
+                                <div class="min-w-0 flex-1">
+                                    <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">4. Laporan Survey Lapangan</span>
+                                    <span class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 block">Lengkap</span>
                                 </div>
                             </div>
                         </button>
 
                         <!-- Step 5 Navigation Card -->
-                        <button type="button" onclick="goToStep(5)" id="step-nav-5" class="w-full text-left p-3 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none">
-                            <div class="flex items-start gap-3">
+                        <button type="button" onclick="goToStep(5)" id="step-nav-5" class="w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group focus:outline-none">
+                            <div class="flex items-start gap-2.5">
                                 <div class="mt-0.5 shrink-0" id="step-nav-icon-5">
-                                    <span class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                    <span class="w-4 h-4 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500">
                                         <x-ui.icon name="x" class="w-2.5 h-2.5" />
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100">5. Perangkat &amp; Instalasi</span>
-                                    <span id="step-nav-status-5" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
-                                    <span id="step-nav-missing-5" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed"></span>
+                                    <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">5. Perangkat &amp; Instalasi</span>
+                                    <span id="step-nav-status-5" class="text-[10px] font-medium text-slate-500 dark:text-slate-400 block">Belum Lengkap</span>
+                                    <span id="step-nav-missing-5" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5 leading-snug"></span>
                                 </div>
                             </div>
                         </button>
 
                         <!-- Step 6 Navigation Card -->
-                        <button type="button" onclick="goToStep(6)" id="step-nav-6" class="w-full text-left p-3 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none">
-                            <div class="flex items-start gap-3">
+                        <button type="button" onclick="goToStep(6)" id="step-nav-6" class="w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group focus:outline-none">
+                            <div class="flex items-start gap-2.5">
                                 <div class="mt-0.5 shrink-0" id="step-nav-icon-6">
-                                    <span class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                    <span class="w-4 h-4 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500">
                                         <x-ui.icon name="x" class="w-2.5 h-2.5" />
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100">6. Laporan Speedtest</span>
-                                    <span id="step-nav-status-6" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
-                                    <span id="step-nav-missing-6" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed"></span>
+                                    <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">6. Laporan Speedtest</span>
+                                    <span id="step-nav-status-6" class="text-[10px] font-medium text-slate-500 dark:text-slate-400 block">Belum Lengkap</span>
+                                    <span id="step-nav-missing-6" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5 leading-snug"></span>
                                 </div>
                             </div>
                         </button>
@@ -199,73 +240,73 @@
             </div>
 
             <!-- RIGHT COLUMN: Wizard Steps Form Panels -->
-            <div class="lg:col-span-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-lg shadow-2xs overflow-hidden flex flex-col justify-between min-h-[540px]">
+            <div class="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden flex flex-col justify-between min-h-[520px]">
 
                 <!-- FORM BODY -->
-                <div class="p-4 sm:p-7 flex-1">
+                <div class="p-4 sm:p-6 flex-1">
 
                     <!-- STEP 1 PANEL: Data Diri Pelanggan -->
-                    <div id="step-panel-1" class="step-panel space-y-5" x-data="{ editingIdentity: false }">
-                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3 flex items-center justify-between gap-3">
+                    <div id="step-panel-1" class="step-panel space-y-4 is-active" x-data="{ editingIdentity: false }">
+                        <div class="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
-                                <span class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center">1</span>
+                                <span class="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center">1</span>
                                 <div>
-                                    <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">Identitas &amp; Alamat Pelanggan</h4>
+                                    <h4 class="text-xs sm:text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Identitas &amp; Alamat Pelanggan</h4>
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400">Data registrasi calon pelanggan</p>
                                 </div>
                             </div>
                             <button type="button" x-show="!editingIdentity" @click="editingIdentity = true"
-                                    class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200 dark:border-sky-800 transition-colors inline-flex items-center gap-1">
+                                    class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors inline-flex items-center gap-1 shadow-xs">
                                 <x-ui.icon name="edit" class="w-3 h-3" />
                                 <span>Edit Data</span>
                             </button>
                             <button type="button" x-show="editingIdentity" x-cloak @click="editingIdentity = false"
-                                    class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                    class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                                 Batal
                             </button>
                         </div>
 
                         <!-- EDIT MODE FORM -->
                         <form x-show="editingIdentity" x-cloak action="{{ route('customers.installation.update-identity', $customer->id) }}" method="POST"
-                              class="bg-slate-50/90 dark:bg-slate-900/70 rounded-lg p-4 sm:p-5 border border-slate-200 dark:border-slate-700/80 space-y-4 text-xs">
+                              class="bg-slate-50/70 dark:bg-slate-950/40 rounded-lg p-4 border border-slate-200 dark:border-slate-800 space-y-3.5 text-xs">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="return_to" value="{{ $returnTo }}">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Nama Lengkap *</span>
                                     <input type="text" name="full_name" value="{{ old('full_name', $customer->full_name) }}" required maxlength="150"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Nomor Identitas (NIK)</span>
                                     <input type="text" name="identity_number" value="{{ old('identity_number', $customer->identity_number) }}" maxlength="16" inputmode="numeric"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs data-text text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Nomor HP Utama *</span>
                                     <input type="text" name="primary_phone" value="{{ old('primary_phone', $customer->primary_phone ?? $customer->phone) }}" required maxlength="20" inputmode="tel"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs data-text text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Nomor HP Alternatif</span>
                                     <input type="text" name="alternative_phone" value="{{ old('alternative_phone', $customer->alternative_phone) }}" maxlength="20" inputmode="tel"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs data-text text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block sm:col-span-2">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Alamat Email</span>
                                     <input type="email" name="email" value="{{ old('email', $customer->email) }}" maxlength="100"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block sm:col-span-2">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Alamat Instalasi Lengkap *</span>
                                     <textarea name="address" required rows="2"
-                                              class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">{{ old('address', $customer->address) }}</textarea>
+                                              class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">{{ old('address', $customer->address) }}</textarea>
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Kota/Kabupaten</span>
                                     <select id="identity-city_id" name="city_id" data-selected-district="{{ old('district_id', $customer->district_id) }}" data-selected-village="{{ old('village_id', $customer->village_id) }}" onchange="wilayahLoadDistricts(this.value)"
-                                            class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                            class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                         <option value="">Pilih Kota/Kabupaten</option>
                                         @foreach($cities as $city)
                                             <option value="{{ $city->id }}" {{ old('city_id', $customer->city_id) == $city->id ? 'selected' : '' }}>{{ $city->name }}</option>
@@ -275,123 +316,121 @@
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Kecamatan</span>
                                     <select id="identity-district_id" name="district_id" onchange="wilayahLoadVillages(this.value)"
-                                            class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                            class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                         <option value="">Pilih kota/kabupaten dulu</option>
                                     </select>
                                 </label>
                                 <label class="block sm:col-span-2">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Desa/Kelurahan</span>
                                     <select id="identity-village_id" name="village_id"
-                                            class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                            class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                         <option value="">Pilih kecamatan dulu</option>
                                     </select>
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Latitude</span>
                                     <input type="text" name="latitude" value="{{ old('latitude', $customer->latitude) }}" inputmode="decimal"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs data-text text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Longitude</span>
                                     <input type="text" name="longitude" value="{{ old('longitude', $customer->longitude) }}" inputmode="decimal"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs data-text text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                             </div>
 
-                            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
                                 <span class="text-[11px] text-slate-500 dark:text-slate-400">Simpan perubahan data diri</span>
                                 <button type="submit"
-                                        class="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-2xs inline-flex items-center gap-1.5">
+                                        class="px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium shadow-xs inline-flex items-center gap-1.5">
                                     <x-ui.icon name="save" class="w-3.5 h-3.5" />
                                     <span>Simpan Data Diri</span>
                                 </button>
                             </div>
                         </form>
 
-                        <!-- READ ONLY CARDS (Mobile-friendly Grid) -->
-                        <div x-show="!editingIdentity" class="space-y-3">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs">
-                                <div class="p-3.5 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Nama Lengkap</span>
-                                    <span class="block text-sm font-bold text-slate-800 dark:text-slate-100">{{ $customer->full_name }}</span>
-                                    <span class="block text-[11px] data-text text-slate-500 dark:text-slate-400 mt-0.5">NIK: {{ $customer->identity_number ?? '-' }}</span>
+                        <!-- READ ONLY DEFINITION TABLE (Stripe/Linear style) -->
+                        <div x-show="!editingIdentity" class="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 p-3 bg-white dark:bg-slate-900 gap-1 sm:gap-2">
+                                <span class="text-slate-500 dark:text-slate-400 font-medium">Nama Lengkap &amp; NIK</span>
+                                <div class="sm:col-span-2 font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
+                                    <span>{{ $customer->full_name }}</span>
+                                    <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-normal">NIK: {{ $customer->identity_number ?? '-' }}</span>
                                 </div>
-
-                                <div class="p-3.5 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Kontak Telepon</span>
-                                    <span class="block text-sm data-text font-bold text-slate-800 dark:text-slate-100">{{ $customer->primary_phone ?? $customer->phone ?? '-' }}</span>
-                                    <span class="block text-[11px] data-text text-slate-500 dark:text-slate-400 mt-0.5">Alt: {{ $customer->alternative_phone ?? '-' }}</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 p-3 bg-white dark:bg-slate-900 gap-1 sm:gap-2">
+                                <span class="text-slate-500 dark:text-slate-400 font-medium">Kontak Telepon</span>
+                                <div class="sm:col-span-2 font-mono text-slate-800 dark:text-slate-200 flex items-center gap-2 flex-wrap">
+                                    <span>{{ $customer->primary_phone ?? $customer->phone ?? '-' }}</span>
+                                    @if($customer->alternative_phone)
+                                        <span class="text-slate-400 dark:text-slate-500 font-normal text-[11px]">Alt: {{ $customer->alternative_phone }}</span>
+                                    @endif
                                 </div>
-
-                                <div class="p-3.5 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60 sm:col-span-2">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Alamat Instalasi</span>
-                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">{{ $customer->address }}</span>
-                                    <span class="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                                        Kel. {{ $customer->village->name ?? '-' }},
-                                        Kec. {{ $customer->district->name ?? '-' }},
-                                        {{ $customer->city->name ?? '-' }}
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 p-3 bg-white dark:bg-slate-900 gap-1 sm:gap-2">
+                                <span class="text-slate-500 dark:text-slate-400 font-medium">Alamat Instalasi</span>
+                                <div class="sm:col-span-2 text-slate-800 dark:text-slate-200 leading-snug">
+                                    {{ $customer->address }}
+                                    <span class="block text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
+                                        Kel. {{ $customer->village->name ?? '-' }}, Kec. {{ $customer->district->name ?? '-' }}, {{ $customer->city->name ?? '-' }}
                                     </span>
                                 </div>
-
-                                <div class="p-3.5 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Koordinat GPS</span>
-                                    <span class="text-xs data-text font-mono font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
-                                        {{ $customer->latitude ?? '-' }}, {{ $customer->longitude ?? '-' }}
-                                    </span>
-                                </div>
-
-                                <div class="p-3.5 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">POP Wilayah</span>
-                                    <span class="block text-xs font-bold text-sky-600 dark:text-sky-400">{{ $customer->pop->name ?? '-' }}</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 p-3 bg-white dark:bg-slate-900 gap-1 sm:gap-2">
+                                <span class="text-slate-500 dark:text-slate-400 font-medium">Koordinat GPS &amp; POP</span>
+                                <div class="sm:col-span-2 text-slate-800 dark:text-slate-200 flex items-center gap-3 flex-wrap">
+                                    <span class="font-mono text-xs">{{ $customer->latitude ?? '-' }}, {{ $customer->longitude ?? '-' }}</span>
+                                    <span class="text-slate-300 dark:text-slate-700">&bull;</span>
+                                    <span class="text-xs font-medium text-sky-600 dark:text-sky-400">{{ $customer->pop->name ?? '-' }}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- STEP 2 PANEL: Dokumen Lampiran -->
-                    <div id="step-panel-2" class="step-panel space-y-5 hidden" x-data="{ editingPhotos: false }">
-                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3 flex items-center justify-between gap-3">
+                    <div id="step-panel-2" class="step-panel space-y-4 hidden" x-data="{ editingPhotos: false }">
+                        <div class="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
-                                <span class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center">2</span>
+                                <span class="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center">2</span>
                                 <div>
-                                    <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">Dokumen Lampiran Survey</h4>
+                                    <h4 class="text-xs sm:text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Dokumen Lampiran Survey</h4>
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400">Foto rumah &amp; ODP dari laporan survey awal</p>
                                 </div>
                             </div>
                             <button type="button" x-show="!editingPhotos" @click="editingPhotos = true"
-                                    class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200 dark:border-sky-800 transition-colors inline-flex items-center gap-1">
+                                    class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors inline-flex items-center gap-1 shadow-xs">
                                 <x-ui.icon name="camera" class="w-3 h-3" />
                                 <span>Ganti Foto</span>
                             </button>
                             <button type="button" x-show="editingPhotos" x-cloak @click="editingPhotos = false"
-                                    class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                    class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                                 Batal
                             </button>
                         </div>
 
                         <!-- EDIT PHOTOS FORM -->
                         <form x-show="editingPhotos" x-cloak action="{{ route('customers.installation.update-photos', $customer->id) }}" method="POST" enctype="multipart/form-data"
-                              class="bg-slate-50/90 dark:bg-slate-900/70 rounded-lg p-4 sm:p-5 border border-slate-200 dark:border-slate-700/80 space-y-4 text-xs">
+                              class="bg-slate-50/70 dark:bg-slate-950/40 rounded-lg p-4 border border-slate-200 dark:border-slate-800 space-y-3.5 text-xs">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="return_to" value="{{ $returnTo }}">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Foto Rumah</span>
                                     <input type="file" name="house_photo" accept="image/*"
-                                           class="w-full text-xs file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 dark:file:bg-sky-950/40 dark:file:text-sky-300">
-                                    @error('house_photo')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                                           class="w-full text-xs file:mr-2.5 file:px-2.5 file:py-1.5 file:rounded-md file:border-0 file:bg-slate-100 file:text-slate-700 dark:file:bg-slate-800 dark:file:text-slate-300">
+                                    @error('house_photo')<p class="text-xs text-rose-600 font-medium mt-1">{{ $message }}</p>@enderror
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Foto ODP Terdekat</span>
                                     <input type="file" name="survey_photo" accept="image/*"
-                                           class="w-full text-xs file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 dark:file:bg-sky-950/40 dark:file:text-sky-300">
-                                    @error('survey_photo')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                                           class="w-full text-xs file:mr-2.5 file:px-2.5 file:py-1.5 file:rounded-md file:border-0 file:bg-slate-100 file:text-slate-700 dark:file:bg-slate-800 dark:file:text-slate-300">
+                                    @error('survey_photo')<p class="text-xs text-rose-600 font-medium mt-1">{{ $message }}</p>@enderror
                                 </label>
                             </div>
-                            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
                                 <span class="text-[11px] text-slate-500 dark:text-slate-400">Maks. 2 MB per foto</span>
-                                <button type="submit" class="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-2xs inline-flex items-center gap-1.5">
+                                <button type="submit" class="px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium shadow-xs inline-flex items-center gap-1.5">
                                     <x-ui.icon name="save" class="w-3.5 h-3.5" />
                                     <span>Simpan Foto</span>
                                 </button>
@@ -399,57 +438,57 @@
                         </form>
 
                         <!-- READ ONLY PHOTO CARDS -->
-                        <div x-show="!editingPhotos" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div x-show="!editingPhotos" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             <!-- Foto Rumah -->
-                            <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-lg p-4 flex flex-col justify-between shadow-2xs text-center">
+                            <div class="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-lg p-3.5 flex flex-col justify-between shadow-xs text-center">
                                 @php $fotoRumahUrl = foto_publik($customer->latestSurvey?->house_photo); @endphp
                                 @if($fotoRumahUrl)
                                     <div>
                                         <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Foto Rumah</span>
-                                        <div class="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                                            <img class="max-h-36 max-w-full rounded-lg object-contain mx-auto hover:scale-105 transition-transform cursor-pointer"
+                                        <div class="relative rounded-md overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
+                                            <img class="max-h-36 max-w-full rounded-md object-contain mx-auto cursor-pointer"
                                                  src="{{ $fotoRumahUrl }}"
                                                  alt="Preview Foto Rumah"
                                                  onclick="window.open('{{ $fotoRumahUrl }}', '_blank')">
                                         </div>
                                     </div>
-                                    <span class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                    <span class="inline-flex items-center justify-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mt-2.5">
                                         <x-ui.icon name="check" class="w-3 h-3" /> Terlampir
                                     </span>
                                 @else
                                     <div class="flex flex-col justify-center py-6">
-                                        <div class="w-12 h-12 mx-auto rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-lg mb-2">
-                                            <x-ui.icon name="house" class="w-5 h-5" />
+                                        <div class="w-10 h-10 mx-auto rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-2">
+                                            <x-ui.icon name="house" class="w-4 h-4" />
                                         </div>
-                                        <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Foto Rumah</span>
-                                        <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1">{{ $customer->latestSurvey?->house_photo ? 'File tidak ditemukan' : 'Tidak ada di survey' }}</span>
+                                        <span class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Foto Rumah</span>
+                                        <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1">Tidak ada di survey</span>
                                     </div>
                                 @endif
                             </div>
 
                             <!-- Foto ODP -->
-                            <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-lg p-4 flex flex-col justify-between shadow-2xs text-center">
+                            <div class="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-lg p-3.5 flex flex-col justify-between shadow-xs text-center">
                                 @php $fotoOdpUrl = foto_publik($customer->latestSurvey?->survey_photo); @endphp
                                 @if($fotoOdpUrl)
                                     <div>
                                         <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Foto ODP Terdekat</span>
-                                        <div class="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                                            <img class="max-h-36 max-w-full rounded-lg object-contain mx-auto hover:scale-105 transition-transform cursor-pointer"
+                                        <div class="relative rounded-md overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
+                                            <img class="max-h-36 max-w-full rounded-md object-contain mx-auto cursor-pointer"
                                                  src="{{ $fotoOdpUrl }}"
                                                  alt="Preview Foto ODP"
                                                  onclick="window.open('{{ $fotoOdpUrl }}', '_blank')">
                                         </div>
                                     </div>
-                                    <span class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                    <span class="inline-flex items-center justify-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mt-2.5">
                                         <x-ui.icon name="check" class="w-3 h-3" /> Terlampir
                                     </span>
                                 @else
                                     <div class="flex flex-col justify-center py-6">
-                                        <div class="w-12 h-12 mx-auto rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-lg mb-2">
-                                            <x-ui.icon name="network" class="w-5 h-5" />
+                                        <div class="w-10 h-10 mx-auto rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-2">
+                                            <x-ui.icon name="network" class="w-4 h-4" />
                                         </div>
-                                        <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Foto ODP</span>
-                                        <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1">{{ $customer->latestSurvey?->survey_photo ? 'File tidak ditemukan' : 'Tidak ada di survey' }}</span>
+                                        <span class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Foto ODP</span>
+                                        <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1">Tidak ada di survey</span>
                                     </div>
                                 @endif
                             </div>
@@ -457,36 +496,36 @@
                     </div>
 
                     <!-- STEP 3 PANEL: Layanan & Paket -->
-                    <div id="step-panel-3" class="step-panel space-y-5 hidden" x-data="{ editingPackage: false }">
-                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3 flex items-center justify-between gap-3">
+                    <div id="step-panel-3" class="step-panel space-y-4 hidden" x-data="{ editingPackage: false }">
+                        <div class="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
-                                <span class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center">3</span>
+                                <span class="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center">3</span>
                                 <div>
-                                    <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">Layanan &amp; Paket Internet</h4>
+                                    <h4 class="text-xs sm:text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Layanan &amp; Paket Internet</h4>
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400">Paket layanan aktif yang dikonfirmasi</p>
                                 </div>
                             </div>
                             <button type="button" x-show="!editingPackage" @click="editingPackage = true"
-                                    class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200 dark:border-sky-800 transition-colors inline-flex items-center gap-1">
+                                    class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors inline-flex items-center gap-1 shadow-xs">
                                 <x-ui.icon name="edit" class="w-3 h-3" />
                                 <span>Edit Paket</span>
                             </button>
                             <button type="button" x-show="editingPackage" x-cloak @click="editingPackage = false"
-                                    class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                    class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                                 Batal
                             </button>
                         </div>
 
                         <!-- EDIT PACKAGE FORM -->
                         <form x-show="editingPackage" x-cloak action="{{ route('customers.installation.update-package', $customer->id) }}" method="POST"
-                              class="bg-slate-50/90 dark:bg-slate-900/70 rounded-lg p-4 sm:p-5 border border-slate-200 dark:border-slate-700/80 space-y-4 text-xs">
+                              class="bg-slate-50/70 dark:bg-slate-950/40 rounded-lg p-4 border border-slate-200 dark:border-slate-800 space-y-3.5 text-xs">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="return_to" value="{{ $returnTo }}">
                             <label class="block">
                                 <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Pilih Paket Internet *</span>
                                 <select name="internet_package_id" required
-                                        class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3.5 py-3 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                        class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                     <option value="">Pilih Paket Internet</option>
                                     @foreach($internetPackages as $package)
                                         <option value="{{ $package->id }}" {{ (int) old('internet_package_id', $customer->internet_package_id) === $package->id ? 'selected' : '' }}>
@@ -495,9 +534,9 @@
                                     @endforeach
                                 </select>
                             </label>
-                            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
                                 <span class="text-[11px] text-slate-500 dark:text-slate-400">Diskon &amp; PPN dipertahankan</span>
-                                <button type="submit" class="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-2xs inline-flex items-center gap-1.5">
+                                <button type="submit" class="px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium shadow-xs inline-flex items-center gap-1.5">
                                     <x-ui.icon name="save" class="w-3.5 h-3.5" />
                                     <span>Simpan Paket</span>
                                 </button>
@@ -505,82 +544,82 @@
                         </form>
 
                         <!-- READ ONLY PACKAGE SUMMARY -->
-                        <div x-show="!editingPackage" class="bg-slate-50/80 dark:bg-slate-900/50 rounded-lg p-4 sm:p-5 border border-slate-200/70 dark:border-slate-700/60 space-y-4 text-xs">
-                            <div class="p-3.5 rounded-lg bg-sky-50/80 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-900/60 flex items-center justify-between">
+                        <div x-show="!editingPackage" class="border border-slate-200 dark:border-slate-800 rounded-lg p-3.5 space-y-3 text-xs bg-slate-50/50 dark:bg-slate-950/40">
+                            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
                                 <div>
-                                    <span class="block text-[10px] font-bold uppercase tracking-wide text-sky-800 dark:text-sky-300">Paket Internet</span>
-                                    <span class="text-sm font-bold text-slate-800 dark:text-slate-100">{{ $customer->internetPackage->package_code ?? '-' }} — {{ $customer->internetPackage->name ?? 'Belum Dipilih' }}</span>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">Paket Layanan</span>
+                                    <span class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $customer->internetPackage->package_code ?? '-' }} &mdash; {{ $customer->internetPackage->name ?? 'Belum Dipilih' }}</span>
                                 </div>
                                 <div class="text-right">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wide text-sky-800 dark:text-sky-300">Biaya Bulanan</span>
-                                    <span class="text-base font-black text-sky-700 dark:text-sky-400 data-text">Rp {{ number_format($customer->internetPackage->monthly_price ?? 0, 0, ',', '.') }}</span>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">Biaya Bulanan</span>
+                                    <span class="text-sm font-semibold font-mono text-sky-600 dark:text-sky-400">Rp {{ number_format($customer->internetPackage->monthly_price ?? 0, 0, ',', '.') }}</span>
                                 </div>
                             </div>
 
-                            <div class="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
-                                <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-0.5">Jenis Kontrak</span>
-                                    <span class="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200">{{ $customer->customerService->contract_type ?? 'Sewa' }}</span>
+                            <div class="grid grid-cols-3 gap-2.5 pt-0.5">
+                                <div>
+                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">Jenis Kontrak</span>
+                                    <span class="font-medium text-slate-800 dark:text-slate-200 uppercase text-xs">{{ $customer->customerService->contract_type ?? 'Sewa' }}</span>
                                 </div>
-                                <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-0.5">Masa Kontrak</span>
-                                    <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">{{ $customer->customerService->contract_period_months ?? 12 }} Bulan</span>
+                                <div>
+                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">Masa Kontrak</span>
+                                    <span class="font-medium text-slate-800 dark:text-slate-200 text-xs">{{ $customer->customerService->contract_period_months ?? 12 }} Bulan</span>
                                 </div>
-                                <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-0.5">Diskon Promosi</span>
-                                    <span class="block text-xs data-text font-semibold text-slate-800 dark:text-slate-200">Rp {{ number_format($customer->discount_amount ?? 0, 0, ',', '.') }}</span>
+                                <div>
+                                    <span class="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">Diskon Promosi</span>
+                                    <span class="font-medium font-mono text-slate-800 dark:text-slate-200 text-xs">Rp {{ number_format($customer->discount_amount ?? 0, 0, ',', '.') }}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- STEP 4 PANEL: Laporan Survey (Read-Only) -->
-                    <div id="step-panel-4" class="step-panel space-y-5 hidden" x-data="{ editingSurvey: false }">
-                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3 flex items-center justify-between gap-3">
+                    <div id="step-panel-4" class="step-panel space-y-4 hidden" x-data="{ editingSurvey: false }">
+                        <div class="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
-                                <span class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center">4</span>
+                                <span class="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center">4</span>
                                 <div>
-                                    <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">Laporan Survey Lapangan</h4>
+                                    <h4 class="text-xs sm:text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Laporan Survey Lapangan</h4>
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400">Hasil pengamatan awal oleh tim survey</p>
                                 </div>
                             </div>
                             <button type="button" x-show="!editingSurvey" @click="editingSurvey = true"
-                                    class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200 dark:border-sky-800 transition-colors inline-flex items-center gap-1">
+                                    class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors inline-flex items-center gap-1 shadow-xs">
                                 <x-ui.icon name="edit" class="w-3 h-3" />
                                 <span>Edit Survey</span>
                             </button>
                             <button type="button" x-show="editingSurvey" x-cloak @click="editingSurvey = false"
-                                    class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                    class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                                 Batal
                             </button>
                         </div>
 
                         @php $surveyForEdit = $customer->latestSurvey; @endphp
                         <form x-show="editingSurvey" x-cloak action="{{ route('customers.installation.update-survey', $customer->id) }}" method="POST"
-                              class="bg-slate-50/90 dark:bg-slate-900/70 rounded-lg p-4 sm:p-5 border border-slate-200 dark:border-slate-700/80 space-y-4 text-xs">
+                              class="bg-slate-50/70 dark:bg-slate-950/40 rounded-lg p-4 border border-slate-200 dark:border-slate-800 space-y-3.5 text-xs">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="return_to" value="{{ $returnTo }}">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">ODP Terdekat</span>
                                     <input type="text" name="nearest_odp" value="{{ old('nearest_odp', $surveyForEdit?->nearest_odp) }}" maxlength="255"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Estimasi Kabel (Meter)</span>
                                     <input type="number" name="cable_estimation_meter" min="0" value="{{ old('cable_estimation_meter', $surveyForEdit?->cable_estimation_meter) }}"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Tanggal Request Pemasangan</span>
                                     <input type="date" name="requested_installation_date" value="{{ old('requested_installation_date', $surveyForEdit?->requested_installation_date?->format('Y-m-d')) }}"
-                                           class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                           class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Tingkat Kesulitan</span>
                                     <select name="difficulty_level"
-                                            class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                                            class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                                         <option value="">Pilih tingkat kesulitan</option>
                                         @foreach(['MUDAH' => 'Mudah', 'SEDANG' => 'Sedang', 'SULIT' => 'Sulit'] as $value => $label)
                                             <option value="{{ $value }}" {{ old('difficulty_level', $surveyFields['difficulty_level']) === $value ? 'selected' : '' }}>{{ $label }}</option>
@@ -590,12 +629,12 @@
                                 <label class="block sm:col-span-2">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Catatan Teknis Survey</span>
                                     <textarea name="survey_note" rows="2"
-                                              class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">{{ old('survey_note', $surveyFields['survey_note']) }}</textarea>
+                                              class="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">{{ old('survey_note', $surveyFields['survey_note']) }}</textarea>
                                 </label>
                             </div>
-                            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
                                 <span class="text-[11px] text-slate-500 dark:text-slate-400">Simpan perubahan survey</span>
-                                <button type="submit" class="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-2xs inline-flex items-center gap-1.5">
+                                <button type="submit" class="px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium shadow-xs inline-flex items-center gap-1.5">
                                     <x-ui.icon name="save" class="w-3.5 h-3.5" />
                                     <span>Simpan Survey</span>
                                 </button>
@@ -603,47 +642,46 @@
                         </form>
 
                         <!-- READ ONLY SURVEY SUMMARY -->
-                        <div x-show="!editingSurvey" class="bg-slate-50/80 dark:bg-slate-900/50 rounded-lg p-4 sm:p-5 border border-slate-200/70 dark:border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                            <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">ODP Terdekat</span>
-                                <span class="block text-sm data-text font-bold text-slate-800 dark:text-slate-100">{{ $customer->latestSurvey->nearest_odp ?? '-' }}</span>
+                        <div x-show="!editingSurvey" class="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                            <div class="grid grid-cols-2 p-3 bg-white dark:bg-slate-900 gap-3">
+                                <div>
+                                    <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold mb-0.5">ODP Terdekat</span>
+                                    <span class="font-semibold text-slate-800 dark:text-slate-200 font-mono">{{ $customer->latestSurvey->nearest_odp ?? '-' }}</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold mb-0.5">Estimasi Kabel</span>
+                                    <span class="font-semibold text-slate-800 dark:text-slate-200 font-mono">{{ $customer->latestSurvey->cable_estimation_meter ?? '0' }} Meter</span>
+                                </div>
                             </div>
-
-                            <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">Estimasi Kabel</span>
-                                <span class="block text-sm data-text font-bold text-slate-800 dark:text-slate-100">{{ $customer->latestSurvey->cable_estimation_meter ?? '0' }} Meter</span>
-                            </div>
-
                             @if($customer->latestSurvey?->requested_installation_date)
-                                <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 sm:col-span-2">
-                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">Tanggal Request Pemasangan</span>
-                                    <span class="block text-xs data-text font-bold text-slate-800 dark:text-slate-100">{{ \App\Support\IndonesianDate::date($customer->latestSurvey->requested_installation_date) }}</span>
+                                <div class="p-3 bg-white dark:bg-slate-900">
+                                    <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold mb-0.5">Tanggal Request Pemasangan</span>
+                                    <span class="font-semibold text-slate-800 dark:text-slate-200">{{ \App\Support\IndonesianDate::date($customer->latestSurvey->requested_installation_date) }}</span>
                                 </div>
                             @endif
-
-                            <div class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 sm:col-span-2">
-                                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">Tingkat Kesulitan</span>
-                                <span class="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200">{{ $surveyFields['difficulty_level'] ?? '-' }}</span>
+                            <div class="p-3 bg-white dark:bg-slate-900">
+                                <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold mb-0.5">Tingkat Kesulitan</span>
+                                <span class="font-medium text-slate-800 dark:text-slate-200 uppercase">{{ $surveyFields['difficulty_level'] ?? '-' }}</span>
                                 @if($surveyFields['survey_note'])
-                                    <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">{{ $surveyFields['survey_note'] }}</p>
+                                    <p class="text-xs text-slate-600 dark:text-slate-400 mt-1.5 whitespace-pre-wrap">{{ $surveyFields['survey_note'] }}</p>
                                 @endif
                             </div>
                         </div>
                     </div>
 
                     <!-- STEP 5 PANEL: Laporan Pemasangan & Perangkat -->
-                    <div id="step-panel-5" class="step-panel space-y-5 hidden">
-                    <form id="form-pemasangan" action="{{ route('customers.installation.pemasangan', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-5"
+                    <div id="step-panel-5" class="step-panel space-y-4 hidden">
+                    <form id="form-pemasangan" action="{{ route('customers.installation.pemasangan', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-4"
                           x-data="{ modemAcquisition: @js(old('modem_acquisition_choice', $installation->modem_acquisition_choice ?? '')) }">
                         @csrf
                         <input type="hidden" name="return_to" value="{{ $returnTo }}">
                         <input type="hidden" name="started_at" id="hidden_started_at">
 
-                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                        <div class="border-b border-slate-100 dark:border-slate-800 pb-3">
                             <div class="flex items-center gap-2">
-                                <span class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center">5</span>
+                                <span class="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center">5</span>
                                 <div>
-                                    <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">Laporan Pemasangan &amp; Perangkat</h4>
+                                    <h4 class="text-xs sm:text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Laporan Pemasangan &amp; Perangkat</h4>
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400">Data teknis perangkat aktif, ODP/OLT, dan bukti foto pemasangan</p>
                                 </div>
                             </div>
@@ -655,28 +693,28 @@
                             $tech5 = $customer->customerTechnicalDetail;
                         @endphp
                         @if($failedInstallation)
-                            <div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg p-4 space-y-2 shadow-2xs">
-                                <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                                    <x-ui.icon name="triangle-alert" class="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                            <div class="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg p-3 space-y-1.5 shadow-xs">
+                                <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                                    <x-ui.icon name="triangle-alert" class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                                     Instruksi Revisi Pemasangan
                                 </div>
-                                <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Catatan dari Admin Verifikasi:</p>
-                                <p class="bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-900/50 p-3 rounded-lg data-text text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{{ $failedInstallation->installation_note }}</p>
+                                <p class="text-[11px] text-slate-600 dark:text-slate-300">Catatan dari Admin Verifikasi:</p>
+                                <p class="bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-900/50 p-2.5 rounded-md text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{{ $failedInstallation->installation_note }}</p>
                             </div>
                         @endif
 
-                        <div class="space-y-5">
+                        <div class="space-y-4">
 
                             <!-- Section: Perangkat Aktif -->
-                            <div class="p-4 sm:p-5 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60 space-y-4">
-                                <h5 class="text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <x-ui.icon name="cpu" class="w-4 h-4" /> Informasi Perangkat Aktif
+                            <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 space-y-3">
+                                <h5 class="text-xs font-semibold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                    <x-ui.icon name="cpu" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" /> Informasi Perangkat Aktif
                                 </h5>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                     <div>
-                                        <label for="device_type" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Jenis Perangkat <span class="text-rose-500">*</span></label>
-                                        <select name="device_type" id="device_type" class="w-full text-xs font-sans px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                        <label for="device_type" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Jenis Perangkat <span class="text-rose-500">*</span></label>
+                                        <select name="device_type" id="device_type" class="w-full text-xs font-sans px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                             <option value="ont" {{ old('device_type', $dev->device_type ?? 'ont') === 'ont' ? 'selected' : '' }}>ONT</option>
                                             <option value="modem" {{ old('device_type', $dev->device_type ?? '') === 'modem' ? 'selected' : '' }}>Modem</option>
                                             <option value="onu" {{ old('device_type', $dev->device_type ?? '') === 'onu' ? 'selected' : '' }}>ONU</option>
@@ -686,8 +724,8 @@
                                     </div>
 
                                     <div>
-                                        <label for="connection_mode" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Mode Koneksi <span class="text-rose-500">*</span></label>
-                                        <select name="connection_mode" id="connection_mode" class="w-full text-xs font-sans px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                        <label for="connection_mode" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Mode Koneksi <span class="text-rose-500">*</span></label>
+                                        <select name="connection_mode" id="connection_mode" class="w-full text-xs font-sans px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                             <option value="pppoe" {{ old('connection_mode', $dev->connection_mode ?? 'pppoe') === 'pppoe' ? 'selected' : '' }}>PPPoE</option>
                                             <option value="bridge" {{ old('connection_mode', $dev->connection_mode ?? '') === 'bridge' ? 'selected' : '' }}>Bridge</option>
                                             <option value="static" {{ old('connection_mode', $dev->connection_mode ?? '') === 'static' ? 'selected' : '' }}>Static IP</option>
@@ -697,38 +735,33 @@
                                     </div>
 
                                     <div>
-                                        <label for="brand" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Merk Perangkat</label>
-                                        <input type="text" name="brand" id="brand" value="{{ old('brand', $dev->brand ?? '') }}" class="w-full text-xs font-sans px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="ZTE / Huawei / FiberHome">
+                                        <label for="brand" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Merk Perangkat</label>
+                                        <input type="text" name="brand" id="brand" value="{{ old('brand', $dev->brand ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="ZTE / Huawei / FiberHome">
                                     </div>
 
                                     <div>
-                                        <label for="model" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tipe Model</label>
-                                        <input type="text" name="model" id="model" value="{{ old('model', $dev->model ?? '') }}" class="w-full text-xs font-sans px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="Contoh: F609 / HG8245H">
+                                        <label for="model" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Tipe Model</label>
+                                        <input type="text" name="model" id="model" value="{{ old('model', $dev->model ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="Contoh: F609 / HG8245H">
                                     </div>
 
-                                    {{-- Ownership modem (rancangan ownership modem sewa/beli, 2026-10-09,
-                                         task 4) — radio 2 opsi CUMA muncul kalau `contract_type`
-                                         pelanggan 'beli'. Pelanggan 'sewa' (default) gak pernah lihat
-                                         ini sama sekali, SN tetap wajib seperti biasa (ownership COMPANY
-                                         di storeSpeedtest()). --}}
                                     @if(($customer->customerService?->contract_type ?? 'sewa') === 'beli')
                                     <div class="sm:col-span-2">
-                                        <label class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Cara Pemilikan Modem <span class="text-rose-500">*</span></label>
+                                        <label class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Cara Pemilikan Modem <span class="text-rose-500">*</span></label>
                                         <div class="grid grid-cols-2 gap-2">
                                             @foreach([
                                                 'beli_sendiri' => 'Beli Sendiri',
                                                 'beli_gudang' => 'Beli dari Gudang',
                                             ] as $value => $label)
-                                            <label class="flex items-center gap-2 rounded-lg px-3 py-2.5 cursor-pointer transition-colors border"
-                                                   :class="modemAcquisition === '{{ $value }}' ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'">
+                                            <label class="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer transition-colors border text-xs"
+                                                   :class="modemAcquisition === '{{ $value }}' ? 'border-sky-500 bg-sky-50/50 dark:bg-sky-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'">
                                                 <input type="radio" name="modem_acquisition_choice" value="{{ $value }}" x-model="modemAcquisition"
                                                        @checked(old('modem_acquisition_choice', $installation->modem_acquisition_choice ?? '') === $value)
-                                                       class="h-3.5 w-3.5">
-                                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $label }}</span>
+                                                       class="h-3.5 w-3.5 text-sky-600">
+                                                <span class="font-medium text-slate-700 dark:text-slate-300">{{ $label }}</span>
                                             </label>
                                             @endforeach
                                         </div>
-                                        <p class="text-[10px] mt-1 leading-relaxed text-slate-500 dark:text-slate-400">Pelanggan kontrak Beli — pilih apakah modem dibeli sendiri (tidak lewat Gudang) atau dibeli dari Gudang (SN custody dijual).</p>
+                                        <p class="text-[10px] mt-1 text-slate-500 dark:text-slate-400">Pelanggan kontrak Beli — pilih apakah modem dibeli sendiri atau dibeli dari Gudang (SN custody dijual).</p>
                                     </div>
                                     @endif
 
@@ -743,52 +776,41 @@
                                         ])->values();
                                     @endphp
 
-                                    {{-- Disembunyikan kalau 'Beli Sendiri' dipilih — modem itu gak pernah
-                                         lewat Gudang, gak ada SN custody buat dipilih sama sekali.
-                                         Default (belum pilih radio apa pun, termasuk semua pelanggan
-                                         'sewa') tetap tampil seperti biasa. --}}
                                     <div class="sm:col-span-2" x-show="modemAcquisition !== 'beli_sendiri'" x-cloak>
-                                        {{-- fieldset :disabled — x-show cuma menyembunyikan; tanpa ini SN
-                                             dari draft sebelumnya tetap ter-POST saat 'Beli Sendiri' dipilih,
-                                             dan server (storePemasangan) menolaknya. --}}
                                         <fieldset class="min-w-0" :disabled="modemAcquisition === 'beli_sendiri'">
-                                        <label for="selected_inventory_serial_id-search" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Serial Number (SN) — Custody Gudang <span class="text-rose-500">*</span></label>
+                                        <label for="selected_inventory_serial_id-search" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Serial Number (SN) — Custody Gudang <span class="text-rose-500">*</span></label>
                                         <div class="mb-2"><x-estimasi-patokan :rows="$estimasiPerangkatAktif" title="Estimasi Perangkat Aktif" /></div>
                                         @if($eligibleSerials->isNotEmpty())
                                             <x-combobox id="selected_inventory_serial_id" name="selected_inventory_serial_id" :options-expr="json_encode($serialOptions)" :value-expr="json_encode((string) $oldSelectedSerialId)" placeholder="Ketik SN atau nama perangkat..." />
                                         @else
-                                            <select disabled class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed">
+                                            <select disabled class="w-full text-xs font-mono px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed">
                                                 <option>Tidak ada SN di custody Anda</option>
                                             </select>
                                             <p class="text-[11px] text-rose-500 mt-1 leading-relaxed">Anda belum mengambil barang dari Gudang — hubungi Admin/FOP.</p>
                                         @endif
 
-                                        {{-- Harga jual — wajib hanya untuk "Beli dari Gudang". --}}
-                                        <div x-show="modemAcquisition === 'beli_gudang'" x-cloak class="mt-3">
-                                            <label for="modem_sale_price" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Harga Jual Modem <span class="text-rose-500">*</span></label>
-                                            <input type="number" step="0.01" min="0.01" name="modem_sale_price" id="modem_sale_price" value="{{ old('modem_sale_price', $installation->modem_sale_price ?? '') }}" placeholder="Contoh: 150000" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
-                                            <p class="text-[10px] mt-1 leading-relaxed text-slate-500 dark:text-slate-400">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, ditagihkan di tagihan AWAL.</p>
+                                        <div x-show="modemAcquisition === 'beli_gudang'" x-cloak class="mt-2.5">
+                                            <label for="modem_sale_price" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Harga Jual Modem <span class="text-rose-500">*</span></label>
+                                            <input type="number" step="0.01" min="0.01" name="modem_sale_price" id="modem_sale_price" value="{{ old('modem_sale_price', $installation->modem_sale_price ?? '') }}" placeholder="Contoh: 150000" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
+                                            <p class="text-[10px] mt-1 text-slate-500 dark:text-slate-400">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, ditagihkan di tagihan AWAL.</p>
                                         </div>
                                         </fieldset>
                                     </div>
 
-                                    {{-- Beli Sendiri — modem milik pelanggan sendiri, gak pernah lewat
-                                         Gudang. Input manual, BUKAN dari custody/SN gudang (field
-                                         brand/model di atas & serial_number tetap 'prohibited'). --}}
                                     <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-2.5" x-show="modemAcquisition === 'beli_sendiri'" x-cloak>
                                         <div>
-                                            <label for="manual_device_brand" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Brand <span class="text-rose-500">*</span></label>
-                                            <input type="text" name="manual_device_brand" id="manual_device_brand" value="{{ old('manual_device_brand', $installation->manual_device_brand ?? '') }}" maxlength="100" placeholder="mis. TP-Link" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                            <label for="manual_device_brand" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Brand <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="manual_device_brand" id="manual_device_brand" value="{{ old('manual_device_brand', $installation->manual_device_brand ?? '') }}" maxlength="100" placeholder="mis. TP-Link" class="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                         </div>
                                         <div>
-                                            <label for="manual_device_model" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Model <span class="text-rose-500">*</span></label>
-                                            <input type="text" name="manual_device_model" id="manual_device_model" value="{{ old('manual_device_model', $installation->manual_device_model ?? '') }}" maxlength="100" placeholder="mis. Archer C6" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                            <label for="manual_device_model" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Model <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="manual_device_model" id="manual_device_model" value="{{ old('manual_device_model', $installation->manual_device_model ?? '') }}" maxlength="100" placeholder="mis. Archer C6" class="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                         </div>
                                         <div>
-                                            <label for="manual_device_serial_number" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Serial Number <span class="text-rose-500">*</span></label>
-                                            <input type="text" name="manual_device_serial_number" id="manual_device_serial_number" value="{{ old('manual_device_serial_number', $installation->manual_device_serial_number ?? '') }}" maxlength="100" placeholder="SN di stiker perangkat" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                            <label for="manual_device_serial_number" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Serial Number <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="manual_device_serial_number" id="manual_device_serial_number" value="{{ old('manual_device_serial_number', $installation->manual_device_serial_number ?? '') }}" maxlength="100" placeholder="SN stiker perangkat" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                         </div>
-                                        <p class="col-span-1 sm:col-span-3 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">Modem milik pelanggan sendiri — tidak lewat Gudang, tidak ada SN custody yang terpakai.</p>
+                                        <p class="col-span-1 sm:col-span-3 text-[10px] text-slate-500 dark:text-slate-400">Modem milik pelanggan sendiri — tidak lewat Gudang, tidak ada SN custody yang terpakai.</p>
                                     </div>
 
                                     @php
@@ -802,12 +824,12 @@
                                     @endphp
 
                                     <div class="sm:col-span-2">
-                                        <label for="selected_inventory_roll_id-search" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Roll Kabel (Opsional) — Sisa Meter Gudang</label>
+                                        <label for="selected_inventory_roll_id-search" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Roll Kabel (Opsional) — Sisa Meter Gudang</label>
                                         <div class="mb-2"><x-estimasi-patokan :rows="$estimasiRoll" title="Estimasi Roll Kabel" /></div>
                                         @if($eligibleRolls->isNotEmpty())
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                                 <x-combobox id="selected_inventory_roll_id" name="selected_inventory_roll_id" :options-expr="json_encode($rollOptions)" :value-expr="json_encode((string) $oldSelectedRollId)" placeholder="Ketik kode roll atau nama kabel..." />
-                                                <input type="number" step="0.01" min="0.01" name="roll_meters_used" id="roll_meters_used" value="{{ old('roll_meters_used', $installation->roll_meters_used ?? '') }}" placeholder="Meter terpakai (cth: 150)" class="w-full text-xs data-text px-3.5 py-2.5 border @error('roll_meters_used') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                                <input type="number" step="0.01" min="0.01" name="roll_meters_used" id="roll_meters_used" value="{{ old('roll_meters_used', $installation->roll_meters_used ?? '') }}" placeholder="Meter terpakai (cth: 150)" class="w-full text-xs font-mono px-3 py-2 border @error('roll_meters_used') border-rose-500 @else border-slate-300 dark:border-slate-700 @enderror rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                             </div>
                                         @else
                                             <p class="text-[11px] text-slate-400 mt-1">Tidak ada roll kabel di custody Anda — lewati jika kabel belum ditrack per roll.</p>
@@ -815,43 +837,43 @@
                                     </div>
 
                                     <div>
-                                        <label for="mac_address" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">MAC Address</label>
-                                        <input type="text" name="mac_address" id="mac_address" value="{{ old('mac_address', $dev->mac_address ?? '') }}" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="00:11:22:33:44:55">
+                                        <label for="mac_address" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">MAC Address</label>
+                                        <input type="text" name="mac_address" id="mac_address" value="{{ old('mac_address', $dev->mac_address ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="00:11:22:33:44:55">
                                     </div>
 
                                     <div>
-                                        <label for="pppoe_username" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Username PPPoE</label>
-                                        <input type="text" name="pppoe_username" id="pppoe_username" value="{{ old('pppoe_username', $dev->pppoe_username ?? '') }}" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="user_ponorogo_01">
+                                        <label for="pppoe_username" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Username PPPoE</label>
+                                        <input type="text" name="pppoe_username" id="pppoe_username" value="{{ old('pppoe_username', $dev->pppoe_username ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="user_ponorogo_01">
                                     </div>
 
                                     <div>
-                                        <label for="pppoe_password" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Password PPPoE</label>
-                                        <input type="text" name="pppoe_password" id="pppoe_password" value="{{ old('pppoe_password', $dev->pppoe_password ?? '') }}" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="Password PPPOE">
+                                        <label for="pppoe_password" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Password PPPoE</label>
+                                        <input type="text" name="pppoe_password" id="pppoe_password" value="{{ old('pppoe_password', $dev->pppoe_password ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="Password PPPOE">
                                     </div>
 
                                     <div>
-                                        <label for="wifi_ssid" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">SSID WiFi <span class="text-rose-500">*</span></label>
-                                        <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid', $dev->wifi_ssid ?? '') }}" class="w-full text-xs font-sans px-3.5 py-2.5 border @error('wifi_ssid') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="SSID Pelanggan">
+                                        <label for="wifi_ssid" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">SSID WiFi <span class="text-rose-500">*</span></label>
+                                        <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid', $dev->wifi_ssid ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_ssid') border-rose-500 @else border-slate-300 dark:border-slate-700 @enderror rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="SSID Pelanggan">
                                     </div>
 
                                     <div>
-                                        <label for="wifi_password" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Password WiFi <span class="text-rose-500">*</span></label>
-                                        <input type="text" name="wifi_password" id="wifi_password" value="{{ old('wifi_password', $dev->wifi_password ?? '') }}" class="w-full text-xs font-sans px-3.5 py-2.5 border @error('wifi_password') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="Password WiFi Pelanggan">
+                                        <label for="wifi_password" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Password WiFi <span class="text-rose-500">*</span></label>
+                                        <input type="text" name="wifi_password" id="wifi_password" value="{{ old('wifi_password', $dev->wifi_password ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_password') border-rose-500 @else border-slate-300 dark:border-slate-700 @enderror rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="Password WiFi Pelanggan">
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Section: Distribusi Jaringan (ODP / OLT) -->
-                            <div class="p-4 sm:p-5 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60 space-y-4">
-                                <h5 class="text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <x-ui.icon name="workflow" class="w-4 h-4" /> Distribusi Jaringan (ODP / OLT)
+                            <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 space-y-3">
+                                <h5 class="text-xs font-semibold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                    <x-ui.icon name="workflow" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" /> Distribusi Jaringan (ODP / OLT)
                                 </h5>
 
                                 @if($hasManagedOdp)
-                                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Pilih ODP & Port Tersedia <span class="text-rose-500">*</span>
+                                <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">Pilih ODP & Port Tersedia <span class="text-rose-500">*</span>
                                     <select name="network_node_port_id" required
                                         x-on:change="document.getElementById('odp_number').value = $event.target.selectedOptions[0]?.dataset.code || ''; document.getElementById('odp_port').value = $event.target.selectedOptions[0]?.dataset.port || ''"
-                                        class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                                        class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500">
                                         <option value="">Pilih titik dan port</option>
                                         @foreach($odpPortOptions as $option)
                                         <option value="{{ $option->id }}" data-code="{{ $option->node->code }}" data-port="{{ $option->number }}"
@@ -864,91 +886,66 @@
                                 </label>
                                 @endif
 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
-                                            <label for="odp_number" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Nomor ODP <span class="text-rose-500">*</span></label>
-                                            <input type="text" name="odp_number" id="odp_number" value="{{ old('odp_number', $tech5->odp_number ?? $customer->latestSurvey->nearest_odp ?? '') }}" class="w-full text-xs data-text px-3.5 py-2.5 border @error('odp_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="ODP-01">
+                                            <label for="odp_number" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Nomor ODP <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="odp_number" id="odp_number" value="{{ old('odp_number', $tech5->odp_number ?? $customer->latestSurvey->nearest_odp ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border @error('odp_number') border-rose-500 @else border-slate-300 dark:border-slate-700 @enderror rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="ODP-01">
                                         </div>
                                         <div>
-                                            <label for="odp_port" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Port ODP <span class="text-rose-500">*</span></label>
-                                            <input type="text" name="odp_port" id="odp_port" value="{{ old('odp_port', $tech5->odp_port ?? '') }}" class="w-full text-xs data-text px-3.5 py-2.5 border @error('odp_port') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="Port 4">
+                                            <label for="odp_port" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Port ODP <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="odp_port" id="odp_port" value="{{ old('odp_port', $tech5->odp_port ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border @error('odp_port') border-rose-500 @else border-slate-300 dark:border-slate-700 @enderror rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="Port 4">
                                         </div>
                                     </div>
 
                                     <div class="grid grid-cols-3 gap-2">
                                         <div>
-                                            <label for="olt_number" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300 truncate">No. OLT</label>
-                                            <input type="text" name="olt_number" id="olt_number" value="{{ old('olt_number', $tech5->olt_number ?? '') }}" placeholder="1" class="w-full text-xs data-text px-2.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                            <label for="olt_number" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400 truncate">No. OLT</label>
+                                            <input type="text" name="olt_number" id="olt_number" value="{{ old('olt_number', $tech5->olt_number ?? '') }}" placeholder="1" class="w-full text-xs font-mono px-2.5 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                         </div>
                                         <div>
-                                            <label for="olt_slot" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300 truncate">Slot OLT</label>
-                                            <input type="text" name="olt_slot" id="olt_slot" value="{{ old('olt_slot', $tech5->olt_slot ?? '') }}" placeholder="2" class="w-full text-xs data-text px-2.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                            <label for="olt_slot" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400 truncate">Slot OLT</label>
+                                            <input type="text" name="olt_slot" id="olt_slot" value="{{ old('olt_slot', $tech5->olt_slot ?? '') }}" placeholder="2" class="w-full text-xs font-mono px-2.5 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                         </div>
                                         <div>
-                                            <label for="olt_port" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300 truncate">Port OLT</label>
-                                            <input type="text" name="olt_port" id="olt_port" value="{{ old('olt_port', $tech5->olt_port ?? '') }}" placeholder="3" class="w-full text-xs data-text px-2.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs">
+                                            <label for="olt_port" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400 truncate">Port OLT</label>
+                                            <input type="text" name="olt_port" id="olt_port" value="{{ old('olt_port', $tech5->olt_port ?? '') }}" placeholder="3" class="w-full text-xs font-mono px-2.5 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                         </div>
                                     </div>
 
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
-                                            <label for="vlan" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">VLAN</label>
-                                            <input type="text" name="vlan" id="vlan" value="{{ old('vlan', $tech5->vlan ?? '') }}" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="100">
+                                            <label for="vlan" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">VLAN</label>
+                                            <input type="text" name="vlan" id="vlan" value="{{ old('vlan', $tech5->vlan ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="100">
                                         </div>
                                         <div>
-                                            <label for="router_number" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">No. Router</label>
-                                            <input type="text" name="router_number" id="router_number" value="{{ old('router_number', $tech5->router_number ?? '') }}" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="Distribusi">
+                                            <label for="router_number" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">No. Router</label>
+                                            <input type="text" name="router_number" id="router_number" value="{{ old('router_number', $tech5->router_number ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="Distribusi">
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label for="initial_attenuation" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Redaman Awal (dBm)</label>
-                                        <input type="text" name="initial_attenuation" id="initial_attenuation" value="{{ old('initial_attenuation', $tech5->initial_attenuation ?? '') }}" class="w-full text-xs data-text px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="-19.5">
+                                        <label for="initial_attenuation" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Redaman Awal (dBm)</label>
+                                        <input type="text" name="initial_attenuation" id="initial_attenuation" value="{{ old('initial_attenuation', $tech5->initial_attenuation ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="-19.5">
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Aktivasi Action Banner -->
-                            @unless($pemasanganComplete)
-                                <div class="p-4 sm:p-5 rounded-lg bg-surface-muted border border-sky-200/80 dark:border-sky-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                    <div>
-                                        <h6 class="text-xs font-bold text-sky-900 dark:text-sky-200">Aktivasi Tahap Speedtest (Fase 6)</h6>
-                                        <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">Tekan setelah Perangkat &amp; ODP terisi untuk membuka akses Speedtest.</p>
-                                    </div>
-                                    <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all text-xs font-bold cursor-pointer shadow-2xs shadow-sky-500/20 active:scale-95 inline-flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50">
-                                        <x-ui.icon name="zap" class="w-3.5 h-3.5" />
-                                        <span>Aktivasi Laporan Speedtest</span>
-                                    </button>
-                                </div>
-                            @else
-                                <div class="p-4 sm:p-5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                    <div>
-                                        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold border border-emerald-300 dark:border-emerald-800">
-                                            <x-ui.icon name="check" class="w-3.5 h-3.5" /> Sudah Diaktivasi — Fase 6 Terbuka
-                                        </div>
-                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Gunakan tombol di samping untuk menyimpan koreksi data perangkat.</p>
-                                    </div>
-                                    <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-2xs inline-flex items-center justify-center gap-1.5">
-                                        <x-ui.icon name="save" class="w-3.5 h-3.5" />
-                                        <span>Simpan Perubahan</span>
-                                    </button>
-                                </div>
-                            @endunless
+
 
                             <!-- Section: Material Realita Terpakai -->
-                            <div class="p-4 sm:p-5 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60 space-y-3">
-                                <label class="block font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">
+                            <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                                <label class="block font-semibold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">
                                     Perangkat Pasif / Material Terpakai Realita (Opsional)
                                 </label>
                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Material yang benar-benar dipakai di lokasi dari custody tim Anda.</p>
                                 <x-estimasi-patokan :rows="$estimasiPasif" title="Estimasi Perangkat Pasif" />
                                 
                                 @if($eligiblePassiveCustody->isEmpty())
-                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">⚠ Tim ini belum punya custody Perangkat Pasif — ambil barang dari Gudang dulu.</p>
+                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">⚠ Tim ini belum punya custody Perangkat Pasif — ambil barang dari Gudang dulu.</p>
                                 @endif
                                 @if($droppedFreeformEstimateNames->isNotEmpty())
-                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">⚠ Estimasi survey "Lainnya" tidak bisa diprefill: {{ $droppedFreeformEstimateNames->implode(', ') }}.</p>
+                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">⚠ Estimasi survey "Lainnya" tidak bisa diprefill: {{ $droppedFreeformEstimateNames->implode(', ') }}.</p>
                                 @endif
                                 
                                 <x-material-rows
@@ -962,7 +959,7 @@
                             </div>
 
                             <!-- Section: Alat Kerja Terpakai -->
-                            <div class="p-4 sm:p-5 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
+                            <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800">
                                 <x-work-tool-checklist
                                     name="work_tools"
                                     :tools="$workTools"
@@ -973,60 +970,60 @@
                             </div>
 
                             <!-- Section: Upload Foto Bukti Pemasangan -->
-                            <div class="p-4 sm:p-5 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60 space-y-4">
-                                <h5 class="text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <x-ui.icon name="camera" class="w-4 h-4" /> Foto Bukti Pemasangan &amp; Kontrak
+                            <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 space-y-3">
+                                <h5 class="text-xs font-semibold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                    <x-ui.icon name="camera" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" /> Foto Bukti Pemasangan &amp; Kontrak
                                 </h5>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     @foreach ([
                                         ['field' => 'installation_photo', 'icon' => 'wrench', 'label' => 'FOTO PEMASANGAN', 'hint' => 'Router / ONT Terpasang', 'cta' => 'Pilih Foto Pemasangan', 'alt' => 'Preview Foto Pemasangan'],
                                         ['field' => 'contract_photo', 'icon' => 'file-text', 'label' => 'FOTO KONTRAK', 'hint' => 'Form Fisik Bertanda Tangan', 'cta' => 'Pilih Foto Kontrak', 'alt' => 'Preview Foto Kontrak'],
                                         ['field' => 'signature_photo', 'icon' => 'signature', 'label' => 'FOTO TTD PELANGGAN', 'hint' => 'Bukti Serah Terima', 'cta' => 'Pilih Foto TTD', 'alt' => 'Preview Foto TTD'],
                                     ] as $photo)
                                         @php $existingFotoUrl = foto_publik($installation->{$photo['field']} ?? null); @endphp
-                                        <div class="border-2 border-dashed @error($photo['field']) border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-lg p-3.5 text-center transition-all shadow-2xs flex flex-col justify-between relative">
+                                        <div class="border border-dashed @error($photo['field']) border-rose-400 bg-rose-50/20 @else border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 @enderror rounded-lg p-3 text-center transition-all shadow-xs flex flex-col justify-between relative">
                                             
                                             <!-- Default Empty Placeholder -->
-                                            <div id="default-placeholder-{{ $photo['field'] }}" class="py-3 space-y-2 {{ $existingFotoUrl ? 'hidden' : '' }}">
-                                                <div class="w-10 h-10 mx-auto rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-200 dark:border-sky-800">
+                                            <div id="default-placeholder-{{ $photo['field'] }}" class="py-2.5 space-y-1.5 {{ $existingFotoUrl ? 'hidden' : '' }}">
+                                                <div class="w-8 h-8 mx-auto rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center">
                                                     <x-ui.icon name="{{ $photo['icon'] }}" class="w-4 h-4" />
                                                 </div>
                                                 <div>
-                                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">{{ $photo['label'] }} <span class="text-rose-500">*</span></span>
+                                                    <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">{{ $photo['label'] }} <span class="text-rose-500">*</span></span>
                                                     <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{{ $photo['hint'] }}</span>
                                                 </div>
                                             </div>
 
                                             <!-- Existing Saved Photo -->
                                             @if($existingFotoUrl)
-                                                <div id="existing-preview-{{ $photo['field'] }}" class="py-2 flex flex-col items-center justify-center">
+                                                <div id="existing-preview-{{ $photo['field'] }}" class="py-1.5 flex flex-col items-center justify-center">
                                                     <div class="relative inline-block w-full">
-                                                        <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-2xs mx-auto cursor-pointer" src="{{ $existingFotoUrl }}" alt="{{ $photo['alt'] }}" onclick="window.open('{{ $existingFotoUrl }}', '_blank')">
+                                                        <img class="max-h-24 max-w-full rounded-md object-contain border border-slate-200 dark:border-slate-700 mx-auto cursor-pointer" src="{{ $existingFotoUrl }}" alt="{{ $photo['alt'] }}" onclick="window.open('{{ $existingFotoUrl }}', '_blank')">
                                                     </div>
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                                                    <span class="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mt-1">
                                                         <x-ui.icon name="check" class="w-3 h-3" /> Sudah Tersimpan
                                                     </span>
                                                 </div>
                                             @endif
 
                                             <!-- Live Picked Preview -->
-                                            <div id="preview-container-{{ $photo['field'] }}" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                            <div id="preview-container-{{ $photo['field'] }}" style="display: none;" class="py-1.5 flex flex-col items-center justify-center">
                                                 <div class="relative inline-block w-full">
-                                                    <img id="preview-img-{{ $photo['field'] }}" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-2xs mx-auto" src="" alt="{{ $photo['alt'] }}">
-                                                    <button type="button" onclick="clearFile('{{ $photo['field'] }}')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-2xs active:scale-95 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                                    <img id="preview-img-{{ $photo['field'] }}" class="max-h-24 max-w-full rounded-md object-contain border border-slate-200 dark:border-slate-700 mx-auto" src="" alt="{{ $photo['alt'] }}">
+                                                    <button type="button" onclick="clearFile('{{ $photo['field'] }}')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-xs transition-transform focus:outline-none cursor-pointer" title="Hapus File">
                                                         <x-ui.icon name="x" class="w-3 h-3" />
                                                     </button>
                                                 </div>
-                                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                                                <span class="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mt-1">
                                                     <x-ui.icon name="check" class="w-3 h-3" /> Terpilih
                                                 </span>
                                             </div>
 
                                             <div class="mt-2">
                                                 <input type="file" name="{{ $photo['field'] }}" id="{{ $photo['field'] }}" accept="image/*" class="hidden" data-has-existing="{{ $existingFotoUrl ? 'true' : 'false' }}" onchange="onFileChange('{{ $photo['field'] }}')">
-                                                <label for="{{ $photo['field'] }}" class="w-full text-center bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-semibold py-2 px-3 rounded-lg cursor-pointer transition-all shadow-2xs focus:outline-none inline-flex items-center justify-center gap-1">
-                                                    <x-ui.icon name="camera" class="w-3.5 h-3.5" />
+                                                <label for="{{ $photo['field'] }}" class="w-full text-center bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium py-1.5 px-2.5 rounded-md cursor-pointer transition-colors shadow-xs inline-flex items-center justify-center gap-1">
+                                                    <x-ui.icon name="camera" class="w-3 h-3" />
                                                     <span>{{ $existingFotoUrl ? 'Ganti Foto' : $photo['cta'] }}</span>
                                                 </label>
                                                 <span id="file-label-{{ $photo['field'] }}" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ $existingFotoUrl ? 'Pakai foto tersimpan' : 'Belum ada file' }}</span>
@@ -1038,23 +1035,50 @@
 
                             <!-- Catatan Pemasangan -->
                             <div>
-                                <label for="installation_note" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Catatan Pemasangan Teknisi</label>
-                                <textarea name="installation_note" id="installation_note" rows="2" class="w-full text-xs font-sans px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="Tuliskan catatan teknis tambahan selama proses pemasangan...">{{ old('installation_note', $installation->installation_note ?? '') }}</textarea>
+                                <label for="installation_note" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Catatan Pemasangan Teknisi</label>
+                                <textarea name="installation_note" id="installation_note" rows="2" class="w-full text-xs font-sans px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="Tuliskan catatan teknis tambahan selama proses pemasangan...">{{ old('installation_note', $installation->installation_note ?? '') }}</textarea>
                             </div>
                         </div>
                     </form>
 
                     <!-- Section: Perangkat Tambahan (ADHOC-190) — form sendiri, saudara form-pemasangan -->
                     @include('installations.partials._additional_devices_step')
+
+                <!-- Aktivasi Action Banner -->
+                @unless($pemasanganComplete)
+                    <div class="p-3.5 sm:p-4 rounded-lg bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/80 dark:border-sky-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <h6 class="text-xs font-semibold text-slate-900 dark:text-slate-100">Aktivasi Tahap Speedtest (Fase 6)</h6>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Simpan perangkat utama dan perangkat tambahan sesuai paket, lalu buka akses Speedtest.</p>
+                        </div>
+                        <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-medium cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50">
+                            <x-ui.icon name="zap" class="w-3.5 h-3.5" />
+                            <span>Aktivasi Laporan Speedtest</span>
+                        </button>
+                    </div>
+                @else
+                    <div class="p-3.5 sm:p-4 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <div class="inline-flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 text-xs font-medium">
+                                <x-ui.icon name="check" class="w-3.5 h-3.5 text-emerald-600" /> Sudah Diaktivasi — Fase 6 Terbuka
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Gunakan tombol di samping untuk menyimpan koreksi data perangkat.</p>
+                        </div>
+                        <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium shadow-xs inline-flex items-center justify-center gap-1.5">
+                            <x-ui.icon name="save" class="w-3.5 h-3.5" />
+                            <span>Simpan Perubahan</span>
+                        </button>
+                    </div>
+                @endunless
                     </div>
 
                     <!-- STEP 6 PANEL: Laporan Uji Koneksi (Speedtest) -->
-                    <div id="step-panel-6" class="step-panel space-y-5 hidden">
-                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                    <div id="step-panel-6" class="step-panel space-y-4 hidden">
+                        <div class="border-b border-slate-100 dark:border-slate-800 pb-3">
                             <div class="flex items-center gap-2">
-                                <span class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center">6</span>
+                                <span class="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center">6</span>
                                 <div>
-                                    <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">Laporan Uji Koneksi (Speedtest)</h4>
+                                    <h4 class="text-xs sm:text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Laporan Uji Koneksi (Speedtest)</h4>
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400">Hasil pengujian kecepatan &amp; stabilitas internet pelanggan</p>
                                 </div>
                             </div>
@@ -1062,17 +1086,17 @@
 
                         @unless($pemasanganComplete)
                             <!-- Locked State View -->
-                            <div class="py-12 px-4 text-center bg-slate-50/70 dark:bg-slate-900/40 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg space-y-3">
-                                <div class="w-14 h-14 mx-auto rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200 dark:border-amber-800/60 shadow-2xs">
-                                    <x-ui.icon name="lock" class="w-6 h-6" />
+                            <div class="py-10 px-4 text-center bg-slate-50/50 dark:bg-slate-950/40 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg space-y-2.5">
+                                <div class="w-10 h-10 mx-auto rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                                    <x-ui.icon name="lock" class="w-4 h-4" />
                                 </div>
                                 <div class="max-w-sm mx-auto space-y-1">
-                                    <h5 class="text-sm font-bold text-slate-800 dark:text-slate-200">Fase Speedtest Masih Terkunci</h5>
+                                    <h5 class="text-xs font-semibold text-slate-800 dark:text-slate-200">Fase Speedtest Masih Terkunci</h5>
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                                         Lengkapi data di <strong>Step 5 (Perangkat &amp; Instalasi)</strong>, lalu tekan tombol <strong>Aktivasi Laporan Speedtest</strong> untuk membuka tahap ini.
                                     </p>
                                 </div>
-                                <button type="button" onclick="goToStep(5)" class="mt-2 inline-flex items-center gap-1.5 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-all active:scale-95">
+                                <button type="button" onclick="goToStep(5)" class="mt-1 inline-flex items-center gap-1 px-3.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md text-xs font-medium shadow-xs transition-colors">
                                     <x-ui.icon name="chevron-left" class="w-3.5 h-3.5" />
                                     <span>Kembali ke Step 5</span>
                                 </button>
@@ -1082,99 +1106,99 @@
                         @error('extra_devices')
                             <p class="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">{{ $message }}</p>
                         @enderror
-                        <form id="form-speedtest" action="{{ route('customers.installation.speedtest', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+                        <form id="form-speedtest" action="{{ route('customers.installation.speedtest', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-4">
                             @csrf
                             <input type="hidden" name="return_to" value="{{ $returnTo }}">
                             <input type="hidden" name="completed_at" id="hidden_completed_at">
 
                             <!-- Speed Metrics Hero Grid -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-surface-muted p-4 sm:p-5 rounded-lg border border-sky-200/80 dark:border-sky-800/60">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
                                 <div>
-                                    <label for="test_download" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-sky-900 dark:text-sky-200">
+                                    <label for="test_download" class="block mb-1 font-semibold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">
                                         Speed Download (Mbps) <span class="text-rose-500">*</span>
                                     </label>
                                     <div class="relative">
-                                        <input type="number" step="0.01" inputmode="decimal" name="test_download" id="test_download" value="{{ old('test_download') }}" class="w-full text-base data-text font-black px-4 py-3 pr-14 border @error('test_download') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="15.5">
-                                        <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-sky-600 dark:text-sky-400">Mbps</span>
+                                        <input type="number" step="0.01" inputmode="decimal" name="test_download" id="test_download" value="{{ old('test_download') }}" class="w-full text-base font-mono font-bold px-3 py-2 pr-14 border @error('test_download') border-rose-500 @else border-slate-300 dark:border-slate-700 @enderror rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="15.5">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">Mbps</span>
                                     </div>
                                     @error('test_download')<p class="text-[10px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
                                 </div>
 
                                 <div>
-                                    <label for="test_upload" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-sky-900 dark:text-sky-200">
+                                    <label for="test_upload" class="block mb-1 font-semibold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">
                                         Speed Upload (Mbps) <span class="text-rose-500">*</span>
                                     </label>
                                     <div class="relative">
-                                        <input type="number" step="0.01" inputmode="decimal" name="test_upload" id="test_upload" value="{{ old('test_upload') }}" class="w-full text-base data-text font-black px-4 py-3 pr-14 border @error('test_upload') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-2xs" placeholder="15.0">
-                                        <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-sky-600 dark:text-sky-400">Mbps</span>
+                                        <input type="number" step="0.01" inputmode="decimal" name="test_upload" id="test_upload" value="{{ old('test_upload') }}" class="w-full text-base font-mono font-bold px-3 py-2 pr-14 border @error('test_upload') border-rose-500 @else border-slate-300 dark:border-slate-700 @enderror rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="15.0">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">Mbps</span>
                                     </div>
                                     @error('test_upload')<p class="text-[10px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>@enderror
                                 </div>
                             </div>
 
                             <!-- Secondary Network Quality Metrics -->
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
-                                <div class="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
-                                    <label for="latency_ms" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-500 dark:text-slate-400">Latency (ms)</label>
-                                    <input type="number" step="0.1" inputmode="decimal" name="latency_ms" id="latency_ms" value="{{ old('latency_ms') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="4.2">
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                                <div class="p-2.5 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800">
+                                    <label for="latency_ms" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-500 dark:text-slate-400">Latency (ms)</label>
+                                    <input type="number" step="0.1" inputmode="decimal" name="latency_ms" id="latency_ms" value="{{ old('latency_ms') }}" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500" placeholder="4.2">
                                 </div>
 
-                                <div class="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
-                                    <label for="jitter_ms" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-500 dark:text-slate-400">Jitter (ms)</label>
-                                    <input type="number" step="0.1" inputmode="decimal" name="jitter_ms" id="jitter_ms" value="{{ old('jitter_ms') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="1.0">
+                                <div class="p-2.5 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800">
+                                    <label for="jitter_ms" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-500 dark:text-slate-400">Jitter (ms)</label>
+                                    <input type="number" step="0.1" inputmode="decimal" name="jitter_ms" id="jitter_ms" value="{{ old('jitter_ms') }}" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500" placeholder="1.0">
                                 </div>
 
-                                <div class="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
-                                    <label for="packet_loss_percent" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-500 dark:text-slate-400">Packet Loss (%)</label>
-                                    <input type="number" step="0.01" inputmode="decimal" name="packet_loss_percent" id="packet_loss_percent" value="{{ old('packet_loss_percent') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="0">
+                                <div class="p-2.5 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800">
+                                    <label for="packet_loss_percent" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-500 dark:text-slate-400">Packet Loss (%)</label>
+                                    <input type="number" step="0.01" inputmode="decimal" name="packet_loss_percent" id="packet_loss_percent" value="{{ old('packet_loss_percent') }}" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500" placeholder="0">
                                 </div>
 
-                                <div class="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60">
-                                    <label for="actual_attenuation" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-500 dark:text-slate-400">Redaman (dBm)</label>
-                                    <input type="text" name="actual_attenuation" id="actual_attenuation" value="{{ old('actual_attenuation') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="-19.8">
+                                <div class="p-2.5 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800">
+                                    <label for="actual_attenuation" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-500 dark:text-slate-400">Redaman (dBm)</label>
+                                    <input type="text" name="actual_attenuation" id="actual_attenuation" value="{{ old('actual_attenuation') }}" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500" placeholder="-19.8">
                                 </div>
                             </div>
 
                             <!-- Foto Speedtest Upload Dropzone -->
-                            <div class="p-4 sm:p-5 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/60 space-y-3">
-                                <h5 class="text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <x-ui.icon name="gauge" class="w-4 h-4" /> Bukti Screenshot Speedtest
+                            <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 space-y-3">
+                                <h5 class="text-xs font-semibold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                    <x-ui.icon name="gauge" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" /> Bukti Screenshot Speedtest
                                 </h5>
 
-                                <div class="border-2 border-dashed @error('speedtest_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-lg p-5 text-center transition-all shadow-2xs flex flex-col justify-between relative">
-                                    <div id="default-placeholder-speedtest_photo" class="py-4 space-y-2">
-                                        <div class="w-12 h-12 mx-auto rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
-                                            <x-ui.icon name="gauge" class="w-5 h-5" />
+                                <div class="border border-dashed @error('speedtest_photo') border-rose-400 bg-rose-50/20 @else border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 @enderror rounded-lg p-4 text-center transition-all shadow-xs flex flex-col justify-between relative">
+                                    <div id="default-placeholder-speedtest_photo" class="py-3 space-y-1.5">
+                                        <div class="w-10 h-10 mx-auto rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center">
+                                            <x-ui.icon name="gauge" class="w-4 h-4" />
                                         </div>
                                         <div>
-                                            <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO BUKTI SPEEDTEST <span class="text-rose-500">*</span></span>
-                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Screenshot Aplikasi Speedtest (Ookla / Fast.com)</span>
+                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">FOTO BUKTI SPEEDTEST <span class="text-rose-500">*</span></span>
+                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Screenshot Ookla / Fast.com</span>
                                         </div>
                                     </div>
 
                                     <div id="preview-container-speedtest_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
                                         <div class="relative inline-block w-full max-w-sm">
-                                            <img id="preview-img-speedtest_photo" class="max-h-44 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-2xs mx-auto" src="" alt="Preview Foto Speedtest">
-                                            <button type="button" onclick="clearFile('speedtest_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-2xs active:scale-95 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
-                                                <x-ui.icon name="x" class="w-3.5 h-3.5" />
+                                            <img id="preview-img-speedtest_photo" class="max-h-36 max-w-full rounded-md object-contain border border-slate-200 dark:border-slate-700 mx-auto" src="" alt="Preview Foto Speedtest">
+                                            <button type="button" onclick="clearFile('speedtest_photo')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-xs transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                                <x-ui.icon name="x" class="w-3 h-3" />
                                             </button>
                                         </div>
-                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mt-1.5">
                                             <x-ui.icon name="check" class="w-3 h-3" /> Foto Speedtest Terpilih
                                         </span>
                                     </div>
 
-                                    <div class="mt-3 max-w-xs mx-auto w-full">
+                                    <div class="mt-2 max-w-xs mx-auto w-full">
                                         <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" class="hidden" onchange="onFileChange('speedtest_photo')">
-                                        <label for="speedtest_photo" class="w-full text-center bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-semibold py-2.5 px-3 rounded-lg cursor-pointer transition-all shadow-2xs focus:outline-none inline-flex items-center justify-center gap-1.5">
-                                            <x-ui.icon name="camera" class="w-3.5 h-3.5" />
+                                        <label for="speedtest_photo" class="w-full text-center bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium py-1.5 px-3 rounded-md cursor-pointer transition-colors shadow-xs inline-flex items-center justify-center gap-1.5">
+                                            <x-ui.icon name="camera" class="w-3 h-3" />
                                             <span>Pilih Foto Speedtest</span>
                                         </label>
-                                        <span id="file-label-speedtest_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file dipilih</span>
+                                        <span id="file-label-speedtest_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">Belum ada file dipilih</span>
                                     </div>
 
                                     @error('speedtest_photo')
-                                        <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
+                                        <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-1.5">{{ $message }}</p>
                                     @enderror
                                 </div>
                             </div>
@@ -1185,27 +1209,29 @@
 
                 </div>
 
-                <!-- DESKTOP & MOBILE NAVIGATION FOOTER (Sticky-safe on mobile) -->
-                <div class="px-4 sm:px-7 py-3.5 sm:py-4 bg-slate-50/95 dark:bg-slate-900/80 backdrop-blur border-t border-slate-200 dark:border-slate-700/60 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 shrink-0 rounded-b-2xl">
+                <!-- DESKTOP & MOBILE NAVIGATION FOOTER (Fixed on mobile, static on desktop) -->
+                <div class="fixed sm:static bottom-0 inset-x-0 z-30 px-4 sm:px-6 py-2.5 sm:py-3 bg-white dark:bg-slate-900 sm:bg-slate-50/90 sm:dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2.5 shrink-0 sm:rounded-b-lg shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.3)] sm:shadow-none pb-[calc(env(safe-area-inset-bottom)+0.625rem)] sm:pb-3">
+                    <!-- Left Actions (Batal on desktop, Sebelumnya on both) -->
                     <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <button type="button" id="btn-prev" onclick="prevStep()" style="display: none;" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-2xs active:scale-95">
+                        <button type="button" id="btn-prev" onclick="prevStep()" style="display: none;" class="w-1/3 sm:w-auto min-h-[44px] sm:min-h-0 py-2.5 sm:py-1.5 px-3 sm:px-3.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-xs shrink-0">
                             <x-ui.icon name="chevron-left" class="w-3.5 h-3.5" />
                             <span>Sebelumnya</span>
                         </button>
-                        <a href="{{ route('verifications.queue') }}" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all text-xs font-semibold cursor-pointer focus:outline-none text-center inline-flex items-center justify-center active:scale-95">
+                        <a href="{{ route('verifications.queue') }}" class="hidden sm:inline-flex px-3.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 text-xs font-medium cursor-pointer focus:outline-none text-center items-center justify-center">
                             Batal
                         </a>
                     </div>
 
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <button type="button" id="btn-next" onclick="nextStep()" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-2xs shadow-sky-500/20 active:scale-95">
-                            <span>Lanjut Langkah Berikutnya</span>
+                    <!-- Right Primary Actions -->
+                    <div class="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+                        <button type="button" id="btn-next" onclick="nextStep()" class="flex-1 sm:w-auto min-h-[44px] sm:min-h-0 py-2.5 sm:py-2 px-4 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors duration-150 text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap">
+                            <span>Lanjut</span><span class="hidden sm:inline">&nbsp;Langkah Berikutnya</span>
                             <x-ui.icon name="chevron-right" class="w-3.5 h-3.5" />
                         </button>
 
-                        <button type="button" onclick="handleSpeedtestSubmit()" id="btn-submit" style="display: none;" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all text-xs font-bold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-2xs shadow-emerald-500/20 active:scale-95">
-                            <x-ui.icon name="check-circle" class="w-4 h-4" />
-                            <span>Simpan &amp; Selesaikan Pemasangan</span>
+                        <button type="button" onclick="handleSpeedtestSubmit()" id="btn-submit" style="display: none;" class="flex-1 sm:w-auto min-h-[44px] sm:min-h-0 py-2.5 sm:py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors duration-150 text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap">
+                            <x-ui.icon name="check-circle" class="w-3.5 h-3.5" />
+                            <span>Simpan</span><span class="hidden sm:inline">&nbsp;&amp; Selesaikan Pemasangan</span>
                         </button>
                     </div>
                 </div>
@@ -1516,6 +1542,7 @@
         const iconDiv = document.getElementById('step-nav-icon-' + step);
         const statusSpan = document.getElementById('step-nav-status-' + step);
         const missingSpan = document.getElementById('step-nav-missing-' + step);
+        const mBadge = document.getElementById('mobile-step-badge-' + step);
 
         if (!navBtn || !iconDiv || !statusSpan || !missingSpan) return;
 
@@ -1524,26 +1551,48 @@
 
         if (requiredMissing.length > 0) {
             statusSpan.textContent = 'Belum Lengkap';
-            statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-rose-600 dark:text-rose-400 mt-0.5';
-            iconDiv.innerHTML = `<span class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400"><x-ui.icon name="x" class="w-2.5 h-2.5" /></span>`;
-            missingSpan.textContent = 'Wajib diisi: ' + requiredMissing.join(', ');
+            statusSpan.className = 'text-[10px] font-medium block text-rose-600 dark:text-rose-400';
+            iconDiv.innerHTML = `<span class="w-4 h-4 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-600 dark:text-rose-400"><x-ui.icon name="x" class="w-2.5 h-2.5" /></span>`;
+            missingSpan.textContent = 'Wajib: ' + requiredMissing.join(', ');
 
             if (currentActiveStep !== step) {
-                navBtn.className = "w-full text-left p-3 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group focus:outline-none";
+            }
+            if (mBadge && currentActiveStep !== step) {
+                mBadge.className = "w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-mono font-bold flex items-center justify-center shrink-0";
+                mBadge.textContent = step;
             }
         } else {
             statusSpan.textContent = 'Lengkap';
-            statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mt-0.5';
-            iconDiv.innerHTML = `<span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0 shadow-2xs"><x-ui.icon name="check" class="w-2.5 h-2.5" /></span>`;
+            statusSpan.className = 'text-[10px] font-medium block text-emerald-600 dark:text-emerald-400';
+            iconDiv.innerHTML = `<span class="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shrink-0"><x-ui.icon name="check" class="w-2.5 h-2.5" /></span>`;
             missingSpan.textContent = 'Semua terisi';
 
             if (currentActiveStep !== step) {
-                navBtn.className = "w-full text-left p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group focus:outline-none";
+            }
+            if (mBadge && currentActiveStep !== step) {
+                mBadge.className = "w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0";
+                mBadge.textContent = "✓";
             }
         }
 
         if (currentActiveStep === step) {
-            navBtn.className = "w-full text-left p-3 rounded-lg border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-2xs";
+            navBtn.className = "w-full text-left p-2.5 rounded-md border border-sky-500 bg-sky-50/50 dark:bg-sky-950/30 transition-colors group focus:outline-none";
+            if (mBadge) {
+                mBadge.className = "w-5 h-5 rounded-full bg-sky-600 text-white text-[10px] font-mono font-bold flex items-center justify-center shrink-0 shadow-xs";
+                mBadge.textContent = step;
+            }
+            const activeStatus = document.getElementById('mobile-active-step-status');
+            if (activeStatus) {
+                if (requiredMissing.length === 0) {
+                    activeStatus.textContent = 'Lengkap';
+                    activeStatus.className = 'text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0';
+                } else {
+                    activeStatus.textContent = 'Belum Lengkap';
+                    activeStatus.className = 'text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400 shrink-0';
+                }
+            }
         }
     }
 
@@ -1552,18 +1601,29 @@
         const iconDiv = document.getElementById('step-nav-icon-6');
         const statusSpan = document.getElementById('step-nav-status-6');
         const missingSpan = document.getElementById('step-nav-missing-6');
+        const mBadge6 = document.getElementById('mobile-step-badge-6');
 
         if (!navBtn || !iconDiv || !statusSpan || !missingSpan) return;
 
         statusSpan.textContent = 'Terkunci';
-        statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-0.5';
-        iconDiv.innerHTML = `<span class="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400"><x-ui.icon name="lock" class="w-2.5 h-2.5" /></span>`;
-        missingSpan.textContent = 'Aktivasi dulu di step 5';
+        statusSpan.className = 'text-[10px] font-medium block text-slate-400 dark:text-slate-500';
+        iconDiv.innerHTML = `<span class="w-4 h-4 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400"><x-ui.icon name="lock" class="w-2.5 h-2.5" /></span>`;
+        missingSpan.textContent = 'Aktivasi di step 5';
+
+        if (mBadge6 && currentActiveStep !== 6) {
+            mBadge6.className = "w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[10px] font-mono font-bold flex items-center justify-center shrink-0";
+            mBadge6.innerHTML = `<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>`;
+        }
 
         if (currentActiveStep !== 6) {
-            navBtn.className = "w-full text-left p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 opacity-70 transition-all group focus:outline-none";
+            navBtn.className = "w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 opacity-70 transition-colors group focus:outline-none";
         } else {
-            navBtn.className = "w-full text-left p-3 rounded-lg border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-2xs";
+            navBtn.className = "w-full text-left p-2.5 rounded-md border border-sky-500 bg-sky-50/50 dark:bg-sky-950/30 transition-colors group focus:outline-none";
+            const activeStatus = document.getElementById('mobile-active-step-status');
+            if (activeStatus) {
+                activeStatus.textContent = 'Terkunci';
+                activeStatus.className = 'text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 shrink-0';
+            }
         }
     }
 
@@ -1611,38 +1671,140 @@
             return;
         }
 
-        document.getElementById('step-panel-' + currentActiveStep).classList.add('hidden');
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+
+        const prevPanel = document.getElementById('step-panel-' + currentActiveStep);
+        if (prevPanel) {
+            prevPanel.classList.add('hidden');
+            prevPanel.classList.remove('is-active');
+        }
         currentActiveStep = stepNumber;
-        document.getElementById('step-panel-' + currentActiveStep).classList.remove('hidden');
+        const nextPanel = document.getElementById('step-panel-' + currentActiveStep);
+        if (nextPanel) {
+            nextPanel.classList.remove('hidden');
+            void nextPanel.offsetWidth;
+            nextPanel.classList.add('is-active');
+        }
+
+        const stepTitles = {
+            1: 'Data Diri Pelanggan',
+            2: 'Dokumen Lampiran',
+            3: 'Paket & Layanan',
+            4: 'Laporan Survey',
+            5: 'Laporan Pemasangan & Perangkat',
+            6: 'Uji Kecepatan (Speedtest)'
+        };
+
+        const activePill = document.getElementById('mobile-step-pill');
+        const activeTitle = document.getElementById('mobile-active-step-title');
+        const activeStatus = document.getElementById('mobile-active-step-status');
+
+        if (activePill) activePill.textContent = 'Langkah ' + stepNumber + '/6';
+        if (activeTitle) activeTitle.textContent = stepTitles[stepNumber] || '';
+
+        if (activeStatus) {
+            if (stepNumber <= 4) {
+                activeStatus.textContent = 'Lengkap';
+                activeStatus.className = 'text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0';
+            } else if (stepNumber === 5) {
+                const missing = getMissingRequiredFields(5);
+                if (missing.length === 0) {
+                    activeStatus.textContent = 'Lengkap';
+                    activeStatus.className = 'text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0';
+                } else {
+                    activeStatus.textContent = 'Belum Lengkap';
+                    activeStatus.className = 'text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400 shrink-0';
+                }
+            } else if (stepNumber === 6) {
+                if (! pemasanganComplete) {
+                    activeStatus.textContent = 'Terkunci';
+                    activeStatus.className = 'text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 shrink-0';
+                } else {
+                    const missing = getMissingRequiredFields(6);
+                    if (missing.length === 0) {
+                        activeStatus.textContent = 'Lengkap';
+                        activeStatus.className = 'text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0';
+                    } else {
+                        activeStatus.textContent = 'Belum Lengkap';
+                        activeStatus.className = 'text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400 shrink-0';
+                    }
+                }
+            }
+        }
 
         for (let i = 1; i <= totalStepsCount; i++) {
             const mBtn = document.getElementById('mobile-step-btn-' + i);
+            const mBadge = document.getElementById('mobile-step-badge-' + i);
+            const mLabel = document.getElementById('mobile-step-label-' + i);
             if (! mBtn) continue;
 
             if (i === currentActiveStep) {
-                mBtn.className = "py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 shadow-2xs";
+                mBtn.className = "min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 shadow-xs border border-slate-200 dark:border-slate-700";
+                if (mBadge) {
+                    mBadge.className = "w-5 h-5 rounded-full bg-sky-600 text-white text-[10px] font-mono font-bold flex items-center justify-center shrink-0 shadow-xs";
+                }
+                if (mLabel) {
+                    mLabel.className = "text-[11px] font-bold tracking-tight text-sky-700 dark:text-sky-300 leading-none";
+                }
             } else if (readOnlySteps.includes(i)) {
-                mBtn.className = "py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800";
+                mBtn.className = "min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-transparent";
+                if (mBadge) {
+                    mBadge.className = "w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0";
+                    mBadge.textContent = "✓";
+                }
+                if (mLabel) {
+                    mLabel.className = "text-[11px] font-semibold tracking-tight text-slate-700 dark:text-slate-300 leading-none";
+                }
+            } else if (i === 6 && ! pemasanganComplete) {
+                mBtn.className = "min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none text-slate-500 dark:text-slate-400 border border-transparent";
+                if (mBadge) {
+                    mBadge.className = "w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[10px] font-mono font-bold flex items-center justify-center shrink-0";
+                    mBadge.innerHTML = `<svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>`;
+                }
+                if (mLabel) {
+                    mLabel.className = "text-[11px] font-semibold tracking-tight text-slate-500 dark:text-slate-400 leading-none";
+                }
             } else {
-                mBtn.className = "py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 focus:outline-none relative text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40";
+                const missing = getMissingRequiredFields(i);
+                mBtn.className = "min-h-[44px] py-1.5 px-0.5 rounded-md text-center transition-colors duration-150 flex flex-col items-center justify-center gap-1 focus:outline-none text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-transparent";
+                if (mBadge) {
+                    if (missing.length === 0) {
+                        mBadge.className = "w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0";
+                        mBadge.textContent = "✓";
+                    } else {
+                        mBadge.className = "w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-mono font-bold flex items-center justify-center shrink-0";
+                        mBadge.textContent = i;
+                    }
+                }
+                if (mLabel) {
+                    mLabel.className = "text-[11px] font-semibold tracking-tight text-slate-700 dark:text-slate-300 leading-none";
+                }
             }
         }
 
         updateWizardButtons();
         runLiveProgressUpdates();
 
-        readOnlySteps.forEach(step => {
+        // Update desktop sidebar navigation uniformly for all 6 steps
+        for (let step = 1; step <= totalStepsCount; step++) {
             const navBtn = document.getElementById('step-nav-' + step);
-            if (! navBtn) return;
+            if (! navBtn) continue;
 
             if (currentActiveStep === step) {
-                navBtn.className = "w-full text-left p-3 rounded-lg border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-2xs";
+                navBtn.className = "w-full text-left p-2.5 rounded-md border border-sky-500 bg-sky-50/50 dark:bg-sky-950/30 transition-colors duration-150 group focus:outline-none";
+            } else if (step === 6 && ! pemasanganComplete) {
+                navBtn.className = "w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 opacity-70 transition-colors duration-150 group focus:outline-none";
             } else {
-                navBtn.className = "w-full text-left p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-150 group focus:outline-none";
             }
-        });
+        }
 
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const wizardContainer = document.getElementById('wizard-container');
+        if (wizardContainer && window.scrollY > wizardContainer.offsetTop) {
+            window.scrollTo({ top: Math.max(0, wizardContainer.offsetTop - 16), behavior: 'smooth' });
+        }
     }
 
     function nextStep() {

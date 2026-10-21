@@ -40,7 +40,7 @@
     </div>
 
     @if ($errors->any())
-        <x-ui.alert variant="error" title="Setoran Gagal" class="rounded-lg">
+        <x-ui.alert variant="error" title="Setoran Gagal" class="rounded-2xl">
             @foreach ($errors->all() as $error)
                 <div>{{ $error }}</div>
             @endforeach
@@ -48,31 +48,34 @@
     @endif
 
     @if (session('success'))
-        <x-ui.alert variant="success" class="rounded-lg">{{ session('success') }}</x-ui.alert>
+        <x-ui.alert variant="success" class="rounded-2xl">{{ session('success') }}</x-ui.alert>
     @endif
 
     {{-- Bento Overview: Saldo & Status Setoran --}}
     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
         {{-- Card Saldo Kas di Tangan --}}
-        <div class="md:col-span-7 bg-surface border border-border rounded-lg p-4 sm:p-5 shadow-2xs flex flex-col justify-between">
+        <div class="md:col-span-7 bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-800 relative overflow-hidden flex flex-col justify-between">
+            <div class="absolute -right-8 -bottom-8 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+            
             <div>
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-text-muted">Kas di Tangan (Belum Disetor)</span>
+                        <div class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Kas di Tangan (Belum Disetor)</span>
                     </div>
-                    <span class="px-2 py-0.5 rounded-full bg-surface-muted text-text-secondary border border-border text-[11px] font-mono">
+                    <span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-[11px] font-medium font-mono">
                         {{ auth()->user()->name }}
                     </span>
                 </div>
 
                 <div class="mt-3 flex items-baseline gap-2">
-                    <span class="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-text-main">
+                    <span class="text-2xl sm:text-4xl font-bold font-mono tracking-tight text-white">
                         Rp {{ number_format($saldo, 0, ',', '.') }}
                     </span>
                 </div>
 
-                <p class="text-xs text-text-muted mt-1">{{ $unsettledCount }} transaksi belum disetor &bull; 
+                <p class="text-xs text-slate-400 mt-1">{{ $unsettledCount }} transaksi belum disetor</p>
+                <p class="text-xs text-slate-400 mt-1">
                     @if($saldo > 0)
                         Uang tunai pelanggan yang wajib diserahkan ke admin kasir.
                     @else
@@ -81,9 +84,9 @@
                 </p>
             </div>
 
-            <div class="mt-4 pt-3.5 border-t border-border flex flex-wrap items-center justify-between gap-3">
-                <div class="text-[11px] text-text-muted flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-text-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="mt-5 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span>Cut-off setor: {{ $closeTime }} WIB</span>
                 </div>
 
@@ -93,35 +96,35 @@
                         @csrf
                         <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                         <button type="submit"
-                                class="inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                             <span>Setor Seluruh Saldo</span>
                         </button>
                     </form>
                 @endif
             </div>
             @if ($pendingDeposits->isNotEmpty())
-                <div class="mt-3.5 space-y-1.5 pt-3 border-t border-border">
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Setoran Menunggu / Kurang</div>
+                <div class="mt-4 space-y-2">
+                    <div class="text-[11px] font-bold uppercase text-slate-400">Setoran Menunggu / Kurang</div>
                     @foreach ($pendingDeposits as $deposit)
-                        <div class="flex flex-wrap justify-between gap-2 rounded-lg bg-surface-muted border border-border p-2 text-xs">
-                            <span class="font-mono text-text-main">{{ $deposit->deposit_number }}</span>
-                            <span class="font-semibold text-amber-600 dark:text-amber-400">{{ $deposit->status->label() }}</span>
+                        <div class="flex flex-wrap justify-between gap-2 rounded-xl bg-slate-800 p-2 text-xs">
+                            <span class="font-mono">{{ $deposit->deposit_number }}</span>
+                            <span>{{ $deposit->status->label() }}</span>
                         </div>
                     @endforeach
-                    <a href="{{ route('technician-payments.index', ['tab' => 'setoran']) }}" class="inline-block text-xs font-semibold text-primary hover:underline">Lihat seluruh riwayat setoran</a>
+                    <a href="{{ route('technician-payments.index', ['tab' => 'setoran']) }}" class="inline-block text-xs font-semibold text-amber-300">Lihat seluruh riwayat setoran</a>
                 </div>
             @endif
         </div>
 
         {{-- Card Status Kepatuhan Setoran --}}
-        <div class="md:col-span-5 rounded-lg p-4 sm:p-5 border shadow-2xs flex flex-col justify-between transition-all {{ $belumSetor ? 'bg-amber-50/60 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30' : 'bg-surface border-border' }}">
+        <div class="md:col-span-5 rounded-3xl p-5 sm:p-6 border shadow-2xs flex flex-col justify-between transition-all {{ $belumSetor ? 'bg-amber-50/90 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30' : 'bg-white dark:bg-slate-800/90 border-slate-200/80 dark:border-slate-700/80' }}">
             <div>
                 <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold uppercase tracking-wider {{ $belumSetor ? 'text-amber-700 dark:text-amber-400' : 'text-text-muted' }}">
+                    <span class="text-[11px] font-bold uppercase tracking-wider {{ $belumSetor ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500' }}">
                         Status Rekonsiliasi
                     </span>
-                    <div class="w-7 h-7 rounded-lg {{ $belumSetor ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' }} flex items-center justify-center shrink-0">
+                    <div class="w-8 h-8 rounded-xl {{ $belumSetor ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' }} flex items-center justify-center shrink-0">
                         @if($belumSetor)
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         @else
@@ -132,44 +135,44 @@
 
                 <div class="mt-2.5">
                     @if($belumSetor)
-                        <div class="text-base font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                        <div class="text-lg font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
                             <span>Perlu Setor Segera</span>
                         </div>
                         <p class="text-xs text-amber-700/90 dark:text-amber-300/90 mt-1 leading-relaxed">
                             Terdapat penerimaan uang sebelum pukul {{ $closeTime }} yang belum disetor. Ini adalah pengingat operasional, pencatatan baru tetap dapat dilakukan.
                         </p>
                     @else
-                        <div class="text-base font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                        <div class="text-lg font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                             <span>Status Tertib</span>
                         </div>
-                        <p class="text-xs text-text-muted mt-1 leading-relaxed">
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                             Tidak ada penerimaan yang melewati batas setor harian. Status setoran menunggu verifikasi dapat dilihat di Riwayat Setoran.
                         </p>
                     @endif
                 </div>
             </div>
 
-            <div class="mt-4 pt-3 border-t {{ $belumSetor ? 'border-amber-200 dark:border-amber-500/20' : 'border-border' }} text-xs">
-                <div class="text-text-muted">Kurang Setor</div>
-                <div class="font-mono font-bold text-sm {{ $outstandingShortfall > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-text-main' }}">Rp {{ number_format($outstandingShortfall, 0, ',', '.') }}</div>
-                <p class="text-[11px] text-text-muted mt-0.5">Selisih tetap tercatat sampai dilunasi atau diselesaikan admin.</p>
+            <div class="mt-4 pt-3 border-t {{ $belumSetor ? 'border-amber-200 dark:border-amber-500/20' : 'border-slate-100 dark:border-slate-700/60' }} text-xs">
+                <div class="text-slate-500 dark:text-slate-400">Kurang Setor</div>
+                <div class="font-mono font-bold {{ $outstandingShortfall > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-900 dark:text-slate-100' }}">Rp {{ number_format($outstandingShortfall, 0, ',', '.') }}</div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Selisih tetap tercatat sampai dilunasi atau diselesaikan admin.</p>
             </div>
         </div>
     </div>
 
-    <nav class="flex gap-2 border-b border-border" aria-label="Pembayaran Teknisi">
-        <a href="{{ route('technician-payments.index', ['tab' => 'catat']) }}" class="px-4 py-2.5 text-xs font-semibold border-b-2 {{ $tab === 'catat' ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-text-muted hover:text-text-main' }}">Catat Pembayaran</a>
-        <a href="{{ route('technician-payments.index', ['tab' => 'bayar']) }}" class="px-4 py-2.5 text-xs font-semibold border-b-2 {{ $tab === 'bayar' ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-text-muted hover:text-text-main' }}">Sudah Bayar ({{ $unsettledCount }})</a>
-        <a href="{{ route('technician-payments.index', ['tab' => 'setoran']) }}" class="px-4 py-2.5 text-xs font-semibold border-b-2 {{ $tab === 'setoran' ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-text-muted hover:text-text-main' }}">Riwayat Setoran</a>
+    <nav class="flex gap-2 border-b border-slate-200 dark:border-slate-700" aria-label="Pembayaran Teknisi">
+        <a href="{{ route('technician-payments.index', ['tab' => 'catat']) }}" class="px-4 py-3 text-sm font-semibold border-b-2 {{ $tab === 'catat' ? 'border-amber-500 text-amber-700 dark:text-amber-300' : 'border-transparent text-slate-500 dark:text-slate-400' }}">Catat Pembayaran</a>
+        <a href="{{ route('technician-payments.index', ['tab' => 'bayar']) }}" class="px-4 py-3 text-sm font-semibold border-b-2 {{ $tab === 'bayar' ? 'border-amber-500 text-amber-700 dark:text-amber-300' : 'border-transparent text-slate-500 dark:text-slate-400' }}">Sudah Bayar ({{ $unsettledCount }})</a>
+        <a href="{{ route('technician-payments.index', ['tab' => 'setoran']) }}" class="px-4 py-3 text-sm font-semibold border-b-2 {{ $tab === 'setoran' ? 'border-amber-500 text-amber-700 dark:text-amber-300' : 'border-transparent text-slate-500 dark:text-slate-400' }}">Riwayat Setoran</a>
     </nav>
 
     @if ($tab === 'catat')
-        <div id="batch-alert" class="hidden rounded-lg border p-3.5 text-xs"></div>
-        <form method="GET" action="{{ route('technician-payments.index') }}" class="flex flex-wrap gap-2.5 rounded-lg border border-border bg-surface p-3.5 sm:p-4 shadow-2xs">
+        <div id="batch-alert" class="hidden rounded-xl border p-4 text-sm"></div>
+        <form method="GET" action="{{ route('technician-payments.index') }}" class="flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
             <input type="hidden" name="tab" value="catat">
-            <label for="technician-search" class="w-full text-xs font-semibold text-text-main">Cari pelanggan atau tagihan dalam POP Anda</label>
-            <input id="technician-search" name="search" type="search" minlength="3" value="{{ $search }}" placeholder="Nama, CID, kode pelanggan, atau nomor tagihan" class="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-text-main placeholder-text-disabled focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary">
-            <button type="submit" class="rounded-lg bg-sky-600 hover:bg-sky-700 px-4 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors">Cari</button>
+            <label for="technician-search" class="w-full text-sm font-semibold text-slate-700 dark:text-slate-200">Cari pelanggan atau tagihan dalam POP Anda</label>
+            <input id="technician-search" name="search" type="search" minlength="3" value="{{ $search }}" placeholder="Nama, CID, kode pelanggan, atau nomor tagihan" class="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+            <button type="submit" class="rounded-xl bg-sky-600 px-5 py-2 text-sm font-semibold text-white">Cari</button>
         </form>
         @if (mb_strlen($search) >= 3)
             @include('partials.collector-pay-table', [
@@ -187,9 +190,7 @@
                 ])
             @endpush
         @else
-            <div class="rounded-lg border border-dashed border-border p-6 text-center text-xs text-text-muted bg-surface/50">
-                Ketik minimal 3 karakter untuk melihat tagihan dan mencatat pembayaran.
-            </div>
+            <p class="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-slate-700">Ketik minimal 3 karakter untuk melihat tagihan dan mencatat pembayaran.</p>
         @endif
     @elseif ($tab === 'bayar')
         @include('technician-payments._unsettled')

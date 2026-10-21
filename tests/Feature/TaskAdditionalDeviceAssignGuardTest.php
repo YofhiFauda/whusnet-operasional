@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\SerialStatus;
 use App\Enums\TaskType;
-use App\Exceptions\InsufficientExtraDeviceCustodyException;
 use App\Models\Customer;
 use App\Models\CustomerAdditionalDevice;
 use App\Models\CustomerService;
@@ -16,6 +15,7 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\AdditionalDeviceCustodyService;
 use App\Services\TaskService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
@@ -28,9 +28,8 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * ADHOC-190 task 3 — guard preventif FOP: Task Pemasangan gak boleh jadi
- * TERJADWAL kalau tim yang diassign gak pegang custody perangkat tambahan
- * yang cukup buat paket pelanggannya. Lihat AdditionalDeviceCustodyService.
+ * Alur assign Task Pemasangan mendahului issue Gudang. Pemilihan SN pada
+ * laporan pemasangan tetap dibatasi ke custody tim yang benar.
  */
 class TaskAdditionalDeviceAssignGuardTest extends TestCase
 {
@@ -49,7 +48,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
     }
 
     #[Test]
-    public function scheduling_pemasangan_task_is_rejected_when_extra_device_custody_insufficient(): void
+    public function scheduling_pemasangan_task_succeeds_before_extra_device_is_issued(): void
     {
         $pop = $this->createPop('ADG1');
         $fop = $this->createFopUser($pop);
@@ -57,11 +56,8 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
         $customer = $this->createCustomer($pop, 'TEST-ADG-001');
         $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-001', 1));
 
-        // Teknisi SENGAJA tanpa custody AP sama sekali.
-        $this->expectException(InsufficientExtraDeviceCustodyException::class);
-        $this->expectExceptionMessage('Barang perangkat tambahan belum di-issue cukup');
-
-        app(TaskService::class)->create([
+        // Teknisi sengaja belum menerima AP dari Gudang.
+        $task = app(TaskService::class)->create([
             'task_type' => TaskType::PEMASANGAN->value,
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
@@ -69,6 +65,13 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
             'team_member_ids' => [$teknisi->id],
             'scheduled_at' => now()->addDay(),
         ], $fop);
+
+        $this->assertSame('terjadwal', $task->status->value);
+        $this->assertTrue($task->teamMembers()->where('user_id', $teknisi->id)->exists());
+        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task));
+
+        $this->issueExtraDeviceSerial($teknisi, 'ADG-SN-SETELAH-ASSIGN', $pop->id);
+        $this->assertCount(1, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task->fresh()));
     }
 
     #[Test]
@@ -139,11 +142,10 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
     }
 
     /**
-     * Regresi update(): reassign tim Pemasangan yang SUDAH terjadwal juga
-     * harus dicek ulang, bukan cuma create().
+     * Tim Task Pemasangan yang sudah terjadwal dapat diganti sebelum issue.
      */
     #[Test]
-    public function reassigning_team_on_scheduled_pemasangan_task_is_rejected_when_custody_insufficient(): void
+    public function reassigning_team_on_scheduled_pemasangan_task_succeeds_before_issue(): void
     {
         $pop = $this->createPop('ADG5');
         $fop = $this->createFopUser($pop);
@@ -163,27 +165,20 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
             'scheduled_at' => now()->addDay(),
         ], $fop);
 
-        $this->expectException(InsufficientExtraDeviceCustodyException::class);
-        $this->expectExceptionMessage('Barang perangkat tambahan belum di-issue cukup');
-
         // Teknisi baru belum pegang custody AP sama sekali.
         app(TaskService::class)->update($task, [
             'team_member_ids' => [$teknisiBaru->id],
         ], $fop);
+
+        $this->assertTrue($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
+        $this->assertFalse($task->teamMembers()->where('user_id', $teknisiLama->id)->exists());
     }
 
     /**
-     * Review follow-up ADHOC-190 task 3: `reassignTeam()` TIDAK lewat
-     * `create()`/`update()` sama sekali — dia nulis langsung ke
-     * `teamMembers()` lewat query builder-nya sendiri. Precondition method
-     * ini (`status` harus TERJADWAL/IN_PROGRESS) justru bikin dia SATU-
-     * SATUNYA jalur lain yang bisa nukar teknisi di Task Pemasangan yang
-     * SUDAH lolos guard custody di create() — tanpa guard di sini, FOP bisa
-     * swap teknisi lama (custody cukup) ke teknisi baru (custody nol) dan
-     * lolos begitu saja.
+     * Jalur reassignTeam juga mengikuti urutan assign dahulu, issue kemudian.
      */
     #[Test]
-    public function reassign_team_is_rejected_when_new_technician_lacks_custody(): void
+    public function reassign_team_succeeds_when_new_technician_has_not_received_device_yet(): void
     {
         $pop = $this->createPop('ADG6');
         $fop = $this->createFopUser($pop);
@@ -203,11 +198,11 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
             'scheduled_at' => now()->addDay(),
         ], $fop);
 
-        $this->expectException(InsufficientExtraDeviceCustodyException::class);
-        $this->expectExceptionMessage('Barang perangkat tambahan belum di-issue cukup');
-
         // Teknisi baru belum pegang custody AP sama sekali.
         app(TaskService::class)->reassignTeam($task, $teknisiLama->id, $teknisiBaru->id, $fop->id);
+
+        $this->assertTrue($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
+        $this->assertFalse($task->teamMembers()->where('user_id', $teknisiLama->id)->exists());
     }
 
     /**
@@ -244,8 +239,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
     }
 
     /**
-     * Guard no-op buat task_type non-Pemasangan — reassign MAINTENANCE tetap
-     * jalan normal walau teknisi barunya gak pegang custody apa pun.
+     * Reassign task non-Pemasangan tetap berjalan seperti semula.
      */
     #[Test]
     public function reassign_team_succeeds_for_non_pemasangan_task_regardless_of_custody(): void
@@ -255,7 +249,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
         $teknisiLama = $this->createTeknisi();
         $teknisiBaru = $this->createTeknisi();
         $customer = $this->createCustomer($pop, 'TEST-ADG-008');
-        // Paket butuh perangkat tambahan, tapi task-nya MAINTENANCE — guard harus no-op.
+        // Paket membutuhkan perangkat tambahan, tetapi task ini MAINTENANCE.
         $this->createActiveCustomerService($customer, $this->createPackage('ADG-PKT-008', 1));
 
         $task = app(TaskService::class)->create([
@@ -273,11 +267,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
     }
 
     /**
-     * Final review ADHOC-190 (Important 3): AP pelanggan SUDAH terpasang
-     * (SN-nya INSTALLED, keluar dari hitungan custody ISSUED). Reassign tim
-     * setelahnya ke teknisi tanpa custody AP sama sekali harus TETAP jalan —
-     * dulu ditolak "butuh 1, tersedia 0" padahal tidak ada yang perlu
-     * di-issue lagi.
+     * Reassign tetap boleh setelah perangkat tambahan pelanggan terpasang.
      */
     #[Test]
     public function reassign_team_succeeds_when_customer_already_has_required_extra_device_installed(): void
@@ -320,12 +310,10 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
     }
 
     /**
-     * Baris perangkat tambahan v1 (teks bebas, tanpa `inventory_serial_id`)
-     * TIDAK dihitung sebagai kredit — definisinya sama dengan langkah
-     * Perangkat Tambahan Laporan Pemasangan.
+     * Baris free-text lama tidak menggantikan SN custody Gudang.
      */
     #[Test]
-    public function legacy_free_text_additional_device_is_not_credited_by_guard(): void
+    public function legacy_free_text_additional_device_is_not_an_eligible_custody_serial(): void
     {
         $pop = $this->createPop('ADG10');
         $fop = $this->createFopUser($pop);
@@ -340,9 +328,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
             'status' => 'terpasang',
         ]);
 
-        $this->expectException(InsufficientExtraDeviceCustodyException::class);
-
-        app(TaskService::class)->create([
+        $task = app(TaskService::class)->create([
             'task_type' => TaskType::PEMASANGAN->value,
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
@@ -350,16 +336,16 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
             'team_member_ids' => [$teknisi->id],
             'scheduled_at' => now()->addDay(),
         ], $fop);
+
+        $this->assertSame('terjadwal', $task->status->value);
+        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task));
     }
 
     /**
-     * SN item company_asset gak akan pernah bisa di-install
-     * (`InventoryService::installSerial()` menolaknya) — jadi gak boleh
-     * memenuhi guard. Dulu `countAvailable()` lupa filter ownership_mode
-     * yang dipakai `eligibleSerialsForTask()`.
+     * SN company_asset tidak boleh dipilih pada laporan pemasangan.
      */
     #[Test]
-    public function company_asset_extra_device_serial_does_not_satisfy_guard(): void
+    public function company_asset_extra_device_serial_is_not_eligible_for_installation(): void
     {
         $pop = $this->createPop('ADG11');
         $fop = $this->createFopUser($pop);
@@ -370,9 +356,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
         $serial = $this->issueExtraDeviceSerial($teknisi, 'ADG-SN-011', $pop->id);
         $serial->item->update(['ownership_mode' => 'company_asset']);
 
-        $this->expectException(InsufficientExtraDeviceCustodyException::class);
-
-        app(TaskService::class)->create([
+        $task = app(TaskService::class)->create([
             'task_type' => TaskType::PEMASANGAN->value,
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
@@ -380,15 +364,16 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
             'team_member_ids' => [$teknisi->id],
             'scheduled_at' => now()->addDay(),
         ], $fop);
+
+        $this->assertSame('terjadwal', $task->status->value);
+        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task));
     }
 
     /**
-     * Final review ADHOC-190 (Important 4): edit task generik
-     * (`PUT tasks.update`) ganti tim task Pemasangan TERJADWAL ke teknisi
-     * tanpa custody — harus jadi error form, bukan 500.
+     * Form edit Task Pemasangan dapat mengganti teknisi sebelum issue.
      */
     #[Test]
-    public function task_edit_form_shows_error_instead_of_500_when_custody_insufficient(): void
+    public function task_edit_can_reassign_team_before_extra_device_is_issued(): void
     {
         $pop = $this->createPop('ADG12');
         $fop = $this->createFopUser($pop);
@@ -412,12 +397,11 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
 
         $this->from(route('tasks.edit', $task))
             ->put(route('tasks.update', $task), ['team_member_ids' => [$teknisiBaru->id]])
-            ->assertRedirect(route('tasks.edit', $task))
-            ->assertSessionHasErrors('team_member_ids');
+            ->assertRedirect(route('tasks.show', $task))
+            ->assertSessionHasNoErrors();
 
-        // Tim lama tetap — update() rollback.
-        $this->assertTrue($task->teamMembers()->where('user_id', $teknisiLama->id)->exists());
-        $this->assertFalse($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
+        $this->assertFalse($task->teamMembers()->where('user_id', $teknisiLama->id)->exists());
+        $this->assertTrue($task->teamMembers()->where('user_id', $teknisiBaru->id)->exists());
     }
 
     private function createPop(string $code): Pop
@@ -504,7 +488,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
     /**
      * Issue satu SN kategori perangkat tambahan (is_customer_extra_device)
      * ke custody teknisi — status ISSUED, `issued_from_pop_id` = cabang task
-     * biar lolos filter cabang `AdditionalDeviceCustodyService::countAvailable()`.
+     * agar sesuai cabang task.
      */
     private function issueExtraDeviceSerial(User $technician, string $serialNumber, int $popId): InventorySerial
     {
