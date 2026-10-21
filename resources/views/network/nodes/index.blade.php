@@ -200,17 +200,16 @@
 
             {{-- Scrollable Tree List (Single-line indent, zero nested boxes!) --}}
             <div id="networkTreeContainer" class="max-h-[calc(100vh-280px)] overflow-y-auto p-3 space-y-0.5 select-none">
-                @forelse($topologyPopChildren->get(0, collect()) as $treePop)
-                    @include('network.nodes._pop-tree')
+                {{-- Proyeksi hierarki tunggal (InfrastructureHierarchyService) — sama
+                     dengan Peta: Server → POP → Mini POP → OLT/Switch → Slot → PON/Port →
+                     ODP → ONT. Garis koneksi (ODP di bawah PON) dibedakan dari lokasi. --}}
+                @forelse($hierarchy['roots'] as $hierarchyKey)
+                    @include('network.nodes._hierarchy-item', ['hierarchyKey' => $hierarchyKey])
                 @empty
                     <div class="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-xs text-slate-400">
                         Belum ada POP dalam scope Anda.
                     </div>
                 @endforelse
-
-                @foreach($rootNodesByPop->get(0, collect()) as $treeNode)
-                    @include('network.nodes._tree-node', ['treeNode' => $treeNode, 'treeChildren' => $treeChildren])
-                @endforeach
             </div>
         </section>
 

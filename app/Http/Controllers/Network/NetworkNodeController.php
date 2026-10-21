@@ -12,6 +12,7 @@ use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
+use App\Services\InfrastructureHierarchyService;
 use App\Services\MasterRecordRemovalService;
 use App\Services\NetworkNodeService;
 use App\Services\NetworkPortAssignmentService;
@@ -120,10 +121,12 @@ class NetworkNodeController extends Controller
                 ])->values()
             : collect();
 
+        $hierarchy = app(InfrastructureHierarchyService::class)->build($user);
+
         return view('network.nodes.index', compact(
             'nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels',
             'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount',
-            'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop', 'availableCustomers'
+            'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop', 'availableCustomers', 'hierarchy'
         ));
     }
 
@@ -210,6 +213,7 @@ class NetworkNodeController extends Controller
             'infrastructureBalances.item',
             'oltSlots.cardNode.deployedSerials',
             'oltSlots.cardNode.ports',
+            'infrastructureSlots' => fn ($query) => $query->withCount('ports'),
         ]);
 
         // Opsi kartu bebas: anak langsung chassis ini bertipe `olt_card` yang

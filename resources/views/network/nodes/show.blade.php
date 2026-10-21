@@ -118,6 +118,42 @@
             </div>
         @endif
     </section>
+    @if(in_array($node->nodeType?->code, ['olt_chassis', 'switch_mini_pop'], true))
+    {{-- Slot kanonis (rancangan hierarki §2/§16.2): OLT → Slot → PON, Switch → Slot → Port. --}}
+    <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
+        <div>
+            <h2 class="text-sm font-black uppercase tracking-wider text-text-main">Slot perangkat</h2>
+            <p class="text-xs text-text-muted">{{ $node->infrastructureSlots->count() }} slot didata. Slot boleh kosong; kartu/modul dicatat sebagai aset terpasang di Slot.</p>
+        </div>
+        @forelse($node->infrastructureSlots as $infraSlot)
+            <a href="{{ route('network.infrastructure-slots.show', $infraSlot) }}" class="flex items-center justify-between border-t border-border pt-2 text-sm hover:text-primary">
+                <span class="font-mono font-semibold">{{ $infraSlot->displayName() }}</span>
+                <span class="text-xs text-text-muted">{{ $infraSlot->ports_count }} {{ $infraSlot->kind->portKind()->label() }} · {{ $infraSlot->status->label() }}</span>
+            </a>
+        @empty
+            <p class="text-xs text-text-muted">Belum ada slot.</p>
+        @endforelse
+        @can('network_nodes.update')
+        <form method="POST" action="{{ route('network.nodes.infrastructure-slots.store', $node) }}" class="grid gap-3 border-t border-border pt-3 sm:grid-cols-4">
+            @csrf
+            <label class="text-xs text-text-secondary">Nomor slot
+                <input type="number" name="number" min="1" required value="{{ old('number') }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+            </label>
+            <label class="text-xs text-text-secondary">Kode (opsional)
+                <input type="text" name="code" maxlength="50" value="{{ old('code') }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+            </label>
+            <label class="text-xs text-text-secondary">Kapasitas ({{ $node->nodeType?->code === 'olt_chassis' ? 'PON' : 'port' }} per slot)
+                <input type="number" name="capacity" min="1" value="{{ old('capacity') }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+            </label>
+            @if($node->nodeType?->code === 'switch_mini_pop')
+            <label class="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" name="is_logical" value="1"> Slot internal/logis (switch port tetap)</label>
+            @endif
+            <button type="submit" class="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover sm:col-span-4 sm:justify-self-start">Tambah slot</button>
+            @error('number')<p class="text-xs text-error sm:col-span-4">{{ $message }}</p>@enderror
+        </form>
+        @endcan
+    </section>
+    @endif
     @if($node->nodeType?->code === 'olt_chassis')
     <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3">

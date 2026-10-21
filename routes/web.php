@@ -61,6 +61,7 @@ use App\Http\Controllers\Master\WorkToolController;
 use App\Http\Controllers\Network\InfraAssetRegistrationController;
 use App\Http\Controllers\Network\InfrastructureMapController;
 use App\Http\Controllers\Network\InfrastructurePortController;
+use App\Http\Controllers\Network\InfrastructurePositionController;
 use App\Http\Controllers\Network\NetworkNodeController;
 use App\Http\Controllers\Network\OltSlotController;
 use App\Http\Controllers\NocDashboardController;
@@ -1230,6 +1231,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
         Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
         Route::get('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'create'])->name('network.nodes.register-asset.create');
+        Route::get('/network/infrastructure-slots/{slot}', [InfrastructurePositionController::class, 'showSlot'])->name('network.infrastructure-slots.show');
+        Route::get('/network/infrastructure-ports/{port}', [InfrastructurePositionController::class, 'showPort'])->name('network.infrastructure-ports.show');
     });
     Route::middleware('permission:network_nodes.create')->group(function () {
         Route::post('/network/nodes', [NetworkNodeController::class, 'store'])->name('network.nodes.store');
@@ -1244,6 +1247,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/nodes/{chassis}/olt-slots', [OltSlotController::class, 'store'])->name('network.nodes.olt-slots.store');
         Route::post('/network/nodes/{chassis}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('network.nodes.olt-slots.card');
         Route::patch('/network/infrastructure-ports/{port}/capacity', [InfrastructurePortController::class, 'updateCapacity'])->name('network.infrastructure-ports.capacity');
+        Route::post('/network/nodes/{node}/infrastructure-slots', [InfrastructurePositionController::class, 'storeSlot'])->name('network.nodes.infrastructure-slots.store');
+        Route::post('/network/infrastructure-slots/{slot}/ports', [InfrastructurePositionController::class, 'storePort'])->name('network.infrastructure-slots.ports.store');
+        Route::post('/network/infrastructure-ports/{port}/connections', [InfrastructurePositionController::class, 'connect'])->name('network.infrastructure-ports.connections.store');
+        Route::post('/network/infrastructure-connections/{connection}/verify', [InfrastructurePositionController::class, 'verifyConnection'])->name('network.infrastructure-connections.verify');
+        Route::post('/network/infrastructure-connections/{connection}/release', [InfrastructurePositionController::class, 'releaseConnection'])->name('network.infrastructure-connections.release');
     });
     Route::middleware('permission:network_nodes.delete')->group(function () {
         Route::delete('/network/nodes/{node}', [NetworkNodeController::class, 'destroy'])->name('network.nodes.destroy');

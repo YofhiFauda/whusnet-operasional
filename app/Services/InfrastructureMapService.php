@@ -377,9 +377,11 @@ class InfrastructureMapService
             $parentId = $node->parent_id !== null && $nodesById->has($node->parent_id)
                 ? $node->parent_id
                 : ($visiblePopsById->has($node->anchor_pop_id) ? -$node->anchor_pop_id : null);
-            $topologyDetails[$node->id] = [...$nodeDetails[$node->id], 'parent_id' => $parentId];
+            $topologyDetails[$node->id] = [...$nodeDetails[$node->id], 'parent_id' => $parentId, 'relation' => 'location', 'verified' => null];
             $topologyIndex[$node->id] = [...$nodeIndex[$node->id], 'parent' => $parentId];
         }
+
+        $this->applyHierarchyProjection($user, $selectedPopId, $topologyDetails, $topologyIndex);
 
         foreach ($nodes as $node) {
             foreach ($node->ports as $port) {
@@ -459,6 +461,99 @@ class InfrastructureMapService
                 'red_zone' => $nodes->filter(fn (NetworkNode $node): bool => $node->isInRedZone())->count(),
             ],
         ];
+    }
+
+    /**
+     * Peta memakai proyeksi hierarki yang SAMA dengan Master Node (Task 10):
+     * ODP ber-uplink PON digantung di kartu OLT pemilik PON itu (garis
+     * koneksi, `relation = connection`, `verified` menandai status), Server
+     * Utama diproyeksikan di atas POP Pusat. Slot/PON/Port tidak menjadi
+     * kartu/pin sendiri — tampil di panel perangkat (`slots`).
+     *
+     * @param  array<int, array<string, mixed>>  $topologyDetails
+     * @param  array<int, array<string, mixed>>  $topologyIndex
+     */
+    private function applyHierarchyProjection(User $user, ?int $selectedPopId, array &$topologyDetails, array &$topologyIndex): void
+    {
+        $projection = app(InfrastructureHierarchyService::class)->build($user, $selectedPopId);
+        $items = $projection['items'];
+
+        foreach ($items as $key => $item) {
+            if ($item['kind'] !== 'node' || ! isset($topologyDetails[$item['id']])) {
+                continue;
+            }
+            $nodeId = $item['id'];
+            $topologyDetails[$nodeId]['verified'] = $item['verified'];
+            $topologyDetails[$nodeId]['uplink_unverified'] = $item['uplink_unverified'];
+            $topologyDetails[$nodeId]['breadcrumb'] = $item['breadcrumb'];
+
+            if ($item['relation'] === 'connection') {
+                $port = $items[$item['parent']] ?? null;
+                $slot = $port ? ($items[$port['parent']] ?? null) : null;
+                $device = $slot ? ($items[$slot['parent']] ?? null) : null;
+                if ($device !== null && isset($topologyDetails[$device['id']])) {
+                    $topologyDetails[$nodeId]['parent_id'] = $device['id'];
+                    $topologyDetails[$nodeId]['relation'] = 'connection';
+                    $topologyDetails[$nodeId]['via_slot'] = $slot['label'];
+                    $topologyDetails[$nodeId]['via_port'] = $port['label'];
+                    $topologyIndex[$nodeId]['parent'] = $device['id'];
+                }
+            }
+
+            $slots = [];
+            foreach ($projection['children'][$key] ?? [] as $childKey) {
+                if ($items[$childKey]['kind'] !== 'slot') {
+                    continue;
+                }
+                $slots[] = [
+                    'label' => $items[$childKey]['label'],
+                    'status' => $items[$childKey]['status_label'],
+                    'url' => $items[$childKey]['url'],
+                    'ports' => array_map(fn (string $portKey): array => [
+                        'label' => $items[$portKey]['label'],
+                        'status' => $items[$portKey]['status_label'],
+                        'capacity' => $items[$portKey]['capacity'],
+                        'connection' => $items[$portKey]['connection_label'] ?? null,
+                        'url' => $items[$portKey]['url'],
+                    ], array_values(array_filter($projection['children'][$childKey] ?? [], fn (string $child): bool => $items[$child]['kind'] === 'port'))),
+                ];
+            }
+            $topologyDetails[$nodeId]['slots'] = $slots;
+
+            // Aset di Slot/Port milik perangkat ini tampil di panel perangkat
+            // dengan posisi tepatnya (Slot/Port tidak punya kartu sendiri).
+            foreach ($projection['children'][$key] ?? [] as $slotKey) {
+                foreach ([$slotKey, ...($projection['children'][$slotKey] ?? [])] as $positionKey) {
+                    foreach ($items[$positionKey]['direct_assets'] as $asset) {
+                        $topologyDetails[$nodeId]['assets'][] = [...$asset, 'position' => $items[$positionKey]['breadcrumb'],
+                            'installed_at' => null, 'technician' => null, 'task' => null,
+                            'trace_url' => $asset['kind'] === 'SN' ? route('warehouse.traceability.index', ['sn' => $asset['reference']]) : null];
+                    }
+                }
+            }
+        }
+
+        foreach ($items as $item) {
+            if ($item['kind'] === 'mini_pop' && isset($topologyDetails[-$item['id']])) {
+                foreach ($item['direct_assets'] as $asset) {
+                    $topologyDetails[-$item['id']]['assets'][] = [...$asset, 'position' => $item['breadcrumb'],
+                        'installed_at' => null, 'technician' => null, 'task' => null,
+                        'trace_url' => $asset['kind'] === 'SN' ? route('warehouse.traceability.index', ['sn' => $asset['reference']]) : null];
+                }
+            }
+        }
+
+        foreach ($items as $item) {
+            if ($item['kind'] === 'pop' && $item['parent'] !== null && str_starts_with($item['parent'], 'node:')) {
+                $serverId = (int) substr($item['parent'], 5);
+                if (isset($topologyDetails[-$item['id']], $topologyDetails[$serverId])) {
+                    $topologyDetails[$serverId]['parent_id'] = null;
+                    $topologyIndex[$serverId]['parent'] = null;
+                    $topologyDetails[-$item['id']]['parent_id'] = $serverId;
+                    $topologyIndex[-$item['id']]['parent'] = $serverId;
+                }
+            }
+        }
     }
 
     /**
