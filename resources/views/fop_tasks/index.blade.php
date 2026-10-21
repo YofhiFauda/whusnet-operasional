@@ -619,7 +619,7 @@
                         <div>
                             <label class="block text-xs font-semibold text-text-secondary mb-1">Tipe Task <span class="text-error">*</span></label>
                             <select name="category" x-model="modal.data.category"
-                                    @change="onCategoryChange()"
+                                    @change="onCategoryChange(); resetInfraScope(); if (isInfraCategory && modal.data.pop_id) loadInfraScopeLevel('mini_pop', modal.data.pop_id)"
                                     :disabled="isEditingLockedSurveyPsb || isEditingLinkedTicket || (modal.isEdit && !canEditCategory)"
                                     required
                                     class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
@@ -648,7 +648,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="!isTicketMode">
                         <div>
                             <label class="block text-xs font-semibold text-text-secondary mb-1">POP / Cabang <span class="text-error">*</span></label>
-                            <select name="pop_id" x-model="modal.data.pop_id" :disabled="isEditingLockedSurveyPsb" :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                            <select name="pop_id" x-model="modal.data.pop_id" @change="resetInfraScope(); if (isInfraCategory) loadInfraScopeLevel('mini_pop', modal.data.pop_id)" :disabled="isEditingLockedSurveyPsb" :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                 <option value="">Pilih Cabang</option>
                                 @foreach($pops as $p)
                                     <option value="{{ $p->id }}">{{ $p->name }}</option>
@@ -664,6 +664,37 @@
                                 @endforeach
                             </select>
                         </div>
+                    </div>
+
+                    {{-- Akar scope O-REQ/INFR-REQ (rancangan hierarki §10.3): pilihan
+                         terdalam yang terisi menjadi batas subtree laporan teknisi.
+                         Opsi dari server per induk; kosong = scope berhenti di tingkat atasnya. --}}
+                    <div x-show="isInfraCategory && !isTicketMode" x-cloak class="border border-border rounded-lg px-3 py-3"
+                         data-scope-options-url="{{ route('fop-tasks.infrastructure-scope-options') }}" x-ref="infraScopeBox">
+                        <p class="text-xs font-semibold text-text-secondary">Lokasi kerja (akar scope)</p>
+                        <p class="mt-0.5 text-[10px] text-text-muted">Pilih tingkat terdalam yang memang dikerjakan. Teknisi hanya bisa melapor di lokasi ini dan turunannya.</p>
+                        <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <template x-for="level in infraScopeLevels" :key="level">
+                                <label class="block text-[11px] font-medium text-text-secondary">
+                                    <span x-text="infraScopeNames[level]"></span>
+                                    <select x-model="infraScope.values[level]" @change="infraScopeChanged(level)"
+                                            :disabled="!infraScopeEnabled(level)"
+                                            class="mt-1 w-full text-sm bg-surface text-text-main border border-border rounded-lg px-2 py-1.5 disabled:bg-surface-muted disabled:text-text-muted">
+                                        <option value="" x-text="infraScope.states[level].disabled ? 'Tidak tersedia' : 'Tidak dipilih (berhenti di atas)'"></option>
+                                        <template x-for="option in infraScope.states[level].options" :key="option.id">
+                                            <option :value="String(option.id)" x-text="option.label" :selected="String(option.id) === infraScope.values[level]"></option>
+                                        </template>
+                                    </select>
+                                </label>
+                            </template>
+                        </div>
+                        <template x-if="isInfraCategory && !isTicketMode">
+                            <div>
+                                <template x-for="level in infraScopeLevels" :key="'hidden-'+level">
+                                    <input type="hidden" :name="'scope_' + level + '_id'" :value="infraScope.values[level]">
+                                </template>
+                            </div>
+                        </template>
                     </div>
 
                     {{-- Tugas/Issue generik: cuma buat tipe non-Ticketing --}}
@@ -1519,6 +1550,77 @@
                 return this.modal.isEdit && this.modal.data.ticket !== null;
             },
 
+            // ── Akar scope O-REQ/INFR-REQ ─────────────────────────────
+            infraScopeLevels: ['mini_pop', 'device', 'slot', 'port', 'odp'],
+            infraScopeNames: { mini_pop: 'Mini POP', device: 'OLT/Switch', slot: 'Slot', port: 'PON/Port', odp: 'ODP' },
+            infraScope: {
+                values: { mini_pop: '', device: '', slot: '', port: '', odp: '' },
+                states: {
+                    mini_pop: { options: [], disabled: false }, device: { options: [], disabled: false },
+                    slot: { options: [], disabled: false }, port: { options: [], disabled: false }, odp: { options: [], disabled: false },
+                },
+            },
+
+            get isInfraCategory() {
+                return ['O-REQ', 'INFR REQ'].includes(this.modal.data.category);
+            },
+
+            infraScopeEnabled(level) {
+                const index = this.infraScopeLevels.indexOf(level);
+                if (!this.modal.data.pop_id || this.infraScope.states[level].disabled) return false;
+                return this.infraScopeLevels.slice(0, index).every((parent) => this.infraScope.values[parent] !== '');
+            },
+
+            resetInfraScope(fromIndex = 0) {
+                this.infraScopeLevels.slice(fromIndex).forEach((level) => {
+                    this.infraScope.values[level] = '';
+                    this.infraScope.states[level] = { options: [], disabled: false };
+                });
+            },
+
+            async loadInfraScopeLevel(level, parent) {
+                const base = this.$refs.infraScopeBox?.dataset.scopeOptionsUrl;
+                if (!base || !this.modal.data.pop_id || !parent) return;
+                const url = new URL(base, window.location.origin);
+                url.searchParams.set('pop_id', this.modal.data.pop_id);
+                url.searchParams.set('level', level);
+                url.searchParams.set('parent', parent);
+                const response = await fetch(url, { headers: { Accept: 'application/json' } });
+                const data = response.ok ? await response.json() : { options: [], disabled: true };
+                this.infraScope.states[level] = { options: data.options, disabled: data.disabled };
+            },
+
+            infraScopeChanged(level) {
+                const index = this.infraScopeLevels.indexOf(level);
+                this.resetInfraScope(index + 1);
+                const value = this.infraScope.values[level];
+                const next = this.infraScopeLevels[index + 1];
+                if (value && next) this.loadInfraScopeLevel(next, value);
+            },
+
+            // Isi ulang dropdown dari snapshot scope task (edit) — level
+            // diturunkan dari jenis leluhur, bukan dari label.
+            async initInfraScope(snapshot) {
+                this.resetInfraScope();
+                if (!this.isInfraCategory || !this.modal.data.pop_id) return;
+                const chosen = {};
+                let afterPort = false;
+                (snapshot?.ancestors || []).forEach((ancestor) => {
+                    if (ancestor.kind === 'mini_pop') chosen.mini_pop = String(ancestor.id);
+                    if (ancestor.kind === 'slot') chosen.slot = String(ancestor.id);
+                    if (ancestor.kind === 'port') { chosen.port = String(ancestor.id); afterPort = true; }
+                    if (ancestor.kind === 'node') chosen[afterPort ? 'odp' : 'device'] = String(ancestor.id);
+                });
+                await this.loadInfraScopeLevel('mini_pop', this.modal.data.pop_id);
+                for (let index = 0; index < this.infraScopeLevels.length; index++) {
+                    const level = this.infraScopeLevels[index];
+                    if (!chosen[level]) break;
+                    this.infraScope.values[level] = chosen[level];
+                    const next = this.infraScopeLevels[index + 1];
+                    if (next) await this.loadInfraScopeLevel(next, chosen[level]);
+                }
+            },
+
             cancelModal: {
                 open: false,
                 taskId: null,
@@ -2036,6 +2138,7 @@
                 this.customerSearchResults = [];
                 this.searchTech = '';
                 this.techFilter = 'all';
+                this.resetInfraScope();
                 this.modal.open = true;
                 this.fetchTechAvailability(nowIso.slice(0, 10));
             },
@@ -2115,6 +2218,7 @@
                 };
                 this.modal.techs = techIds ? [...techIds] : [];
                 this.modal.open = true;
+                this.initInfraScope(task.scope_snapshot || null);
                 if (dateStr) {
                     this.fetchTechAvailability(dateStr.slice(0, 10), task.id);
                 }

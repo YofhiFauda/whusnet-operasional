@@ -39,6 +39,7 @@ use App\Http\Controllers\FopAnalyticsController;
 use App\Http\Controllers\FopDashboardController;
 use App\Http\Controllers\FopTaskController;
 use App\Http\Controllers\ImportReportController;
+use App\Http\Controllers\InfrastructureLocationOptionsController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceReportController;
 use App\Http\Controllers\ManualBookController;
@@ -1310,6 +1311,8 @@ Route::middleware('auth')->group(function () {
     // Maintenance Report
     Route::get('/tasks/{task}/maintenance-report', [TaskMaintenanceController::class, 'report'])->name('tasks.maintenance.report');
     Route::post('/tasks/{task}/maintenance-report', [TaskMaintenanceController::class, 'store'])->name('tasks.maintenance.store');
+    Route::get('/tasks/{task}/infrastructure/location-options', [InfrastructureLocationOptionsController::class, 'taskOptions'])->name('tasks.infrastructure.location-options');
+    Route::get('/tasks/{task}/infrastructure/location-assets', [InfrastructureLocationOptionsController::class, 'taskAssets'])->name('tasks.infrastructure.location-assets');
 
     // Laporan Ambil Modem (DEAC) — form khusus, ADHOC-86.
     Route::get('/tasks/{task}/device-retrieval-report', [TaskDeviceRetrievalController::class, 'report'])->name('tasks.device-retrieval.report');
@@ -1342,6 +1345,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/fop-tasks/history', [FopTaskController::class, 'history'])->name('fop-tasks.history');
         Route::get('/fop-tasks/history/{fop_task}', [FopTaskController::class, 'showHistory'])->name('fop-tasks.history.show');
         Route::get('/fop-tasks/technicians-availability', [FopTaskController::class, 'techniciansAvailability'])->name('fop-tasks.technicians-availability');
+        Route::get('/fop-tasks/infrastructure-scope-options', [InfrastructureLocationOptionsController::class, 'scopeOptions'])->name('fop-tasks.infrastructure-scope-options');
         Route::get('/fop-tasks/{fop_task}/row', [FopTaskController::class, 'row'])->name('fop-tasks.row');
     });
     Route::middleware('permission:fop_tasks.create')->group(function () {

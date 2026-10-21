@@ -20,9 +20,17 @@
             'id' => $node->id, 'label' => $node->breadcrumbLabel(),
             'type' => $node->nodeType?->code, 'type_id' => $node->node_type_id, 'parent_id' => $node->parent_id,
         ])->values()->all(),
+        // Dropdown lokasi bertingkat (rancangan hierarki §10.2): opsi diambil
+        // dari server per induk terpilih — URL dirender server, klien hanya
+        // menambah query level/parent.
+        'scope' => $infraScope,
+        'locationOptionsUrl' => route('tasks.infrastructure.location-options', $task),
+        'locationAssetsUrl' => route('tasks.infrastructure.location-assets', $task),
         'serials' => $eligibleInfraSerials->map(fn ($serial) => [
             'id' => $serial->id, 'label' => $serial->item?->name . ' · SN ' . $serial->serial_number,
             'item_node_type_id' => $serial->item?->infrastructure_node_type_id,
+            'item_node_type_code' => $serial->item?->infrastructureNodeType?->code,
+            'location_kind' => $serial->item?->infrastructure_location_kind?->value,
         ])->values()->all(),
         'oldSerials' => $eligibleInfraRetrievableSerials->map(fn ($serial) => [
             'id' => $serial->id, 'label' => $serial->item?->name . ' · SN ' . $serial->serial_number,
@@ -68,6 +76,8 @@
 
     <form action="{{ route('tasks.maintenance.store', $task) }}" method="POST" enctype="multipart/form-data"
           class="no-confirm" x-data="infrastructureReport(@js($infraUi))" x-ref="form"
+          data-location-options-url="{{ route('tasks.infrastructure.location-options', $task) }}"
+          data-location-assets-url="{{ route('tasks.infrastructure.location-assets', $task) }}"
           @input="reviewing = false" @change="reviewing = false" @submit.prevent="submit()">
         @csrf
         <div class="rounded-lg border border-border bg-surface">
@@ -137,15 +147,8 @@
                                     </div>
                                     <button type="button" @click="removeAction(index)" class="min-h-10 text-xs font-semibold text-error hover:underline">Hapus tindakan</button>
                                 </div>
+                                @include('tasks.partials.infra-location-picker')
                                 <div class="grid gap-4 sm:grid-cols-2">
-                                    <label class="block text-sm font-medium text-text-secondary">Lokasi yang dikerjakan <span x-show="taskType === 'infr' || row.action_type !== 'inspect'" class="text-error">*</span>
-                                        <select x-model="row.network_node_id" @change="nodeChanged(row)" :name="'infra_actions['+index+'][network_node_id]'"
-                                                class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
-                                            <option value="">Pilih titik jaringan</option>
-                                            <template x-for="node in nodes" :key="node.id"><option :value="node.id" x-text="node.label"></option></template>
-                                        </select>
-                                        <span x-show="taskType === 'oreq' && row.action_type === 'inspect'" class="mt-1 block text-xs font-normal text-text-muted">Pemeriksaan kantor boleh tanpa titik jaringan.</span>
-                                    </label>
                                     <template x-if="row.action_type === 'install'">
                                         <label class="block text-sm font-medium text-text-secondary">Jenis barang <span class="text-error">*</span>
                                             <select x-model="row.material_kind" :disabled="isCard(row)" class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
@@ -172,7 +175,7 @@
                                                 <option value="">Pilih SN yang terpasang di lokasi ini</option>
                                                 <template x-for="serial in serialsAt(row)" :key="serial.id"><option :value="serial.id" x-text="serial.label"></option></template>
                                             </select>
-                                            <span x-show="!row.network_node_id" class="mt-1 block text-xs font-normal text-text-muted">Pilih lokasi dulu agar SN terpasang terlihat.</span>
+                                            <span x-show="row.location_mode === 'legacy' ? !row.network_node_id : !deepestLocation(row)" class="mt-1 block text-xs font-normal text-text-muted">Pilih lokasi dulu — hanya SN yang terpasang tepat di lokasi itu yang muncul.</span>
                                         </label>
                                     </template>
                                     <template x-if="row.action_type === 'install' && row.material_kind === 'quantity'">
@@ -203,7 +206,30 @@
                                         <label class="block text-sm font-medium text-text-secondary">Meter terpakai <span class="text-error">*</span>
                                             <input type="number" min="0.01" step="0.01" x-model="row.meters" :name="'infra_actions['+index+'][meters]'" placeholder="Contoh: 12.5"
                                                    class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                            <span class="mt-1 block text-xs font-normal text-text-muted">Hanya mengurangi sisa roll; kabel tidak menjadi saldo di lokasi.</span>
                                         </label>
+                                    </template>
+                                    <template x-if="row.action_type === 'install' && row.material_kind === 'roll' && row.location_mode === 'hierarchy'">
+                                        <div class="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+                                            <label class="block text-sm font-medium text-text-secondary">Ujung sambungan dari <span class="text-xs font-normal text-text-muted">(opsional)</span>
+                                                <select x-model="row.end_from" :name="'infra_actions['+index+'][end_from]'" class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                                    <option value="">Tidak dicatat</option>
+                                                    <template x-for="end in endOptions(row)" :key="end.value"><option :value="end.value" x-text="end.label"></option></template>
+                                                </select>
+                                            </label>
+                                            <label class="block text-sm font-medium text-text-secondary">Ujung sambungan ke <span class="text-xs font-normal text-text-muted">(opsional)</span>
+                                                <select x-model="row.end_to" :name="'infra_actions['+index+'][end_to]'" class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                                    <option value="">Tidak dicatat</option>
+                                                    <template x-for="end in endOptions(row)" :key="end.value"><option :value="end.value" x-text="end.label"></option></template>
+                                                </select>
+                                            </label>
+                                            <label class="block text-sm font-medium text-text-secondary">Latitude titik kerja <span class="text-xs font-normal text-text-muted">(opsional)</span>
+                                                <input type="number" step="0.0000001" min="-90" max="90" x-model="row.work_latitude" :name="'infra_actions['+index+'][work_latitude]'" class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                            </label>
+                                            <label class="block text-sm font-medium text-text-secondary">Longitude titik kerja <span class="text-xs font-normal text-text-muted">(opsional)</span>
+                                                <input type="number" step="0.0000001" min="-180" max="180" x-model="row.work_longitude" :name="'infra_actions['+index+'][work_longitude]'" class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                            </label>
+                                        </div>
                                     </template>
                                     <template x-if="['install', 'replace'].includes(row.action_type) && isCard(row)">
                                         <label class="block text-sm font-medium text-text-secondary">Slot pada chassis OLT <span class="text-error">*</span>
@@ -219,9 +245,9 @@
                                             <select x-model="row.port_id" :name="'infra_actions['+index+'][port_id]'"
                                                     class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
                                                 <option value="">Pilih port</option>
-                                                <template x-for="port in portsAt(row.network_node_id, row.action_type)" :key="port.id"><option :value="port.id" x-text="'Port ' + port.label"></option></template>
+                                                <template x-for="port in portsAt(portNodeId(row), row.action_type)" :key="port.id"><option :value="port.id" x-text="'Port ' + port.label"></option></template>
                                             </select>
-                                            <span x-show="!row.network_node_id" class="mt-1 block text-xs font-normal text-text-muted">Pilih lokasi dulu agar portnya terlihat.</span>
+                                            <span x-show="!portNodeId(row)" class="mt-1 block text-xs font-normal text-text-muted">Pilih lokasi node (mis. ODP) dulu agar portnya terlihat.</span>
                                         </label>
                                     </template>
                                     <template x-if="row.action_type === 'port_connect'">
@@ -326,7 +352,7 @@
                     <template x-for="(row, index) in rows" :key="row.action_key">
                         <div class="py-3 text-sm">
                             <p class="font-semibold text-text-main" x-text="(index + 1) + '. ' + actionNames[row.action_type]"></p>
-                            <p class="mt-1 text-text-secondary"><span x-text="nodeName(row.network_node_id)"></span> · <span x-text="assetSummary(row)"></span></p>
+                            <p class="mt-1 text-text-secondary"><span x-text="locationLabel(row)"></span> · <span x-text="assetSummary(row)"></span></p>
                             <p class="mt-1 text-text-muted" x-text="row.result_note"></p>
                             <p class="mt-1 text-xs font-medium text-primary" x-text="stockEffects[row.action_type]"></p>
                         </div>

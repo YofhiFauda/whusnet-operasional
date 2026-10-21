@@ -38,6 +38,7 @@ use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskInfrastructureScopeService;
 use App\Services\FopTaskProvisioningService;
+use App\Services\InfrastructureLocationOptionsService;
 use App\Services\InfrastructureLocationResolver;
 use App\Services\InfrastructureMaterialService;
 use App\Services\InfrastructureReportLocationParser;
@@ -441,6 +442,14 @@ class TaskMaintenanceController extends Controller
 
         $infraMaterialActionKey = (string) Str::uuid();
 
+        // Akar scope untuk dropdown bertingkat (Task 9). Task tanpa anchor
+        // memakai FopTask sementara (tidak disimpan) — akar = Cabang task.
+        $infraScope = $showsInfraSection
+            ? app(InfrastructureLocationOptionsService::class)->rootPathFor(
+                $fopTask ?? new FopTask(['pop_id' => $task->pop_id, 'category' => $task->task_type])
+            )
+            : null;
+
         // Dropdown Kategori C-REQ (docs/plan/task-teknisi/
         // rancangan-biaya-creq-verifikasi-cs.md §2) — cuma dipakai view kalau
         // task_type = CREQ, tapi selalu dioper biar view gak perlu query lagi.
@@ -452,7 +461,7 @@ class TaskMaintenanceController extends Controller
         $cabangPops = Pop::query()->where('type', 'cabang')->where('status', 'active')
             ->orderBy('name')->get(['id', 'name']);
 
-        return view($showsInfraSection ? 'tasks.infrastructure-report' : 'tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions', 'infraPortOptions', 'infraSlotOptions', 'infraMaterialSources', 'infraMaterialActionKey'));
+        return view($showsInfraSection ? 'tasks.infrastructure-report' : 'tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions', 'infraPortOptions', 'infraSlotOptions', 'infraMaterialSources', 'infraMaterialActionKey', 'infraScope'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
