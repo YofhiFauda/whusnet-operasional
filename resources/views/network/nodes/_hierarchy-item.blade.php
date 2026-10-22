@@ -26,8 +26,16 @@
      @endif
      x-data="{ isOpen: true }"
      @tree-toggle-all.window="isOpen = $event.detail.open">
-    <div class="tree-node-item group flex items-center justify-between gap-2 rounded-xl border border-transparent px-2.5 py-1.5 transition-all hover:bg-slate-100/80 dark:hover:bg-slate-800/60 {{ $isNode ? 'cursor-pointer' : '' }}"
-         @if($isNode) @click="selectNode({{ $item['id'] }})" :class="{ 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 font-semibold': selectedNodeId === {{ $item['id'] }} }" @endif>
+    <div class="tree-node-item group flex items-center justify-between gap-2 rounded-xl border border-transparent px-2.5 py-1.5 transition-all hover:bg-slate-100/80 dark:hover:bg-slate-800/60 {{ $isNode || $childKeys !== [] ? 'cursor-pointer' : '' }}"
+         @if($isNode)
+             @click="selectNode({{ $item['id'] }})" :class="{ 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 font-semibold': selectedNodeId === {{ $item['id'] }} }"
+         @elseif($childKeys !== [])
+             {{-- Slot/Port/dll sekadar bongkar-tutup di tree, BUKAN langsung
+                  pindah ke halaman detail (bug 2026-10-22: klik "Slot 1" nyasar
+                  buka detail). Navigasi ke detail lewat tombol "Detail" eksplisit
+                  yang sudah di-stopPropagation di bawah. --}}
+             @click="isOpen = !isOpen"
+         @endif>
         <div class="flex min-w-0 flex-1 items-center gap-2">
             @if($childKeys !== [])
                 <button type="button" @click.stop="isOpen = !isOpen" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200/60 hover:text-slate-700" title="Buka/Tutup">
@@ -41,10 +49,12 @@
                 <span class="shrink-0 text-[10px] {{ $item['verified'] ? 'text-emerald-600' : 'text-amber-600' }}" title="{{ $item['verified'] ? 'Koneksi PON terverifikasi' : 'Koneksi belum terverifikasi' }}">⇢</span>
             @endif
             <div class="min-w-0 flex-1 truncate text-left" title="{{ $item['breadcrumb'] }}">
+                <span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">{{ $item['label'] }}</span>
                 @if($item['url'] && ! $isNode)
-                    <a href="{{ $item['url'] }}" class="font-mono text-xs font-semibold text-slate-800 hover:underline dark:text-slate-200">{{ $item['label'] }}</a>
-                @else
-                    <span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">{{ $item['label'] }}</span>
+                    {{-- Klik label cuma expand/select (lihat div pembungkus) —
+                         "Detail" terpisah + stopPropagation supaya tidak ikut
+                         toggle isOpen saat navigasi. --}}
+                    <a href="{{ $item['url'] }}" @click.stop class="ml-1.5 text-[10px] font-semibold text-primary hover:underline">Detail &rarr;</a>
                 @endif
                 @if($item['name'])<span class="mx-1 text-slate-300">-</span><span class="text-xs text-slate-500">{{ $item['name'] }}</span>@endif
                 @if($item['kind'] === 'customer')
