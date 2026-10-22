@@ -61,6 +61,10 @@
                     @php
                         $portItem = $hierarchy['items']['port:'.$componentPort->id] ?? null;
                         $portCapacity = $portItem['capacity'] ?? null;
+                        $portOdps = $componentPort->kind === \App\Enums\InfrastructurePortKind::PON
+                            ? array_values(array_filter($hierarchy['children']['port:'.$componentPort->id] ?? [],
+                                fn (string $childKey): bool => $hierarchy['items'][$childKey]['type'] === 'odp'))
+                            : [];
                         $statusLabel = $portItem['status_label'] ?? $componentPort->status->label();
                         $isTerpakai = str_starts_with($statusLabel, 'Terpakai');
                         $isTerverifikasi = str_contains($statusLabel, 'terverifikasi') && ! str_contains($statusLabel, 'belum');
@@ -94,6 +98,20 @@
                             </div>
                             <a href="{{ route('network.infrastructure-ports.show', $componentPort) }}" class="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-primary hover:bg-surface-muted">Detail &rarr;</a>
                         </div>
+                        {{-- Daftar ODP/splitter yang nyambung ke PON ini — view-only
+                             (pola 1 CLAUDE.md), satu PON bisa punya banyak ODP. Lepas/
+                             hubungkan baru tetap lewat tombol Detail di atas. --}}
+                        @if($portOdps !== [])
+                        <div class="mt-2 space-y-1 border-t border-border/60 pt-2">
+                            @foreach($portOdps as $odpKey)
+                            @php($odpItem = $hierarchy['items'][$odpKey])
+                            <a href="{{ $odpItem['url'] }}" class="flex items-center justify-between gap-1 text-[11px] hover:text-primary">
+                                <span class="truncate font-mono">&rarr; {{ $odpItem['label'] }}</span>
+                                <span class="shrink-0 {{ $odpItem['verified'] ? 'text-emerald-600' : 'text-amber-600' }}">{{ $odpItem['verified'] ? 'terverifikasi' : 'belum verifikasi' }}</span>
+                            </a>
+                            @endforeach
+                        </div>
+                        @endif
                     </div>
                     @empty
                     <p class="col-span-full text-xs text-text-muted">Belum ada {{ $portLabel }} pada Slot ini.</p>
