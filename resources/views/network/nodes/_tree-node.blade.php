@@ -13,10 +13,10 @@
      x-show="matchesTreeFilter({{ $treeNode->id }}, '{{ $treeNode->node_type_id }}', @js(strtolower($treeNode->code . ' ' . $treeNode->name)))"
      x-data="{ isOpen: true }"
      @tree-toggle-all.window="isOpen = $event.detail.open">
-    <div class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all hover:bg-slate-100/80 dark:hover:bg-slate-800/60"
+    <div class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-surface-muted"
          :class="{
-             'bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100 font-semibold shadow-2xs': selectedNodeId === {{ $treeNode->id }},
-             'text-slate-700 dark:text-slate-200 border border-transparent': selectedNodeId !== {{ $treeNode->id }}
+             'bg-primary-soft text-primary-hover border-l-2 border-primary font-semibold shadow-2xs': selectedNodeId === {{ $treeNode->id }},
+             'text-text-main border-l-2 border-transparent': selectedNodeId !== {{ $treeNode->id }}
          }"
          @click="selectNode({{ $treeNode->id }})">
         <div class="flex items-center gap-2 min-w-0 flex-1">

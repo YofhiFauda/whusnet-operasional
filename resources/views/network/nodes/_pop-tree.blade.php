@@ -8,25 +8,25 @@
 @endphp
 
 <div class="tree-line select-none my-0.5" x-data="{ isOpen: true }" @tree-toggle-all.window="isOpen = $event.detail.open">
-    <div class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all hover:bg-slate-100/80 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200">
+    <div class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-surface-muted text-text-main">
         <div class="flex items-center gap-2 min-w-0 flex-1">
             {{-- Expand/Collapse Chevron --}}
-            <button type="button" @click.stop="isOpen = !isOpen" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition shrink-0" title="Buka/Tutup">
+            <button type="button" @click.stop="isOpen = !isOpen" class="w-5 h-5 rounded-md flex items-center justify-center text-text-muted hover:text-text-main hover:bg-surface-muted transition-colors shrink-0" title="Buka/Tutup">
                 <svg class="w-3.5 h-3.5 transition-transform duration-150" :class="{ 'rotate-0': isOpen, '-rotate-90': !isOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
 
             {{-- POP Type Badge --}}
-            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-blue-600 text-white border-blue-600 shrink-0">
+            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-sky-600 text-white border-sky-600 shrink-0">
                 {{ $treePop->type === 'pusat' ? 'P' : ($treePop->type === 'cabang' ? 'C' : 'M') }}
             </span>
 
             {{-- Code & Name --}}
             <div class="min-w-0 flex-1 truncate text-left" title="{{ $treePop->name }} — {{ $popTypeLabel }}">
-                <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 font-mono">{{ $treePop->name }}</span>
-                <span class="text-slate-300 dark:text-slate-600 mx-1">-</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">{{ $popTypeLabel }}</span>
+                <span class="text-xs font-semibold text-text-main font-mono">{{ $treePop->name }}</span>
+                <span class="text-text-muted mx-1">-</span>
+                <span class="text-xs text-text-muted font-medium">{{ $popTypeLabel }}</span>
             </div>
         </div>
 
@@ -35,7 +35,7 @@
             @can('pops.view')
                 <a href="{{ route('master.pop.show', $treePop) }}"
                    @click.stop
-                   class="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded opacity-85 group-hover:opacity-100 transition hover:underline">
+                   class="text-[10px] font-semibold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-900 px-1.5 py-0.5 rounded opacity-90 group-hover:opacity-100 transition-colors hover:underline">
                     Detail POP
                 </a>
             @endcan
