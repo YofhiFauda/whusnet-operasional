@@ -35,6 +35,7 @@ use App\Models\District;
 use App\Models\FopTask;
 use App\Models\ImportBatch;
 use App\Models\ImportError;
+use App\Models\InfrastructureConnection;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -1702,11 +1703,39 @@ class CustomerController extends Controller
             ->limit(15)
             ->get();
 
+        // Lokasi jaringan tepat pelanggan ini (OLT -> Slot -> PON -> ODP -> Port):
+        // tanpa ini petugas harus menebak-nebak lewat drill-down manual di
+        // Master Node/Peta kalau satu Cabang punya puluhan ODP (temuan user
+        // 22-10-2026). Satu sumber: assignment port ODP aktif + koneksi PON
+        // aktif yang nge-uplink ke ODP itu — SAMA data yang dipakai proyeksi
+        // hierarki, bukan dihitung ulang dengan logic lain.
+        $activePortAssignment = $customer->portAssignments()
+            ->whereNull('released_at')
+            ->with('port.node.nodeType', 'port.node.anchorPop.parent')
+            ->latest('id')->first();
+        $customerNetworkLocation = null;
+        if ($activePortAssignment?->port?->node !== null) {
+            $odpNode = $activePortAssignment->port->node;
+            $uplink = InfrastructureConnection::query()->active()
+                ->where('target_network_node_id', $odpNode->id)
+                ->with('sourcePort.slot.device.nodeType', 'sourcePort.slot.device.anchorPop.parent')
+                ->first();
+            $customerNetworkLocation = [
+                'odp' => $odpNode,
+                'port_number' => $activePortAssignment->port->number,
+                'olt' => $uplink?->sourcePort?->slot?->device,
+                'slot' => $uplink?->sourcePort?->slot,
+                'pon' => $uplink?->sourcePort,
+                'verified' => $uplink?->isVerified() ?? false,
+            ];
+        }
+
         return view('customers.show', compact(
             'customer',
             'displayId',
             'displayIdLabel',
             'completeness',
+            'customerNetworkLocation',
             'timeline',
             'workflowStages',
             'timelineAnomaly',

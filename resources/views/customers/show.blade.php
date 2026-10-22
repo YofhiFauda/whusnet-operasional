@@ -650,6 +650,44 @@
                 </div>
                 @endif
             </div>
+
+            {{-- Lokasi jaringan tepat (temuan user 22-10-2026: drill-down manual
+                 OLT->Slot->PON->ODP gak kepraktisan kalau satu Cabang punya
+                 puluhan ODP) — satu baris jawab "pelanggan ini nempel di mana". --}}
+            @can('network_nodes.view')
+            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                    <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Lokasi Jaringan</span>
+                </div>
+                @if($customerNetworkLocation)
+                <div class="p-5 space-y-3 text-xs">
+                    <div class="flex flex-wrap items-center gap-1.5 font-mono">
+                        @if($customerNetworkLocation['olt'])
+                            <a href="{{ route('network.nodes.show', $customerNetworkLocation['olt']) }}" class="rounded border border-slate-200 dark:border-slate-700 px-2 py-1 font-semibold text-slate-800 dark:text-slate-100 hover:border-sky-500 hover:text-sky-700">{{ $customerNetworkLocation['olt']->code }}</a>
+                            <span class="text-slate-300">→</span>
+                            <a href="{{ route('network.infrastructure-slots.show', $customerNetworkLocation['slot']) }}" class="rounded border border-slate-200 dark:border-slate-700 px-2 py-1 text-slate-700 dark:text-slate-200 hover:border-sky-500 hover:text-sky-700">{{ $customerNetworkLocation['slot']->displayName() }}</a>
+                            <span class="text-slate-300">→</span>
+                            <a href="{{ route('network.infrastructure-ports.show', $customerNetworkLocation['pon']) }}" class="rounded border border-slate-200 dark:border-slate-700 px-2 py-1 text-slate-700 dark:text-slate-200 hover:border-sky-500 hover:text-sky-700">{{ $customerNetworkLocation['pon']->displayName() }}</a>
+                            <span class="text-slate-300">→</span>
+                        @else
+                            <span class="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">OLT/Slot/PON belum terhubung</span>
+                            <span class="text-slate-300">→</span>
+                        @endif
+                        <a href="{{ route('network.nodes.show', $customerNetworkLocation['odp']) }}" class="rounded border border-slate-200 dark:border-slate-700 px-2 py-1 font-semibold text-slate-800 dark:text-slate-100 hover:border-sky-500 hover:text-sky-700">{{ $customerNetworkLocation['odp']->code }}</a>
+                        <span class="text-slate-300">·</span>
+                        <span class="text-slate-500">Port {{ $customerNetworkLocation['port_number'] }}</span>
+                    </div>
+                    @if($customerNetworkLocation['olt'] && ! $customerNetworkLocation['verified'])
+                        <p class="text-[11px] text-amber-600 dark:text-amber-400">Uplink PON→ODP belum terverifikasi.</p>
+                    @endif
+                </div>
+                @else
+                <div class="p-8 text-center text-slate-400 text-xs">
+                    Belum ada assignment port ODP aktif untuk pelanggan ini.
+                </div>
+                @endif
+            </div>
+            @endcan
         </div>
 
         <!-- TAB 5: SURVEY -->

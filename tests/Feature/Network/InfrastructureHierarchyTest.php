@@ -383,6 +383,31 @@ class InfrastructureHierarchyTest extends TestCase
     }
 
     #[Test]
+    public function detail_pelanggan_menampilkan_lokasi_jaringan_tepat(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('customers.show', $this->customerDuaOnt));
+
+        $response->assertOk()
+            ->assertSee($this->olt1->code)
+            ->assertSee($this->pon->displayName())
+            ->assertSee($this->odpVerified->code)
+            ->assertSee('Port 1')
+            ->assertDontSee('Uplink PON');
+    }
+
+    #[Test]
+    public function detail_pelanggan_tanpa_uplink_pon_tandai_belum_terhubung(): void
+    {
+        $customer = $this->customerOn($this->odpUnverified, 1, 'Pelanggan ODP Belum Verifikasi');
+
+        $response = $this->actingAs($this->owner)->get(route('customers.show', $customer));
+
+        $response->assertOk()
+            ->assertSee($this->odpUnverified->code)
+            ->assertSee('Uplink PON→ODP belum terverifikasi');
+    }
+
+    #[Test]
     public function inventaris_peta_menunjukkan_aset_pada_posisi_tepat(): void
     {
         $item = Item::create(['code' => 'KARTU', 'name' => 'Kartu GPON', 'unit' => 'pcs', 'item_category_id' => ItemCategory::where('code', 'olt_module')->value('id'),
