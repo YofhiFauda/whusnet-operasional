@@ -148,13 +148,34 @@
         </div>
     </div>
 
+    {{-- Segmented View Switcher untuk Layar Mobile & Tablet (< 1024px) --}}
+    <div class="flex lg:hidden bg-surface-muted p-1 rounded-lg border border-border shadow-2xs">
+        <button type="button" @click="activeMobileTab = 'tree'"
+                :class="activeMobileTab === 'tree' ? 'bg-surface text-primary font-bold shadow-xs' : 'text-text-muted hover:text-text-main'"
+                class="flex-1 py-2 text-xs rounded-md text-center transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h8m-8 6h16"/>
+            </svg>
+            <span>Pohon Node Jaringan</span>
+        </button>
+        <button type="button" @click="activeMobileTab = 'inspector'"
+                :class="activeMobileTab === 'inspector' ? 'bg-surface text-primary font-bold shadow-xs' : 'text-text-muted hover:text-text-main'"
+                class="flex-1 py-2 text-xs rounded-md text-center transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            <span>Detail &amp; Port ODP</span>
+        </button>
+    </div>
+
     {{-- Layer 3: Main Split Workspace (Card Budget = 1 per Panel, 8px Radius) --}}
     <div class="flex flex-col lg:flex-row gap-5 items-start">
 
         {{-- ========================================================================= --}}
         {{-- PANEL KIRI: HIRARKI TOPOLOGI JARINGAN (w-[410px] xl:w-[440px])            --}}
         {{-- ========================================================================= --}}
-        <section class="w-full lg:w-[410px] xl:w-[440px] bg-surface rounded-lg border border-border shadow-xs flex flex-col overflow-hidden shrink-0" aria-label="Pohon node jaringan">
+        <section :class="{ 'hidden lg:flex': activeMobileTab !== 'tree', 'flex': activeMobileTab === 'tree' }"
+                 class="w-full lg:w-[410px] xl:w-[440px] bg-surface rounded-lg border border-border shadow-xs flex-col overflow-hidden shrink-0" aria-label="Pohon node jaringan">
             {{-- Tree Header & Filter --}}
             <div class="p-3.5 border-b border-border space-y-3 bg-surface">
                 <div class="flex items-center justify-between gap-2">
@@ -236,7 +257,8 @@
         {{-- ========================================================================= --}}
         {{-- PANEL KANAN: DETAIL NODE & MANAJEMEN PORT (flex-1)                        --}}
         {{-- ========================================================================= --}}
-        <section class="flex-1 w-full bg-surface rounded-lg border border-border shadow-2xs flex flex-col overflow-hidden" id="node-inspector">
+        <section :class="{ 'hidden lg:flex': activeMobileTab !== 'inspector', 'flex': activeMobileTab === 'inspector' }"
+                 class="flex-1 w-full bg-surface rounded-lg border border-border shadow-2xs flex-col overflow-hidden" id="node-inspector">
             @include('network.nodes._slot-inspector')
             @include('network.nodes._pon-inspector')
             @forelse($nodes as $node)
@@ -267,8 +289,13 @@
 
                     {{-- Sticky Top Bar: Breadcrumb Path & Quick Actions --}}
                     <div class="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3 bg-surface-muted/40">
-                        {{-- Hierarchy Path Breadcrumb --}}
+                        {{-- Hierarchy Path Breadcrumb & Mobile Back Button --}}
                         <div id="nodeBreadcrumb" class="flex items-center flex-wrap gap-1.5 text-xs text-text-muted">
+                            <button type="button" @click="activeMobileTab = 'tree'"
+                                    class="lg:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface border border-border text-xs font-semibold text-primary hover:text-sky-700 shadow-2xs mr-1 cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                                <span>Pohon</span>
+                            </button>
                             @foreach($breadcrumbParts as $index => $part)
                                 @if(! $loop->last)
                                     <span class="hover:text-primary transition font-mono">{{ $part }}</span>
@@ -1062,6 +1089,7 @@
 <script>
 function networkNodeManager(config) {
     return {
+        activeMobileTab: 'tree',
         treeSearchQuery: '',
         typeFilter: 'all',
         portFilter: 'ALL',
@@ -1277,6 +1305,7 @@ function networkNodeManager(config) {
         selectSlot(id) {
             this.selectedSlotId = id;
             this.selectedPonId = null;
+            this.activeMobileTab = 'inspector';
             this.$nextTick(() => {
                 const el = document.getElementById('inspector-slot-' + id);
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1286,6 +1315,7 @@ function networkNodeManager(config) {
         selectPon(id) {
             this.selectedSlotId = null;
             this.selectedPonId = id;
+            this.activeMobileTab = 'inspector';
             this.$nextTick(() => {
                 const el = document.getElementById('inspector-pon-' + id);
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1297,6 +1327,7 @@ function networkNodeManager(config) {
             this.selectedPonId = null;
             this.selectedNodeId = id;
             this.portFilter = 'ALL';
+            this.activeMobileTab = 'inspector';
             this.$nextTick(() => {
                 const el = document.getElementById('inspector-node-' + id);
                 if (el) {
