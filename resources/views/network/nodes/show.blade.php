@@ -9,7 +9,7 @@
     {{-- Top Back & Breadcrumb --}}
     <div class="flex items-center justify-between gap-3 flex-wrap">
         <a href="{{ route('network.nodes.index') }}"
-           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-muted text-xs font-bold text-text-secondary hover:text-text-main transition-colors shadow-2xs">
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-xs font-semibold text-text-secondary hover:text-text-main transition-colors shadow-2xs">
             <svg class="h-3.5 w-3.5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -21,7 +21,7 @@
             <form method="POST" action="{{ route('network.nodes.destroy', $node) }}" onsubmit="return confirm('Hapus node kosong? Node yang punya relasi akan dinonaktifkan.');">
                 @csrf
                 @method('DELETE')
-                <button type="submit" class="rounded-xl border border-rose-300 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50">Hapus / Nonaktifkan</button>
+                <button type="submit" class="rounded-lg border border-rose-300 dark:border-rose-900 px-3 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40">Hapus / Nonaktifkan</button>
             </form>
             @endcan
             <div class="flex items-center gap-2 text-xs font-mono">
@@ -32,19 +32,19 @@
     </div>
 
     {{-- Node Header & Summary Card --}}
-    <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
+    <section class="rounded-lg border border-border bg-surface p-6 shadow-2xs space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-border pb-4">
             <div class="space-y-1">
                 <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                         {{ $node->nodeType?->name }}
                     </span>
-                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold {{ $node->status === 'active' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200' : 'bg-slate-100 text-slate-700 border border-border' }}">
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold {{ $node->status === 'active' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-border' }}">
                         <span class="w-1.5 h-1.5 rounded-full {{ $node->status === 'active' ? 'bg-emerald-500' : 'bg-slate-400' }}"></span>
                         {{ ucfirst($node->status) }}
                     </span>
                 </div>
-                <h1 class="text-2xl font-black font-mono tracking-tight text-text-main">
+                <h1 class="text-2xl font-bold font-mono tracking-tight text-text-main">
                     {{ $node->code }} · {{ $node->name }}
                 </h1>
                 <p class="text-xs text-text-muted font-medium">
@@ -55,15 +55,15 @@
 
         {{-- Effective Location Grid --}}
         <div class="grid gap-4 sm:grid-cols-3 pt-2 text-xs">
-            <div class="p-3.5 rounded-xl bg-surface-muted/60 dark:bg-slate-900/40 border border-border space-y-1">
+            <div class="p-3.5 rounded-lg bg-surface-muted/60 dark:bg-slate-900/40 border border-border space-y-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Alamat Efektif</span>
                 <p class="font-semibold text-text-main">{{ $location['address'] ?: 'Belum dicatat' }}</p>
             </div>
-            <div class="p-3.5 rounded-xl bg-surface-muted/60 dark:bg-slate-900/40 border border-border space-y-1">
+            <div class="p-3.5 rounded-lg bg-surface-muted/60 dark:bg-slate-900/40 border border-border space-y-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Wilayah Administratif</span>
                 <p class="font-semibold text-text-main">{{ collect([$location['village'], $location['district'], $location['city']])->filter()->implode(', ') ?: 'Belum dicatat' }}</p>
             </div>
-            <div class="p-3.5 rounded-xl bg-surface-muted/60 dark:bg-slate-900/40 border border-border space-y-1">
+            <div class="p-3.5 rounded-lg bg-surface-muted/60 dark:bg-slate-900/40 border border-border space-y-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Koordinat Geospasial</span>
                 <p class="font-mono font-semibold text-sky-600 dark:text-sky-400">
                     @if($location['latitude'] !== null && $location['longitude'] !== null)
@@ -82,37 +82,31 @@
         </p>
     </section>
 
-    <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
+    {{-- Ringkasan jumlah per barang saja; detail lengkap (SN/lot/teknisi/jam/task) ada di Peta Infrastruktur. --}}
+    <section class="rounded-lg border border-border bg-surface p-6 shadow-2xs space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
-            <h2 class="text-sm font-black uppercase tracking-wider text-text-main">Aset Gudang Terpasang</h2>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-text-main">Aset Gudang Terpasang</h2>
             <div class="flex items-center gap-2">
-                <span class="text-xs text-text-muted">{{ $node->deployedSerials->count() }} unit serial</span>
+                <a href="{{ route('network.map.index', ['node_id' => $node->id]) }}"
+                   class="text-xs font-semibold text-sky-700 dark:text-sky-300 hover:underline">
+                    Lihat detail di Peta Infrastruktur &rarr;
+                </a>
                 @can('network_nodes.register_infra')
                 <a href="{{ route('network.nodes.register-asset.create', $node) }}"
-                   class="inline-flex items-center gap-1 rounded-lg border border-sky-300 px-2.5 py-1 text-xs font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors">
+                   class="inline-flex items-center gap-1 rounded-lg border border-sky-300 dark:border-sky-800 px-2.5 py-1 text-xs font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors">
                     Registrasi Aset Lama
                 </a>
                 @endcan
             </div>
         </div>
-        @if($node->deployedSerials->isEmpty() && $node->infrastructureBalances->where('qty', '>', 0)->isEmpty())
+        @if($node->assetSummary()->isEmpty())
             <p class="text-xs text-text-muted">Belum ada aset yang dicatat terpasang pada node ini.</p>
         @else
             <div class="grid gap-2 sm:grid-cols-2">
-                @foreach($node->deployedSerials as $serial)
-                    <div class="rounded-xl border border-border bg-surface-muted/60 p-3 text-xs">
-                        <p class="font-semibold text-text-main">{{ $serial->item?->name ?: 'Barang tanpa nama' }}</p>
-                        <a href="{{ route('warehouse.traceability.index', ['sn' => $serial->serial_number]) }}"
-                           class="mt-1 font-mono text-sky-700 dark:text-sky-300 font-bold hover:underline inline-flex items-center gap-1"
-                           title="Lihat riwayat pergerakan barang">
-                            SN {{ $serial->serial_number }} &nearr;
-                        </a>
-                    </div>
-                @endforeach
-                @foreach($node->infrastructureBalances->where('qty', '>', 0) as $balance)
-                    <div class="rounded-xl border border-border bg-surface-muted/60 p-3 text-xs">
-                        <p class="font-semibold text-text-main">{{ $balance->item?->name ?: 'Barang tanpa nama' }}</p>
-                        <p class="mt-1 text-text-secondary">{{ $balance->qty }} {{ $balance->item?->unit }} @if($balance->lot_no) · Lot {{ $balance->lot_no }} @endif</p>
+                @foreach($node->assetSummary() as $row)
+                    <div class="rounded-lg border border-border bg-surface-muted/60 p-3 text-xs">
+                        <p class="font-semibold text-text-main">{{ $row['name'] }}</p>
+                        <p class="mt-1 text-text-secondary font-mono">{{ rtrim(rtrim(number_format((float) $row['qty'], 2, ',', '.'), '0'), ',') }} {{ $row['unit'] }}</p>
                     </div>
                 @endforeach
             </div>
@@ -123,11 +117,11 @@
     @endif
 
     @if($node->ports->isNotEmpty())
-    <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-5">
+    <section class="rounded-lg border border-border bg-surface p-6 shadow-2xs space-y-5">
         {{-- Header & Kapasitas Ringkas --}}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
             <div>
-                <h2 class="text-sm font-black uppercase tracking-wider text-text-main flex items-center gap-2">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-text-main flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
                     Port &amp; Penghuni
                 </h2>
@@ -140,13 +134,13 @@
                 $usedPercent = $totalPortsCount > 0 ? round(($usedPortsCount / $totalPortsCount) * 100) : 0;
             @endphp
             <div class="flex items-center gap-2 text-xs flex-wrap">
-                <span class="px-2.5 py-1 rounded-lg bg-surface-muted border border-border font-bold text-text-main">
+                <span class="px-2.5 py-1 rounded-lg bg-surface-muted border border-border font-bold text-text-main font-mono">
                     Total: {{ $totalPortsCount }} Port
                 </span>
-                <span class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 font-bold">
+                <span class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 font-bold font-mono">
                     {{ $usedPortsCount }} / {{ $totalPortsCount }} terpakai ({{ $usedPercent }}%)
                 </span>
-                <span class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold">
+                <span class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold font-mono">
                     {{ $freePortsCount }} Kosong
                 </span>
             </div>
@@ -156,7 +150,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
             @foreach($node->ports->sortBy('number') as $port)
             @php($assignment = $port->activeAssignment->first())
-            <div class="rounded-xl border transition-all shadow-2xs flex flex-col justify-between
+            <div class="rounded-lg border transition-all shadow-2xs flex flex-col justify-between
                         {{ $port->is_used
                             ? ($assignment?->customer
                                 ? 'border-sky-300/80 bg-sky-50/40 dark:border-sky-900/80 dark:bg-sky-950/20'
@@ -302,59 +296,59 @@
     {{-- Edit Node Details Form --}}
     @can('network_nodes.update')
     <form method="POST" action="{{ route('network.nodes.update', $node) }}"
-          class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-5">
+          class="rounded-lg border border-border bg-surface p-6 shadow-2xs space-y-5">
         @csrf
         @method('PATCH')
 
         <div class="flex items-center gap-2 border-b border-border pb-3">
             <span class="w-1.5 h-3.5 bg-sky-600 rounded-full"></span>
-            <h2 class="text-sm font-black uppercase tracking-wider text-text-main">Edit Informasi &amp; Lokasi Node</h2>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-text-main">Edit Informasi &amp; Lokasi Node</h2>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
-            <label class="text-xs font-bold text-text-secondary">Kode Node <span class="text-rose-500">*</span>
-                <input name="code" required maxlength="50" value="{{ old('code', $node->code) }}" class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs font-mono">
+            <label class="text-xs font-semibold text-text-secondary">Kode Node <span class="text-rose-500">*</span>
+                <input name="code" required maxlength="50" value="{{ old('code', $node->code) }}" class="mt-1 block w-full rounded-lg border border-border bg-surface px-3.5 py-2 text-text-main text-xs font-mono focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none">
             </label>
-            <label class="text-xs font-bold text-text-secondary">Tipe Node <span class="text-rose-500">*</span>
-                <select name="node_type_id" required class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs">
+            <label class="text-xs font-semibold text-text-secondary">Tipe Node <span class="text-rose-500">*</span>
+                <select name="node_type_id" required class="mt-1 block w-full rounded-lg border border-border bg-surface px-3.5 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none cursor-pointer">
                     @foreach($nodeTypes as $type)
                     <option value="{{ $type->id }}" @selected((int) old('node_type_id', $node->node_type_id) === $type->id)>{{ $type->name }}</option>
                     @endforeach
                 </select>
             </label>
             <p class="sm:col-span-2 text-xs text-text-muted">Kode dan tipe hanya dapat diubah sebelum node memiliki port atau relasi lain.</p>
-            <label class="text-xs font-bold text-text-secondary">Nama Node <span class="text-rose-500">*</span>
+            <label class="text-xs font-semibold text-text-secondary">Nama Node <span class="text-rose-500">*</span>
                 <input name="name" required value="{{ old('name', $node->name) }}"
-                       class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
+                       class="mt-1 block w-full rounded-lg border border-border bg-surface px-3.5 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none">
             </label>
 
-            <label class="text-xs font-bold text-text-secondary">Status Operasional <span class="text-rose-500">*</span>
-                <select name="status" class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
+            <label class="text-xs font-semibold text-text-secondary">Status Operasional <span class="text-rose-500">*</span>
+                <select name="status" class="mt-1 block w-full rounded-lg border border-border bg-surface px-3.5 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none cursor-pointer">
                     <option value="active" @selected($node->status === 'active')>Aktif</option>
                     <option value="inactive" @selected($node->status === 'inactive')>Nonaktif</option>
                 </select>
             </label>
 
-            <label class="text-xs font-bold text-text-secondary sm:col-span-2">Alamat Fisik / Titik Tiang
-                <textarea name="address" rows="2" class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">{{ old('address', $node->address) }}</textarea>
+            <label class="text-xs font-semibold text-text-secondary sm:col-span-2">Alamat Fisik / Titik Tiang
+                <textarea name="address" rows="2" class="mt-1 block w-full rounded-lg border border-border bg-surface px-3.5 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none">{{ old('address', $node->address) }}</textarea>
             </label>
 
             @foreach(['village' => 'Desa/Kelurahan', 'district' => 'Kecamatan', 'city' => 'Kota/Kabupaten', 'latitude' => 'Latitude', 'longitude' => 'Longitude'] as $field => $label)
-            <label class="text-xs font-bold text-text-secondary">{{ $label }}
+            <label class="text-xs font-semibold text-text-secondary">{{ $label }}
                 <input name="{{ $field }}" value="{{ old($field, $node->$field) }}"
-                       class="mt-1 block w-full rounded-xl border border-border bg-background px-3.5 py-2 text-text-main text-xs font-mono focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
+                       class="mt-1 block w-full rounded-lg border border-border bg-surface px-3.5 py-2 text-text-main text-xs font-mono focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none">
             </label>
             @endforeach
         </div>
 
         @if($errors->any())
-        <div class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-xs font-semibold text-rose-600 dark:text-rose-400">
+        <div class="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-xs font-semibold text-rose-600 dark:text-rose-400">
             {{ $errors->first() }}
         </div>
         @endif
 
         <div class="pt-4 border-t border-border flex items-center justify-end">
-            <button type="submit" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer">
+            <button type="submit" class="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer">
                 Simpan Detail
             </button>
         </div>
