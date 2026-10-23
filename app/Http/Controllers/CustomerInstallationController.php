@@ -31,6 +31,7 @@ use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\AdditionalDeviceCustodyService;
+use App\Services\CableCrossingService;
 use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
@@ -377,7 +378,7 @@ class CustomerInstallationController extends Controller
             ->get();
     }
 
-    public function report(Customer $customer, Request $request)
+    public function report(Customer $customer, Request $request, CableCrossingService $cableCrossings)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
@@ -538,7 +539,9 @@ class CustomerInstallationController extends Controller
         $odpPortOptions = $this->odpPortsFor($customer);
         $currentOdpPortId = $odpPortOptions->first(fn (NetworkNodePort $port) => $port->activeAssignment->first()?->customer_id === $customer->id)?->id;
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif', 'odpPortOptions', 'currentOdpPortId', 'hasManagedOdp', 'eligibleExtraDeviceSerials', 'requiredExtraDevices', 'additionalDeviceRequirements'));
+        $cableCrossingRows = $cableCrossings->formRows($installation ? $cableCrossings->terpasangForInstallation($installation) : collect());
+
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif', 'odpPortOptions', 'currentOdpPortId', 'hasManagedOdp', 'eligibleExtraDeviceSerials', 'requiredExtraDevices', 'additionalDeviceRequirements', 'cableCrossingRows'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -1065,7 +1068,7 @@ class CustomerInstallationController extends Controller
      * apa adanya supaya alur admin manual (radio installation_status) tidak
      * ikut berubah perilaku.
      */
-    public function storePemasangan(Request $request, Customer $customer)
+    public function storePemasangan(Request $request, Customer $customer, CableCrossingService $cableCrossings)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
@@ -1253,6 +1256,15 @@ class CustomerInstallationController extends Controller
             'modem_acquisition_choice.prohibited' => 'Cara pemilikan modem hanya untuk pelanggan kontrak Beli.',
         ]);
 
+        // Rute kabel melintang jalan (ADHOC-205) — divalidasi terpisah karena
+        // aturannya bergantung pada checkbox. Kalau checkbox tidak dicentang,
+        // rute yang ikut terkirim diabaikan (lihat pemanggilan sync di bawah).
+        $crossingOn = $request->boolean('cable_crossing');
+        $crossingInput = $request->validate(
+            $cableCrossings->pemasanganRules($crossingOn),
+            $cableCrossings->messages(),
+        );
+
         if (! empty($validated['network_node_port_id'])) {
             $selectedOdpPort = $managedOdpPorts->firstWhere('id', (int) $validated['network_node_port_id']);
             $validated['odp_number'] = $selectedOdpPort->node->code;
@@ -1322,6 +1334,10 @@ class CustomerInstallationController extends Controller
         // beneran kebuka ($pemasanganComplete di report(), abort_unless di
         // storeSpeedtest()) — teknisi tetap harus balik tekan Aktivasi lagi
         // setelah upload foto & catat material supaya Fase 6 kebuka.
+        if ($crossingOn) {
+            $cableCrossings->assertInstallationPhotos($installation, $crossingInput['cable_crossings']);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -1401,6 +1417,10 @@ class CustomerInstallationController extends Controller
             }
 
             $installation->save();
+
+            // Rute kabel melintang disinkron ke pemasangan ini (draft, sama seperti
+            // pointer roll di atas). Eksekusi final tetap di storeSpeedtest().
+            $cableCrossings->syncFromPemasangan($installation, $customer, $request->user(), $crossingOn, $crossingInput['cable_crossings'] ?? [], $installation->selected_inventory_roll_id);
 
             if (! empty($validated['network_node_port_id'])) {
                 app(NetworkPortAssignmentService::class)->assignCustomer($selectedOdpPort, $customer, $request->user());

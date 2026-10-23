@@ -57,6 +57,15 @@
                 </span>
             @endif
 
+            {{-- Kabel melintang jalan (ADHOC-205): rute belum ditarik wajib dibereskan
+                 saat Deact. Badge ini supaya terlihat tanpa harus buka tab Pemasangan. --}}
+            @if($openCableCrossingCount > 0)
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30" title="Kabel melintang jalan yang belum selesai. Wajib ditarik saat Deact.">
+                    <i class="fa-solid fa-triangle-exclamation mr-1 text-[10px] opacity-70"></i>
+                    Kabel melintang: {{ $openCableCrossingCount }}
+                </span>
+            @endif
+
             {{-- Saldo Pelanggan (ADHOC-92) — pengganti badge "Lebih Bayar" lama.
                  Beda dari total overpay historis: ini saldo AKTIF (SUM kredit −
                  SUM debit), otomatis dipakai untuk tagihan Bulanan berikutnya

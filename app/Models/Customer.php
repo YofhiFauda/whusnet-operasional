@@ -547,6 +547,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<CustomerCableCrossing, $this>
+     */
+    public function cableCrossings(): HasMany
+    {
+        return $this->hasMany(CustomerCableCrossing::class);
+    }
+
+    /**
      * @return HasMany<Task, $this>
      */
     public function tasks(): HasMany

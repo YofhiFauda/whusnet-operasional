@@ -17,6 +17,7 @@ use App\Http\Controllers\CollectorWorksheetController;
 use App\Http\Controllers\CustomerAcquisitionController;
 use App\Http\Controllers\CustomerAdditionalDeviceController;
 use App\Http\Controllers\CustomerBillingWaiverController;
+use App\Http\Controllers\CustomerCableCrossingController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\CustomerDocumentController;
@@ -252,6 +253,11 @@ Route::middleware('auth')->group(function () {
     // Customers Management - Static Routes First
     Route::middleware('permission:customers.view')->group(function () {
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+    });
+
+    // Daftar pemantauan Kabel Melintang Jalan (ADHOC-205) — static, sebelum /customers/{customer}.
+    Route::middleware('permission:customer_cable_crossings.view')->group(function () {
+        Route::get('/customer-cable-crossings', [CustomerCableCrossingController::class, 'index'])->name('customer-cable-crossings.index');
     });
 
     // List Pelanggan Putus & List Pelanggan Gagal — permission SENDIRI,
@@ -1231,6 +1237,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
         Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
         Route::get('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'create'])->name('network.nodes.register-asset.create');
+        Route::post('/network/nodes/{node}/seen', [NetworkNodeController::class, 'markSeen'])->name('network.nodes.seen');
         Route::get('/network/infrastructure-slots/{slot}', [InfrastructurePositionController::class, 'showSlot'])->name('network.infrastructure-slots.show');
         Route::get('/network/infrastructure-ports/{port}', [InfrastructurePositionController::class, 'showPort'])->name('network.infrastructure-ports.show');
     });

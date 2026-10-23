@@ -126,6 +126,7 @@ class RolePermissionSeeder extends Seeder
                 'collector_worksheet.validate',
                 'collector_worksheet.view',
                 'customer_balance.view', // Saldo Pelanggan (ADHOC-92) — read-only, keuangan
+                'customer_cable_crossings.view', // Daftar Kabel Melintang Jalan (ADHOC-205)
                 'customers.detail.address.view',
                 'customers.detail.devices.view',
                 'customers.detail.devices.view_sensitive',
@@ -630,6 +631,7 @@ class RolePermissionSeeder extends Seeder
                 'collector_worksheet.validate',
                 'collector_worksheet.view', // Cross check kolektor DALAM scope POP-nya
                 'customer_balance.view', // Saldo Pelanggan (ADHOC-92) DALAM scope POP-nya
+                'customer_cable_crossings.view', // Kabel Melintang Jalan (ADHOC-205) DALAM scope POP-nya
                 'customers.create',
                 'customers.deactivate', // Terminasi langganan dalam scope POP-nya
                 'customers.detail.address.update',

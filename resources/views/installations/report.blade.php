@@ -836,6 +836,98 @@
                                         @endif
                                     </div>
 
+                                    {{-- Kabel Melintang Jalan (ADHOC-205). Rute dicatat di sini (draft, disinkron
+                                         tiap simpan); Deact wajib menyelesaikannya. Lokasi = titik awal → rumah pelanggan. --}}
+                                    @php
+                                        $hasCrossingOld = session()->hasOldInput();
+                                        $crossingOn = $hasCrossingOld ? (bool) old('cable_crossing') : ! empty($cableCrossingRows);
+                                        $crossingRows = $hasCrossingOld ? array_values((array) old('cable_crossings', [])) : $cableCrossingRows;
+                                        $crossingErrors = collect($errors->messages())->filter(fn ($messages, $key) => str_starts_with($key, 'cable_crossings'))->flatten()->unique();
+                                    @endphp
+                                    <div class="sm:col-span-2 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/20 p-3 space-y-3"
+                                         x-data="{
+                                             on: @js($crossingOn),
+                                             rows: @js($crossingRows),
+                                             addRow() { this.rows.push({ id: '', nama_jalan: '', jenis_jalan: '', meter_terpakai: '', points: [{ label: '', latitude: '', longitude: '' }, { label: '', latitude: '', longitude: '' }] }) },
+                                             removeRow(r) { this.rows.splice(r, 1) },
+                                             addPoint(r) { this.rows[r].points.push({ label: '', latitude: '', longitude: '' }) },
+                                             removePoint(r, p) { this.rows[r].points.splice(p, 1) },
+                                             useGps(r, p) {
+                                                 if (! navigator.geolocation) { alert('GPS tidak tersedia di perangkat ini. Isi koordinat manual.'); return }
+                                                 navigator.geolocation.getCurrentPosition(
+                                                     (pos) => { this.rows[r].points[p].latitude = pos.coords.latitude.toFixed(7); this.rows[r].points[p].longitude = pos.coords.longitude.toFixed(7) },
+                                                     () => alert('Lokasi GPS tidak terbaca. Isi koordinat manual.'),
+                                                 )
+                                             },
+                                         }">
+                                        <label class="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-200 cursor-pointer">
+                                            <input type="checkbox" name="cable_crossing" value="1" x-model="on" class="h-4 w-4 rounded border-slate-300 accent-amber-600">
+                                            Kabel melintang jalan?
+                                        </label>
+                                        <p class="text-[10px] text-slate-600 dark:text-slate-400">Centang kalau kabel drop dari tiang/ODP ke rumah pelanggan dipasang melintang jalan. Rute akan ditarik saat Deact.</p>
+
+                                        @if($crossingErrors->isNotEmpty())
+                                            <div class="rounded-md border border-rose-200 bg-rose-50 dark:bg-rose-950/40 dark:border-rose-900 p-2 text-[11px] text-rose-700 dark:text-rose-300 space-y-0.5">
+                                                @foreach($crossingErrors as $message)<p>{{ $message }}</p>@endforeach
+                                            </div>
+                                        @endif
+
+                                        <div x-show="on" x-cloak class="space-y-3">
+                                            <template x-for="(row, r) in rows" :key="r">
+                                                <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 space-y-2.5">
+                                                    <input type="hidden" :name="`cable_crossings[${r}][id]`" :value="row.id">
+                                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                                        <div>
+                                                            <label class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Nama Jalan <span class="text-rose-500">*</span></label>
+                                                            <input type="text" :name="`cable_crossings[${r}][nama_jalan]`" x-model="row.nama_jalan" maxlength="191" placeholder="mis. Jl. Raya Ponorogo" class="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 shadow-xs">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Jenis Jalan</label>
+                                                            <input type="text" :name="`cable_crossings[${r}][jenis_jalan]`" x-model="row.jenis_jalan" maxlength="100" placeholder="mis. Jalan raya / gang" class="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 shadow-xs">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Meter Terpakai</label>
+                                                            <input type="number" step="0.01" min="0.01" :name="`cable_crossings[${r}][meter_terpakai]`" x-model="row.meter_terpakai" placeholder="mis. 35" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 shadow-xs">
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="space-y-1.5">
+                                                        <p class="text-[10px] font-medium uppercase tracking-wide text-slate-600 dark:text-slate-400">Lokasi Rute (titik awal → rumah pelanggan) <span class="text-rose-500">*</span></p>
+                                                        <template x-for="(point, p) in row.points" :key="p">
+                                                            <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto_auto] gap-2 items-end">
+                                                                <div>
+                                                                    <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-0.5" x-text="p === 0 ? 'Titik awal' : (p === row.points.length - 1 ? 'Rumah pelanggan' : 'Titik ' + (p + 1))"></label>
+                                                                    <input type="text" :name="`cable_crossings[${r}][points][${p}][label]`" x-model="point.label" maxlength="150" placeholder="Label (opsional)" class="w-full text-xs px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs">
+                                                                </div>
+                                                                <div>
+                                                                    <input type="text" inputmode="decimal" :name="`cable_crossings[${r}][points][${p}][latitude]`" x-model="point.latitude" placeholder="Latitude" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs">
+                                                                </div>
+                                                                <div>
+                                                                    <input type="text" inputmode="decimal" :name="`cable_crossings[${r}][points][${p}][longitude]`" x-model="point.longitude" placeholder="Longitude" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs">
+                                                                </div>
+                                                                <button type="button" @click="useGps(r, p)" class="px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 rounded-md hover:bg-sky-100">GPS</button>
+                                                                <button type="button" @click="removePoint(r, p)" x-show="row.points.length > 2" class="px-2.5 py-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-md">Hapus</button>
+                                                            </div>
+                                                        </template>
+                                                        <button type="button" @click="addPoint(r)" class="text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline">+ Tambah titik perantara</button>
+                                                    </div>
+
+                                                    <div class="space-y-1">
+                                                        <label class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Foto Bukti <span x-show="!row.id" class="text-rose-500">*</span></label>
+                                                        <input type="file" :name="`cable_crossings[${r}][foto]`" accept="image/*" class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 dark:file:bg-sky-950/60 dark:file:text-sky-300 cursor-pointer">
+                                                        <p x-show="row.id" class="text-[10px] text-slate-500">Foto sebelumnya tersimpan — unggah lagi kalau ingin menggantinya.</p>
+                                                    </div>
+
+                                                    <div class="flex justify-end">
+                                                        <button type="button" @click="removeRow(r)" class="text-[11px] font-semibold text-red-600 dark:text-red-400 hover:underline">Hapus rute ini</button>
+                                                    </div>
+                                                </div>
+                                            </template>
+
+                                            <button type="button" @click="addRow()" class="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline">+ Tambah rute kabel melintang</button>
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <label for="mac_address" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">MAC Address</label>
                                         <input type="text" name="mac_address" id="mac_address" value="{{ old('mac_address', $dev->mac_address ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="00:11:22:33:44:55">
@@ -929,9 +1021,38 @@
                                         <input type="text" name="initial_attenuation" id="initial_attenuation" value="{{ old('initial_attenuation', $tech5->initial_attenuation ?? '') }}" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs" placeholder="-19.5">
                                     </div>
                                 </div>
+
                             </div>
 
+                            {{-- Aktivasi Action Banner — tepat di atas Section Perangkat Tambahan --}}
+                            @unless($pemasanganComplete)
+                                <div class="p-3.5 sm:p-4 rounded-lg bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/80 dark:border-sky-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div>
+                                        <h6 class="text-xs font-semibold text-slate-900 dark:text-slate-100">Aktivasi Tahap Speedtest (Fase 6)</h6>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Simpan perangkat utama dan perangkat tambahan sesuai paket, lalu buka akses Speedtest.</p>
+                                    </div>
+                                    <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-medium cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50">
+                                        <x-ui.icon name="zap" class="w-3.5 h-3.5" />
+                                        <span>Aktivasi Laporan Speedtest</span>
+                                    </button>
+                                </div>
+                            @else
+                                <div class="p-3.5 sm:p-4 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div>
+                                        <div class="inline-flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 text-xs font-medium">
+                                            <x-ui.icon name="check" class="w-3.5 h-3.5 text-emerald-600" /> Sudah Diaktivasi — Fase 6 Terbuka
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Gunakan tombol di samping untuk menyimpan koreksi data perangkat.</p>
+                                    </div>
+                                    <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium shadow-xs inline-flex items-center justify-center gap-1.5">
+                                        <x-ui.icon name="save" class="w-3.5 h-3.5" />
+                                        <span>Simpan Perubahan</span>
+                                    </button>
+                                </div>
+                            @endunless
 
+                            {{-- Perangkat Tambahan (ADHOC-190) — di bawah Aktivasi; submit-nya lewat form shell di luar form-pemasangan --}}
+                            @include('installations.partials._additional_devices_step')
 
                             <!-- Section: Material Realita Terpakai -->
                             <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 space-y-2.5">
@@ -1041,35 +1162,14 @@
                         </div>
                     </form>
 
-                    <!-- Section: Perangkat Tambahan (ADHOC-190) — form sendiri, saudara form-pemasangan -->
-                    @include('installations.partials._additional_devices_step')
+                    {{-- Form shell Perangkat Tambahan (ADHOC-190) — sengaja di luar form-pemasangan (tidak boleh nested). Field-nya ditarik ke sini lewat atribut form=, lihat partial di Section Distribusi. --}}
+                    @if($requiredExtraDevices > 0)
+                        <form id="form-additional-devices" action="{{ route('customers.installation.additional-devices.store', $customer->id) }}" method="POST" class="hidden">
+                            @csrf
+                            <input type="hidden" name="return_to" value="{{ $returnTo }}">
+                        </form>
+                    @endif
 
-                <!-- Aktivasi Action Banner -->
-                @unless($pemasanganComplete)
-                    <div class="p-3.5 sm:p-4 rounded-lg bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/80 dark:border-sky-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                            <h6 class="text-xs font-semibold text-slate-900 dark:text-slate-100">Aktivasi Tahap Speedtest (Fase 6)</h6>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Simpan perangkat utama dan perangkat tambahan sesuai paket, lalu buka akses Speedtest.</p>
-                        </div>
-                        <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-medium cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50">
-                            <x-ui.icon name="zap" class="w-3.5 h-3.5" />
-                            <span>Aktivasi Laporan Speedtest</span>
-                        </button>
-                    </div>
-                @else
-                    <div class="p-3.5 sm:p-4 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                            <div class="inline-flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 text-xs font-medium">
-                                <x-ui.icon name="check" class="w-3.5 h-3.5 text-emerald-600" /> Sudah Diaktivasi — Fase 6 Terbuka
-                            </div>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Gunakan tombol di samping untuk menyimpan koreksi data perangkat.</p>
-                        </div>
-                        <button type="button" id="btn-aktivasi" onclick="attemptActivate()" class="w-full sm:w-auto px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium shadow-xs inline-flex items-center justify-center gap-1.5">
-                            <x-ui.icon name="save" class="w-3.5 h-3.5" />
-                            <span>Simpan Perubahan</span>
-                        </button>
-                    </div>
-                @endunless
                     </div>
 
                     <!-- STEP 6 PANEL: Laporan Uji Koneksi (Speedtest) -->

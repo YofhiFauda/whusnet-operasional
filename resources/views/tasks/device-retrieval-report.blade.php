@@ -263,6 +263,60 @@
                 </div>
             </div>
 
+            {{-- ── Section 2b: KABEL MELINTANG JALAN (ADHOC-205) ──
+                 Wajib diisi semua sebelum DEAC bisa ditutup, berapa pun hasil
+                 modemnya. Penarikan kabel tidak masuk stok (kabel sudah keluar). --}}
+            @if($pendingCableCrossings->isNotEmpty())
+            <div class="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 space-y-3">
+                <h2 class="text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 font-ui">
+                    Kabel Melintang Jalan
+                </h2>
+                <p class="text-xs text-slate-600 dark:text-slate-400 font-ui">
+                    Saat pemasangan, kabel ini tercatat melintang jalan. Tarik kabelnya, atau catat alasan kalau tidak bisa ditarik. Task ini belum bisa ditutup sebelum semua rute diisi.
+                </p>
+
+                @foreach($pendingCableCrossings as $crossing)
+                <div class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 space-y-3" x-data="{ result: @js(old("cable_crossings.{$crossing->id}.status", '')) }">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-100 font-ui">{{ $crossing->nama_jalan }}</p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 font-ui">
+                            {{ $crossing->jenis_jalan ?? 'Jenis jalan belum diisi' }}@if($crossing->meter_terpakai) · {{ rtrim(rtrim(number_format((float) $crossing->meter_terpakai, 2, ',', '.'), '0'), ',') }} m @endif
+                        </p>
+                        <ol class="mt-1.5 space-y-0.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                            @foreach($crossing->points as $point)
+                            <li>{{ $point->urutan }}. {{ $point->label ? $point->label.' — ' : '' }}{{ $point->latitude }}, {{ $point->longitude }}</li>
+                            @endforeach
+                        </ol>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui has-[:checked]:border-sky-600 has-[:checked]:bg-sky-50/60 dark:has-[:checked]:bg-sky-950/40">
+                            <input type="radio" name="cable_crossings[{{ $crossing->id }}][status]" value="ditarik" x-model="result" class="accent-sky-600">
+                            Kabel sudah ditarik
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui has-[:checked]:border-sky-600 has-[:checked]:bg-sky-50/60 dark:has-[:checked]:bg-sky-950/40">
+                            <input type="radio" name="cable_crossings[{{ $crossing->id }}][status]" value="tidak_bisa_ditarik" x-model="result" class="accent-sky-600">
+                            Tidak bisa ditarik
+                        </label>
+                    </div>
+
+                    <div x-show="result === 'ditarik'" x-cloak class="space-y-1.5">
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui">Foto Penarikan <span class="text-red-500">*</span></label>
+                        <input type="file" name="cable_crossings[{{ $crossing->id }}][foto]" accept="image/*"
+                               class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-950/60 dark:file:text-sky-300 font-ui transition-colors cursor-pointer">
+                    </div>
+
+                    <div x-show="result === 'tidak_bisa_ditarik'" x-cloak class="space-y-1.5">
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui">Alasan tidak bisa ditarik <span class="text-red-500">*</span></label>
+                        <textarea name="cable_crossings[{{ $crossing->id }}][alasan]" rows="2" maxlength="500"
+                                  placeholder="Mis. kabel tertanam di aspal, perlu galian"
+                                  class="w-full rounded-lg text-xs sm:text-sm font-ui bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 p-2.5 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-colors resize-y">{{ old("cable_crossings.{$crossing->id}.alasan") }}</textarea>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
             {{-- ── Section 3: CATATAN / ALASAN (Design.md §4) ── --}}
             <div class="p-5 sm:p-6 space-y-2">
                 <label class="block text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 font-ui">

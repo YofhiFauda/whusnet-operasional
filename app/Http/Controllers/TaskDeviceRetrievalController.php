@@ -14,6 +14,7 @@ use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\Task;
 use App\Models\TaskDeviceRetrieval;
+use App\Services\CableCrossingService;
 use App\Services\FileUploadService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
@@ -38,7 +39,7 @@ use InvalidArgumentException;
  */
 class TaskDeviceRetrievalController extends Controller
 {
-    public function report(Task $task, LegacyDeviceHintService $hints): View|RedirectResponse
+    public function report(Task $task, LegacyDeviceHintService $hints, CableCrossingService $cableCrossings): View|RedirectResponse
     {
         $this->authorize('statusComplete', $task);
 
@@ -68,10 +69,14 @@ class TaskDeviceRetrievalController extends Controller
         $accessoryOptions = TaskDeviceRetrieval::ACCESSORY_OPTIONS;
         $outcomes = DeviceRetrievalOutcome::cases();
 
-        return view('tasks.device-retrieval-report', compact('task', 'installedSerials', 'legacySerial', 'legacyHint', 'items', 'accessoryOptions', 'outcomes', 'showOwnershipSkipBanner'));
+        // Rute kabel melintang jalan yang wajib diselesaikan sebelum DEAC
+        // ditutup (ADHOC-205). Kosong = seksi disembunyikan.
+        $pendingCableCrossings = $cableCrossings->pendingFor($task->customer);
+
+        return view('tasks.device-retrieval-report', compact('task', 'installedSerials', 'legacySerial', 'legacyHint', 'items', 'accessoryOptions', 'outcomes', 'showOwnershipSkipBanner', 'pendingCableCrossings'));
     }
 
-    public function store(Request $request, Task $task, TaskService $taskService, InventoryReassignService $inventory): RedirectResponse
+    public function store(Request $request, Task $task, TaskService $taskService, InventoryReassignService $inventory, CableCrossingService $cableCrossings): RedirectResponse
     {
         $this->authorize('statusComplete', $task);
 
@@ -120,6 +125,14 @@ class TaskDeviceRetrievalController extends Controller
             'notes.required' => 'Alasan wajib diisi kalau alat tidak berhasil diambil.',
         ]);
 
+        // Hasil tiap rute kabel melintang (ADHOC-205) — wajib lengkap, berlaku
+        // untuk outcome apa pun: kabel melintang jalan tetap ada walau modem
+        // tidak berhasil diambil. Sengaja validasi terpisah (lihat deactRules()).
+        $crossingInput = $request->validate(
+            $cableCrossings->deactRules($task->customer, $request),
+            $cableCrossings->messages(),
+        );
+
         $outcome = DeviceRetrievalOutcome::from($validated['outcome']);
         $rows = $outcome->isRetrieved() ? $validated['serials'] : [];
 
@@ -139,7 +152,7 @@ class TaskDeviceRetrievalController extends Controller
         $task->loadMissing(['customer', 'pop', 'fopTask']);
 
         try {
-            DB::transaction(function () use ($request, $task, $taskService, $inventory, $technician, $outcome, $rows, $validated) {
+            DB::transaction(function () use ($request, $task, $taskService, $inventory, $cableCrossings, $crossingInput, $technician, $outcome, $rows, $validated) {
                 foreach ($rows as $row) {
                     $item = ! empty($row['item_id']) ? Item::find($row['item_id']) : null;
 
@@ -174,6 +187,10 @@ class TaskDeviceRetrievalController extends Controller
                     'accessories' => $outcome->isRetrieved() ? ($validated['accessories'] ?? []) : [],
                     'notes' => $validated['notes'] ?? null,
                 ]);
+
+                // Sebelum complete(): task DEAC tidak boleh tertutup dengan rute
+                // kabel yang masih `terpasang` (lihat CableCrossingService::resolveForDeact()).
+                $cableCrossings->resolveForDeact($task->customer, $task, $crossingInput['cable_crossings'] ?? []);
 
                 $taskService->complete($task, $technician);
             });

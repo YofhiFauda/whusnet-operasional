@@ -499,6 +499,13 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Kabel Melintang Jalan (ADHOC-205) — cuma VIEW (daftar pemantauan).
+        // Penulisan rute ikut izin Pemasangan (customers.detail.installation.update)
+        // dan penyelesaiannya ikut izin task DEAC, supaya tidak ada jalur kedua.
+        'customer_cable_crossings' => [
+            ActionCode::VIEW->value,
+        ],
+
         // Master Alasan Putus Langganan (ADHOC-69) — TERPISAH dari
         // `customers.deactivate` (dokumen §4.2): role yang cuma bisa
         // memproses form putus langganan (butuh `.view` buat isi dropdown)
@@ -930,6 +937,7 @@ return [
         'sales_omset_dashboard.view' => 'Lihat Dashboard Omset Sales',
         'business_customers.view' => 'Lihat List Pelanggan Bisnis',
         'customer_balance.view' => 'Lihat Saldo Pelanggan',
+        'customer_cable_crossings.view' => 'Lihat Daftar Kabel Melintang Jalan',
 
         // Verifikasi Biaya C-REQ (docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)
         'creq_billing_verification.view' => 'Lihat Antrean Verifikasi Biaya C-REQ',

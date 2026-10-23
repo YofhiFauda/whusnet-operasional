@@ -50,6 +50,7 @@ use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
 use App\Services\BillingPeriodWaiverService;
+use App\Services\CableCrossingService;
 use App\Services\CustomerBalanceService;
 use App\Services\CustomerCidService;
 use App\Services\CustomerDeviceProfileService;
@@ -1730,8 +1731,12 @@ class CustomerController extends Controller
             ];
         }
 
+        // Kabel melintang jalan yang belum selesai (ADHOC-205) — badge di header.
+        $openCableCrossingCount = app(CableCrossingService::class)->countOpenFor($customer);
+
         return view('customers.show', compact(
             'customer',
+            'openCableCrossingCount',
             'displayId',
             'displayIdLabel',
             'completeness',
