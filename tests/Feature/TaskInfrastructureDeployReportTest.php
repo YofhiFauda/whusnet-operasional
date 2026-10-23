@@ -249,7 +249,9 @@ class TaskInfrastructureDeployReportTest extends TestCase
     public function kartu_olt_wajib_memilih_slot_pada_chassis_induk(): void
     {
         $chassisType = NetworkNodeType::where('code', 'olt_chassis')->firstOrFail();
-        $cardType = NetworkNodeType::where('code', 'olt_card')->firstOrFail();
+        // 'olt_card' dihapus dari seeder master 2026-10-23 (ADHOC-212) —
+        // provisioning sendiri, sama pola dengan baris 1122 di bawah.
+        $cardType = NetworkNodeType::firstOrCreate(['code' => 'olt_card'], ['name' => 'Kartu OLT', 'has_ports' => true]);
         $chassis = NetworkNode::factory()->create(['anchor_pop_id' => $this->pop->id, 'node_type_id' => $chassisType->id]);
         $card = NetworkNode::factory()->child($chassis)->create(['node_type_id' => $cardType->id]);
         $slot = OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 1]);

@@ -34,8 +34,8 @@
 
 <div
     x-data="{
-        tab: @js(request('tab') === 'inventaris' ? 'inventaris' : (request('tab') === 'pohon' ? 'pohon' : 'topologi')),
-        selectedNodeId: @js($topologyPops->isNotEmpty() ? -$topologyPops->first()->id : $nodes->first()?->id),
+        tab: @js(isset($initialNodeId) ? 'inventaris' : (request('tab') === 'inventaris' ? 'inventaris' : (request('tab') === 'pohon' ? 'pohon' : 'topologi'))),
+        selectedNodeId: @js($initialNodeId ?? ($topologyPops->isNotEmpty() ? -$topologyPops->first()->id : $nodes->first()?->id)),
         selectedPort: null,
         drawerOpen: true,
         query: '',

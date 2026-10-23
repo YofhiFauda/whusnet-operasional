@@ -2,6 +2,23 @@
 
 Status: **v3 diimplementasikan; perluasan operasional 2026-10-13 di §10; revisi
 Fase 0 (Mini POP = lokasi, bukan 1 OLT) di §11, 2026-10-14.**
+
+> **Koreksi 2026-10-23 (ADHOC-202, tidak berlaku lagi — biarkan di bawah
+> sebagai riwayat):** §10 dan §11 menyebut `olt_chassis` dan `olt_card`
+> sebagai dua node topologi terpisah (`chassis_node_id`/`card_node_id`,
+> slot milik chassis, kartu = anak chassis). **Model itu sudah diganti.**
+> Model berjalan sekarang: **OLT itu sendiri adalah satu `network_node`**
+> (tipe `olt_chassis` dipertahankan sebagai *code* historis, tapi artinya
+> sudah = OLT, bukan "pembungkus chassis yang menaungi node kartu
+> terpisah"). Slot (`infrastructure_slots`) FK langsung ke node OLT/Switch
+> itu (`network_node_id`), **bukan** ke node chassis. Chassis, rack, dan
+> kartu OLT **adalah aset Gudang** (SN) yang di-deploy ke slot
+> (`InventorySerial::current_infrastructure_slot_id`) — **bukan node**.
+> Tipe `olt_card` (anak chassis) jadi representasi lama, masuk daftar
+> `InfrastructureCutover::LEGACY_NODE_TYPES`, jalur tulisnya sudah ditutup.
+> Rujukan utuh: `docs/plan/infrastruktur/rancangan-hierarki-infrastruktur-server-pop-mini-pop.md`
+> §17 dan `docs/plan/infrastruktur/audit-transisi-hierarki-infrastruktur.md`.
+> Jangan baca §10/§11 di bawah sebagai desain aktif untuk chassis/kartu.
 Dibuat: 2026-10-09. Revisi v2: 2026-10-12. Revisi v3: 2026-10-12 — OLT = Mini POP,
 penempatan model folder-di-drive (`anchor_pop_id` hanya di node puncak), cabang
 diturunkan (tidak disimpan), snapshot cabang di ledger, aturan tipe-di-bawah-tipe

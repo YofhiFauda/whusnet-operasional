@@ -48,6 +48,23 @@ class NetworkPortAssignmentTest extends TestCase
         $this->assertNotNull($assignment->fresh()->released_at);
     }
 
+    public function test_assign_customer_menyinkronkan_kolom_legacy_odp_code_dan_release_mengosongkannya(): void
+    {
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $type = NetworkNodeType::create(['code' => 'odp', 'name' => 'ODP', 'has_ports' => true]);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $pop->id, 'node_type_id' => $type->id, 'code' => 'ODP-JETIS-01']);
+        $port = $node->ports()->create(['number' => 1]);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'odp_code' => 'ODP-LAMA-99']);
+        $actor = User::factory()->create();
+        $service = app(NetworkPortAssignmentService::class);
+
+        $service->assignCustomer($port, $customer, $actor);
+        $this->assertSame('ODP-JETIS-01', $customer->fresh()->odp_code);
+
+        $service->release($port, $actor, 'Kabel drop dicabut pada kunjungan lapangan');
+        $this->assertNull($customer->fresh()->odp_code);
+    }
+
     public function test_rekonsiliasi_port_lama_membuat_catatan_manual_tanpa_mengubah_status(): void
     {
         $node = NetworkNode::factory()->create();

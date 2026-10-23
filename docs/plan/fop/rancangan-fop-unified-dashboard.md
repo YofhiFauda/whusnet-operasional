@@ -105,11 +105,11 @@ FOP Dashboard diubah menjadi **Command Center Operasional 1 Halaman** yang mengi
   - Indikator stok kritis ONT/Modem di gudang POP (indikator merah jika < safety stock).
   - **Watchlist Modem Retur Transit**: Daftar modem yang dicabut teknisi (dari task DEAC / Swap) yang statusnya masih `RETURNED` di tangan teknisi dan belum diterima gudang cabang. Mencegah modem hilang di lapangan!
 
-### Modul 6: Kapasitas ODP (Network Glance)
-- ODP adalah entitas infrastruktur tersendiri dan **tidak berelasi dengan Distribusi**. Distribusi hanya label pembentuk CID pelanggan.
-- Master ODP menyimpan kode, nama, dan POP. Kapasitas berasal dari jumlah record port child; setiap port ditandai kosong/terpakai secara manual oleh petugas FOP berizin.
-- Dashboard FOP menampilkan jumlah ODP dan watchlist Red Zone (port terpakai ≥85% dari port child), disaring menurut scope POP. Ambang ini membantu perencanaan; data tetap bergantung pada pencatatan manual yang akurat.
-- Penambahan kapasitas membuat port child baru tanpa menghapus status port lama. Belum ada pemetaan port ODP ke pelanggan maupun ODC pada implementasi ini.
+### Modul 6: Kapasitas ODP/ODC (Network Glance)
+- Status kode per 2026-10-23: widget Red Zone sudah memakai `NetworkNode` bertipe `has_ports` dan `monitors_capacity`, termasuk ODP/ODC. `Distribution` adalah label CID dan bukan sumber kapasitas.
+- Kapasitas berasal dari jumlah `network_node_ports`; port dengan `is_used=true` dihitung terpakai. `FopUnifiedDashboardService::getOdpSummary()` membatasi POP scope, menghitung Red Zone, lalu menampilkan lima node terpadat di `_distribution_glance.blade.php`.
+- Ambang mengikuti `network_node_types.red_zone_threshold`; seeder ODP/ODC memakai 80%, bukan 85% tetap pada rancangan awal. Nilainya dapat diubah melalui master tipe node.
+- Angka bergantung pada ketepatan data port. Tujuh mapping topologi lama yang ambigu masih menunggu operator; widget belum membuktikan kapasitas fisik semua jalur atau kapasitas PON.
 
 ---
 
@@ -126,6 +126,8 @@ FOP Dashboard diubah menjadi **Command Center Operasional 1 Halaman** yang mengi
    - Menghindari N+1 query melalui subquery SQL agregat dan eager loading terukur.
 
 ---
+
+**Koreksi 2026-10-23:** Baris audit 12 Oktober yang menyebut model `Odp`/`OdpPort` adalah catatan implementasi lama. Kode saat ini memakai `NetworkNode`/`NetworkNodePort` dan `getOdpSummary()` untuk widget Red Zone; ambang bawaan seeder ODP/ODC adalah 80%.
 
 ## 5. Audit implementasi terhadap temuan dashboard FOP (12 Oktober 2026)
 

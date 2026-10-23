@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -206,6 +207,17 @@ class NetworkNode extends Model
     }
 
     /**
+     * Aksi laporan O-REQ/INFR-REQ yang perangkat induknya node ini (termasuk
+     * slot/port di bawah OLT/Switch), dipakai untuk riwayat & badge perangkat baru.
+     *
+     * @return HasMany<TaskInfrastructureAction, $this>
+     */
+    public function deviceInfrastructureActions(): HasMany
+    {
+        return $this->hasMany(TaskInfrastructureAction::class, 'device_network_node_id');
+    }
+
+    /**
      * Saldo stok QUANTITY/ROLL yang dideploy ke node ini (lihat docblock
      * `InfrastructureBalance` — proyeksi dari ledger `inventory_transactions`,
      * bukan sumber kebenaran sendiri). Reverse direction `InfrastructureBalance::networkNode()`.
@@ -215,6 +227,45 @@ class NetworkNode extends Model
     public function infrastructureBalances(): HasMany
     {
         return $this->hasMany(InfrastructureBalance::class);
+    }
+
+    /**
+     * Ringkasan jumlah aset Gudang per barang di node ini — SN/lot/teknisi/
+     * jam/nomor task SENGAJA tidak disertakan di sini. Master Node cuma
+     * butuh "berapa barang apa" buat kerja; detail lengkap itu domain Peta
+     * Infrastruktur (`InfrastructureMapService`), lihat
+     * docs/plan/infrastruktur/rancangan-pembagian-detail-master-node-vs-peta-infrastruktur.md.
+     *
+     * Dihitung di model, bukan `@php` inline di Blade — file
+     * `network/nodes/index.blade.php` sudah sangat besar & bernested, dan
+     * blok `@php...@endphp` tambahan di titik tertentu terbukti membuat
+     * compiler Blade gagal (unexpected end of file) meski sintaksnya sendiri
+     * valid berdiri sendiri. Panggil method ini, jangan tulis ulang logicnya
+     * di view manapun.
+     *
+     * @return Collection<int, array{name: string, unit: ?string, qty: float}>
+     */
+    public function assetSummary(): Collection
+    {
+        return $this->deployedSerials
+            ->groupBy('item_id')
+            ->map(fn ($group) => [
+                'name' => $group->first()->item?->name ?: 'Barang tanpa nama',
+                'unit' => $group->first()->item?->unit,
+                'qty' => (float) $group->count(),
+            ])
+            ->values()
+            ->merge(
+                $this->infrastructureBalances
+                    ->where('qty', '>', 0)
+                    ->groupBy('item_id')
+                    ->map(fn ($group) => [
+                        'name' => $group->first()->item?->name ?: 'Barang tanpa nama',
+                        'unit' => $group->first()->item?->unit,
+                        'qty' => (float) $group->sum('qty'),
+                    ])
+                    ->values()
+            );
     }
 
     /**

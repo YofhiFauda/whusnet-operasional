@@ -99,7 +99,6 @@
                     <input type="text" name="target_label" maxlength="150" required placeholder="Contoh: Radio PTP gedung A" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
                 </label>
             @endif
-            <label class="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" name="verified" value="1"> Sudah diverifikasi di lapangan</label>
             <button type="submit" class="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover sm:col-span-3 sm:justify-self-start">Catat sambungan</button>
         </form>
         @endif

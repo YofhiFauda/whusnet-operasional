@@ -552,7 +552,7 @@ class InventoryService
     }
 
     /**
-     * Pasang SN dari custody tim ke posisi TEPAT (§16.1): Mini POP, node,
+     * Pasang SN dari custody tim ke posisi TEPAT (§16.1): POP Cabang, Mini POP, node,
      * Slot, atau PON/Port — bukan sekadar node induknya. Kartu di Slot 1
      * tersimpan di ID Slot 1, SFP di Port 4 tersimpan di ID Port 4.
      *
@@ -631,6 +631,7 @@ class InventoryService
             $serial->current_infrastructure_port_id !== null => $this->locations()->resolve(InfrastructureLocation::PORT, $serial->current_infrastructure_port_id),
             $serial->current_infrastructure_slot_id !== null => $this->locations()->resolve(InfrastructureLocation::SLOT, $serial->current_infrastructure_slot_id),
             $serial->current_network_node_id !== null => $this->locations()->resolve(InfrastructureLocation::NODE, $serial->current_network_node_id),
+            $serial->current_infrastructure_pop_id !== null => $this->locations()->resolve(InfrastructureLocation::POP, $serial->current_infrastructure_pop_id),
             $serial->current_mini_pop_id !== null => $this->locations()->resolve(InfrastructureLocation::MINI_POP, $serial->current_mini_pop_id),
             default => null,
         };
@@ -640,11 +641,12 @@ class InventoryService
      * Kolom lokasi SN — SELALU keempatnya ditulis sekaligus supaya satu SN
      * tidak pernah aktif di dua posisi.
      *
-     * @return array{current_mini_pop_id: ?int, current_network_node_id: ?int, current_infrastructure_slot_id: ?int, current_infrastructure_port_id: ?int}
+     * @return array{current_infrastructure_pop_id: ?int, current_mini_pop_id: ?int, current_network_node_id: ?int, current_infrastructure_slot_id: ?int, current_infrastructure_port_id: ?int}
      */
     public function serialLocationColumns(?InfrastructureLocation $location): array
     {
         return [
+            'current_infrastructure_pop_id' => $location?->kind === InfrastructureLocation::POP ? $location->id : null,
             'current_mini_pop_id' => $location?->kind === InfrastructureLocation::MINI_POP ? $location->id : null,
             'current_network_node_id' => $location?->kind === InfrastructureLocation::NODE ? $location->id : null,
             'current_infrastructure_slot_id' => $location?->kind === InfrastructureLocation::SLOT ? $location->id : null,
@@ -658,6 +660,7 @@ class InventoryService
     public function transactionLocationColumns(string $direction, ?InfrastructureLocation $location): array
     {
         return [
+            "{$direction}_infrastructure_pop_id" => $location?->kind === InfrastructureLocation::POP ? $location->id : null,
             "{$direction}_mini_pop_id" => $location?->kind === InfrastructureLocation::MINI_POP ? $location->id : null,
             "{$direction}_network_node_id" => $location?->kind === InfrastructureLocation::NODE ? $location->id : null,
             "{$direction}_infrastructure_slot_id" => $location?->kind === InfrastructureLocation::SLOT ? $location->id : null,
@@ -673,7 +676,7 @@ class InventoryService
      *   (null = node, perilaku lama).
      * - COMPANY_ASSET (Switch/SFP): HANYA bila Master Barang menyatakan posisi
      *   eksplisit — tanpa itu alat kerja tidak boleh tercatat netap.
-     * - POP Cabang/Pusat bukan lokasi aset berserial (hanya lokasi kerja kabel).
+     * - POP Cabang boleh menjadi lokasi aset berserial bila SKU menyatakannya; POP Pusat tetap ditolak.
      */
     public function assertSerialItemFitsLocation(?Item $item, InfrastructureLocation $location): void
     {
@@ -690,8 +693,8 @@ class InventoryService
                 : "Item {$item->name} bukan aset infrastruktur (ownership_mode) — gak bisa di-deploy ke titik jaringan.");
         }
 
-        if ($location->kind === InfrastructureLocation::POP) {
-            throw new InvalidArgumentException('POP Cabang bukan lokasi pemasangan aset berserial — pilih Mini POP atau perangkat.');
+        if ($location->kind === InfrastructureLocation::POP && ($location->ancestors[array_key_last($location->ancestors)]['type'] ?? null) !== 'cabang') {
+            throw new InvalidArgumentException('Aset berserial hanya dapat dipasang di POP Cabang, bukan POP Pusat.');
         }
 
         $kind = $declared ?? InfrastructureLocationKind::NODE;

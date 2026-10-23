@@ -73,12 +73,26 @@ class InfrastructureMapController extends Controller
         $filters = $request->validate([
             'pop_id' => ['nullable', 'integer'],
             'sort' => ['nullable', 'in:topology,utilization,free'],
+            'node_id' => ['nullable', 'integer'],
         ]);
 
-        return view('network.map.index', $this->map->build(
+        $data = $this->map->build(
             $request->user(),
             isset($filters['pop_id']) ? (int) $filters['pop_id'] : null,
             $filters['sort'] ?? 'topology'
-        ));
+        );
+
+        // Deep link dari Master Node ("Lihat detail di Peta Infrastruktur").
+        // Node HARUS sudah lolos scope POP + filter pop_id di atas (nodeIndex
+        // dibangun dari $nodes yang sama) — node di luar scope atau ID yang
+        // gak ada mendapat 404 YANG SAMA, biar gak kebocoran info lewat beda
+        // status/pesan error (rancangan-pembagian-detail-master-node-vs-peta-infrastruktur.md §Ketepatan sumber data).
+        $initialNodeId = null;
+        if (isset($filters['node_id'])) {
+            abort_unless(array_key_exists((int) $filters['node_id'], $data['nodeIndex']), 404);
+            $initialNodeId = (int) $filters['node_id'];
+        }
+
+        return view('network.map.index', $data + ['initialNodeId' => $initialNodeId]);
     }
 }

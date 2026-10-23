@@ -40,7 +40,8 @@ class WhusnetTopologySeeder extends Seeder
     public function run(): void
     {
         DB::transaction(function (): void {
-            $pusat = $this->pop('WHUSNET', 'pusat');
+            $pusat = Pop::query()->where('type', 'pusat')->whereIn(DB::raw('LOWER(name)'), ['connexa', 'whusnet'])->first()
+                ?? $this->pop('CONNEXA', 'pusat');
             $branches = [$this->pop('Jetis', 'cabang'), $this->pop('Sandya', 'cabang')];
 
             foreach ($branches as $branch) {
@@ -65,8 +66,7 @@ class WhusnetTopologySeeder extends Seeder
                 throw new RuntimeException('Seeder membutuhkan akun operator nyata untuk mencatat koneksi.');
             }
 
-            $this->node('CORE-WHUSNET-PUSAT', 'Server Utama WHUSNET', (int) $types['server'], $pusat);
-
+            $pusatSuffix = strtoupper($pusat->name);
             foreach ($branches as $branch) {
                 $suffix = strtoupper($branch->name);
                 $mini = $this->miniPop($branch);

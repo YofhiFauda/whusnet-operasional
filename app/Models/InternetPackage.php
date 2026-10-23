@@ -122,22 +122,25 @@ class InternetPackage extends Model
     }
 
     /**
+     * Hanya AP yang jadi perangkat tambahan pelanggan. Router di paket (mis.
+     * "3 AP & 1 Router") tetap tampil di kartu paket, tapi dikelola server —
+     * tidak dipasang di pelanggan, jadi tidak ikut kebutuhan pemasangan.
+     *
      * @return array<string, int>
      */
     public function additionalDeviceRequirements(): array
     {
-        $requirements = ['access_point' => 0, 'customer_router' => 0];
+        $requirements = ['access_point' => 0];
 
         foreach ($this->features ?? [] as $feature) {
             if (! is_string($feature)) {
                 continue;
             }
 
-            preg_match_all('/(?<![A-Za-z0-9])(\\d+)\\s*(AP|Router)(?![A-Za-z0-9])/i', $feature, $matches, PREG_SET_ORDER);
+            preg_match_all('/(?<![A-Za-z0-9])(\\d+)\\s*AP(?![A-Za-z0-9])/i', $feature, $matches, PREG_SET_ORDER);
 
             foreach ($matches as $match) {
-                $code = strtoupper($match[2]) === 'AP' ? 'access_point' : 'customer_router';
-                $requirements[$code] += (int) $match[1];
+                $requirements['access_point'] += (int) $match[1];
             }
         }
 

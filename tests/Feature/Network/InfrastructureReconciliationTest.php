@@ -65,8 +65,12 @@ class InfrastructureReconciliationTest extends TestCase
 
     private function node(string $typeCode, Pop $anchor, string $code): NetworkNode
     {
+        // 'odc' dihapus dari seeder master 2026-10-23 (ADHOC-212) —
+        // provisioning sendiri, lihat InfrastructureLegacyDecisionTest.
+        $typeId = NetworkNodeType::firstOrCreate(['code' => $typeCode], ['name' => $typeCode, 'has_ports' => false])->id;
+
         return NetworkNode::factory()->create([
-            'node_type_id' => NetworkNodeType::where('code', $typeCode)->firstOrFail()->id,
+            'node_type_id' => $typeId,
             'anchor_pop_id' => $anchor->id, 'code' => $code,
         ]);
     }
@@ -214,8 +218,11 @@ class InfrastructureReconciliationTest extends TestCase
     public function reset_dummy_card_preserves_real_chassis_slot_and_canonical_mapping(): void
     {
         $chassis = $this->node('olt_chassis', $this->miniPop, 'REAL-CHASSIS');
+        // 'olt_card' dihapus dari seeder master 2026-10-23 (ADHOC-212) —
+        // provisioning sendiri, lihat helper node() di atas.
+        $cardTypeId = NetworkNodeType::firstOrCreate(['code' => 'olt_card'], ['name' => 'olt_card', 'has_ports' => true])->id;
         $card = NetworkNode::factory()->create([
-            'node_type_id' => NetworkNodeType::where('code', 'olt_card')->sole()->id,
+            'node_type_id' => $cardTypeId,
             'parent_id' => $chassis->id, 'anchor_pop_id' => null, 'code' => 'DUMMY-CARD',
         ]);
         $legacy = OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 1, 'card_node_id' => $card->id]);

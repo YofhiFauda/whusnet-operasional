@@ -50,6 +50,14 @@ class NetworkPortAssignmentService
             if ($active?->target_port_id !== null) {
                 NetworkNodePort::query()->whereKey($active->target_port_id)->update(['is_used' => false]);
             }
+            if ($active?->customer_id !== null) {
+                // Kolom legacy `customers.odp_code` dulu cuma keisi manual/laporan
+                // teknisi — gak ikut ter-update jalur baru ini sebelum fix ini,
+                // jadi Detail Pelanggan tetap nampilin ODP lama walau port sudah
+                // dilepas. Disinkronkan di sini juga supaya release tanpa
+                // assign ulang tidak membekukan nilai usang (temuan user 2026-10-22).
+                Customer::query()->whereKey($active->customer_id)->update(['odp_code' => null]);
+            }
             $port->update(['is_used' => false]);
         });
     }
@@ -127,6 +135,16 @@ class NetworkPortAssignmentService
             ]);
             $port->update(['is_used' => true]);
             $targetPort?->update(['is_used' => true]);
+
+            // `customers.odp_code` kolom legacy yang masih dibaca di beberapa
+            // tempat (tab Paket & Layanan, CustomerDeviceProfileService
+            // fallback) — tanpa ini, assign port ODP baru lewat Master Node/
+            // Peta Infrastruktur gak kelihatan di sana, cuma di kartu "Lokasi
+            // Jaringan" (bug temuan user 2026-10-22, Ardiyanto tetap nunjukin
+            // ODP lama walau sudah di-assign ke ODP-JETIS-01 Port 1).
+            if ($customer !== null) {
+                $customer->update(['odp_code' => $port->node->code]);
+            }
 
             return $assignment;
         });

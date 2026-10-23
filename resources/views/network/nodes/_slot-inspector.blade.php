@@ -8,21 +8,21 @@
         ->filter(fn (array $item) => $item['kind'] === 'port');
     $slotCapacity = $slotItem['capacity'];
 @endphp
-<div id="inspector-slot-{{ $slotItem['id'] }}" x-show="selectedSlotId === {{ $slotItem['id'] }}" x-cloak class="space-y-5 p-5">
-    <header class="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+<div id="inspector-slot-{{ $slotItem['id'] }}" x-show="selectedSlotId === {{ $slotItem['id'] }}" x-cloak class="space-y-4 sm:space-y-5 p-3.5 sm:p-6">
+    <header class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b border-border pb-4">
         <div>
             <div class="flex items-center gap-2 mb-1">
                 <button type="button" @click="activeMobileTab = 'tree'"
-                        class="lg:hidden inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface border border-border text-[11px] font-semibold text-primary hover:text-sky-700 shadow-2xs cursor-pointer">
-                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                        class="lg:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface border border-border text-xs font-semibold text-primary hover:text-sky-700 shadow-2xs cursor-pointer shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
                     <span>Pohon</span>
                 </button>
                 <p class="text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300 font-mono">{{ $slotItem['type_label'] }} · {{ $slotItem['status_label'] }}</p>
             </div>
-            <h2 class="mt-1 text-xl font-bold font-mono text-text-main">{{ $slotItem['label'] }}@if($slotItem['name']) · {{ $slotItem['name'] }}@endif</h2>
-            <p class="mt-1 text-xs text-text-muted font-mono">{{ $slotItem['breadcrumb'] }}</p>
+            <h2 class="mt-1 text-lg sm:text-xl font-bold font-mono text-text-main">{{ $slotItem['label'] }}@if($slotItem['name']) · {{ $slotItem['name'] }}@endif</h2>
+            <p class="mt-1 text-xs text-text-muted font-mono truncate">{{ $slotItem['breadcrumb'] }}</p>
         </div>
-        <a href="{{ $slotItem['url'] }}" class="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:bg-surface-muted transition-colors shadow-2xs">Kelola Slot &rarr;</a>
+        <a href="{{ $slotItem['url'] }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:bg-surface-muted transition-colors shadow-2xs w-full sm:w-auto">Kelola Slot &rarr;</a>
     </header>
 
     <section class="rounded-lg border border-border bg-surface-muted/50 p-4">

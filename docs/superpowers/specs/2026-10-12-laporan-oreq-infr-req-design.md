@@ -9,7 +9,7 @@ Status: **Fondasi laporan, anchor FopTask, koreksi/cabut material, inspeksi Guda
 | Area | Keadaan terbaru | Dampak pada rancangan laporan |
 |---|---|---|
 | Lokasi dan Gudang | Pohon node, port, aset DEPLOYED, saldo qty/roll, ledger DEPLOY/RETRIEVE_INFRA sudah ada di kode lokal. **Halaman Inventaris berdiri sendiri sudah dihapus (2026-10-15)** — jejak aset/saldo sekarang disajikan dari Peta Infrastruktur (`InfrastructureMapController`/`InfrastructureMapService`, route `/network/peta`), bukan halaman terpisah. | Alur utama tetap; laporan harus memakai sumber ini. Setiap acuan "halaman Inventaris" di dokumen ini (§6, §10 poin 8) dibaca sebagai **Peta Infrastruktur** — jangan dibuat halaman Inventaris baru. |
-| Chassis OLT | Fase 0 ADHOC-173: Mini POP adalah lokasi fisik yang dapat menaungi banyak chassis. Chassis boleh ber-anchor ke Mini POP **atau Cabang langsung**; kartu menjadi anak chassis, slot dimiliki chassis (`OltSlot`, kolom `chassis_node_id`/`card_node_id`). | Ketentuan lama di §8 yang hanya mengizinkan anchor Mini POP diganti dengan aturan ini. |
+| Chassis OLT | Fase 0 ADHOC-173: Mini POP adalah lokasi fisik yang dapat menaungi banyak chassis. Chassis boleh ber-anchor ke Mini POP **atau Cabang langsung**; kartu menjadi anak chassis, slot dimiliki chassis (`OltSlot`, kolom `chassis_node_id`/`card_node_id`). | Ketentuan lama di §8 yang hanya mengizinkan anchor Mini POP diganti dengan aturan ini. **Koreksi 2026-10-23 (ADHOC-202):** baris ini sendiri sudah usang. OLT sekarang satu `network_node` (tipe `olt_chassis`); Slot (`infrastructure_slots`) FK langsung ke node OLT itu, bukan ke node chassis terpisah. Chassis/kartu = aset Gudang (SN) di slot, bukan node anak. Lihat §8 di bawah dan `docs/plan/infrastruktur/rancangan-hierarki-infrastruktur-server-pop-mini-pop.md` §17. |
 | Aset lama | Jalur registrasi aset lama REGISTER_INFRA dan halaman per node sudah ada. | Jangan membuat task, ISSUE, atau DEPLOY fiktif untuk aset yang sudah lama terpasang. |
 | Form O-REQ/INFR-REQ | Seksi infra dasar sudah ada: satu node tujuan, SN baru, SN lama, satu item qty, dan satu roll; transaksi di dalam submit laporan. | Task 12 plan v3 telah dijalankan sebagian. §10 di bawah adalah daftar gap lanjutan, bukan langkah sebelum form pertama dibuat. |
 | Port dan slot | Port assignment (`NetworkPortAssignmentService`) serta slot chassis (`OltSlot`) dikelola tersendiri; Peta Infrastruktur membacanya. | DEPLOY barang pada node tidak otomatis membuktikan port tersambung, slot terisi, atau pelanggan menempati port. Perubahan port/slot butuh aksi dan verifikasi terpisah. |
@@ -130,6 +130,19 @@ Untuk task baru, buat/pastikan anchor pada alur pembuatan Task. Untuk task lama 
 Aset lama yang diregistrasi melalui REGISTER_INFRA tetap pengecualian: tidak mempunyai Task/FopTask pemasangan fiktif (§6).
 
 ## 8. Chassis OLT
+
+> **Koreksi 2026-10-23 (ADHOC-202):** paragraf di bawah menggambarkan model
+> lama (chassis dan kartu sebagai dua node topologi terpisah). Model
+> berjalan sekarang: OLT adalah satu `network_node` (tipe `olt_chassis`,
+> code historis), dan Slot (`infrastructure_slots`) FK langsung ke node
+> OLT/Switch itu — **bukan** ke node chassis. Tipe `olt_card` sudah masuk
+> `InfrastructureCutover::LEGACY_NODE_TYPES`, jalur tulisnya ditutup.
+> Chassis/rack/kartu OLT dicatat sebagai **aset Gudang** (SN) yang
+> di-deploy ke slot (`InventorySerial::current_infrastructure_slot_id`),
+> bukan sebagai node anak. Rujukan:
+> `docs/plan/infrastruktur/rancangan-hierarki-infrastruktur-server-pop-mini-pop.md`
+> §17. Paragraf historis di bawah dipertahankan sebagai riwayat keputusan,
+> jangan dibaca sebagai desain aktif.
 
 Keputusan Fase 0 tanggal 2026-10-14: Mini POP adalah **lokasi fisik**, bukan identitas satu OLT. Satu Mini POP dapat memiliki beberapa node olt_chassis. Jika chassis berada di gedung Cabang, node boleh ber-anchor langsung ke POP Cabang tanpa membuat Mini POP baru. Kartu olt_card menjadi anak chassis dan nomor slot dikelola per chassis.
 

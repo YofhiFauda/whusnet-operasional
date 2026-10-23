@@ -104,7 +104,8 @@ class InfrastructureLocationOptionsService
         $descendantCount = InventorySerial::query()->where('status', SerialStatus::DEPLOYED->value)
             ->whereNotIn('id', $direct->pluck('id'))
             ->where(function ($query) use ($subtree): void {
-                $query->whereIn('current_mini_pop_id', $subtree[InfrastructureLocation::MINI_POP] ?? [])
+                $query->whereIn('current_infrastructure_pop_id', $subtree[InfrastructureLocation::POP] ?? [])
+                    ->orWhereIn('current_mini_pop_id', $subtree[InfrastructureLocation::MINI_POP] ?? [])
                     ->orWhereIn('current_network_node_id', $subtree[InfrastructureLocation::NODE] ?? [])
                     ->orWhereIn('current_infrastructure_slot_id', $subtree[InfrastructureLocation::SLOT] ?? [])
                     ->orWhereIn('current_infrastructure_port_id', $subtree[InfrastructureLocation::PORT] ?? []);
@@ -269,9 +270,9 @@ class InfrastructureLocationOptionsService
             'device' => [NetworkNode::query()->with('nodeType')->where('anchor_pop_id', $parent->id)
                 ->whereHas('nodeType', fn ($query) => $query->whereIn('code', ['olt_chassis', 'switch_mini_pop']))
                 ->orderBy('code')->get()->map(fn (NetworkNode $node) => $this->resolver->forNode($node)), false],
-            'slot' => [InfrastructureSlot::query()->where('network_node_id', $parent->id)->orderBy('number')->get()
+            'slot' => [InfrastructureSlot::query()->with('device')->where('network_node_id', $parent->id)->orderBy('number')->get()
                 ->map(fn (InfrastructureSlot $slot) => $this->resolver->forSlot($slot)), false],
-            'port' => [InfrastructurePort::query()->where('infrastructure_slot_id', $parent->id)->orderBy('number')->get()
+            'port' => [InfrastructurePort::query()->with('slot.device')->where('infrastructure_slot_id', $parent->id)->orderBy('number')->get()
                 ->map(fn (InfrastructurePort $port) => $this->resolver->forPort($port)), false],
             'odp' => $this->odpChildren($parent),
             default => throw ValidationException::withMessages(['level' => 'Tingkat lokasi tidak dikenal.']),

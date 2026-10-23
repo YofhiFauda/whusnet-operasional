@@ -167,6 +167,25 @@ class FileUploadService
     }
 
     /**
+     * Foto bukti rute kabel melintang jalan (ADHOC-205). `bukti` = saat
+     * Pemasangan, `penarikan` = saat Deact. Disimpan per kejadian, jadi nama
+     * file membawa jenisnya supaya bisa dibedakan saat audit.
+     */
+    public static function uploadCableCrossingPhoto(UploadedFile $file, ?Customer $customer, string $photoType): string
+    {
+        $customerId = self::getCustomerIdentifier($customer);
+        $customerName = self::getCustomerName($customer);
+        $ext = $file->getClientOriginalExtension();
+
+        $folder = 'cable-crossings';
+        $prefix = $photoType === 'penarikan' ? 'penarikan' : 'bukti';
+        $baseName = "kabel-melintang-{$prefix}_{$customerId}_{$customerName}";
+        $fileName = self::getUniqueFileName($folder, $baseName, $ext);
+
+        return $file->storeAs($folder, $fileName, 'public');
+    }
+
+    /**
      * 6. Bukti Transfer Pembayaran
      * Aturan folder: payments/{id_pelanggan}/{awal|bulanan}
      * Contoh format:

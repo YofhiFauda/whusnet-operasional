@@ -151,6 +151,7 @@ class FopTaskController extends Controller
 
         // Get POPs for cabang selector
         $pops = Pop::orderBy('name', 'asc')->get();
+        $cabangPops = $pops->where('type', 'cabang')->values();
 
         // Get technicians for assignee selector
         // ->technicians() = Role::TECHNICIAN_CODES ('teknisi' + 'pic_gudang') —
@@ -241,7 +242,7 @@ class FopTaskController extends Controller
         // Tim aktif khusus hari ini (untuk Roster Summary Bar di atas tabel)
         $todayTeams = $teams->filter(fn ($t) => $t['work_date'] === $today)->values();
 
-        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks', 'todayTeams', 'todayWorkloadByTech'));
+        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'cabangPops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks', 'todayTeams', 'todayWorkloadByTech'));
     }
 
     /**
@@ -377,7 +378,9 @@ class FopTaskController extends Controller
             'task_date' => ['required', 'date'],
             'tugas' => ['required', 'string', 'max:255'],
             'village_id' => ['required', 'exists:villages,id'],
-            'pop_id' => ['required', 'exists:pops,id'],
+            'pop_id' => ['required', FopTaskInfrastructureScopeService::supportsCategory($request->input('category'))
+                ? Rule::exists('pops', 'id')->where('type', 'cabang')
+                : Rule::exists('pops', 'id')],
             'customer_id' => ['nullable', 'exists:customers,id'],
             'issue' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
@@ -499,7 +502,9 @@ class FopTaskController extends Controller
             'task_date' => ['sometimes', 'required', 'date'],
             'tugas' => ['sometimes', 'required', 'string', 'max:255'],
             'village_id' => ['sometimes', 'required', 'exists:villages,id'],
-            'pop_id' => ['sometimes', 'required', 'exists:pops,id'],
+            'pop_id' => ['sometimes', 'required', FopTaskInfrastructureScopeService::supportsCategory($request->input('category', $lockedExistingCategory))
+                ? Rule::exists('pops', 'id')->where('type', 'cabang')
+                : Rule::exists('pops', 'id')],
             'customer_id' => ['nullable', 'exists:customers,id'],
             'issue' => ['sometimes', 'required', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],

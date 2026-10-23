@@ -369,41 +369,27 @@ class InstallationAdditionalDeviceStepTest extends TestCase
     }
 
     #[Test]
-    public function package_requires_three_access_points_and_one_customer_router(): void
+    public function package_router_is_server_managed_so_only_access_points_are_required(): void
     {
-        $this->givePackage(4);
+        // Kartu paket tetap "3 AP & 1 Router", tapi router dikelola server (bukan perangkat
+        // tambahan pelanggan), jadi kebutuhan pemasangan hanya AP dan max-nya ikut 3.
+        $this->givePackage(3);
         $this->customer->customerService->internetPackage->update(['features' => ['Unlimited', '3 AP & 1 Router']]);
-        $apCategory = $this->apItem->category;
-        $apCategory->update(['code' => 'access_point']);
-        $routerCategory = ItemCategory::where('code', 'customer_router')->firstOrFail();
+        $this->apItem->category->update(['code' => 'access_point']);
 
-        $routerItem = Item::create([
-            'code' => 'RTR-CUSTOMER-TEST',
-            'name' => 'Router Pelanggan Test',
-            'unit' => 'pcs',
-            'item_category_id' => $routerCategory->id,
-            'tracking_type' => 'serialized',
-            'ownership_mode' => OwnershipMode::INSTALLABLE->value,
-        ]);
         $aps = [
             $this->issueAp('SN-ADS-AP-301'),
             $this->issueAp('SN-ADS-AP-302'),
             $this->issueAp('SN-ADS-AP-303'),
-            $this->issueAp('SN-ADS-AP-304'),
         ];
-        $router = InventorySerial::create([
-            'item_id' => $routerItem->id,
-            'serial_number' => 'SN-ADS-ROUTER-301',
-            'status' => SerialStatus::ISSUED->value,
-            'current_technician_id' => $this->technician->id,
-            'issued_from_pop_id' => $this->pop->id,
-        ]);
 
         $report = $this->actingAs($this->technician)->get(route('customers.installation.report', $this->customer));
         $report->assertOk()
-            ->assertSee('Kebutuhan paket: 1 modem utama + 3 AP + 1 router pelanggan.')
-            ->assertSee('SN-ADS-ROUTER-301');
-        $this->assertLessThan(
+            ->assertSee('Kebutuhan paket: 1 modem utama + 3 AP.')
+            ->assertDontSee('router pelanggan')
+            ->assertSee('SN-ADS-AP-301');
+        // Perangkat Tambahan ditaruh di bawah banner Aktivasi (Speedtest), bukan di atasnya.
+        $this->assertGreaterThan(
             strpos($report->getContent(), 'Aktivasi Laporan Speedtest'),
             strpos($report->getContent(), 'form-additional-devices')
         );
@@ -412,26 +398,19 @@ class InstallationAdditionalDeviceStepTest extends TestCase
             fn (InventorySerial $serial) => ['inventory_serial_id' => $serial->id, 'outcome' => 'terpasang'],
             $aps
         );
+
+        // 2 dari 3 AP tanpa kekurangan → ditolak.
         $this->actingAs($this->technician)
-            ->post(route('customers.installation.additional-devices.store', $this->customer), ['decisions' => $allAps])
+            ->post(route('customers.installation.additional-devices.store', $this->customer), ['decisions' => array_slice($allAps, 0, 2)])
             ->assertSessionHasErrors('decisions');
         $this->assertDatabaseCount('customer_additional_devices', 0);
-        $this->actingAs($this->technician)
-            ->post(route('customers.installation.additional-devices.store', $this->customer), [
-                'decisions' => $allAps,
-                'kekurangan_perangkat' => 1,
-                'kekurangan_perangkat_alasan' => 'Router belum di-issue',
-            ])
-            ->assertSessionHasErrors('decisions');
 
-        array_pop($allAps);
-        $allAps[] = ['inventory_serial_id' => $router->id, 'outcome' => 'terpasang'];
+        // 3 AP lengkap → lolos, tanpa router.
         $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), ['decisions' => $allAps])
             ->assertSessionHasNoErrors();
-        $this->assertDatabaseCount('customer_additional_devices', 4);
-        $this->assertSame(SerialStatus::ISSUED, $aps[3]->refresh()->status);
-        $this->assertSame(SerialStatus::INSTALLED, $router->refresh()->status);
+        $this->assertDatabaseCount('customer_additional_devices', 3);
+        $this->assertSame(SerialStatus::INSTALLED, $aps[2]->refresh()->status);
     }
 
     #[Test]

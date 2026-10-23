@@ -1,6 +1,6 @@
 # Analisa & Rancangan: Request Deaktivasi + Cuti Berlangganan — Membebaskan Tagihan Per Periode (ADHOC-87)
 
-**Status:** Terbuka — analisa selesai 2026-09-21, implementasi belum mulai. Di luar sprint aktif (Sprint 8.10), dicatat sebagai ADHOC-87 di `docs/TASKS.md`.
+**Status (2026-10-23):** Ditutup atas keputusan user. Catatan implementasi dan perubahan alur 2026-09-24 di bawah menggantikan status awal yang menyebut implementasi belum mulai. Penutupan ini tidak mencakup verifikasi ulang kode atau data operasional.
 
 **Keputusan user 2026-09-21 (menjawab §7):** (1) "Request" **hanya label** — tidak ada persetujuan bertingkat. Tombolnya berlabel **"Request Putus Langganan"**, berisi **dropdown riwayat tagihan pelanggan** yang ingin dihilangkan + **catatan**. (2) Jendela mundur **1 bulan** cukup; kalau kurang, admin membatalkan manual bulan berikutnya. (3) Tagihan `batal` disaring di **sisi API** (repo ini), bukan di aplikasi Portal — lihat §4.6 (sudah dicek ke kode Portal).
 

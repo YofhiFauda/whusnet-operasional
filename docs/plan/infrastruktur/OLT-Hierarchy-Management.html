@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="id"><head><script data-bard-client-injected="true">(function(firebaseConfig, initialAuthToken, appId) {
+        window.__firebase_config = firebaseConfig;
+        window.__initial_auth_token = initialAuthToken;
+        window.__app_id = appId;
+            })("\n{\n  \"apiKey\": \"AIzaSyCqyCcs2R2e7AegGjvFAwG98wlamtbHvZY\",\n  \"authDomain\": \"bard-frontend.firebaseapp.com\",\n  \"projectId\": \"bard-frontend\",\n  \"storageBucket\": \"bard-frontend.firebasestorage.app\",\n  \"messagingSenderId\": \"175205271074\",\n  \"appId\": \"1:175205271074:web:2b7bd4d34d33bf38e6ec7b\"\n}\n","eyJhbGciOiJSUzI1NiIsImtpZCI6IjExNjRiNzdiNDMzZDdhMDAyMWI4NjE4YjhjYTU3ZTMyZGI5MWUxMTMiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJmaXJlYmFzZS1hZG1pbnNkay1mYnN2Y0BiYXJkLWZyb250ZW5kLmlhbS5nc2VydmljZWFjY291bnQuY29tIiwiYXVkIjoiaHR0cHM6Ly9pZGVudGl0eXRvb2xraXQuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmlkZW50aXR5LmlkZW50aXR5dG9vbGtpdC52MS5JZGVudGl0eVRvb2xraXQiLCJ1aWQiOiIxNzIzNDE1MzA3MzgzODI4NTE2MSIsImlzcyI6ImZpcmViYXNlLWFkbWluc2RrLWZic3ZjQGJhcmQtZnJvbnRlbmQuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20iLCJjbGFpbXMiOnsiYXBwSWQiOiJjX2E2YjYzNjlkZjI5MGFkYjJfaW5kZXguaHRtbC0zNTUifSwiZXhwIjoxNzkyNjM3NDU5LCJpYXQiOjE3OTI2MzM4NTksImFsZyI6IlJTMjU2In0.KrCYvaGdsORA5Q6ljqvCV6QNQZhQ98deoe73vZMZePagmPdHHeZaGjQ1ZPvtklt_OniySpD-Lozn0B8LBl279tqLuAHXNwS2xtfXdwEtDicpC8R9hmtqoStYJ9dr23KOB945g6L-jhm5-bCZEdcmlPa7F2vZFWHgt-lgYR3HDEkzHdnGFH8y9gD8kO-4S8m8J44o0XjJKQCHhkACaZSpE6rxEkMZYxjADPO-JaWnIupWMx9uFCE7AFDEGK6NBHBsIdSneHyfHT5Bk0DuEaVmoatolJswn3-pEkkly7Topkr05aumiFyP3jLytZ--SBvzLxahMNaZtnaWBo4hlmFYpA","c_a6b6369df290adb2_index.html-355")</script><script data-bard-client-injected="true">
+  document.addEventListener('input', (event) => {
+    if (event.target && (event.target.isContentEditable || event.target.hasAttribute('contenteditable'))) {
+      const clonedDoc = document.cloneNode(true);
+      const injectedScripts = clonedDoc.querySelectorAll('[data-bard-client-injected="true"]');
+      injectedScripts.forEach(el => el.remove());
+      window.parent.postMessage({
+        type: 'inlineEdit',
+        html: '<!DOCTYPE html>\n' + clonedDoc.documentElement.outerHTML
+      }, '*');
+    }
+  });
+</script><script data-bard-client-injected="true">(function(){'use strict';window.addEventListener("message",a=>{a.data&&a.data.type==="SUPPLEMENTAL_DATA_UPDATE"&&window.dispatchEvent(new CustomEvent("supplementaldataupdate",{detail:a.data.data}))});}).call(this);
+</script><script data-bard-client-injected="true">(function(){'use strict';var h=typeof Object.defineProperties=="function"?Object.defineProperty:function(a,b,c){if(a==Array.prototype||a==Object.prototype)return a;a[b]=c.value;return a};function l(a){a=["object"==typeof globalThis&&globalThis,a,"object"==typeof window&&window,"object"==typeof self&&self,"object"==typeof global&&global];for(var b=0;b<a.length;++b){var c=a[b];if(c&&c.Math==Math)return c}throw Error("Cannot find global object");}var n=l(this);
+function p(a,b){if(b)a:{var c=n;a=a.split(".");for(var d=0;d<a.length-1;d++){var e=a[d];if(!(e in c))break a;c=c[e]}a=a[a.length-1];d=c[a];b=b(d);b!=d&&b!=null&&h(c,a,{configurable:!0,writable:!0,value:b})}}function r(a){function b(d){return a.next(d)}function c(d){return a.throw(d)}return new Promise(function(d,e){function f(g){g.done?d(g.value):Promise.resolve(g.value).then(b,c).then(f,e)}f(a.next())})}function t(a){return r(a())}
+p("Object.values",function(a){return a?a:function(b){var c=[],d;for(d in b)Object.prototype.hasOwnProperty.call(b,d)&&c.push(b[d]);return c}});p("Array.prototype.includes",function(a){return a?a:function(b,c){var d=this;d instanceof String&&(d=String(d));var e=d.length;c=c||0;for(c<0&&(c=Math.max(c+e,0));c<e;c++){var f=d[c];if(f===b||Object.is(f,b))return!0}return!1}});/*
+
+ MIT License
+
+ Copyright (c) 2017-2023 W.Y.
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+
+*/
+function u(a,b){var c=a.style;b.backgroundColor&&(c.backgroundColor=b.backgroundColor);b.width&&(c.width=`${b.width}px`);b.height&&(c.height=`${b.height}px`);var d=b.style;d!=null&&Object.keys(d).forEach(e=>{c[e]=d[e]})};var v=(()=>{var a=0;return()=>{a+=1;return`u${`0000${(Math.random()*1679616<<0).toString(36)}`.slice(-4)}${a}`}})();function w(a){var b=[];for(let c=0,d=a.length;c<d;c++)b.push(a[c]);return b}let x=null;function y(a={}){return x?x:a.u?x=a.u:x=w(window.getComputedStyle(document.documentElement))}function z(a,b){return(a=(a.ownerDocument.defaultView||window).getComputedStyle(a).getPropertyValue(b))?parseFloat(a.replace("px","")):0}
+function A(a,b={}){var c;if(!(c=b.width)){c=z(a,"border-left-width");var d=z(a,"border-right-width");c=a.clientWidth+c+d}(b=b.height)||(b=z(a,"border-top-width"),d=z(a,"border-bottom-width"),b=a.clientHeight+b+d);return{width:c,height:b}}function B(a){return new Promise((b,c)=>{var d=new Image;d.onload=()=>{d.decode().then(()=>{requestAnimationFrame(()=>b(d))})};d.onerror=c;d.crossOrigin="anonymous";d.decoding="async";d.src=a})}
+function C(a){return t(function*(){return Promise.resolve().then(()=>(new XMLSerializer).serializeToString(a)).then(encodeURIComponent).then(b=>`data:image/svg+xml;charset=utf-8,${b}`)})}
+function D(a,b,c){return t(function*(){var d=document.createElementNS("http://www.w3.org/2000/svg","svg"),e=document.createElementNS("http://www.w3.org/2000/svg","foreignObject");d.setAttribute("width",`${b}`);d.setAttribute("height",`${c}`);d.setAttribute("viewBox",`0 0 ${b} ${c}`);e.setAttribute("width","100%");e.setAttribute("height","100%");e.setAttribute("x","0");e.setAttribute("y","0");e.setAttribute("externalResourcesRequired","true");d.appendChild(e);e.appendChild(a);return C(d)})}
+var E=(a,b)=>{if(a instanceof b)return!0;a=Object.getPrototypeOf(a);return a===null?!1:a.constructor.name===b.name||E(a,b)};function F(a,b){return y(b).map(c=>{var d=a.getPropertyValue(c),e=a.getPropertyPriority(c);return`${c}: ${d}${e?" !important":""};`}).join(" ")}
+function G(a,b,c,d){a=window.getComputedStyle(a,c);var e=a.getPropertyValue("content");if(e!==""&&e!=="none"){var f=v();try{b.className=`${b.className} ${f}`}catch(k){return}e=document.createElement("style");var g=e.appendChild;c=`.${f}:${c}`;a.cssText?(d=a.getPropertyValue("content"),d=`${a.cssText} content: '${d.replace(/'|"/g,"")}';`):d=F(a,d);g.call(e,document.createTextNode(`${c}{${d}}`));b.appendChild(e)}};function H(a){return a.search(/^(data:)/)!==-1}function I(a,b,c){return t(function*(){var d=yield fetch(a,b);if(d.status===404)throw Error(`Resource "${d.url}" not found`);var e=yield d.blob();return new Promise((f,g)=>{var k=new FileReader;k.onerror=g;k.onloadend=()=>{try{f(c({v:d,result:k.result}))}catch(m){g(m)}};k.readAsDataURL(e)})})}const J={};function aa(a,b,c){var d=a.replace(/\?.*/,"");c&&(d=a);/ttf|otf|eot|woff2?/i.test(d)&&(d=d.replace(/.*\//,""));return b?`[${b}]${d}`:d}
+function K(a,b,c){return t(function*(){var d=aa(a,b,c.F);if(J[d]!=null)return J[d];c.B&&(a+=(/\?/.test(a)?"&":"?")+(new Date).getTime());try{let f=yield I(a,c.l,({v:g,result:k})=>{b||(b=g.headers.get("Content-Type")||"");return k.split(/,/)[1]});var e=`data:${b};base64,${f}`}catch(f){e=c.o||""}return J[d]=e})};const L={R:"application/font-woff",S:"application/font-woff",O:"application/font-truetype",C:"application/vnd.ms-fontobject",J:"image/png",H:"image/jpeg",G:"image/jpeg",D:"image/gif",N:"image/tiff",M:"image/svg+xml",P:"image/webp"};function M(a){return(a=/\.([^./]*?)$/g.exec(a))?a[1]:""};function ba(a){return t(function*(){var b=a.toDataURL();return b==="data:,"?a.cloneNode(!1):B(b)})}function ca(a,b){return t(function*(){if(a.currentSrc){var c=document.createElement("canvas");let d=c.getContext("2d");c.width=a.clientWidth;c.height=a.clientHeight;d==null||d.drawImage(a,0,0,c.width,c.height);c=c.toDataURL();return B(c)}c=a.poster;c=yield K(c,L[M(c).toLowerCase()]||"",b);return B(c)})}
+function da(a,b){return t(function*(){try{let c;if(a==null?0:(c=a.contentDocument)==null?0:c.body)return yield N(a.contentDocument.body,b,!0)}catch(c){}return a.cloneNode(!1)})}function ea(a,b){return t(function*(){return E(a,HTMLCanvasElement)?ba(a):E(a,HTMLVideoElement)?ca(a,b):E(a,HTMLIFrameElement)?da(a,b):a.cloneNode(a.tagName!=null&&a.tagName.toUpperCase()==="SVG")})}
+function fa(a,b,c){return t(function*(){if(b.tagName!=null&&b.tagName.toUpperCase()==="SVG")return b;var d=[];if(a.tagName!=null&&a.tagName.toUpperCase()==="SLOT"&&a.assignedNodes)d=w(a.assignedNodes());else{let e;if(E(a,HTMLIFrameElement)&&((e=a.contentDocument)==null?0:e.body))d=w(a.contentDocument.body.childNodes);else{let f;d=w(((f=a.shadowRoot)!=null?f:a).childNodes)}}if(d.length===0||E(a,HTMLVideoElement))return b;yield d.reduce((e,f)=>e.then(()=>N(f,c)).then(g=>{g&&b.appendChild(g)}),Promise.resolve());
+return b})}function ha(a,b,c){var d=b.style;if(d){var e=window.getComputedStyle(a);e.cssText?(d.cssText=e.cssText,d.transformOrigin=e.transformOrigin):y(c).forEach(f=>{var g=e.getPropertyValue(f);f==="font-size"&&g.endsWith("px")&&(g=`${Math.floor(parseFloat(g.substring(0,g.length-2)))-.1}px`);E(a,HTMLIFrameElement)&&f==="display"&&g==="inline"&&(g="block");f==="d"&&b.getAttribute("d")&&(g=`path(${b.getAttribute("d")})`);d.setProperty(f,g,e.getPropertyPriority(f))})}}
+function ia(a,b){E(a,HTMLSelectElement)&&(b=Array.from(b.children).find(c=>a.value===c.getAttribute("value")))&&b.setAttribute("selected","")}
+function ja(a,b){return t(function*(){var c=a.querySelectorAll?a.querySelectorAll("use"):[];if(c.length===0)return a;var d={};for(var e=0;e<c.length;e++){var f=c[e].getAttribute("xlink:href");if(f){let g=document.querySelector(f);a.querySelector(f)||!g||d[f]||(d[f]=yield N(g,b,!0))}}c=Object.values(d);if(c.length){d=document.createElementNS("http://www.w3.org/1999/xhtml","svg");d.setAttribute("xmlns","http://www.w3.org/1999/xhtml");d.style.position="absolute";d.style.width="0";d.style.height="0";
+d.style.overflow="hidden";d.style.display="none";e=document.createElementNS("http://www.w3.org/1999/xhtml","defs");d.appendChild(e);for(f=0;f<c.length;f++)e.appendChild(c[f]);a.appendChild(d)}return a})}
+function N(a,b,c){return t(function*(){return c||!b.filter||b.filter(a)?Promise.resolve(a).then(d=>ea(d,b)).then(d=>fa(a,d,b)).then(d=>{E(d,Element)&&(ha(a,d,b),G(a,d,":before",b),G(a,d,":after",b),E(a,HTMLTextAreaElement)&&(d.textContent=a.value),E(a,HTMLInputElement)&&d.setAttribute("value",a.value),ia(a,d));return d}).then(d=>ja(d,b)):null})};const O=/url\((['"]?)([^'"]+?)\1\)/g,ka=/url\([^)]+\)\s*format\((["']?)([^"']+)\1\)/g,la=/src:\s*(?:url\([^)]+\)\s*format\([^)]+\)[,;]\s*)+/g;function ma(a){var b=[];a.replace(O,(c,d,e)=>{b.push(e);return c});return b.filter(c=>!H(c))}
+function na(a,b,c,d){return t(function*(){try{let e=c?(new URL(b,c||void 0)).toString():b,f;f=yield K(e,L[M(b).toLowerCase()]||"",d);return a.replace(new RegExp(`(url\\(['"]?)(${b.replace(/([.*+?^${}()|\[\]\/\\])/g,"\\$1")})(['"]?\\))`,"g"),`$1${f}$3`)}catch(e){}return a})}function oa(a,{K:b}){return b?a.replace(la,c=>{for(;;){let [d,,e]=ka.exec(c)||[];if(!e)return"";if(e===b)return`src: ${d};`}}):a}
+function P(a,b,c){return t(function*(){if(a.search(O)===-1)return a;var d=oa(a,c);return ma(d).reduce((e,f)=>e.then(g=>na(g,f,b,c)),Promise.resolve(d))})};function Q(a,b,c){return t(function*(){var d,e=(d=b.style)==null?void 0:d.getPropertyValue(a);return e?(d=yield P(e,null,c),b.style.setProperty(a,d,b.style.getPropertyPriority(a)),!0):!1})}function pa(a,b){return t(function*(){(yield Q("background",a,b))||(yield Q("background-image",a,b));(yield Q("mask",a,b))||(yield Q("-webkit-mask",a,b))||(yield Q("mask-image",a,b))||(yield Q("-webkit-mask-image",a,b))})}
+function qa(a,b){return t(function*(){var c=E(a,HTMLImageElement);if(c&&!H(a.src)||E(a,SVGImageElement)&&!H(a.href.baseVal)){var d=c?a.src:a.href.baseVal,e=yield K(d,L[M(d).toLowerCase()]||"",b);yield new Promise((f,g)=>{a.onload=f;a.onerror=b.h?(...k)=>{try{f(b.h(...k))}catch(m){g(m)}}:g;a.decode&&(a.decode=f);a.loading==="lazy"&&(a.loading="eager");c?(a.srcset="",a.src=e):a.href.baseVal=e})}})}
+function ra(a,b){return t(function*(){var c=w(a.childNodes).map(d=>R(d,b));yield Promise.all(c).then(()=>a)})}function R(a,b){return t(function*(){E(a,Element)&&(yield pa(a,b),yield qa(a,b),yield ra(a,b))})};const S={};function T(a){return t(function*(){var b=S[a];if(b!=null)return b;b=yield(yield fetch(a)).text();b={url:a,cssText:b};return S[a]=b})}function U(a,b){return t(function*(){var c=a.cssText,d=/url\(["']?([^"')]+)["']?\)/g,e=(c.match(/url\([^)]+\)/g)||[]).map(f=>t(function*(){var g=f.replace(d,"$1");g.startsWith("https://")||(g=(new URL(g,a.url)).href);return I(g,b.l,({result:k})=>{c=c.replace(f,`url(${k})`);return[f,k]})}));return Promise.all(e).then(()=>c)})}
+function V(a){if(a==null)return[];var b=[];a=a.replace(/(\/\*[\s\S]*?\*\/)/gi,"");for(var c=RegExp("((@.*?keyframes [\\s\\S]*?){([\\s\\S]*?}\\s*?)})","gi");;){var d=c.exec(a);if(d===null)break;b.push(d[0])}a=a.replace(c,"");c=/@import[\s\S]*?url\([^)]*\)[\s\S]*?;/gi;for(d=RegExp("((\\s*?(?:\\/\\*[\\s\\S]*?\\*\\/)?\\s*?@media[\\s\\S]*?){([\\s\\S]*?)}\\s*?})|(([\\s\\S]*?){([\\s\\S]*?)})","gi");;){let e=c.exec(a);if(e===null)if(e=d.exec(a),e===null)break;else c.lastIndex=d.lastIndex;else d.lastIndex=
+c.lastIndex;b.push(e[0])}return b}
+function sa(a,b){return t(function*(){var c=[],d=[];a.forEach(e=>{if("cssRules"in e)try{w(e.cssRules||[]).forEach((f,g)=>{if(f.type===CSSRule.IMPORT_RULE){let k=g+1;f=T(f.href).then(m=>U(m,b)).then(m=>V(m).forEach(q=>{try{e.insertRule(q,q.startsWith("@import")?k+=1:e.cssRules.length)}catch(Fa){}})).catch(()=>{});d.push(f)}})}catch(f){let g=a.find(k=>k.href==null)||document.styleSheets[0];e.href!=null&&d.push(T(e.href).then(k=>U(k,b)).then(k=>V(k).forEach(m=>{g.insertRule(m,g.cssRules.length)})).catch(()=>
+{}))}});return Promise.all(d).then(()=>{a.forEach(e=>{if("cssRules"in e)try{w(e.cssRules||[]).forEach(f=>{c.push(f)})}catch(f){}});return c})})}function ta(a){return a.filter(b=>b.type===CSSRule.FONT_FACE_RULE).filter(b=>b.style.getPropertyValue("src").search(O)!==-1)}function ua(a,b){return t(function*(){if(a.ownerDocument==null)throw Error("Provided element is not within a Document");var c=yield sa(w(a.ownerDocument.styleSheets),b);return ta(c)})}
+function va(a){function b(d){(d.style.fontFamily||getComputedStyle(d).fontFamily).split(",").forEach(e=>{c.add(e.trim().replace(/["']/g,""))});Array.from(d.children).forEach(e=>{e instanceof HTMLElement&&b(e)})}var c=new Set;b(a);return c}function wa(a,b){return t(function*(){var c=yield ua(a,b),d=va(a);return(yield Promise.all(c.filter(e=>d.has(e.style.fontFamily.trim().replace(/["']/g,""))).map(e=>P(e.cssText,e.parentStyleSheet?e.parentStyleSheet.href:null,b)))).join("\n")})}
+function xa(a,b){return t(function*(){var c=b.m!=null?b.m:b.A?null:yield wa(a,b);if(c){let d=document.createElement("style");d.appendChild(document.createTextNode(c));a.firstChild?a.insertBefore(d,a.firstChild):a.appendChild(d)}})};function ya(a,b={}){return t(function*(){var {width:c,height:d}=A(a,b),e=yield N(a,b,!0);yield xa(e,b);yield R(e,b);u(e,b);return yield D(e,c,d)})}
+function za(a,b={}){return t(function*(){var {width:c,height:d}=A(a,b),e=yield ya(a,b);e=yield B(e);var f=document.createElement("canvas"),g=f.getContext("2d"),k=b.I||window.devicePixelRatio||1,m=b.j||c,q=b.i||d;f.width=m*k;f.height=q*k;!b.L&&(f.width>16384||f.height>16384)&&(f.width>16384&&f.height>16384?f.width>f.height?(f.height*=16384/f.width,f.width=16384):(f.width*=16384/f.height,f.height=16384):f.width>16384?(f.height*=16384/f.width,f.width=16384):(f.width*=16384/f.height,f.height=16384));
+f.style.width=`${m}`;f.style.height=`${q}`;b.backgroundColor&&(g.fillStyle=b.backgroundColor,g.fillRect(0,0,f.width,f.height));g.drawImage(e,0,0,f.width,f.height);return f})}function Aa(a,b={}){return t(function*(){return(yield za(a,b)).toDataURL()})};const Ba=["gemini.google.com","corp.google.com","proxy.googlers.com"];function W(){return document.body.querySelectorAll('[class*="animate"]').length>0}function X(a,b){var c=document.createElement("canvas");c.width=a;c.height=b;return c.toDataURL("image/png")}const Y=X(1,1);
+function Z(a){return t(function*(){try{return yield Aa(a,{j:a.offsetWidth,i:a.offsetHeight,A:!0,filter:b=>{if(b.tagName==="IMG"){let c=b.getAttribute("src");if(!c||c.trim()===""||b.style.display==="none")return!1}return!0},o:Y,h:()=>Y})}catch(b){return X(a.offsetWidth,a.offsetHeight)}})}
+function Ca(){return t(function*(){var a=document.body.offsetWidth,b=document.body.offsetHeight,c=document.body.cloneNode(!0);c.querySelectorAll('[class*="animate"]').forEach(d=>{d.classList.remove(...Array.from(d.classList).filter(e=>e.startsWith("animate")))});c.style.width=`${a}px`;c.style.height=`${b}px`;return c})}
+function Da(a){return t(function*(){var b=document.body;if(W()){var c=yield Ca();b=c;document.body.appendChild(c)}c=yield Z(b);W()&&document.body.removeChild(b);window.parent.postMessage({type:"SEND_SCREENSHOT",image:c,topOffset:document.documentElement.scrollTop},a.origin)})}function Ea(a){return t(function*(){var b={type:"SEND_SCREENSHOT_FOR_DATA_VISUALIZATION",image:yield Z(document.body),topOffset:0};window.parent.postMessage(b,a.origin)})}
+window.addEventListener("message",a=>t(function*(){if(Ba.some(c=>a.origin.includes(c))){var b=a.data;b&&(b.type==="MAKE_SCREENSHOT"&&(yield Da(a)),b.type==="MAKE_SCREENSHOT_FOR_DATA_VISUALIZATION"&&(yield Ea(a)))}}));
+})();</script><script data-bard-client-injected="true">(function() {
+  // Ensure this script is executed only once
+  if (window.firebaseAuthBridgeScriptLoaded) {
+    return;
+  }
+  window.firebaseAuthBridgeScriptLoaded = true;
+
+  let nextTokenPromiseId = 0;
+
+  // Stores { resolve, reject } for ongoing token requests
+  const pendingTokenPromises = {};
+
+  // Listen for messages from the Host Application
+  window.addEventListener('message', function(event) {
+
+    const messageData = event.data;
+
+  if (messageData && messageData.type === 'RESOLVE_NEW_FIREBASE_TOKEN') {
+      const { success, token, error, promiseId } = messageData ?? {};
+      if (pendingTokenPromises[promiseId]) {
+        if (success) {
+          pendingTokenPromises[promiseId].resolve(token);
+        } else {
+          pendingTokenPromises[promiseId].reject(new Error(error || 'Token refresh failed from host.'));
+        }
+        delete pendingTokenPromises[promiseId];
+      }
+    }
+  });
+
+  // Expose a function for the Generated App to request a new Firebase token
+  window.requestNewFirebaseToken = function() {
+    const currentPromiseId = nextTokenPromiseId++;
+    const promise = new Promise((resolve, reject) => {
+      pendingTokenPromises[currentPromiseId] = { resolve, reject };
+    });
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: 'REQUEST_NEW_FIREBASE_TOKEN',
+        promiseId: currentPromiseId
+      }, '*');
+    } else {
+      pendingTokenPromises[currentPromiseId].reject(new Error('No parent window to request token from.'));
+      delete pendingTokenPromises[currentPromiseId];
+    }
+    return promise;
+  };
+})();</script><script data-bard-client-injected="true">
+let realOriginalGetUserMedia = null;
+if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+  realOriginalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+}
+
+(function() {
+  if (navigator.mediaDevices && navigator.mediaDevices.__proto__) {
+    try {
+      Object.defineProperty(navigator.mediaDevices.__proto__, 'getUserMedia', {
+        get: function() {
+          return undefined; // Or throw an error
+        },
+        configurable: false
+      });
+    } catch (error) {
+      console.error("Error defining prototype getter:", error);
+    }
+  }
+})();
+
+(function() {
+  const pendingMediaResolvers = {};
+  let nextMediaPromiseId = 0;
+
+  function requestMediaPermissions(constraints) {
+    const mediaPromiseId = nextMediaPromiseId++;
+    const promise = new Promise((resolve, reject) => {
+      pendingMediaResolvers[mediaPromiseId] = (granted) => {
+        delete pendingMediaResolvers[mediaPromiseId];
+        resolve(granted);
+      };
+    });
+
+    window.parent.postMessage({
+      type: 'requestMediaPermission',
+      constraints: constraints,
+      promiseId: mediaPromiseId,
+    }, '*');
+
+    return promise;
+  }
+
+  let originalGetUserMedia = realOriginalGetUserMedia;
+
+  function interceptGetUserMedia() {
+    if (navigator.mediaDevices) {
+      Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+        value: function(constraints) {
+          return requestMediaPermissions(constraints).then((granted) => {
+            if (granted) {
+              if (originalGetUserMedia) {
+                return originalGetUserMedia(constraints);
+              } else {
+                throw new Error("Original getUserMedia not available.");
+              }
+            } else {
+              throw new DOMException('Permission denied', 'NotAllowedError');
+            }
+          });
+        },
+        writable: false,
+        configurable: false
+      });
+    }
+  }
+
+  interceptGetUserMedia();
+
+  const observer = new MutationObserver(function(mutationsList, observer) {
+    for (const mutation of mutationsList) {
+      if (mutation.type === 'reconfigured' && mutation.name === 'getUserMedia' && mutation.object === navigator.mediaDevices) {
+        interceptGetUserMedia();
+      } else if (mutation.type === 'attributes' && mutation.attributeName === 'getUserMedia' && mutation.target === navigator.mediaDevices) {
+        interceptGetUserMedia();
+      } else if (mutation.type === 'childList' && mutation.addedNodes) {
+        mutation.addedNodes.forEach(node => {
+          if (node === navigator.mediaDevices) {
+            interceptGetUserMedia();
+          }
+        });
+      }
+    }
+  });
+
+  function interceptSpeechRecognition() {
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+      return;
+    }
+
+    const OriginalSpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    const SpeechRecognitionWrapper = function(...args) {
+      const recognizer = new OriginalSpeechRecognition(...args);
+      const originalStart = recognizer.start.bind(recognizer);
+
+      recognizer.start = function() {
+        requestMediaPermissions({ audio: true }).then(granted => {
+          if (granted) {
+            originalStart();
+          } else {
+            const errorEvent = new SpeechRecognitionErrorEvent('error');
+            errorEvent.error = 'not-allowed'; // This is the standard error for permission denial.
+            recognizer.dispatchEvent(errorEvent);
+          }
+        });
+      };
+
+      return recognizer;
+    };
+
+    SpeechRecognitionWrapper.prototype = OriginalSpeechRecognition.prototype;
+    SpeechRecognitionWrapper.prototype.constructor = SpeechRecognitionWrapper;
+
+    if (window.SpeechRecognition) {
+      window.SpeechRecognition = SpeechRecognitionWrapper;
+    }
+    if (window.webkitSpeechRecognition) {
+      window.webkitSpeechRecognition = SpeechRecognitionWrapper;
+    }
+  }
+
+  interceptSpeechRecognition();
+
+  window.addEventListener('message', function(event) {
+    if (event.data) {
+      if (event.data.type === 'resolveMediaPermission') {
+        const { promiseId, granted } = event.data;
+        if (pendingMediaResolvers[promiseId]) {
+          pendingMediaResolvers[promiseId](granted);
+        }
+      }
+    }
+  });
+
+})();</script><script ws-interception-config="{&quot;parentOrigin&quot;:&quot;https://gemini.google.com&quot;,&quot;proxiedDomains&quot;:[]}" data-bard-client-injected="true">(function(){'use strict';var u=typeof Object.defineProperties=="function"?Object.defineProperty:function(b,d,e){if(b==Array.prototype||b==Object.prototype)return b;b[d]=e.value;return b};function v(b){b=["object"==typeof globalThis&&globalThis,b,"object"==typeof window&&window,"object"==typeof self&&self,"object"==typeof global&&global];for(var d=0;d<b.length;++d){var e=b[d];if(e&&e.Math==Math)return e}throw Error("Cannot find global object");}var w=v(this);
+function y(b,d){if(d)a:{var e=w;b=b.split(".");for(var h=0;h<b.length-1;h++){var k=b[h];if(!(k in e))break a;e=e[k]}b=b[b.length-1];h=e[b];d=d(h);d!=h&&d!=null&&u(e,b,{configurable:!0,writable:!0,value:d})}}function z(b){function d(h){return b.next(h)}function e(h){return b.throw(h)}return new Promise(function(h,k){function m(n){n.done?h(n.value):Promise.resolve(n.value).then(d,e).then(m,k)}m(b.next())})}y("globalThis",function(b){return b||w});/*
+
+ Copyright The Closure Library Authors.
+ SPDX-License-Identifier: Apache-2.0
+*/
+function A(b,d){function e(){}e.prototype=d.prototype;b.j=d.prototype;b.prototype=new e;b.prototype.constructor=b;b.h=function(h,k,m){for(var n=Array(arguments.length-2),p=2;p<arguments.length;p++)n[p-2]=arguments[p];return d.prototype[k].apply(h,n)}};function B(b,d,e="*"){function h(a){if(typeof a==="string")return F.encode(a).buffer;if(a instanceof ArrayBuffer)return a.slice(0);if(ArrayBuffer.isView(a))return a.buffer.slice(a.byteOffset,a.byteOffset+a.byteLength);throw Error("Invalid data type");}function k(a){a=h(a);var f={type:"send",data:new Uint8Array(a)},g;(g=r)==null||g.postMessage(f,[a])}function m(){if(!r)throw Error("Data port not captured yet.");r.onmessage=a=>{if(a.data.type==="message"){a=new MessageEvent("message",{data:G.decode(a.data.data)});
+let f;(f=c.onmessage)==null||f.call(c,a);c.dispatchEvent(a)}}}function n(){if(!t)throw Error("Control port not captured yet.");t.onmessage=a=>{switch(a.data.type){case "open":l=1;var f=new Event("open"),g;(g=c.onopen)==null||g.call(c,f);c.dispatchEvent(f);q.forEach(H=>{k(H)});q=[];break;case "close":g=a.data;l=3;g=new CloseEvent("close",{code:g.code,reason:g.reason,wasClean:g.wasClean});(f=c.onclose)==null||f.call(c,g);c.dispatchEvent(g);break;case "error":l=3;f=new Event("error");let x;(x=c.onerror)==
+null||x.call(c,f);c.dispatchEvent(f)}}}function p(a){return z(function*(){var f=new MessageChannel;t=f.port1;var g=new MessageChannel;r=g.port1;n();m();window.parent.postMessage({type:"websocket_open",portOrdering:["control","data"],url:b,protocols:a||[],connectionId:I},e,[f.port2,g.port2])}())}var c=Reflect.construct(EventTarget,[],new.target);c.CONNECTING=0;c.OPEN=1;c.CLOSING=2;c.CLOSED=3;c.url=b;c.binaryType="arraybuffer";c.protocol="";c.i="";var l=0,t=null,r=null,q=[],F=new TextEncoder,G=new TextDecoder;
+c.onopen=null;c.onmessage=null;c.onclose=null;c.onerror=null;Object.defineProperty(c,"readyState",{get:()=>l,enumerable:!0,configurable:!0});Object.defineProperty(c,"bufferedAmount",{get:()=>{var a=0;q.forEach(f=>{a+=typeof f==="string"?f.length:f.byteLength});return a},enumerable:!0,configurable:!0});var I=function(){var a;return((a=globalThis.crypto)==null?0:a.randomUUID)?globalThis.crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,f=>{var g=Math.random()*16|0;return(f===
+"x"?g:g&3|8).toString(16)})}();c.send=a=>{if(l===1)a instanceof Blob?a.arrayBuffer().then(f=>{k(f)}):k(a);else if(l===0)if(typeof a==="string")q.push(a);else if(a instanceof ArrayBuffer||ArrayBuffer.isView(a))q.push(h(a));else throw Error("Sending Blob is not supported before the connection is open.");else console.debug("WebSocket send called in CLOSING or CLOSED state; ignored.")};c.close=(a=1E3,f="")=>{if(l!==2&&l!==3){l=2;a={type:"close",code:a,reason:f,wasClean:a===1E3};var g;(g=t)==null||g.postMessage(a)}};
+Promise.resolve().then(()=>p(d));return c}A(B,EventTarget);var C=document.currentScript,D=C==null?void 0:C.getAttribute("ws-interception-config");if(!D)throw Error("WebSocket Interceptor: Missing ws-interception-config attribute in the script tag.");var E=JSON.parse(D);if(!E.parentOrigin||typeof E.parentOrigin!=="string")throw Error("WebSocket Interceptor: Invalid parentOrigin in ws-interception-config");
+(function(b){var d=Object.getOwnPropertyDescriptor(window,"WebSocket");if(!d||d.writable||d.configurable)d=Object.assign(function(e,h){try{let k=(new URL(e)).hostname;if(b.proxiedDomains.some(m=>k===m||k.endsWith(`.${m}`)))return new B(e,h,b.parentOrigin)}catch(k){throw window.parent.postMessage({type:"websocket_blocked",url:e,reason:"blocked_invalid_url"},b.parentOrigin),new DOMException(`WebSocket connection to '${e}' is not allowed in Canvas.`,"SecurityError");}window.parent.postMessage({type:"websocket_blocked",
+url:e,reason:"blocked_domain_not_allowlisted"},b.parentOrigin);throw new DOMException(`WebSocket connection to '${e}' is not allowed in Canvas.`,"SecurityError");},{CONNECTING:0,OPEN:1,CLOSING:2,CLOSED:3}),Object.defineProperty(window,"WebSocket",{value:d,writable:!1,configurable:!1})})({proxiedDomains:E.proxiedDomains||[],parentOrigin:E.parentOrigin});}).call(this);
+</script><script data-bard-client-injected="true">((function(modelInformation) {
+  const originalFetch = window.fetch;
+  // TODO: b/421908508 - Move these out of the script and match all generative AI model calls.
+  let googleLlmBaseApiUrls = [
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.textModelName + ':streamGenerateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.textModelName + ':generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.imageModelName + ':predict',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.imageModelName + ':predictLongRunning',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.imageEditModelName + ':generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.imageTransformModelName + ':generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.videoModelName + ':predict',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.videoModelName + ':predictLongRunning',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.ttsModelName + ':generateContent',
+  ];
+  modelInformation.deprecatedTextModelNames.forEach((modelName) => {
+    googleLlmBaseApiUrls.push(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':streamGenerateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent',
+    );
+  });
+  modelInformation.deprecatedImageModelNames.forEach((modelName) => {
+    googleLlmBaseApiUrls.push(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':predict',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':predictLongRunning',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':streamGenerateContent',
+    );
+  });
+  modelInformation.deprecatedGenerateImageModelNames.forEach((modelName) => {
+    googleLlmBaseApiUrls.push(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':streamGenerateContent',
+    );
+  });
+  modelInformation.deprecatedImageTransformModelNames.forEach((modelName) => {
+    googleLlmBaseApiUrls.push(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':streamGenerateContent',
+    );
+  });
+
+  const pendingFetchResolvers = {};
+  let nextPromiseId = 0;
+
+  function handleStringInput(input, optionsArgument) {
+    const actualUrl = input;
+    const fetchCallArgs = [actualUrl, optionsArgument];
+    const effectiveOptions = optionsArgument || {};
+    const bodyForApiKeyCheck = effectiveOptions.body;
+    const bodyForPostMessage = effectiveOptions.body;
+    return { actualUrl, fetchCallArgs, effectiveOptions, bodyForApiKeyCheck, bodyForPostMessage };
+  }
+
+  function handleRequestInput(input, optionsArgument) {
+    const actualUrl = input.url;
+    const fetchCallArgs = [input, optionsArgument];
+    const effectiveOptions = { method: input.method, headers: new Headers(input.headers) };
+    let bodyForApiKeyCheck;
+    let bodyForPostMessage;
+
+    if (optionsArgument) {
+      if (optionsArgument.method) effectiveOptions.method = optionsArgument.method;
+      if (optionsArgument.headers) effectiveOptions.headers = new Headers(optionsArgument.headers);
+      if ('body' in optionsArgument) {
+        bodyForApiKeyCheck = optionsArgument.body;
+        bodyForPostMessage = optionsArgument.body;
+      } else {
+        bodyForApiKeyCheck = undefined;
+        bodyForPostMessage = input.body;
+      }
+    } else {
+      bodyForApiKeyCheck = undefined;
+      bodyForPostMessage = input.body;
+    }
+    return { actualUrl, fetchCallArgs, effectiveOptions, bodyForApiKeyCheck, bodyForPostMessage };
+  }
+
+  window.fetch = function(input, optionsArgument) {
+    let actualUrl;
+    let fetchCallArgs;
+    let effectiveOptions = {};
+    let bodyForApiKeyCheck;
+    let bodyForPostMessage;
+
+    if (typeof input === 'string') {
+      ({actualUrl, fetchCallArgs, effectiveOptions, bodyForApiKeyCheck, bodyForPostMessage} = handleStringInput(input, optionsArgument));
+    } else if (input instanceof Request) {
+      ({actualUrl, fetchCallArgs, effectiveOptions, bodyForApiKeyCheck, bodyForPostMessage} = handleRequestInput(input, optionsArgument));
+    } else {
+      return originalFetch.apply(window, [input, optionsArgument]);
+    }
+
+    effectiveOptions.method = effectiveOptions.method || 'GET';
+    if (!effectiveOptions.headers) {
+      effectiveOptions.headers = new Headers();
+    }
+
+
+    if (typeof actualUrl === 'string' && googleLlmBaseApiUrls.some((url) => actualUrl.startsWith(url))) {
+      let apiKeyIsNull = true;
+
+      const regex = new RegExp("models/([^:]+)");
+      const modelNameMatch = actualUrl.match(regex);
+      const modelName = modelNameMatch ? modelNameMatch[1] : 'unspecified';
+
+
+      try {
+        const urlObject = new URL(actualUrl);  // Use URL object for robust parsing
+        const apiKeyParam = urlObject.searchParams.get('key');
+        if (apiKeyParam) {
+          apiKeyIsNull = false;
+        }
+      } catch (e) {
+        // Continue checks even if URL parsing fails
+      }
+
+      if (apiKeyIsNull && effectiveOptions.headers) {
+        const h = new Headers(effectiveOptions.headers);
+        const apiKeyHeaderValue = h.get('X-API-Key') || h.get('x-api-key');
+        if (apiKeyHeaderValue) {
+          apiKeyIsNull = false;
+          return originalFetch.apply(window, fetchCallArgs);
+        }
+      }
+
+      if (apiKeyIsNull && effectiveOptions.method && ['POST', 'PUT', 'PATCH'].includes(effectiveOptions.method.toUpperCase()) && typeof bodyForApiKeyCheck === 'string') {
+        try {
+          const bodyData = JSON.parse(bodyForApiKeyCheck);
+          if (bodyData && bodyData.apiKey) {
+            apiKeyIsNull = false;
+            return originalFetch.apply(window, fetchCallArgs);
+          }
+        } catch (e) {
+          // Ignore JSON parsing errors
+        }
+      }
+
+      if(apiKeyIsNull) {
+        const promiseId = nextPromiseId++;
+        const promise = new Promise((resolve) => {
+          pendingFetchResolvers[promiseId] = (resolvedResponse) => {
+            delete pendingFetchResolvers[promiseId];
+            resolve(resolvedResponse);
+          };
+        });
+
+        let serializedBodyForPostMessage;
+        if (typeof bodyForPostMessage === 'string' || bodyForPostMessage == null) {
+            serializedBodyForPostMessage = bodyForPostMessage;
+        } else if (bodyForPostMessage instanceof ReadableStream) {
+            serializedBodyForPostMessage = null;
+        } else {
+            try {
+                serializedBodyForPostMessage = JSON.stringify(bodyForPostMessage);
+            } catch (e) {
+                serializedBodyForPostMessage = null;
+            }
+        }
+
+        const messageOptions = {
+            method: effectiveOptions.method,
+            headers: Object.fromEntries(new Headers(effectiveOptions.headers).entries()),
+            body: serializedBodyForPostMessage
+        };
+
+        window.parent.postMessage({
+          type: 'requestFetch',
+          url: actualUrl,
+          modelName: modelName,
+          options: messageOptions,
+          promiseId: promiseId,
+        }, '*');
+
+        return promise;
+      }
+      return originalFetch.apply(window, fetchCallArgs);
+    }
+    return originalFetch.apply(window, fetchCallArgs);
+  };
+
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'resolveFetch') {
+      const { promiseId, response } = event.data;
+      if (pendingFetchResolvers[promiseId]) {
+        try {
+          const reconstructedResponse = new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: new Headers(response.headers),
+          });
+          pendingFetchResolvers[promiseId](reconstructedResponse);
+        } catch (error) {
+          pendingFetchResolvers[promiseId](new Response(null, { status: 500, statusText: "Interceptor Response Reconstruction Error" }));
+        }
+      }
+    }
+  });
+
+}))({"textModelName":"gemini-3-flash-preview","imageModelName":"imagen-4.0-generate-001","imageEditModelName":"gemini-3.1-flash-image","imageTransformModelName":"gemini-3-pro-image","videoModelName":"veo-2.0-generate-001","ttsModelName":"gemini-2.5-flash-preview-tts","deprecatedTextModelNames":["gemini-2.0-flash","gemini-2.5-flash","gemini-2.5-flash-preview-04-17","gemini-2.5-flash-preview-05-20","gemini-2.5-flash-preview-09-2025"],"deprecatedImageModelNames":["imagen-3.0-generate-001","imagen-3.0-generate-002"],"deprecatedGenerateImageModelNames":["gemini-2.5-flash-image-preview","gemini-2.5-flash-image","gemini-3.1-flash-image-preview"],"deprecatedImageTransformModelNames":["gemini-3-pro-image-preview-11-2025"]})</script><script data-bard-client-injected="true">(function(){'use strict';function a(){window.parent.postMessage({type:"interaction"},"*")}window.addEventListener("click",a,{capture:!0,passive:!0});window.addEventListener("touchstart",a,{capture:!0,passive:!0});window.addEventListener("keydown",a,{capture:!0,passive:!0});}).call(this);
+</script><script data-bard-client-injected="true">(function() {
+  const originalConsoleLog = console.log;
+  const originalConsoleError = console.error;
+
+    /**
+   * Normalizes an error event or a promise rejection reason into a structured error object.
+   * @param {*} errorEventOrReason The error object or reason.
+   * @return {object} Structured error data { message, name, stack }.
+   */
+  function getErrorObject(errorEventOrReason) {
+    if (errorEventOrReason instanceof Error) {
+      return {
+        message: errorEventOrReason.message,
+        name: errorEventOrReason.name,
+        stack: errorEventOrReason.stack,
+      };
+    }
+    // Fallback for non-Error objects.
+    try {
+      return {
+        message: JSON.stringify(errorEventOrReason),
+        name: 'UnknownErrorType',
+        stack: null,
+      };
+    } catch (e) {
+      return {
+        message: String(errorEventOrReason),
+        name: 'UnknownErrorTypeNonStringifiable',
+        stack: null,
+      };
+    }
+  }
+
+  /**
+   * Converts an array of arguments (from log/error) into a single string.
+   * Handles Error objects specially to include their message and stack.
+   * @param {Array<*>} args - Arguments passed to console methods.
+   * @return {string} A string representation of the arguments.
+   */
+  function stringifyArgs(args) {
+    return args
+      .map((arg) => {
+        if (arg instanceof Error) {
+          const {message, stack} = arg;
+          return `Error: ${message}${stack ? ('\nStack: ' + stack) : ''}`;
+        }
+        if (typeof arg === 'object' && arg !== null) {
+          try {
+            return JSON.stringify(arg);
+          } catch (error) {
+            return '[Circular Object]';
+          }
+        } else {
+          return String(arg);
+        }
+      })
+      .join(' ');
+  }
+
+  console.log = function(...args) {
+    const logString = stringifyArgs(args);
+    window.parent.postMessage({ type: 'log', message: logString }, '*');
+    originalConsoleLog.apply(console, args);
+  };
+
+  console.error = function(...args) {
+    let errorData;
+    if (args.length > 0 && args[0] instanceof Error) {
+      const err = args[0];
+      // If the first arg is an Error, capture its details.
+      errorData = {
+        type: 'error',
+        source: 'CONSOLE_ERROR',
+        ...getErrorObject(err),
+        rawArgsString: stringifyArgs(args.slice(1)),
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      // If not an Error object, treat all args as a general error message.
+      errorData = {
+        type: 'error',
+        source: 'CONSOLE_ERROR',
+        message: stringifyArgs(args),
+        name: 'ConsoleLoggedError',
+        stack: null,
+        timestamp: new Date().toISOString(),
+      };
+    }
+    window.parent.postMessage(errorData, '*');
+    originalConsoleError.apply(console, args);
+  };
+
+  // Listen for global unhandled synchronous errors.
+  window.addEventListener('error', function(event) {
+    const errorDetails = event.error ? getErrorObject(event.error) : {
+      message: event.message,
+      name: 'GlobalError',
+      stack: null,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    };
+
+    window.parent.postMessage({
+      type: 'error',
+      source: 'global',
+      ...errorDetails,
+      message: errorDetails.message || event.message,
+      timestamp: new Date().toISOString(),
+    }, '*');
+  });
+
+  // Listen for unhandled promise rejections (asynchronous errors).
+  window.addEventListener('unhandledrejection', function(event) {
+    const errorDetails = getErrorObject(event.reason);
+
+    window.parent.postMessage({
+      type: 'error',
+      source: 'unhandledrejection',
+      ...errorDetails,
+      message: errorDetails.message || 'Unhandled Promise Rejection',
+      timestamp: new Date().toISOString(),
+    }, '*');
+  });
+
+})();</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hirarki Topologi Node - Sistem Management OLT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d131e;
+            color: #d1d5db;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .tree-line {
+            position: relative;
+        }
+        .tree-line::before {
+            content: '';
+            position: absolute;
+            left: 14px;
+            top: 24px;
+            bottom: 8px;
+            width: 1px;
+            background-color: #1f293d;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: #27354a;
+            border-radius: 4px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background-color: transparent;
+        }
+        .custom-dashed-border {
+            border: 1.5px dashed #059669;
+        }
+        .custom-dashed-border:hover {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.03);
+        }
+    </style>
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.left-2\.5{left:0.625rem}.top-2\.5{top:0.625rem}.z-50{z-index:50}.mr-1{margin-right:0.25rem}.mt-1{margin-top:0.25rem}.ml-1{margin-left:0.25rem}.ml-2{margin-left:0.5rem}.mt-0\.5{margin-top:0.125rem}.block{display:block}.flex{display:flex}.grid{display:grid}.hidden{display:none}.h-2{height:0.5rem}.h-2\.5{height:0.625rem}.h-screen{height:100vh}.h-1\.5{height:0.375rem}.h-4{height:1rem}.max-h-\[300px\]{max-height:300px}.max-h-\[85vh\]{max-height:85vh}.w-2{width:0.5rem}.w-2\.5{width:0.625rem}.w-\[360px\]{width:360px}.w-full{width:100%}.w-1\.5{width:0.375rem}.w-32{width:8rem}.w-4{width:1rem}.max-w-3xl{max-width:48rem}.flex-1{flex:1 1 0%}.shrink-0{flex-shrink:0}@keyframes pulse{50%{opacity:.5}}.animate-pulse{animation:pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite}.cursor-pointer{cursor:pointer}.select-none{-webkit-user-select:none;user-select:none}.select-all{-webkit-user-select:all;user-select:all}.grid-cols-1{grid-template-columns:repeat(1, minmax(0, 1fr))}.flex-col{flex-direction:column}.items-start{align-items:flex-start}.items-center{align-items:center}.justify-end{justify-content:flex-end}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:0.25rem}.gap-1\.5{gap:0.375rem}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.gap-4{gap:1rem}.space-x-2 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.5rem * var(--tw-space-x-reverse));margin-left:calc(0.5rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-3 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.75rem * var(--tw-space-x-reverse));margin-left:calc(0.75rem * calc(1 - var(--tw-space-x-reverse)))}.space-y-1 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.25rem * var(--tw-space-y-reverse))}.space-y-2\.5 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.625rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.625rem * var(--tw-space-y-reverse))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.space-y-6 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem * var(--tw-space-y-reverse))}.space-x-1\.5 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.375rem * var(--tw-space-x-reverse));margin-left:calc(0.375rem * calc(1 - var(--tw-space-x-reverse)))}.space-y-0\.5 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.125rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.125rem * var(--tw-space-y-reverse))}.space-y-2 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.5rem * var(--tw-space-y-reverse))}.space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}.overflow-y-auto{overflow-y:auto}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rounded{border-radius:0.25rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:0.5rem}.rounded-md{border-radius:0.375rem}.rounded-xl{border-radius:0.75rem}.border{border-width:1px}.border-b{border-bottom-width:1px}.border-r{border-right-width:1px}.border-t{border-top-width:1px}.border-l{border-left-width:1px}.border-dashed{border-style:dashed}.border-blue-500\/20{border-color:rgb(59 130 246 / 0.2)}.border-emerald-500\/20{border-color:rgb(16 185 129 / 0.2)}.border-slate-700{--tw-border-opacity:1;border-color:rgb(51 65 85 / var(--tw-border-opacity, 1))}.border-slate-700\/70{border-color:rgb(51 65 85 / 0.7)}.border-slate-800{--tw-border-opacity:1;border-color:rgb(30 41 59 / var(--tw-border-opacity, 1))}.border-slate-800\/80{border-color:rgb(30 41 59 / 0.8)}.border-amber-500\/30{border-color:rgb(245 158 11 / 0.3)}.border-emerald-500\/30{border-color:rgb(16 185 129 / 0.3)}.border-emerald-500\/40{border-color:rgb(16 185 129 / 0.4)}.border-rose-500\/30{border-color:rgb(244 63 94 / 0.3)}.border-slate-600{--tw-border-opacity:1;border-color:rgb(71 85 105 / var(--tw-border-opacity, 1))}.border-slate-800\/60{border-color:rgb(30 41 59 / 0.6)}.bg-\[\#0b0f17\]{--tw-bg-opacity:1;background-color:rgb(11 15 23 / var(--tw-bg-opacity, 1))}.bg-\[\#111827\]{--tw-bg-opacity:1;background-color:rgb(17 24 39 / var(--tw-bg-opacity, 1))}.bg-\[\#111827\]\/50{background-color:rgb(17 24 39 / 0.5)}.bg-\[\#1a2333\]{--tw-bg-opacity:1;background-color:rgb(26 35 51 / var(--tw-bg-opacity, 1))}.bg-\[\#1a2333\]\/30{background-color:rgb(26 35 51 / 0.3)}.bg-\[\#1a2333\]\/50{background-color:rgb(26 35 51 / 0.5)}.bg-black\/80{background-color:rgb(0 0 0 / 0.8)}.bg-blue-500{--tw-bg-opacity:1;background-color:rgb(59 130 246 / var(--tw-bg-opacity, 1))}.bg-blue-500\/10{background-color:rgb(59 130 246 / 0.1)}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235 / var(--tw-bg-opacity, 1))}.bg-emerald-500{--tw-bg-opacity:1;background-color:rgb(16 185 129 / var(--tw-bg-opacity, 1))}.bg-emerald-500\/10{background-color:rgb(16 185 129 / 0.1)}.bg-rose-500{--tw-bg-opacity:1;background-color:rgb(244 63 94 / var(--tw-bg-opacity, 1))}.bg-slate-800{--tw-bg-opacity:1;background-color:rgb(30 41 59 / var(--tw-bg-opacity, 1))}.bg-slate-900{--tw-bg-opacity:1;background-color:rgb(15 23 42 / var(--tw-bg-opacity, 1))}.bg-\[\#0b0f17\]\/60{background-color:rgb(11 15 23 / 0.6)}.bg-amber-500\/10{background-color:rgb(245 158 11 / 0.1)}.bg-blue-400{--tw-bg-opacity:1;background-color:rgb(96 165 250 / var(--tw-bg-opacity, 1))}.bg-blue-600\/20{background-color:rgb(37 99 235 / 0.2)}.bg-emerald-400{--tw-bg-opacity:1;background-color:rgb(52 211 153 / var(--tw-bg-opacity, 1))}.bg-emerald-500\/20{background-color:rgb(16 185 129 / 0.2)}.bg-emerald-600{--tw-bg-opacity:1;background-color:rgb(5 150 105 / var(--tw-bg-opacity, 1))}.bg-rose-500\/10{background-color:rgb(244 63 94 / 0.1)}.bg-slate-700{--tw-bg-opacity:1;background-color:rgb(51 65 85 / var(--tw-bg-opacity, 1))}.bg-slate-900\/30{background-color:rgb(15 23 42 / 0.3)}.bg-slate-900\/80{background-color:rgb(15 23 42 / 0.8)}.p-1\.5{padding:0.375rem}.p-2{padding:0.5rem}.p-3{padding:0.75rem}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-6{padding:1.5rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.px-2{padding-left:0.5rem;padding-right:0.5rem}.px-2\.5{padding-left:0.625rem;padding-right:0.625rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-5{padding-left:1.25rem;padding-right:1.25rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-0\.5{padding-top:0.125rem;padding-bottom:0.125rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-2\.5{padding-top:0.625rem;padding-bottom:0.625rem}.py-3{padding-top:0.75rem;padding-bottom:0.75rem}.py-3\.5{padding-top:0.875rem;padding-bottom:0.875rem}.px-1\.5{padding-left:0.375rem;padding-right:0.375rem}.pl-8{padding-left:2rem}.pr-3{padding-right:0.75rem}.pt-1{padding-top:0.25rem}.pb-2{padding-bottom:0.5rem}.pb-4{padding-bottom:1rem}.pl-3\.5{padding-left:0.875rem}.pt-2{padding-top:0.5rem}.font-mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}.text-\[11px\]{font-size:11px}.text-\[8px\]{font-size:8px}.text-\[9px\]{font-size:9px}.text-base{font-size:1rem;line-height:1.5rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xs{font-size:0.75rem;line-height:1rem}.text-2xl{font-size:1.5rem;line-height:2rem}.text-\[10px\]{font-size:10px}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-normal{font-weight:400}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.tracking-wide{letter-spacing:0.025em}.tracking-wider{letter-spacing:0.05em}.tracking-tight{letter-spacing:-0.025em}.text-amber-300{--tw-text-opacity:1;color:rgb(252 211 77 / var(--tw-text-opacity, 1))}.text-blue-300{--tw-text-opacity:1;color:rgb(147 197 253 / var(--tw-text-opacity, 1))}.text-blue-400{--tw-text-opacity:1;color:rgb(96 165 250 / var(--tw-text-opacity, 1))}.text-emerald-400{--tw-text-opacity:1;color:rgb(52 211 153 / var(--tw-text-opacity, 1))}.text-slate-200{--tw-text-opacity:1;color:rgb(226 232 240 / var(--tw-text-opacity, 1))}.text-slate-300{--tw-text-opacity:1;color:rgb(203 213 225 / var(--tw-text-opacity, 1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184 / var(--tw-text-opacity, 1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139 / var(--tw-text-opacity, 1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.text-amber-400{--tw-text-opacity:1;color:rgb(251 191 36 / var(--tw-text-opacity, 1))}.text-rose-400{--tw-text-opacity:1;color:rgb(251 113 133 / var(--tw-text-opacity, 1))}.text-slate-950{--tw-text-opacity:1;color:rgb(2 6 23 / var(--tw-text-opacity, 1))}.placeholder-slate-500::placeholder{--tw-placeholder-opacity:1;color:rgb(100 116 139 / var(--tw-placeholder-opacity, 1))}.shadow-2xl{--tw-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25);--tw-shadow-colored:0 25px 50px -12px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition{transition-property:color, background-color, border-color, fill, stroke, opacity, box-shadow, transform, filter, -webkit-text-decoration-color, -webkit-backdrop-filter;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-text-decoration-color, -webkit-backdrop-filter;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.hover\:bg-blue-500:hover{--tw-bg-opacity:1;background-color:rgb(59 130 246 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-700:hover{--tw-bg-opacity:1;background-color:rgb(51 65 85 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-800:hover{--tw-bg-opacity:1;background-color:rgb(30 41 59 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-800\/60:hover{background-color:rgb(30 41 59 / 0.6)}.hover\:text-slate-200:hover{--tw-text-opacity:1;color:rgb(226 232 240 / var(--tw-text-opacity, 1))}.hover\:text-white:hover{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.hover\:text-blue-300:hover{--tw-text-opacity:1;color:rgb(147 197 253 / var(--tw-text-opacity, 1))}.hover\:text-slate-300:hover{--tw-text-opacity:1;color:rgb(203 213 225 / var(--tw-text-opacity, 1))}.focus\:border-blue-500:focus{--tw-border-opacity:1;border-color:rgb(59 130 246 / var(--tw-border-opacity, 1))}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}@media (min-width: 768px){.md\:grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}}</style></head>
+<body class="h-screen overflow-hidden flex flex-col bg-[#0b0f17] text-slate-200">
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- LEFT SIDEBAR: Tree Hierarchy Navigator -->
+        <aside class="w-[360px] bg-[#111827] border-r border-slate-800/80 flex flex-col shrink-0">
+            <!-- Sidebar Controls -->
+            <div class="p-3 border-b border-slate-800/80 space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-sitemap text-blue-400"></i> Hirarki Topologi Node
+                    </span>
+                    <div class="flex items-center gap-1 text-[11px]">
+                        <button onclick="expandAllTree()" class="px-2 py-0.5 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200">Buka Semua</button>
+                        <button onclick="collapseAllTree()" class="px-2 py-0.5 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200">Tutup</button>
+                    </div>
+                </div>
+
+                <!-- Search and Filter Input -->
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-search absolute left-2.5 top-2.5 text-slate-500 text-xs"></i>
+                        <input type="text" id="tree-search" oninput="filterTree()" placeholder="Filter nama node / kode..." class="w-full bg-[#1a2333] border border-slate-700/70 rounded-md pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <select class="bg-[#1a2333] border border-slate-700/70 rounded-md px-2 py-1.5 text-xs text-slate-300 focus:outline-none">
+                        <option>Semua Tipe</option>
+                        <option>OLT</option>
+                        <option>ODP</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-between items-center text-[11px] text-slate-400 pt-1">
+                    <span>Total: <strong class="text-slate-200">7 Node</strong></span>
+                    <div class="flex items-center gap-3">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Normal</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Red Zone</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tree Items Container -->
+            <div class="flex-1 overflow-y-auto p-2 scrollbar-thin space-y-1 text-xs" id="tree-root"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-down"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-slate-700 text-slate-300">SRV</span><span class="truncate text-xs font-mono">CORE-CONNEXA-PUSAT</span><span class="text-slate-500 text-[10px] truncate ml-1 font-normal">- Server Utama CONNEXA</span></div></div><div class="pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-down"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-blue-600 text-white">P</span><span class="truncate text-xs font-mono">CONNEXA</span></div></div><div class="pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-down"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-blue-500 text-white">C</span><span class="truncate text-xs font-mono">Jetis</span></div></div><div class="pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-down"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-blue-400 text-slate-950">M</span><span class="truncate text-xs font-mono">C1</span></div></div><div class="pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition bg-blue-600/20 text-white font-semibold"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-down"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-slate-800 text-slate-300 border border-slate-600">OLT</span><span class="truncate text-xs font-mono">OLT-JETIS-01</span></div><span class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-mono shrink-0 ml-1">2 / 200 slot terisi kartu</span></div><div class="pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-down"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-slate-800 text-slate-400">SLOT</span><span class="truncate text-xs font-mono">Slot 1</span></div><span class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-mono shrink-0 ml-1">2 / 100 PON per slot</span></div><div class="pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-down"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-slate-800 text-slate-400">PON</span><span class="truncate text-xs font-mono">PON 1</span></div><span class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-mono shrink-0 ml-1">1 / 80 pelanggan aktif</span></div><div class="pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-down"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-emerald-600 text-white">ODP</span><span class="truncate text-xs font-mono">ODP-JETIS-01</span></div><span class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-mono shrink-0 ml-1">1 / 4 port pelanggan</span></div><div class="pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5"><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4"></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-slate-700 text-slate-300">ONT</span><span class="truncate text-xs font-mono">Ardiyanto Cahyo...</span></div></div></div></div></div></div></div><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4"></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-slate-800 text-slate-400">PON</span><span class="truncate text-xs font-mono">PON 2</span></div><span class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-mono shrink-0 ml-1">0 / 50 pelanggan aktif</span></div></div></div></div><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-right"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-slate-800 text-slate-400">SLOT</span><span class="truncate text-xs font-mono">Slot 2</span></div><span class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-mono shrink-0 ml-1">1 / 100 PON per slot</span></div></div></div></div><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer"><i class="fa-solid fa-chevron-right"></i></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-slate-800 text-slate-300">SW</span><span class="truncate text-xs font-mono">SW-JETIS-...</span></div><span class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-mono shrink-0 ml-1">0 / ? slot terisi kartu</span></div></div></div></div><div class="select-none"><div class="flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition hover:bg-slate-800/60 text-slate-300"><div class="flex items-center space-x-1.5 overflow-hidden"><span class="w-4"></span><span class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 bg-blue-500 text-white">C</span><span class="truncate text-xs font-mono">Sandya</span></div></div></div></div></div></div></div></div></div></div>
+        </aside>
+
+        <!-- RIGHT PANEL: Node Detail & Management View -->
+        <main class="flex-1 flex flex-col bg-[#0b0f17] overflow-y-auto scrollbar-thin" id="detail-panel">
+            <!-- Header Bar Breadcrumb & Quick Actions -->
+            <div class="px-6 py-3 border-b border-slate-800/80 bg-[#111827]/50 flex justify-between items-center shrink-0">
+                <div class="flex items-center space-x-2 text-xs" id="breadcrumb-container">
+                    <span class="text-slate-400">Jetis</span>
+                    <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+                    <span class="text-slate-400">C1</span>
+                    <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+                    <span class="bg-slate-800 text-slate-200 px-2 py-0.5 rounded font-medium border border-slate-700" id="current-node-name">OLT-JETIS-01</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-md text-xs font-medium border border-slate-700 transition">
+                        Slot / PON
+                    </button>
+                    <button class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-pen-to-square"></i> Edit Detail Node
+                    </button>
+                    <button class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-md text-xs font-medium border border-slate-700 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-qrcode"></i> Registrasi Aset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content Area Rendered Dynamically -->
+        <div class="p-6 space-y-6" id="main-content-area">
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-bold px-2.5 py-0.5 rounded font-mono uppercase">CHASSIS OLT</span>
+                            <h1 class="text-2xl font-bold text-white tracking-wide">OLT-JETIS-01</h1>
+                            <span class="text-slate-500">•</span>
+                            <span class="text-slate-400 text-sm">OLT Jetis 01</span>
+                            <span class="bg-emerald-500/20 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-400 flex items-center gap-4">
+                        <span><i class="fa-solid fa-info-circle mr-1 text-slate-500"></i> Tipe Perangkat: <strong class="text-slate-300">Chassis OLT</strong></span>
+                        <span>•</span>
+                        <span>POP: <strong class="text-slate-300">C1</strong></span>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-6 space-y-6">
+                    <div class="flex justify-between items-start pb-4 border-b border-slate-800/80">
+                        <div>
+                            <h2 class="text-base font-bold text-white">Slot perangkat • OLT-JETIS-01</h2>
+                            <p class="text-xs text-slate-400 mt-0.5">Slot merupakan komponen OLT ini. Setiap Slot memuat PON; PON menghubungkan ODP.</p>
+                        </div>
+                        <div class="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                            2 slot didata / <span class="text-slate-200">200 slot kapasitas</span> • 0 slot terisi kartu
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-xs font-semibold text-slate-300 block">Kapasitas perangkat (slot)</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="number" value="200" class="w-32 bg-[#1a2333] border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-blue-500">
+                            <button class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition">
+                                Simpan kapasitas perangkat
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-800 rounded-xl bg-[#0b0f17]/60 p-5 space-y-4">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-800/60">
+                            <h3 class="font-bold text-sm text-white">Slot 1</h3>
+                            <span class="text-xs font-mono text-slate-400">2 / 100 PON per slot</span>
+                        </div>
+
+                        <div class="flex justify-between items-center text-xs">
+                            <div class="space-y-1">
+                                <span class="font-semibold text-blue-400">Detail Slot 1</span>
+                                <div class="text-slate-400 text-[11px]">Kapasitas (PON per slot)</div>
+                            </div>
+                            <span class="text-slate-500 text-xs">Belum didata</span>
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                            <input type="number" value="100" class="w-32 bg-[#1a2333] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none">
+                            <button class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition">
+                                Simpan kapasitas slot
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div class="border border-rose-500/30 bg-slate-900/80 rounded-xl p-4 space-y-3 relative">
+                                <div class="flex justify-between items-start">
+                                    <span class="font-bold text-sm text-white">PON 1</span>
+                                    <span class="bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                        Terpakai terverifikasi
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-xs font-mono text-slate-300">1 / 80 pelanggan aktif</span>
+                                    <button onclick="selectPONNode('pon-1-1')" class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">
+                                        Detail →
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="border border-dashed border-emerald-500/40 bg-slate-900/30 rounded-xl p-4 space-y-3 relative">
+                                <div class="flex justify-between items-start">
+                                    <span class="font-bold text-sm text-white">PON 2</span>
+                                    <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                        Kosong terverifikasi
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-xs font-mono text-slate-400">0 / 50 pelanggan aktif</span>
+                                    <button onclick="selectPONNode('pon-1-2')" class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">
+                                        Detail →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <button class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1.5">
+                                <i class="fa-solid fa-caret-right"></i> Tambah PON pada Slot 1
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-800 rounded-xl bg-[#0b0f17]/60 p-5 space-y-4">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-800/60">
+                            <h3 class="font-bold text-sm text-white">Slot 2</h3>
+                            <span class="text-xs font-mono text-slate-400">1 / 100 PON per slot</span>
+                        </div>
+
+                        <div class="flex justify-between items-center text-xs">
+                            <div>
+                                <span class="font-semibold text-blue-400">Detail Slot 2</span>
+                                <div class="text-slate-400 text-[11px]">Kapasitas (PON per slot)</div>
+                            </div>
+                            <span class="text-slate-400 text-xs">Terverifikasi</span>
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                            <input type="number" value="100" class="w-32 bg-[#1a2333] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none">
+                            <button class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition">
+                                Simpan kapasitas slot
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div class="border border-dashed border-emerald-500/40 bg-slate-900/30 rounded-xl p-4 space-y-3">
+                                <div class="flex justify-between items-start">
+                                    <span class="font-bold text-sm text-white">PON 1</span>
+                                    <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                        Kosong terverifikasi
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-xs font-mono text-slate-400">0 / 50 pelanggan aktif</span>
+                                    <button class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">
+                                        Detail →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </main>
+
+    </div>
+
+    <!-- Modal Export & Download Source Code -->
+    <div id="export-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#111827] border border-slate-800 rounded-xl max-w-3xl w-full flex flex-col max-h-[85vh] shadow-2xl overflow-hidden">
+            <div class="px-5 py-3.5 border-b border-slate-800 flex justify-between items-center bg-[#1a2333]/50">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-file-code text-blue-400 text-base"></i>
+                    <h3 class="font-bold text-sm text-white">Source Code &amp; Panduan Unduh (HTML, CSS, JS)</h3>
+                </div>
+                <button onclick="closeExportModal()" class="text-slate-400 hover:text-white text-base">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4 text-xs scrollbar-thin">
+                <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-blue-300">
+                    <p class="font-medium flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-info"></i> Kode ini telah digabungkan menjadi <strong>Single File Ready-to-Run (.html)</strong>.
+                    </p>
+                    <p class="text-[11px] text-slate-300 mt-1">Anda dapat mendownloadnya langsung menggunakan tombol di bawah ini atau menyalin kode secara manual ke dalam editor teks (*VS Code / Notepad*), lalu menyimpannya dengan nama <code class="bg-slate-900 px-1 py-0.5 rounded text-amber-300 font-mono">index.html</code>.</p>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <span class="font-mono text-slate-400 text-[11px]">File: index.html (Tailwind CSS CDN + FontAwesome CDN)</span>
+                    <button onclick="copySourceCode()" id="copy-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-copy"></i> Salin Semua Kode
+                    </button>
+                </div>
+
+                <pre class="bg-[#0b0f17] p-4 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-[300px] scrollbar-thin select-all" id="code-preview-area"><!-- Source code preview will be filled dynamically -->
+                </pre>
+            </div>
+
+            <div class="px-5 py-3 border-t border-slate-800 bg-[#1a2333]/30 flex justify-end gap-2">
+                <button onclick="closeExportModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-1.5 rounded-md text-xs font-medium border border-slate-700">
+                    Tutup
+                </button>
+                <button onclick="downloadHtmlFile()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-download"></i> Download (.html)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Hierarchy Tree Object
+        const hierarchyTree = [
+            {
+                id: 'srv-1',
+                type: 'SRV',
+                typeBg: 'bg-slate-700 text-slate-300',
+                name: 'CORE-CONNEXA-PUSAT',
+                desc: 'Server Utama CONNEXA',
+                expanded: true,
+                children: [
+                    {
+                        id: 'p-1',
+                        type: 'P',
+                        typeBg: 'bg-blue-600 text-white',
+                        name: 'CONNEXA',
+                        expanded: true,
+                        children: [
+                            {
+                                id: 'c-1',
+                                type: 'C',
+                                typeBg: 'bg-blue-500 text-white',
+                                name: 'Jetis',
+                                expanded: true,
+                                children: [
+                                    {
+                                        id: 'm-1',
+                                        type: 'M',
+                                        typeBg: 'bg-blue-400 text-slate-950',
+                                        name: 'C1',
+                                        expanded: true,
+                                        children: [
+                                            {
+                                                id: 'olt-1',
+                                                type: 'OLT',
+                                                nodeType: 'OLT',
+                                                typeBg: 'bg-slate-800 text-slate-300 border border-slate-600',
+                                                name: 'OLT-JETIS-01',
+                                                capacityTag: '2 / 200 slot terisi kartu',
+                                                expanded: true,
+                                                children: [
+                                                    {
+                                                        id: 'slot-1',
+                                                        type: 'SLOT',
+                                                        typeBg: 'bg-slate-800 text-slate-400',
+                                                        name: 'Slot 1',
+                                                        capacityTag: '2 / 100 PON per slot',
+                                                        expanded: true,
+                                                        children: [
+                                                            {
+                                                                id: 'pon-1-1',
+                                                                type: 'PON',
+                                                                typeBg: 'bg-slate-800 text-slate-400',
+                                                                name: 'PON 1',
+                                                                capacityTag: '1 / 80 pelanggan aktif',
+                                                                expanded: true,
+                                                                children: [
+                                                                    {
+                                                                        id: 'odp-1',
+                                                                        type: 'ODP',
+                                                                        nodeType: 'ODP',
+                                                                        typeBg: 'bg-emerald-600 text-white',
+                                                                        name: 'ODP-JETIS-01',
+                                                                        capacityTag: '1 / 4 port pelanggan',
+                                                                        expanded: true,
+                                                                        children: [
+                                                                            {
+                                                                                id: 'ont-1',
+                                                                                type: 'ONT',
+                                                                                typeBg: 'bg-slate-700 text-slate-300',
+                                                                                name: 'Ardiyanto Cahyo...',
+                                                                                capacityTag: ''
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                id: 'pon-1-2',
+                                                                type: 'PON',
+                                                                typeBg: 'bg-slate-800 text-slate-400',
+                                                                name: 'PON 2',
+                                                                capacityTag: '0 / 50 pelanggan aktif'
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        id: 'slot-2',
+                                                        type: 'SLOT',
+                                                        typeBg: 'bg-slate-800 text-slate-400',
+                                                        name: 'Slot 2',
+                                                        capacityTag: '1 / 100 PON per slot',
+                                                        expanded: false,
+                                                        children: [
+                                                            {
+                                                                id: 'pon-2-1',
+                                                                type: 'PON',
+                                                                typeBg: 'bg-slate-800 text-slate-400',
+                                                                name: 'PON 1',
+                                                                capacityTag: '0 / 50 pelanggan aktif'
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                id: 'sw-1',
+                                                type: 'SW',
+                                                typeBg: 'bg-slate-800 text-slate-300',
+                                                name: 'SW-JETIS-...',
+                                                capacityTag: '0 / ? slot terisi kartu',
+                                                children: [
+                                                    {
+                                                        id: 'sw-slot-1',
+                                                        type: 'SLOT',
+                                                        typeBg: 'bg-slate-800 text-slate-400',
+                                                        name: 'Slot 1 ...',
+                                                        capacityTag: '1 / ? port per slot',
+                                                        children: [
+                                                            {
+                                                                id: 'port-1',
+                                                                type: 'PORT',
+                                                                typeBg: 'bg-slate-800 text-slate-400',
+                                                                name: 'Port 1'
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        id: 'c-2',
+                                        type: 'C',
+                                        typeBg: 'bg-blue-500 text-white',
+                                        name: 'Sandya'
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        let selectedNodeId = 'olt-1';
+
+        function renderTree() {
+            const container = document.getElementById('tree-root');
+            container.innerHTML = '';
+
+            function createNodeElement(node) {
+                const isSelected = node.id === selectedNodeId;
+                const hasChildren = node.children && node.children.length > 0;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'select-none';
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition ${
+                    isSelected ? 'bg-blue-600/20 text-white font-semibold' : 'hover:bg-slate-800/60 text-slate-300'
+                }`;
+                
+                itemDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedNodeId = node.id;
+                    renderTree();
+                    renderDetailPanel(node);
+                };
+
+                const leftFlex = document.createElement('div');
+                leftFlex.className = 'flex items-center space-x-1.5 overflow-hidden';
+
+                if (hasChildren) {
+                    const toggle = document.createElement('span');
+                    toggle.className = 'w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 text-[10px] cursor-pointer';
+                    toggle.innerHTML = `<i class="fa-solid fa-chevron-${node.expanded ? 'down' : 'right'}"></i>`;
+                    toggle.onclick = (e) => {
+                        e.stopPropagation();
+                        node.expanded = !node.expanded;
+                        renderTree();
+                    };
+                    leftFlex.appendChild(toggle);
+                } else {
+                    const spacer = document.createElement('span');
+                    spacer.className = 'w-4';
+                    leftFlex.appendChild(spacer);
+                }
+
+                const badge = document.createElement('span');
+                badge.className = `px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight font-mono shrink-0 ${node.typeBg}`;
+                badge.innerText = node.type;
+                leftFlex.appendChild(badge);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'truncate text-xs font-mono';
+                nameSpan.innerText = node.name;
+                leftFlex.appendChild(nameSpan);
+
+                if (node.desc) {
+                    const descSpan = document.createElement('span');
+                    descSpan.className = 'text-slate-500 text-[10px] truncate ml-1 font-normal';
+                    descSpan.innerText = `- ${node.desc}`;
+                    leftFlex.appendChild(descSpan);
+                }
+
+                itemDiv.appendChild(leftFlex);
+
+                if (node.capacityTag) {
+                    const capTag = document.createElement('span');
+                    capTag.className = 'text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-mono shrink-0 ml-1';
+                    capTag.innerText = node.capacityTag;
+                    itemDiv.appendChild(capTag);
+                }
+
+                wrapper.appendChild(itemDiv);
+
+                if (hasChildren && node.expanded) {
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'pl-3.5 ml-2 border-l border-slate-800/80 space-y-0.5 mt-0.5';
+                    node.children.forEach(child => {
+                        childrenContainer.appendChild(createNodeElement(child));
+                    });
+                    wrapper.appendChild(childrenContainer);
+                }
+
+                return wrapper;
+            }
+
+            hierarchyTree.forEach(node => {
+                container.appendChild(createNodeElement(node));
+            });
+        }
+
+        function renderOLTDetail(container) {
+            container.innerHTML = `
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-bold px-2.5 py-0.5 rounded font-mono uppercase">CHASSIS OLT</span>
+                            <h1 class="text-2xl font-bold text-white tracking-wide">OLT-JETIS-01</h1>
+                            <span class="text-slate-500">&bull;</span>
+                            <span class="text-slate-400 text-sm">OLT Jetis 01</span>
+                            <span class="bg-emerald-500/20 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-400 flex items-center gap-4">
+                        <span><i class="fa-solid fa-info-circle mr-1 text-slate-500"></i> Tipe Perangkat: <strong class="text-slate-300">Chassis OLT</strong></span>
+                        <span>&bull;</span>
+                        <span>POP: <strong class="text-slate-300">C1</strong></span>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-6 space-y-6">
+                    <div class="flex justify-between items-start pb-4 border-b border-slate-800/80">
+                        <div>
+                            <h2 class="text-base font-bold text-white">Slot perangkat &bull; OLT-JETIS-01</h2>
+                            <p class="text-xs text-slate-400 mt-0.5">Slot merupakan komponen OLT ini. Setiap Slot memuat PON; PON menghubungkan ODP.</p>
+                        </div>
+                        <div class="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                            2 slot didata / <span class="text-slate-200">200 slot kapasitas</span> &bull; 0 slot terisi kartu
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-xs font-semibold text-slate-300 block">Kapasitas perangkat (slot)</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="number" value="200" class="w-32 bg-[#1a2333] border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-blue-500">
+                            <button class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition">
+                                Simpan kapasitas perangkat
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-800 rounded-xl bg-[#0b0f17]/60 p-5 space-y-4">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-800/60">
+                            <h3 class="font-bold text-sm text-white">Slot 1</h3>
+                            <span class="text-xs font-mono text-slate-400">2 / 100 PON per slot</span>
+                        </div>
+
+                        <div class="flex justify-between items-center text-xs">
+                            <div class="space-y-1">
+                                <span class="font-semibold text-blue-400">Detail Slot 1</span>
+                                <div class="text-slate-400 text-[11px]">Kapasitas (PON per slot)</div>
+                            </div>
+                            <span class="text-slate-500 text-xs">Belum didata</span>
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                            <input type="number" value="100" class="w-32 bg-[#1a2333] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none">
+                            <button class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition">
+                                Simpan kapasitas slot
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div class="border border-rose-500/30 bg-slate-900/80 rounded-xl p-4 space-y-3 relative">
+                                <div class="flex justify-between items-start">
+                                    <span class="font-bold text-sm text-white">PON 1</span>
+                                    <span class="bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                        Terpakai terverifikasi
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-xs font-mono text-slate-300">1 / 80 pelanggan aktif</span>
+                                    <button onclick="selectPONNode('pon-1-1')" class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">
+                                        Detail &rarr;
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="border border-dashed border-emerald-500/40 bg-slate-900/30 rounded-xl p-4 space-y-3 relative">
+                                <div class="flex justify-between items-start">
+                                    <span class="font-bold text-sm text-white">PON 2</span>
+                                    <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                        Kosong terverifikasi
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-xs font-mono text-slate-400">0 / 50 pelanggan aktif</span>
+                                    <button onclick="selectPONNode('pon-1-2')" class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">
+                                        Detail &rarr;
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <button class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1.5">
+                                <i class="fa-solid fa-caret-right"></i> Tambah PON pada Slot 1
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-800 rounded-xl bg-[#0b0f17]/60 p-5 space-y-4">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-800/60">
+                            <h3 class="font-bold text-sm text-white">Slot 2</h3>
+                            <span class="text-xs font-mono text-slate-400">1 / 100 PON per slot</span>
+                        </div>
+
+                        <div class="flex justify-between items-center text-xs">
+                            <div>
+                                <span class="font-semibold text-blue-400">Detail Slot 2</span>
+                                <div class="text-slate-400 text-[11px]">Kapasitas (PON per slot)</div>
+                            </div>
+                            <span class="text-slate-400 text-xs">Terverifikasi</span>
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                            <input type="number" value="100" class="w-32 bg-[#1a2333] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none">
+                            <button class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition">
+                                Simpan kapasitas slot
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div class="border border-dashed border-emerald-500/40 bg-slate-900/30 rounded-xl p-4 space-y-3">
+                                <div class="flex justify-between items-start">
+                                    <span class="font-bold text-sm text-white">PON 1</span>
+                                    <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                        Kosong terverifikasi
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2">
+                                    <span class="text-xs font-mono text-slate-400">0 / 50 pelanggan aktif</span>
+                                    <button class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">
+                                        Detail &rarr;
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSLOTDetail(container, node) {
+            const slotName = node ? node.name : 'Slot 1';
+            container.innerHTML = `
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 flex justify-between items-center">
+                    <div class="space-y-1.5">
+                        <div class="flex items-center space-x-3">
+                            <span class="bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded font-mono">SLOT</span>
+                            <h1 class="text-2xl font-bold text-white tracking-wide">${slotName}</h1>
+                            <span class="text-slate-500">&bull;</span>
+                            <span class="text-slate-400 text-sm">Service Board 16-Port GPON</span>
+                            <span class="bg-emerald-500/20 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Board Active
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-400"><i class="fa-solid fa-microchip mr-1"></i> Tipe Modul: <strong class="text-slate-300">ZTE GTGH 16-Port GPON</strong> &bull; Induk: <strong class="text-blue-400">OLT-JETIS-01</strong></p>
+                    </div>
+
+                    <div class="bg-[#1a2333] border border-slate-700/80 rounded-xl p-3.5 min-w-[260px] space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-300 font-medium">Alokasi PON Slot</span>
+                            <span class="bg-slate-800 text-slate-200 px-2 py-0.5 rounded font-bold font-mono text-[11px]">2 / 100 Terdaftar</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div class="bg-blue-500 h-full w-[2%] rounded-full"></div>
+                        </div>
+                        <div class="flex justify-between items-center text-[11px] font-mono">
+                            <span class="text-slate-300"><strong class="text-white">2</strong> PON Aktif</span>
+                            <span class="text-emerald-400 font-semibold">98 PON Kosong</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
+                    <div class="flex justify-between items-center border-b border-slate-800/80 pb-3">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-blue-400"></i> SPESIFIKASI & MONITORING BOARD
+                        </h2>
+                        <button class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded border border-slate-700">Refresh Telemetry</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-[#1a2333]/60 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block">Suhu Modul (Temperature)</span>
+                            <p class="text-sm font-mono text-emerald-400 font-bold">42.5 °C <span class="text-[10px] text-slate-400 font-normal">(Normal)</span></p>
+                        </div>
+                        <div class="bg-[#1a2333]/60 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block">Serial Number Board</span>
+                            <p class="text-xs font-mono text-slate-200 font-medium">GTGH-C320-202409</p>
+                        </div>
+                        <div class="bg-[#1a2333]/60 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block">Beban Trafik Uplink Board</span>
+                            <p class="text-xs font-mono text-blue-400 font-medium">1.25 Gbps / 10 Gbps</p>
+                        </div>
+                        <div class="bg-[#1a2333]/60 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block">Kapasitas Maksimal PON</span>
+                            <p class="text-xs font-mono text-slate-200 font-medium">100 Port PON / Slot</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                        <div>
+                            <h2 class="text-sm font-bold text-white uppercase tracking-wider">MANAJEMEN PORT PON &bull; ${slotName.toUpperCase()}</h2>
+                            <p class="text-xs text-slate-400 mt-0.5">Daftar seluruh port PON yang terdapat pada ${slotName}.</p>
+                        </div>
+                        <button class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i> Tambah Port PON Baru
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="border border-rose-500/30 bg-slate-900/80 rounded-xl p-4 space-y-3">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-bold text-sm text-white">PON 1</span>
+                                    <span class="text-xs text-slate-400 block mt-0.5">Connected ODP: ODP-JETIS-01</span>
+                                </div>
+                                <span class="bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                    1 / 80 Pelanggan Aktif
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t border-slate-800/80">
+                                <span class="text-xs font-mono text-emerald-400">Optic Power: +4.8 dBm</span>
+                                <button onclick="selectPONNode('pon-1-1')" class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+                                    Kelola PON 1 &rarr;
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="border border-dashed border-emerald-500/40 bg-slate-900/30 rounded-xl p-4 space-y-3">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-bold text-sm text-white">PON 2</span>
+                                    <span class="text-xs text-slate-400 block mt-0.5">Belum ada ODP terhubung</span>
+                                </div>
+                                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                    0 / 50 Pelanggan
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t border-slate-800/80">
+                                <span class="text-xs font-mono text-slate-500">Optic Power: Standby</span>
+                                <button onclick="selectPONNode('pon-1-2')" class="text-xs text-blue-400 hover:text-blue-300 font-medium">
+                                    Kelola PON 2 &rarr;
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPONDetail(container, node) {
+            const ponName = node ? node.name : 'PON 1';
+            container.innerHTML = `
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 flex flex-wrap justify-between items-center gap-4">
+                    <div class="space-y-1.5">
+                        <div class="flex items-center space-x-3">
+                            <span class="bg-cyan-600 text-white text-xs font-bold px-2 py-0.5 rounded font-mono">PON</span>
+                            <h1 class="text-2xl font-bold text-white tracking-wide">${ponName}</h1>
+                            <span class="text-slate-500">&bull;</span>
+                            <span class="text-slate-400 text-sm">Slot 1 &bull; OLT-JETIS-01</span>
+                            <span class="bg-emerald-500/20 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> PON Active
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-400"><i class="fa-solid fa-network-wired mr-1"></i> Mode: <strong class="text-slate-300">GPON Class B+</strong> &bull; Total ODP Terhubung: <strong class="text-emerald-400 font-mono">1 ODP</strong></p>
+                    </div>
+
+                    <div class="bg-[#1a2333] border border-slate-700/80 rounded-xl p-3.5 min-w-[280px] space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-300 font-medium">Beban Pelanggan (ONT / ONU)</span>
+                            <span class="bg-slate-800 text-slate-200 px-2 py-0.5 rounded font-bold font-mono text-[11px]">1 / 80 ONT Max</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div class="bg-blue-500 h-full w-[1.25%] rounded-full"></div>
+                        </div>
+                        <div class="flex justify-between items-center text-[11px] font-mono">
+                            <span class="text-slate-300"><strong class="text-white">1</strong> Pelanggan Aktif</span>
+                            <span class="text-emerald-400 font-semibold">79 Slot Bebas</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-800/80 pb-3">
+                        <div>
+                            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-users-line text-blue-400"></i> BATAS KAPASITAS PELANGGAN (ONT) PON
+                            </h2>
+                            <p class="text-xs text-slate-400 mt-0.5">Atur batasan jumlah pelanggan maksimal (Split Ratio) yang diizinkan menumpang pada port PON ini.</p>
+                        </div>
+                        <span class="text-xs font-mono text-slate-400">Default Splitter 1:64 / 1:128</span>
+                    </div>
+
+                    <div class="flex items-center space-x-3 pt-1">
+                        <div class="space-y-1">
+                            <label class="text-[11px] text-slate-400 block font-medium">Maksimal Pelanggan ONT pada PON ini</label>
+                            <input type="number" value="80" class="w-36 bg-[#1a2333] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div class="pt-4">
+                            <button class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition">
+                                Simpan Batas Pelanggan PON
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
+                    <div class="flex justify-between items-center border-b border-slate-800/80 pb-3">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-wave-square text-cyan-400"></i> TELEMETRI & OPTICAL BUDGET PON
+                        </h2>
+                        <button class="text-xs text-blue-400 hover:text-blue-300 font-medium">Uji Laser DDM</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-[#1a2333]/60 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block">Daya Pancar Optik (TX Power)</span>
+                            <p class="text-xs font-mono text-emerald-400 font-bold">+4.85 dBm</p>
+                        </div>
+                        <div class="bg-[#1a2333]/60 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block">Daya Terima Avg Pelanggan</span>
+                            <p class="text-xs font-mono text-slate-200 font-medium">-19.42 dBm</p>
+                        </div>
+                        <div class="bg-[#1a2333]/60 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block">Panjang Gelombang</span>
+                            <p class="text-xs font-mono text-slate-200 font-medium">1490nm / 1310nm</p>
+                        </div>
+                        <div class="bg-[#1a2333]/60 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block">Total ODP Terdistribusi</span>
+                            <p class="text-xs font-mono text-blue-400 font-medium">1 ODP Active</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                        <div>
+                            <h2 class="text-sm font-bold text-white uppercase tracking-wider">DAFTAR ODP PADA ${ponName.toUpperCase()}</h2>
+                            <p class="text-xs text-slate-400 mt-0.5">Setiap ODP menyalurkan sinyal optik ke pelanggan (ONT). Total kapasitas pelanggan diakumulasi per ODP.</p>
+                        </div>
+                        <button class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i> Hubungkan ODP Baru Ke PON
+                        </button>
+                    </div>
+
+                    <div class="bg-[#162032] border border-slate-700 rounded-xl p-4 space-y-4">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                            <div class="flex items-center space-x-2.5">
+                                <span class="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded font-mono">ODP</span>
+                                <span class="font-bold text-base text-white">ODP-JETIS-01</span>
+                                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] px-2 py-0.5 rounded-full font-semibold">1 / 4 Port Terpakai</span>
+                            </div>
+                            <button onclick="selectODPNode()" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 px-3 py-1 rounded font-medium">
+                                Kelola Port ODP &rarr;
+                            </button>
+                        </div>
+
+                        <div class="text-xs text-slate-400 flex items-center gap-4">
+                            <span><i class="fa-solid fa-location-dot text-rose-400 mr-1"></i> JL. ABIMANYU No.8, RT 02 RW 02, Siman</span>
+                            <span>&bull;</span>
+                            <span>Koordinat: <span class="font-mono text-slate-300">-7.9712270, 111.4988930</span></span>
+                        </div>
+
+                        <div class="space-y-2 pt-1">
+                            <span class="text-[11px] font-semibold text-slate-300 uppercase tracking-wide block">Pelanggan ONT Terhubung pada ODP ini:</span>
+                            <div class="bg-[#0d131e] rounded-lg p-3 border border-slate-800 flex justify-between items-center text-xs">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-8 h-8 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center text-blue-400">
+                                        <i class="fa-solid fa-user text-xs"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-white">Ardiyanto Cahyo Nugroho</p>
+                                        <p class="text-[11px] font-mono text-slate-400">ID: RQ000004 &bull; Port ODP: <strong class="text-emerald-400">Port 1</strong> &bull; SN: ZTEGC88123A</p>
+                                    </div>
+                                </div>
+                                <div class="text-right font-mono">
+                                    <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] px-2 py-0.5 rounded-full inline-block">Online</span>
+                                    <span class="text-[10px] text-slate-400 mt-1 block">Rx Optik: -18.5 dBm</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderODPDetail(container) {
+            container.innerHTML = `
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 flex flex-wrap justify-between items-center gap-4">
+                    <div class="space-y-1.5">
+                        <div class="flex items-center space-x-3">
+                            <span class="bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded font-mono">ODP</span>
+                            <h1 class="text-2xl font-bold text-white tracking-wide">ODP-JETIS-01</h1>
+                            <span class="text-slate-500">&bull;</span>
+                            <span class="text-slate-400 text-sm">ODP contoh Jetis 01</span>
+                            <span class="bg-emerald-500/20 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/30 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-400"><i class="fa-solid fa-cube mr-1"></i> Tipe Perangkat: <strong class="text-slate-300">ODP</strong> &bull; POP: <strong class="text-slate-300">C1</strong></p>
+                    </div>
+
+                    <div class="bg-[#1a2333] border border-slate-700/80 rounded-xl p-3.5 min-w-[260px] space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-300 font-medium">Okupansi Port</span>
+                            <span class="bg-slate-800 text-slate-200 px-2 py-0.5 rounded font-bold font-mono text-[11px]">25% Terpakai</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div class="bg-emerald-500 h-full w-[25%] rounded-full"></div>
+                        </div>
+                        <div class="flex justify-between items-center text-[11px] font-mono">
+                            <span class="text-slate-300"><strong class="text-white">1</strong> dari 4 port terpakai</span>
+                            <span class="text-emerald-400 font-semibold">3 slot tersedia</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-800/80 pb-3">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-location-dot text-rose-400"></i> LOKASI FISIK & KOORDINAT
+                        </h2>
+                        <button class="text-xs text-blue-400 hover:text-blue-300 font-medium">Mewarisi lokasi Induk / POP</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-1">
+                        <div class="bg-[#1a2333]/50 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block font-medium">Alamat / Patokan Tiang</span>
+                            <p class="text-slate-200">JL. ABIMANYU No.8, RT 02 RW 02, Desa Pijeran, Kecamatan Siman</p>
+                        </div>
+                        <div class="bg-[#1a2333]/50 border border-slate-800 rounded-lg p-3 space-y-1">
+                            <span class="text-[11px] text-slate-400 block font-medium">Wilayah / Coverage Area</span>
+                            <p class="text-slate-200">Turi, Jetis, Kab. Ponorogo</p>
+                        </div>
+                        <div class="bg-[#1a2333]/50 border border-slate-800 rounded-lg p-3 space-y-1 flex justify-between items-start">
+                            <div>
+                                <span class="text-[11px] text-slate-400 block font-medium">Koordinat Maps</span>
+                                <p class="text-slate-200 font-mono text-xs">-7.9712270, 111.4988930</p>
+                            </div>
+                            <a href="#" class="text-blue-400 hover:text-blue-300"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-5 space-y-4">
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                        <div>
+                            <h2 class="text-sm font-bold text-white uppercase tracking-wider">MANAJEMEN PORT NODE &bull; ODP</h2>
+                            <p class="text-xs text-slate-400 mt-0.5">Klik pada port untuk menghubungkan pelanggan, melihat detail tujuan, atau menandai port.</p>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <div class="bg-[#1a2333] border border-slate-700/80 p-0.5 rounded-lg flex text-xs">
+                                <button class="px-2.5 py-1 rounded-md bg-slate-800 text-white font-medium">Semua</button>
+                                <button class="px-2.5 py-1 rounded-md text-slate-400 hover:text-slate-200">Tersedia</button>
+                                <button class="px-2.5 py-1 rounded-md text-slate-400 hover:text-slate-200">Terpakai</button>
+                            </div>
+                            <div class="flex items-center space-x-1 pl-2">
+                                <span class="bg-[#1a2333] border border-slate-700/80 px-2.5 py-1 rounded text-xs font-mono text-slate-200">4</span>
+                                <button class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 transition">
+                                    <i class="fa-solid fa-plus text-[10px]"></i> Tambah Port
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+                        <div class="bg-[#162032] border border-blue-500/40 rounded-xl p-4 space-y-3 relative">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm text-blue-400">Port 1</span>
+                                <span class="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Terpakai
+                                </span>
+                            </div>
+                            <div>
+                                <p class="font-bold text-xs text-white">Ardiyanto Cahyo Nugroho</p>
+                                <p class="text-[11px] font-mono text-slate-400 mt-0.5">RQ000004</p>
+                            </div>
+                            <div class="text-right pt-1">
+                                <button class="text-xs text-blue-400 hover:text-blue-300 font-medium">Edit &rarr;</button>
+                            </div>
+                        </div>
+
+                        <div class="custom-dashed-border bg-slate-900/30 rounded-xl p-4 space-y-3 flex flex-col justify-between">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm text-slate-200">Port 2</span>
+                                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Tersedia
+                                </span>
+                            </div>
+                            <div class="py-2">
+                                <button class="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1">
+                                    <i class="fa-solid fa-plus text-[10px]"></i> Hubungkan Tujuan
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="custom-dashed-border bg-slate-900/30 rounded-xl p-4 space-y-3 flex flex-col justify-between">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm text-slate-200">Port 3</span>
+                                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Tersedia
+                                </span>
+                            </div>
+                            <div class="py-2">
+                                <button class="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1">
+                                    <i class="fa-solid fa-plus text-[10px]"></i> Hubungkan Tujuan
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="custom-dashed-border bg-slate-900/30 rounded-xl p-4 space-y-3 flex flex-col justify-between">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm text-slate-200">Port 4</span>
+                                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Tersedia
+                                </span>
+                            </div>
+                            <div class="py-2">
+                                <button class="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1">
+                                    <i class="fa-solid fa-plus text-[10px]"></i> Hubungkan Tujuan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111827] border border-slate-800 rounded-xl p-4 flex justify-between items-center text-xs text-slate-400">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-arrow-right-arrow-left text-amber-400"></i>
+                        <span><strong>Relokasi / Pindah Posisi Induk Node (Uplink)</strong> - Pindahkan node ini beserta seluruh turunannya ke POP, OLT, atau Feeder lain</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-down text-xs text-slate-500"></i>
+                </div>
+            `;
+        }
+
+        function renderDetailPanel(node) {
+            const mainContent = document.getElementById('main-content-area');
+            const currentNodeName = document.getElementById('current-node-name');
+            
+            let selectedType = node ? (node.nodeType || node.type) : 'OLT';
+            let name = node ? node.name : 'OLT-JETIS-01';
+            
+            currentNodeName.innerText = name;
+
+            if (selectedType === 'ODP') {
+                renderODPDetail(mainContent);
+            } else if (selectedType === 'SLOT') {
+                renderSLOTDetail(mainContent, node);
+            } else if (selectedType === 'PON') {
+                renderPONDetail(mainContent, node);
+            } else {
+                renderOLTDetail(mainContent);
+            }
+        }
+
+        // Helper triggers to auto-navigate to nodes
+        function selectODPNode() {
+            selectedNodeId = 'odp-1';
+            renderTree();
+            renderDetailPanel({ type: 'ODP', name: 'ODP-JETIS-01' });
+        }
+
+        function selectPONNode(ponId) {
+            selectedNodeId = ponId || 'pon-1-1';
+            renderTree();
+            renderDetailPanel({ type: 'PON', name: ponId === 'pon-1-2' ? 'PON 2' : 'PON 1' });
+        }
+
+        function expandAllTree() {
+            function setExpand(nodes, state) {
+                nodes.forEach(n => {
+                    n.expanded = state;
+                    if (n.children) setExpand(n.children, state);
+                });
+            }
+            setExpand(hierarchyTree, true);
+            renderTree();
+        }
+
+        function collapseAllTree() {
+            function setExpand(nodes, state) {
+                nodes.forEach(n => {
+                    n.expanded = state;
+                    if (n.children) setExpand(n.children, state);
+                });
+            }
+            setExpand(hierarchyTree, false);
+            renderTree();
+        }
+
+        function filterTree() {
+            const query = document.getElementById('tree-search').value.toLowerCase();
+            if (!query) {
+                renderTree();
+                return;
+            }
+        }
+
+        // --- Fitur Download & Export Code Functions ---
+        function getFullSourceCode() {
+            return "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+        }
+
+        function downloadHtmlFile() {
+            const code = getFullSourceCode();
+            const blob = new Blob([code], { type: 'text/html;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'OLT-Hierarchy-Management.html');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function openExportModal() {
+            const modal = document.getElementById('export-modal');
+            const previewArea = document.getElementById('code-preview-area');
+            previewArea.textContent = getFullSourceCode();
+            modal.classList.remove('hidden');
+        }
+
+        function closeExportModal() {
+            document.getElementById('export-modal').classList.add('hidden');
+        }
+
+        function copySourceCode() {
+            const code = getFullSourceCode();
+            
+            // Modern & Fallback clipboard method
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(showCopySuccess);
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = code;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showCopySuccess();
+            }
+        }
+
+        function showCopySuccess() {
+            const copyBtn = document.getElementById('copy-btn');
+            copyBtn.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> Tersalin!';
+            copyBtn.classList.add('border-emerald-500/50', 'text-emerald-400');
+            setTimeout(() => {
+                copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Salin Semua Kode';
+                copyBtn.classList.remove('border-emerald-500/50', 'text-emerald-400');
+            }, 2000);
+        }
+
+        window.onload = function() {
+            renderTree();
+            renderDetailPanel(null);
+        };
+    </script>
+
+</body></html>

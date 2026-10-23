@@ -37,6 +37,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'to_network_node_id',
     'from_mini_pop_id',
     'to_mini_pop_id',
+    'from_infrastructure_pop_id',
+    'to_infrastructure_pop_id',
     'from_infrastructure_slot_id',
     'to_infrastructure_slot_id',
     'from_infrastructure_port_id',
@@ -69,6 +71,8 @@ class InventoryTransaction extends Model
             'to_network_node_id' => 'integer',
             'from_mini_pop_id' => 'integer',
             'to_mini_pop_id' => 'integer',
+            'from_infrastructure_pop_id' => 'integer',
+            'to_infrastructure_pop_id' => 'integer',
             'from_infrastructure_slot_id' => 'integer',
             'to_infrastructure_slot_id' => 'integer',
             'from_infrastructure_port_id' => 'integer',
@@ -86,6 +90,16 @@ class InventoryTransaction extends Model
     public function toMiniPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'to_mini_pop_id');
+    }
+
+    public function fromInfrastructurePop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'from_infrastructure_pop_id');
+    }
+
+    public function toInfrastructurePop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'to_infrastructure_pop_id');
     }
 
     public function fromInfrastructureSlot(): BelongsTo

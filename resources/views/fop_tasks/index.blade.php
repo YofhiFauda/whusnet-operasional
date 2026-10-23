@@ -650,9 +650,9 @@
                             <label class="block text-xs font-semibold text-text-secondary mb-1">POP / Cabang <span class="text-error">*</span></label>
                             <select name="pop_id" x-model="modal.data.pop_id" @change="resetInfraScope(); infraScope.ready = true; if (isInfraCategory) loadInfraScopeLevel('mini_pop', modal.data.pop_id)" :disabled="isEditingLockedSurveyPsb" :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                 <option value="">Pilih Cabang</option>
-                                @foreach($pops as $p)
-                                    <option value="{{ $p->id }}">{{ $p->name }}</option>
-                                @endforeach
+                                <template x-for="pop in (isInfraCategory ? cabangPopsData : popsData)" :key="pop.id">
+                                    <option :value="String(pop.id)" x-text="pop.name"></option>
+                                </template>
                             </select>
                         </div>
                         <div>
@@ -1566,6 +1566,9 @@
                 },
             },
 
+            popsData: @json($pops->map->only(['id', 'name'])->values()),
+            cabangPopsData: @json($cabangPops->map->only(['id', 'name'])->values()),
+
             get isInfraCategory() {
                 return ['O-REQ', 'INFR REQ'].includes(this.modal.data.category);
             },
@@ -2107,6 +2110,9 @@
             },
 
             onCategoryChange() {
+                if (this.isInfraCategory && this.modal.data.pop_id && !this.cabangPopsData.some(pop => String(pop.id) === String(this.modal.data.pop_id))) {
+                    this.modal.data.pop_id = '';
+                }
                 if (this.isTicketMode) {
                     this.modal.data.tugas = '';
                     this.modal.data.issue = '';

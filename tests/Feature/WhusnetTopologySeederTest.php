@@ -116,9 +116,15 @@ class WhusnetTopologySeederTest extends TestCase
     public function tidak_membuat_representasi_lama_dan_tipe_lama_tetap_terbaca(): void
     {
         $this->seed(NetworkNodeTypeSeeder::class);
+        // aggregation_switch/olt_card/pon_port dihapus dari seeder master
+        // 2026-10-23 (ADHOC-212) — tes ini tetap membuktikan baris lama
+        // (kalau ada, mis. dari impor/migrasi susulan) tidak diam-diam
+        // tersentuh/ditambah seeder baru, jadi tipenya diprovisioning
+        // sendiri (bukan gantung baris seeder permanen yang sudah dihapus).
+        $legacyTypeId = NetworkNodeType::firstOrCreate(['code' => 'aggregation_switch'], ['name' => 'aggregation_switch', 'has_ports' => false])->id;
         $legacy = NetworkNode::create([
             'code' => 'AGG-LAMA', 'name' => 'Agregasi lama', 'anchor_pop_id' => $this->jetis->id, 'status' => 'active',
-            'node_type_id' => NetworkNodeType::where('code', 'aggregation_switch')->value('id'),
+            'node_type_id' => $legacyTypeId,
         ]);
 
         $this->seed(WhusnetTopologySeeder::class);
@@ -129,7 +135,6 @@ class WhusnetTopologySeederTest extends TestCase
         }
         $this->assertSame('aggregation_switch', $legacy->fresh()->nodeType->code);
         $this->assertSame($this->jetis->id, $legacy->fresh()->anchor_pop_id);
-        $this->assertFalse(NetworkNodeType::where('code', 'aggregation_switch')->value('is_active'));
     }
 
     #[Test]

@@ -284,6 +284,53 @@ class InfrastructureLocationOptionsTest extends TestCase
     }
 
     #[Test]
+    public function opsi_slot_fop_memuat_slot_milik_olt_terpilih(): void
+    {
+        $fop = User::factory()->create(['role_id' => Role::where('code', 'fop')->firstOrFail()->id]);
+        $this->giveAllPopScope($fop);
+        $slotKedua = app(InfrastructurePositionService::class)->createSlot($this->oltA, 2);
+
+        $this->actingAs($fop)->getJson(route('fop-tasks.infrastructure-scope-options', [
+            'pop_id' => $this->cabang->id,
+            'level' => 'slot',
+            'parent' => $this->oltA->id,
+        ]))->assertOk()
+            ->assertJsonPath('options.0.id', $this->slotA1->id)
+            ->assertJsonPath('options.0.label', 'Slot 1')
+            ->assertJsonPath('options.1.id', $slotKedua->id)
+            ->assertJsonPath('options.1.label', 'Slot 2')
+            ->assertJsonCount(2, 'options');
+    }
+
+    #[Test]
+    public function opsi_pon_dan_odp_fop_mengikuti_slot_dan_pon_terpilih(): void
+    {
+        $fop = User::factory()->create(['role_id' => Role::where('code', 'fop')->firstOrFail()->id]);
+        $this->giveAllPopScope($fop);
+        $ponKedua = app(InfrastructurePositionService::class)->createPort($this->slotA1, 2, InfrastructurePortKind::PON);
+        $odpKedua = $this->node('odp', $this->miniA1, 'ODP-B');
+        app(InfrastructureConnectionService::class)->connect($this->ponA11, $fop, targetNode: $odpKedua, verified: true);
+
+        $pons = $this->actingAs($fop)->getJson(route('fop-tasks.infrastructure-scope-options', [
+            'pop_id' => $this->cabang->id,
+            'level' => 'port',
+            'parent' => $this->slotA1->id,
+        ]))->assertOk()->json('options');
+
+        $this->assertSame([$this->ponA11->id, $ponKedua->id], array_column($pons, 'id'));
+        $this->assertSame(['PON 1', 'PON 2'], array_column($pons, 'label'));
+
+        $odps = $this->actingAs($fop)->getJson(route('fop-tasks.infrastructure-scope-options', [
+            'pop_id' => $this->cabang->id,
+            'level' => 'odp',
+            'parent' => $pons[0]['id'],
+        ]))->assertOk()->json('options');
+
+        $this->assertSame([$this->odpA->id, $odpKedua->id], array_column($odps, 'id'));
+        $this->assertSame(['ODP-A', 'ODP-B'], array_column($odps, 'label'));
+    }
+
+    #[Test]
     public function modal_task_fop_menyediakan_dropdown_akar_scope_dari_server(): void
     {
         $this->withoutVite();

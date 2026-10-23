@@ -169,9 +169,15 @@ class ItemSeeder extends Seeder
             ['code' => 'KONEKTOR-RJ45', 'name' => 'Konektor RJ45', 'category' => 'lainnya', 'unit' => 'pcs'],
         ];
 
+        // OLT-MODULE-GPON-8P dulu nunjuk tipe node 'olt_card' — dihapus
+        // 2026-10-23 (ADHOC-212, bukan bagian hierarki resmi lagi). Kartu
+        // OLT sekarang aset yang di-deploy ke Slot
+        // (`infrastructure_slots` + kategori `olt_module`), tidak baca
+        // `infrastructure_node_type_id` sama sekali untuk jalur itu
+        // (`InventoryService::deploySerial()` ~baris 711) — kolom ini
+        // sengaja dibiarkan null untuk item itu, bukan lupa diisi.
         $oltNodeTypes = [
             'OLT-ZTE-C320' => 'olt_chassis',
-            'OLT-MODULE-GPON-8P' => 'olt_card',
         ];
 
         foreach ($items as $item) {

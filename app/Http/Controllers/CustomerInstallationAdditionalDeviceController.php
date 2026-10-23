@@ -107,7 +107,7 @@ class CustomerInstallationAdditionalDeviceController extends Controller
                 $reported = ($selectedByCategory[$categoryCode] ?? 0) + ($installedByCategory[$categoryCode] ?? 0);
                 if ($reported > $count || (! $shortage && $reported < $count)) {
                     throw ValidationException::withMessages([
-                        'decisions' => 'Paket ini membutuhkan '.($requirements['access_point'] ?? 0).' AP dan '.($requirements['customer_router'] ?? 0).' router pelanggan sebagai perangkat tambahan.',
+                        'decisions' => 'Paket ini membutuhkan '.($requirements['access_point'] ?? 0).' AP sebagai perangkat tambahan.',
                     ]);
                 }
             }

@@ -178,6 +178,11 @@ class Pop extends Model
      *
      * @return HasMany<InventorySerial, $this>
      */
+    public function directlyDeployedSerials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class, 'current_infrastructure_pop_id');
+    }
+
     public function deployedSerials(): HasMany
     {
         return $this->hasMany(InventorySerial::class, 'current_mini_pop_id');

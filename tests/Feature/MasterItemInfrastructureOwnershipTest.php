@@ -177,14 +177,22 @@ class MasterItemInfrastructureOwnershipTest extends TestCase
         foreach (['OLT-ZTE-C320', 'OLT-MODULE-GPON-8P'] as $code) {
             $item = Item::where('code', $code)->firstOrFail();
             $this->assertSame(OwnershipMode::INFRASTRUCTURE_ASSET, $item->ownership_mode);
-            $this->assertSame($code === 'OLT-ZTE-C320' ? 'olt_chassis' : 'olt_card', $item->infrastructureNodeType?->code);
         }
+        $this->assertSame('olt_chassis', Item::where('code', 'OLT-ZTE-C320')->first()->infrastructureNodeType?->code);
+        // 'olt_card' dihapus dari seeder master 2026-10-23 (ADHOC-212) —
+        // kartu OLT sekarang aset yang di-deploy ke Slot, tidak baca kolom
+        // ini. Null di sini sengaja, bukan regresi.
+        $this->assertNull(Item::where('code', 'OLT-MODULE-GPON-8P')->first()->infrastructure_node_type_id);
     }
 
     #[Test]
     public function master_barang_dapat_memetakan_sku_ke_tipe_node(): void
     {
-        $type = NetworkNodeType::where('code', 'olt_card')->firstOrFail();
+        // 'olt_card' dihapus dari seeder master 2026-10-23 (ADHOC-212) —
+        // subjek tes ini mekanisme generik "map SKU ke tipe node", bukan
+        // 'olt_card' spesifik. 'olt_chassis' kompatibel kategori olt_module
+        // juga (InventoryService::assertNodeAcceptsSerialItem()).
+        $type = NetworkNodeType::where('code', 'olt_chassis')->firstOrFail();
         $this->actingAs($this->owner)->post(route('master.items.store'), [
             'code' => 'OLT-ADMIN-CARD', 'name' => 'Kartu OLT Admin',
             'item_category_id' => ItemCategory::where('code', 'olt_module')->firstOrFail()->id,

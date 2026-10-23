@@ -37,12 +37,23 @@ class NetworkNodePlacementRuleTest extends TestCase
         app(NetworkNodeService::class)->assertTypePlacement($odpType, $odpParent, null);
     }
 
-    public function test_olt_card_wajib_anak_chassis_bukan_anchor_pop_langsung(): void
+    public function test_tipe_anak_dengan_aturan_parent_wajib_anak_bukan_anchor_pop_langsung(): void
     {
+        // 'olt_card' dihapus dari seeder master 2026-10-23 (ADHOC-212, bukan
+        // bagian hierarki resmi lagi). Subjek tes ini sebenarnya mesin
+        // `assertTypePlacement()` menegakkan aturan "anak wajib anchor ke
+        // tipe node tertentu" — dites pakai tipe+aturan buatan sendiri,
+        // bentuknya identik dengan aturan lama olt_card→olt_chassis.
         $this->seed(NetworkNodeTypeSeeder::class);
         $mini = Pop::factory()->create(['type' => 'mini_pop']);
-        $cardType = NetworkNodeType::where('code', 'olt_card')->firstOrFail();
         $chassisType = NetworkNodeType::where('code', 'olt_chassis')->firstOrFail();
+        $cardType = NetworkNodeType::create(['code' => 'test-card', 'name' => 'Kartu Uji', 'has_ports' => true]);
+        DB::table('network_node_type_rules')->insert([
+            'child_type_id' => $cardType->id,
+            'parent_type_id' => $chassisType->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         $chassis = NetworkNode::factory()->create(['anchor_pop_id' => $mini->id, 'node_type_id' => $chassisType->id]);
 
         app(NetworkNodeService::class)->assertTypePlacement($cardType, $chassis, null);

@@ -32,8 +32,10 @@ use App\Services\InfrastructureMapService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\NetworkNodeTypeSeeder;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Database\Seeders\WarehouseFeatureSeeder;
 use Database\Seeders\WhusnetTopologySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -550,5 +552,127 @@ class InfrastructureMapTest extends TestCase
         $this->assertArrayHasKey(-$cabang->id, $payload['topologyDetails']);
         $this->assertArrayNotHasKey(-$rahasia->id, $payload['topologyDetails']);
         $this->actingAs($user)->get(route('network.map.index'))->assertOk()->assertDontSee('Cabang Rahasia Topologi');
+    }
+
+    /**
+     * Deep link "Lihat detail di Peta Infrastruktur" dari Master Node
+     * (rancangan-pembagian-detail-master-node-vs-peta-infrastruktur.md §4).
+     * Node valid & dalam scope → tab Inventaris + node itu terpilih duluan.
+     */
+    #[Test]
+    public function node_id_valid_dalam_scope_membuka_tab_inventaris_dengan_node_terpilih(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'parent_id' => null]);
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $user->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabang->id]);
+
+        $response = $this->actingAs($user)->get(route('network.map.index', ['node_id' => $node->id]));
+
+        $response->assertOk();
+        $response->assertSee("tab: 'inventaris'", false);
+        $response->assertSee("selectedNodeId: {$node->id},", false);
+    }
+
+    #[Test]
+    public function node_id_di_luar_scope_pop_mendapat_404(): void
+    {
+        $cabangA = Pop::factory()->create(['type' => 'cabang']);
+        $cabangB = Pop::factory()->create(['type' => 'cabang']);
+        $nodeAsing = NetworkNode::factory()->create(['anchor_pop_id' => $cabangB->id, 'parent_id' => null]);
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $user->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabangA->id]);
+
+        $this->actingAs($user)->get(route('network.map.index', ['node_id' => $nodeAsing->id]))->assertNotFound();
+    }
+
+    #[Test]
+    public function node_id_yang_tidak_ada_mendapat_404_sama_seperti_di_luar_scope(): void
+    {
+        $this->loginAsAdmin();
+
+        $this->get(route('network.map.index', ['node_id' => 999999]))->assertNotFound();
+    }
+
+    #[Test]
+    public function node_id_tersaring_pop_id_yang_berbeda_mendapat_404(): void
+    {
+        $cabangA = Pop::factory()->create(['type' => 'cabang']);
+        $cabangB = Pop::factory()->create(['type' => 'cabang']);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabangA->id, 'parent_id' => null]);
+        $this->loginAsAdmin();
+
+        $this->get(route('network.map.index', ['node_id' => $node->id, 'pop_id' => $cabangB->id]))->assertNotFound();
+    }
+
+    /**
+     * Rancangan §5: tautan "Riwayat Gudang" (SN/roll → warehouse.traceability.index)
+     * cuma boleh tampil buat aktor yang pegang warehouse_traceability.view —
+     * network_nodes.view tidak otomatis ikut permission itu (role matrix dinamis).
+     */
+    #[Test]
+    public function tautan_riwayat_gudang_tersembunyi_tanpa_permission_warehouse_traceability(): void
+    {
+        // setUp() di file ini gak nyeeding fitur warehouse_traceability (itu
+        // modul Gudang, bukan Network) — tanpa WarehouseFeatureSeeder,
+        // permission warehouse_traceability.view gak pernah tergenerate, jadi
+        // detach(null) di bawah bakal nendang SEMUA permission role (bug test,
+        // bukan bug produksi). Seed dulu lalu generate ulang permission.
+        $this->seed(PermissionSeeder::class);
+        $this->seed(WarehouseFeatureSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'parent_id' => null]);
+        $modem = Item::create([
+            'code' => 'MAP-TRACE-MODEM',
+            'name' => 'Modem Uji Trace',
+            'item_category_id' => ItemCategory::create([
+                'code' => 'map_trace_cat', 'name' => 'Kategori Uji Trace', 'default_unit' => 'pcs',
+                'equipment_class' => 'pasif', 'is_system' => false, 'is_active' => true,
+            ])->id,
+            'unit' => 'pcs',
+        ]);
+        $serial = InventorySerial::create([
+            'item_id' => $modem->id,
+            'serial_number' => 'MAP-TRACE-SN-0001',
+            'status' => SerialStatus::DEPLOYED,
+            'current_network_node_id' => $node->id,
+        ]);
+
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $traceabilityPermissionId = Permission::where('code', 'warehouse_traceability.view')->value('id');
+        $role->permissions()->detach($traceabilityPermissionId);
+        $limitedUser = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $limitedUser->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabang->id]);
+
+        $limitedResponse = $this->actingAs($limitedUser)->get(route('network.map.index'));
+        $limitedResponse->assertOk();
+        $limitedResponse->assertSee($serial->serial_number);
+        // "nodes" (topologyDetails) di-embed sebagai JS object literal di dalam atribut
+        // HTML x-data="..." — Blade meng-escape "/" dan `"` berlapis buat itu, jadi
+        // assertSee(URL mentah) gak bisa dipakai. Cek substring tanpa slash/quote yang
+        // pasti lolos semua layer escaping itu.
+        $this->assertStringNotContainsString(
+            'traceability?sn=MAP-TRACE-SN-0001',
+            $limitedResponse->getContent(),
+        );
+
+        $role->permissions()->attach($traceabilityPermissionId);
+        $fullUser = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $fullScope = UserRoleScope::create(['user_id' => $fullUser->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $fullScope->id, 'pop_id' => $cabang->id]);
+
+        $fullResponse = $this->actingAs($fullUser)->get(route('network.map.index'));
+        $fullResponse->assertOk();
+        $this->assertStringContainsString(
+            'traceability?sn=MAP-TRACE-SN-0001',
+            $fullResponse->getContent(),
+        );
     }
 }

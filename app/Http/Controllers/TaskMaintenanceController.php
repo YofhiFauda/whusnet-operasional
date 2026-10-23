@@ -348,6 +348,7 @@ class TaskMaintenanceController extends Controller
         return InventorySerial::query()
             ->where('status', SerialStatus::DEPLOYED->value)
             ->where(fn ($query) => $query->whereIn('current_network_node_id', $nodeIds)
+                ->orWhereIn('current_infrastructure_pop_id', $popIds)
                 ->orWhereIn('current_mini_pop_id', $popIds)
                 ->orWhereIn('current_infrastructure_slot_id', $slotIds)
                 ->orWhereIn('current_infrastructure_port_id', $portIds))

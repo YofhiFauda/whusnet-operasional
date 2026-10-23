@@ -319,4 +319,46 @@ Tipe `aggregation_switch` tidak dipakai pada struktur baru; Switch operasional b
 
 Untuk data nyata yang dipertahankan, representasi lama dihentikan hanya setelah ketujuh baris di atas punya bukti tertulis "selesai". Baris dan histori nyata tetap dapat dibaca; "dihentikan" berarti berhenti ditulisi. Untuk data dummy yang sudah diverifikasi, reset diperbolehkan sesuai pengantar bagian ini.
 
+## 17. Penegasan 23 Oktober 2026 — Chassis/Rack/Card adalah aset, bukan node
+
+Klarifikasi user 2026-10-23 terhadap jawaban yang salah kutip spec lama
+(`docs/superpowers/specs/2026-10-09-aset-infrastruktur-lokasi-design.md` §10–11
+dan `docs/superpowers/specs/2026-10-12-laporan-oreq-infr-req-design.md` §8,
+sekarang sudah ditandai usang di berkas masing-masing). Bagian ini menegaskan
+ulang, dengan kalimat eksplisit, prinsip yang **sudah berjalan di kode** sejak
+ADHOC-202 Task 2 (`feat: model kanonis Slot, PON, dan Port Switch`) — bukan
+rancangan baru yang belum dikerjakan:
+
+1. **Hierarki yang benar:** `Mini POP → OLT/Switch → Slot → PON/Port → ODP →
+   ONT pelanggan`. Satu Mini POP boleh menaungi **lebih dari satu OLT** (dan
+   lebih dari satu Switch) — ini sudah berlaku sejak Fase 0 (§11 dokumen spec
+   2026-10-09), bukan perubahan baru.
+2. **OLT itu sendiri adalah satu node (`network_nodes`, tipe `olt_chassis` —
+   nama *code* historis, artinya sekarang = OLT, bukan "pembungkus chassis
+   yang menaungi node kartu terpisah").** Tidak ada lagi node chassis dan
+   node kartu sebagai dua tingkat topologi berbeda.
+3. **Slot (`infrastructure_slots`) FK langsung ke node OLT/Switch itu**
+   (`network_node_id`, lihat `InfrastructureSlot::device()`), bukan ke node
+   chassis. Slot tetap ada walau unit fisiknya (chassis/kartu) diganti.
+4. **Chassis, rack, dan kartu OLT adalah aset Gudang** (baris
+   `inventory_serials`, tipe barang `olt_module`) yang **di-deploy ke slot**
+   lewat `InventoryService::deploySerial()` → `current_infrastructure_slot_id`.
+   Mereka **bukan** baris `network_nodes` — tidak punya `parent_id`/
+   `anchor_pop_id` sendiri, tidak muncul sebagai cabang terpisah di Master
+   Node. Mengganti unit fisik = ganti SN yang terpasang di slot yang sama;
+   posisi slot (dan identitas Slot/PON/ODP di bawahnya) tidak berubah.
+5. **Tipe `olt_card`** (representasi lama, kartu sebagai anak node chassis)
+   sudah masuk `InfrastructureCutover::LEGACY_NODE_TYPES` bersama `pon_port`
+   dan `aggregation_switch` — jalur tulis baru ke tipe ini ditutup lewat
+   `assertLegacyWriteAllowed()`. Baris lama tetap bisa dibaca untuk histori,
+   tidak dihapus.
+6. **Konsekuensi langsung:** menambah unit OLT baru di satu Mini POP = tambah
+   satu node OLT baru (bukan tambah "chassis" di bawah OLT yang sudah ada).
+   Mengganti/menambah kartu OLT di slot yang sama = mutasi aset (deploy/
+   retrieve SN), bukan mutasi topologi (tidak lewat `NetworkNodeService::move()`).
+
+Tidak ada perubahan skema/kode baru akibat penegasan ini — bagian ini
+mendokumentasikan ulang model yang sudah diimplementasikan, supaya dokumen
+lama (§16 di atas dan spec 2026-10-09/12) tidak lagi dibaca sebagai bertentangan.
+
 

@@ -10,8 +10,8 @@
 
 Aturan CLAUDE.md: jangan loncat sprint.
 
-- **`S8.10-T003` FOP Notification Dashboard**: status PAUSED di `docs/TASKS.md`, menunggu BATCH 1 & BATCH 2 selesai.
-- Cek ulang scope T003 sebelum lanjut. `/notifications` sudah punya filter tanggal/type/user dan mark read/unread (lihat `analisa-status-implementasi-notifikasi.md` §1). Yang tersisa mungkin hanya filter aksi dan tampilan FOP.
+- **`S8.10-T003` FOP Notification Dashboard**: ditutup dari task aktif atas keputusan user 2026-10-23. Riwayat, filter, dan baca/belum baca sudah berkembang pada modul notifikasi; acceptance criteria historis tidak diverifikasi ulang dalam keputusan ini.
+- Tahap Web Push dan perluasan realtime di bawah tetap usulan terpisah, bukan sisa otomatis S8.10-T003.
 
 ## Tahap 1: Keputusan Sebelum Kode
 

@@ -89,7 +89,10 @@ class LegacyInfrastructureWriteCutoverTest extends TestCase
     public function kartu_olt_lama_tidak_bisa_dipasang_ke_slot_lama_setelah_cutover(): void
     {
         $slot = OltSlot::create(['chassis_node_id' => $this->chassis->id, 'number' => 1]);
-        $card = NetworkNode::factory()->child($this->chassis)->create(['node_type_id' => NetworkNodeType::where('code', 'olt_card')->value('id')]);
+        // 'olt_card' dihapus dari seeder master 2026-10-23 (ADHOC-212) —
+        // provisioning sendiri, lihat InfrastructureLegacyDecisionTest.
+        $cardTypeId = NetworkNodeType::firstOrCreate(['code' => 'olt_card'], ['name' => 'olt_card', 'has_ports' => true])->id;
+        $card = NetworkNode::factory()->child($this->chassis)->create(['node_type_id' => $cardTypeId]);
         $this->closeLegacyWrites();
 
         $this->actingAs($this->owner)->post(route('network.nodes.olt-slots.card', [$this->chassis, $slot]), ['network_node_id' => $card->id])

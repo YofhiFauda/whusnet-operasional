@@ -45,6 +45,11 @@ class InfrastructureMapService
         }
 
         $canViewDeviceSerials = $user->hasPermission('customers.detail.devices.view_sensitive');
+        // Tautan "Riwayat Gudang" cuma boleh terbentuk buat aktor yang
+        // beneran pegang warehouse_traceability.view — network_nodes.view
+        // gak otomatis ngikutin izin itu (role matrix dinamis, bukan
+        // keduanya selalu digrant bareng).
+        $canViewTraceability = $user->hasPermission('warehouse_traceability.view');
 
         $nodes = NetworkNode::query()
             ->when($popIds !== null, fn ($query) => $query->whereIn('network_nodes.id', $this->scopedNodeIds($popIds)))
@@ -138,7 +143,7 @@ class InfrastructureMapService
                     'installed_at' => $event?->created_at?->format('d M Y H:i'),
                     'technician' => $event?->fromTechnician?->name,
                     'task' => $event?->fopTask?->task?->task_number ?? $event?->fopTask?->task_number,
-                    'trace_url' => route('warehouse.traceability.index', ['sn' => $serial->serial_number]),
+                    'trace_url' => $canViewTraceability ? route('warehouse.traceability.index', ['sn' => $serial->serial_number]) : null,
                 ];
             }
 
@@ -158,7 +163,7 @@ class InfrastructureMapService
                     'installed_at' => $event?->created_at?->format('d M Y H:i'),
                     'technician' => $event?->fromTechnician?->name ?? $event?->createdBy?->name,
                     'task' => $event?->fopTask?->task?->task_number ?? $event?->fopTask?->task_number,
-                    'trace_url' => $lot ? route('warehouse.traceability.index', ['roll' => $lot]) : null,
+                    'trace_url' => ($lot && $canViewTraceability) ? route('warehouse.traceability.index', ['roll' => $lot]) : null,
                 ];
             }
 
@@ -382,7 +387,7 @@ class InfrastructureMapService
         }
 
         $hierarchy = app(InfrastructureHierarchyService::class)->build($user, $selectedPopId);
-        $this->applyHierarchyProjection($hierarchy, $topologyDetails, $topologyIndex);
+        $this->applyHierarchyProjection($hierarchy, $topologyDetails, $topologyIndex, $canViewTraceability);
 
         foreach ($nodes as $node) {
             foreach ($node->ports as $port) {
@@ -480,7 +485,7 @@ class InfrastructureMapService
 
     private const CANVAS_PORT_OFFSET = 3_000_000_000;
 
-    private function applyHierarchyProjection(array $projection, array &$topologyDetails, array &$topologyIndex): void
+    private function applyHierarchyProjection(array $projection, array &$topologyDetails, array &$topologyIndex, bool $canViewTraceability): void
     {
         $items = $projection['items'];
 
@@ -524,7 +529,7 @@ class InfrastructureMapService
                 'ports' => [],
                 'assets' => array_map(fn (array $asset): array => [...$asset, 'position' => $item['breadcrumb'],
                     'installed_at' => null, 'technician' => null, 'task' => null,
-                    'trace_url' => $asset['kind'] === 'SN' ? route('warehouse.traceability.index', ['sn' => $asset['reference']]) : null],
+                    'trace_url' => ($asset['kind'] === 'SN' && $canViewTraceability) ? route('warehouse.traceability.index', ['sn' => $asset['reference']]) : null],
                     $item['direct_assets']),
                 'location_description' => null,
                 'coverage_area' => null,
@@ -603,7 +608,7 @@ class InfrastructureMapService
                 foreach ($item['direct_assets'] as $asset) {
                     $topologyDetails[-$item['id']]['assets'][] = [...$asset, 'position' => $item['breadcrumb'],
                         'installed_at' => null, 'technician' => null, 'task' => null,
-                        'trace_url' => $asset['kind'] === 'SN' ? route('warehouse.traceability.index', ['sn' => $asset['reference']]) : null];
+                        'trace_url' => ($asset['kind'] === 'SN' && $canViewTraceability) ? route('warehouse.traceability.index', ['sn' => $asset['reference']]) : null];
                 }
             }
         }

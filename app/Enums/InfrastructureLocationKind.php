@@ -15,6 +15,8 @@ use App\Support\InfrastructureLocation;
  */
 enum InfrastructureLocationKind: string
 {
+    case POP = 'pop';
+
     case NODE = 'node';
     case MINI_POP = 'mini_pop';
     case SLOT = 'slot';
@@ -23,6 +25,7 @@ enum InfrastructureLocationKind: string
     public function label(): string
     {
         return match ($this) {
+            self::POP => 'Langsung di POP/Cabang',
             self::NODE => 'Node/perangkat (OLT, Switch, ODP, …)',
             self::MINI_POP => 'Langsung di Mini POP',
             self::SLOT => 'Slot perangkat (kartu/modul)',
@@ -33,6 +36,7 @@ enum InfrastructureLocationKind: string
     public function matchesLocation(InfrastructureLocation $location): bool
     {
         return match ($this) {
+            self::POP => $location->kind === InfrastructureLocation::POP && ($location->ancestors[array_key_last($location->ancestors)]['type'] ?? null) === 'cabang',
             self::NODE => $location->kind === InfrastructureLocation::NODE,
             self::MINI_POP => $location->kind === InfrastructureLocation::MINI_POP,
             self::SLOT => $location->kind === InfrastructureLocation::SLOT,

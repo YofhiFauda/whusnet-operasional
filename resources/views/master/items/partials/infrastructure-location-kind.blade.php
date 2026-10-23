@@ -5,7 +5,7 @@
         <details class="group relative">
             <summary aria-label="Penjelasan Posisi Pemasangan" class="flex size-4 cursor-pointer list-none items-center justify-center rounded-full border border-slate-400 text-[10px] font-bold leading-none text-slate-500 hover:border-sky-500 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-500 dark:text-slate-400 [&::-webkit-details-marker]:hidden">?</summary>
             <div class="absolute left-0 top-full z-30 mt-2 w-64 rounded-md border border-slate-200 bg-white p-3 text-xs font-normal normal-case leading-relaxed tracking-normal text-slate-700 shadow-lg dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                Tingkat tempat SN barang ini boleh dipasang lewat laporan O-REQ/INFR-REQ. Contoh: kartu OLT di Slot, SFP di PON/Port, rak di Mini POP. Kosong = node/perangkat. Aset Perusahaan (Switch/SFP) wajib diisi supaya boleh dipasang netap.
+                Tingkat tempat SN barang ini boleh dipasang lewat laporan O-REQ/INFR-REQ. Contoh: rak di POP/Cabang, kartu OLT di Slot, SFP di PON/Port. Kosong = node/perangkat. Aset Perusahaan (Switch/SFP) wajib diisi supaya boleh dipasang netap.
             </div>
         </details>
     </div>

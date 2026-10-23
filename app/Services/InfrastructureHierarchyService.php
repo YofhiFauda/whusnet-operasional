@@ -160,7 +160,7 @@ class InfrastructureHierarchyService
                 ]);
         }
 
-        $this->attachCustomers($items, $nodes, $popIds, $canSeeSerials, $user);
+        // $this->attachCustomers($items, $nodes, $popIds, $canSeeSerials, $user);
         $this->attachDirectAssets($items, $popIds, $nodes, $slots, $ports);
         $this->attachServerProjection($items, $nodes);
 
@@ -313,7 +313,8 @@ class InfrastructureHierarchyService
     private function attachDirectAssets(array &$items, array $popIds, Collection $nodes, Collection $slots, Collection $ports): void
     {
         $serials = InventorySerial::query()->with('item')->where('status', SerialStatus::DEPLOYED->value)
-            ->where(fn ($query) => $query->whereIn('current_mini_pop_id', $popIds)
+            ->where(fn ($query) => $query->whereIn('current_infrastructure_pop_id', $popIds)
+                ->orWhereIn('current_mini_pop_id', $popIds)
                 ->orWhereIn('current_network_node_id', $nodes->pluck('id'))
                 ->orWhereIn('current_infrastructure_slot_id', $slots->pluck('id'))
                 ->orWhereIn('current_infrastructure_port_id', $ports->pluck('id')))
@@ -323,10 +324,11 @@ class InfrastructureHierarchyService
                 $serial->current_infrastructure_port_id !== null => 'port:'.$serial->current_infrastructure_port_id,
                 $serial->current_infrastructure_slot_id !== null => 'slot:'.$serial->current_infrastructure_slot_id,
                 $serial->current_network_node_id !== null => 'node:'.$serial->current_network_node_id,
-                default => 'pop:'.$serial->current_mini_pop_id,
+                $serial->current_mini_pop_id !== null => 'pop:'.$serial->current_mini_pop_id,
+                default => 'pop:'.$serial->current_infrastructure_pop_id,
             };
             if (isset($items[$key])) {
-                $items[$key]['direct_assets'][] = ['kind' => 'SN', 'name' => $serial->item?->name, 'reference' => $serial->serial_number, 'amount' => '1'];
+                $items[$key]['direct_assets'][] = ['kind' => 'SN', 'name' => $serial->item?->name, 'item_code' => $serial->item?->code, 'reference' => $serial->serial_number, 'amount' => '1'];
             }
         }
 
@@ -343,7 +345,7 @@ class InfrastructureHierarchyService
             };
             if (isset($items[$key])) {
                 $items[$key]['direct_assets'][] = ['kind' => $balance->lot_no !== '' ? 'ROLL' : 'QTY', 'name' => $balance->item?->name,
-                    'reference' => $balance->lot_no ?: null, 'amount' => rtrim(rtrim(number_format((float) $balance->qty, 2, '.', ''), '0'), '.')];
+                    'item_code' => $balance->item?->code, 'reference' => $balance->lot_no ?: null, 'amount' => rtrim(rtrim(number_format((float) $balance->qty, 2, '.', ''), '0'), '.')];
             }
         }
     }

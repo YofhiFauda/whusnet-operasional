@@ -37,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'current_pop_id',
     'current_network_node_id',
     'current_mini_pop_id',
+    'current_infrastructure_pop_id',
     'current_infrastructure_slot_id',
     'current_infrastructure_port_id',
     'current_technician_id',
@@ -60,6 +61,7 @@ class InventorySerial extends Model
             'installed_at' => 'datetime',
             'current_network_node_id' => 'integer',
             'current_mini_pop_id' => 'integer',
+            'current_infrastructure_pop_id' => 'integer',
             'current_infrastructure_slot_id' => 'integer',
             'current_infrastructure_port_id' => 'integer',
         ];
@@ -72,6 +74,11 @@ class InventorySerial extends Model
     public function currentMiniPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'current_mini_pop_id');
+    }
+
+    public function currentInfrastructurePop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'current_infrastructure_pop_id');
     }
 
     public function currentInfrastructureSlot(): BelongsTo

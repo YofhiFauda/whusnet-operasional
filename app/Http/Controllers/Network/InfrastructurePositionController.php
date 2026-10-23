@@ -166,7 +166,6 @@ class InfrastructurePositionController extends Controller
             'target_network_node_id' => [Rule::requiredIf($port->kind === InfrastructurePortKind::PON), 'nullable', 'integer', Rule::exists('network_nodes', 'id')],
             'target_infrastructure_port_id' => ['nullable', 'integer', Rule::exists('infrastructure_ports', 'id')],
             'target_label' => ['nullable', 'string', 'max:150'],
-            'verified' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
         $target = isset($validated['target_network_node_id']) ? NetworkNode::findOrFail($validated['target_network_node_id']) : null;
@@ -180,7 +179,7 @@ class InfrastructurePositionController extends Controller
         }
 
         $this->domain(fn () => $connections->connect($port, $request->user(), targetNode: $target, targetPort: $targetPort,
-            targetLabel: $validated['target_label'] ?? null, verified: (bool) ($validated['verified'] ?? false), notes: $validated['notes'] ?? null),
+            targetLabel: $validated['target_label'] ?? null, verified: true, notes: $validated['notes'] ?? null),
             'target_network_node_id');
 
         return redirect()->route('network.infrastructure-ports.show', $port)->with('success', 'Sambungan dicatat.');

@@ -30,6 +30,7 @@
         </a>
         @endif
 
+
         @if(auth()->user()->hasPermission('customers.detail.survey.view'))
         <a href="{{ route('surveys.queue') }}" title="Antrean Survey"
            class="flex items-center justify-between gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('surveys.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"

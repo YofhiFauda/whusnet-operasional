@@ -153,7 +153,10 @@ class InfrastructureCutoverEvidenceTest extends TestCase
     {
         $mini = Pop::where('type', 'mini_pop')->firstOrFail();
         $chassis = NetworkNode::factory()->create(['node_type_id' => NetworkNodeType::where('code', 'olt_chassis')->value('id'), 'anchor_pop_id' => $mini->id]);
-        $card = NetworkNode::factory()->create(['node_type_id' => NetworkNodeType::where('code', 'olt_card')->value('id'), 'parent_id' => $chassis->id]);
+        // 'olt_card' dihapus dari seeder master 2026-10-23 (ADHOC-212) —
+        // provisioning sendiri, lihat InfrastructureLegacyDecisionTest.
+        $cardTypeId = NetworkNodeType::firstOrCreate(['code' => 'olt_card'], ['name' => 'olt_card', 'has_ports' => true])->id;
+        $card = NetworkNode::factory()->create(['node_type_id' => $cardTypeId, 'parent_id' => $chassis->id]);
         $legacy = OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 1, 'card_node_id' => $card->id]);
         $rows = $this->service->run('2026-10');
         $row = $rows->firstWhere('pop_id', $mini->parent_id);

@@ -29,6 +29,8 @@ use App\Models\User;
 use App\Models\UserRoleScopeTarget;
 use App\Services\FopTaskInfrastructureScopeService;
 use App\Services\InfrastructureConnectionService;
+use App\Services\InfrastructureHierarchyService;
+use App\Services\InfrastructureLocationOptionsService;
 use App\Services\InfrastructureLocationResolver;
 use App\Services\InfrastructurePositionService;
 use App\Services\InventoryService;
@@ -228,6 +230,47 @@ class TaskInfrastructureHierarchicalLocationTest extends TestCase
         $this->assertNull($action->network_node_id);
         $this->assertSame('mini_pop:'.$this->miniA1->id, $action->work_location_snapshot['key']);
         $this->assertSame('mini_pop:'.$this->miniA1->id, $action->scope_snapshot['key']);
+    }
+
+    #[Test]
+    public function aset_berserial_bisa_dipasang_dan_dilacak_langsung_di_pop_cabang(): void
+    {
+        $task = $this->task();
+        $serial = $this->serial($this->item('RACK-CABANG', InfrastructureLocationKind::POP), 'SN-RACK-CABANG');
+
+        $this->submit($task, [$this->row('install', ['loc_pop' => $this->cabang->id, 'loc_mini_pop' => 'none'], ['serial_id' => $serial->id])])
+            ->assertSessionHasNoErrors()->assertSessionMissing('error');
+
+        $this->assertSame($this->cabang->id, $serial->fresh()->current_infrastructure_pop_id);
+        $this->assertNull($serial->fresh()->current_pop_id);
+        $this->assertSame('pop:'.$this->cabang->id, app(InventoryService::class)->currentLocationOf($serial->fresh())->key());
+        $this->assertSame($this->cabang->id, InventoryTransaction::sole()->to_infrastructure_pop_id);
+        $fopTask = FopTask::where('task_id', $task->id)->sole();
+        $assets = app(InfrastructureLocationOptionsService::class)
+            ->assetsAt($fopTask, $this->technician, 'pop', $this->cabang->id);
+        $this->assertSame('SN-RACK-CABANG', $assets['direct'][0]['serial_number']);
+        $projection = app(InfrastructureHierarchyService::class)->build($this->technician);
+        $this->assertSame('SN-RACK-CABANG', $projection['items']['pop:'.$this->cabang->id]['direct_assets'][0]['reference']);
+
+        app(InventoryService::class)->retrieveSerialFromLocation(
+            $serial, $fopTask, $this->technician,
+            expectedLocation: app(InfrastructureLocationResolver::class)->forPop($this->cabang)
+        );
+        $this->assertNull($serial->fresh()->current_infrastructure_pop_id);
+        $this->assertSame($this->cabang->id, InventoryTransaction::where('type', InventoryTransactionType::RETRIEVE_INFRA->value)->sole()->from_infrastructure_pop_id);
+    }
+
+    #[Test]
+    public function aset_pop_cabang_tidak_boleh_dipasang_di_pop_pusat(): void
+    {
+        $pusat = Pop::factory()->create(['type' => 'pusat']);
+        $item = $this->item('RACK-PUSAT-DITOLAK', InfrastructureLocationKind::POP);
+
+        $this->expectException(\InvalidArgumentException::class);
+        app(InventoryService::class)->assertSerialItemFitsLocation(
+            $item,
+            app(InfrastructureLocationResolver::class)->forPop($pusat)
+        );
     }
 
     #[Test]

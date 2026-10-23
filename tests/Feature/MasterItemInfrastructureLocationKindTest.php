@@ -75,6 +75,19 @@ class MasterItemInfrastructureLocationKindTest extends TestCase
     }
 
     #[Test]
+    public function barang_infrastruktur_boleh_dinyatakan_terpasang_langsung_di_pop_cabang(): void
+    {
+        $this->actingAs($this->owner)->post(route('master.items.store'), $this->payload('RACK-CABANG', 'olt_module', 'infrastructure_asset', ['infrastructure_location_kind' => 'pop']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(InfrastructureLocationKind::POP, Item::where('code', 'RACK-CABANG')->firstOrFail()->infrastructure_location_kind);
+
+        $this->actingAs($this->owner)->get(route('master.items.create'))
+            ->assertOk()
+            ->assertSee('Langsung di POP/Cabang');
+    }
+
+    #[Test]
     public function barang_pelanggan_tidak_boleh_punya_posisi_infrastruktur(): void
     {
         $this->actingAs($this->owner)->post(route('master.items.store'), $this->payload('MDM-A', 'modem_ont', 'installable', ['infrastructure_location_kind' => 'mini_pop']))

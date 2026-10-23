@@ -49,21 +49,29 @@ class NetworkNodeTypeSeeder extends Seeder
 
         app(PermissionGeneratorService::class)->generate();
 
+        // core_router, aggregation_switch, pon_port, olt_card, odc DIHAPUS
+        // TOTAL (migration 2026_10_23_000003/000004 — ADHOC-211/212,
+        // keputusan user): bukan bagian hierarki resmi
+        // `Server → POP → Mini POP → OLT/Switch → Slot → PON/Port → ODP → ONT`
+        // (§17 rancangan hierarki), dan database aplikasi dipastikan nol
+        // baris legacy yang memakainya. JANGAN ditambah balik ke sini —
+        // reseed bakal menghidupkannya lagi padahal sudah dihapus permanen.
+        //
+        // `pon_port` dicek literal di kode produksi
+        // (`InfrastructureLegacyDecisionService.php`:
+        // `$ancestor->nodeType?->code === 'pon_port'`) dan kelimanya dipakai
+        // sebagai fixture topologi lama di `InfrastructureLegacyDecisionTest`/
+        // `InfrastructureLegacyMappingTest`/`InfrastructureCutoverEvidenceTest`/
+        // `LegacyInfrastructureWriteCutoverTest`/`InfrastructureReconciliationTest`/
+        // `NetworkNodePlacementRuleTest` — tes itu TIDAK ikut dihapus, cuma
+        // diubah supaya provisioning tipe-nya sendiri (`firstOrCreate` lokal
+        // per tes), bukan gantung ke baris seeder permanen. Jangan hapus
+        // baris itu di test tanpa paham polanya — lihat komentar di tiap
+        // helper `node()` masing-masing file.
         $types = [
             ['code' => 'server', 'name' => 'Server Utama', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
-            ['code' => 'core_router', 'name' => 'Core Router/Switch', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
-            // backbone/feeder/drop_cable DIHAPUS (keputusan user 21-10-2026,
-            // migration 2026_10_21_000008): bukan tingkat pohon lagi — uplink POP,
-            // koneksi PON → ODP, dan assignment port ODP + pemakaian roll kabel.
-            // Tipe lama (§16.2) — tetap dibuat supaya histori/audit yang merujuk
-            // kode ini terbaca, tapi nonaktif: Switch operasional baru memakai
-            // `switch_mini_pop` di bawah.
-            ['code' => 'aggregation_switch', 'name' => 'Router/Switch Agregasi POP', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null, 'is_active' => false],
             ['code' => 'switch_mini_pop', 'name' => 'Switch Mini POP', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
-            ['code' => 'pon_port', 'name' => 'PON Port/Card', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'olt_chassis', 'name' => 'Chassis OLT', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
-            ['code' => 'olt_card', 'name' => 'Kartu OLT', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => 128, 'red_zone_threshold' => null],
-            ['code' => 'odc', 'name' => 'ODC', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
             ['code' => 'odp', 'name' => 'ODP', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
         ];
 
@@ -95,36 +103,18 @@ class NetworkNodeTypeSeeder extends Seeder
 
         $defaultRules = [
             'server' => ['pops' => ['pusat'], 'nodes' => []],
-            'core_router' => ['pops' => ['pusat', 'cabang'], 'nodes' => []],
-            'aggregation_switch' => ['pops' => ['cabang'], 'nodes' => ['core_router']],
             'switch_mini_pop' => ['pops' => ['mini_pop'], 'nodes' => []],
             // Mini POP sekarang sebuah LOKASI fisik, bisa menaungi beberapa
             // chassis OLT sekaligus — jadi chassis boleh anchor Mini POP ATAU
-            // Cabang langsung (bukan 1:1 lagi). Kartu OLT WAJIB jadi anak
-            // chassis (bukan anchor POP langsung) karena satu chassis bisa
-            // punya banyak kartu dan kartu tanpa chassis tidak bermakna.
+            // Cabang langsung (bukan 1:1 lagi).
             'olt_chassis' => ['pops' => ['mini_pop', 'cabang'], 'nodes' => []],
-            'olt_card' => ['pops' => [], 'nodes' => ['olt_chassis']],
-            'pon_port' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card']],
-            'odc' => ['pops' => ['mini_pop'], 'nodes' => ['olt_card', 'pon_port']],
-            'odp' => ['pops' => ['cabang', 'mini_pop'], 'nodes' => ['odc']],
+            'odp' => ['pops' => ['cabang', 'mini_pop'], 'nodes' => []],
         ];
         NetworkNodeType::query()->where('code', 'ont')
             ->whereNotIn('id', DB::table('network_nodes')->select('node_type_id'))
             ->update(['is_active' => false]);
 
         $ids = NetworkNodeType::query()->pluck('id', 'code');
-        foreach ([
-            ['olt_chassis', 'aggregation_switch'],
-            ['pon_port', 'olt_chassis'],
-        ] as [$childCode, $parentCode]) {
-            DB::table('network_node_type_rules')->insertOrIgnore([
-                'child_type_id' => $ids[$childCode],
-                'parent_type_id' => $ids[$parentCode],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
         foreach ($createdCodes as $code) {
             foreach ($defaultRules[$code]['pops'] as $popType) {
                 DB::table('network_node_type_rules')->insertOrIgnore([

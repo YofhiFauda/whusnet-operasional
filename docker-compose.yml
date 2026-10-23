@@ -34,7 +34,6 @@ services:
   # storage), jadi yang diperbaiki memang berkas yang dipakai test.
   assets:
     image: node:24-alpine
-    container_name: whusnet-assets
     working_dir: /var/www
     restart: "no"
     command: >
@@ -55,7 +54,7 @@ services:
       - app_network
 
   app:
-    image: whusnet-app:latest
+    image: app:${APP_VERSION:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -141,7 +140,6 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: whusnet-nginx
     restart: unless-stopped
     ports:
       - "8000:80"
@@ -164,7 +162,6 @@ services:
 
   db:
     image: mysql:8.0
-    container_name: whusnet-db
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: whusnet_operasional
@@ -185,7 +182,6 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: whusnet-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -202,8 +198,7 @@ services:
   #  HORIZON — Queue Worker
   # ─────────────────────────────────────────
   horizon:
-    image: whusnet-app:${APP_VERSION:-latest}
-    container_name: whusnet-horizon
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     working_dir: /var/www
     networks:
@@ -256,8 +251,7 @@ services:
   #  REVERB — WebSocket Server
   # ─────────────────────────────────────────
   reverb:
-    image: whusnet-app:${APP_VERSION:-latest}
-    container_name: whusnet-reverb
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     working_dir: /var/www
     networks:
@@ -312,8 +306,7 @@ services:
   #  SCHEDULER — Laravel Cron
   # ─────────────────────────────────────────
   scheduler:
-    image: whusnet-app:${APP_VERSION:-latest}
-    container_name: whusnet-scheduler
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     working_dir: /var/www
     networks:
@@ -364,22 +357,6 @@ services:
       retries: 3
       start_period: 30s
       
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: whusnet-phpmyadmin
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    environment:
-      PMA_HOST: db
-      PMA_PORT: 3306
-      MYSQL_ROOT_PASSWORD: root
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - app_network
-
 networks:
   app_network:
     driver: bridge

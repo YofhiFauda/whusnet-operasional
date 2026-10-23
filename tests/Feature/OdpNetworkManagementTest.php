@@ -238,9 +238,14 @@ class OdpNetworkManagementTest extends TestCase
     {
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
         $pop = Pop::create(['code' => 'ODP-G', 'name' => 'POP ODP G', 'type' => 'cabang', 'status' => 'active']);
+        // core_router dinonaktifkan 2026-10-23 (bukan bagian hierarki resmi,
+        // §17 rancangan hierarki) — pakai tipe generik tanpa port buatan
+        // sendiri supaya tes tetap menguji behavior "tipe tanpa port", bukan
+        // tipe core_router itu sendiri.
+        $noPortType = NetworkNodeType::create(['code' => 'test-no-port', 'name' => 'Tipe Tanpa Port', 'has_ports' => false]);
 
         $this->actingAs($owner)->post(route('network.nodes.store'), [
-            'node_type_id' => NetworkNodeType::where('code', 'core_router')->value('id'),
+            'node_type_id' => $noPortType->id,
             'anchor_pop_id' => $pop->id,
             'code' => 'CR-01',
             'name' => 'Core',
@@ -430,8 +435,11 @@ class OdpNetworkManagementTest extends TestCase
     {
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
         $pop = Pop::create(['code' => 'TREE-A', 'name' => 'POP Pohon', 'type' => 'cabang', 'status' => 'active']);
-        $coreTypeId = NetworkNodeType::where('code', 'core_router')->value('id');
-        $odcTypeId = NetworkNodeType::where('code', 'odc')->value('id');
+        // core_router/odc dinonaktifkan 2026-10-23 (bukan bagian hierarki
+        // resmi, §17 rancangan hierarki). "Core" di sini memakai tipe
+        // generik tanpa port buatan sendiri, murni untuk menguji node
+        // bertingkat tanpa port — bukan menguji core_router.
+        $coreTypeId = NetworkNodeType::create(['code' => 'test-core', 'name' => 'Induk Generik', 'has_ports' => false])->id;
 
         $this->actingAs($owner)->post(route('network.nodes.store'), [
             'node_type_id' => $coreTypeId,
@@ -445,16 +453,21 @@ class OdpNetworkManagementTest extends TestCase
         $this->assertSame(0, $core->ports()->count());
         $this->assertSame(100, $core->capacity);
 
+        // ODC sendiri sudah nonaktif (bukan sekadar "parent_id salah") —
+        // request ditolak pada validasi node_type_id, sebelum aturan
+        // placement lama (anak dari olt_card/pon_port) dicek.
         $this->actingAs($owner)->post(route('network.nodes.store'), [
-            'node_type_id' => $odcTypeId,
+            'node_type_id' => NetworkNodeType::where('code', 'odc')->value('id'),
             'parent_id' => $core->id,
             'code' => 'ODC-INVALID-1',
             'name' => 'ODC Tidak Valid',
             'capacity' => 4,
-        ])->assertSessionHasErrors('parent_id');
+        ])->assertSessionHasErrors('node_type_id');
 
-        // Backbone bukan tipe node lagi (migration 000008) — anak bertingkat
-        // tanpa port diuji lewat PON lama di bawah chassis OLT.
+        // Backbone bukan tipe node lagi (migration 000008). pon_port
+        // dinonaktifkan 2026-10-23 (ADHOC-209, representasi lama PON sebagai
+        // node sudah tidak dipakai — PON sekarang infrastructure_ports) —
+        // anak bertingkat tanpa port diuji pakai tipe generik buatan sendiri.
         $this->actingAs($owner)->post(route('network.nodes.store'), [
             'node_type_id' => NetworkNodeType::where('code', 'olt_chassis')->value('id'),
             'anchor_pop_id' => $pop->id,
@@ -462,8 +475,9 @@ class OdpNetworkManagementTest extends TestCase
             'name' => 'OLT Pohon',
         ])->assertRedirect(route('network.nodes.index'));
         $olt = NetworkNode::where('code', 'OLT-TREE-1')->firstOrFail();
+        $genericChildType = NetworkNodeType::create(['code' => 'test-child-no-port', 'name' => 'Anak Generik', 'has_ports' => false]);
         $this->actingAs($owner)->post(route('network.nodes.store'), [
-            'node_type_id' => NetworkNodeType::where('code', 'pon_port')->value('id'),
+            'node_type_id' => $genericChildType->id,
             'parent_id' => $olt->id,
             'code' => 'PON-CHILD-1',
             'name' => 'PON Anak',
@@ -546,9 +560,12 @@ class OdpNetworkManagementTest extends TestCase
     {
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
         $pop = Pop::create(['code' => 'CORE-NP', 'name' => 'POP Core', 'type' => 'cabang', 'status' => 'active']);
+        // core_router DIHAPUS 2026-10-23 (ADHOC-211) — tipe generik buatan
+        // sendiri, cukup buat menguji "tipe tanpa port".
+        $noPortType = NetworkNodeType::create(['code' => 'test-core-np', 'name' => 'Tipe Tanpa Port', 'has_ports' => false]);
         $core = NetworkNode::create([
             'anchor_pop_id' => $pop->id,
-            'node_type_id' => NetworkNodeType::where('code', 'core_router')->value('id'),
+            'node_type_id' => $noPortType->id,
             'code' => 'CORE-NP-1',
             'name' => 'Core',
             'capacity' => 100,
@@ -682,7 +699,10 @@ class OdpNetworkManagementTest extends TestCase
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
         $pop = Pop::factory()->create(['type' => 'cabang']);
         $node = $this->makeNode($pop->id, 'ODP-EDIT-01', 'Node Awal');
-        $coreType = NetworkNodeType::where('code', 'core_router')->firstOrFail();
+        // core_router dinonaktifkan 2026-10-23 — tipe tujuan ganti pakai
+        // tipe generik aktif biar tes tidak bergantung ke tipe yang sudah
+        // ditutup (lihat §17 rancangan hierarki).
+        $coreType = NetworkNodeType::create(['code' => 'test-retype', 'name' => 'Tipe Ganti Generik', 'has_ports' => false]);
 
         $this->actingAs($owner)->patch(route('network.nodes.update', $node), [
             'code' => 'CORE-EDIT-01',
@@ -702,7 +722,10 @@ class OdpNetworkManagementTest extends TestCase
         $pop = Pop::factory()->create(['type' => 'cabang']);
         $node = $this->makeNode($pop->id, 'ODP-TERPAKAI-01', 'Node Terpakai');
         $node->ports()->create(['number' => 1]);
-        $coreType = NetworkNodeType::where('code', 'core_router')->firstOrFail();
+        // Tipe generik aktif (bukan core_router yang sudah dinonaktifkan
+        // 2026-10-23) — tes ini menguji guard "punya port = tidak boleh
+        // ganti tipe", bukan status aktif tipe tujuan.
+        $coreType = NetworkNodeType::create(['code' => 'test-retype-locked', 'name' => 'Tipe Ganti Terkunci', 'has_ports' => false]);
 
         $this->actingAs($owner)->patch(route('network.nodes.update', $node), [
             'code' => 'CORE-TERPAKAI-01',

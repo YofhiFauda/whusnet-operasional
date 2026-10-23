@@ -46,8 +46,12 @@ class InfrastructureLegacyMappingTest extends TestCase
 
     private function node(string $typeCode, array $placement): NetworkNode
     {
+        // Tipe representasi lama dihapus dari seeder master 2026-10-23
+        // (ADHOC-212) — provisioning sendiri, lihat InfrastructureLegacyDecisionTest.
+        $typeId = NetworkNodeType::firstOrCreate(['code' => $typeCode], ['name' => $typeCode, 'has_ports' => false])->id;
+
         return NetworkNode::factory()->create(array_merge([
-            'node_type_id' => NetworkNodeType::where('code', $typeCode)->firstOrFail()->id,
+            'node_type_id' => $typeId,
             'parent_id' => null,
             'anchor_pop_id' => null,
         ], $placement));

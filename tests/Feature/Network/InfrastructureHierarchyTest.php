@@ -127,8 +127,13 @@ class InfrastructureHierarchyTest extends TestCase
 
     private function node(string $typeCode, Pop $anchor, string $code): NetworkNode
     {
+        // Tipe representasi lama (pon_port dkk) dihapus dari seeder master
+        // 2026-10-23 (ADHOC-212) — provisioning sendiri, lihat
+        // InfrastructureLegacyDecisionTest.
+        $typeId = NetworkNodeType::firstOrCreate(['code' => $typeCode], ['name' => $typeCode, 'has_ports' => false])->id;
+
         return NetworkNode::factory()->create([
-            'node_type_id' => NetworkNodeType::where('code', $typeCode)->firstOrFail()->id,
+            'node_type_id' => $typeId,
             'anchor_pop_id' => $anchor->id, 'code' => $code, 'name' => $code,
         ]);
     }
@@ -317,6 +322,19 @@ class InfrastructureHierarchyTest extends TestCase
     }
 
     #[Test]
+    public function sambungan_baru_dari_form_langsung_terverifikasi(): void
+    {
+        $odp = $this->node('odp', $this->miniA, 'ODP-FORM');
+
+        $this->actingAs($this->owner)->post(route('network.infrastructure-ports.connections.store', $this->pon), ['target_network_node_id' => $odp->id])
+            ->assertRedirect(route('network.infrastructure-ports.show', $this->pon));
+
+        $connection = InfrastructureConnection::query()->active()->where('target_network_node_id', $odp->id)->sole();
+        $this->assertTrue($connection->isVerified());
+        $this->assertSame($this->owner->id, $connection->verified_by);
+    }
+
+    #[Test]
     public function aksi_tambah_kontekstual_perangkat_slot_pon_odp(): void
     {
         $this->withoutVite();
@@ -361,28 +379,6 @@ class InfrastructureHierarchyTest extends TestCase
     }
 
     #[Test]
-    public function peta_memakai_proyeksi_yang_sama(): void
-    {
-        $this->withoutVite();
-        $map = app(InfrastructureMapService::class)->build($this->owner, null, 'path');
-
-        // Keputusan user 21-10-2026: Slot dan PON instance kanvas sendiri
-        // (ID dinamespace negatif), rantai lengkap OLT→Slot→PON→ODP.
-        $ponCanvasId = -3_000_000_000 - $this->pon->id;
-        $slotCanvasId = -2_000_000_000 - $this->pon->infrastructure_slot_id;
-        $slotKosongCanvasId = -2_000_000_000 - $this->slotKosong->id;
-        $this->assertSame($ponCanvasId, $map['topologyDetails'][$this->odpVerified->id]['parent_id']);
-        $this->assertSame('connection', $map['topologyDetails'][$this->odpVerified->id]['relation']);
-        $this->assertFalse($map['topologyDetails'][$this->odpUnverified->id]['verified']);
-        $this->assertSame($this->server->id, $map['topologyDetails'][-$this->pusat->id]['parent_id']);
-        $this->assertSame('PON 1', $map['topologyDetails'][$this->odpVerified->id]['via_port']);
-        $this->assertSame(['Slot 1', 'Slot 2'], array_column($map['topologyDetails'][$this->olt1->id]['slots'], 'label'));
-        $this->assertSame($this->olt1->id, $map['topologyDetails'][$slotCanvasId]['parent_id']);
-        $this->assertSame($slotCanvasId, $map['topologyDetails'][$ponCanvasId]['parent_id']);
-        $this->assertSame($this->olt1->id, $map['topologyDetails'][$slotKosongCanvasId]['parent_id']);
-    }
-
-    #[Test]
     public function detail_pelanggan_menampilkan_lokasi_jaringan_tepat(): void
     {
         $response = $this->actingAs($this->owner)->get(route('customers.show', $this->customerDuaOnt));
@@ -405,6 +401,153 @@ class InfrastructureHierarchyTest extends TestCase
         $response->assertOk()
             ->assertSee($this->odpUnverified->code)
             ->assertSee('Uplink PON→ODP belum terverifikasi');
+    }
+
+    #[Test]
+    public function form_tambah_titik_memilih_enam_tipe_operasional_dengan_induk_yang_jelas(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('network.nodes.index'));
+
+        $response->assertOk();
+        foreach (['server', 'switch', 'olt', 'slot', 'pon', 'odp'] as $type) {
+            $response->assertSee('data-device-type="'.$type.'"', false);
+        }
+        $response->assertSee('POP penempatan fisik')
+            ->assertSee('Perangkat induk')
+            ->assertSee('Slot OLT induk')
+            ->assertSee('PON uplink');
+    }
+
+    #[Test]
+    public function odp_baru_dapat_dipetakan_ke_pon_dalam_satu_transaksi(): void
+    {
+        $this->actingAs($this->owner)->post(route('network.nodes.store'), [
+            'node_type_id' => NetworkNodeType::where('code', 'odp')->value('id'),
+            'anchor_pop_id' => $this->miniA->id,
+            'uplink_pon_id' => $this->pon->id,
+            'code' => 'ODP-BARU-1',
+            'name' => 'ODP Baru Satu',
+            'capacity' => 8,
+        ])->assertRedirect(route('network.nodes.index'));
+
+        $odp = NetworkNode::where('code', 'ODP-BARU-1')->sole();
+        $this->assertSame($this->miniA->id, $odp->anchor_pop_id);
+        $this->assertDatabaseHas('infrastructure_connections', [
+            'source_infrastructure_port_id' => $this->pon->id,
+            'target_network_node_id' => $odp->id,
+            'active_key' => 1,
+        ]);
+    }
+
+    #[Test]
+    public function mapping_odp_ke_pon_cabang_lain_ditolak_tanpa_menyimpan_node(): void
+    {
+        $oltLain = $this->node('olt_chassis', $this->miniB, 'OLT-SANDYA');
+        $positions = app(InfrastructurePositionService::class);
+        $ponLain = $positions->createPort($positions->createSlot($oltLain, 1), 1, InfrastructurePortKind::PON);
+
+        $this->actingAs($this->owner)->post(route('network.nodes.store'), [
+            'node_type_id' => NetworkNodeType::where('code', 'odp')->value('id'),
+            'anchor_pop_id' => $this->miniA->id,
+            'uplink_pon_id' => $ponLain->id,
+            'code' => 'ODP-SALAH-CABANG',
+            'name' => 'ODP Salah Cabang',
+            'capacity' => 8,
+        ])->assertSessionHasErrors('uplink_pon_id');
+
+        $this->assertDatabaseMissing('network_nodes', ['code' => 'ODP-SALAH-CABANG']);
+    }
+
+    #[Test]
+    public function panel_slot_menampilkan_alokasi_pon_kartu_dan_rincian_pon(): void
+    {
+        $slot = $this->pon->slot;
+        $slot->update(['capacity' => 16]);
+        $card = Item::create([
+            'code' => 'KARTU-PANEL', 'name' => 'Kartu GPON Panel',
+            'unit' => 'pcs', 'item_category_id' => ItemCategory::where('code', 'olt_module')->value('id'),
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+            'infrastructure_location_kind' => 'slot',
+        ]);
+        InventorySerial::create([
+            'item_id' => $card->id, 'serial_number' => 'SN-KARTU-PANEL',
+            'status' => SerialStatus::DEPLOYED->value,
+            'current_infrastructure_slot_id' => $slot->id,
+        ]);
+
+        $response = $this->actingAs($this->owner)->get(route('network.nodes.index'));
+
+        $response->assertOk()
+            ->assertSee('id="inspector-slot-'.$slot->id.'"', false)
+            ->assertSee('@click="selectSlot('.$slot->id.')"', false)
+            ->assertSee('1 / 16')
+            ->assertSee('PON terdaftar')
+            ->assertSee('Kartu GPON Panel')
+            ->assertSee('SN-KARTU-PANEL')
+            ->assertSee('2 / 10 pelanggan aktif')
+            ->assertSee('ODP-1')
+            ->assertSee('id="inspector-slot-'.$this->slotKosong->id.'"', false)
+            ->assertSee('Belum ada PON tercatat pada slot ini.');
+    }
+
+    #[Test]
+    public function panel_pon_menampilkan_kapasitas_pelanggan_odp_dan_splitter_terpasang(): void
+    {
+        $splitter = Item::create([
+            'code' => 'SPL-PANEL-1X8', 'name' => 'Splitter 1:8 Panel',
+            'unit' => 'pcs', 'item_category_id' => ItemCategory::where('code', 'splitter_odp')->value('id'),
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+        ]);
+        InventorySerial::create([
+            'item_id' => $splitter->id, 'serial_number' => 'SPL-PANEL-SN-1',
+            'status' => SerialStatus::DEPLOYED->value,
+            'current_network_node_id' => $this->odpVerified->id,
+        ]);
+
+        $odpAsset = Item::create([
+            'code' => 'ODP-PANEL-8', 'name' => 'ODP Box Panel',
+            'unit' => 'pcs', 'item_category_id' => ItemCategory::where('code', 'splitter_odp')->value('id'),
+            'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+        ]);
+        InventorySerial::create([
+            'item_id' => $odpAsset->id, 'serial_number' => 'ODP-PANEL-SN-1',
+            'status' => SerialStatus::DEPLOYED->value,
+            'current_network_node_id' => $this->odpVerified->id,
+        ]);
+
+        $response = $this->actingAs($this->owner)->get(route('network.nodes.index'));
+
+        $response->assertOk()
+            ->assertSee('id="inspector-pon-'.$this->pon->id.'"', false)
+            ->assertSee('2 / 10 pelanggan aktif')
+            ->assertSee('ODP-1')
+            ->assertSee('ODP-2')
+            ->assertSee('Pelanggan Dua ONT')
+            ->assertSee('Splitter 1:8 Panel')
+            ->assertSee('SPL-PANEL-SN-1')
+            ->assertDontSee('ODP Box Panel · 1 unit');
+    }
+
+    #[Test]
+    public function peta_memakai_proyeksi_yang_sama(): void
+    {
+        $this->withoutVite();
+        $map = app(InfrastructureMapService::class)->build($this->owner, null, 'path');
+
+        // Keputusan user 21-10-2026: Slot dan PON instance kanvas sendiri
+        // (ID dinamespace negatif), rantai lengkap OLT→Slot→PON→ODP.
+        $ponCanvasId = -3_000_000_000 - $this->pon->id;
+        $slotCanvasId = -2_000_000_000 - $this->pon->infrastructure_slot_id;
+        $slotKosongCanvasId = -2_000_000_000 - $this->slotKosong->id;
+        $this->assertSame($ponCanvasId, $map['topologyDetails'][$this->odpVerified->id]['parent_id']);
+        $this->assertSame('connection', $map['topologyDetails'][$this->odpVerified->id]['relation']);
+        $this->assertFalse($map['topologyDetails'][$this->odpUnverified->id]['verified']);
+        $this->assertSame($this->server->id, $map['topologyDetails'][-$this->pusat->id]['parent_id']);
+        $this->assertSame('PON 1', $map['topologyDetails'][$this->odpVerified->id]['via_port']);
+        $this->assertSame(['Slot 1', 'Slot 2'], array_column($map['topologyDetails'][$this->olt1->id]['slots'], 'label'));
+        $this->assertSame($this->olt1->id, $map['topologyDetails'][$slotCanvasId]['parent_id']);
+        $this->assertSame($slotCanvasId, $map['topologyDetails'][$ponCanvasId]['parent_id']);
+        $this->assertSame($this->olt1->id, $map['topologyDetails'][$slotKosongCanvasId]['parent_id']);
     }
 
     #[Test]
@@ -533,7 +676,12 @@ class InfrastructureHierarchyTest extends TestCase
     public function target_switch_luar_scope_tidak_bocor_di_pohon(): void
     {
         $sibling = Pop::factory()->create(['type' => 'mini_pop', 'parent_id' => $this->cabangA->id]);
-        $outside = $this->node('core_router', $sibling, 'RAHASIA-MINI-LAIN');
+        // core_router DIHAPUS 2026-10-23 (ADHOC-211). 'odp' tidak bisa
+        // dipakai gantinya — Switch wajib berhenti di Port, tujuan ODP
+        // ditolak (InfrastructureConnectionService). Tipe generik buatan
+        // sendiri: cuma butuh "node apa pun di luar scope", bukan ODP.
+        $outsideType = NetworkNodeType::create(['code' => 'test-outside-scope', 'name' => 'Generik Luar Scope', 'has_ports' => false]);
+        $outside = NetworkNode::factory()->create(['node_type_id' => $outsideType->id, 'anchor_pop_id' => $sibling->id, 'code' => 'RAHASIA-MINI-LAIN', 'name' => 'RAHASIA-MINI-LAIN']);
         app(InfrastructureConnectionService::class)->release(
             InfrastructureConnection::where('source_infrastructure_port_id', $this->switchPort->id)->sole(),
             $this->owner, 'Ubah tujuan',

@@ -381,6 +381,61 @@ class FopTaskInfrastructureScopeTest extends TestCase
     }
 
     #[Test]
+    public function dropdown_pop_task_infrastruktur_hanya_menyediakan_cabang(): void
+    {
+        $this->withoutVite();
+
+        $response = $this->actingAs($this->owner)->get(route('fop-tasks.index'))->assertOk();
+
+        $cabangPops = $response->viewData('cabangPops');
+        $this->assertTrue($cabangPops->contains('id', $this->cabangA->id));
+        $this->assertTrue($cabangPops->contains('id', $this->cabangB->id));
+        $this->assertTrue($cabangPops->every(fn (Pop $pop): bool => $pop->type === 'cabang'));
+        $this->assertFalse($cabangPops->contains('id', $this->miniA1->id));
+        $this->assertTrue($response->viewData('pops')->contains('id', $this->miniA1->id));
+    }
+
+    #[Test]
+    public function tambah_task_infrastruktur_menolak_mini_pop_sebagai_pop_utama(): void
+    {
+        $technician = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->firstOrFail()->id, 'status' => 'active']);
+        $village = Village::create([
+            'district_id' => District::create(['city_id' => City::create(['name' => 'Kota'])->id, 'name' => 'Kecamatan'])->id,
+            'name' => 'Desa', 'postal_code' => '63491',
+        ]);
+
+        foreach (['O-REQ', 'INFR REQ'] as $category) {
+            $this->actingAs($this->owner)->post(route('fop-tasks.store'), [
+                'category' => $category,
+                'task_date' => now()->format('Y-m-d H:i:s'),
+                'tugas' => 'Uji pilihan POP '.$category,
+                'village_id' => $village->id,
+                'pop_id' => $this->miniA1->id,
+                'issue' => 'Uji',
+                'status' => 'terjadwal',
+                'priority' => 'Medium',
+                'technicians' => [$technician->id],
+            ])->assertSessionHasErrors('pop_id');
+
+            $this->assertFalse(FopTask::where('tugas', 'Uji pilihan POP '.$category)->exists());
+        }
+    }
+
+    #[Test]
+    public function task_infrastruktur_tidak_boleh_memakai_mini_pop_sebagai_pop_utama(): void
+    {
+        foreach (['O-REQ', 'INFR REQ'] as $category) {
+            $task = $this->fopTask($this->cabangA, $category);
+
+            $this->actingAs($this->owner)->put(route('fop-tasks.update', $task), [
+                'pop_id' => $this->miniA1->id,
+            ])->assertSessionHasErrors('pop_id');
+
+            $this->assertSame($this->cabangA->id, $task->fresh()->pop_id);
+        }
+    }
+
+    #[Test]
     public function form_fop_menolak_scope_untuk_kategori_non_infrastruktur(): void
     {
         $task = $this->fopTask($this->cabangA, 'MTN');

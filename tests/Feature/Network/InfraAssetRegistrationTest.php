@@ -162,9 +162,14 @@ class InfraAssetRegistrationTest extends TestCase
         $response->assertRedirect(route('network.nodes.show', $node));
         $response->assertSessionHas('success');
 
+        // Master Node cuma nampilin RINGKASAN jumlah per barang, bukan SN
+        // mentah — detail lengkap (SN/teknisi/jam/task) itu domain Peta
+        // Infrastruktur (rancangan-pembagian-detail-master-node-vs-peta-infrastruktur.md).
         $show = $this->actingAs($user)->get(route('network.nodes.show', $node));
         $show->assertOk();
-        $show->assertSee('SN-LEGACY-SUKSES');
+        $show->assertSee($item->name);
+        $show->assertDontSee('SN-LEGACY-SUKSES');
+        $show->assertSee(route('network.map.index', ['node_id' => $node->id]));
     }
 
     #[Test]

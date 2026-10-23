@@ -30,7 +30,7 @@ services:
       # baca env runtime container. Lihat catatan di Dockerfile.prod stage `assets`.
       args:
         VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
-    image: whusnet-app:${APP_VERSION:-latest}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment: &app_env
       CONTAINER_ROLE: app
@@ -190,7 +190,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
       target: runtime
-    image: whusnet-app:${APP_VERSION:-latest}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       <<: *app_env
@@ -222,7 +222,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
       target: runtime
-    image: whusnet-app:${APP_VERSION:-latest}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       <<: *app_env
@@ -255,7 +255,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
       target: runtime
-    image: whusnet-app:${APP_VERSION:-latest}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       <<: *app_env

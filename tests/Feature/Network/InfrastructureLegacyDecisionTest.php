@@ -69,8 +69,15 @@ class InfrastructureLegacyDecisionTest extends TestCase
 
     private function node(string $typeCode, array $placement): NetworkNode
     {
+        // Tipe representasi lama (pon_port/olt_card/aggregation_switch/odc)
+        // dihapus dari seeder master 2026-10-23 (ADHOC-212) — bukan bagian
+        // hierarki resmi lagi. Alat keputusan data lama tetap harus bisa
+        // dites terhadap fixture-nya, jadi tes ini provisioning tipe sendiri
+        // (firstOrCreate), bukan gantung ke baris seeder permanen.
+        $typeId = NetworkNodeType::firstOrCreate(['code' => $typeCode], ['name' => $typeCode, 'has_ports' => false])->id;
+
         return NetworkNode::factory()->create(array_merge([
-            'node_type_id' => NetworkNodeType::where('code', $typeCode)->firstOrFail()->id, 'parent_id' => null, 'anchor_pop_id' => null,
+            'node_type_id' => $typeId, 'parent_id' => null, 'anchor_pop_id' => null,
         ], $placement));
     }
 
