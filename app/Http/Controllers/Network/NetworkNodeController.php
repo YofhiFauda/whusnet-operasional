@@ -2,22 +2,28 @@
 
 namespace App\Http\Controllers\Network;
 
+use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureSlotKind;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\InfrastructurePort;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
+use App\Services\InfrastructureConnectionService;
 use App\Services\InfrastructureHierarchyService;
+use App\Services\InfrastructureLocationResolver;
 use App\Services\MasterRecordRemovalService;
+use App\Services\NetworkNodeAttentionService;
 use App\Services\NetworkNodeService;
 use App\Services\NetworkPortAssignmentService;
 use App\Support\InfrastructureCutover;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +47,7 @@ class NetworkNodeController extends Controller
 {
     public function __construct(private readonly EffectiveAccessService $access) {}
 
-    public function index(): View
+    public function index(NetworkNodeAttentionService $attention): View
     {
         $user = auth()->user();
         $nodes = NetworkNode::query()
@@ -124,15 +130,17 @@ class NetworkNodeController extends Controller
             : collect();
 
         $hierarchy = app(InfrastructureHierarchyService::class)->build($user);
+        $unseenNodeIds = $attention->unseenNodeIds($user);
 
         return view('network.nodes.index', compact(
             'nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels',
             'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount',
-            'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop', 'availableCustomers', 'hierarchy'
+            'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop', 'availableCustomers', 'hierarchy',
+            'unseenNodeIds'
         ));
     }
 
-    public function store(Request $request, NetworkNodeService $service): RedirectResponse
+    public function store(Request $request, NetworkNodeService $service, InfrastructureConnectionService $connections, InfrastructureLocationResolver $locations): RedirectResponse
     {
         $request->merge(['code' => strtoupper(trim((string) $request->input('code')))]);
         $user = auth()->user();
@@ -147,6 +155,7 @@ class NetworkNodeController extends Controller
             'code' => ['required', 'string', 'max:50', Rule::unique('network_nodes', 'code')],
             'name' => ['required', 'string', 'max:150'],
             'capacity' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'uplink_pon_id' => ['nullable', 'integer', Rule::exists('infrastructure_ports', 'id')->where('kind', InfrastructurePortKind::PON->value)],
             ...$this->locationRules(),
         ]);
 
@@ -163,6 +172,18 @@ class NetworkNodeController extends Controller
         }
 
         $nodeType = NetworkNodeType::findOrFail($validated['node_type_id']);
+        if (isset($validated['uplink_pon_id']) && $nodeType->code !== 'odp') {
+            throw ValidationException::withMessages(['uplink_pon_id' => 'Uplink PON hanya dapat dipilih untuk ODP.']);
+        }
+        $uplinkPon = isset($validated['uplink_pon_id'])
+            ? InfrastructurePort::query()->with('slot.device')->findOrFail($validated['uplink_pon_id'])
+            : null;
+        if ($uplinkPon !== null) {
+            abort_unless($user->hasPermission('network_nodes.update'), 403);
+            $uplinkPopId = $locations->forPort($uplinkPon)->deepestPopId();
+            abort_unless($this->access->hasAllPopAccess($user)
+                || ($uplinkPopId !== null && in_array($uplinkPopId, $this->access->getAllowedPopIds($user), true)), 403);
+        }
         if (in_array($nodeType->code, InfrastructureCutover::LEGACY_NODE_TYPES, true)) {
             InfrastructureCutover::assertLegacyWriteAllowed('node_type_id', "Node {$nodeType->name}");
         }
@@ -183,7 +204,7 @@ class NetworkNodeController extends Controller
             throw ValidationException::withMessages(['capacity' => "Kapasitas maksimal {$nodeType->max_ports} port."]);
         }
 
-        DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount, $hasLegacyPorts): void {
+        DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount, $hasLegacyPorts, $uplinkPon, $connections, $user): void {
             $node = NetworkNode::create([
                 'parent_id' => $parent?->id,
                 'anchor_pop_id' => $anchor?->id,
@@ -198,14 +219,23 @@ class NetworkNodeController extends Controller
             for ($number = 1; $number <= $portCount; $number++) {
                 $node->ports()->create(['number' => $number, 'is_used' => false]);
             }
+
+            if ($uplinkPon !== null) {
+                try {
+                    $connections->connect($uplinkPon, $user, targetNode: $node, verified: true);
+                } catch (InvalidArgumentException $exception) {
+                    throw ValidationException::withMessages(['uplink_pon_id' => $exception->getMessage()]);
+                }
+            }
         });
 
         return redirect()->route('network.nodes.index')->with('success', 'Node berhasil ditambahkan.');
     }
 
-    public function show(NetworkNode $node): View
+    public function show(NetworkNode $node, NetworkNodeAttentionService $attention): View
     {
         $this->authorizeNodeScope($node);
+        $attention->markSeen(auth()->user(), $node);
         $node->load([
             'nodeType',
             'ports.activeAssignment.customer.customerTechnicalDetail',
@@ -253,9 +283,18 @@ class NetworkNodeController extends Controller
             'location' => $node->effectiveLocation(),
             'cardOptions' => $cardOptions,
             'availableCustomers' => $availableCustomers,
+            'infrastructureActions' => $node->deviceInfrastructureActions()->with(['task', 'technician'])->latest('performed_at')->limit(20)->get(),
             'canViewDeviceSerials' => $user->hasPermission('customers.detail.devices.view_sensitive'),
             'allowedCustomerPopIds' => $this->access->hasAllPopAccess($user) ? null : $this->access->getAllowedPopIds($user),
         ]);
+    }
+
+    public function markSeen(NetworkNode $node, NetworkNodeAttentionService $attention): JsonResponse
+    {
+        $this->authorizeNodeScope($node);
+        $attention->markSeen(auth()->user(), $node);
+
+        return response()->json(['ok' => true]);
     }
 
     public function update(Request $request, NetworkNode $node, NetworkNodeService $service, MasterRecordRemovalService $removal): RedirectResponse

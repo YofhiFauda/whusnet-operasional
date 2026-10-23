@@ -224,6 +224,37 @@ class BusinessDevelopmentVerificationGateTest extends TestCase
         $response->assertSee($customer->full_name);
     }
 
+    public function test_badge_and_queue_only_include_customers_this_role_can_verify(): void
+    {
+        $approverRole = Role::where('code', 'atasan')->firstOrFail();
+        $approver = User::factory()->create(['status' => 'active', 'role_id' => $approverRole->id]);
+        $this->giveAllPopScope($approver);
+
+        $eligible = $this->createCustomerWithCategory('Paket Bisnis Broadband');
+        $ineligible = $this->createCustomerWithCategory('Paket Bisnis UKM');
+
+        PackageCategory::where('name', 'Paket Bisnis Broadband')
+            ->update(['installation_fee_approval_role_id' => $approverRole->id]);
+        PackageCategory::where('name', 'Paket Bisnis UKM')
+            ->update(['installation_fee_approval_role_id' => Role::where('code', 'business_development')->firstOrFail()->id]);
+
+        $eligible->update(['status' => WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value]);
+        $ineligible->update(['status' => WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value]);
+
+        $response = $this->actingAs($approver)->get(route('business-development-verifications.index'));
+
+        $response->assertOk()
+            ->assertSee($eligible->customer_code)
+            ->assertDontSee($ineligible->customer_code)
+            ->assertSee('data-badge="bd-verification"', false);
+        $this->assertMatchesRegularExpression('/data-badge="bd-verification"[^>]*>\s*1\s*<\/span>/', $response->getContent());
+        $eligible->update(['status' => WorkflowTransition::ACTIVE->value]);
+
+        $this->get(route('business-development-verifications.index'))
+            ->assertOk()
+            ->assertDontSee('data-badge="bd-verification"', false);
+    }
+
     /**
      * Kebalikan dari regresi di atas — nilai bawaan paket TETAP dipakai,
      * cuma dipindah ke tempat yang benar: prefill "Biaya Instalasi" di

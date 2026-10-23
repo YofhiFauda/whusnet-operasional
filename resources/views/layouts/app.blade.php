@@ -119,7 +119,7 @@
                     </a>
                     @endif
 
-                    @if(auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.create') || auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.detail.survey.view') || auth()->user()->hasPermission('customers.detail.installation.view') || auth()->user()->hasPermission('customers.terminated.view') || auth()->user()->hasPermission('customers.failed.view'))
+                    @if(auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.create') || auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.detail.survey.view') || auth()->user()->hasPermission('customers.detail.installation.view') || auth()->user()->hasPermission('customers.terminated.view') || auth()->user()->hasPermission('customers.failed.view') || auth()->user()->hasPermission('customer_cable_crossings.view'))
                     {{-- Pelanggan collapsible submenu --}}
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')"
@@ -200,6 +200,13 @@
                                    class="block py-1.5 px-3 rounded-md transition-colors
                                           {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                     List Pelanggan
+                                </a>
+                                @endif
+                                @if(auth()->user()->hasPermission('customer_cable_crossings.view'))
+                                <a href="{{ route('customer-cable-crossings.index') }}"
+                                   class="block py-1.5 px-3 rounded-md transition-colors
+                                          {{ Request::routeIs('customer-cable-crossings.*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    Kabel Melintang Jalan
                                 </a>
                                 @endif
                                 @if(auth()->user()->hasPermission('customers.failed.view'))
@@ -347,7 +354,12 @@
                                 @endif
                                 @if(auth()->user()->hasPermission('business_development_verification.view'))
                                 <a href="{{ route('business-development-verifications.index') }}"
-                                   class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Menunggu Verifikasi BD</a>
+                                   class="flex items-center justify-between gap-2 py-1.5 px-3 rounded-md transition-colors {{ Request::is('business-development-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                    <span>Menunggu Verifikasi BD</span>
+                                    @if(($badge_business_development_verification_count ?? 0) > 0)
+                                        <span data-badge="bd-verification" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">{{ $badge_business_development_verification_count }}</span>
+                                    @endif
+                                </a>
                                 @endif
                                 @if(auth()->user()->hasPermission('business_customers.view'))
                                 <a href="{{ route('business-development.business-customers.index') }}"
@@ -451,6 +463,9 @@
                     @can('network_nodes.view')
                     <a href="{{ route('network.nodes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
                         <span class="sidebar-text">Master Node Jaringan &amp; Port</span>
+                        @if(($badge_node_attention_count ?? 0) > 0)
+                            <span id="node-attention-count" class="ml-auto bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full" title="Node dengan perangkat baru terpasang">{{ $badge_node_attention_count }}</span>
+                        @endif
                     </a>
                     <a href="{{ route('network.map.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ Request::routeIs('network.map.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60' }}">
                         <span class="sidebar-text">Peta Infrastruktur ISP</span>

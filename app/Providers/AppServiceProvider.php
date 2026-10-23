@@ -23,7 +23,10 @@ use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TaskObserver;
 use App\Policies\TaskPolicy;
+use App\Services\BusinessDevelopmentVerificationQueue;
 use App\Services\EffectiveAccessService;
+use App\Services\NetworkNodeAttentionService;
+use App\Services\WarehouseTransferActionQueue;
 use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -285,6 +288,7 @@ class AppServiceProvider extends ServiceProvider
             $verificationCount = 0;
             $registrationVerificationCount = 0;
             $creqBillingVerificationCount = 0;
+            $nodeAttentionCount = 0;
 
             if (auth()->check()) {
                 $user = auth()->user();
@@ -349,12 +353,35 @@ class AppServiceProvider extends ServiceProvider
 
                     $verificationCount = $verificationQuery->count();
                 }
+
+                if ($user->hasPermission('network_nodes.view')) {
+                    $nodeAttentionCount = app(NetworkNodeAttentionService::class)->unseenCount($user);
+                }
             }
 
             $view->with('badge_survey_count', $surveyCount)
                 ->with('badge_verification_count', $verificationCount)
                 ->with('badge_registration_verification_count', $registrationVerificationCount)
-                ->with('badge_creq_billing_verification_count', $creqBillingVerificationCount);
+                ->with('badge_creq_billing_verification_count', $creqBillingVerificationCount)
+                ->with('badge_node_attention_count', $nodeAttentionCount);
+        });
+
+        View::composer('layouts.app', function ($view): void {
+            $user = auth()->user();
+            $count = $user?->hasPermission('business_development_verification.view')
+                ? app(BusinessDevelopmentVerificationQueue::class)->forUser($user)->count()
+                : 0;
+
+            $view->with('badge_business_development_verification_count', $count);
+        });
+
+        View::composer('components.warehouse.header', function ($view): void {
+            $user = auth()->user();
+            $count = $user?->hasPermission('warehouse_transfer.receive')
+                ? app(WarehouseTransferActionQueue::class)->forUser($user)->count()
+                : 0;
+
+            $view->with('badge_transfer_confirmation_count', $count);
         });
 
         // Konteks cabang global gudang (analisa-ui-ux-warehouse.md §S1) — chip

@@ -159,7 +159,7 @@ class WarehouseHistoryController extends Controller
             // fopTask.customer & serial.customer — kolom tujuan baris INSTALL
             // menampilkan pelanggannya (lihat view); tanpa eager load ini
             // preventLazyLoading meledak di non-production.
-            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial.customer', 'roll', 'createdBy.role', 'transfer.toPop', 'fopTask.customer'])
+            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial.customer', 'roll', 'createdBy.role', 'transfer.fromPop', 'transfer.toPop', 'fopTask.customer'])
             ->latest('id')
             ->get();
 

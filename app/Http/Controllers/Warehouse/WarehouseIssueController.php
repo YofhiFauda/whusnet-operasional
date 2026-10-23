@@ -136,6 +136,7 @@ class WarehouseIssueController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,
@@ -161,6 +162,7 @@ class WarehouseIssueController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,
@@ -180,6 +182,7 @@ class WarehouseIssueController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,

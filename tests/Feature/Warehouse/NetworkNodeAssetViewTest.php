@@ -24,10 +24,11 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Task 13: halaman Master Node Jaringan (`network.nodes.index`, Task 7)
- * sekarang juga menampilkan aset Gudang yang nempel di tiap node — SN
- * `DEPLOYED` (`deployedSerials()`) dan saldo infrastruktur
- * (`infrastructureBalances()`) — bukan cuma kapasitas port.
+ * Master Node Jaringan (`network.nodes.index`/`network.nodes.show`) cuma
+ * menampilkan RINGKASAN jumlah aset Gudang per node — bukan SN/lot/teknisi/
+ * jam/nomor task. Detail lengkap itu domain Peta Infrastruktur
+ * (`InfrastructureMapService`), ditautkan lewat `network.map.index?node_id=`.
+ * Lihat docs/plan/infrastruktur/rancangan-pembagian-detail-master-node-vs-peta-infrastruktur.md.
  *
  * Role aktor dipilih `fop` (bukan `helpdesk`) karena cuma role itu yang
  * dipegang `network_nodes.view` di `RolePermissionSeeder` — sama seperti
@@ -88,7 +89,7 @@ class NetworkNodeAssetViewTest extends TestCase
     }
 
     #[Test]
-    public function node_dengan_sn_deployed_dan_saldo_infrastruktur_menampilkan_keduanya_bersebelahan_dengan_port(): void
+    public function daftar_master_node_menampilkan_ringkasan_jumlah_aset_tanpa_sn_atau_lot(): void
     {
         $cabang = Pop::factory()->create(['type' => 'cabang']);
         $user = $this->makeScopedUser('fop', $cabang);
@@ -99,6 +100,12 @@ class NetworkNodeAssetViewTest extends TestCase
         $serial = InventorySerial::create([
             'item_id' => $modem->id,
             'serial_number' => 'NNV-SN-0001',
+            'status' => SerialStatus::DEPLOYED,
+            'current_network_node_id' => $node->id,
+        ]);
+        InventorySerial::create([
+            'item_id' => $modem->id,
+            'serial_number' => 'NNV-SN-0002',
             'status' => SerialStatus::DEPLOYED,
             'current_network_node_id' => $node->id,
         ]);
@@ -114,11 +121,49 @@ class NetworkNodeAssetViewTest extends TestCase
         $response = $this->actingAs($user)->get(route('network.nodes.index'));
 
         $response->assertOk();
-        $response->assertSee($serial->serial_number);
+        $response->assertSee('Aset Terpasang');
         $response->assertSee($modem->name);
         $response->assertSee($kabel->name);
         $response->assertSee('Port 1');
-        $response->assertSee($balance->lot_no);
+        // Ringkasan jumlah: 2 unit modem (count serial), 25,5 m kabel — bukan SN/lot mentah.
+        $response->assertSee('2 pcs');
+        $response->assertSee('25,5');
+        $response->assertDontSee($serial->serial_number);
+        $response->assertDontSee($balance->lot_no);
+        $response->assertSee(route('network.map.index', ['node_id' => $node->id]));
+    }
+
+    #[Test]
+    public function detail_master_node_menampilkan_ringkasan_jumlah_aset_tanpa_sn_atau_lot(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $user = $this->makeScopedUser('fop', $cabang);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'parent_id' => null]);
+
+        $modem = $this->createItem('NNV-MODEM-SHOW', 'Modem Aset Node Detail');
+        $serial = InventorySerial::create([
+            'item_id' => $modem->id,
+            'serial_number' => 'NNV-SN-SHOW-0001',
+            'status' => SerialStatus::DEPLOYED,
+            'current_network_node_id' => $node->id,
+        ]);
+
+        $kabel = $this->createItem('NNV-KABEL-SHOW', 'Kabel Aset Node Detail');
+        $balance = InfrastructureBalance::create([
+            'item_id' => $kabel->id,
+            'network_node_id' => $node->id,
+            'lot_no' => 'LOT-SHOW-01',
+            'qty' => 10,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('network.nodes.show', $node));
+
+        $response->assertOk();
+        $response->assertSee($modem->name);
+        $response->assertSee($kabel->name);
+        $response->assertDontSee($serial->serial_number);
+        $response->assertDontSee($balance->lot_no);
+        $response->assertSee(route('network.map.index', ['node_id' => $node->id]));
     }
 
     #[Test]

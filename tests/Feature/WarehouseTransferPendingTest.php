@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
+use App\Models\WarehousePopPic;
 use App\Services\InventoryReceiveService;
 use App\Services\InventoryTransferService;
 use Database\Seeders\ActionSeeder;
@@ -83,11 +84,14 @@ class WarehouseTransferPendingTest extends TestCase
     {
         $transfer = $this->dispatchTransfer();
 
-        $this->actingAs($this->owner)->get(route('warehouse.transfers.pending'))
-            ->assertOk()
+        $response = $this->actingAs($this->owner)->get(route('warehouse.transfers.pending'));
+
+        $response->assertOk()
             ->assertSee('Perlu Dikonfirmasi Di Sini')
             ->assertSee($transfer->reference_number)
+            ->assertSee('data-badge="transfer-confirmation"', false)
             ->assertSee('Tinjau &amp; Konfirmasi', false);
+        $this->assertMatchesRegularExpression('/data-badge="transfer-confirmation"[^>]*>\s*1\s*<\/span>/', $response->getContent());
     }
 
     #[Test]
@@ -109,6 +113,7 @@ class WarehouseTransferPendingTest extends TestCase
         $this->actingAs($popAdmin)->get(route('warehouse.transfers.pending'))
             ->assertOk()
             ->assertSee($transfer->reference_number)
+            ->assertSee('data-badge="transfer-confirmation"', false)
             ->assertSee('Tinjau &amp; Konfirmasi', false);
     }
 
@@ -137,6 +142,7 @@ class WarehouseTransferPendingTest extends TestCase
         // Transfer ini gak boleh nongol di daftar actionable pop_admin pusat —
         // dia gak punya scope ke cabang tujuan buat konfirmasi.
         $response->assertDontSee('Tinjau &amp; Konfirmasi', false);
+        $response->assertDontSee('data-badge="transfer-confirmation"', false);
     }
 
     #[Test]
@@ -160,6 +166,47 @@ class WarehouseTransferPendingTest extends TestCase
         $this->actingAs($popAdmin)->get(route('warehouse.transfers.pending'))
             ->assertOk()
             ->assertDontSee($transfer->reference_number);
+    }
+
+    #[Test]
+    public function badge_transfer_berpindah_ke_pic_dan_hilang_setelah_konfirmasi(): void
+    {
+        $transfer = $this->dispatchTransfer();
+        $popAdminRole = Role::where('code', 'pop_admin')->firstOrFail();
+        $popAdmin = User::factory()->create(['role_id' => $popAdminRole->id]);
+        $popAdminScope = UserRoleScope::create([
+            'user_id' => $popAdmin->id,
+            'role_id' => $popAdminRole->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $popAdminScope->id, 'pop_id' => $this->cabang->id]);
+
+        $picRole = Role::where('code', 'pic_gudang')->firstOrFail();
+        $pic = User::factory()->create(['role_id' => $picRole->id]);
+        $picScope = UserRoleScope::create([
+            'user_id' => $pic->id,
+            'role_id' => $picRole->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $picScope->id, 'pop_id' => $this->cabang->id]);
+        WarehousePopPic::create(['pop_id' => $this->cabang->id, 'user_id' => $pic->id]);
+
+        $this->actingAs($popAdmin)->get(route('warehouse.transfers.pending'))
+            ->assertOk()
+            ->assertDontSee('data-badge="transfer-confirmation"', false)
+            ->assertDontSee('Tinjau &amp; Konfirmasi', false);
+
+        $this->actingAs($pic)->get(route('warehouse.transfers.pending'))
+            ->assertOk()
+            ->assertSee('data-badge="transfer-confirmation"', false)
+            ->assertSee($transfer->reference_number);
+
+        $this->post(route('warehouse.transfers.receive', $transfer))
+            ->assertRedirect(route('warehouse.transfers.show', $transfer));
+
+        $this->get(route('warehouse.transfers.pending'))
+            ->assertOk()
+            ->assertDontSee('data-badge="transfer-confirmation"', false);
     }
 
     #[Test]

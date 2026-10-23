@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\CustomerAcquisition;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Services\BusinessDevelopmentVerificationQueue;
 use App\Services\CustomerVerificationDetailService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
@@ -53,17 +54,10 @@ use Illuminate\View\View;
  */
 class BusinessDevelopmentVerificationController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, BusinessDevelopmentVerificationQueue $queue): View
     {
-        $access = app(EffectiveAccessService::class);
-        $user = $request->user();
-
-        $customers = Customer::query()
+        $customers = $queue->forUser($request->user())
             ->with(['customerService.internetPackage', 'pop'])
-            ->where('status', WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value)
-            ->when(! $access->hasAllPopAccess($user), function ($query) use ($access, $user) {
-                $query->whereIn('pop_id', $access->getAllowedPopIds($user));
-            })
             ->orderBy('updated_at')
             ->get();
 

@@ -15,6 +15,7 @@ use App\Models\TaskInfrastructureAction;
 use App\Models\User;
 use App\Support\InfrastructureCutover;
 use App\Support\InfrastructureLocation;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
@@ -43,6 +44,7 @@ class TaskInfrastructureActionService
         private readonly InfrastructureReportLocationParser $parser,
         private readonly InfrastructureLocationResolver $resolver,
         private readonly FopTaskInfrastructureScopeService $scopes,
+        private readonly NetworkNodeAttentionService $attention,
     ) {}
 
     /** @param array<int, array<string, mixed>> $rows */
@@ -52,6 +54,7 @@ class TaskInfrastructureActionService
             throw new InvalidArgumentException('Aksi infrastruktur hanya untuk O-REQ/INFR-REQ.');
         }
         $seen = [];
+        $installedDeviceIds = [];
         foreach ($rows as $row) {
             $key = $row['action_key'];
             if (isset($seen[$key])) {
@@ -79,10 +82,12 @@ class TaskInfrastructureActionService
             $endFrom = $this->parser->parseEnd($fopTask, $mutation['end_from'] ?? null, $actor);
             $endTo = $this->parser->parseEnd($fopTask, $mutation['end_to'] ?? null, $actor);
 
+            $deviceNodeId = $location?->ancestorId(InfrastructureLocation::NODE);
             $action = TaskInfrastructureAction::create([
                 'task_id' => $task->id, 'fop_task_id' => $fopTask->id,
                 'action_key' => $key, 'action_type' => $mutation['action_type'],
                 ...$this->workColumns($location),
+                'device_network_node_id' => $deviceNodeId,
                 'work_latitude' => $mutation['work_latitude'] ?? null,
                 'work_longitude' => $mutation['work_longitude'] ?? null,
                 'work_location_snapshot' => $location?->snapshot(),
@@ -96,6 +101,14 @@ class TaskInfrastructureActionService
             foreach ($this->apply($mutation, $location, $fopTask, $technicians, $actor) as $id) {
                 $action->transactions()->attach($id);
             }
+            if ($deviceNodeId !== null && in_array($mutation['action_type'], NetworkNodeAttentionService::ACTION_TYPES, true)) {
+                $installedDeviceIds[$deviceNodeId] = true;
+            }
+        }
+
+        foreach (array_keys($installedDeviceIds) as $installedDeviceId) {
+            $device = NetworkNode::query()->findOrFail($installedDeviceId);
+            DB::afterCommit(fn () => $this->attention->notifyInstalled($device, $task, $actor));
         }
     }
 

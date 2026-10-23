@@ -18,7 +18,7 @@ class TaskInfrastructureAction extends Model
     use HasFactory;
 
     protected $fillable = [
-        'task_id', 'fop_task_id', 'action_key', 'action_type', 'network_node_id',
+        'task_id', 'fop_task_id', 'action_key', 'action_type', 'network_node_id', 'device_network_node_id',
         'work_pop_id', 'work_infrastructure_slot_id', 'work_infrastructure_port_id',
         'work_latitude', 'work_longitude', 'work_location_snapshot',
         'end_from_pop_id', 'end_from_network_node_id', 'end_from_infrastructure_port_id',
@@ -34,6 +34,7 @@ class TaskInfrastructureAction extends Model
             'work_location_snapshot' => 'array',
             'performed_at' => 'datetime',
             'network_node_id' => 'integer',
+            'device_network_node_id' => 'integer',
             'work_pop_id' => 'integer',
             'work_infrastructure_slot_id' => 'integer',
             'work_infrastructure_port_id' => 'integer',
@@ -51,6 +52,11 @@ class TaskInfrastructureAction extends Model
     public function node(): BelongsTo
     {
         return $this->belongsTo(NetworkNode::class, 'network_node_id');
+    }
+
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
     }
 
     public function workPop(): BelongsTo
@@ -71,6 +77,19 @@ class TaskInfrastructureAction extends Model
     public function technician(): BelongsTo
     {
         return $this->belongsTo(User::class, 'performed_by');
+    }
+
+    public function actionLabel(): string
+    {
+        return match ($this->action_type) {
+            'install' => 'Pasang',
+            'replace' => 'Ganti',
+            'retrieve' => 'Cabut',
+            'inspect' => 'Periksa',
+            'port_connect' => 'Sambung Port',
+            'port_release' => 'Lepas Port',
+            default => $this->action_type,
+        };
     }
 
     public function transactions(): BelongsToMany

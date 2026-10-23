@@ -347,7 +347,7 @@ class WarehouseController extends Controller
         $recentTransfers = InventoryTransaction::query()
             ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)->orWhereIn('to_pop_id', $popIds))
             ->where('type', InventoryTransactionType::TRANSFER->value)
-            ->with(['item.category', 'fromPop', 'toPop', 'transfer.toPop', 'serial', 'roll', 'createdBy'])
+            ->with(['item.category', 'fromPop', 'toPop', 'transfer.fromPop', 'transfer.toPop', 'serial', 'roll', 'createdBy'])
             ->latest('id')
             ->limit(60)
             ->get();
@@ -451,7 +451,7 @@ class WarehouseController extends Controller
         $recentLedger = InventoryTransaction::query()
             ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)->orWhereIn('to_pop_id', $popIds))
             ->whereNotIn('type', [InventoryTransactionType::TRANSFER_CUSTODY->value])
-            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial', 'roll', 'createdBy', 'transfer.toPop'])
+            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial', 'roll', 'createdBy', 'transfer.fromPop', 'transfer.toPop'])
             ->latest('id')
             ->limit(25)
             ->get();

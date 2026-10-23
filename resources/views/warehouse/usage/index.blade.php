@@ -476,7 +476,7 @@
                             <th class="px-4 py-3 text-right">Qty</th>
                             <th class="px-4 py-3">Identitas (SN / Roll)</th>
                             <th class="px-4 py-3">Teknisi Pelaksana</th>
-                            <th class="px-4 py-3">Pelanggan & Tiket Tugas</th>
+                            <th class="px-4 py-3">Pelanggan / Lokasi & Tiket Tugas</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-xs">
@@ -529,17 +529,24 @@
                                 <div class="text-[10px] text-slate-400">Teknisi Lapangan</div>
                             </td>
 
-                            <!-- Pelanggan & Tiket Tugas -->
+                            <!-- Pelanggan / Lokasi & Tiket Tugas -->
                             <td class="px-4 py-3">
+                                @if($log['customer_id'])
                                 <div class="font-bold text-slate-800 dark:text-slate-200">
-                                    @if($log['customer_id'])
                                     <a href="{{ route('customers.show', $log['customer_id']) }}" class="text-sky-600 dark:text-sky-400 hover:underline">
                                         {{ $log['customer_name'] }}
                                     </a>
-                                    @else
-                                    {{ $log['customer_name'] }}
-                                    @endif
                                 </div>
+                                @elseif(!empty($log['location_breadcrumb']))
+                                <div class="flex items-start gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                    <svg class="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    </svg>
+                                    <span>{{ $log['location_breadcrumb'] }}</span>
+                                </div>
+                                @else
+                                <div class="font-bold text-slate-800 dark:text-slate-200">{{ $log['customer_name'] }}</div>
+                                @endif
                                 <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                     <x-task.usage-badge :type="$log['task_type']" :detail="$log['task_detail']" />
                                     @if($log['task_number'] !== '-')
@@ -594,16 +601,20 @@
 
                     <div class="flex items-center justify-between text-xs pt-0.5">
                         <div>
-                            <span class="text-slate-400 block text-[10px]">PELANGGAN</span>
+                            <span class="text-slate-400 block text-[10px]">
+                                {{ $log['customer_id'] || $log['customer_name'] !== '-' ? 'PELANGGAN' : 'LOKASI INFRASTRUKTUR' }}
+                            </span>
+                            @if($log['customer_id'])
                             <span class="font-bold text-sky-600 dark:text-sky-400">
-                                @if($log['customer_id'])
                                 <a href="{{ route('customers.show', $log['customer_id']) }}" class="hover:underline">
                                     {{ $log['customer_name'] }}
                                 </a>
-                                @else
-                                {{ $log['customer_name'] }}
-                                @endif
                             </span>
+                            @elseif(!empty($log['location_breadcrumb']))
+                            <span class="font-bold text-indigo-600 dark:text-indigo-400 block">{{ $log['location_breadcrumb'] }}</span>
+                            @else
+                            <span class="font-bold text-slate-800 dark:text-slate-200">{{ $log['customer_name'] }}</span>
+                            @endif
                             <div class="flex items-center gap-1.5 mt-1 flex-wrap">
                                 <x-task.usage-badge :type="$log['task_type']" :detail="$log['task_detail']" />
                                 @if($log['task_number'] !== '-')

@@ -102,7 +102,7 @@ class WarehouseTransferInvoiceSuratJalanTest extends TestCase
     #[Test]
     public function admin_pusat_bisa_cetak_invoice_pop_admin_cabang_tidak_boleh(): void
     {
-        $adminRole = Role::where('code', 'admin')->firstOrFail();
+        $adminRole = Role::where('code', 'admin_gudang')->firstOrFail();
         $adminPusat = User::factory()->create(['role_id' => $adminRole->id]);
         UserRoleScope::create([
             'user_id' => $adminPusat->id,

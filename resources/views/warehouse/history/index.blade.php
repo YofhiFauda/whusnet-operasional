@@ -452,10 +452,10 @@
                     'timestamp' => $group->createdAt->translatedFormat('d M Y, H:i').' WIB',
                     'type' => $txn->type->value ?? 'general',
                     'type_label' => $group->typeLabel,
-                    'origin' => $txn->fromPop->name ?? ($txn->fromTechnician->name ?? 'Pengadaan (Baru)'),
+                    'origin' => $txn->fromPop->name ?? ($txn->fromTechnician->name ?? ($txn->transfer?->fromPop?->name ?? 'Pengadaan (Baru)')),
                     'destination' => ($txn->type->value === 'install')
                         ? (($txn->fopTask?->customer ?? $txn->serial?->customer)?->full_name ?? 'Pelanggan')
-                        : ($txn->toPop->name ?? ($txn->toTechnician->name ?? ($txn->transfer?->toPop ? $txn->transfer->toPop->name.' (menunggu konfirmasi)' : 'Pelanggan / Luar'))),
+                        : ($txn->toPop->name ?? ($txn->toTechnician->name ?? ($txn->transfer?->toPop ? ($txn->transfer->toPop->name.($txn->transfer->isInTransit() ? ' (menunggu konfirmasi)' : '')) : 'Pelanggan / Luar'))),
                     'item_name' => ($group->lineCount > 1) ? "{$group->itemCount} Jenis Barang" : $txn->item->name,
                     'category' => ($group->lineCount > 1) ? $group->lines->pluck('item.name')->unique()->take(3)->implode(', ') : ($txn->item->category?->name ?? 'Material Logistik'),
                     'qty' => ($group->lineCount > 1) ? $group->lineCount : ($txn->serial ? 1 : rtrim(rtrim(number_format((float) $txn->qty, 2, ',', '.'), '0'), ',')),
@@ -543,13 +543,19 @@
                         <td class="py-3.5 px-4 align-top">
                             <div class="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200 flex-wrap">
                                 <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300">
-                                    {{ $txn->fromPop->name ?? ($txn->fromTechnician->name ?? 'Pengadaan (Baru)') }}
+                                    {{ $txn->fromPop->name ?? ($txn->fromTechnician->name ?? ($txn->transfer?->fromPop?->name ?? 'Pengadaan (Baru)')) }}
                                 </span>
                                 <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
                                 @if($txn->to_pop_id === null && $txn->to_technician_id === null && $txn->type->value === 'transfer' && $txn->transfer?->toPop)
-                                <span class="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 font-semibold">
-                                    {{ $txn->transfer->toPop->name }} <span class="text-[10px] font-normal opacity-80">(menunggu konfirmasi)</span>
-                                </span>
+                                    @if($txn->transfer->isInTransit())
+                                    <span class="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 font-semibold">
+                                        {{ $txn->transfer->toPop->name }} <span class="text-[10px] font-normal opacity-80">(menunggu konfirmasi)</span>
+                                    </span>
+                                    @else
+                                    <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 font-semibold text-sky-600 dark:text-sky-400">
+                                        {{ $txn->transfer->toPop->name }}
+                                    </span>
+                                    @endif
                                 @elseif($txn->type->value === 'install')
                                 @php $cust = $txn->fopTask?->customer ?? $txn->serial?->customer; @endphp
                                 <span class="px-2 py-0.5 rounded bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800/50 font-semibold">
@@ -557,7 +563,7 @@
                                 </span>
                                 @else
                                 <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 font-semibold text-sky-600 dark:text-sky-400">
-                                    {{ $txn->toPop->name ?? ($txn->toTechnician->name ?? 'Pelanggan / Luar') }}
+                                    {{ $txn->toPop->name ?? ($txn->toTechnician->name ?? ($txn->transfer?->toPop?->name ?? 'Pelanggan / Luar')) }}
                                 </span>
                                 @endif
                             </div>
@@ -738,10 +744,10 @@
                 <!-- Route & Operator -->
                 <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 pt-1">
                     <div class="flex items-center gap-1 font-medium">
-                        <span>{{ $txn->fromPop->name ?? ($txn->fromTechnician->name ?? 'Pengadaan') }}</span>
+                        <span>{{ $txn->fromPop->name ?? ($txn->fromTechnician->name ?? ($txn->transfer?->fromPop?->name ?? 'Pengadaan')) }}</span>
                         <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                         <span class="font-bold text-sky-600 dark:text-sky-400">
-                            {{ $txn->toPop->name ?? ($txn->toTechnician->name ?? ($txn->type->value === 'install' ? 'Pelanggan' : 'Gudang')) }}
+                            {{ $txn->toPop->name ?? ($txn->toTechnician->name ?? ($txn->transfer?->toPop?->name ?? ($txn->type->value === 'install' ? 'Pelanggan' : 'Gudang'))) }}
                         </span>
                     </div>
                     <span class="text-[11px] text-slate-400">{{ $txn->createdBy?->name ?? 'Sistem' }}</span>

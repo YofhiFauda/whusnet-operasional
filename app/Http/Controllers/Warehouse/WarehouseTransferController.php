@@ -16,6 +16,7 @@ use App\Models\Item;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryTransferService;
+use App\Services\WarehouseTransferActionQueue;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -126,6 +127,7 @@ class WarehouseTransferController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,
@@ -145,6 +147,7 @@ class WarehouseTransferController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,
@@ -164,6 +167,7 @@ class WarehouseTransferController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,
@@ -196,7 +200,7 @@ class WarehouseTransferController extends Controller
      * selalu kosong buat mereka — udah kebagian di `actionable` semua,
      * bukan bug.
      */
-    public function pending(EffectiveAccessService $access): View
+    public function pending(EffectiveAccessService $access, WarehouseTransferActionQueue $actionQueue): View
     {
         $user = auth()->user();
         $hasAllAccess = $access->hasAllPopAccess($user);
@@ -212,7 +216,8 @@ class WarehouseTransferController extends Controller
             ->oldest('id') // yang paling lama nunggu duluan — itu yang paling mendesak dikonfirmasi
             ->get();
 
-        $canReceiveTransfer = fn (InventoryTransfer $t) => $hasAllAccess || in_array($t->to_pop_id, $allowedPopIds, true);
+        $receivablePopIds = $actionQueue->receivablePopIds($user);
+        $canReceiveTransfer = fn (InventoryTransfer $t) => in_array($t->to_pop_id, $receivablePopIds, true);
 
         $actionable = $transfers->filter($canReceiveTransfer)->values();
         $awaitingOtherSide = $transfers->reject($canReceiveTransfer)->values();
@@ -247,7 +252,7 @@ class WarehouseTransferController extends Controller
             ->with('success', "Transfer {$transfer->reference_number} berhasil dibuat, menunggu konfirmasi terima di {$toPop->name}.");
     }
 
-    public function show(InventoryTransfer $transfer, EffectiveAccessService $access): View
+    public function show(InventoryTransfer $transfer, EffectiveAccessService $access, WarehouseTransferActionQueue $actionQueue): View
     {
         $transfer->load(['fromPop', 'toPop', 'createdBy', 'receivedBy']);
 
@@ -264,7 +269,7 @@ class WarehouseTransferController extends Controller
         // tombol Konfirmasi walau `receive()` bakal nolak 403 pas beneran
         // diklik — dirapikan biar tombolnya emang gak nongol kalau bakal
         // ditolak (ketauan audit tata-letak 2026-09-03).
-        $canReceive = $access->hasAllPopAccess($user) || in_array($transfer->to_pop_id, $access->getAllowedPopIds($user), true);
+        $canReceive = in_array($transfer->to_pop_id, $actionQueue->receivablePopIds($user), true);
 
         return view('warehouse.transfers.show', compact('transfer', 'dispatchLines', 'confirmedLines', 'canReceive'));
     }

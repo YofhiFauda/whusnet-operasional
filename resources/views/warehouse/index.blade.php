@@ -878,7 +878,7 @@
                                     $isOutgoing = (int) $trf->from_pop_id === (int) $pop->id;
                                     $targetPopName = $isOutgoing
                                         ? ($trf->toPop->name ?? ($trf->transfer->toPop->name ?? 'Cabang Tujuan'))
-                                        : ($trf->fromPop->name ?? 'Gudang Asal');
+                                        : ($trf->fromPop->name ?? ($trf->transfer?->fromPop?->name ?? 'Gudang Asal'));
                                 @endphp
                                 <div class="p-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-xs shadow-2xs hover:border-slate-300 dark:hover:border-slate-600 transition-colors group">
                                     <div class="flex items-start justify-between gap-2">

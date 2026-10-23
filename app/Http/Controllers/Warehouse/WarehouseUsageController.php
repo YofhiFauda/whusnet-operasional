@@ -11,6 +11,8 @@ use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\TaskMaterial;
 use App\Services\EffectiveAccessService;
+use App\Services\InfrastructureLocationResolver;
+use App\Support\InfrastructureLocation;
 use App\Support\LikeSearch;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -30,13 +32,18 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * - Berapa meter kabel dropcore yang dipotong dari roll?
  * - Berapa pcs patchcord/konektor/aksesori pasif yang dipakai teknisi?
  *
- * Menggabungkan dua sumber data konsumsi lapangan:
- * 1. `task_materials` (kind=TERPAKAI) — kabel per-roll (meter) dan material pasif.
- * 2. `inventory_transactions` (type=INSTALL) — modem ONT (serialized).
+ * Menggabungkan tiga sumber data konsumsi lapangan:
+ * 1. `task_materials` (kind=TERPAKAI) — kabel per-roll (meter) dan material pasif ke pelanggan.
+ * 2. `inventory_transactions` (type=INSTALL) — modem ONT ke pelanggan (serialized).
+ * 3. `inventory_transactions` (type=DEPLOY) — barang terpasang netap ke titik infrastruktur
+ *    (OLT/Slot/PON/ODP, bukan ke pelanggan). Sebelumnya cuma kelihatan di drawer "Detail
+ *    Mutasi Material" (riwayat ledger mentah, gampang tertimbun) — di sini lokasi pasang
+ *    (breadcrumb `InfrastructureLocationResolver`), pelaksana, waktu, dan task-nya digabung
+ *    ke laporan yang sama (laporan 2026-10-22).
  */
 class WarehouseUsageController extends Controller
 {
-    public function index(Request $request, EffectiveAccessService $access): View
+    public function index(Request $request, EffectiveAccessService $access, InfrastructureLocationResolver $locationResolver): View
     {
         $user = auth()->user();
 
@@ -51,7 +58,7 @@ class WarehouseUsageController extends Controller
         $categories = ItemCategory::query()->active()->orderBy('sort_order')->orderBy('name')->get();
 
         $filters = $this->resolveFilters($request, $popIds);
-        $usageEntries = $this->fetchUnifiedUsageEntries($filters, $popIds);
+        $usageEntries = $this->fetchUnifiedUsageEntries($filters, $popIds, $locationResolver);
 
         // Filter pencarian teks & kategori
         $filteredEntries = $this->applySearchAndCategoryFilters($usageEntries, $filters);
@@ -89,7 +96,7 @@ class WarehouseUsageController extends Controller
         ]);
     }
 
-    public function export(Request $request, EffectiveAccessService $access): StreamedResponse
+    public function export(Request $request, EffectiveAccessService $access, InfrastructureLocationResolver $locationResolver): StreamedResponse
     {
         $user = auth()->user();
 
@@ -102,7 +109,7 @@ class WarehouseUsageController extends Controller
 
         $popIds = $pops->pluck('id')->all();
         $filters = $this->resolveFilters($request, $popIds);
-        $usageEntries = $this->fetchUnifiedUsageEntries($filters, $popIds);
+        $usageEntries = $this->fetchUnifiedUsageEntries($filters, $popIds, $locationResolver);
         $filteredEntries = $this->applySearchAndCategoryFilters($usageEntries, $filters);
 
         $filename = 'rekap-pemakaian-material-'.$filters['start']->format('Ymd').'-sd-'.$filters['end']->format('Ymd').'.xlsx';
@@ -130,6 +137,7 @@ class WarehouseUsageController extends Controller
                 'No. Tiket Tugas',
                 'Tipe Tugas',
                 'Nama Pelanggan',
+                'Lokasi Infrastruktur',
                 'Catatan',
             ], $headerStyle);
 
@@ -147,6 +155,7 @@ class WarehouseUsageController extends Controller
                     $entry['task_number'],
                     $entry['task_category'],
                     $entry['customer_name'],
+                    $entry['location_breadcrumb'] ?? '-',
                     $entry['note'] ?? '-',
                 ]);
             }
@@ -258,7 +267,7 @@ class WarehouseUsageController extends Controller
      * @param  list<int>  $popIds
      * @return Collection<int, array<string, mixed>>
      */
-    private function fetchUnifiedUsageEntries(array $filters, array $popIds): Collection
+    private function fetchUnifiedUsageEntries(array $filters, array $popIds, InfrastructureLocationResolver $locationResolver): Collection
     {
         $scopedPops = $filters['pop_id'] ? [$filters['pop_id']] : $popIds;
         $start = $filters['start'];
@@ -329,6 +338,7 @@ class WarehouseUsageController extends Controller
                 'unit_price' => (float) ($tm->unit_price_snapshot ?? 0),
                 'total_price' => (float) ($tm->unit_price_snapshot ?? 0) * (float) $tm->qty,
                 'note' => $tm->note,
+                'location_breadcrumb' => null,
             ]);
         }
 
@@ -398,10 +408,109 @@ class WarehouseUsageController extends Controller
                 'unit_price' => (float) ($trx->unit_price_snapshot ?? 0),
                 'total_price' => (float) ($trx->unit_price_snapshot ?? 0) * (float) ($trx->qty ?: 1),
                 'note' => $trx->reason,
+                'location_breadcrumb' => null,
+            ]);
+        }
+
+        // 3. Ambil barang yang terpasang NETAP ke titik infrastruktur (type=DEPLOY) —
+        // OLT/Slot/PON/ODP, bukan ke pelanggan. Dulu cuma kelihatan di drawer Riwayat
+        // Mutasi (ledger mentah, numpuk seiring waktu); di sini digabung supaya "dipasang
+        // dimana, siapa, jam berapa, task apa" kebaca langsung dari laporan Pemakaian
+        // Material (laporan 2026-10-22).
+        $deployTransactions = InventoryTransaction::query()
+            ->where('type', InventoryTransactionType::DEPLOY->value)
+            ->whereBetween('created_at', [$start, $end])
+            ->with([
+                'item.category',
+                'serial',
+                'roll',
+                'fopTask.pop',
+                'fopTask.task.creqDetail',
+                'fromTechnician',
+                'createdBy',
+                'toInfrastructurePop',
+                'toMiniPop',
+            ])
+            ->where(function ($q) use ($scopedPops) {
+                $q->whereIn('to_pop_id', $scopedPops)
+                    ->orWhereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $scopedPops));
+            })
+            ->get();
+
+        foreach ($deployTransactions as $trx) {
+            $popName = $trx->fopTask?->pop?->name
+                ?? $trx->toInfrastructurePop?->name
+                ?? $trx->toMiniPop?->name
+                ?? '-';
+
+            $itemName = $trx->item?->name ?? 'Material Infrastruktur';
+            $itemCode = $trx->item?->code ?? '-';
+            $categoryName = $trx->item?->category?->name ?? 'Infrastruktur';
+            $categoryCode = $trx->item?->category?->code ?? 'infrastruktur';
+            $unit = $trx->roll_id !== null ? 'meter' : ($trx->item?->unit ?? 'Unit');
+
+            $technicianName = $trx->fromTechnician?->name
+                ?? $trx->createdBy?->name
+                ?? '-';
+
+            $locationBreadcrumb = $this->resolveDeployLocationBreadcrumb($trx, $locationResolver);
+
+            $badge = FopTask::resolveUsageBadgeForTask($trx->fopTask);
+
+            $entries->push([
+                'source' => 'inventory_transaction_deploy',
+                'source_id' => $trx->id,
+                'created_at' => $trx->created_at,
+                'item_id' => $trx->item_id,
+                'item_category_id' => $trx->item?->item_category_id,
+                'item_name' => $itemName,
+                'item_code' => $itemCode,
+                'category_name' => $categoryName,
+                'category_code' => $categoryCode,
+                'tracking_type' => $trx->item?->tracking_type?->value ?? ($trx->serial_id ? 'serialized' : ($trx->roll_id ? 'roll' : 'quantity')),
+                'qty' => (float) ($trx->qty ?: 1),
+                'unit' => $unit,
+                'identifier' => $trx->serial?->serial_number ?: ($trx->roll?->roll_code ?: ($trx->lot_no ?: '-')),
+                'technician_name' => $technicianName,
+                'customer_name' => '-',
+                'customer_id' => null,
+                'fop_task_id' => $trx->fop_task_id,
+                'task_number' => $trx->fopTask?->task_number ?? '-',
+                'task_type' => $badge['type'],
+                'task_detail' => $badge['detail'],
+                'task_category' => $badge['label'],
+                'pop_name' => $popName,
+                'unit_price' => (float) ($trx->unit_price_snapshot ?? 0),
+                'total_price' => (float) ($trx->unit_price_snapshot ?? 0) * (float) ($trx->qty ?: 1),
+                'note' => $trx->notes,
+                'location_breadcrumb' => $locationBreadcrumb,
             ]);
         }
 
         return $entries->sortByDesc('created_at')->values();
+    }
+
+    /**
+     * Breadcrumb lokasi pasang DEPLOY ("Cabang → OLT-X → Slot 2 → PON 4"), dibaca dari
+     * kolom `to_*` ledger (bukan posisi SN SEKARANG — SN bisa sudah dicabut/dipindah
+     * belakangan, tapi baris ledger ini tetap wajib nunjuk lokasi SAAT dipasang).
+     * `InfrastructureLocationResolver` yang dipakai sama di Peta Infrastruktur &
+     * Detail Pelanggan — satu sumber breadcrumb, jangan dihitung manual di sini.
+     */
+    private function resolveDeployLocationBreadcrumb(InventoryTransaction $trx, InfrastructureLocationResolver $locationResolver): ?string
+    {
+        try {
+            return match (true) {
+                $trx->to_infrastructure_port_id !== null => $locationResolver->resolve(InfrastructureLocation::PORT, $trx->to_infrastructure_port_id)->breadcrumb(),
+                $trx->to_infrastructure_slot_id !== null => $locationResolver->resolve(InfrastructureLocation::SLOT, $trx->to_infrastructure_slot_id)->breadcrumb(),
+                $trx->to_network_node_id !== null => $locationResolver->resolve(InfrastructureLocation::NODE, $trx->to_network_node_id)->breadcrumb(),
+                $trx->to_infrastructure_pop_id !== null => $locationResolver->resolve(InfrastructureLocation::POP, $trx->to_infrastructure_pop_id)->breadcrumb(),
+                $trx->to_mini_pop_id !== null => $locationResolver->resolve(InfrastructureLocation::MINI_POP, $trx->to_mini_pop_id)->breadcrumb(),
+                default => null,
+            };
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -426,6 +535,7 @@ class WarehouseUsageController extends Controller
                     $entry['customer_name'],
                     $entry['task_number'],
                     $entry['pop_name'],
+                    $entry['location_breadcrumb'] ?? '',
                 ]));
 
                 if (! str_contains($haystack, $search)) {
@@ -449,7 +559,17 @@ class WarehouseUsageController extends Controller
         $taskIds = [];
 
         foreach ($entries as $entry) {
-            if ($entry['tracking_type'] === 'serialized' || str_contains(mb_strtolower($entry['category_code']), 'ont')) {
+            // Tile KPI ini khusus konsumsi KE PELANGGAN (modem ONT, dropcore, aksesori
+            // pasang baru) — DEPLOY ke infrastruktur (OLT/Slot/PON/ODP) ikut dihitung di
+            // tile "Material Pasif" lewat `cableMeters`/dibawah, bukan "Modem ONT Terpasang"
+            // yang labelnya eksplisit buat pelanggan.
+            if ($entry['source'] === 'inventory_transaction_deploy') {
+                if ($entry['unit'] === 'meter') {
+                    $cableMeters += (float) $entry['qty'];
+                } else {
+                    $passiveCount += (float) $entry['qty'];
+                }
+            } elseif ($entry['tracking_type'] === 'serialized' || str_contains(mb_strtolower($entry['category_code']), 'ont')) {
                 $modemCount += (int) $entry['qty'];
             } elseif ($entry['unit'] === 'meter' || str_contains(mb_strtolower($entry['category_code']), 'kabel')) {
                 $cableMeters += (float) $entry['qty'];
