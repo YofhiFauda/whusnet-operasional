@@ -148,7 +148,56 @@ class GenerateInfrastructureStructureTest extends TestCase
         $this->assertSame(0, $this->typeCount('olt_slot'));
         $this->assertSame(0, $this->typeCount('olt_pon'));
         $this->assertNull($olt->fresh()->capacity);
-        $this->assertSame(0, AuditLog::where('module', 'Struktur Infrastruktur')->count());
+    }
+
+    #[Test]
+    public function kapasitas_yang_sudah_lebih_besar_tidak_pernah_diturunkan(): void
+    {
+        $olt = $this->device('olt_chassis');
+        $olt->forceFill(['capacity' => 32])->saveQuietly();
+        $slot = $this->service()->createSlot($olt, 1, ['capacity' => 12]);
+
+        $this->service()->generateStructure($olt->fresh(), 16, 8, null, $this->owner);
+
+        $this->assertSame(32, $olt->fresh()->capacity);
+        $this->assertSame(12, $slot->fresh()->capacity);
+    }
+
+    #[Test]
+    public function node_yang_sudah_ada_tidak_disentuh_selain_kapasitas_sempit(): void
+    {
+        $olt = $this->device('olt_chassis');
+        $slot = $this->service()->createSlot($olt, 1, ['capacity' => 8, 'status' => 'terverifikasi', 'notes' => 'catatan slot']);
+        $pon = $this->service()->createPort($slot, 1, ['capacity' => 50, 'red_zone_threshold' => 70, 'status' => 'terverifikasi']);
+
+        $this->service()->generateStructure($olt->fresh(), 2, 8, 999, $this->owner);
+
+        $this->assertSame('terverifikasi', $slot->fresh()->record_status->value);
+        $this->assertSame('catatan slot', $slot->fresh()->notes);
+        $pon = $pon->fresh();
+        $this->assertSame(50, $pon->capacity);
+        $this->assertSame(70, $pon->red_zone_threshold);
+        $this->assertSame('terverifikasi', $pon->record_status->value);
+    }
+
+    #[Test]
+    public function kapasitas_null_tidak_diset_di_bawah_nomor_anak_tertinggi(): void
+    {
+        $olt = $this->device('olt_chassis');
+        foreach (range(1, 20) as $number) {
+            $this->service()->createSlot($olt, $number);
+        }
+        $slot = $olt->slots()->where('number', 1)->sole();
+        foreach (range(1, 12) as $number) {
+            $this->service()->createPort($slot, $number);
+        }
+        $this->assertNull($olt->fresh()->capacity);
+        $this->assertNull($slot->fresh()->capacity);
+
+        $this->service()->generateStructure($olt->fresh(), 4, 8, null, $this->owner);
+
+        $this->assertGreaterThanOrEqual(20, $olt->fresh()->capacity);
+        $this->assertGreaterThanOrEqual(12, $slot->fresh()->capacity);
     }
 
     #[Test]

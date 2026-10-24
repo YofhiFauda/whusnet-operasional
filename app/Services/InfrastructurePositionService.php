@@ -217,7 +217,10 @@ class InfrastructurePositionService
 
             NetworkNode::withoutEvents(function () use ($device, $slotNumbers, $portsPerSlot, $ponCapacity, $isOlt, &$created): void {
                 // Kapasitas perangkat dinaikkan DULU: createSlot menolak nomor > kapasitas.
-                $needed = max($slotNumbers);
+                // Lantai = max(nomor anak tertinggi yang sudah ada, nilai diminta): capacity null
+                // berarti "tak terbatas", jadi mengisinya dengan angka lebih kecil dari anak
+                // yang ada akan menciptakan state yang ditolak updateDeviceCapacity.
+                $needed = max(max($slotNumbers), (int) $device->slots()->reorder()->max('number'));
                 if ($device->capacity === null || $device->capacity < $needed) {
                     $device->forceFill(['capacity' => $needed])->saveQuietly();
                 }
@@ -232,11 +235,12 @@ class InfrastructurePositionService
                         $created['slots_created']++;
                     }
                     // Kapasitas slot dinaikkan DULU: createPort menolak nomor > kapasitas.
-                    if ($slot->capacity === null || $slot->capacity < $portsPerSlot) {
-                        $slot->forceFill(['capacity' => $portsPerSlot])->saveQuietly();
+                    $have = $slot->positionPorts()->pluck('number')->all();
+                    $slotFloor = max($portsPerSlot, $have === [] ? 0 : max($have));
+                    if ($slot->capacity === null || $slot->capacity < $slotFloor) {
+                        $slot->forceFill(['capacity' => $slotFloor])->saveQuietly();
                     }
 
-                    $have = $slot->positionPorts()->pluck('number')->all();
                     foreach (range(1, $portsPerSlot) as $portNumber) {
                         if (in_array($portNumber, $have, true)) {
                             continue;
