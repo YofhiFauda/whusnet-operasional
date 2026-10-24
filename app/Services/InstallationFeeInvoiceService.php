@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\RevenueCategory;
 use App\Support\Money;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Menerbitkan tagihan "Biaya Instalasi" (kategori Bisnis, divalidasi
@@ -22,6 +23,15 @@ use App\Support\Money;
  */
 class InstallationFeeInvoiceService
 {
+    /**
+     * Satu literal, dipakai di `manual_subtype_name` DAN baris rincian
+     * (`custom_name`) — dua tempat itu dulu masing-masing ketik ulang
+     * `'Biaya Instalasi'` sendiri; typo di satu tempat bikin laporan yang
+     * menyaring `manual_subtype_name` (lihat ReceiptPresenter) berbeda dari
+     * nama yang tampil di rincian tagihan.
+     */
+    public const SUBTYPE_NAME = 'Biaya Instalasi';
+
     public function __construct(
         private readonly InvoiceNumberGenerator $numbers,
         private readonly InvoiceItemBuilder $items,
@@ -31,10 +41,20 @@ class InstallationFeeInvoiceService
      * Wajib dipanggil di dalam transaksi pemanggil: invoice dan baris rinciannya
      * harus commit bersama, dan lockForUpdate() di generator nomor bermakna
      * hanya selama transaksinya hidup.
+     *
+     * @throws ValidationException pelanggan belum punya layanan (POP, paket,
+     *                             dan PPN tagihan diambil dari layanan).
      */
-    public function issue(Customer $customer, float $amount): Invoice
+    public function issue(Customer $customer, float $amount, ?int $actorId): Invoice
     {
         $service = $customer->customerService;
+
+        if (! $service) {
+            throw ValidationException::withMessages([
+                'customer_id' => 'Pelanggan ini belum memiliki layanan aktif — Biaya Instalasi butuh layanan aktif untuk menentukan POP, paket, dan PPN.',
+            ]);
+        }
+
         $period = now()->format('Y-m');
 
         // PPN mengikuti layanan pelanggan, sama seperti ManualInvoiceService
@@ -48,8 +68,8 @@ class InstallationFeeInvoiceService
             'invoice_number' => $this->numbers->nextFor(InvoiceType::MANUAL, ManualInvoiceCategory::LAINNYA, now()),
             'invoice_type' => InvoiceType::MANUAL->value,
             'manual_category' => ManualInvoiceCategory::LAINNYA->value,
-            'manual_subtype_name' => 'Biaya Instalasi',
-            'description' => 'Biaya Instalasi (divalidasi Busdev) — '.$customer->full_name,
+            'manual_subtype_name' => self::SUBTYPE_NAME,
+            'description' => self::SUBTYPE_NAME.' (divalidasi Busdev) — '.$customer->full_name,
             'customer_id' => $customer->id,
             'pop_id' => $customer->pop_id,
             'customer_service_id' => $service?->id,
@@ -64,6 +84,7 @@ class InstallationFeeInvoiceService
             'paid_amount' => 0,
             'remaining_amount' => $total,
             'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
+            'created_by' => $actorId,
         ]);
 
         // Tanpa baris rincian, tagihan tampil lewat fallback "Langganan Internet"
@@ -71,7 +92,7 @@ class InstallationFeeInvoiceService
         // baris kategori Lainnya dengan nama tetap, seperti jalur Tagihan Manual.
         $this->items->rebuildFor($invoice, [[
             'category_code' => RevenueCategory::CODE_LAINNYA,
-            'custom_name' => 'Biaya Instalasi',
+            'custom_name' => self::SUBTYPE_NAME,
             'description' => null,
             'amount' => $amount,
         ]]);

@@ -135,12 +135,8 @@ Setiap user dihubungkan ke role beserta **Scope Type** yang menentukan cakupan d
     *   *Pengecualian:* Admin POP tidak boleh melihat data dari POP lain.
 3.  **Scope `pop_tree`:**
     *   Dapat mengakses data di POP utama yang ditunjuk beserta sub-POP (Mini POP) di bawahnya secara hierarkis.
-4.  **Scope `assigned_only`:**
-    *   Hanya dapat melihat data tugas (survey/pemasangan/pelanggan) yang di-assign langsung kepada ID user tersebut.
-    *   *Role default:* Teknisi Lapangan.
-5.  **Scope `own_created`:**
-    *   Hanya dapat melihat data pelanggan/registrasi yang dibuat oleh ID user yang bersangkutan.
-    *   *Role default:* Sales Lapangan.
+
+`ScopeType` cuma 3 nilai di atas (`app/Enums/ScopeType.php`) — **bukan** ScopeType terpisah: `assigned_only`/`own_created` tidak ada sebagai Scope Type. Pembatasan "cuma tugas/pelanggan milik user ini sendiri" ditangani di QUERY, di atas scope POP yang mana pun di atas, mis. permission `task.view.own` + `TaskPolicy::viewOwn` (Teknisi Lapangan — tugas yang di-assign ke dirinya) atau filter `created_by` di controller terkait (Sales Lapangan). Jangan tafsirkan ini sebagai ScopeType kelima/keenam saat menulis kode baru.
 
 ---
 
@@ -216,7 +212,7 @@ Field berikut boleh kosong pada awal registrasi, namun wajib dilengkapi oleh Tek
 
 1.  **Bukan Manual dari Nol:** Invoice bulanan harus diturunkan otomatis dari kombinasi: Pelanggan Aktif + Paket Aktif + Harga Layanan Snapshot + Periode Tagihan.
 2.  **Pencegahan Invoice Ganda:** Sistem harus memblokir pembuatan invoice dengan periode tagihan yang sama untuk satu pelanggan yang sama guna mencegah double billing.
-3.  **Status Invoice:** Terdiri dari `belum_dibayar`, `sebagian`, `lunas`, dan `batal`. Invoice yang sudah berstatus `lunas` tidak boleh dihapus atau dibatalkan tanpa hak akses Owner dan audit log yang ketat.
+3.  **Status Invoice:** Terdiri dari `belum_dibayar`, `sebagian`, `lunas`, `batal`, dan `tak_tertagih` (piutang yang dihapus buku, ADHOC-90 — tagihannya sah, hanya diakui tak akan tertagih; sengaja di luar hitungan piutang/tunggakan, lihat `InvoiceStatus::TAK_TERTAGIH`). Invoice yang sudah berstatus `lunas` tidak boleh dihapus atau dibatalkan tanpa hak akses Owner dan audit log yang ketat.
 4.  **Jatuh Tempo vs Piutang (2026-09-21):** `due_date` (default tanggal 10) hanya formalitas sistem / label UI — tidak ada denda, blokir, atau status "terlambat" karena lewat tanggal itu. Batas riil pembayaran adalah akhir bulan `billing_period`. Begitu bulan berganti, tagihan `belum_dibayar`/`sebagian` dari periode lalu menjadi **piutang**, karena kas admin/pembukuan bulan sebelumnya ditutup **selalu tanggal 1** setiap bulan — jadi batas piutang = pergantian bulan kalender persis, tidak perlu dikonfigurasi. Alur: tagihan terbit tanggal 1 (`billing:generate-monthly-invoices`, 01:00) → `due_date` tanggal 10 (label) → bebas bayar sampai akhir bulan → tanggal 1 bulan berikutnya jadi piutang. Tagihan `sebagian` ikut jadi piutang sebesar `remaining_amount`; `lunas`/`batal` tidak pernah piutang. Pelunasan piutang tercatat di laporan uang masuk pada bulan uang diterima. **Istilah baku:** *tunggakan* = *piutang* (periode sebelum bulan berjalan, belum lunas); *belum dibayar* = semua tagihan belum lunas termasuk bulan berjalan. Angka berlabel "Tunggakan"/"Piutang" (dashboard, halaman Tagihan, Laporan Tagihan, hub pelanggan) wajib memakai `scopePiutang()`; angka kolektor (Worksheet/Worklist) memakai "Belum Dibayar" karena kolektor menagih bulan berjalan juga. Satu-satunya definisi di kode: `Invoice::scopePiutang()` / `Invoice::isPiutang()`; jangan bandingkan `due_date` dengan hari ini untuk menentukan terlambat. **Worklist Kolektor ikut berbasis periode (2026-09-23):** tagihan boleh ditagih kolektor begitu periodenya berjalan (`billing_period <= bulan ini`, `CollectorWorklistService::dueInvoices()`) — jendela lama `collector_due_window_days` (`due_date <= hari ini + N`) dihapus. Ganti paket (upgrade/downgrade) juga tidak mengubah `due_date`.
 
 ---
@@ -224,7 +220,7 @@ Field berikut boleh kosong pada awal registrasi, namun wajib dilengkapi oleh Tek
 # 8. Aturan Pembayaran
 
 1.  Pembayaran wajib mencatat relasi ke Invoice, Pelanggan, POP/Cabang, dan User Penerima (Kasir/Admin POP yang memproses).
-2.  Status pembayaran terdiri dari `pending`, `valid`, dan `ditolak`. Status `ditolak` tidak boleh mengurangi nilai sisa tagihan pada invoice.
+2.  Status pembayaran terdiri dari `valid` dan `ditolak` (`PaymentStatus`; status `pending` dihapus dari enum 2026-08-03 — tidak ada payment yang "menunggu validasi"). Status `ditolak` tidak boleh mengurangi nilai sisa tagihan pada invoice.
 3.  Setiap pencatatan pembayaran wajib menulis log ke audit log sistem secara instan.
 4.  **Batch kolektor, teknisi, dan portal staf tidak menerima lebih bayar (2026-10-05).** Tunai + saldo per tagihan tidak boleh melebihi sisa tagihan. Kelebihan uang hanya bisa dicatat lewat form Tagihan admin, yang masuk saldo pelanggan dengan konfirmasi.
 5.  **Saldo pelanggan boleh dipakai kolektor, teknisi, dan portal staf** per tagihan (checkbox "Pakai saldo", default tidak dicentang), dengan batas `min(saldo, sisa tagihan)`. Saldo bukan uang fisik dan tidak masuk setoran tunai.

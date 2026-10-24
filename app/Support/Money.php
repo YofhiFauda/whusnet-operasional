@@ -117,6 +117,25 @@ class Money
     }
 
     /**
+     * Auto-split tunai+saldo terhadap sisa tagihan — bagian yang menutup
+     * tagihan dulu (tunai+saldo digabung), sisanya (kalau ada) jadi overpay.
+     * SATU rumus dipakai `PaymentService::record()/revise()` (jalur admin) DAN
+     * `CollectorPaymentService::record()` (jalur batch kolektor/teknisi) —
+     * dulu dua salinan terpisah, risikonya definisi "lebih bayar" menyimpang
+     * diam-diam begitu salah satu diperbaiki tanpa yang lain.
+     *
+     * @return array{0: float, 1: float} [appliedAmount, overpayAmount]
+     */
+    public static function splitApplied(mixed $tunai, mixed $saldoDipakai, mixed $remaining): array
+    {
+        $totalReceived = static::add($tunai, $saldoDipakai);
+        $appliedAmount = static::min($totalReceived, $remaining);
+        $overpayAmount = static::sub($totalReceived, $appliedAmount);
+
+        return [$appliedAmount, $overpayAmount];
+    }
+
+    /**
      * Rupiah → string desimal presisi (`"150000.00"`), untuk serialisasi JSON API
      * (docs/api/api-portal-pelanggan/). SENGAJA tidak lewat `number_format($float, 2)`
      * — itu balik ke float dulu, persis kelas galat yang dihindari kelas ini. Dirakit
