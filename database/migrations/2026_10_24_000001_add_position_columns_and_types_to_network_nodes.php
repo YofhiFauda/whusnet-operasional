@@ -107,6 +107,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        // `code` sengaja TIDAK disusutkan kembali ke 50: kode posisi yang lebih panjang bisa terpotong/gagal.
         $ids = DB::table('network_node_types')->pluck('id', 'code');
 
         foreach (self::PARENT_RULES as $child => $parent) {
