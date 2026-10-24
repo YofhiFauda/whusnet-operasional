@@ -105,6 +105,23 @@ class NetworkNodePlacementRuleTest extends TestCase
         $this->assertSame(4, NetworkNode::where('anchor_pop_id', $mini->id)->where('node_type_id', $chassisType->id)->count());
     }
 
+    /**
+     * `NetworkNodeTypeSeeder` mencabut rule anchor Cabang/Mini POP langsung
+     * untuk `odp` dan menggantinya dengan rule parent wajib `olt_pon`
+     * (ADHOC-213) — ODP baru TIDAK BOLEH lagi ditambatkan ke POP langsung,
+     * beda dari ODP lama yang dibiarkan migrasi reset dummy (D2, lihat
+     * `odp_lama_anchor_pop_bisa_dipasang_ke_pon` di `NetworkNodeMoveTest`).
+     */
+    public function test_odp_baru_tanpa_pon_ditolak(): void
+    {
+        $this->seed(NetworkNodeTypeSeeder::class);
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $odpType = NetworkNodeType::where('code', 'odp')->firstOrFail();
+
+        $this->expectException(InvalidArgumentException::class);
+        app(NetworkNodeService::class)->assertTypePlacement($odpType, null, $cabang);
+    }
+
     public function test_existing_types_get_default_rules_from_forward_migration(): void
     {
         $odc = NetworkNodeType::create(['code' => 'odc', 'name' => 'ODC', 'has_ports' => true]);

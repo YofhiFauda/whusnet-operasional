@@ -6,8 +6,6 @@ use App\Enums\SerialStatus;
 use App\Models\AuditLog;
 use App\Models\InfrastructureBalance;
 use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
@@ -48,6 +46,21 @@ class NetworkNodeService
 
             if ($newParent && $this->isSelfOrDescendant($newParent, $node)) {
                 throw new InvalidArgumentException('Node tidak boleh dipindah ke dalam dirinya sendiri atau turunannya.');
+            }
+
+            // D5: Slot/PON/Port BUKAN entitas berdiri sendiri — kode, nomor,
+            // dan kapasitasnya diturunkan dari jalur induk saat dibuat
+            // (`InfrastructurePositionService`, Task 2/3). Memindah node ini
+            // sendirian akan membuat kode turunannya (mis. `OLT-A-S3-P5`)
+            // menunjuk ke induk yang salah tanpa regenerasi — identitasnya
+            // cuma valid selama menempel ke induk yang membuatnya. Yang
+            // boleh dipindah adalah perangkat (OLT/Switch) atau ODP di atas
+            // PON; Slot/PON/Port ikut pindah otomatis sebagai bagian subtree
+            // perangkatnya, bukan dipindah satu-satu.
+            if ($node->isPosition()) {
+                throw new InvalidArgumentException(
+                    'Slot/PON/Port tidak dapat dipindah — identitasnya mengikuti induk.'
+                );
             }
 
             $this->assertTypePlacement($node->nodeType, $newParent, $newPop);
@@ -177,6 +190,17 @@ class NetworkNodeService
      * A subtree with live physical connections or deployed stock needs a
      * dedicated relocation workflow so its customer and ledger scope stays
      * correct. Lock its ports before checking to serialize against assignment.
+     *
+     * Slot/PON/Port Switch SUDAH jadi baris `network_nodes` biasa (Task 2) —
+     * mereka otomatis masuk `$nodeIds` lewat CTE rekursif di bawah ini
+     * selama ada di bawah `$nodeId` lewat `parent_id`. Jadi semua kolom FK
+     * lokasi yang namanya historis `*_infrastructure_slot_id`/
+     * `*_infrastructure_port_id` (lihat komentar di model masing-masing)
+     * cukup dicek terhadap `$nodeIds` — TIDAK boleh query tabel
+     * `infrastructure_slots`/`infrastructure_ports` lagi, karena tabel itu
+     * sudah dihapus (migrasi retarget FK, Task 5/6). Query ke tabel itu
+     * yang sebelumnya bikin guard ini melempar "no such table" di setiap
+     * pemindahan lintas cabang (bug yang diperbaiki Task 10).
      */
     private function assertCrossBranchSubtreeIsEmpty(int $nodeId): void
     {
@@ -197,31 +221,29 @@ class NetworkNodeService
                 $query->whereIn('network_node_port_id', $portIds)
                     ->orWhereIn('target_node_id', $nodeIds);
             })->exists();
-        // Termasuk aset di Slot/Port milik node ini (posisi kanonis Task 6) —
-        // kartu di Slot 1 OLT ikut pindah cabang kalau OLT-nya dipindah.
-        $slotIds = InfrastructureSlot::query()->whereIn('network_node_id', $nodeIds)->pluck('id');
+
+        // Aset Gudang (SN) yang dideploy di node manapun dalam subtree —
+        // termasuk yang "diparkir" di Slot/PON/Port (nama kolom historis,
+        // isinya kini id `network_nodes`).
         $hasSerials = InventorySerial::query()->where('status', SerialStatus::DEPLOYED)
             ->where(fn ($query) => $query->whereIn('current_network_node_id', $nodeIds)
-                ->orWhereIn('current_infrastructure_slot_id', $slotIds)
-                ->orWhereIn('current_infrastructure_port_id', InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slotIds)->select('id')))
+                ->orWhereIn('current_infrastructure_slot_id', $nodeIds)
+                ->orWhereIn('current_infrastructure_port_id', $nodeIds))
             ->exists();
+
         $hasBalances = InfrastructureBalance::query()
             ->where(fn ($query) => $query->whereIn('network_node_id', $nodeIds)
-                ->orWhereIn('infrastructure_slot_id', $slotIds)
-                ->orWhereIn('infrastructure_port_id', InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slotIds)->select('id')))
+                ->orWhereIn('infrastructure_slot_id', $nodeIds)
+                ->orWhereIn('infrastructure_port_id', $nodeIds))
             ->where('qty', '>', 0)->exists();
 
-        // Koneksi kanonis (Task 3): node jadi tujuan sambungan aktif (mis. ODP
-        // ber-uplink PON), atau PON/Port milik slot node ini masih tersambung.
-        // Memindah lintas cabang tanpa rekonsiliasi membuat uplink menunjuk
-        // lintas Cabang dan merusak scope laporan.
-        $portIds = InfrastructurePort::query()
-            ->whereIn('infrastructure_slot_id', InfrastructureSlot::query()->whereIn('network_node_id', $nodeIds)->select('id'))
-            ->pluck('id');
+        // Koneksi kanonis (Task 8): dipertahankan hanya untuk sambungan Port
+        // Switch non-pohon — ODP→PON sekarang `parent_id`, otomatis ikut
+        // pindah bersama subtree-nya dan tidak perlu dicek di sini lagi.
         $hasConnections = InfrastructureConnection::query()->active()
             ->where(fn ($query) => $query->whereIn('target_network_node_id', $nodeIds)
-                ->orWhereIn('source_infrastructure_port_id', $portIds)
-                ->orWhereIn('target_infrastructure_port_id', $portIds))
+                ->orWhereIn('source_infrastructure_port_id', $nodeIds)
+                ->orWhereIn('target_infrastructure_port_id', $nodeIds))
             ->exists();
 
         if ($hasAssignments || $hasSerials || $hasBalances || $hasConnections) {
