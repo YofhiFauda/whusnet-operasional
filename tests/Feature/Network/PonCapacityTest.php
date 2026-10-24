@@ -142,6 +142,53 @@ class PonCapacityTest extends TestCase
     }
 
     #[Test]
+    public function tanpa_pemakaian_bukan_red_zone(): void
+    {
+        $summary = $this->capacity()->summary($this->pon);
+
+        $this->assertSame(0, $summary['used']);
+        $this->assertSame(10, $summary['capacity']);
+        $this->assertSame('pelanggan aktif', $summary['unit_label']);
+        $this->assertFalse($summary['red_zone']);
+        $this->assertFalse($summary['is_full']);
+    }
+
+    #[Test]
+    public function tepat_di_ambang_menjadi_red_zone_dan_di_bawahnya_tidak(): void
+    {
+        $this->odpWithCustomers(7);
+        $this->assertFalse($this->capacity()->summary($this->pon)['red_zone']);
+
+        $this->odpWithCustomers(1);
+        $summary = $this->capacity()->summary($this->pon);
+        $this->assertSame(8, $summary['used']);
+        $this->assertTrue($summary['red_zone']);
+    }
+
+    #[Test]
+    public function di_atas_ambang_dan_penuh(): void
+    {
+        $this->odpWithCustomers(10);
+
+        $summary = $this->capacity()->summary($this->pon);
+        $this->assertTrue($summary['red_zone']);
+        $this->assertTrue($summary['is_full']);
+    }
+
+    #[Test]
+    public function kapasitas_dan_ambang_divalidasi(): void
+    {
+        foreach ([[0, 80], [10, 0], [10, 101]] as [$capacity, $threshold]) {
+            try {
+                $this->capacity()->updateCapacity($this->pon, $capacity, $threshold, $this->owner);
+                $this->fail("Nilai {$capacity}/{$threshold} harus ditolak.");
+            } catch (ValidationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    #[Test]
     public function kapasitas_di_bawah_pemakaian_ditolak(): void
     {
         $this->odpWithCustomers(3);
