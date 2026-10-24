@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\InfrastructureCapacityUnit;
+use App\Enums\InfrastructureRecordStatus;
 use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,6 +39,11 @@ use Illuminate\Support\Facades\DB;
     'longitude',
     'status',
     'notes',
+    'number',
+    'capacity_unit',
+    'is_logical',
+    'record_status',
+    'red_zone_threshold',
 ])]
 class NetworkNode extends Model
 {
@@ -63,6 +70,11 @@ class NetworkNode extends Model
             'anchor_pop_id' => 'integer',
             'node_type_id' => 'integer',
             'capacity' => 'integer',
+            'number' => 'integer',
+            'red_zone_threshold' => 'integer',
+            'is_logical' => 'boolean',
+            'record_status' => InfrastructureRecordStatus::class,
+            'capacity_unit' => InfrastructureCapacityUnit::class,
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
         ];

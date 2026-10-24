@@ -73,6 +73,11 @@ class NetworkNodeTypeSeeder extends Seeder
             ['code' => 'switch_mini_pop', 'name' => 'Switch Mini POP', 'has_ports' => true, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'olt_chassis', 'name' => 'Chassis OLT', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
             ['code' => 'odp', 'name' => 'ODP', 'has_ports' => true, 'monitors_capacity' => true, 'max_ports' => 128, 'red_zone_threshold' => 80],
+            // Posisi fisik jadi node (ADHOC-213): Slot/PON/Port bukan lagi tabel terpisah.
+            ['code' => 'olt_slot', 'name' => 'Slot OLT', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
+            ['code' => 'olt_pon', 'name' => 'PON', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
+            ['code' => 'switch_slot', 'name' => 'Slot Switch', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
+            ['code' => 'switch_port', 'name' => 'Port Switch', 'has_ports' => false, 'monitors_capacity' => false, 'max_ports' => null, 'red_zone_threshold' => null],
         ];
 
         // firstOrCreate, BUKAN updateOrCreate (beda dari dua Feature di atas,
@@ -108,7 +113,12 @@ class NetworkNodeTypeSeeder extends Seeder
             // chassis OLT sekaligus — jadi chassis boleh anchor Mini POP ATAU
             // Cabang langsung (bukan 1:1 lagi).
             'olt_chassis' => ['pops' => ['mini_pop', 'cabang'], 'nodes' => []],
-            'odp' => ['pops' => ['cabang', 'mini_pop'], 'nodes' => []],
+            // ODP wajib di bawah PON (anchor Cabang/Mini POP dicabut, ADHOC-213).
+            'odp' => ['pops' => [], 'nodes' => ['olt_pon']],
+            'olt_slot' => ['pops' => [], 'nodes' => ['olt_chassis']],
+            'olt_pon' => ['pops' => [], 'nodes' => ['olt_slot']],
+            'switch_slot' => ['pops' => [], 'nodes' => ['switch_mini_pop']],
+            'switch_port' => ['pops' => [], 'nodes' => ['switch_slot']],
         ];
         NetworkNodeType::query()->where('code', 'ont')
             ->whereNotIn('id', DB::table('network_nodes')->select('node_type_id'))
