@@ -22,4 +22,21 @@ return [
     'legacy_emergency_reason' => env('INFRA_LEGACY_EMERGENCY_REASON', 'Alasan darurat belum dicatat di konfigurasi'),
 
     'legacy_writes_enabled' => (bool) env('INFRA_LEGACY_WRITES', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Konfirmasi reset data posisi lama (ADHOC-213 Task 5)
+    |--------------------------------------------------------------------------
+    |
+    | Migrasi `2026_10_24_000002_retarget_location_foreign_keys_to_network_nodes`
+    | MENGHAPUS seluruh isi infrastructure_slots/ports/connections/legacy_mappings
+    | lalu men-drop tabel lama. Di luar env `testing` migrasi menolak jalan
+    | kecuali saklar ini true — operator wajib menyatakan sendiri bahwa
+    | database target dummy (spec §10). Migrasi membaca config(), bukan env(),
+    | supaya tetap benar saat config di-cache (`config:cache` → ubah env lalu
+    | cache ulang).
+    |
+    */
+
+    'confirm_dummy_reset' => (bool) env('INFRA_CONFIRM_DUMMY_RESET', false),
 ];
