@@ -72,11 +72,14 @@ class InfrastructureConnection extends Model
     }
 
     /**
-     * @return BelongsTo<InfrastructurePort, $this>
+     * Nama kolom source/target_infrastructure_port_id bersifat historis: kini berisi
+     * id node bertipe Port Switch / PON di network_nodes.
+     *
+     * @return BelongsTo<NetworkNode, $this>
      */
     public function sourcePort(): BelongsTo
     {
-        return $this->belongsTo(InfrastructurePort::class, 'source_infrastructure_port_id');
+        return $this->belongsTo(NetworkNode::class, 'source_infrastructure_port_id');
     }
 
     /**
@@ -88,10 +91,10 @@ class InfrastructureConnection extends Model
     }
 
     /**
-     * @return BelongsTo<InfrastructurePort, $this>
+     * @return BelongsTo<NetworkNode, $this>
      */
     public function targetPort(): BelongsTo
     {
-        return $this->belongsTo(InfrastructurePort::class, 'target_infrastructure_port_id');
+        return $this->belongsTo(NetworkNode::class, 'target_infrastructure_port_id');
     }
 }

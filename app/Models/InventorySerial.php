@@ -81,14 +81,16 @@ class InventorySerial extends Model
         return $this->belongsTo(Pop::class, 'current_infrastructure_pop_id');
     }
 
+    // Nama kolom *_slot_id/*_port_id bersifat historis: kini berisi id node bertipe
+    // Slot / PON / Port Switch di network_nodes (FK ke network_nodes.id).
     public function currentInfrastructureSlot(): BelongsTo
     {
-        return $this->belongsTo(InfrastructureSlot::class, 'current_infrastructure_slot_id');
+        return $this->belongsTo(NetworkNode::class, 'current_infrastructure_slot_id');
     }
 
     public function currentInfrastructurePort(): BelongsTo
     {
-        return $this->belongsTo(InfrastructurePort::class, 'current_infrastructure_port_id');
+        return $this->belongsTo(NetworkNode::class, 'current_infrastructure_port_id');
     }
 
     public function item(): BelongsTo

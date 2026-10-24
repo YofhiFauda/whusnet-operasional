@@ -64,14 +64,16 @@ class TaskInfrastructureAction extends Model
         return $this->belongsTo(Pop::class, 'work_pop_id');
     }
 
+    // Nama kolom *_slot_id/*_port_id bersifat historis: kini berisi id node bertipe
+    // Slot / PON / Port Switch di network_nodes (FK ke network_nodes.id).
     public function workSlot(): BelongsTo
     {
-        return $this->belongsTo(InfrastructureSlot::class, 'work_infrastructure_slot_id');
+        return $this->belongsTo(NetworkNode::class, 'work_infrastructure_slot_id');
     }
 
     public function workPort(): BelongsTo
     {
-        return $this->belongsTo(InfrastructurePort::class, 'work_infrastructure_port_id');
+        return $this->belongsTo(NetworkNode::class, 'work_infrastructure_port_id');
     }
 
     public function technician(): BelongsTo

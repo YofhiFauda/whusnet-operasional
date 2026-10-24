@@ -60,13 +60,15 @@ class InfrastructureBalance extends Model
         return $this->belongsTo(Pop::class);
     }
 
+    // Nama kolom *_slot_id/*_port_id bersifat historis: kini berisi id node bertipe
+    // Slot / PON / Port Switch di network_nodes (FK ke network_nodes.id).
     public function infrastructureSlot(): BelongsTo
     {
-        return $this->belongsTo(InfrastructureSlot::class);
+        return $this->belongsTo(NetworkNode::class, 'infrastructure_slot_id');
     }
 
     public function infrastructurePort(): BelongsTo
     {
-        return $this->belongsTo(InfrastructurePort::class);
+        return $this->belongsTo(NetworkNode::class, 'infrastructure_port_id');
     }
 }

@@ -102,24 +102,26 @@ class InventoryTransaction extends Model
         return $this->belongsTo(Pop::class, 'to_infrastructure_pop_id');
     }
 
+    // Nama kolom *_slot_id/*_port_id bersifat historis: kini berisi id node bertipe
+    // Slot / PON / Port Switch di network_nodes (FK ke network_nodes.id).
     public function fromInfrastructureSlot(): BelongsTo
     {
-        return $this->belongsTo(InfrastructureSlot::class, 'from_infrastructure_slot_id');
+        return $this->belongsTo(NetworkNode::class, 'from_infrastructure_slot_id');
     }
 
     public function toInfrastructureSlot(): BelongsTo
     {
-        return $this->belongsTo(InfrastructureSlot::class, 'to_infrastructure_slot_id');
+        return $this->belongsTo(NetworkNode::class, 'to_infrastructure_slot_id');
     }
 
     public function fromInfrastructurePort(): BelongsTo
     {
-        return $this->belongsTo(InfrastructurePort::class, 'from_infrastructure_port_id');
+        return $this->belongsTo(NetworkNode::class, 'from_infrastructure_port_id');
     }
 
     public function toInfrastructurePort(): BelongsTo
     {
-        return $this->belongsTo(InfrastructurePort::class, 'to_infrastructure_port_id');
+        return $this->belongsTo(NetworkNode::class, 'to_infrastructure_port_id');
     }
 
     public function transfer(): BelongsTo

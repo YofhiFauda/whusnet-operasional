@@ -3,12 +3,9 @@
 namespace Tests\Feature\Warehouse;
 
 use App\Enums\InfrastructureLocationKind;
-use App\Enums\InfrastructurePortKind;
 use App\Enums\InventoryTransactionType;
 use App\Enums\SerialStatus;
 use App\Models\FopTask;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -19,13 +16,13 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\InfrastructureLocationResolver;
-use App\Services\InfrastructurePositionService;
 use App\Services\InventoryAdjustmentService;
 use App\Services\InventoryService;
 use App\Services\NetworkNodeService;
 use App\Support\InfrastructureLocation;
 use Database\Seeders\NetworkNodeTypeSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
@@ -52,11 +49,11 @@ class ExactInfrastructureAssetLocationTest extends TestCase
 
     private NetworkNode $switch;
 
-    private InfrastructureSlot $slot1;
+    private NetworkNode $slot1;
 
-    private InfrastructureSlot $slot2;
+    private NetworkNode $slot2;
 
-    private InfrastructurePort $switchPort;
+    private NetworkNode $switchPort;
 
     protected function setUp(): void
     {
@@ -70,12 +67,13 @@ class ExactInfrastructureAssetLocationTest extends TestCase
             'pop_id' => $this->cabang->id, 'issue' => 'Uji', 'status' => 'draft', 'priority' => 'Medium',
         ]);
 
-        $positions = app(InfrastructurePositionService::class);
         $this->olt = $this->node('olt_chassis');
         $this->switch = $this->node('switch_mini_pop');
-        $this->slot1 = $positions->createSlot($this->olt, 1);
-        $this->slot2 = $positions->createSlot($this->olt, 2);
-        $this->switchPort = $positions->createPort($positions->ensureLogicalSlot($this->switch), 4, InfrastructurePortKind::SWITCH);
+        // Slot/PON/Port Switch adalah baris network_nodes (ADHOC-213), bukan tabel terpisah.
+        $this->slot1 = NetworkNode::factory()->slot($this->olt, 1)->create();
+        $this->slot2 = NetworkNode::factory()->slot($this->olt, 2)->create();
+        $switchSlot = NetworkNode::factory()->slot($this->switch, 1)->create();
+        $this->switchPort = NetworkNode::factory()->switchPort($switchSlot, 4)->create();
     }
 
     private function node(string $typeCode): NetworkNode
@@ -176,7 +174,7 @@ class ExactInfrastructureAssetLocationTest extends TestCase
         $this->assertSame($this->slot1->id, $serial->fresh()->current_infrastructure_slot_id);
         $this->assertNull($serial->fresh()->current_network_node_id);
         $this->assertSame($this->slot1->id, $tx->to_infrastructure_slot_id);
-        $this->assertSame(1, $this->slot1->deployedSerials()->count());
+        $this->assertSame(1, InventorySerial::where('current_infrastructure_slot_id', $this->slot1->id)->count());
 
         try {
             $this->inventory()->retrieveSerialFromLocation($serial, $this->fopTask, $this->technician,
@@ -208,7 +206,7 @@ class ExactInfrastructureAssetLocationTest extends TestCase
         $this->assertSame($this->switchPort->id, $serial->fresh()->current_infrastructure_port_id);
         $this->assertNull($serial->fresh()->current_network_node_id);
         $this->assertSame($this->switchPort->id, $tx->to_infrastructure_port_id);
-        $this->assertSame(1, $this->switchPort->deployedSerials()->count());
+        $this->assertSame(1, InventorySerial::where('current_infrastructure_port_id', $this->switchPort->id)->count());
     }
 
     #[Test]
@@ -298,5 +296,36 @@ class ExactInfrastructureAssetLocationTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         app(NetworkNodeService::class)->move($this->olt, null, $otherMini, $owner);
+    }
+
+    #[Test]
+    public function serial_dipasang_di_slot_node_membawa_lokasi_tepat(): void
+    {
+        $card = $this->item('CARD-NODE', 'olt_module', 'infrastructure_asset', InfrastructureLocationKind::SLOT);
+        $serial = $this->issued($card, 'SN-NODE');
+        $pon = NetworkNode::factory()->pon($this->slot1, 3)->create();
+
+        // Kolom bernama *_slot_id/*_port_id kini menyimpan id node bertipe Slot/PON.
+        $serial->update(['status' => SerialStatus::DEPLOYED->value, 'current_technician_id' => null,
+            'issued_from_pop_id' => null, 'current_infrastructure_slot_id' => $this->slot1->id]);
+
+        $fresh = $serial->fresh();
+        $this->assertTrue($fresh->currentInfrastructureSlot->is($this->slot1));
+        $this->assertTrue($fresh->currentInfrastructureSlot->isSlot());
+        $this->assertSame($this->olt->id, $fresh->currentInfrastructureSlot->parent_id);
+
+        $fresh->update(['current_infrastructure_slot_id' => null, 'current_infrastructure_port_id' => $pon->id]);
+        $this->assertTrue($fresh->fresh()->currentInfrastructurePort->is($pon));
+        $this->assertTrue($fresh->fresh()->currentInfrastructurePort->isPon());
+    }
+
+    #[Test]
+    public function fk_menolak_slot_yang_bukan_node(): void
+    {
+        $card = $this->item('CARD-FK', 'olt_module', 'infrastructure_asset', InfrastructureLocationKind::SLOT);
+        $serial = $this->issued($card, 'SN-FK');
+
+        $this->expectException(QueryException::class);
+        $serial->update(['current_infrastructure_slot_id' => 9_999_999]);
     }
 }
