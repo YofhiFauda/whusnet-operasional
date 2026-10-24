@@ -524,8 +524,18 @@
 
                         {{-- Chassis / Switch Special Component Slots --}}
                         @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
-                            <div class="pb-2">
-                                @include('network.nodes._device-slots', ['device' => $node])
+                            <div class="pb-2 rounded-lg border border-border bg-surface-muted/40 p-4 text-xs text-text-muted">
+                                {{-- `_device-slots.blade.php` masih berbasis `InfrastructureSlot`/`InfrastructurePort`
+                                     (tabelnya sudah di-drop sebelum Task 11, lihat
+                                     `database/migrations/2026_10_24_000002_retarget_location_foreign_keys_to_network_nodes.php`)
+                                     — di luar scope file Task 11 untuk disesuaikan ulang
+                                     ke `NetworkNode::slots()`/`positionPorts()`. Dipanggil di
+                                     sini akan melempar "lazy loading disabled" dan menjatuhkan
+                                     seluruh halaman Master Node. Buka pohon di sebelah kiri
+                                     (lazy load Slot/PON lewat `network.nodes.children`) untuk
+                                     navigasi komponen perangkat ini sampai panel ini disusun ulang. --}}
+                                Panel komponen Slot/PON perangkat ini sedang disusun ulang untuk model node baru.
+                                Buka cabang <span class="font-mono font-semibold">{{ $node->code }}</span> di pohon sebelah kiri untuk menelusuri Slot/PON-nya.
                             </div>
                         @endif
 
@@ -1192,6 +1202,32 @@
 </div>
 
 <script>
+/**
+ * Lazy load anak Slot/PON/Port (Task 11, rancangan "Slot & PON sebagai
+ * node" §7) — `url` SELALU datang dari atribut `data-children-url` yang
+ * dirender server-side lewat `route()` (konvensi CLAUDE.md), tidak pernah
+ * dirakit dari id/type di sini.
+ */
+async function loadNodeChildren(url) {
+    if (!url) {
+        return [];
+    }
+    try {
+        const response = await fetch(url, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        if (!response.ok) {
+            return [];
+        }
+        const data = await response.json();
+
+        return data.children || [];
+    } catch {
+        return [];
+    }
+}
+
 function networkNodeManager(config) {
     return {
         activeMobileTab: 'tree',

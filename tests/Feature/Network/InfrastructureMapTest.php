@@ -12,8 +12,6 @@ use App\Models\CustomerDevice;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\FopTask;
 use App\Models\InfrastructureBalance;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -29,6 +27,7 @@ use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
 use App\Services\InfrastructureMapService;
+use App\Services\InfrastructurePositionService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\NetworkNodeTypeSeeder;
@@ -36,7 +35,6 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\WarehouseFeatureSeeder;
-use Database\Seeders\WhusnetTopologySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -60,13 +58,20 @@ class InfrastructureMapTest extends TestCase
     public function peta_merangkai_server_pop_dan_mini_pop_hasil_seeder_struktur_baru(): void
     {
         $pusat = Pop::factory()->create(['name' => 'WHUSNET', 'type' => 'pusat', 'parent_id' => null]);
-        $jetis = Pop::factory()->create(['name' => 'Jetis', 'type' => 'cabang', 'parent_id' => null]);
+        $jetis = Pop::factory()->create(['name' => 'Jetis', 'type' => 'cabang', 'parent_id' => $pusat->id]);
         $mini = Pop::factory()->create(['code' => 'C1', 'name' => 'C1', 'type' => 'mini_pop', 'parent_id' => $jetis->id]);
         $sandya = Pop::factory()->create(['name' => 'Sandya', 'type' => 'cabang', 'parent_id' => null]);
         Pop::factory()->create(['code' => 'D1', 'name' => 'D1', 'type' => 'mini_pop', 'parent_id' => $sandya->id]);
         $role = Role::where('code', 'owner')->firstOrFail();
         $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
-        $this->seed(WhusnetTopologySeeder::class);
+        $type = fn (string $code) => NetworkNodeType::where('code', $code)->firstOrFail();
+        $server = NetworkNode::factory()->create(['node_type_id' => $type('server')->id, 'anchor_pop_id' => $pusat->id, 'code' => 'CORE-WHUSNET-PUSAT']);
+        $olt = NetworkNode::factory()->create(['node_type_id' => $type('olt_chassis')->id, 'anchor_pop_id' => $mini->id, 'code' => 'OLT-JETIS-01']);
+        NetworkNode::factory()->create(['node_type_id' => $type('switch_mini_pop')->id, 'anchor_pop_id' => $mini->id, 'code' => 'SW-JETIS-01']);
+        $positions = app(InfrastructurePositionService::class);
+        $slot = $positions->createSlot($olt, 1);
+        $pon = $positions->createPort($slot, 1, ['capacity' => 8]);
+        $odp = NetworkNode::factory()->create(['node_type_id' => $type('odp')->id, 'parent_id' => $pon->id, 'anchor_pop_id' => null, 'code' => 'ODP-JETIS-01']);
         UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $role->id,
@@ -74,8 +79,6 @@ class InfrastructureMapTest extends TestCase
         ]);
 
         $topology = app(InfrastructureMapService::class)->build($user, null, 'name')['topologyDetails'];
-        $server = NetworkNode::where('code', 'CORE-WHUSNET-PUSAT')->firstOrFail();
-        $olt = NetworkNode::where('code', 'OLT-JETIS-01')->firstOrFail();
 
         // Rancangan hierarki §1/§16.2: Server diproyeksikan di atas Pusat,
         // Cabang → Mini POP → OLT/Switch; tanpa backbone/agregasi lama.
@@ -86,15 +89,12 @@ class InfrastructureMapTest extends TestCase
         $this->assertSame(-$mini->id, $topology[$olt->id]['parent_id']);
         $this->assertSame(-$mini->id, $topology[NetworkNode::where('code', 'SW-JETIS-01')->value('id')]['parent_id']);
 
-        // Keputusan user 21-10-2026: Slot dan PON instance kanvas sendiri,
-        // bukan diringkas ke panel perangkat — rantai lengkap OLT→Slot→PON→ODP.
-        $slot = InfrastructureSlot::where('network_node_id', $olt->id)->orderBy('number')->first();
-        $pon = InfrastructurePort::where('infrastructure_slot_id', $slot->id)->orderBy('number')->first();
-        $slotCanvasId = -2_000_000_000 - $slot->id;
-        $ponCanvasId = -3_000_000_000 - $pon->id;
-        $this->assertSame($olt->id, $topology[$slotCanvasId]['parent_id']);
-        $this->assertSame($slotCanvasId, $topology[$ponCanvasId]['parent_id']);
-        $this->assertSame($ponCanvasId, $topology[NetworkNode::where('code', 'ODP-JETIS-01')->value('id')]['parent_id']);
+        // Task 11: Slot/PON/Port Switch baris `network_nodes` sungguhan —
+        // rantai lengkap OLT→Slot→PON→ODP dari `parent_id`, bukan lagi
+        // kanvas negatif-offset dari tabel `infrastructure_slots/ports`.
+        $this->assertSame($olt->id, $topology[$slot->id]['parent_id']);
+        $this->assertSame($slot->id, $topology[$pon->id]['parent_id']);
+        $this->assertSame($pon->id, $topology[$odp->id]['parent_id']);
 
         $fopRole = Role::where('code', 'fop')->firstOrFail();
         $scopedUser = User::factory()->create(['role_id' => $fopRole->id, 'status' => 'active']);

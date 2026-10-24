@@ -3,7 +3,9 @@
     $children = $hierarchy['children'][$hierarchyKey] ?? [];
     $isLocation = in_array($item['kind'], ['pop', 'mini_pop'], true);
     $selectedId = $isLocation ? -$item['id'] : ($item['kind'] === 'customer' ? -1000000000 - $item['id'] : $item['id']);
-    $isPosition = in_array($item['kind'], ['slot', 'port'], true);
+    // Sejak Task 11, Slot/PON/Port Switch adalah item `kind = node` biasa
+    // (bukan `kind = slot`/`port` lagi) — dibedakan lewat `type`.
+    $isPosition = in_array($item['type'], ['olt_slot', 'olt_pon', 'switch_slot', 'switch_port'], true);
 @endphp
 @unless(in_array($item['type'], ['pon_port', 'olt_card', 'aggregation_switch', 'backbone', 'feeder', 'drop_cable'], true))
 <div data-map-hierarchy-key="{{ $hierarchyKey }}" x-show="matchesHierarchyFilter(@js($hierarchyKey))" x-data="{ isOpen: {{ $item['type'] === 'odp' ? 'false' : 'true' }} }" class="space-y-1">

@@ -386,7 +386,11 @@ class InfrastructureMapService
             $topologyIndex[$node->id] = [...$nodeIndex[$node->id], 'parent' => $parentId];
         }
 
-        $hierarchy = app(InfrastructureHierarchyService::class)->build($user, $selectedPopId);
+        // Peta butuh rantai lengkap OLT→Slot→PON→ODP sekaligus untuk kanvas
+        // (deep link & tray "slots" di kartu perangkat) — $withPositions =
+        // true supaya lazy load Task 11 (default Master Node) tidak
+        // menyembunyikan Slot/PON dari Peta.
+        $hierarchy = app(InfrastructureHierarchyService::class)->build($user, $selectedPopId, withPositions: true);
         $this->applyHierarchyProjection($hierarchy, $topologyDetails, $topologyIndex, $canViewTraceability);
 
         foreach ($nodes as $node) {
@@ -467,118 +471,58 @@ class InfrastructureMapService
     }
 
     /**
-     * Peta memakai proyeksi hierarki yang SAMA dengan Master Node (Task 10):
-     * ODP ber-uplink PON digantung di kartu OLT pemilik PON itu (garis
-     * koneksi, `relation = connection`, `verified` menandai status), Server
-     * Utama diproyeksikan di atas POP Pusat. Slot/PON/Port tidak menjadi
-     * kartu/pin sendiri — tampil di panel perangkat (`slots`).
+     * Peta memakai proyeksi hierarki yang SAMA dengan Master Node, dibangun
+     * dengan `$withPositions = true` (Task 11) supaya Slot/PON/Port Switch
+     * ikut terbawa. Sejak Slot/PON/Port Switch adalah baris `network_nodes`
+     * sungguhan (bukan `infrastructure_slots`/`infrastructure_ports` lagi),
+     * mereka SUDAH tampil sebagai kartu kanvas sendiri lewat `$nodeDetails`/
+     * `$topologyDetails` yang dibangun dari `$nodes` di atas (parent_id apa
+     * adanya) — tidak perlu lagi dinamespace ID negatif seperti dulu. Method
+     * ini HANYA menambahkan info yang tidak ada di proyeksi `$nodes` biasa:
+     * kapasitas PON (pelanggan aktif), breadcrumb jalur lengkap, dan tray
+     * "slots" ringkas pada kartu perangkat OLT/Switch.
      *
      * @param  array<int, array<string, mixed>>  $topologyDetails
      * @param  array<int, array<string, mixed>>  $topologyIndex
      */
-    /**
-     * ID kanvas untuk Slot/Port dinamespace negatif TERPISAH dari POP
-     * (-1..) dan ONT pelanggan (-1e9-id) supaya tidak bertabrakan — lihat
-     * konstanta di bawah.
-     */
-    private const CANVAS_SLOT_OFFSET = 2_000_000_000;
-
-    private const CANVAS_PORT_OFFSET = 3_000_000_000;
-
     private function applyHierarchyProjection(array $projection, array &$topologyDetails, array &$topologyIndex, bool $canViewTraceability): void
     {
         $items = $projection['items'];
-
-        // Slot dan PON/Port sekarang instance kanvas sendiri (keputusan user
-        // 21-10-2026: harus kelihatan bersarang persis seperti ODP, bukan
-        // cuma diringkas di panel perangkat). ID dinamespace negatif supaya
-        // tidak bertabrakan dengan node (positif) / POP (-1..) / ONT (-1e9-id).
-        foreach ($items as $key => $item) {
-            if (! in_array($item['kind'], ['slot', 'port'], true)) {
-                continue;
-            }
-            $id = $item['kind'] === 'slot'
-                ? -self::CANVAS_SLOT_OFFSET - $item['id']
-                : -self::CANVAS_PORT_OFFSET - $item['id'];
-            $parentItem = $items[$item['parent']] ?? null;
-            $parentId = $parentItem === null ? null : match ($parentItem['kind']) {
-                'node' => $parentItem['id'],
-                'slot' => -self::CANVAS_SLOT_OFFSET - $parentItem['id'],
-                default => null,
-            };
-            $deviceItem = $item['kind'] === 'port' ? ($items[$parentItem['parent']] ?? null) : $parentItem;
-            // Tipe kanvas dibedakan dari tipe device ('olt_chassis'/'switch_mini_pop')
-            // supaya getNodeStyle() JS bisa warnai Slot/PON/Port beda dari kartu
-            // perangkatnya sendiri, bukan ketimpa tag yang sama.
-            $canvasType = $item['kind'].'_'.$item['type'];
-            $topologyDetails[$id] = [
-                'id' => $id,
-                'code' => $item['label'],
-                'name' => $item['type_label'],
-                'type' => $canvasType,
-                'typeName' => $item['type_label'],
-                'parent_id' => $parentId,
-                'anchor_pop_id' => null,
-                'anchor_pop_name' => null,
-                'cabang_name' => $deviceItem['id'] ?? null ? ($topologyDetails[$deviceItem['id']]['cabang_name'] ?? null) : null,
-                'status' => $item['status_label'] ?? '',
-                'path' => $item['breadcrumb'],
-                'ports_count' => 0,
-                'used_ports_count' => 0,
-                'is_red_zone' => $item['capacity']['red_zone'] ?? false,
-                'ports' => [],
-                'assets' => array_map(fn (array $asset): array => [...$asset, 'position' => $item['breadcrumb'],
-                    'installed_at' => null, 'technician' => null, 'task' => null,
-                    'trace_url' => ($asset['kind'] === 'SN' && $canViewTraceability) ? route('warehouse.traceability.index', ['sn' => $asset['reference']]) : null],
-                    $item['direct_assets']),
-                'location_description' => null,
-                'coverage_area' => null,
-                'latitude' => null,
-                'longitude' => null,
-                'show_url' => $item['url'],
-                'capacity' => $item['capacity'],
-                'relation' => 'location',
-                'verified' => null,
-                'uplink_unverified' => false,
-                'connection_label' => $item['connection_label'] ?? null,
-            ];
-            $topologyIndex[$id] = [
-                'parent' => $parentId,
-                'type' => $canvasType,
-                'search' => mb_strtolower($item['label'].' '.($item['type_label'] ?? '').' '.$item['breadcrumb']),
-            ];
-        }
+        $isSlotType = fn (string $type): bool => in_array($type, ['olt_slot', 'switch_slot'], true);
+        $isPositionPortType = fn (string $type): bool => in_array($type, ['olt_pon', 'switch_port'], true);
 
         foreach ($items as $key => $item) {
             if ($item['kind'] !== 'node' || ! isset($topologyDetails[$item['id']])) {
                 continue;
             }
             $nodeId = $item['id'];
-            $topologyDetails[$nodeId]['verified'] = $item['verified'];
-            $topologyDetails[$nodeId]['uplink_unverified'] = $item['uplink_unverified'];
             $topologyDetails[$nodeId]['breadcrumb'] = $item['breadcrumb'];
             $topologyDetails[$nodeId]['path'] = $item['breadcrumb'];
-            $topologyDetails[$nodeId]['capacity'] = $item['capacity'];
+            if ($item['capacity'] !== null) {
+                $topologyDetails[$nodeId]['capacity'] = $item['capacity'];
+            }
 
-            // ODP ber-uplink PON: parent kanvasnya PORT PON itu (instance
-            // sendiri, bukan device langsung) — rantai lengkap OLT→Slot→
-            // PON→ODP sekarang tampil sebagai kartu terpisah di kanvas.
-            if ($item['relation'] === 'connection') {
-                $port = $items[$item['parent']] ?? null;
-                if ($port !== null) {
-                    $portCanvasId = -self::CANVAS_PORT_OFFSET - $port['id'];
-                    $slot = $items[$port['parent']] ?? null;
-                    $topologyDetails[$nodeId]['parent_id'] = $portCanvasId;
-                    $topologyDetails[$nodeId]['relation'] = 'connection';
-                    $topologyDetails[$nodeId]['via_slot'] = $slot['label'] ?? null;
-                    $topologyDetails[$nodeId]['via_port'] = $port['label'];
-                    $topologyIndex[$nodeId]['parent'] = $portCanvasId;
+            // Slot/PON/Port Switch mencatat aset lewat kolom
+            // `current_infrastructure_slot_id`/`_port_id` (nama historis,
+            // bukan `current_network_node_id`) — relasi `deployedSerials()`
+            // node (dipakai `$nodeDetails` di atas) TIDAK menangkapnya, jadi
+            // digabung di sini dari `direct_assets` hierarki yang sudah
+            // menyatukan ketiga kolom lokasi (`InfrastructureHierarchyService::attachDirectAssets()`).
+            if ($isSlotType($item['type']) || $isPositionPortType($item['type'])) {
+                foreach ($item['direct_assets'] as $asset) {
+                    $topologyDetails[$nodeId]['assets'][] = [...$asset, 'position' => $item['breadcrumb'],
+                        'installed_at' => null, 'technician' => null, 'task' => null,
+                        'trace_url' => ($asset['kind'] === 'SN' && $canViewTraceability) ? route('warehouse.traceability.index', ['sn' => $asset['reference']]) : null];
                 }
+            }
+
+            if (! in_array($item['type'], ['olt_chassis', 'switch_mini_pop'], true)) {
+                continue;
             }
 
             $slots = [];
             foreach ($projection['children'][$key] ?? [] as $childKey) {
-                if ($items[$childKey]['kind'] !== 'slot') {
+                if (! $isSlotType($items[$childKey]['type'])) {
                     continue;
                 }
                 $slots[] = [
@@ -594,10 +538,9 @@ class InfrastructureMapService
                         'url' => $items[$portKey]['url'],
                         'odps' => array_map(fn (string $odpKey): array => [
                             'label' => $items[$odpKey]['label'], 'url' => $items[$odpKey]['url'],
-                            'verified' => $items[$odpKey]['verified'],
                         ], array_values(array_filter($projection['children'][$portKey] ?? [],
                             fn (string $child): bool => $items[$child]['type'] === 'odp'))),
-                    ], array_values(array_filter($projection['children'][$childKey] ?? [], fn (string $child): bool => $items[$child]['kind'] === 'port'))),
+                    ], array_values(array_filter($projection['children'][$childKey] ?? [], fn (string $child): bool => $isPositionPortType($items[$child]['type'])))),
                 ];
             }
             $topologyDetails[$nodeId]['slots'] = $slots;

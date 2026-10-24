@@ -3,13 +3,9 @@
 namespace App\Services;
 
 use App\Enums\InfrastructurePortKind;
-use App\Enums\InfrastructureSlotKind;
 use App\Enums\SerialStatus;
-use App\Models\Customer;
 use App\Models\InfrastructureBalance;
 use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\NetworkNode;
 use App\Models\Pop;
@@ -18,25 +14,33 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * SATU proyeksi hierarki infrastruktur (§1, §5, Task 10) untuk Master Node,
- * Peta, dan detail posisi:
+ * SATU proyeksi hierarki infrastruktur untuk Master Node, Peta, dan metrik
+ * rekonsiliasi (Task 10/11, rancangan "Slot & PON sebagai node" §7):
  *
  *   Server Utama → POP Pusat → POP Cabang → Mini POP
  *     ├── OLT → Slot → PON → ODP → ONT pelanggan
- *     └── Switch → Slot → Port (berhenti; tujuan port = info koneksi)
+ *     └── Switch → Slot → Port Switch (berhenti; tujuan port = info koneksi)
  *
- * Proyeksi dari beberapa relasi — bukan satu tabel pohon. Parent lokasi
- * (pops.parent_id, network_nodes.parent_id/anchor_pop_id, slot/port FK)
- * dibedakan dari koneksi (ODP di bawah PON lewat `infrastructure_connections`;
- * `relation = connection`, `verified` menandai status verifikasinya). Node
- * legacy (feeder/PON node lama) tetap tampil di parent lamanya.
+ * Sejak Task 11, Slot/PON/Port Switch adalah baris `network_nodes` SUNGGUHAN
+ * (parent_id), BUKAN lagi tabel `infrastructure_slots`/`infrastructure_ports`
+ * terpisah — item proyeksi karena itu hanya ada dua `kind`: `pop` dan `node`.
+ * Tidak ada lagi `slot:`/`port:` sebagai kind terpisah.
  *
- * Server Utama yang ditambatkan ke POP Pusat diproyeksikan DI ATAS Pusat
- * tanpa mengubah data (tidak ada siklus parent di database).
+ * LAZY LOAD (§7 rancangan): tingkat Slot ke bawah (Slot, PON/Port Switch, ODP
+ * yang jadi anak PON) TIDAK dimuat di proyeksi default (`$withPositions =
+ * false`, dipakai Master Node) — perangkat (OLT/Switch) ditandai
+ * `has_children` dan sisanya diambil lewat endpoint
+ * `network.nodes.children` saat dibuka. `$withPositions = true` (dipakai
+ * Peta & `metricsByCabang()`) memuat seluruh subtree seperti sebelumnya,
+ * karena kanvas Peta & metrik ODP butuh rantai lengkap sekaligus.
+ *
+ * ODP lama yang masih ditambatkan LANGSUNG ke POP (anchor_pop_id, bukan
+ * PON) — peninggalan sebelum keputusan "ODP wajib punya PON" — tetap tampil
+ * sejajar perangkat lain di bawah POP-nya; keduanya sama-sama node
+ * top-level (parent_id null), jadi tidak kena lazy load.
  *
  * Scope: hanya POP yang boleh dilihat aktor (`Pop::forUser`) dan node di
  * dalamnya; SN ONT pelanggan butuh `customers.detail.devices.view_sensitive`.
- * Nama/kode jalur diturunkan dari relasi FK saat proyeksi dibuat.
  */
 class InfrastructureHierarchyService
 {
@@ -49,22 +53,22 @@ class InfrastructureHierarchyService
     /**
      * @return array{items: array<string, array<string, mixed>>, children: array<string, list<string>>, roots: list<string>}
      */
-    public function build(?User $user, ?int $cabangId = null): array
+    public function build(?User $user, ?int $cabangId = null, bool $withPositions = false): array
     {
         $pops = $this->visiblePops($user, $cabangId);
         $popIds = $pops->pluck('id')->all();
-        $nodes = $this->visibleNodes($popIds);
+        $nodes = $this->visibleNodes($popIds, $withPositions);
         $nodesById = $nodes->keyBy('id');
-        $slots = InfrastructureSlot::query()->whereIn('network_node_id', $nodes->pluck('id'))->orderBy('number')->get();
-        $ports = InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slots->pluck('id'))->orderBy('number')->get();
-        $portIds = $ports->pluck('id')->all();
-        $filledSlotIds = InventorySerial::query()->where('status', SerialStatus::DEPLOYED->value)
-            ->whereIn('current_infrastructure_slot_id', $slots->pluck('id'))->distinct()->pluck('current_infrastructure_slot_id')->all();
-        $activeConnections = InfrastructureConnection::query()->active()
-            ->whereIn('source_infrastructure_port_id', $portIds)->with('targetNode', 'targetPort')->get();
-        $uplinkByTarget = $activeConnections->filter(fn (InfrastructureConnection $connection): bool => $connection->target_network_node_id !== null
-            && $ports->firstWhere('id', $connection->source_infrastructure_port_id)?->kind === InfrastructurePortKind::PON)
-            ->keyBy('target_network_node_id');
+
+        // Koneksi non-pohon (§3) HANYA untuk Port Switch -> Port Switch/node/label;
+        // ODP->PON murni parent_id, tidak lagi lewat tabel ini (Task 9).
+        $switchPortIds = $nodes->filter(fn (NetworkNode $node): bool => $node->portKind() === InfrastructurePortKind::SWITCH)
+            ->pluck('id')->all();
+        $activeConnections = $switchPortIds !== []
+            ? InfrastructureConnection::query()->active()->whereIn('source_infrastructure_port_id', $switchPortIds)
+                ->with('targetNode', 'targetPort')->get()
+            : collect();
+
         // $user null = proyeksi sistem (rekonsiliasi terjadwal), tanpa
         // pembatasan POP — TIDAK pernah dipakai untuk tampilan pengguna.
         $canSeeSerials = $user === null || $user->hasPermission('customers.detail.devices.view_sensitive');
@@ -85,83 +89,48 @@ class InfrastructureHierarchyService
         }
 
         foreach ($nodes as $node) {
-            $uplink = $uplinkByTarget->get($node->id);
             $parent = match (true) {
-                $uplink !== null => 'port:'.$uplink->source_infrastructure_port_id,
                 $node->parent_id !== null && $nodesById->has($node->parent_id) => 'node:'.$node->parent_id,
                 $node->anchor_pop_id !== null && in_array($node->anchor_pop_id, $popIds, true) => 'pop:'.$node->anchor_pop_id,
                 default => null,
             };
-            $isOdp = $node->nodeType?->code === 'odp';
+            $isSwitchPort = $node->portKind() === InfrastructurePortKind::SWITCH;
+            $outgoing = $isSwitchPort ? $activeConnections->firstWhere('source_infrastructure_port_id', $node->id) : null;
+            $capacity = match (true) {
+                $node->isPon() => $this->ponCapacity->summary($node),
+                (bool) $node->nodeType?->has_ports => [
+                    'used' => (int) $node->used_ports_count,
+                    'capacity' => (int) $node->ports_count,
+                    'unit_label' => 'port pelanggan',
+                    'red_zone' => $node->isInRedZone(),
+                ],
+                default => null,
+            };
+
             $items['node:'.$node->id] = $this->item('node:'.$node->id, 'node', $node->id, $node->nodeType?->code ?? 'other',
-                $node->code, $parent, [
+                $node->isPosition() ? $node->displayName() : $node->code, $parent, [
                     'name' => $node->name,
                     'type_id' => $node->node_type_id,
                     'anchor_pop_id' => $node->anchor_pop_id,
                     'type_label' => $node->nodeType?->name ?? 'Node',
-                    'has_pin' => true,
+                    'has_pin' => ! $node->isPosition(),
                     'latitude' => $node->latitude,
                     'longitude' => $node->longitude,
                     'status' => $node->status,
-                    'relation' => $uplink !== null ? 'connection' : 'location',
-                    'verified' => $uplink !== null ? $uplink->isVerified() : ($isOdp ? false : null),
-                    'uplink_unverified' => $isOdp && ($uplink === null || ! $uplink->isVerified()),
-                    'capacity' => match (true) {
-                        // OLT/Switch: kapasitas = slot chassis terisi kartu/modul
-                        // (keputusan user 21-10-2026). Total = kapasitas tercatat
-                        // di node; null berarti kapasitas belum didata.
-                        InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) !== null => [
-                            'used' => $slots->where('network_node_id', $node->id)->whereIn('id', $filledSlotIds)->count(),
-                            'capacity' => $node->capacity,
-                            'documented' => $slots->where('network_node_id', $node->id)->count(),
-                            'unit_label' => 'slot terisi kartu',
-                            'red_zone' => null,
-                        ],
-                        (bool) $node->nodeType?->has_ports => [
-                            'used' => (int) $node->used_ports_count,
-                            'capacity' => (int) $node->ports_count,
-                            'unit_label' => 'port pelanggan',
-                            'red_zone' => $node->isInRedZone(),
-                        ],
-                        default => null,
-                    },
+                    'status_label' => $node->isPosition() ? $node->record_status?->label() : null,
+                    'has_children' => (int) ($node->children_count ?? 0) > 0,
+                    'capacity' => $capacity,
+                    'connection_label' => $outgoing === null ? null
+                        : ($outgoing->target_network_node_id !== null && ! $nodesById->has($outgoing->target_network_node_id)
+                            || $outgoing->target_infrastructure_port_id !== null && ! $nodesById->has($outgoing->target_infrastructure_port_id)
+                            ? 'Tujuan di luar scope'
+                            : ($outgoing->target_label ?? $outgoing->targetNode?->code ?? $outgoing->targetPort?->displayName())),
+                    'connection_verified' => $outgoing?->isVerified(),
                     'url' => route('network.nodes.show', $node),
                 ]);
         }
 
-        foreach ($slots as $slot) {
-            $items['slot:'.$slot->id] = $this->item('slot:'.$slot->id, 'slot', $slot->id, $slot->kind->value, "Slot {$slot->number}",
-                'node:'.$slot->network_node_id, [
-                    'name' => $slot->label,
-                    'type_label' => $slot->kind->label(),
-                    'status_label' => $slot->status->label(),
-                    'capacity' => ['used' => $ports->where('infrastructure_slot_id', $slot->id)->count(), 'capacity' => $slot->capacity,
-                        'unit_label' => $slot->capacity_unit?->label()],
-                    'url' => route('network.infrastructure-slots.show', $slot),
-                ]);
-        }
-
-        foreach ($ports as $port) {
-            $outgoing = $activeConnections->where('source_infrastructure_port_id', $port->id);
-            $switchTarget = $port->kind === InfrastructurePortKind::SWITCH ? $outgoing->first() : null;
-            $summary = $port->kind === InfrastructurePortKind::PON ? $this->ponCapacity->summary($port) : null;
-            $items['port:'.$port->id] = $this->item('port:'.$port->id, 'port', $port->id, $port->kind->value, $port->displayName(),
-                'slot:'.$port->infrastructure_slot_id, [
-                    'type_label' => $port->kind->label(),
-                    'status_label' => $this->connections->occupancyOf($port)->label(),
-                    'capacity' => $summary,
-                    'connection_label' => $switchTarget === null ? null
-                        : ($switchTarget->target_network_node_id !== null && ! $nodesById->has($switchTarget->target_network_node_id)
-                            || $switchTarget->target_infrastructure_port_id !== null && ! in_array($switchTarget->target_infrastructure_port_id, $portIds, true)
-                            ? 'Tujuan di luar scope'
-                            : ($switchTarget->target_label ?? $switchTarget->targetNode?->code ?? $switchTarget->targetPort?->displayName())),
-                    'connection_verified' => $switchTarget?->isVerified(),
-                    'url' => route('network.infrastructure-ports.show', $port),
-                ]);
-        }
-
-        // $this->attachCustomers($items, $nodes, $popIds, $canSeeSerials, $user);
-        $this->attachDirectAssets($items, $popIds, $nodes, $slots, $ports);
+        $this->attachDirectAssets($items, $popIds, $nodes);
         $this->attachServerProjection($items, $nodes);
 
         $children = [];
@@ -184,13 +153,15 @@ class InfrastructureHierarchyService
 
     /**
      * Empat metrik rekonsiliasi per POP Pusat/Cabang (Task 1/11, §16.4 #6): ODP,
-     * pelanggan terhubung, port pelanggan terpakai, aset DEPLOYED.
+     * pelanggan terhubung, port pelanggan terpakai, aset DEPLOYED. Selalu
+     * lewat subtree LENGKAP ($withPositions) — kalau tidak, ODP yang jadi
+     * anak PON tidak pernah dihitung karena lazy load.
      *
      * @return array<int, array{odp: int, customers: int, used_ports: int, assets: int}>
      */
     public function metricsByCabang(?User $user): array
     {
-        $projection = $this->build($user);
+        $projection = $this->build($user, withPositions: true);
         $metrics = [];
         foreach ($projection['items'] as $item) {
             if ($item['kind'] === 'pop' && in_array($item['type'], ['pop_pusat', 'pop_cabang'], true)) {
@@ -206,8 +177,13 @@ class InfrastructureHierarchyService
             if ($item['kind'] === 'node') {
                 if ($item['type'] === 'odp') {
                     $metrics[$cabangId]['odp']++;
+                    // Hanya port pelanggan ODP yang dihitung — PON juga
+                    // punya 'capacity.used' (pelanggan aktif), tapi itu
+                    // satuan berbeda dan pelanggan yang sama sudah terhitung
+                    // lewat port ODP-nya; menjumlahkan keduanya dobel-hitung
+                    // sejak PON jadi item `kind = node` (Task 11).
+                    $metrics[$cabangId]['used_ports'] += $item['capacity']['used'] ?? 0;
                 }
-                $metrics[$cabangId]['used_ports'] += $item['capacity']['used'] ?? 0;
             }
             if ($item['kind'] === 'customer') {
                 $metrics[$cabangId]['customers']++;
@@ -232,13 +208,32 @@ class InfrastructureHierarchyService
     }
 
     /**
+     * Node yang boleh dilihat aktor. `$withPositions = false` (default,
+     * Master Node) HANYA memuat node top-level (`anchor_pop_id` terisi —
+     * perangkat OLT/Switch/Server, dan ODP lama yang masih anchor-POP
+     * langsung) sehingga Slot/PON/Port/ODP-di-bawah-PON tidak pernah ikut
+     * sebelum diminta lewat endpoint lazy. `$withPositions = true` (Peta,
+     * metrik) memuat seluruh subtree lewat CTE rekursif seperti proyeksi
+     * lama.
+     *
      * @param  list<int>  $popIds
      * @return Collection<int, NetworkNode>
      */
-    private function visibleNodes(array $popIds): Collection
+    private function visibleNodes(array $popIds, bool $withPositions): Collection
     {
         if ($popIds === []) {
             return collect();
+        }
+
+        $query = NetworkNode::query()
+            ->with(['nodeType', 'ports.activeAssignment.customer.customerDevice', 'ports.activeAssignment.customer.customerTechnicalDetail',
+                'ports.activeAssignment.customer.inventorySerials' => fn ($q) => $q
+                    ->where('status', SerialStatus::INSTALLED->value)->with('item.category')])
+            ->withCount(['ports', 'ports as used_ports_count' => fn ($q) => $q->where('is_used', true), 'children'])
+            ->orderBy('code');
+
+        if (! $withPositions) {
+            return $query->whereIn('anchor_pop_id', $popIds)->get();
         }
 
         $placeholders = implode(',', array_fill(0, count($popIds), '?'));
@@ -252,77 +247,36 @@ class InfrastructureHierarchyService
             SELECT id FROM scoped
             SQL, array_values($popIds)));
 
-        return NetworkNode::query()->whereIn('id', $ids)
-            ->with(['nodeType', 'ports.activeAssignment.customer.customerDevice', 'ports.activeAssignment.customer.customerTechnicalDetail',
-                'ports.activeAssignment.customer.inventorySerials' => fn ($query) => $query
-                    ->where('status', SerialStatus::INSTALLED->value)->with('item.category')])
-            ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
-            ->orderBy('code')
-            ->get();
-    }
-
-    /**
-     * ONT = daun visual pelanggan pada port ODP (bukan network node). Semua
-     * ONT milik satu pelanggan terlihat; tanpa SN → «ONT belum tercatat».
-     *
-     * @param  array<string, array<string, mixed>>  $items
-     * @param  Collection<int, NetworkNode>  $nodes
-     * @param  list<int>  $popIds
-     */
-    private function attachCustomers(array &$items, Collection $nodes, array $popIds, bool $canSeeSerials, ?User $user): void
-    {
-        foreach ($nodes as $node) {
-            if ($node->nodeType?->code !== 'odp') {
-                continue;
-            }
-            foreach ($node->ports as $port) {
-                /** @var Customer|null $customer */
-                $customer = $port->activeAssignment->first()?->customer;
-                if ($customer === null || ! in_array((int) $customer->pop_id, $popIds, true)) {
-                    continue;
-                }
-                $onts = $canSeeSerials ? array_map(fn (array $modem): array => [
-                    'serial_number' => $modem['serial_number'], 'name' => $modem['name'],
-                ], $customer->networkPortModems()) : [];
-                usort($onts, fn (array $a, array $b): int => strcmp($a['serial_number'], $b['serial_number']));
-
-                $items['customer:'.$customer->id] = $this->item('customer:'.$customer->id, 'customer', $customer->id, 'customer_ont',
-                    $customer->full_name, 'node:'.$node->id, [
-                        'name' => $customer->cid ?? $customer->customer_code,
-                        'type_label' => 'ONT pelanggan',
-                        'port_number' => $port->number,
-                        'onts' => $onts,
-                        'onts_hidden' => ! $canSeeSerials,
-                        'ont_label' => $canSeeSerials && $onts === [] ? 'ONT belum tercatat' : null,
-                        'url' => $user?->hasPermission('customers.view') ? route('customers.show', $customer) : null,
-                    ]);
-            }
-        }
+        return $query->whereIn('id', $ids)->get();
     }
 
     /**
      * Aset langsung per posisi (bukan ringkasan turunan) — SN DEPLOYED pada
-     * kolom lokasinya dan saldo qty non-kabel per lokasi.
+     * kolom lokasinya dan saldo qty non-kabel per lokasi. Kolom
+     * `current_infrastructure_slot_id`/`current_infrastructure_port_id`
+     * (nama historis dipertahankan, §4 rancangan) kini menunjuk
+     * `network_nodes.id` juga, jadi ketiganya diproyeksikan ke `node:` yang
+     * sama — `isset($items[$key])` otomatis menyaring posisi yang belum
+     * dimuat (lazy).
      *
      * @param  array<string, array<string, mixed>>  $items
      * @param  list<int>  $popIds
      * @param  Collection<int, NetworkNode>  $nodes
-     * @param  Collection<int, InfrastructureSlot>  $slots
-     * @param  Collection<int, InfrastructurePort>  $ports
      */
-    private function attachDirectAssets(array &$items, array $popIds, Collection $nodes, Collection $slots, Collection $ports): void
+    private function attachDirectAssets(array &$items, array $popIds, Collection $nodes): void
     {
+        $nodeIds = $nodes->pluck('id')->all();
         $serials = InventorySerial::query()->with('item')->where('status', SerialStatus::DEPLOYED->value)
             ->where(fn ($query) => $query->whereIn('current_infrastructure_pop_id', $popIds)
                 ->orWhereIn('current_mini_pop_id', $popIds)
-                ->orWhereIn('current_network_node_id', $nodes->pluck('id'))
-                ->orWhereIn('current_infrastructure_slot_id', $slots->pluck('id'))
-                ->orWhereIn('current_infrastructure_port_id', $ports->pluck('id')))
+                ->orWhereIn('current_network_node_id', $nodeIds)
+                ->orWhereIn('current_infrastructure_slot_id', $nodeIds)
+                ->orWhereIn('current_infrastructure_port_id', $nodeIds))
             ->get();
         foreach ($serials as $serial) {
             $key = match (true) {
-                $serial->current_infrastructure_port_id !== null => 'port:'.$serial->current_infrastructure_port_id,
-                $serial->current_infrastructure_slot_id !== null => 'slot:'.$serial->current_infrastructure_slot_id,
+                $serial->current_infrastructure_port_id !== null => 'node:'.$serial->current_infrastructure_port_id,
+                $serial->current_infrastructure_slot_id !== null => 'node:'.$serial->current_infrastructure_slot_id,
                 $serial->current_network_node_id !== null => 'node:'.$serial->current_network_node_id,
                 $serial->current_mini_pop_id !== null => 'pop:'.$serial->current_mini_pop_id,
                 default => 'pop:'.$serial->current_infrastructure_pop_id,
@@ -333,13 +287,15 @@ class InfrastructureHierarchyService
         }
 
         $balances = InfrastructureBalance::query()->with('item')->where('qty', '>', 0)
-            ->where(fn ($query) => $query->whereIn('pop_id', $popIds)->orWhereIn('network_node_id', $nodes->pluck('id'))
-                ->orWhereIn('infrastructure_slot_id', $slots->pluck('id'))->orWhereIn('infrastructure_port_id', $ports->pluck('id')))
+            ->where(fn ($query) => $query->whereIn('pop_id', $popIds)
+                ->orWhereIn('network_node_id', $nodeIds)
+                ->orWhereIn('infrastructure_slot_id', $nodeIds)
+                ->orWhereIn('infrastructure_port_id', $nodeIds))
             ->get();
         foreach ($balances as $balance) {
             $key = match (true) {
-                $balance->infrastructure_port_id !== null => 'port:'.$balance->infrastructure_port_id,
-                $balance->infrastructure_slot_id !== null => 'slot:'.$balance->infrastructure_slot_id,
+                $balance->infrastructure_port_id !== null => 'node:'.$balance->infrastructure_port_id,
+                $balance->infrastructure_slot_id !== null => 'node:'.$balance->infrastructure_slot_id,
                 $balance->network_node_id !== null => 'node:'.$balance->network_node_id,
                 default => 'pop:'.$balance->pop_id,
             };
@@ -392,6 +348,7 @@ class InfrastructureHierarchyService
             'verified' => null,
             'uplink_unverified' => false,
             'status_label' => null,
+            'has_children' => false,
             'capacity' => null,
             'has_pin' => false,
             'latitude' => null,

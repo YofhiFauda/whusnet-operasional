@@ -233,15 +233,17 @@
             if (t.includes('odc')) {
                 return { tag: 'ODC', color: '#b45309', border: '#d97706', bg: 'rgba(254, 249, 195, 0.4)' };
             }
-            // Slot/PON/Port: instance sendiri (keputusan user 21-10-2026), beda
-            // warna dari kartu device-nya supaya kelihatan sebagai lapisan terpisah.
-            if (t === 'slot_olt' || t === 'slot_switch') {
+            // Slot/PON/Port: baris `network_nodes` sungguhan sejak Task 11
+            // (bukan lagi kanvas negatif-offset dari tabel lama) — tipe
+            // literalnya langsung dari `network_node_types.code`, beda warna
+            // dari kartu device-nya supaya kelihatan sebagai lapisan terpisah.
+            if (t === 'olt_slot' || t === 'switch_slot') {
                 return { tag: 'SLOT', color: '#0e7490', border: '#22d3ee', bg: 'rgba(207, 250, 254, 0.4)' };
             }
-            if (t === 'port_pon') {
+            if (t === 'olt_pon') {
                 return { tag: 'PON', color: '#166534', border: '#4ade80', bg: 'rgba(220, 252, 231, 0.4)' };
             }
-            if (t === 'port_switch') {
+            if (t === 'switch_port') {
                 return { tag: 'PORT', color: '#3730a3', border: '#818cf8', bg: 'rgba(224, 231, 255, 0.4)' };
             }
             if (t.includes('olt') || t.includes('pon')) {
@@ -1010,7 +1012,7 @@
                                                     <a :href="port.url" class="font-semibold text-sky-700 hover:underline dark:text-sky-300" x-text="port.label"></a>
                                                     <span class="text-slate-500" x-text="port.capacity ? ' · ' + port.capacity.used + ' / ' + (port.capacity.capacity ?? '?') + ' ' + port.capacity.unit_label : ' · ' + port.status"></span>
                                                     <template x-for="odp in port.odps" :key="odp.url">
-                                                        <a :href="odp.url" class="mt-1 block border-l border-slate-200 pl-3 text-[11px] text-slate-600 hover:underline dark:border-slate-700 dark:text-slate-300" x-text="odp.label + (odp.verified ? '' : ' · uplink belum terverifikasi')"></a>
+                                                        <a :href="odp.url" class="mt-1 block border-l border-slate-200 pl-3 text-[11px] text-slate-600 hover:underline dark:border-slate-700 dark:text-slate-300" x-text="odp.label"></a>
                                                     </template>
                                                 </div>
                                             </template>

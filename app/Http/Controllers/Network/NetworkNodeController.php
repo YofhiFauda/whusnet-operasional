@@ -22,6 +22,7 @@ use App\Services\MasterRecordRemovalService;
 use App\Services\NetworkNodeAttentionService;
 use App\Services\NetworkNodeService;
 use App\Services\NetworkPortAssignmentService;
+use App\Services\PonCapacityService;
 use App\Support\InfrastructureCutover;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -54,7 +55,7 @@ class NetworkNodeController extends Controller
             ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
             ->with(
                 'nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode',
-                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item', 'children.nodeType', 'infrastructureSlots.ports'
+                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item', 'children.nodeType'
             )
             ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
             ->orderBy('code')
@@ -250,7 +251,6 @@ class NetworkNodeController extends Controller
             'infrastructureBalances.item',
             'oltSlots.cardNode.deployedSerials',
             'oltSlots.cardNode.ports',
-            'infrastructureSlots' => fn ($query) => $query->with('ports')->withCount('ports'),
         ]);
 
         // Opsi kartu bebas: anak langsung chassis ini bertipe `olt_card` yang
@@ -287,6 +287,57 @@ class NetworkNodeController extends Controller
             'canViewDeviceSerials' => $user->hasPermission('customers.detail.devices.view_sensitive'),
             'allowedCustomerPopIds' => $this->access->hasAllPopAccess($user) ? null : $this->access->getAllowedPopIds($user),
         ]);
+    }
+
+    /**
+     * Anak langsung satu node, dimuat JIT (Task 11, rancangan "Slot & PON
+     * sebagai node" §7) — Master Node default-nya tidak memuat Slot ke
+     * bawah sama sekali (`InfrastructureHierarchyService::build()` dengan
+     * `$withPositions = false`), supaya payload halaman gak ikut menyeret
+     * ribuan baris PON/Port yang belum dibuka usernya. Dipanggil Alpine
+     * lewat `data-children-url` yang dirender server-side (`route()`),
+     * BUKAN dirakit dari id/type di klien (konvensi CLAUDE.md).
+     *
+     * Scope POP sama dengan `show()`/`markSeen()` — `authorizeNodeScope()`,
+     * jadi node di luar scope dapat 403, bukan bocor lewat endpoint lain.
+     */
+    public function children(NetworkNode $node, PonCapacityService $ponCapacity): JsonResponse
+    {
+        $this->authorizeNodeScope($node);
+
+        $children = $node->children()
+            ->with('nodeType')
+            ->withCount(['children', 'ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
+            ->orderBy('number')
+            ->orderBy('code')
+            ->get();
+
+        return response()->json(['children' => $children->map(function (NetworkNode $child) use ($ponCapacity): array {
+            $capacity = null;
+            $used = null;
+            if ($child->isPon()) {
+                $summary = $ponCapacity->summary($child);
+                $capacity = $summary['capacity'];
+                $used = $summary['used'];
+            } elseif ((bool) $child->nodeType?->has_ports) {
+                $capacity = (int) $child->ports_count;
+                $used = (int) $child->used_ports_count;
+            } else {
+                $capacity = $child->capacity;
+            }
+
+            return [
+                'id' => $child->id,
+                'key' => 'node:'.$child->id,
+                'type' => $child->nodeType?->code ?? 'other',
+                'label' => $child->isPosition() ? $child->displayName() : $child->code,
+                'has_children' => (int) $child->children_count > 0,
+                'capacity' => $capacity,
+                'used' => $used,
+                'record_status' => $child->record_status?->value,
+                'url' => route('network.nodes.show', $child),
+            ];
+        })->values()]);
     }
 
     public function markSeen(NetworkNode $node, NetworkNodeAttentionService $attention): JsonResponse
