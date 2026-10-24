@@ -7,6 +7,7 @@ use App\Enums\InfrastructureSlotKind;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
+use App\Services\InfrastructurePositionService;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use InvalidArgumentException;
 
@@ -56,19 +57,17 @@ class NetworkNodeFactory extends Factory
         $kind = InfrastructureSlotKind::forDeviceTypeCode($device->nodeType?->code)
             ?? throw new InvalidArgumentException('Perangkat induk Slot harus OLT chassis atau Switch Mini POP.');
 
-        // TODO Task 3: samakan dengan InfrastructurePositionService::derivedCode().
-        return $this->position($device, $kind->typeCode(), $number, "{$device->code}-S{$number}", "Slot {$number}");
+        return $this->position($device, $kind->typeCode(), $number, InfrastructurePositionService::derivedCode($device, 'S', $number), "Slot {$number}");
     }
 
     public function pon(NetworkNode $slot, int $number): static
     {
-        // TODO Task 3: samakan dengan InfrastructurePositionService::derivedCode().
-        return $this->position($slot, InfrastructurePortKind::PON->typeCode(), $number, "{$slot->code}-P{$number}", "PON {$number}");
+        return $this->position($slot, InfrastructurePortKind::PON->typeCode(), $number, InfrastructurePositionService::derivedCode($slot, 'P', $number), "PON {$number}");
     }
 
     public function switchPort(NetworkNode $slot, int $number): static
     {
-        return $this->position($slot, InfrastructurePortKind::SWITCH->typeCode(), $number, "{$slot->code}-P{$number}", "Port {$number}");
+        return $this->position($slot, InfrastructurePortKind::SWITCH->typeCode(), $number, InfrastructurePositionService::derivedCode($slot, 'P', $number), "Port {$number}");
     }
 
     private function position(NetworkNode $parent, string $typeCode, int $number, string $code, string $name): static

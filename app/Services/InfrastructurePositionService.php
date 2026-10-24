@@ -7,10 +7,8 @@ use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureRecordStatus;
 use App\Enums\InfrastructureSlotKind;
 use App\Models\AuditLog;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
-use App\Models\OltSlot;
+use App\Models\NetworkNodeType;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -18,12 +16,16 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
- * Satu-satunya penulis Slot/Port kanonis. Aturan yang dijaga di sini:
+ * Satu-satunya penulis Slot/PON/Port Switch. Sejak ADHOC-213 ketiganya adalah
+ * baris `network_nodes` (bukan tabel `infrastructure_*` lagi). Aturan yang dijaga:
  *
  * - Slot hanya di perangkat OLT (`olt_chassis`) atau Switch (`switch_mini_pop`);
  *   jenis slot diturunkan dari tipe perangkat, tidak bisa dipilih bebas.
- * - PON hanya di Slot OLT, Port Switch hanya di Slot Switch (§4.2).
- * - Nomor & kode unik dalam induknya (unique index DB + pesan ramah di sini).
+ * - PON hanya di Slot OLT, Port Switch hanya di Slot Switch (§4.2). Aturan
+ *   tipe-induk TIDAK ditulis ulang di sini: divalidasi lewat
+ *   `NetworkNodeService::assertTypePlacement` (tabel `network_node_type_rules`)
+ *   supaya hanya ada satu sumber kebenaran.
+ * - Nomor unik dalam induknya (unique index DB + pesan ramah di sini).
  *
  * Pemeriksaan POP scope aktor dilakukan pemanggil (controller/laporan) lewat
  * `InfrastructureLocationResolver` — service ini tidak tahu siapa aktornya.
@@ -32,16 +34,35 @@ class InfrastructurePositionService
 {
     public const LOGICAL_SLOT_LABEL = 'Slot internal/logis';
 
+    private const MAX_CODE_LENGTH = 120;
+
     /**
-     * @param  array{code?: ?string, label?: ?string, capacity?: ?int, status?: InfrastructureRecordStatus|string, notes?: ?string, is_logical?: bool, legacy_olt_slot_id?: ?int}  $attributes
+     * Kode posisi diturunkan dari kode induk (`{induk}-S3`, `{induk}-S3-P5`)
+     * supaya unik tanpa input manual. Lebar kolom `code` hanya bisa diuji di
+     * MySQL, jadi batasnya DIJAGA DI SINI: tanpa guard, kode kepanjangan jadi
+     * error SQL mentah (500) di production, bukan pesan ramah.
      */
-    public function createSlot(NetworkNode $device, int $number, array $attributes = []): InfrastructureSlot
+    public static function derivedCode(NetworkNode $parent, string $letter, int $number): string
+    {
+        $code = "{$parent->code}-{$letter}{$number}";
+
+        if (mb_strlen($code) > self::MAX_CODE_LENGTH) {
+            throw new InvalidArgumentException('Kode turunan melebihi 120 karakter.');
+        }
+
+        return $code;
+    }
+
+    /**
+     * @param  array{capacity?: ?int, status?: InfrastructureRecordStatus|string, notes?: ?string, is_logical?: bool}  $attributes
+     */
+    public function createSlot(NetworkNode $device, int $number, array $attributes = []): NetworkNode
     {
         if ($number < 1) {
             throw new InvalidArgumentException('Nomor slot harus mulai dari 1.');
         }
 
-        return DB::transaction(function () use ($device, $number, $attributes): InfrastructureSlot {
+        return DB::transaction(function () use ($device, $number, $attributes): NetworkNode {
             $device = NetworkNode::query()->with('nodeType')->lockForUpdate()->findOrFail($device->id);
             $kind = InfrastructureSlotKind::forDeviceTypeCode($device->nodeType?->code);
 
@@ -49,45 +70,36 @@ class InfrastructurePositionService
                 throw new InvalidArgumentException('Slot hanya dapat dibuat pada OLT atau Switch Mini POP.');
             }
 
-            if (($attributes['is_logical'] ?? false) && $kind !== InfrastructureSlotKind::SWITCH) {
+            $isLogical = (bool) ($attributes['is_logical'] ?? false);
+            if ($isLogical && $kind !== InfrastructureSlotKind::SWITCH) {
                 throw new InvalidArgumentException('Slot internal/logis hanya untuk Switch.');
             }
 
             if ($device->capacity !== null && $number > $device->capacity) {
                 throw new InvalidArgumentException("Nomor slot melebihi kapasitas perangkat {$device->capacity} slot.");
             }
-            if (! isset($attributes['legacy_olt_slot_id'])) {
-                $legacy = OltSlot::query()->where('chassis_node_id', $device->id)->where('number', $number)->first();
-                if ($legacy !== null && ! InfrastructureSlot::query()->where('network_node_id', $device->id)->where('number', $number)->exists()) {
-                    $slot = app(InfrastructureLegacyBackfillService::class)->syncOltSlot($legacy);
-                    $slot->update(array_intersect_key($attributes, array_flip(['code', 'label', 'capacity', 'status', 'notes'])));
 
-                    return $slot;
-                }
-            }
-
-            if (InfrastructureSlot::query()->where('network_node_id', $device->id)->where('number', $number)->exists()) {
+            if ($device->children()->where('number', $number)->exists()) {
                 throw new InvalidArgumentException("Slot {$number} sudah ada pada perangkat {$device->code}.");
             }
 
-            $code = $this->normalizeCode($attributes['code'] ?? null);
-            if ($code !== null && InfrastructureSlot::query()->where('network_node_id', $device->id)->where('code', $code)->exists()) {
-                throw new InvalidArgumentException("Kode slot {$code} sudah dipakai pada perangkat {$device->code}.");
-            }
+            $type = NetworkNodeType::query()->where('code', $kind->typeCode())->firstOrFail();
+            app(NetworkNodeService::class)->assertTypePlacement($type, $device, null);
 
-            return $this->guardUnique(fn () => InfrastructureSlot::create([
-                'network_node_id' => $device->id,
+            return $this->guardUnique(fn () => NetworkNode::create([
+                'parent_id' => $device->id,
+                'anchor_pop_id' => null,
+                'node_type_id' => $type->id,
                 'number' => $number,
-                'kind' => $kind,
-                'code' => $code,
-                'label' => $attributes['label'] ?? null,
-                'is_logical' => (bool) ($attributes['is_logical'] ?? false),
-                'status' => $attributes['status'] ?? InfrastructureRecordStatus::BELUM_DIDATA,
+                'code' => self::derivedCode($device, 'S', $number),
+                'name' => $isLogical ? self::LOGICAL_SLOT_LABEL : "Slot {$number}",
+                'is_logical' => $isLogical,
+                'record_status' => $attributes['status'] ?? InfrastructureRecordStatus::BELUM_DIDATA,
                 'capacity' => $attributes['capacity'] ?? null,
                 'capacity_unit' => $kind === InfrastructureSlotKind::OLT
                     ? InfrastructureCapacityUnit::PON
                     : InfrastructureCapacityUnit::PORT,
-                'legacy_olt_slot_id' => $attributes['legacy_olt_slot_id'] ?? null,
+                'status' => 'active',
                 'notes' => $attributes['notes'] ?? null,
             ]));
         });
@@ -98,49 +110,47 @@ class InfrastructurePositionService
      * internal/logis" (§1, §16.2) supaya urutan Switch → Slot → Port tetap
      * seragam tanpa mengesankan ada kartu yang bisa dicabut. Idempoten.
      */
-    public function ensureLogicalSlot(NetworkNode $switch): InfrastructureSlot
+    public function ensureLogicalSlot(NetworkNode $switch): NetworkNode
     {
-        $existing = InfrastructureSlot::query()->where('network_node_id', $switch->id)->where('number', 1)->first();
-        if ($existing !== null) {
-            if ($existing->kind !== InfrastructureSlotKind::SWITCH) {
-                throw new InvalidArgumentException('Slot internal/logis hanya untuk Switch.');
-            }
+        $switch->loadMissing('nodeType');
+        if (InfrastructureSlotKind::forDeviceTypeCode($switch->nodeType?->code) !== InfrastructureSlotKind::SWITCH) {
+            throw new InvalidArgumentException('Slot internal/logis hanya untuk Switch.');
+        }
 
+        $existing = $switch->slots()->where('number', 1)->first();
+        if ($existing !== null) {
             return $existing;
         }
 
-        return $this->createSlot($switch, 1, ['is_logical' => true, 'label' => self::LOGICAL_SLOT_LABEL]);
+        return $this->createSlot($switch, 1, ['is_logical' => true]);
     }
 
     /**
-     * @param  array{code?: ?string, capacity?: ?int, red_zone_threshold?: ?int, status?: InfrastructureRecordStatus|string, notes?: ?string, legacy_network_node_id?: ?int}  $attributes
+     * Jenis port (PON/Port Switch) diturunkan dari tipe Slot, tidak dipilih
+     * pemanggil — jadi "PON di Slot Switch" mustahil dibuat lewat service ini.
+     *
+     * @param  array{capacity?: ?int, red_zone_threshold?: ?int, status?: InfrastructureRecordStatus|string, notes?: ?string}  $attributes
      */
-    public function createPort(InfrastructureSlot $slot, int $number, InfrastructurePortKind $kind, array $attributes = []): InfrastructurePort
+    public function createPort(NetworkNode $slot, int $number, array $attributes = []): NetworkNode
     {
         if ($number < 1) {
             throw new InvalidArgumentException('Nomor port harus mulai dari 1.');
         }
 
-        return DB::transaction(function () use ($slot, $number, $kind, $attributes): InfrastructurePort {
-            $slot = InfrastructureSlot::query()->lockForUpdate()->findOrFail($slot->id);
+        return DB::transaction(function () use ($slot, $number, $attributes): NetworkNode {
+            $slot = NetworkNode::query()->with('nodeType')->lockForUpdate()->findOrFail($slot->id);
+            $kind = $slot->slotKind()?->portKind();
 
-            if ($slot->kind->portKind() !== $kind) {
-                throw new InvalidArgumentException($kind === InfrastructurePortKind::PON
-                    ? 'PON hanya boleh berada di Slot OLT.'
-                    : 'Port Switch hanya boleh berada di Slot Switch.');
+            if ($kind === null) {
+                throw new InvalidArgumentException('PON atau Port Switch hanya dapat dibuat pada Slot.');
             }
 
             if ($slot->capacity !== null && $number > $slot->capacity) {
                 throw new InvalidArgumentException("Nomor port melebihi kapasitas slot {$slot->capacity}.");
             }
 
-            if (InfrastructurePort::query()->where('infrastructure_slot_id', $slot->id)->where('number', $number)->exists()) {
+            if ($slot->children()->where('number', $number)->exists()) {
                 throw new InvalidArgumentException("{$kind->label()} {$number} sudah ada pada slot ini.");
-            }
-
-            $code = $this->normalizeCode($attributes['code'] ?? null);
-            if ($code !== null && InfrastructurePort::query()->where('infrastructure_slot_id', $slot->id)->where('code', $code)->exists()) {
-                throw new InvalidArgumentException("Kode port {$code} sudah dipakai pada slot ini.");
             }
 
             $threshold = $attributes['red_zone_threshold'] ?? null;
@@ -153,16 +163,22 @@ class InfrastructurePositionService
                 throw new InvalidArgumentException('Kapasitas pelanggan aktif hanya untuk PON dan minimal 1.');
             }
 
-            return $this->guardUnique(fn () => InfrastructurePort::create([
-                'infrastructure_slot_id' => $slot->id,
+            $type = NetworkNodeType::query()->where('code', $kind->typeCode())->firstOrFail();
+            app(NetworkNodeService::class)->assertTypePlacement($type, $slot, null);
+
+            return $this->guardUnique(fn () => NetworkNode::create([
+                'parent_id' => $slot->id,
+                'anchor_pop_id' => null,
+                'node_type_id' => $type->id,
                 'number' => $number,
-                'kind' => $kind,
-                'code' => $code,
-                'status' => $attributes['status'] ?? InfrastructureRecordStatus::BELUM_DIDATA,
+                'code' => self::derivedCode($slot, 'P', $number),
+                'name' => ($kind === InfrastructurePortKind::PON ? 'PON' : 'Port').' '.$number,
+                'is_logical' => false,
+                'record_status' => $attributes['status'] ?? InfrastructureRecordStatus::BELUM_DIDATA,
                 'capacity' => $capacity,
                 'capacity_unit' => $kind->capacityUnit(),
                 'red_zone_threshold' => $threshold,
-                'legacy_network_node_id' => $attributes['legacy_network_node_id'] ?? null,
+                'status' => 'active',
                 'notes' => $attributes['notes'] ?? null,
             ]));
         });
@@ -175,7 +191,9 @@ class InfrastructurePositionService
             if (InfrastructureSlotKind::forDeviceTypeCode($device->nodeType?->code) === null) {
                 throw ValidationException::withMessages(['capacity' => 'Kapasitas slot hanya untuk OLT atau Switch.']);
             }
-            $highest = max((int) $device->infrastructureSlots()->max('number'), (int) $device->oltSlots()->max('number'));
+            // reorder(): relasi slots() sudah orderBy; max() + ORDER BY kolom
+            // non-agregat ditolak MySQL ONLY_FULL_GROUP_BY.
+            $highest = (int) $device->slots()->reorder()->max('number');
             if ($capacity < 1 || $capacity < $highest) {
                 throw ValidationException::withMessages(['capacity' => "Kapasitas tidak boleh di bawah posisi slot tertinggi {$highest}."]);
             }
@@ -189,11 +207,14 @@ class InfrastructurePositionService
         });
     }
 
-    public function updateSlotCapacity(InfrastructureSlot $slot, int $capacity, User $actor): InfrastructureSlot
+    public function updateSlotCapacity(NetworkNode $slot, int $capacity, User $actor): NetworkNode
     {
-        return DB::transaction(function () use ($slot, $capacity, $actor): InfrastructureSlot {
-            $slot = InfrastructureSlot::query()->lockForUpdate()->findOrFail($slot->id);
-            $highest = (int) $slot->ports()->max('number');
+        return DB::transaction(function () use ($slot, $capacity, $actor): NetworkNode {
+            $slot = NetworkNode::query()->with('nodeType')->lockForUpdate()->findOrFail($slot->id);
+            if (! $slot->isSlot()) {
+                throw ValidationException::withMessages(['capacity' => 'Kapasitas port hanya untuk Slot.']);
+            }
+            $highest = (int) $slot->positionPorts()->reorder()->max('number');
             if ($capacity < 1 || $capacity < $highest) {
                 throw ValidationException::withMessages(['capacity' => "Kapasitas tidak boleh di bawah nomor port tertinggi {$highest}."]);
             }
@@ -207,21 +228,14 @@ class InfrastructurePositionService
         });
     }
 
-    private function auditCapacity(NetworkNode|InfrastructureSlot $position, ?int $old, int $capacity, User $actor): void
+    private function auditCapacity(NetworkNode $position, ?int $old, int $capacity, User $actor): void
     {
         AuditLog::create([
             'user_id' => $actor->id, 'module' => 'Kapasitas Infrastruktur', 'action' => 'capacity_change',
-            'auditable_type' => $position::class, 'auditable_id' => $position->id,
+            'auditable_type' => NetworkNode::class, 'auditable_id' => $position->id,
             'old_values' => ['capacity' => $old], 'new_values' => ['capacity' => $capacity],
             'ip_address' => request()?->ip(), 'user_agent' => request()?->userAgent(), 'created_at' => now(),
         ]);
-    }
-
-    private function normalizeCode(?string $code): ?string
-    {
-        $code = $code === null ? null : trim($code);
-
-        return $code === '' ? null : $code;
     }
 
     /**
