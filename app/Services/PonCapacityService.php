@@ -3,10 +3,8 @@
 namespace App\Services;
 
 use App\Enums\InfrastructureCapacityUnit;
-use App\Enums\InfrastructurePortKind;
 use App\Models\AuditLog;
-use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
+use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkPortAssignment;
 use App\Models\User;
@@ -14,32 +12,34 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Kapasitas PON manual + Red Zone (§16.3, keputusan user 21-10-2026).
+ * Kapasitas PON manual + Red Zone (§16.3, keputusan user 21-10-2026;
+ * disesuaikan Task 9 rancangan "Slot & PON sebagai node" 2026-10-24).
  *
  * Satuan = PELANGGAN AKTIF: satu pelanggan dengan assignment port ODP aktif
- * pada ODP yang uplink-nya ke PON ini aktif DAN terverifikasi dihitung
- * satu unit — berapa pun ONT-nya (ONT tidak pernah jadi dasar hitung).
- * Assignment aktif ganda untuk pelanggan yang sama sudah ditolak di DB
- * (`network_customer_active_unique`). Kapasitas ODP (port pelanggan) adalah
- * ukuran lain dan TIDAK dicampur di sini.
+ * pada ODP yang jadi ANAK LANGSUNG PON ini (`network_nodes.parent_id`)
+ * dihitung satu unit — berapa pun ONT-nya (ONT tidak pernah jadi dasar
+ * hitung). Assignment aktif ganda untuk pelanggan yang sama sudah ditolak
+ * di DB (`network_customer_active_unique`). Kapasitas ODP (port pelanggan)
+ * adalah ukuran lain dan TIDAK dicampur di sini.
  *
- * `NetworkNode::isInRedZone()` & `monitors_capacity` node `pon_port` lama
- * BUKAN sumber rumus ini.
+ * Konsep "koneksi terverifikasi" (dulu lewat `InfrastructureConnection`)
+ * DIHAPUS Task 9 — uplink ODP→PON sekarang murni `parent_id`, tidak ada lagi
+ * status terverifikasi/belum untuk dilaporkan terpisah. `summary()` karena
+ * itu tidak punya kunci `unverified` lagi.
  */
 class PonCapacityService
 {
-    public function used(InfrastructurePort $pon): int
+    public function used(NetworkNode $pon): int
     {
-        return $this->customersOn($pon, verifiedOnly: true);
+        return $this->customersOn($pon);
     }
 
     /**
-     * @return array{used: int, unverified: int, capacity: ?int, threshold: ?int, unit: string, unit_label: string, red_zone: ?bool, is_full: bool, remaining: ?int}
+     * @return array{used: int, capacity: ?int, threshold: ?int, unit: string, unit_label: string, red_zone: ?bool, is_full: bool, remaining: ?int}
      */
-    public function summary(InfrastructurePort $pon): array
+    public function summary(NetworkNode $pon): array
     {
         $used = $this->used($pon);
-        $unverified = $this->customersOn($pon, verifiedOnly: false) - $used;
         $capacity = $pon->capacity;
         $threshold = $pon->red_zone_threshold;
 
@@ -51,7 +51,6 @@ class PonCapacityService
 
         return [
             'used' => $used,
-            'unverified' => $unverified,
             'capacity' => $capacity,
             'threshold' => $threshold,
             'unit' => InfrastructureCapacityUnit::PELANGGAN_AKTIF->value,
@@ -62,9 +61,9 @@ class PonCapacityService
         ];
     }
 
-    public function updateCapacity(InfrastructurePort $pon, int $capacity, int $threshold, User $actor): InfrastructurePort
+    public function updateCapacity(NetworkNode $pon, int $capacity, int $threshold, User $actor): NetworkNode
     {
-        if ($pon->kind !== InfrastructurePortKind::PON) {
+        if (! $pon->isPon()) {
             throw ValidationException::withMessages(['capacity' => 'Kapasitas pelanggan aktif hanya untuk PON.']);
         }
         if ($capacity < 1) {
@@ -74,8 +73,8 @@ class PonCapacityService
             throw ValidationException::withMessages(['red_zone_threshold' => 'Ambang Red Zone bernilai 1–100 persen.']);
         }
 
-        return DB::transaction(function () use ($pon, $capacity, $threshold, $actor): InfrastructurePort {
-            $pon = InfrastructurePort::query()->lockForUpdate()->findOrFail($pon->id);
+        return DB::transaction(function () use ($pon, $capacity, $threshold, $actor): NetworkNode {
+            $pon = NetworkNode::query()->lockForUpdate()->findOrFail($pon->id);
             $used = $this->used($pon);
 
             if ($capacity < $used) {
@@ -97,9 +96,12 @@ class PonCapacityService
 
             AuditLog::create([
                 'user_id' => $actor->id,
+                // Modul audit dipertahankan sama walau entitasnya sekarang
+                // NetworkNode (Task 9) — supaya riwayat lama & baru tetap
+                // tampil satu daftar konsisten di halaman audit.
                 'module' => 'Port Infrastruktur',
                 'action' => 'capacity_change',
-                'auditable_type' => InfrastructurePort::class,
+                'auditable_type' => NetworkNode::class,
                 'auditable_id' => $pon->id,
                 'old_values' => $old,
                 'new_values' => ['capacity' => $capacity, 'red_zone_threshold' => $threshold, 'used_at_change' => $used],
@@ -112,13 +114,9 @@ class PonCapacityService
         });
     }
 
-    private function customersOn(InfrastructurePort $pon, bool $verifiedOnly): int
+    private function customersOn(NetworkNode $pon): int
     {
-        $odpIds = InfrastructureConnection::query()->active()
-            ->when($verifiedOnly, fn ($query) => $query->verified())
-            ->where('source_infrastructure_port_id', $pon->id)
-            ->whereNotNull('target_network_node_id')
-            ->select('target_network_node_id');
+        $odpIds = NetworkNode::query()->where('parent_id', $pon->id)->select('id');
 
         return NetworkPortAssignment::query()
             ->where('active_key', 1)
