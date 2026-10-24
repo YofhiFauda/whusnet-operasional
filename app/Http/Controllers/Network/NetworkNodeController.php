@@ -2,22 +2,18 @@
 
 namespace App\Http\Controllers\Network;
 
-use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureSlotKind;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
-use App\Models\InfrastructurePort;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
-use App\Services\InfrastructureConnectionService;
 use App\Services\InfrastructureHierarchyService;
-use App\Services\InfrastructureLocationResolver;
 use App\Services\MasterRecordRemovalService;
 use App\Services\NetworkNodeAttentionService;
 use App\Services\NetworkNodeService;
@@ -141,7 +137,7 @@ class NetworkNodeController extends Controller
         ));
     }
 
-    public function store(Request $request, NetworkNodeService $service, InfrastructureConnectionService $connections, InfrastructureLocationResolver $locations): RedirectResponse
+    public function store(Request $request, NetworkNodeService $service): RedirectResponse
     {
         $request->merge(['code' => strtoupper(trim((string) $request->input('code')))]);
         $user = auth()->user();
@@ -156,7 +152,6 @@ class NetworkNodeController extends Controller
             'code' => ['required', 'string', 'max:50', Rule::unique('network_nodes', 'code')],
             'name' => ['required', 'string', 'max:150'],
             'capacity' => ['nullable', 'integer', 'min:0', 'max:1000'],
-            'uplink_pon_id' => ['nullable', 'integer', Rule::exists('infrastructure_ports', 'id')->where('kind', InfrastructurePortKind::PON->value)],
             ...$this->locationRules(),
         ]);
 
@@ -173,18 +168,18 @@ class NetworkNodeController extends Controller
         }
 
         $nodeType = NetworkNodeType::findOrFail($validated['node_type_id']);
-        if (isset($validated['uplink_pon_id']) && $nodeType->code !== 'odp') {
-            throw ValidationException::withMessages(['uplink_pon_id' => 'Uplink PON hanya dapat dipilih untuk ODP.']);
+
+        // ODP wajib anak langsung PON (rancangan "Slot & PON sebagai node"
+        // §2.4/§7, Task 12) — uplink sekarang murni `parent_id`, bukan lagi
+        // sambungan `infrastructure_connections` terpisah (tabel itu + model
+        // InfrastructurePort sudah dibuang Task 9). Dicek eksplisit di sini
+        // (bukan cuma lewat `network_node_type_rules`) supaya pesannya jelas
+        // dan tidak bergantung ke baris aturan lama (`odc`) yang sengaja
+        // ditutup tapi belum tentu ikut dihapus dari tabel aturan.
+        if ($nodeType->code === 'odp' && ($parent === null || ! $parent->isPon())) {
+            throw ValidationException::withMessages(['parent_id' => 'ODP wajib dibuat sebagai anak langsung PON.']);
         }
-        $uplinkPon = isset($validated['uplink_pon_id'])
-            ? InfrastructurePort::query()->with('slot.device')->findOrFail($validated['uplink_pon_id'])
-            : null;
-        if ($uplinkPon !== null) {
-            abort_unless($user->hasPermission('network_nodes.update'), 403);
-            $uplinkPopId = $locations->forPort($uplinkPon)->deepestPopId();
-            abort_unless($this->access->hasAllPopAccess($user)
-                || ($uplinkPopId !== null && in_array($uplinkPopId, $this->access->getAllowedPopIds($user), true)), 403);
-        }
+
         if (in_array($nodeType->code, InfrastructureCutover::LEGACY_NODE_TYPES, true)) {
             InfrastructureCutover::assertLegacyWriteAllowed('node_type_id', "Node {$nodeType->name}");
         }
@@ -205,7 +200,7 @@ class NetworkNodeController extends Controller
             throw ValidationException::withMessages(['capacity' => "Kapasitas maksimal {$nodeType->max_ports} port."]);
         }
 
-        DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount, $hasLegacyPorts, $uplinkPon, $connections, $user): void {
+        DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount, $hasLegacyPorts): void {
             $node = NetworkNode::create([
                 'parent_id' => $parent?->id,
                 'anchor_pop_id' => $anchor?->id,
@@ -219,14 +214,6 @@ class NetworkNodeController extends Controller
 
             for ($number = 1; $number <= $portCount; $number++) {
                 $node->ports()->create(['number' => $number, 'is_used' => false]);
-            }
-
-            if ($uplinkPon !== null) {
-                try {
-                    $connections->connect($uplinkPon, $user, targetNode: $node, verified: true);
-                } catch (InvalidArgumentException $exception) {
-                    throw ValidationException::withMessages(['uplink_pon_id' => $exception->getMessage()]);
-                }
             }
         });
 

@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers\Network;
 
-use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureRecordStatus;
 use App\Enums\InfrastructureSlotKind;
 use App\Http\Controllers\Controller;
 use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\NetworkNode;
@@ -33,6 +30,16 @@ use InvalidArgumentException;
  * PON → hubungkan ODP. Detail hanya baca (tanpa mutasi). Semua aksi tulis
  * redirect balik ke halaman Detail (PRG) dan memeriksa POP scope aktor
  * lewat rantai lokasi.
+ *
+ * `{slot}`/`{port}` adalah `NetworkNode` biasa sejak Task 2 (bukan lagi
+ * tabel `infrastructure_slots`/`infrastructure_ports` yang sudah dihapus) —
+ * route-model-binding implisit cuma mencocokkan `id`, jadi tipenya WAJIB
+ * diverifikasi manual di sini (`isSlot()`/`isPort()`). Tanpa ini, memasukkan
+ * id ODP/OLT biasa ke `/network/infrastructure-slots/{id}` akan lolos
+ * binding dan baru gagal di tempat lain dengan pesan yang membingungkan —
+ * harus 404 di titik masuk (Task 12, bug route-model-binding "no such
+ * table" yang dulu nempel di sini selama controller masih mengetik
+ * `InfrastructureSlot`/`InfrastructurePort`).
  */
 class InfrastructurePositionController extends Controller
 {
@@ -41,18 +48,19 @@ class InfrastructurePositionController extends Controller
         private readonly InfrastructureLocationResolver $resolver,
     ) {}
 
-    public function showSlot(InfrastructureSlot $slot): View
+    public function showSlot(NetworkNode $slot): View
     {
+        abort_unless($slot->isSlot(), 404);
         $location = $this->authorizeLocation($this->resolver->forSlot($slot));
-        $slot->load('device.nodeType', 'ports');
+        $slot->load('nodeType', 'parent');
         $connections = app(InfrastructureConnectionService::class);
 
         return view('network.positions.slot', [
             'slot' => $slot,
             'location' => $location,
-            'ports' => $slot->ports->map(fn (InfrastructurePort $port): array => [
+            'ports' => $slot->positionPorts()->get()->map(fn (NetworkNode $port): array => [
                 'port' => $port,
-                'occupancy' => $connections->occupancyOf($port)->label(),
+                'occupancy' => $port->isPon() ? null : $connections->occupancyOf($port)->label(),
             ]),
             'directAssets' => $this->directSerials('current_infrastructure_slot_id', $slot->id),
             'history' => $this->history('infrastructure_slot_id', $slot->id),
@@ -61,36 +69,26 @@ class InfrastructurePositionController extends Controller
         ]);
     }
 
-    public function showPort(InfrastructurePort $port, PonCapacityService $capacity): View
+    public function showPort(NetworkNode $port, PonCapacityService $capacity): View
     {
+        abort_unless($port->isPort(), 404);
         $location = $this->authorizeLocation($this->resolver->forPort($port));
-        $port->load('slot.device');
-        $connections = InfrastructureConnection::query()
-            ->where(fn ($query) => $query->where('source_infrastructure_port_id', $port->id)->orWhere('target_infrastructure_port_id', $port->id))
-            ->with('targetNode', 'targetPort.slot.device', 'sourcePort.slot.device')->orderByDesc('active_key')->latest('id')->get()
-            ->filter(fn (InfrastructureConnection $connection): bool => $this->canAccessConnection($connection))->values();
-        $cabangId = $location->cabangId;
+        $port->load('nodeType', 'parent.parent');
+        $connections = $port->isPon()
+            ? collect()
+            : InfrastructureConnection::query()
+                ->where(fn ($query) => $query->where('source_infrastructure_port_id', $port->id)->orWhere('target_infrastructure_port_id', $port->id))
+                ->with('targetNode', 'targetPort.parent.parent', 'sourcePort.parent.parent')->orderByDesc('active_key')->latest('id')->get()
+                ->filter(fn (InfrastructureConnection $connection): bool => $this->canAccessConnection($connection))->values();
 
         return view('network.positions.port', [
             'port' => $port,
             'location' => $location,
-            'occupancy' => app(InfrastructureConnectionService::class)->occupancyOf($port)->label(),
-            'capacity' => $port->kind === InfrastructurePortKind::PON ? $capacity->summary($port) : null,
+            'occupancy' => $port->isPon() ? null : app(InfrastructureConnectionService::class)->occupancyOf($port)->label(),
+            // ODP->PON tidak lagi lewat sambungan (Task 9): kapasitas PON
+            // murni dihitung dari ODP anak langsung (`parent_id`).
+            'capacity' => $port->isPon() ? $capacity->summary($port) : null,
             'connections' => $connections,
-            // ODP kandidat: satu Cabang & belum punya uplink aktif (§2).
-            'odpCandidates' => $port->kind === InfrastructurePortKind::PON
-                ? NetworkNode::query()->whereHas('nodeType', fn ($query) => $query->where('code', 'odp'))
-                    ->whereNotIn('id', InfrastructureConnection::query()->active()->whereNotNull('target_network_node_id')->select('target_network_node_id'))
-                    ->orderBy('code')->get()->filter(function (NetworkNode $node) use ($cabangId): bool {
-                        try {
-                            $candidate = $this->resolver->forNode($node);
-                        } catch (InvalidArgumentException) {
-                            return false;
-                        }
-
-                        return $candidate->cabangId === $cabangId && $this->canAccessLocation($candidate);
-                    })->values()
-                : collect(),
             'directAssets' => $this->directSerials('current_infrastructure_port_id', $port->id),
             'history' => $this->history('infrastructure_port_id', $port->id),
             'actions' => TaskInfrastructureAction::query()->where('work_infrastructure_port_id', $port->id)->with('technician')->latest('id')->limit(20)->get(),
@@ -129,8 +127,9 @@ class InfrastructurePositionController extends Controller
         return redirect()->route('network.nodes.show', $node)->with('success', 'Kapasitas slot perangkat diperbarui.');
     }
 
-    public function updateSlotCapacity(Request $request, InfrastructureSlot $slot, InfrastructurePositionService $positions): RedirectResponse
+    public function updateSlotCapacity(Request $request, NetworkNode $slot, InfrastructurePositionService $positions): RedirectResponse
     {
+        abort_unless($slot->isSlot(), 404);
         $this->authorizeLocation($this->resolver->forSlot($slot));
         $validated = $request->validate(['capacity' => ['required', 'integer', 'min:1', 'max:9999']]);
         $positions->updateSlotCapacity($slot, (int) $validated['capacity'], $request->user());
@@ -138,10 +137,11 @@ class InfrastructurePositionController extends Controller
         return redirect()->route('network.infrastructure-slots.show', $slot)->with('success', 'Kapasitas slot diperbarui.');
     }
 
-    public function storePort(Request $request, InfrastructureSlot $slot, InfrastructurePositionService $positions): RedirectResponse
+    public function storePort(Request $request, NetworkNode $slot, InfrastructurePositionService $positions): RedirectResponse
     {
+        abort_unless($slot->isSlot(), 404);
         $this->authorizeLocation($this->resolver->forSlot($slot));
-        $isPon = $slot->kind === InfrastructureSlotKind::OLT;
+        $isPon = $slot->slotKind() === InfrastructureSlotKind::OLT;
         $validated = $request->validate([
             'number' => ['required', 'integer', 'min:1', 'max:999'],
             'code' => ['nullable', 'string', 'max:50'],
@@ -149,22 +149,29 @@ class InfrastructurePositionController extends Controller
             'red_zone_threshold' => [$isPon ? 'nullable' : 'prohibited', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $this->domain(fn () => $positions->createPort($slot, (int) $validated['number'], $slot->kind->portKind(), [
+        $this->domain(fn () => $positions->createPort($slot, (int) $validated['number'], [
             'code' => $validated['code'] ?? null,
             'capacity' => isset($validated['capacity']) ? (int) $validated['capacity'] : null,
             'red_zone_threshold' => isset($validated['red_zone_threshold']) ? (int) $validated['red_zone_threshold'] : null,
             'status' => InfrastructureRecordStatus::TERVERIFIKASI,
         ]), 'number');
 
-        return redirect()->route('network.infrastructure-slots.show', $slot)->with('success', $slot->kind->portKind()->label()." {$validated['number']} ditambahkan.");
+        return redirect()->route('network.infrastructure-slots.show', $slot)->with('success', $slot->slotKind()->portKind()->label()." {$validated['number']} ditambahkan.");
     }
 
-    public function connect(Request $request, InfrastructurePort $port, InfrastructureConnectionService $connections): RedirectResponse
+    /**
+     * Sambungan non-pohon (§3 rancangan): HANYA Port Switch -> Port Switch /
+     * node lain / label — ODP->PON sudah murni `parent_id` sejak Task 9, jadi
+     * PON ditolak sebagai sumber oleh `InfrastructureConnectionService`
+     * sendiri (satu sumber kebenaran, tidak diduplikasi jadi guard di sini).
+     */
+    public function connect(Request $request, NetworkNode $port, InfrastructureConnectionService $connections): RedirectResponse
     {
+        abort_unless($port->isPort(), 404);
         $this->authorizeLocation($this->resolver->forPort($port));
         $validated = $request->validate([
-            'target_network_node_id' => [Rule::requiredIf($port->kind === InfrastructurePortKind::PON), 'nullable', 'integer', Rule::exists('network_nodes', 'id')],
-            'target_infrastructure_port_id' => ['nullable', 'integer', Rule::exists('infrastructure_ports', 'id')],
+            'target_network_node_id' => ['nullable', 'integer', Rule::exists('network_nodes', 'id')],
+            'target_infrastructure_port_id' => ['nullable', 'integer', Rule::exists('network_nodes', 'id')],
             'target_label' => ['nullable', 'string', 'max:150'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
@@ -173,7 +180,7 @@ class InfrastructurePositionController extends Controller
             $this->authorizeLocation($this->resolver->forNode($target));
         }
 
-        $targetPort = isset($validated['target_infrastructure_port_id']) ? InfrastructurePort::findOrFail($validated['target_infrastructure_port_id']) : null;
+        $targetPort = isset($validated['target_infrastructure_port_id']) ? NetworkNode::findOrFail($validated['target_infrastructure_port_id']) : null;
         if ($targetPort !== null) {
             $this->authorizeLocation($this->resolver->forPort($targetPort));
         }

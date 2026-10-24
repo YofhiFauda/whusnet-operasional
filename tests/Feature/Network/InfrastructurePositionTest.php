@@ -5,14 +5,25 @@ namespace Tests\Feature\Network;
 use App\Enums\InfrastructureCapacityUnit;
 use App\Enums\InfrastructureRecordStatus;
 use App\Enums\InfrastructureSlotKind;
+use App\Enums\ScopeType;
 use App\Models\AuditLog;
+use App\Models\InventorySerial;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use App\Services\InfrastructurePositionService;
 use App\Services\NetworkNodeService;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\NetworkNodeTypeSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -300,5 +311,154 @@ class InfrastructurePositionTest extends TestCase
 
         $this->expectException(ValidationException::class);
         $this->service()->updateSlotCapacity($slot, 2, $actor);
+    }
+
+    /**
+     * RBAC minimal untuk tes rute HTTP di bawah — dipanggil per tes (bukan
+     * `setUp()`) supaya tes service-level di atas tetap ringan.
+     */
+    private function seedRbac(): void
+    {
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+    }
+
+    /**
+     * Task 12: route-model-binding `{slot}`/`{port}` sekarang NetworkNode
+     * biasa (bukan lagi tabel `infrastructure_slots`/`infrastructure_ports`
+     * yang sudah dihapus) — tanpa verifikasi tipe manual, id ODP/PON/node
+     * lain yang kebetulan valid akan lolos binding dan baru gagal di tempat
+     * lain dengan pesan membingungkan. Harus 404 tepat di titik masuk.
+     */
+    #[Test]
+    public function slot_route_binding_404_bila_node_bukan_slot(): void
+    {
+        $this->seedRbac();
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $olt = $this->device('olt_chassis');
+        $slot = $this->service()->createSlot($olt, 1);
+        $pon = $this->service()->createPort($slot, 1);
+        $odp = $this->device('odp');
+
+        $this->actingAs($owner)->get(route('network.infrastructure-slots.show', $slot))->assertOk();
+        // PON (bukan Slot) dan node biasa (ODP) ditolak 404 lewat rute Slot.
+        $this->actingAs($owner)->get(route('network.infrastructure-slots.show', $pon))->assertNotFound();
+        $this->actingAs($owner)->get(route('network.infrastructure-slots.show', $odp))->assertNotFound();
+
+        $this->actingAs($owner)->get(route('network.infrastructure-ports.show', $pon))->assertOk();
+        // Slot (bukan PON/Port) dan node biasa ditolak 404 lewat rute Port.
+        $this->actingAs($owner)->get(route('network.infrastructure-ports.show', $slot))->assertNotFound();
+        $this->actingAs($owner)->get(route('network.infrastructure-ports.show', $odp))->assertNotFound();
+    }
+
+    /**
+     * Scope POP aktor dicek lewat rantai lokasi (`InfrastructureLocationResolver`),
+     * sama seperti node biasa — PON di Cabang lain harus 403, bukan bocor
+     * lewat endpoint Slot/PON (Review Focus 4).
+     */
+    #[Test]
+    public function user_cabang_lain_tidak_bisa_membuka_pon_cabang_lain(): void
+    {
+        $this->seedRbac();
+        $allowedPop = $this->miniPop;
+        $foreignCabang = Pop::factory()->create(['type' => 'cabang']);
+        $foreignMiniPop = Pop::factory()->create(['type' => 'mini_pop', 'parent_id' => $foreignCabang->id]);
+
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $fop = User::factory()->create(['role_id' => $role->id]);
+        $scope = UserRoleScope::create(['user_id' => $fop->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $this->cabang->id]);
+
+        $olt = $this->device('olt_chassis', $allowedPop);
+        $slot = $this->service()->createSlot($olt, 1);
+        $pon = $this->service()->createPort($slot, 1);
+
+        $foreignOlt = $this->device('olt_chassis', $foreignMiniPop);
+        $foreignSlot = $this->service()->createSlot($foreignOlt, 1);
+        $foreignPon = $this->service()->createPort($foreignSlot, 1);
+
+        $this->actingAs($fop)->get(route('network.infrastructure-ports.show', $pon))->assertOk();
+        $this->actingAs($fop)->get(route('network.infrastructure-slots.show', $slot))->assertOk();
+        $this->actingAs($fop)->get(route('network.infrastructure-ports.show', $foreignPon))->assertForbidden();
+        $this->actingAs($fop)->get(route('network.infrastructure-slots.show', $foreignSlot))->assertForbidden();
+    }
+
+    /**
+     * `InfrastructurePortController::updateCapacity` lewat `NetworkNode`
+     * (Task 12) — `PonCapacityService::updateCapacity` tetap satu-satunya
+     * penulis kapasitas PON + audit (modul "Port Infrastruktur").
+     */
+    #[Test]
+    public function ubah_kapasitas_pon_menulis_audit(): void
+    {
+        $this->seedRbac();
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $olt = $this->device('olt_chassis');
+        $slot = $this->service()->createSlot($olt, 1);
+        $pon = $this->service()->createPort($slot, 1);
+
+        $this->actingAs($owner)->patch(route('network.infrastructure-ports.capacity', $pon), [
+            'capacity' => 64,
+            'red_zone_threshold' => 80,
+        ])->assertRedirect(route('network.infrastructure-ports.show', $pon));
+
+        $pon->refresh();
+        $this->assertSame(64, $pon->capacity);
+        $this->assertSame(80, $pon->red_zone_threshold);
+        $this->assertSame(1, AuditLog::where('module', 'Port Infrastruktur')
+            ->where('action', 'capacity_change')
+            ->where('auditable_type', NetworkNode::class)
+            ->where('auditable_id', $pon->id)->count());
+
+        // Rute ini khusus PON — Slot ditolak 404.
+        $this->actingAs($owner)->patch(route('network.infrastructure-ports.capacity', $slot), [
+            'capacity' => 10,
+            'red_zone_threshold' => 80,
+        ])->assertNotFound();
+    }
+
+    /**
+     * Halaman Detail Slot menampilkan aset terpasang tepat milik Slot itu
+     * (SN DEPLOYED di `current_infrastructure_slot_id`) — bukan aset PON
+     * anaknya, bukan aset Slot lain (§16.1 lokasi aset berserial tepat satu
+     * posisi).
+     */
+    #[Test]
+    public function halaman_slot_menampilkan_aset_terpasang_tepat(): void
+    {
+        $this->seedRbac();
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $olt = $this->device('olt_chassis');
+        $slot = $this->service()->createSlot($olt, 1);
+        $otherSlot = $this->service()->createSlot($olt, 2);
+        $pon = $this->service()->createPort($slot, 1);
+
+        $category = ItemCategory::firstOrCreate(['code' => 'OLT-CARD'], ['name' => 'Kartu OLT', 'default_unit' => 'pcs']);
+        $item = Item::create([
+            'code' => 'CARD-SLOT-1', 'name' => 'Kartu Slot 1', 'unit' => 'pcs',
+            'item_category_id' => $category->id, 'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+            'infrastructure_location_kind' => null, 'infrastructure_node_type_id' => null,
+        ]);
+        $onThisSlot = InventorySerial::create([
+            'item_id' => $item->id, 'serial_number' => 'SN-SLOT-1', 'status' => 'deployed',
+            'current_infrastructure_slot_id' => $slot->id,
+        ]);
+        InventorySerial::create([
+            'item_id' => $item->id, 'serial_number' => 'SN-SLOT-2', 'status' => 'deployed',
+            'current_infrastructure_slot_id' => $otherSlot->id,
+        ]);
+        InventorySerial::create([
+            'item_id' => $item->id, 'serial_number' => 'SN-PON-1', 'status' => 'deployed',
+            'current_infrastructure_port_id' => $pon->id,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('network.infrastructure-slots.show', $slot))->assertOk();
+        $response->assertSee('SN-SLOT-1');
+        $response->assertDontSee('SN-SLOT-2');
+        $response->assertDontSee('SN-PON-1');
+        $this->assertSame($onThisSlot->id, InventorySerial::where('status', 'deployed')
+            ->where('current_infrastructure_slot_id', $slot->id)->sole()->id);
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Network;
 
 use App\Http\Controllers\Controller;
-use App\Models\InfrastructurePort;
+use App\Models\NetworkNode;
 use App\Services\EffectiveAccessService;
 use App\Services\InfrastructureLocationResolver;
 use App\Services\PonCapacityService;
@@ -13,6 +13,10 @@ use Illuminate\Http\Request;
 /**
  * Aksi tulis pada PON/Port kanonis. Scope POP aktor dicek lewat rantai
  * lokasi (resolver), bukan `pop_id` — port tidak punya kolom POP sendiri.
+ *
+ * `{port}` adalah `NetworkNode` (bukan lagi `infrastructure_ports` yang
+ * sudah dihapus, Task 2/5) — tipenya diverifikasi manual (`isPort()`),
+ * bukan cuma dicocokkan lewat `id` (lihat docblock `InfrastructurePositionController`).
  */
 class InfrastructurePortController extends Controller
 {
@@ -21,8 +25,9 @@ class InfrastructurePortController extends Controller
         private readonly InfrastructureLocationResolver $resolver,
     ) {}
 
-    public function updateCapacity(Request $request, InfrastructurePort $port, PonCapacityService $capacity): RedirectResponse
+    public function updateCapacity(Request $request, NetworkNode $port, PonCapacityService $capacity): RedirectResponse
     {
+        abort_unless($port->isPort(), 404);
         $this->authorizePortScope($port);
 
         $validated = $request->validate([
@@ -32,11 +37,11 @@ class InfrastructurePortController extends Controller
 
         $capacity->updateCapacity($port, (int) $validated['capacity'], (int) $validated['red_zone_threshold'], $request->user());
 
-        return redirect()->route('network.nodes.show', $port->slot->network_node_id)
+        return redirect()->route('network.infrastructure-ports.show', $port)
             ->with('success', "Kapasitas {$port->displayName()} diperbarui.");
     }
 
-    private function authorizePortScope(InfrastructurePort $port): void
+    private function authorizePortScope(NetworkNode $port): void
     {
         $user = auth()->user();
         if ($this->access->hasAllPopAccess($user)) {

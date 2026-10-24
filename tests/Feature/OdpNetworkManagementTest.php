@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
 use App\Services\FopUnifiedDashboardService;
+use App\Services\InfrastructurePositionService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\NetworkNodeTypeSeeder;
@@ -24,6 +25,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OdpNetworkManagementTest extends TestCase
@@ -57,6 +59,26 @@ class OdpNetworkManagementTest extends TestCase
         ]);
     }
 
+    /**
+     * ODP wajib anak langsung PON sejak Task 12 (rancangan "Slot & PON
+     * sebagai node" §2.4) — bangun rantai OLT -> Slot -> PON minimal lewat
+     * `InfrastructurePositionService` (satu-satunya penulis posisi) supaya
+     * tes pembuatan ODP baru punya induk PON yang sah.
+     */
+    private function makePon(Pop $pop): NetworkNode
+    {
+        $chassisType = NetworkNodeType::where('code', 'olt_chassis')->firstOrFail();
+        $chassis = NetworkNode::factory()->create([
+            'anchor_pop_id' => $pop->id,
+            'node_type_id' => $chassisType->id,
+            'parent_id' => null,
+        ]);
+        $positions = app(InfrastructurePositionService::class);
+        $slot = $positions->createSlot($chassis, 1);
+
+        return $positions->createPort($slot, 1);
+    }
+
     public function test_node_menyimpan_lokasi_sendiri_dan_mewarisi_lokasi_induk(): void
     {
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
@@ -64,9 +86,13 @@ class OdpNetworkManagementTest extends TestCase
             'code' => 'LOC-A', 'name' => 'POP Lokasi', 'type' => 'cabang', 'status' => 'active',
             'address' => 'Jalan POP 1', 'city' => 'Ponorogo', 'latitude' => -7.8650000, 'longitude' => 111.4690000,
         ]);
+        // Tipe generik tanpa aturan induk khusus — tes ini menguji warisan
+        // lokasi lewat `parent_id` (fitur umum NetworkNode), bukan aturan
+        // "ODP wajib anak PON" (Task 12), jadi tidak dipasangkan ke odp.
+        $locationTypeId = NetworkNodeType::create(['code' => 'test-location', 'name' => 'Tipe Lokasi Generik', 'has_ports' => false])->id;
 
         $this->actingAs($owner)->post(route('network.nodes.store'), [
-            'node_type_id' => $this->odpTypeId,
+            'node_type_id' => $locationTypeId,
             'anchor_pop_id' => $pop->id,
             'code' => 'ODP-LOC-A',
             'name' => 'ODP Lokasi A',
@@ -84,7 +110,7 @@ class OdpNetworkManagementTest extends TestCase
         $this->assertSame('Siman', $parent->village);
 
         $child = NetworkNode::create([
-            'parent_id' => $parent->id, 'node_type_id' => $this->odpTypeId,
+            'parent_id' => $parent->id, 'node_type_id' => $locationTypeId,
             'code' => 'ODP-LOC-B', 'name' => 'ODP Lokasi B', 'status' => 'active',
         ]);
         $this->assertSame('Tiang RT 02', $child->effectiveLocation()['address']);
@@ -100,18 +126,20 @@ class OdpNetworkManagementTest extends TestCase
     {
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
         $pop = Pop::create(['code' => 'ODP-A', 'name' => 'POP ODP A', 'type' => 'cabang', 'status' => 'active']);
+        // ODP wajib anak langsung PON sejak Task 12 — tidak lagi anchor POP langsung.
+        $pon = $this->makePon($pop);
 
         $this->actingAs($owner)->post(route('network.nodes.store'), [
             'node_type_id' => $this->odpTypeId,
-            'anchor_pop_id' => $pop->id,
+            'parent_id' => $pon->id,
             'code' => 'odp-test-01',
             'name' => 'ODP Test 01',
             'capacity' => 8,
         ])->assertRedirect(route('network.nodes.index'));
 
         $node = NetworkNode::where('code', 'ODP-TEST-01')->firstOrFail();
-        $this->assertSame($pop->id, $node->anchor_pop_id);
-        $this->assertNull($node->parent_id);
+        $this->assertSame($pon->id, $node->parent_id);
+        $this->assertNull($node->anchor_pop_id);
         $this->assertSame(8, $node->ports()->count());
         $this->assertSame(0, $node->ports()->where('is_used', true)->count());
 
@@ -131,6 +159,63 @@ class OdpNetworkManagementTest extends TestCase
         $this->assertSame(8, $summary['red_zone'][0]['capacity']);
         $this->assertSame(88, $summary['red_zone'][0]['percent']);
         $this->actingAs($owner)->get(route('network.nodes.index'))->assertSee('Red Zone');
+    }
+
+    /**
+     * Task 12: ODP tanpa induk PON wajib ditolak — anchor POP langsung
+     * (gaya lama) maupun tanpa induk sama sekali keduanya kena.
+     */
+    #[Test]
+    public function buat_odp_tanpa_pon_ditolak(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create(['code' => 'ODP-NOPON', 'name' => 'POP Tanpa PON', 'type' => 'cabang', 'status' => 'active']);
+
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => $this->odpTypeId,
+            'anchor_pop_id' => $pop->id,
+            'code' => 'ODP-NOPON-1',
+            'name' => 'ODP Tanpa PON',
+            'capacity' => 4,
+        ])->assertSessionHasErrors('parent_id');
+        $this->assertDatabaseMissing('network_nodes', ['code' => 'ODP-NOPON-1']);
+
+        // Punya parent_id tapi bukan PON (mis. Slot) juga ditolak.
+        $slotParent = $this->makePon($pop)->parent;
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => $this->odpTypeId,
+            'parent_id' => $slotParent->id,
+            'code' => 'ODP-NOPON-2',
+            'name' => 'ODP Induk Salah',
+            'capacity' => 4,
+        ])->assertSessionHasErrors('parent_id');
+        $this->assertDatabaseMissing('network_nodes', ['code' => 'ODP-NOPON-2']);
+    }
+
+    /**
+     * Task 12: ODP yang dibuat di bawah PON tersimpan sebagai anak langsung
+     * PON itu (`parent_id`), tanpa `anchor_pop_id` — lokasi diturunkan dari
+     * rantai induk (`resolvePop()`), bukan ditambatkan sendiri.
+     */
+    #[Test]
+    public function buat_odp_di_pon_membuat_induk_pon(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::create(['code' => 'ODP-PON', 'name' => 'POP Dengan PON', 'type' => 'cabang', 'status' => 'active']);
+        $pon = $this->makePon($pop);
+
+        $this->actingAs($owner)->post(route('network.nodes.store'), [
+            'node_type_id' => $this->odpTypeId,
+            'parent_id' => $pon->id,
+            'code' => 'ODP-PON-1',
+            'name' => 'ODP Di Bawah PON',
+            'capacity' => 4,
+        ])->assertRedirect(route('network.nodes.index'));
+
+        $odp = NetworkNode::where('code', 'ODP-PON-1')->firstOrFail();
+        $this->assertSame($pon->id, $odp->parent_id);
+        $this->assertNull($odp->anchor_pop_id);
+        $this->assertSame($pop->id, $odp->resolvePop()?->id);
     }
 
     public function test_fop_hanya_bisa_mengelola_odp_di_pop_scope_nya(): void
@@ -508,10 +593,15 @@ class OdpNetworkManagementTest extends TestCase
         ])->assertSessionHasErrors('parent_id');
 
         $this->assertNull($root->fresh()->parent_id);
+
+        // Memindah ODP ke anchor POP langsung ditolak sejak Task 12 (ODP
+        // wajib anak PON) — bagian "scope" tes ini sekarang dibuktikan lewat
+        // pemindahan ke PON yang sah di Cabang yang sama.
+        $pon = $this->makePon($pop);
         $this->actingAs($owner)->patch(route('network.nodes.move', $child), [
-            'anchor_pop_id' => $pop->id,
+            'parent_id' => $pon->id,
         ])->assertRedirect(route('network.nodes.index'));
-        $this->assertSame($pop->id, $child->fresh()->anchor_pop_id);
+        $this->assertSame($pon->id, $child->fresh()->parent_id);
     }
 
     public function test_index_menampilkan_pohon_node_dengan_anak_bertingkat(): void

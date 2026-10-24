@@ -56,7 +56,7 @@
                 <p x-show="createType === 'olt'"><strong>OLT</strong> ditempatkan di <strong>Cabang/Mini POP</strong> lalu memiliki <strong>SLOT</strong> dan <strong>PON</strong>.</p>
                 <p x-show="createType === 'slot'"><strong>SLOT</strong> ditambahkan pada perangkat induk <strong>OLT</strong> atau <strong>Switch</strong> yang sudah ada.</p>
                 <p x-show="createType === 'pon'"><strong>PON</strong> ditambahkan pada <strong>SLOT OLT</strong> induk; beban port mengikuti pelanggan aktif.</p>
-                <p x-show="createType === 'odp'"><strong>ODP</strong> ditempatkan pada POP fisik tertentu; pilih <strong>PON uplink</strong> jika kabel distribusi sudah tersambung.</p>
+                <p x-show="createType === 'odp'"><strong>ODP</strong> wajib dibuat sebagai anak langsung <strong>PON</strong> (Task 12) — pilih PON induknya di bawah.</p>
             </div>
 
             {{-- Form A: Nodes (Server, Switch, OLT, ODP) --}}
@@ -66,15 +66,26 @@
                 <input type="hidden" name="device_type" :value="createType">
                 <input type="hidden" name="node_type_id" :value="nodeTypeIds[({server:'server',switch:'switch_mini_pop',olt:'olt_chassis',odp:'odp'})[createType]] || ''">
 
-                <div>
+                <div x-show="createType !== 'odp'">
                     <label class="block text-xs font-semibold text-text-secondary mb-1">2. POP penempatan fisik <span class="text-rose-500">*</span></label>
-                    <select name="anchor_pop_id" x-model="createPopId" @change="createPonId = ''" required
+                    <select name="anchor_pop_id" x-model="createPopId" @change="createPonId = ''" :required="createType !== 'odp'"
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
                         <option value="">Pilih POP Wilayah...</option>
                         <template x-for="pop in allowedCreationPops" :key="pop.id">
                             <option :value="pop.id" x-text="pop.name"></option>
                         </template>
                     </select>
+                </div>
+                <div x-show="createType === 'odp'">
+                    <label class="block text-xs font-semibold text-text-secondary mb-1">2. PON induk <span class="text-rose-500">*</span></label>
+                    <select name="parent_id" x-model="createPonId" :required="createType === 'odp'"
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
+                        <option value="">Pilih PON...</option>
+                        <template x-for="pon in creationPons" :key="pon.id">
+                            <option :value="pon.id" x-text="pon.breadcrumb"></option>
+                        </template>
+                    </select>
+                    <p class="mt-1 text-[11px] text-text-muted">ODP wajib anak langsung PON (Task 12) — tidak lagi ditambatkan ke POP.</p>
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -103,22 +114,6 @@
                         <input name="address" value="{{ old('address') }}" placeholder="Jl. Raya Siman No. 12 / Tiang PLN #4"
                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                     </div>
-                </div>
-
-                <div x-show="createType === 'odp'">
-                    @can('network_nodes.update')
-                    <label class="block text-xs font-semibold text-text-secondary mb-1">PON uplink (opsional)</label>
-                    <select name="uplink_pon_id" x-model="createPonId" :disabled="createType !== 'odp' || !createPopId"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
-                        <option value="">Belum diketahui; sambungkan nanti</option>
-                        <template x-for="pon in allowedCreationPons" :key="pon.id">
-                            <option :value="pon.id" x-text="pon.breadcrumb"></option>
-                        </template>
-                    </select>
-                    <p class="mt-1 text-[11px] text-text-muted">Hanya PON di Cabang yang sama. Tanpa uplink, ODP akan ditempatkan di level POP.</p>
-                    @else
-                    <p class="text-[11px] text-text-muted">Uplink PON dapat diatur oleh pengguna dengan akses ubah node.</p>
-                    @endcan
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">

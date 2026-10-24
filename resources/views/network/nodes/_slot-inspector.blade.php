@@ -1,11 +1,16 @@
+{{-- Task 11/12: `$hierarchy['items']` tidak lagi punya `kind` terpisah
+'slot'/'port' — Slot/PON/Port Switch sekarang `kind === 'node'` dengan
+`type` = kode tipe node (`olt_slot`/`switch_slot`). Dicek lewat `type`,
+bukan `kind`, supaya cocok dengan `InfrastructureHierarchyService::build()`
+pasca Task 11. --}}
 @foreach($hierarchy['items'] as $slotItem)
-@if($slotItem['kind'] === 'slot')
+@if($slotItem['kind'] === 'node' && in_array($slotItem['type'], ['olt_slot', 'switch_slot'], true))
 @php
-    $isOltSlot = $slotItem['type'] === 'olt';
+    $isOltSlot = $slotItem['type'] === 'olt_slot';
     $portLabel = $isOltSlot ? 'PON' : 'port';
     $slotPorts = collect($hierarchy['children'][$slotItem['key']] ?? [])
         ->map(fn (string $key) => $hierarchy['items'][$key])
-        ->filter(fn (array $item) => $item['kind'] === 'port');
+        ->filter(fn (array $item) => $item['kind'] === 'node' && in_array($item['type'], ['olt_pon', 'switch_port'], true));
     $slotCapacity = $slotItem['capacity'];
 @endphp
 <div id="inspector-slot-{{ $slotItem['id'] }}" x-show="selectedSlotId === {{ $slotItem['id'] }}" x-cloak class="space-y-4 sm:space-y-5 p-3.5 sm:p-6">
@@ -85,9 +90,6 @@
                         <p class="text-xs text-text-secondary font-mono">{{ $portOdps->count() }} ODP terhubung</p>
                         @if($portOdps->isNotEmpty())
                             <p class="text-[11px] text-text-muted font-mono truncate">{{ $portOdps->pluck('label')->implode(', ') }}</p>
-                        @endif
-                        @if($portItem['capacity']['unverified'] > 0)
-                            <p class="text-[11px] text-amber-600 font-medium">{{ $portItem['capacity']['unverified'] }} pelanggan pada koneksi belum terverifikasi</p>
                         @endif
                         <div class="pt-1">
                             <button type="button" @click="selectPon({{ $portItem['id'] }})" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 cursor-pointer transition-colors">Lihat rincian {{ $portItem['label'] }} &rarr;</button>

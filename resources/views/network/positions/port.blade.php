@@ -1,23 +1,25 @@
 @extends('layouts.app')
 
-@section('title', $port->displayName().' · '.$port->slot->device->code)
-@section('page_title', 'Detail '.$port->kind->label())
+@php($portKind = $port->portKind())
+
+@section('title', $port->displayName().' · '.$port->parent->parent->code)
+@section('page_title', 'Detail '.$portKind->label())
 
 @section('content')
 <div class="mx-auto max-w-5xl space-y-6 pb-16">
-    <a href="{{ route('network.infrastructure-slots.show', $port->slot) }}" class="inline-flex min-h-10 items-center text-sm text-text-secondary hover:text-primary">&larr; Kembali ke {{ $port->slot->displayName() }}</a>
+    <a href="{{ route('network.infrastructure-slots.show', $port->parent) }}" class="inline-flex min-h-10 items-center text-sm text-text-secondary hover:text-primary">&larr; Kembali ke {{ $port->parent->displayName() }}</a>
 
     @if(session('success'))<div role="status" class="border-l-4 border-emerald-500 py-2 pl-4 text-sm text-emerald-700">{{ session('success') }}</div>@endif
     @if($errors->any())<div role="alert" class="border-l-4 border-error py-2 pl-4 text-sm text-error">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
 
     <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-3">
-        <p class="text-xs font-semibold uppercase tracking-wider text-text-muted">{{ $port->kind->label() }}</p>
+        <p class="text-xs font-semibold uppercase tracking-wider text-text-muted">{{ $portKind->label() }}</p>
         <h1 class="text-2xl font-black font-mono text-text-main">{{ $port->displayName() }}</h1>
         <p class="text-xs text-text-muted">Jalur: <span class="font-semibold text-text-main">{{ $location->breadcrumb() }}</span></p>
         <dl class="grid gap-3 pt-2 text-xs sm:grid-cols-3">
-            <div><dt class="text-text-muted">Status data</dt><dd class="font-semibold text-text-main">{{ $port->status->label() }}</dd></div>
-            <div><dt class="text-text-muted">Pemakaian</dt><dd class="font-semibold text-text-main">{{ $occupancy }}</dd></div>
-            <div><dt class="text-text-muted">Koordinat</dt><dd class="text-text-secondary">Mengikuti perangkat {{ $port->slot->device->code }}</dd></div>
+            <div><dt class="text-text-muted">Status data</dt><dd class="font-semibold text-text-main">{{ $port->record_status?->label() }}</dd></div>
+            <div><dt class="text-text-muted">Pemakaian</dt><dd class="font-semibold text-text-main">{{ $occupancy ?? '—' }}</dd></div>
+            <div><dt class="text-text-muted">Koordinat</dt><dd class="text-text-secondary">Mengikuti perangkat {{ $port->parent->parent->code }}</dd></div>
         </dl>
     </section>
 
@@ -27,8 +29,7 @@
         <p class="text-sm text-text-main">
             <span class="font-mono font-bold">{{ $capacity['used'] }}</span>
             @if($capacity['capacity'] !== null) / <span class="font-mono font-bold">{{ $capacity['capacity'] }}</span> @endif
-            {{ $capacity['unit_label'] }} terverifikasi
-            @if($capacity['unverified'] > 0)<span class="text-text-muted">(+{{ $capacity['unverified'] }} pada koneksi belum terverifikasi, tidak dihitung)</span>@endif
+            {{ $capacity['unit_label'] }}
         </p>
         @if($capacity['red_zone'] === null)
             <p class="text-xs text-text-muted">Kapasitas atau ambang belum terdata — status Red Zone belum bisa dinilai.</p>
@@ -53,9 +54,12 @@
     </section>
     @endif
 
+    @unless($port->isPon())
+    {{-- ODP->PON murni lewat `parent_id` sejak Task 9 — bagian sambungan ini
+    cuma berlaku untuk Port Switch (sambungan non-pohon, §3 rancangan). --}}
     <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-3">
         <h2 class="text-sm font-black uppercase tracking-wider text-text-main">Koneksi</h2>
-        <p class="text-xs text-text-muted">{{ $port->kind === \App\Enums\InfrastructurePortKind::PON ? 'Satu PON dapat melayani beberapa ODP; satu ODP hanya punya satu uplink aktif.' : 'Jalur Switch berhenti di Port; tujuan dicatat sebagai sambungan fisik tersendiri.' }}</p>
+        <p class="text-xs text-text-muted">Jalur Switch berhenti di Port; tujuan dicatat sebagai sambungan fisik tersendiri.</p>
         @forelse($connections as $connection)
             <div class="flex flex-wrap items-start justify-between gap-3 border-t border-border pt-3 text-sm">
                 <div>
@@ -87,22 +91,14 @@
         @if($canManage)
         <form method="POST" action="{{ route('network.infrastructure-ports.connections.store', $port) }}" class="grid gap-3 border-t border-border pt-3 sm:grid-cols-3">
             @csrf
-            @if($port->kind === \App\Enums\InfrastructurePortKind::PON)
-                <label class="text-xs text-text-secondary sm:col-span-2">Hubungkan ODP
-                    <select name="target_network_node_id" required class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
-                        <option value="">Pilih ODP satu Cabang yang belum ber-uplink</option>
-                        @foreach($odpCandidates as $odp)<option value="{{ $odp->id }}">{{ $odp->code }} · {{ $odp->name }}</option>@endforeach
-                    </select>
-                </label>
-            @else
-                <label class="text-xs text-text-secondary sm:col-span-2">Tujuan sambungan (label)
-                    <input type="text" name="target_label" maxlength="150" required placeholder="Contoh: Radio PTP gedung A" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
-                </label>
-            @endif
+            <label class="text-xs text-text-secondary sm:col-span-2">Tujuan sambungan (label)
+                <input type="text" name="target_label" maxlength="150" required placeholder="Contoh: Radio PTP gedung A" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+            </label>
             <button type="submit" class="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover sm:col-span-3 sm:justify-self-start">Catat sambungan</button>
         </form>
         @endif
     </section>
+    @endunless
 
     @include('network.positions._assets-history', ['directAssets' => $directAssets, 'history' => $history, 'actions' => $actions])
 </div>

@@ -1,5 +1,7 @@
+{{-- Task 11/12: PON sekarang `kind === 'node'`, `type === 'olt_pon'` (lihat
+catatan di `_slot-inspector.blade.php`). --}}
 @foreach($hierarchy['items'] as $ponItem)
-@if($ponItem['kind'] === 'port' && $ponItem['type'] === 'pon')
+@if($ponItem['kind'] === 'node' && $ponItem['type'] === 'olt_pon')
 @php
     $capacity = $ponItem['capacity'];
     $odps = collect($hierarchy['children'][$ponItem['key']] ?? [])->map(fn (string $key) => $hierarchy['items'][$key])->filter(fn (array $item) => $item['type'] === 'odp');
@@ -32,7 +34,6 @@
         @else
             <p class="mt-2 text-[11px] text-text-muted">Batas pelanggan belum dicatat.</p>
         @endif
-        @if($capacity['unverified'] > 0)<p class="mt-2 text-[11px] text-amber-600 font-medium">{{ $capacity['unverified'] }} pelanggan pada koneksi belum terverifikasi, belum dihitung.</p>@endif
     </section>
     <section class="space-y-3">
         <div class="flex items-center justify-between gap-2">
@@ -50,7 +51,9 @@
             <article class="rounded-lg border border-border bg-surface p-4 space-y-2 shadow-2xs">
                 <div class="flex flex-wrap items-start justify-between gap-2">
                     <a href="{{ $odp['url'] }}" class="font-mono text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline">{{ $odp['label'] }}</a>
-                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border {{ $odp['verified'] ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800' }}">{{ $odp['verified'] ? 'Terverifikasi' : 'Belum terverifikasi' }}</span>
+                    {{-- Konsep "uplink terverifikasi" dihapus Task 9 — ODP->PON
+                    murni `parent_id`, jadi tidak ada status verifikasi per ODP. --}}
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-surface-muted text-text-secondary border-border">{{ $odp['status_label'] }}</span>
                 </div>
                 <p class="text-xs text-text-secondary font-mono">{{ $customers->count() }} pelanggan · {{ $odp['capacity']['used'] ?? 0 }} / {{ $odp['capacity']['capacity'] ?? '?' }} port ODP terpakai</p>
                 @foreach($odpSplitters as $splitter)
