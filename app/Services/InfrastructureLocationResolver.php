@@ -2,10 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\InfrastructurePortKind;
-use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Support\InfrastructureLocation;
@@ -16,14 +12,15 @@ use InvalidArgumentException;
  * laporan, Gudang, Master Node, Peta). Leluhur diturunkan berbasis ID:
  *
  * - POP/Mini POP → `pops.parent_id`.
- * - Node → rantai `parent_id` sampai `anchor_pop_id`; KECUALI node yang punya
- *   uplink PON aktif (ODP): leluhurnya PON → Slot → OLT (§2 "ODP ditautkan
- *   ke PON"). Koneksi Port Switch tidak pernah menjadikan tujuan anak Switch.
- * - Slot → perangkat; Port → slot.
+ * - Node (termasuk Slot, PON, Port Switch) → HANYA rantai `parent_id` sampai
+ *   node ber-`anchor_pop_id`, lalu rantai POP. ODP kini anak langsung PON,
+ *   jadi leluhurnya otomatis PON → Slot → OLT → Mini POP → Cabang tanpa
+ *   lookup koneksi. ODP lama yang masih menempel langsung di POP tetap
+ *   terselesaikan lewat `anchor_pop_id`.
  *
- * Uplink yang belum terverifikasi tetap menjadi leluhur untuk scope (posisi
- * fisiknya memang di sana), tapi TIDAK dihitung sebagai pemakaian PON
- * terverifikasi — itu urusan `PonCapacityService`.
+ * Koneksi (`infrastructure_connections`) sengaja TIDAK dipakai untuk menurunkan
+ * lokasi: kalau dipakai lagi, pindah uplink akan diam-diam mengubah scope
+ * cabang sebuah node. Pemakaian PON terverifikasi urusan `PonCapacityService`.
  */
 class InfrastructureLocationResolver
 {
@@ -33,9 +30,9 @@ class InfrastructureLocationResolver
     {
         return match ($kind) {
             InfrastructureLocation::POP, InfrastructureLocation::MINI_POP => $this->forPop(Pop::findOrFail($id)),
-            InfrastructureLocation::NODE => $this->forNode(NetworkNode::findOrFail($id)),
-            InfrastructureLocation::SLOT => $this->forSlot(InfrastructureSlot::findOrFail($id)),
-            InfrastructureLocation::PORT => $this->forPort(InfrastructurePort::findOrFail($id)),
+            InfrastructureLocation::NODE => $this->forNode($this->loadNode($id)),
+            InfrastructureLocation::SLOT => $this->forSlot($this->loadNode($id)),
+            InfrastructureLocation::PORT => $this->forPort($this->loadNode($id)),
             default => throw new InvalidArgumentException("Jenis lokasi {$kind} tidak dikenal."),
         };
     }
@@ -65,29 +62,50 @@ class InfrastructureLocationResolver
 
     public function forNode(NetworkNode $node): InfrastructureLocation
     {
-        $node->loadMissing('nodeType');
-        $self = ['kind' => InfrastructureLocation::NODE, 'id' => $node->id, 'label' => $node->code ?: $node->name, 'type' => $node->nodeType?->code];
+        return $this->walk($node, InfrastructureLocation::NODE);
+    }
 
-        $uplink = InfrastructureConnection::query()->active()
-            ->where('target_network_node_id', $node->id)
-            ->whereHas('sourcePort', fn ($query) => $query->where('kind', InfrastructurePortKind::PON->value))
-            ->with('sourcePort')
-            ->first();
-        if ($uplink?->sourcePort !== null) {
-            $base = $this->forPort($uplink->sourcePort);
-
-            return new InfrastructureLocation(InfrastructureLocation::NODE, $node->id, $base->cabangId, [...$base->ancestors, $self]);
+    public function forSlot(NetworkNode $slot): InfrastructureLocation
+    {
+        $slot->loadMissing('nodeType');
+        if (! $slot->isSlot()) {
+            throw new InvalidArgumentException("Node {$slot->code} bukan Slot");
         }
 
-        $nodes = [$self];
+        return $this->walk($slot, InfrastructureLocation::SLOT);
+    }
+
+    public function forPort(NetworkNode $port): InfrastructureLocation
+    {
+        $port->loadMissing('nodeType');
+        if (! $port->isPort()) {
+            throw new InvalidArgumentException("Node {$port->code} bukan PON atau Port Switch");
+        }
+
+        return $this->walk($port, InfrastructureLocation::PORT);
+    }
+
+    private function loadNode(int $id): NetworkNode
+    {
+        return NetworkNode::query()->with('nodeType')->findOrFail($id);
+    }
+
+    /**
+     * Naik lewat `parent_id`. nodeType dimuat di tiap hop supaya `isSlot()`/
+     * `isPort()` tidak memicu query tambahan per node lewat typeCode().
+     */
+    private function walk(NetworkNode $node, string $kind): InfrastructureLocation
+    {
+        $node->loadMissing('nodeType');
+        $nodes = [$this->entry($node)];
         $current = $node;
         $guard = 0;
         while ($current->parent_id !== null) {
             if (++$guard > self::MAX_DEPTH) {
                 throw new InvalidArgumentException('Rantai node melingkar.');
             }
-            $current = NetworkNode::query()->with('nodeType')->findOrFail($current->parent_id);
-            $nodes[] = ['kind' => InfrastructureLocation::NODE, 'id' => $current->id, 'label' => $current->code ?: $current->name, 'type' => $current->nodeType?->code];
+            $current = $this->loadNode($current->parent_id);
+            $nodes[] = $this->entry($current);
         }
 
         if ($current->anchor_pop_id === null) {
@@ -96,26 +114,22 @@ class InfrastructureLocationResolver
 
         $pop = $this->forPop(Pop::findOrFail($current->anchor_pop_id));
 
-        return new InfrastructureLocation(InfrastructureLocation::NODE, $node->id, $pop->cabangId, [...$pop->ancestors, ...array_reverse($nodes)]);
+        return new InfrastructureLocation($kind, $node->id, $pop->cabangId, [...$pop->ancestors, ...array_reverse($nodes)]);
     }
 
-    public function forSlot(InfrastructureSlot $slot): InfrastructureLocation
+    /**
+     * @return array{kind: string, id: int, label: string, type: ?string}
+     */
+    private function entry(NetworkNode $node): array
     {
-        $device = $this->forNode($slot->device ?? NetworkNode::findOrFail($slot->network_node_id));
+        $isSlot = $node->isSlot();
+        $isPort = $node->isPort();
 
-        return new InfrastructureLocation(InfrastructureLocation::SLOT, $slot->id, $device->cabangId, [
-            ...$device->ancestors,
-            ['kind' => InfrastructureLocation::SLOT, 'id' => $slot->id, 'label' => "Slot {$slot->number}", 'type' => $slot->kind->value],
-        ]);
-    }
-
-    public function forPort(InfrastructurePort $port): InfrastructureLocation
-    {
-        $slot = $this->forSlot($port->slot ?? InfrastructureSlot::findOrFail($port->infrastructure_slot_id));
-
-        return new InfrastructureLocation(InfrastructureLocation::PORT, $port->id, $slot->cabangId, [
-            ...$slot->ancestors,
-            ['kind' => InfrastructureLocation::PORT, 'id' => $port->id, 'label' => $port->displayName(), 'type' => $port->kind->value],
-        ]);
+        return [
+            'kind' => $isSlot ? InfrastructureLocation::SLOT : ($isPort ? InfrastructureLocation::PORT : InfrastructureLocation::NODE),
+            'id' => $node->id,
+            'label' => ($isSlot || $isPort) ? $node->displayName() : ($node->code ?: $node->name),
+            'type' => $node->nodeType?->code,
+        ];
     }
 }

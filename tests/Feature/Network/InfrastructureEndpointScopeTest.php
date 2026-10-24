@@ -2,9 +2,7 @@
 
 namespace Tests\Feature\Network;
 
-use App\Enums\InfrastructurePortKind;
 use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
@@ -14,7 +12,6 @@ use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
 use App\Services\EffectiveAccessService;
 use App\Services\InfrastructureConnectionService;
-use App\Services\InfrastructurePositionService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\NetworkNodeTypeSeeder;
@@ -38,11 +35,11 @@ class InfrastructureEndpointScopeTest extends TestCase
 
     private Pop $miniB;
 
-    private InfrastructurePort $pon;
+    private NetworkNode $pon;
 
-    private InfrastructurePort $switchPort;
+    private NetworkNode $switchPort;
 
-    private InfrastructurePort $outsidePort;
+    private NetworkNode $outsidePort;
 
     protected function setUp(): void
     {
@@ -58,10 +55,16 @@ class InfrastructureEndpointScopeTest extends TestCase
         $scope = UserRoleScope::create(['user_id' => $this->actor->id, 'role_id' => $this->actor->role_id, 'scope_type' => 'selected_pop']);
         UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $this->miniA->id]);
         app(EffectiveAccessService::class)->clearCache($this->actor);
-        $positions = app(InfrastructurePositionService::class);
-        $this->pon = $positions->createPort($positions->createSlot($this->node('olt_chassis', $this->miniA, 'OLT-A'), 1), 1, InfrastructurePortKind::PON);
-        $this->switchPort = $positions->createPort($positions->ensureLogicalSlot($this->node('switch_mini_pop', $this->miniA, 'SW-A')), 1, InfrastructurePortKind::SWITCH);
-        $this->outsidePort = $positions->createPort($positions->ensureLogicalSlot($this->node('switch_mini_pop', $this->miniB, 'SW-B-SECRET')), 1, InfrastructurePortKind::SWITCH);
+        $this->pon = NetworkNode::factory()->pon(NetworkNode::factory()->slot($this->node('olt_chassis', $this->miniA, 'OLT-A'), 1)->create(), 1)->create();
+        $this->switchPort = $this->switchPortAt($this->miniA, 'SW-A');
+        $this->outsidePort = $this->switchPortAt($this->miniB, 'SW-B-SECRET');
+    }
+
+    private function switchPortAt(Pop $pop, string $code, int $number = 1): NetworkNode
+    {
+        $slot = NetworkNode::factory()->slot($this->node('switch_mini_pop', $pop, $code), 1)->create();
+
+        return NetworkNode::factory()->switchPort($slot, $number)->create();
     }
 
     private function node(string $type, Pop $pop, string $code): NetworkNode
@@ -174,8 +177,7 @@ class InfrastructureEndpointScopeTest extends TestCase
     #[Test]
     public function permitted_port_destination_is_recorded_and_can_be_verified_and_released(): void
     {
-        $positions = app(InfrastructurePositionService::class);
-        $target = $positions->createPort($positions->ensureLogicalSlot($this->node('switch_mini_pop', $this->miniA, 'SW-LOCAL')), 1, InfrastructurePortKind::SWITCH);
+        $target = $this->switchPortAt($this->miniA, 'SW-LOCAL');
 
         $this->actingAs($this->actor)->post(route('network.infrastructure-ports.connections.store', $this->switchPort),
             ['target_infrastructure_port_id' => $target->id])->assertRedirect()->assertSessionHasNoErrors();

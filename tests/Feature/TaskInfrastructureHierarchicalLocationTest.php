@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\FopTaskPriority;
 use App\Enums\InfrastructureLocationKind;
-use App\Enums\InfrastructurePortKind;
 use App\Enums\InventoryTransactionType;
 use App\Enums\RollStatus;
 use App\Enums\ScopeType;
@@ -12,8 +11,6 @@ use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\FopTask;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
@@ -28,11 +25,9 @@ use App\Models\TaskInfrastructureAction;
 use App\Models\User;
 use App\Models\UserRoleScopeTarget;
 use App\Services\FopTaskInfrastructureScopeService;
-use App\Services\InfrastructureConnectionService;
 use App\Services\InfrastructureHierarchyService;
 use App\Services\InfrastructureLocationOptionsService;
 use App\Services\InfrastructureLocationResolver;
-use App\Services\InfrastructurePositionService;
 use App\Services\InventoryService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
@@ -70,13 +65,13 @@ class TaskInfrastructureHierarchicalLocationTest extends TestCase
 
     private NetworkNode $switchB;
 
-    private InfrastructureSlot $slotA1;
+    private NetworkNode $slotA1;
 
-    private InfrastructureSlot $slotA2;
+    private NetworkNode $slotA2;
 
-    private InfrastructurePort $ponA11;
+    private NetworkNode $ponA11;
 
-    private InfrastructurePort $switchPort;
+    private NetworkNode $switchPort;
 
     private NetworkNode $odpA;
 
@@ -102,16 +97,14 @@ class TaskInfrastructureHierarchicalLocationTest extends TestCase
         $this->technician = User::factory()->create(['role_id' => $teknisi->id]);
         $this->technician->roleScopes()->create(['role_id' => $teknisi->id, 'scope_type' => ScopeType::ALL_POP]);
 
-        $positions = app(InfrastructurePositionService::class);
         $this->oltA = $this->node('olt_chassis', $this->miniA1, 'OLT-A');
         $this->oltB = $this->node('olt_chassis', $this->miniA1, 'OLT-B');
         $this->switchB = $this->node('switch_mini_pop', $this->miniA1, 'SW-B');
-        $this->slotA1 = $positions->createSlot($this->oltA, 1);
-        $this->slotA2 = $positions->createSlot($this->oltA, 2);
-        $this->ponA11 = $positions->createPort($this->slotA1, 1, InfrastructurePortKind::PON);
-        $this->switchPort = $positions->createPort($positions->ensureLogicalSlot($this->switchB), 4, InfrastructurePortKind::SWITCH);
-        $this->odpA = $this->node('odp', $this->miniA1, 'ODP-A');
-        app(InfrastructureConnectionService::class)->connect($this->ponA11, $this->technician, targetNode: $this->odpA, verified: true);
+        $this->slotA1 = NetworkNode::factory()->slot($this->oltA, 1)->create();
+        $this->slotA2 = NetworkNode::factory()->slot($this->oltA, 2)->create();
+        $this->ponA11 = NetworkNode::factory()->pon($this->slotA1, 1)->create();
+        $this->switchPort = NetworkNode::factory()->switchPort(NetworkNode::factory()->slot($this->switchB, 1)->create(), 4)->create();
+        $this->odpA = NetworkNode::factory()->child($this->ponA11)->create(['node_type_id' => NetworkNodeType::where('code', 'odp')->firstOrFail()->id, 'code' => 'ODP-A', 'name' => 'ODP-A']);
     }
 
     private function node(string $typeCode, Pop $anchor, string $code): NetworkNode
@@ -393,7 +386,7 @@ class TaskInfrastructureHierarchicalLocationTest extends TestCase
         $task = $this->task(['scope_mini_pop_id' => $this->miniA1->id]);
 
         $this->assertRejected($this->submit($task, [$this->row('inspect', [...$this->miniPath(),
-            'loc_device' => $this->switchB->id, 'loc_slot' => $this->switchPort->infrastructure_slot_id,
+            'loc_device' => $this->switchB->id, 'loc_slot' => $this->switchPort->parent_id,
             'loc_port' => $this->switchPort->id, 'loc_odp' => $this->odpA->id,
         ])]), $task);
     }
@@ -404,7 +397,7 @@ class TaskInfrastructureHierarchicalLocationTest extends TestCase
         $task = $this->task(['scope_mini_pop_id' => $this->miniA1->id]);
 
         $this->submit($task, [$this->row('inspect', [...$this->miniPath(),
-            'loc_device' => $this->switchB->id, 'loc_slot' => $this->switchPort->infrastructure_slot_id, 'loc_port' => $this->switchPort->id,
+            'loc_device' => $this->switchB->id, 'loc_slot' => $this->switchPort->parent_id, 'loc_port' => $this->switchPort->id,
         ], ['result_note' => 'Link normal'])])->assertSessionHasNoErrors()->assertSessionMissing('error');
 
         $this->assertSame($this->switchPort->id, TaskInfrastructureAction::sole()->work_infrastructure_port_id);
