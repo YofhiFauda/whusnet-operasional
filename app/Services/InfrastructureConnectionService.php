@@ -7,7 +7,6 @@ use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureRecordStatus;
 use App\Models\AuditLog;
 use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
 use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Models\User;
@@ -16,12 +15,16 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Satu-satunya penulis `infrastructure_connections`. Aturan (§2, §4.3, §10.2):
+ * Satu-satunya penulis `infrastructure_connections`. Sejak ADHOC-213 Slot/PON/Port
+ * Switch adalah baris `network_nodes`, dan aturannya menyempit:
  *
- * - PON → hanya ODP, satu PON boleh banyak ODP, satu ODP satu uplink aktif.
- * - Port Switch → satu sambungan aktif per port; tujuan node/port/label,
- *   TIDAK PERNAH ODP — jalur Switch berhenti di Port, sambungan sesudahnya
- *   bukan anak ODP. Koneksi juga tidak pernah mengubah `parent_id` node.
+ * - ODP -> PON TIDAK lewat sambungan: ODP tergantung PON lewat `parent_id`
+ *   (uplink = induk, lihat `NetworkNode::uplinkPon()`). Konsep "uplink
+ *   terverifikasi" sengaja dibuang supaya tidak ada dua sumber kebenaran
+ *   uplink yang bisa menyimpang. Karena itu PON ditolak sebagai sumber.
+ * - Sambungan hanya untuk Port Switch -> Port Switch / node (non-ODP) / label.
+ *   Satu sambungan aktif per port; tujuan TIDAK PERNAH ODP — jalur Switch
+ *   berhenti di Port. Koneksi juga tidak pernah mengubah `parent_id` node.
  * - Sumber & tujuan wajib satu Cabang; port rusak tidak bisa disambung.
  * - Pelepasan menyimpan histori (released_at, alasan), tidak menghapus baris.
  *
@@ -30,10 +33,10 @@ use InvalidArgumentException;
 class InfrastructureConnectionService
 {
     public function connect(
-        InfrastructurePort $source,
+        NetworkNode $source,
         User $actor,
         ?NetworkNode $targetNode = null,
-        ?InfrastructurePort $targetPort = null,
+        ?NetworkNode $targetPort = null,
         ?string $targetLabel = null,
         bool $verified = false,
         ?string $notes = null,
@@ -46,39 +49,38 @@ class InfrastructureConnectionService
         }
 
         return DB::transaction(function () use ($source, $actor, $targetNode, $targetPort, $targetLabel, $verified, $notes): InfrastructureConnection {
-            $source = InfrastructurePort::query()->with('slot.device')->lockForUpdate()->findOrFail($source->id);
+            $source = NetworkNode::query()->with('nodeType')->lockForUpdate()->findOrFail($source->id);
+            if ($source->isPon()) {
+                throw new InvalidArgumentException('ODP tersambung ke PON lewat induknya, bukan sambungan.');
+            }
+            if ($source->portKind() !== InfrastructurePortKind::SWITCH) {
+                throw new InvalidArgumentException('Sumber sambungan harus Port Switch.');
+            }
             $this->assertUsable($source);
             $sourceCabang = $this->cabangOfPort($source);
 
-            if ($source->kind === InfrastructurePortKind::PON) {
-                if ($targetNode === null) {
-                    throw new InvalidArgumentException('PON hanya boleh disambungkan ke ODP.');
-                }
-            } elseif (InfrastructureConnection::query()->active()->where('source_infrastructure_port_id', $source->id)->exists()) {
-                throw new InvalidArgumentException('Port Switch ini sudah punya sambungan aktif.');
+            if (InfrastructureConnection::query()->active()->where('source_infrastructure_port_id', $source->id)->exists()) {
+                throw new InvalidArgumentException("{$source->displayName()} ini sudah punya sambungan aktif.");
             }
 
             if ($targetNode !== null) {
                 $targetNode = NetworkNode::query()->with('nodeType')->lockForUpdate()->findOrFail($targetNode->id);
-                $isOdp = $targetNode->nodeType?->code === 'odp';
-                if ($source->kind === InfrastructurePortKind::PON && ! $isOdp) {
-                    throw new InvalidArgumentException('PON hanya boleh disambungkan ke ODP.');
-                }
-                if ($source->kind === InfrastructurePortKind::SWITCH && $isOdp) {
+                if ($targetNode->nodeType?->code === 'odp') {
                     throw new InvalidArgumentException('Jalur Switch berhenti di Port — tujuan tidak boleh ODP.');
                 }
                 if ($sourceCabang === null || $sourceCabang !== Pop::resolveCabangId($targetNode->resolvePop()?->id)) {
                     throw new InvalidArgumentException('Tujuan sambungan berada di cabang berbeda.');
                 }
                 if (InfrastructureConnection::query()->active()->where('target_network_node_id', $targetNode->id)->exists()) {
-                    throw new InvalidArgumentException($isOdp
-                        ? 'ODP ini sudah punya uplink PON aktif. Lepas dulu sebelum menyambung ulang.'
-                        : 'Node tujuan sudah punya sambungan aktif.');
+                    throw new InvalidArgumentException('Node tujuan sudah punya sambungan aktif.');
                 }
             }
 
             if ($targetPort !== null) {
-                $targetPort = InfrastructurePort::query()->with('slot.device')->lockForUpdate()->findOrFail($targetPort->id);
+                $targetPort = NetworkNode::query()->with('nodeType')->lockForUpdate()->findOrFail($targetPort->id);
+                if ($targetPort->portKind() !== InfrastructurePortKind::SWITCH) {
+                    throw new InvalidArgumentException('Port tujuan harus Port Switch.');
+                }
                 $this->assertUsable($targetPort);
                 if ($targetPort->id === $source->id) {
                     throw new InvalidArgumentException('Port tidak dapat disambungkan ke dirinya sendiri.');
@@ -87,7 +89,7 @@ class InfrastructureConnectionService
                     throw new InvalidArgumentException('Tujuan sambungan berada di cabang berbeda.');
                 }
                 if (InfrastructureConnection::query()->active()->where('target_infrastructure_port_id', $targetPort->id)->exists()) {
-                    throw new InvalidArgumentException('Port tujuan sudah punya sambungan aktif.');
+                    throw new InvalidArgumentException("{$targetPort->displayName()} tujuan sudah punya sambungan aktif.");
                 }
             }
 
@@ -162,17 +164,9 @@ class InfrastructureConnectionService
         });
     }
 
-    public function activeUplinkFor(NetworkNode $odp): ?InfrastructureConnection
+    public function occupancyOf(NetworkNode $port): InfrastructureOccupancy
     {
-        return InfrastructureConnection::query()->active()
-            ->where('target_network_node_id', $odp->id)
-            ->whereHas('sourcePort', fn ($query) => $query->where('kind', InfrastructurePortKind::PON->value))
-            ->first();
-    }
-
-    public function occupancyOf(InfrastructurePort $port): InfrastructureOccupancy
-    {
-        if ($port->status === InfrastructureRecordStatus::RUSAK_NONAKTIF) {
+        if ($port->record_status === InfrastructureRecordStatus::RUSAK_NONAKTIF) {
             return InfrastructureOccupancy::RUSAK_NONAKTIF;
         }
 
@@ -187,21 +181,23 @@ class InfrastructureConnectionService
                 : InfrastructureOccupancy::TERPAKAI_BELUM_TERVERIFIKASI;
         }
 
-        return $port->status === InfrastructureRecordStatus::BELUM_DIDATA
+        // Kolom record_status nullable di node: null diperlakukan belum didata (bukan kosong terverifikasi).
+        return ($port->record_status ?? InfrastructureRecordStatus::BELUM_DIDATA) === InfrastructureRecordStatus::BELUM_DIDATA
             ? InfrastructureOccupancy::BELUM_DIDATA
             : InfrastructureOccupancy::KOSONG_TERVERIFIKASI;
     }
 
-    private function assertUsable(InfrastructurePort $port): void
+    private function assertUsable(NetworkNode $port): void
     {
-        if ($port->status === InfrastructureRecordStatus::RUSAK_NONAKTIF) {
+        if ($port->record_status === InfrastructureRecordStatus::RUSAK_NONAKTIF) {
             throw new InvalidArgumentException("{$port->displayName()} berstatus rusak/nonaktif.");
         }
     }
 
-    private function cabangOfPort(InfrastructurePort $port): ?int
+    private function cabangOfPort(NetworkNode $port): ?int
     {
-        return Pop::resolveCabangId($port->slot?->device?->resolvePop()?->id);
+        // Cabang dari rantai parent_id (Port -> Slot -> perangkat -> anchor).
+        return Pop::resolveCabangId($port->resolvePop()?->id);
     }
 
     /**
