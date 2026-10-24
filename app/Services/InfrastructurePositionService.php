@@ -184,6 +184,85 @@ class InfrastructurePositionService
         });
     }
 
+    /**
+     * Generate massal Slot + PON/Port Switch (spec §6). Idempoten: hanya nomor
+     * yang belum ada yang dibuat; node lama tidak disentuh kecuali kapasitas
+     * yang SEMPIT dinaikkan (createSlot/createPort menolak nomor > kapasitas,
+     * jadi tanpa itu generate ulang pada perangkat berkapasitas kecil gagal).
+     * Kapasitas tidak pernah diturunkan.
+     *
+     * Satu transaksi + audit per-node dimatikan: 16 slot x 8 PON = 144 baris
+     * audit "created" akan menenggelamkan jejak; satu ringkasan sudah cukup,
+     * dan kalau satu node gagal semuanya batal (tidak ada struktur setengah jadi).
+     *
+     * @param  ?int  $ponCapacity  kapasitas pelanggan aktif PON BARU (hanya OLT); null = dibiarkan kosong.
+     * @return array{slots_created: int, ports_created: int}
+     */
+    public function generateStructure(NetworkNode $device, int $slotCount, int $portsPerSlot, ?int $ponCapacity, User $actor): array
+    {
+        return DB::transaction(function () use ($device, $slotCount, $portsPerSlot, $ponCapacity, $actor): array {
+            $device = NetworkNode::query()->with('nodeType')->lockForUpdate()->findOrFail($device->id);
+            $kind = InfrastructureSlotKind::forDeviceTypeCode($device->nodeType?->code);
+            if ($kind === null) {
+                throw new InvalidArgumentException('Generate struktur hanya untuk OLT atau Switch Mini POP.');
+            }
+            if ($portsPerSlot < 1 || ($kind === InfrastructureSlotKind::OLT && $slotCount < 1)) {
+                throw new InvalidArgumentException('Jumlah slot dan port harus minimal 1.');
+            }
+
+            $isOlt = $kind === InfrastructureSlotKind::OLT;
+            // Switch: hanya satu Slot internal/logis (§1), $slotCount diabaikan.
+            $slotNumbers = $isOlt ? range(1, $slotCount) : [1];
+            $created = ['slots_created' => 0, 'ports_created' => 0];
+
+            NetworkNode::withoutEvents(function () use ($device, $slotNumbers, $portsPerSlot, $ponCapacity, $isOlt, &$created): void {
+                // Kapasitas perangkat dinaikkan DULU: createSlot menolak nomor > kapasitas.
+                $needed = max($slotNumbers);
+                if ($device->capacity === null || $device->capacity < $needed) {
+                    $device->forceFill(['capacity' => $needed])->saveQuietly();
+                }
+
+                $existing = $device->slots()->get()->keyBy('number');
+                foreach ($slotNumbers as $number) {
+                    $slot = $existing->get($number);
+                    if ($slot === null) {
+                        $slot = $isOlt
+                            ? $this->createSlot($device, $number, ['capacity' => $portsPerSlot])
+                            : $this->ensureLogicalSlot($device);
+                        $created['slots_created']++;
+                    }
+                    // Kapasitas slot dinaikkan DULU: createPort menolak nomor > kapasitas.
+                    if ($slot->capacity === null || $slot->capacity < $portsPerSlot) {
+                        $slot->forceFill(['capacity' => $portsPerSlot])->saveQuietly();
+                    }
+
+                    $have = $slot->positionPorts()->pluck('number')->all();
+                    foreach (range(1, $portsPerSlot) as $portNumber) {
+                        if (in_array($portNumber, $have, true)) {
+                            continue;
+                        }
+                        $this->createPort($slot, $portNumber, $isOlt && $ponCapacity !== null ? ['capacity' => $ponCapacity] : []);
+                        $created['ports_created']++;
+                    }
+                }
+            });
+
+            AuditLog::create([
+                'user_id' => $actor->id, 'module' => 'Struktur Infrastruktur', 'action' => 'generate_structure',
+                'auditable_type' => NetworkNode::class, 'auditable_id' => $device->id,
+                'old_values' => null,
+                'new_values' => [
+                    'device_id' => $device->id, 'device_code' => $device->code,
+                    'slot_count' => $isOlt ? $slotCount : 1, 'ports_per_slot' => $portsPerSlot,
+                    ...$created,
+                ],
+                'ip_address' => request()?->ip(), 'user_agent' => request()?->userAgent(), 'created_at' => now(),
+            ]);
+
+            return $created;
+        });
+    }
+
     public function updateDeviceCapacity(NetworkNode $device, int $capacity, User $actor): NetworkNode
     {
         return DB::transaction(function () use ($device, $capacity, $actor): NetworkNode {

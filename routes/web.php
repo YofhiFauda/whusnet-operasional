@@ -59,6 +59,7 @@ use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
 use App\Http\Controllers\Master\WorkToolController;
+use App\Http\Controllers\Network\GenerateInfrastructureStructureController;
 use App\Http\Controllers\Network\InfraAssetRegistrationController;
 use App\Http\Controllers\Network\InfrastructureMapController;
 use App\Http\Controllers\Network\InfrastructurePortController;
@@ -1256,6 +1257,8 @@ Route::middleware('auth')->group(function () {
         Route::patch('/network/nodes/{node}/capacity', [InfrastructurePositionController::class, 'updateDeviceCapacity'])->name('network.nodes.capacity');
         Route::patch('/network/infrastructure-slots/{slot}/capacity', [InfrastructurePositionController::class, 'updateSlotCapacity'])->name('network.infrastructure-slots.capacity');
         Route::patch('/network/infrastructure-ports/{port}/capacity', [InfrastructurePortController::class, 'updateCapacity'])->name('network.infrastructure-ports.capacity');
+        Route::get('/network/nodes/{node}/generate-structure', [GenerateInfrastructureStructureController::class, 'create'])->name('network.nodes.generate-structure.create');
+        Route::post('/network/nodes/{node}/generate-structure', [GenerateInfrastructureStructureController::class, 'store'])->name('network.nodes.generate-structure.store');
         Route::post('/network/nodes/{node}/infrastructure-slots', [InfrastructurePositionController::class, 'storeSlot'])->name('network.nodes.infrastructure-slots.store');
         Route::post('/network/infrastructure-slots/{slot}/ports', [InfrastructurePositionController::class, 'storePort'])->name('network.infrastructure-slots.ports.store');
         Route::post('/network/infrastructure-ports/{port}/connections', [InfrastructurePositionController::class, 'connect'])->name('network.infrastructure-ports.connections.store');

@@ -49,6 +49,15 @@
                 <span>Kembali ke Pohon Node</span>
             </a>
 
+            @can('network_nodes.update')
+            @if(\App\Enums\InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) !== null)
+            <a href="{{ route('network.nodes.generate-structure.create', $node) }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-xs font-semibold text-text-secondary transition-colors shadow-2xs">
+                Generate Slot &amp; PON
+            </a>
+            @endif
+            @endcan
+
             @can('network_nodes.delete')
             <form method="POST" action="{{ route('network.nodes.destroy', $node) }}" onsubmit="return confirm('Hapus node kosong? Node yang punya relasi akan dinonaktifkan.');">
                 @csrf
