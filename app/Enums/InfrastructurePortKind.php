@@ -16,6 +16,27 @@ enum InfrastructurePortKind: string
     }
 
     /**
+     * Kode tipe node PON/Port Switch (baris `network_nodes`, ADHOC-213) —
+     * satu-satunya pemetaan enum -> kode tipe, jangan tulis string literal.
+     */
+    public function typeCode(): string
+    {
+        return match ($this) {
+            self::PON => 'olt_pon',
+            self::SWITCH => 'switch_port',
+        };
+    }
+
+    public static function fromPortTypeCode(?string $typeCode): ?self
+    {
+        return match ($typeCode) {
+            'olt_pon' => self::PON,
+            'switch_port' => self::SWITCH,
+            default => null,
+        };
+    }
+
+    /**
      * Satuan kapasitas wajib ikut jenis port (§12/§16.3): kapasitas PON =
      * jumlah pelanggan aktif (keputusan user 21-10-2026). Port Switch tidak
      * punya kapasitas pelanggan — satu port = satu sambungan fisik.

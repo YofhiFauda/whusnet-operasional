@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\InfrastructureCapacityUnit;
+use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureRecordStatus;
+use App\Enums\InfrastructureSlotKind;
 use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -185,6 +187,111 @@ class NetworkNode extends Model
     public function infrastructureSlots(): HasMany
     {
         return $this->hasMany(InfrastructureSlot::class)->orderBy('number');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function slotTypeCodes(): array
+    {
+        return array_map(fn (InfrastructureSlotKind $k) => $k->typeCode(), InfrastructureSlotKind::cases());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function portTypeCodes(): array
+    {
+        return array_map(fn (InfrastructurePortKind $k) => $k->typeCode(), InfrastructurePortKind::cases());
+    }
+
+    private function typeCode(): ?string
+    {
+        return $this->relationLoaded('nodeType')
+            ? $this->nodeType?->code
+            : ($this->node_type_id ? NetworkNodeType::whereKey($this->node_type_id)->value('code') : null);
+    }
+
+    public function slotKind(): ?InfrastructureSlotKind
+    {
+        return InfrastructureSlotKind::fromSlotTypeCode($this->typeCode());
+    }
+
+    public function portKind(): ?InfrastructurePortKind
+    {
+        return InfrastructurePortKind::fromPortTypeCode($this->typeCode());
+    }
+
+    public function isSlot(): bool
+    {
+        return $this->slotKind() !== null;
+    }
+
+    /** PON OLT maupun Port Switch. */
+    public function isPort(): bool
+    {
+        return $this->portKind() !== null;
+    }
+
+    public function isPon(): bool
+    {
+        return $this->portKind() === InfrastructurePortKind::PON;
+    }
+
+    public function isPosition(): bool
+    {
+        return $this->isSlot() || $this->isPort();
+    }
+
+    /**
+     * Anak bertipe Slot, urut nomor (mis. slot milik chassis OLT).
+     *
+     * @return HasMany<NetworkNode, $this>
+     */
+    public function slots(): HasMany
+    {
+        return $this->children()
+            ->whereHas('nodeType', fn (Builder $q) => $q->whereIn('code', self::slotTypeCodes()))
+            ->orderBy('number');
+    }
+
+    /**
+     * Anak bertipe PON/Port Switch, urut nomor. SENGAJA bukan `ports()`:
+     * nama itu sudah dipakai relasi `NetworkNodePort` (port fisik ODP yang
+     * diisi pelanggan, dipertahankan spec) di banyak caller — menimpanya
+     * merusak halaman node/ODP.
+     *
+     * @return HasMany<NetworkNode, $this>
+     */
+    public function positionPorts(): HasMany
+    {
+        return $this->children()
+            ->whereHas('nodeType', fn (Builder $q) => $q->whereIn('code', self::portTypeCodes()))
+            ->orderBy('number');
+    }
+
+    /**
+     * PON tempat node ini tergantung (parent bila bertipe `olt_pon`); null
+     * bila ditambatkan ke POP/node lain.
+     */
+    public function uplinkPon(): ?NetworkNode
+    {
+        $parent = $this->resolveParentNode();
+
+        return $parent?->isPon() ? $parent : null;
+    }
+
+    /**
+     * Label tampilan: `Slot 3`, `PON 5`, `Port 7`; node biasa pakai `code`.
+     */
+    public function displayName(): string
+    {
+        return match (true) {
+            $this->isSlot() => 'Slot '.$this->number,
+            $this->isPon() => 'PON '.$this->number,
+            $this->isPort() => 'Port '.$this->number,
+            default => (string) $this->code,
+        };
     }
 
     public function nodeType(): BelongsTo

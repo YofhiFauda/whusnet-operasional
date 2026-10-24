@@ -33,6 +33,23 @@ enum InfrastructureSlotKind: string
      * = OLT pada rancangan; `switch_mini_pop` = Switch operasional (§16.2).
      * `aggregation_switch` lama SENGAJA tidak masuk.
      */
+    public function typeCode(): string
+    {
+        return match ($this) {
+            self::OLT => 'olt_slot',
+            self::SWITCH => 'switch_slot',
+        };
+    }
+
+    public static function fromSlotTypeCode(?string $typeCode): ?self
+    {
+        return match ($typeCode) {
+            'olt_slot' => self::OLT,
+            'switch_slot' => self::SWITCH,
+            default => null,
+        };
+    }
+
     public static function forDeviceTypeCode(?string $typeCode): ?self
     {
         return match ($typeCode) {
