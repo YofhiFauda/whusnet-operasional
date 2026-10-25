@@ -56,4 +56,28 @@ class CustomerShowLokasiJaringanDariPohonNodeTest extends TestCase
             ->assertSee('ODP-POHON-01')
             ->assertDontSee('OLT/Slot/PON belum terhubung');
     }
+
+    #[Test]
+    public function odp_tanpa_induk_pon_menampilkan_olt_slot_pon_belum_terhubung(): void
+    {
+        $this->seed(NetworkNodeTypeSeeder::class);
+        $owner = $this->loginAsAdmin();
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+
+        // ODP legacy yang masih menempel langsung di POP (belum dipindah ke PON).
+        $odp = NetworkNode::factory()->create([
+            'node_type_id' => NetworkNodeType::where('code', 'odp')->firstOrFail()->id,
+            'parent_id' => null,
+            'anchor_pop_id' => $cabang->id,
+            'code' => 'ODP-YATIM-01',
+        ]);
+        $port = NetworkNodePort::create(['network_node_id' => $odp->id, 'number' => 2]);
+        $customer = Customer::factory()->create(['pop_id' => $cabang->id]);
+        app(NetworkPortAssignmentService::class)->assignCustomer($port, $customer, $owner);
+
+        $this->get(route('customers.show', $customer))
+            ->assertOk()
+            ->assertSee('OLT/Slot/PON belum terhubung')
+            ->assertSee('ODP-YATIM-01');
+    }
 }

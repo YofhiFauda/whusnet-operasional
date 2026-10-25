@@ -111,6 +111,39 @@ class InfrastructureMapTest extends TestCase
     }
 
     #[Test]
+    public function slot_olt_kosong_artinya_slot_tanpa_pon_dan_mengikuti_scope_pop(): void
+    {
+        $jetis = Pop::factory()->create(['name' => 'Jetis', 'type' => 'cabang', 'parent_id' => null]);
+        $miniJetis = Pop::factory()->create(['code' => 'CJ', 'name' => 'CJ', 'type' => 'mini_pop', 'parent_id' => $jetis->id]);
+        $sandya = Pop::factory()->create(['name' => 'Sandya', 'type' => 'cabang', 'parent_id' => null]);
+        $miniSandya = Pop::factory()->create(['code' => 'DS', 'name' => 'DS', 'type' => 'mini_pop', 'parent_id' => $sandya->id]);
+        $oltType = NetworkNodeType::where('code', 'olt_chassis')->firstOrFail();
+
+        $oltJetis = NetworkNode::factory()->create(['node_type_id' => $oltType->id, 'anchor_pop_id' => $miniJetis->id, 'code' => 'OLT-JETIS-SLOT']);
+        NetworkNode::factory()->slot($oltJetis, 1)->create();
+        $slotTerisi = NetworkNode::factory()->slot($oltJetis, 2)->create();
+        NetworkNode::factory()->pon($slotTerisi, 1)->create();
+
+        // Dua Slot kosong di cabang lain: tidak boleh ikut terhitung saat scope Jetis.
+        $oltSandya = NetworkNode::factory()->create(['node_type_id' => $oltType->id, 'anchor_pop_id' => $miniSandya->id, 'code' => 'OLT-SANDYA-SLOT']);
+        NetworkNode::factory()->slot($oltSandya, 1)->create();
+        NetworkNode::factory()->slot($oltSandya, 2)->create();
+
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id, 'status' => 'active']);
+        UserRoleScope::create(['user_id' => $owner->id, 'role_id' => $owner->role_id, 'scope_type' => ScopeType::ALL_POP]);
+
+        $fopRole = Role::where('code', 'fop')->firstOrFail();
+        $scoped = User::factory()->create(['role_id' => $fopRole->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $scoped->id, 'role_id' => $fopRole->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $jetis->id]);
+
+        $service = app(InfrastructureMapService::class);
+
+        $this->assertSame(1, $service->build($scoped, $jetis->id, 'name')['summary']['free_olt_slots']);
+        $this->assertSame(3, $service->build($owner, null, 'name')['summary']['free_olt_slots']);
+    }
+
+    #[Test]
     public function peta_menampilkan_topologi_inventaris_port_dan_bukti_aset_terpasang(): void
     {
         $cabang = Pop::factory()->create(['name' => 'Cabang Peta A', 'type' => 'cabang']);

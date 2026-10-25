@@ -1727,9 +1727,6 @@ class CustomerController extends Controller
                 'olt' => $slot?->parent,
                 'slot' => $slot,
                 'pon' => $pon,
-                // Struktur pohon = sumber kebenaran tunggal; tidak ada lagi status
-                // "uplink belum terverifikasi" yang terpisah dari parent_id.
-                'verified' => true,
             ];
         }
 

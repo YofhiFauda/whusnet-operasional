@@ -37,9 +37,7 @@ use InvalidArgumentException;
  * diverifikasi manual di sini (`isSlot()`/`isPort()`). Tanpa ini, memasukkan
  * id ODP/OLT biasa ke `/network/infrastructure-slots/{id}` akan lolos
  * binding dan baru gagal di tempat lain dengan pesan yang membingungkan —
- * harus 404 di titik masuk (Task 12, bug route-model-binding "no such
- * table" yang dulu nempel di sini selama controller masih mengetik
- * `InfrastructureSlot`/`InfrastructurePort`).
+ * harus 404 di titik masuk.
  */
 class InfrastructurePositionController extends Controller
 {

@@ -525,15 +525,13 @@
                         {{-- Chassis / Switch Special Component Slots --}}
                         @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
                             <div class="pb-2 rounded-lg border border-border bg-surface-muted/40 p-4 text-xs text-text-muted">
-                                {{-- `_device-slots.blade.php` masih berbasis `InfrastructureSlot`/`InfrastructurePort`
-                                     (tabelnya sudah di-drop sebelum Task 11, lihat
-                                     `database/migrations/2026_10_24_000002_retarget_location_foreign_keys_to_network_nodes.php`)
-                                     — di luar scope file Task 11 untuk disesuaikan ulang
-                                     ke `NetworkNode::slots()`/`positionPorts()`. Dipanggil di
-                                     sini akan melempar "lazy loading disabled" dan menjatuhkan
-                                     seluruh halaman Master Node. Buka pohon di sebelah kiri
-                                     (lazy load Slot/PON lewat `network.nodes.children`) untuk
-                                     navigasi komponen perangkat ini sampai panel ini disusun ulang. --}}
+                                {{-- Slot/PON perangkat kini baris `network_nodes` (`NetworkNode::slots()`/
+                                     `positionPorts()`). Panel inspector ini belum dirangkai ke lazy load,
+                                     dan memanggil relasi itu di sini tanpa eager load akan melempar
+                                     "lazy loading disabled" serta menjatuhkan seluruh halaman Master
+                                     Node. Buka pohon di sebelah kiri (lazy load Slot/PON lewat
+                                     `network.nodes.children`) untuk menelusuri komponen perangkat ini
+                                     sampai panel ini disusun ulang. --}}
                                 Panel komponen Slot/PON perangkat ini sedang disusun ulang untuk model node baru.
                                 Buka cabang <span class="font-mono font-semibold">{{ $node->code }}</span> di pohon sebelah kiri untuk menelusuri Slot/PON-nya.
                             </div>
