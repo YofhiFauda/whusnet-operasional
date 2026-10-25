@@ -65,7 +65,6 @@ use App\Http\Controllers\Network\InfrastructureMapController;
 use App\Http\Controllers\Network\InfrastructurePortController;
 use App\Http\Controllers\Network\InfrastructurePositionController;
 use App\Http\Controllers\Network\NetworkNodeController;
-use App\Http\Controllers\Network\OltSlotController;
 use App\Http\Controllers\NocDashboardController;
 use App\Http\Controllers\NocWorksheetController;
 use App\Http\Controllers\NotificationController;
@@ -1253,8 +1252,6 @@ Route::middleware('auth')->group(function () {
         Route::put('/network/node-ports/{port}', [NetworkNodeController::class, 'updatePort'])->name('network.node-ports.update');
         Route::post('/network/node-ports/{port}/assign-node', [NetworkNodeController::class, 'assignNodePort'])->name('network.node-ports.assign-node');
         Route::post('/network/node-ports/{port}/assign-customer', [NetworkNodeController::class, 'assignCustomerPort'])->name('network.node-ports.assign-customer');
-        Route::post('/network/nodes/{chassis}/olt-slots', [OltSlotController::class, 'store'])->name('network.nodes.olt-slots.store');
-        Route::post('/network/nodes/{chassis}/olt-slots/{slot}/card', [OltSlotController::class, 'attachCard'])->name('network.nodes.olt-slots.card');
         Route::patch('/network/nodes/{node}/capacity', [InfrastructurePositionController::class, 'updateDeviceCapacity'])->name('network.nodes.capacity');
         Route::patch('/network/infrastructure-slots/{slot}/capacity', [InfrastructurePositionController::class, 'updateSlotCapacity'])->name('network.infrastructure-slots.capacity');
         Route::patch('/network/infrastructure-ports/{port}/capacity', [InfrastructurePortController::class, 'updateCapacity'])->name('network.infrastructure-ports.capacity');

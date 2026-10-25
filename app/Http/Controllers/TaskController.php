@@ -13,7 +13,6 @@ use App\Models\FopTask;
 use App\Models\InventorySerial;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
-use App\Models\OltSlot;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TaskInfrastructureAction;
@@ -262,12 +261,10 @@ class TaskController extends Controller
             $action->mutation['port_id'] ?? null,
             $action->mutation['target_port_id'] ?? null,
         ])->filter()->unique();
-        $slotIds = $infraActions->pluck('mutation.slot_id')->filter()->unique();
         $infraTargetNodes = NetworkNode::query()->whereIn('id', $targetNodeIds)->get()->keyBy('id');
         $infraPorts = NetworkNodePort::query()->whereIn('id', $portIds)->get()->keyBy('id');
-        $infraSlots = OltSlot::query()->whereIn('id', $slotIds)->get()->keyBy('id');
 
-        return view('tasks.show', compact('task', 'recentMaintenanceTasks', 'statusTimeline', 'infraActions', 'infraTargetNodes', 'infraPorts', 'infraSlots'));
+        return view('tasks.show', compact('task', 'recentMaintenanceTasks', 'statusTimeline', 'infraActions', 'infraTargetNodes', 'infraPorts'));
     }
 
     /**

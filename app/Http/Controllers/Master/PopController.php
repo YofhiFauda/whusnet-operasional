@@ -150,19 +150,11 @@ class PopController extends Controller
     {
         $this->authorizePopScope($pop);
 
-        // `Pop::oltSlots()` sudah dihapus (slot kini milik node chassis, bukan
-        // POP — satu Mini POP bisa punya beberapa chassis). Jangan eager-load
-        // relasi itu di $pop lagi; slot dimuat per-chassis di bawah lewat
-        // `NetworkNode::oltSlots()`.
+        // Slot tidak lagi relasi Eloquent: Slot/PON kini baris `network_nodes`
+        // (anak chassis), jadi detail POP hanya perlu chassis + SN-nya.
         $pop->load(['parent', 'children' => function ($q) {
             $q->orderBy('name');
         }]);
-
-        $cardOptions = $pop->type === 'mini_pop'
-            ? NetworkNode::query()->where('anchor_pop_id', $pop->id)
-                ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_card'))
-                ->whereDoesntHave('oltSlot')->orderBy('code')->get()
-            : collect();
 
         // Sejak Task 1, chassis OLT boleh ditambatkan langsung ke POP
         // `cabang` (bukan cuma `mini_pop`) — lihat NetworkNodeTypeSeeder
@@ -172,11 +164,11 @@ class PopController extends Controller
         $chassisNodes = in_array($pop->type, ['mini_pop', 'cabang'], true)
             ? NetworkNode::query()->where('anchor_pop_id', $pop->id)
                 ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_chassis'))
-                ->with(['deployedSerials.item', 'oltSlots.cardNode.ports', 'oltSlots.cardNode.deployedSerials.item'])
+                ->with(['deployedSerials.item'])
                 ->orderBy('code')->get()
             : collect();
 
-        return view('master.pop.show', compact('pop', 'cardOptions', 'chassisNodes'));
+        return view('master.pop.show', compact('pop', 'chassisNodes'));
     }
 
     /**

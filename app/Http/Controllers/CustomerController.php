@@ -35,7 +35,6 @@ use App\Models\District;
 use App\Models\FopTask;
 use App\Models\ImportBatch;
 use App\Models\ImportError;
-use App\Models\InfrastructureConnection;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -1717,17 +1716,20 @@ class CustomerController extends Controller
         $customerNetworkLocation = null;
         if ($activePortAssignment?->port?->node !== null) {
             $odpNode = $activePortAssignment->port->node;
-            $uplink = InfrastructureConnection::query()->active()
-                ->where('target_network_node_id', $odpNode->id)
-                ->with('sourcePort.slot.device.nodeType', 'sourcePort.slot.device.anchorPop.parent')
-                ->first();
+            // ODP menggantung ke PON lewat parent_id; PON anak Slot, Slot anak OLT.
+            // Tabel `infrastructure_connections`/slots/ports lama sudah dibuang
+            // (Task 14), jadi rantai ini dibaca langsung dari pohon node.
+            $pon = $odpNode->uplinkPon();
+            $slot = $pon?->parent;
             $customerNetworkLocation = [
                 'odp' => $odpNode,
                 'port_number' => $activePortAssignment->port->number,
-                'olt' => $uplink?->sourcePort?->slot?->device,
-                'slot' => $uplink?->sourcePort?->slot,
-                'pon' => $uplink?->sourcePort,
-                'verified' => $uplink?->isVerified() ?? false,
+                'olt' => $slot?->parent,
+                'slot' => $slot,
+                'pon' => $pon,
+                // Struktur pohon = sumber kebenaran tunggal; tidak ada lagi status
+                // "uplink belum terverifikasi" yang terpisah dari parent_id.
+                'verified' => true,
             ];
         }
 

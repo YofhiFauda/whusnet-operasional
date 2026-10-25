@@ -18,10 +18,13 @@ return new class extends Migration
      * punya satu uplink aktif tanpa melarang histori pelepasan (pola sama
      * `network_port_assignments`).
      *
-     * Backfill data lama dijalankan di sini lewat
-     * `InfrastructureLegacyBackfillService` — hanya hubungan yang terbukti FK
-     * + nomor unik; sisanya masuk daftar manual. down() membatalkan hasil
-     * backfill tanpa menyentuh tabel lama.
+     * Backfill data lama (dulu `InfrastructureLegacyBackfillService`) sudah
+     * dipensiunkan bersama tabel `infrastructure_slots`/`infrastructure_ports`
+     * (Slot/PON kini baris `network_nodes`, Task 14), jadi up() cukup membuat
+     * tabel. DB yang SUDAH menjalankan migration ini tidak mengulangnya, jadi
+     * hasil backfill-nya tidak berubah; di DB baru backfill memang no-op (belum
+     * ada data lama). down() tidak lagi membatalkan hasil backfill karena
+     * service-nya hilang; tabel mapping langsung di-drop.
      */
     public function up(): void
     {
@@ -63,16 +66,10 @@ return new class extends Migration
             $table->unique(['legacy_type', 'legacy_id']);
             $table->index(['status']);
         });
-
-        app(InfrastructureLegacyBackfillService::class)->run();
     }
 
     public function down(): void
     {
-        if (Schema::hasTable('infrastructure_legacy_mappings')) {
-            app(InfrastructureLegacyBackfillService::class)->rollback();
-        }
-
         Schema::dropIfExists('infrastructure_legacy_mappings');
         Schema::dropIfExists('infrastructure_connections');
     }

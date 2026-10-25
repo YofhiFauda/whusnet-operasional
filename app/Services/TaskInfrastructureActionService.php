@@ -9,7 +9,6 @@ use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
-use App\Models\OltSlot;
 use App\Models\Task;
 use App\Models\TaskInfrastructureAction;
 use App\Models\User;
@@ -139,7 +138,6 @@ class TaskInfrastructureActionService
             'qty' => $float('qty'),
             'roll_id' => $int('roll_id'),
             'meters' => $float('meters'),
-            'slot_id' => $int('slot_id'),
             'port_id' => $int('port_id'),
             'target_node_id' => $int('target_node_id'),
             'target_port_id' => $int('target_port_id'),
@@ -155,9 +153,9 @@ class TaskInfrastructureActionService
     {
         $specific = match ($row['action_type']) {
             'inspect' => ['port_id'],
-            'install' => ['serial_id', 'item_id', 'qty', 'roll_id', 'meters', 'slot_id', 'end_from', 'end_to', 'work_latitude', 'work_longitude'],
+            'install' => ['serial_id', 'item_id', 'qty', 'roll_id', 'meters', 'end_from', 'end_to', 'work_latitude', 'work_longitude'],
             'retrieve' => ['old_serial_id'],
-            'replace' => ['old_serial_id', 'serial_id', 'slot_id'],
+            'replace' => ['old_serial_id', 'serial_id'],
             'port_connect' => ['port_id', 'target_node_id', 'target_port_id'],
             'port_release' => ['port_id'],
             default => throw ValidationException::withMessages(['infra_actions' => 'Jenis aksi tidak dikenal.']),
@@ -300,19 +298,11 @@ class TaskInfrastructureActionService
         }
         if (in_array($type, ['install', 'replace'], true)) {
             if ($node?->nodeType?->code === 'olt_card') {
-                // Jalur legacy kartu-sebagai-node (sebelum Slot kanonis).
+                // Sisa jalur kartu-sebagai-node. Pemilihan Slot (`olt_slots`) dibuang di
+                // Task 14: Slot kini node sendiri, tidak ada lagi kartu yang "dipasang ke slot".
                 if (! isset($row['serial_id'])) {
                     throw ValidationException::withMessages(['infra_actions' => 'Kartu OLT wajib memakai SN aset kartu.']);
                 }
-                if (! isset($row['slot_id'])) {
-                    throw ValidationException::withMessages(['infra_actions' => 'Slot wajib dipilih untuk kartu OLT.']);
-                }
-            }
-            if (isset($row['slot_id'])) {
-                if ($node === null) {
-                    throw ValidationException::withMessages(['infra_actions' => 'Slot lama hanya untuk kartu OLT berbentuk node.']);
-                }
-                $this->attachCardSlot($row['slot_id'], $node);
             }
             if (isset($row['serial_id'])) {
                 $ids[] = $this->inventory->deploySerialAt(
@@ -333,22 +323,5 @@ class TaskInfrastructureActionService
         }
 
         return $ids;
-    }
-
-    private function attachCardSlot(int $slotId, NetworkNode $card): void
-    {
-        $slot = OltSlot::query()->lockForUpdate()->findOrFail($slotId);
-        if ($card->nodeType?->code !== 'olt_card' || $card->parent_id !== $slot->chassis_node_id) {
-            throw new InvalidArgumentException('Node kartu harus anak chassis pemilik slot.');
-        }
-        if ($slot->card_node_id !== null && $slot->card_node_id !== $card->id) {
-            throw new InvalidArgumentException('Slot OLT sudah terisi.');
-        }
-        if (OltSlot::query()->where('card_node_id', $card->id)->whereKeyNot($slot->id)->exists()) {
-            throw new InvalidArgumentException('Kartu sudah terpasang di slot lain.');
-        }
-        // Cermin ke Slot kanonis (syncOltSlot) sengaja dibuang: Slot kini node di network_nodes
-        // dan tabel pemetaan legacy sudah di-drop, jadi memanggilnya hanya melempar QueryException.
-        $slot->update(['card_node_id' => $card->id]);
     }
 }

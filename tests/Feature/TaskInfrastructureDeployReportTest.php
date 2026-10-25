@@ -22,7 +22,6 @@ use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
 use App\Models\NetworkPortAssignment;
-use App\Models\OltSlot;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -241,53 +240,6 @@ class TaskInfrastructureDeployReportTest extends TestCase
         $this->assertSame(0, InventoryTransaction::where('type', InventoryTransactionType::DEPLOY)->count());
         $this->assertSame(SerialStatus::ISSUED, $serial->refresh()->status);
         $this->assertSame(TaskStatus::IN_PROGRESS, $task->refresh()->status);
-    }
-
-    #[Test]
-    public function kartu_olt_wajib_memilih_slot_pada_chassis_induk(): void
-    {
-        $chassisType = NetworkNodeType::where('code', 'olt_chassis')->firstOrFail();
-        // 'olt_card' dihapus dari seeder master 2026-10-23 (ADHOC-212) —
-        // provisioning sendiri, sama pola dengan baris 1122 di bawah.
-        $cardType = NetworkNodeType::firstOrCreate(['code' => 'olt_card'], ['name' => 'Kartu OLT', 'has_ports' => true]);
-        $chassis = NetworkNode::factory()->create(['anchor_pop_id' => $this->pop->id, 'node_type_id' => $chassisType->id]);
-        $card = NetworkNode::factory()->child($chassis)->create(['node_type_id' => $cardType->id]);
-        $slot = OltSlot::create(['chassis_node_id' => $chassis->id, 'number' => 1]);
-        $category = ItemCategory::where('code', 'olt_module')->firstOrFail();
-        $item = $this->makeItem('OLT-CARD-REPORT', 'serialized');
-        $item->update(['item_category_id' => $category->id, 'infrastructure_node_type_id' => $cardType->id]);
-        $serial = $this->issuedSerial($item, 'OLT-CARD-001');
-        $task = $this->makeTask(TaskType::INFR, false);
-        $row = [
-            'action_key' => 'd83bd300-9bc1-4845-8b11-c03771579999',
-            'action_type' => 'install', 'network_node_id' => $card->id, 'serial_id' => $serial->id,
-        ];
-
-        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $task), [
-            'kendala_teknis' => 'Pasang kartu OLT.', 'infra_actions' => [$row],
-        ])->assertRedirect()->assertSessionHasErrors('infra_actions');
-
-        $this->assertSame(SerialStatus::ISSUED, $serial->refresh()->status);
-        $this->assertNull($slot->refresh()->card_node_id);
-
-        $qtyItem = $this->makeItem('OLT-CARD-QTY', 'quantity');
-        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $task), [
-            'kendala_teknis' => 'Coba pakai barang qty sebagai kartu.',
-            'infra_actions' => [[
-                'action_key' => 'd83bd300-9bc1-4845-8b11-c03771579998',
-                'action_type' => 'install', 'network_node_id' => $card->id,
-                'item_id' => $qtyItem->id, 'qty' => 1, 'slot_id' => $slot->id,
-            ]],
-        ])->assertRedirect()->assertSessionHasErrors('infra_actions');
-        $this->assertNull($slot->refresh()->card_node_id);
-
-        $row['slot_id'] = $slot->id;
-        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $task), [
-            'kendala_teknis' => 'Pasang kartu OLT.', 'infra_actions' => [$row],
-        ])->assertRedirect()->assertSessionHas('success')->assertSessionHasNoErrors();
-
-        $this->assertSame($card->id, $slot->refresh()->card_node_id);
-        $this->assertSame($card->id, $serial->refresh()->current_network_node_id);
     }
 
     #[Test]

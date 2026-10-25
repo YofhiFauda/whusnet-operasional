@@ -39,9 +39,6 @@
                     @if($action->result_note)
                         <p class="mt-3 text-sm leading-relaxed text-text-secondary">{{ $action->result_note }}</p>
                     @endif
-                    @if($action->mutation['slot_id'] ?? null)
-                        <p class="mt-2 text-xs text-text-secondary">Slot OLT: {{ $infraSlots->get($action->mutation['slot_id'])?->number ?? 'tidak tersedia' }}</p>
-                    @endif
                     @if($action->mutation['port_id'] ?? null)
                         <p class="mt-2 text-xs text-text-secondary">
                             Port asal: {{ $infraPorts->get($action->mutation['port_id'])?->number ?? 'tidak tersedia' }}

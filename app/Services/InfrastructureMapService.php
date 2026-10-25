@@ -6,12 +6,10 @@ use App\Enums\InventoryTransactionType;
 use App\Enums\SerialStatus;
 use App\Models\InventoryTransaction;
 use App\Models\NetworkNode;
-use App\Models\OltSlot;
 use App\Models\Pop;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class InfrastructureMapService
 {
@@ -204,24 +202,20 @@ class InfrastructureMapService
             : ($selectedPopId !== null ? [$selectedPopId] : $cabangs->pluck('id')->all());
         $anchorPopIds = array_values(array_unique(array_merge($miniPopIds, $cabangIdsForChassis)));
 
-        // Slot OLT dimiliki node chassis (`olt_slots.chassis_node_id`), bukan
-        // POP langsung — satu Mini POP/Cabang bisa punya beberapa chassis.
-        // Cari dulu node chassis yang ditambatkan ke tiap POP, lalu petakan
-        // chassis_node_id -> anchor_pop_id supaya groupBy tetap Collection
-        // dikunci id POP seperti sebelumnya ($slotsByPop->has($popId)/get()).
-        $chassisNodesForSlots = $anchorPopIds !== []
+        // Slot OLT kini baris `network_nodes` (anak langsung chassis, tipe
+        // `olt_slot`) — tabel `olt_slots` + konsep kartu sudah dibuang. "Slot
+        // kosong" diartikan ulang: Slot yang belum punya PON satu pun, karena
+        // tidak ada lagi kartu yang bisa kosong/terisi.
+        $chassisIdsForSlots = $anchorPopIds !== []
             ? NetworkNode::query()->whereIn('anchor_pop_id', $anchorPopIds)
                 ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_chassis'))
-                ->get(['id', 'anchor_pop_id'])
+                ->pluck('id')
             : collect();
-        $miniPopIdByChassisNodeId = $chassisNodesForSlots->pluck('anchor_pop_id', 'id');
-
-        $slotsByPop = Schema::hasTable('olt_slots') && $chassisNodesForSlots->isNotEmpty()
-            ? OltSlot::query()->whereIn('chassis_node_id', $miniPopIdByChassisNodeId->keys())
-                ->with('cardNode')->orderBy('number')->get()
-                ->groupBy(fn (OltSlot $slot): ?int => $miniPopIdByChassisNodeId->get($slot->chassis_node_id))
-            : collect();
-        $freeOltSlots = $slotsByPop->sum(fn ($slots) => $slots->whereNull('card_node_id')->count());
+        $freeOltSlots = $chassisIdsForSlots->isNotEmpty()
+            ? NetworkNode::query()->whereIn('parent_id', $chassisIdsForSlots)
+                ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_slot'))
+                ->whereDoesntHave('children')->count()
+            : 0;
 
         $nodeDetails = [];
         foreach ($nodes as $node) {
@@ -306,16 +300,6 @@ class InfrastructureMapService
                 'longitude' => $node->longitude,
                 'show_url' => route('network.nodes.show', $node),
             ];
-        }
-
-        $slotsData = [];
-        foreach ($slotsByPop as $popId => $slots) {
-            $slotsData[$popId] = $slots->map(fn ($slot) => [
-                'number' => $slot->number,
-                'card_node_id' => $slot->card_node_id,
-                'card_code' => $slot->cardNode?->code ?? null,
-                'card_name' => $slot->cardNode?->name ?? null,
-            ])->all();
         }
 
         $topologyPops = Pop::forUser($user)
@@ -454,9 +438,7 @@ class InfrastructureMapService
             'topologyIndex' => $topologyIndex,
             'topologyPops' => $topologyPops,
             'topologyPopChildren' => $topologyPops->groupBy(fn (Pop $pop): int => $visiblePopsById->has($pop->parent_id) ? $pop->parent_id : 0),
-            'slotsData' => $slotsData,
             'cabangs' => $cabangs,
-            'slotsByPop' => $slotsByPop,
             'selectedPopId' => $selectedPopId,
             'sort' => $sort,
             'summary' => [

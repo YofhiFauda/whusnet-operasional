@@ -5,9 +5,6 @@ namespace Tests\Feature;
 use App\Enums\InfrastructurePortKind;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
-use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\NetworkPortAssignment;
@@ -24,8 +21,9 @@ use Tests\TestCase;
 /**
  * Seeder topologi struktur baru (rancangan hierarki §16.2, §16.4 #5):
  * Server → POP → Mini POP → OLT → Slot 1 → PON 1 → ODP dan
- * Mini POP → Switch → Slot 1 (logis) → Port 1. Tidak lagi membuat
- * aggregation_switch, backbone, feeder, node kartu OLT, atau node PON, dan
+ * Mini POP → Switch → Slot 1 (logis) → Port 1, semuanya baris `network_nodes`
+ * (Slot/PON anak lewat parent_id). Tidak lagi membuat
+ * aggregation_switch, backbone, feeder, atau node kartu OLT, dan
  * tidak pernah memetakan pelanggan ke port ODP berdasarkan teks label
  * (§4.3 — referensi harus ID terverifikasi).
  */
@@ -87,7 +85,6 @@ class WhusnetTopologySeederTest extends TestCase
         $this->seed(WhusnetTopologySeeder::class);
 
         $this->assertSame($this->pusat->id, $this->jetis->fresh()->parent_id);
-        $this->assertSame($this->pusat->id, NetworkNode::where('code', 'CORE-WHUSNET-PUSAT')->firstOrFail()->anchor_pop_id);
 
         foreach (['JETIS' => $this->c1, 'SANDYA' => $this->d1] as $suffix => $mini) {
             $olt = NetworkNode::where('code', "OLT-{$suffix}-01")->firstOrFail();
@@ -97,18 +94,24 @@ class WhusnetTopologySeederTest extends TestCase
             $this->assertSame('switch_mini_pop', $switch->nodeType->code);
             $this->assertSame($mini->id, $switch->anchor_pop_id);
 
-            $switchSlot = InfrastructureSlot::where('network_node_id', $switch->id)->sole();
+            $switchSlot = $switch->slots()->sole();
             $this->assertSame(1, $switchSlot->number);
             $this->assertTrue($switchSlot->is_logical);
-            $this->assertSame(1, InfrastructurePort::where('infrastructure_slot_id', $switchSlot->id)->where('kind', InfrastructurePortKind::SWITCH->value)->count());
+            $this->assertSame('switch_slot', $switchSlot->nodeType->code);
+            $this->assertSame(1, $switchSlot->positionPorts()->count());
+            $this->assertSame(InfrastructurePortKind::SWITCH, $switchSlot->positionPorts()->sole()->portKind());
 
-            $oltSlot = InfrastructureSlot::where('network_node_id', $olt->id)->where('number', 1)->sole();
-            $pon = InfrastructurePort::where('infrastructure_slot_id', $oltSlot->id)->where('number', 1)->sole();
-            $this->assertSame(InfrastructurePortKind::PON, $pon->kind);
-            $connection = InfrastructureConnection::query()->active()->where('target_network_node_id', $odp->id)->sole();
-            $this->assertSame($pon->id, $connection->source_infrastructure_port_id);
-            $this->assertFalse($connection->isVerified(), 'Data contoh tidak boleh berstatus terverifikasi palsu.');
-            $this->assertSame($mini->id, $odp->anchor_pop_id);
+            // Idempoten: jalan dua kali tetap satu Slot, satu PON, satu ODP.
+            $oltSlot = $olt->slots()->sole();
+            $this->assertSame(1, $oltSlot->number);
+            $this->assertTrue($oltSlot->isSlot());
+            $pon = $oltSlot->positionPorts()->sole();
+            $this->assertTrue($pon->isPon());
+            $this->assertSame(1, $pon->number);
+            // ODP menggantung langsung ke PON lewat parent_id, bukan koneksi.
+            $this->assertSame($pon->id, $odp->parent_id);
+            $this->assertSame(1, $pon->children()->count());
+            $this->assertSame($mini->parent_id, $odp->resolvePop()?->id, 'POP ODP diwariskan dari rantai OLT → Mini POP (Cabang pemilik).');
         }
     }
 
@@ -160,7 +163,7 @@ class WhusnetTopologySeederTest extends TestCase
         $this->seed(WhusnetTopologySeeder::class);
 
         $this->assertSame($this->jetis->id, $odp->fresh()->anchor_pop_id);
-        $this->assertSame(0, InfrastructureConnection::where('target_network_node_id', $odp->id)->count(),
-            'ODP lama tidak disambung otomatis ke PON contoh.');
+        $this->assertNull($odp->fresh()->parent_id, 'ODP lama tidak dipindah ke PON contoh.');
+        $this->assertSame(1, NetworkNode::where('code', 'ODP-JETIS-01')->count());
     }
 }

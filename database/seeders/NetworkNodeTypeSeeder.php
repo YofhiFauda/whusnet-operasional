@@ -57,15 +57,9 @@ class NetworkNodeTypeSeeder extends Seeder
         // baris legacy yang memakainya. JANGAN ditambah balik ke sini —
         // reseed bakal menghidupkannya lagi padahal sudah dihapus permanen.
         //
-        // `pon_port` dicek literal di kode produksi
-        // (`InfrastructureLegacyDecisionService.php`:
-        // `$ancestor->nodeType?->code === 'pon_port'`) dan kelimanya dipakai
-        // sebagai fixture topologi lama di `InfrastructureLegacyDecisionTest`/
-        // `InfrastructureLegacyMappingTest`/`InfrastructureCutoverEvidenceTest`/
-        // `LegacyInfrastructureWriteCutoverTest`/`InfrastructureReconciliationTest`/
-        // `NetworkNodePlacementRuleTest` — tes itu TIDAK ikut dihapus, cuma
-        // diubah supaya provisioning tipe-nya sendiri (`firstOrCreate` lokal
-        // per tes), bukan gantung ke baris seeder permanen. Jangan hapus
+        // Tes legacy (InfrastructureLegacy*/Reconciliation/Cutover) yang dulu memakai
+        // tipe-tipe ini sebagai fixture sudah dihapus (Task 14); `NetworkNodePlacementRuleTest`
+        // tetap memprovisioning tipe-nya sendiri (`firstOrCreate` lokal). Jangan hapus
         // baris itu di test tanpa paham polanya — lihat komentar di tiap
         // helper `node()` masing-masing file.
         $types = [

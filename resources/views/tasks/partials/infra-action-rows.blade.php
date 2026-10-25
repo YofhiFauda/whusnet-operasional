@@ -79,16 +79,6 @@
                         <p class="sm:col-span-2 text-xs text-text-muted">Pilih tepat satu: SN, barang qty, atau roll.</p>
                     </div>
                 </template>
-                <template x-if="['install','replace'].includes(row.action_type) && @js($infraNodeOptions->filter(fn ($node) => $node->nodeType?->code === 'olt_card')->pluck('id')->values()->all()).map(String).includes(String(row.network_node_id))">
-                    <label class="mt-3 block text-xs font-medium text-text-secondary">Slot chassis OLT
-                        <select x-model="row.slot_id" :name="'infra_actions['+index+'][slot_id]'" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
-                            <option value="">Pilih slot</option>
-                            @foreach($infraSlotOptions as $slot)
-                                <option value="{{ $slot->id }}">Chassis #{{ $slot->chassis_node_id }} · slot {{ $slot->number }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-                </template>
                 <template x-if="['inspect','port_connect','port_release'].includes(row.action_type)">
                     <label class="mt-3 block text-xs font-medium text-text-secondary">Port asal (opsional untuk pemeriksaan)
                         <select x-model="row.port_id" :name="'infra_actions['+index+'][port_id]'" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">

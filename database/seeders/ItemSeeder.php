@@ -172,7 +172,7 @@ class ItemSeeder extends Seeder
         // OLT-MODULE-GPON-8P dulu nunjuk tipe node 'olt_card' — dihapus
         // 2026-10-23 (ADHOC-212, bukan bagian hierarki resmi lagi). Kartu
         // OLT sekarang aset yang di-deploy ke Slot
-        // (`infrastructure_slots` + kategori `olt_module`), tidak baca
+        // (node bertipe `olt_slot` + kategori `olt_module`), tidak baca
         // `infrastructure_node_type_id` sama sekali untuk jalur itu
         // (`InventoryService::deploySerial()` ~baris 711) — kolom ini
         // sengaja dibiarkan null untuk item itu, bukan lupa diisi.

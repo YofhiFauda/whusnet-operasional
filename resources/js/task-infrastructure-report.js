@@ -4,7 +4,7 @@ export const LOCATION_LEVELS = ['pop', 'mini_pop', 'device', 'slot', 'port', 'od
 
 const LEVEL_LABELS = { pop: 'POP', mini_pop: 'Mini POP', device: 'OLT/Switch', slot: 'Slot', port: 'PON/Port', odp: 'ODP' };
 const LEVEL_KIND = { pop: 'pop', mini_pop: 'mini_pop', device: 'node', slot: 'slot', port: 'port', odp: 'node' };
-const DEPENDENT_FIELDS = ['serial_id', 'old_serial_id', 'port_id', 'slot_id', 'target_node_id', 'target_port_id', 'end_from', 'end_to'];
+const DEPENDENT_FIELDS = ['serial_id', 'old_serial_id', 'port_id', 'target_node_id', 'target_port_id', 'end_from', 'end_to'];
 
 function levelState(overrides = {}) {
     return { options: [], allow_none: true, disabled: false, loading: false, ...overrides };
@@ -287,7 +287,6 @@ export function infrastructureReport(config) {
             row.old_serial_id = '';
             row.serial_id = '';
             row.port_id = '';
-            row.slot_id = '';
             row.target_node_id = '';
             row.target_port_id = '';
             if (this.isCard(row)) row.material_kind = 'serial';
@@ -333,12 +332,6 @@ export function infrastructureReport(config) {
 
         targetNodes(row) {
             return this.nodes.filter((node) => String(node.parent_id) === String(row.network_node_id));
-        },
-
-        slotsFor(row) {
-            const parentId = this.node(row)?.parent_id;
-            return this.slots.filter((slot) => String(slot.chassis_id) === String(parentId)
-                && (!slot.card_node_id || String(slot.card_node_id) === String(row.network_node_id)));
         },
 
         optionName(options, id) {
@@ -396,9 +389,6 @@ export function infrastructureReport(config) {
                 }
                 if (['retrieve', 'replace'].includes(row.action_type) && !row.old_serial_id) return `${label}: pilih SN lama pada lokasi ini.`;
                 if (row.action_type === 'replace' && !row.serial_id) return `${label}: pilih SN pengganti.`;
-                if (['install', 'replace'].includes(row.action_type) && this.isCard(row) && !row.slot_id) {
-                    return `${label}: pilih slot pada chassis OLT.`;
-                }
                 if (['port_connect', 'port_release'].includes(row.action_type) && !row.port_id) return `${label}: pilih port asal.`;
                 if (row.action_type === 'port_connect' && (!row.target_node_id || !row.target_port_id)) {
                     return `${label}: pilih node dan port tujuan.`;

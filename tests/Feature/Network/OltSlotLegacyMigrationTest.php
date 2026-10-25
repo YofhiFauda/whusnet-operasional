@@ -60,6 +60,18 @@ class OltSlotLegacyMigrationTest extends TestCase
         $firstChassis = $this->createChassis($pop);
         $secondChassis = $this->createChassis($pop);
 
+        // Sejak Task 14 `olt_slots` di-drop migration terbaru; tes ini menguji migration
+        // lama (2026_10_14) jadi tabel dalam bentuk SESUDAH migration itu dibuat sendiri.
+        Schema::dropIfExists('olt_slots');
+        Schema::create('olt_slots', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('chassis_node_id')->constrained('network_nodes')->restrictOnDelete();
+            $table->unsignedSmallInteger('number');
+            $table->foreignId('card_node_id')->nullable()->unique()->constrained('network_nodes')->restrictOnDelete();
+            $table->timestamps();
+            $table->unique(['chassis_node_id', 'number']);
+        });
+
         foreach ([$firstChassis, $secondChassis] as $chassis) {
             DB::table('olt_slots')->insert([
                 'chassis_node_id' => $chassis->id,

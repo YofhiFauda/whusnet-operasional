@@ -236,18 +236,7 @@ class NetworkNodeController extends Controller
             'children.nodeType',
             'deployedSerials.item',
             'infrastructureBalances.item',
-            'oltSlots.cardNode.deployedSerials',
-            'oltSlots.cardNode.ports',
         ]);
-
-        // Opsi kartu bebas: anak langsung chassis ini bertipe `olt_card` yang
-        // belum terpasang di slot manapun — kartu selalu anak chassis lewat
-        // `parent_id` (Task 2/3), bukan ditambatkan ke POP langsung.
-        $cardOptions = $node->nodeType?->code === 'olt_chassis'
-            ? NetworkNode::query()->where('parent_id', $node->id)
-                ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_card'))
-                ->whereDoesntHave('oltSlot')->orderBy('code')->get()
-            : collect();
 
         $user = auth()->user();
         $cabangPopId = Pop::resolveCabangId($node->resolvePop()?->id);
@@ -268,7 +257,6 @@ class NetworkNodeController extends Controller
             'hierarchy' => app(InfrastructureHierarchyService::class)->build($user),
             'nodeTypes' => NetworkNodeType::query()->where('is_active', true)->orWhere('id', $node->node_type_id)->orderBy('sort_order')->get(),
             'location' => $node->effectiveLocation(),
-            'cardOptions' => $cardOptions,
             'availableCustomers' => $availableCustomers,
             'infrastructureActions' => $node->deviceInfrastructureActions()->with(['task', 'technician'])->latest('performed_at')->limit(20)->get(),
             'canViewDeviceSerials' => $user->hasPermission('customers.detail.devices.view_sensitive'),

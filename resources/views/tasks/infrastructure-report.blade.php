@@ -46,10 +46,6 @@
             'id' => $port->id, 'node_id' => $port->network_node_id,
             'label' => (string) $port->number, 'used' => (bool) $port->is_used,
         ])->values()->all(),
-        'slots' => $infraSlotOptions->map(fn ($slot) => [
-            'id' => $slot->id, 'label' => 'Slot ' . $slot->number,
-            'chassis_id' => $slot->chassis_node_id, 'card_node_id' => $slot->card_node_id,
-        ])->values()->all(),
         'sources' => $infraMaterialSources->map(fn ($source) => [
             'id' => $source->id,
             'label' => $source->reference_number . ' · ' . $source->item?->name . ' · ' . $source->qty . ' ' . $source->item?->unit . ' · ' . $source->toNetworkNode?->breadcrumbLabel(),
@@ -156,7 +152,7 @@
                                                 <option value="quantity">Barang satuan (qty)</option>
                                                 <option value="roll">Kabel dari roll (meter)</option>
                                             </select>
-                                            <span x-show="isCard(row)" class="mt-1 block text-xs font-normal text-text-muted">Kartu OLT harus memakai SN dan slot chassis.</span>
+                                            <span x-show="isCard(row)" class="mt-1 block text-xs font-normal text-text-muted">Kartu OLT harus memakai SN.</span>
                                         </label>
                                     </template>
                                     <template x-if="(row.action_type === 'install' && row.material_kind === 'serial') || row.action_type === 'replace'">
@@ -230,15 +226,6 @@
                                                 <input type="number" step="0.0000001" min="-180" max="180" x-model="row.work_longitude" :name="'infra_actions['+index+'][work_longitude]'" class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
                                             </label>
                                         </div>
-                                    </template>
-                                    <template x-if="['install', 'replace'].includes(row.action_type) && isCard(row)">
-                                        <label class="block text-sm font-medium text-text-secondary">Slot pada chassis OLT <span class="text-error">*</span>
-                                            <select x-model="row.slot_id" :name="'infra_actions['+index+'][slot_id]'"
-                                                    class="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
-                                                <option value="">Pilih slot kartu ini</option>
-                                                <template x-for="slot in slotsFor(row)" :key="slot.id"><option :value="slot.id" x-text="slot.label"></option></template>
-                                            </select>
-                                        </label>
                                     </template>
                                     <template x-if="['inspect', 'port_connect', 'port_release'].includes(row.action_type)">
                                         <label class="block text-sm font-medium text-text-secondary">Port pada lokasi ini <span x-show="row.action_type !== 'inspect'" class="text-error">*</span>

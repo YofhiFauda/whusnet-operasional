@@ -2,15 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Enums\InfrastructurePortKind;
-use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Models\User;
-use App\Services\InfrastructureConnectionService;
 use App\Services\InfrastructurePositionService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -21,18 +16,25 @@ use RuntimeException;
  * §16.4 #5):
  *
  *   Server Utama (anchor Pusat) → Cabang → Mini POP
- *     ├── OLT-{CABANG}-01 → Slot 1 → PON 1 → ODP-{CABANG}-01 (koneksi BELUM terverifikasi)
+ *     ├── OLT-{CABANG}-01 → Slot 1 → PON 1 → ODP-{CABANG}-01 (anak langsung PON)
  *     └── SW-{CABANG}-01 (switch_mini_pop) → Slot 1 internal/logis → Port 1
  *
+ * Slot, PON, dan Port Switch adalah baris `network_nodes` biasa (anak lewat
+ * `parent_id`), dibuat lewat `InfrastructurePositionService` supaya kode
+ * turunan (`{OLT}-S1`, `{OLT}-S1-P1`) dan aturan penempatannya identik dengan
+ * jalur UI. ODP menggantung ke PON lewat `parent_id`, bukan lewat
+ * `infrastructure_connections` (sambungan hanya untuk Port Switch) — tabel
+ * `infrastructure_slots`/`infrastructure_ports` sudah dibuang (Task 14).
+ *
  * Aturan yang sengaja dipegang (dulu dilanggar seeder versi lama):
- * - TIDAK membuat backbone, aggregation_switch, feeder, node kartu OLT, atau
- *   node PON — representasi lama (§3, §16.2). Baris lama yang sudah ada TIDAK
- *   dipindah, diubah tipenya, atau dihapus (data nyata, audit Task 1).
+ * - TIDAK membuat backbone, aggregation_switch, feeder, atau node kartu OLT —
+ *   representasi lama (§3, §16.2). Baris lama yang sudah ada TIDAK dipindah,
+ *   diubah tipenya, atau dihapus (data nyata, audit Task 1).
  * - TIDAK memetakan pelanggan ke port ODP dari teks `odp_number` — §4.3
  *   mewajibkan referensi ID terverifikasi; pemetaan pelanggan = keputusan
  *   operator di Master Node.
- * - Koneksi contoh dibuat BELUM terverifikasi supaya tidak ada status
- *   verifikasi palsu.
+ * - ODP contoh dibuat `inactive` supaya tidak dianggap sudah terpasang di
+ *   lapangan (tidak ada status palsu).
  * - Idempoten: dijalankan ulang tidak menggandakan posisi.
  */
 class WhusnetTopologySeeder extends Seeder
@@ -60,35 +62,37 @@ class WhusnetTopologySeeder extends Seeder
             }
 
             $positions = app(InfrastructurePositionService::class);
-            $connections = app(InfrastructureConnectionService::class);
-            $actor = User::query()->orderBy('id')->first();
-            if ($actor === null) {
-                throw new RuntimeException('Seeder membutuhkan akun operator nyata untuk mencatat koneksi.');
+            // Operator nyata tetap disyaratkan: seeder tidak boleh jalan di DB
+            // tanpa akun (jejak audit pembuatan node butuh pelakunya).
+            if (User::query()->doesntExist()) {
+                throw new RuntimeException('Seeder membutuhkan akun operator nyata untuk mencatat pembuatan topologi.');
             }
 
-            $pusatSuffix = strtoupper($pusat->name);
             foreach ($branches as $branch) {
                 $suffix = strtoupper($branch->name);
                 $mini = $this->miniPop($branch);
 
                 $olt = $this->node("OLT-{$suffix}-01", "OLT {$branch->name} 01", (int) $types['olt_chassis'], $mini);
-                $slot = InfrastructureSlot::query()->where('network_node_id', $olt->id)->where('number', 1)->first()
-                    ?? $positions->createSlot($olt, 1);
-                $pon = InfrastructurePort::query()->where('infrastructure_slot_id', $slot->id)->where('number', 1)->first()
-                    ?? $positions->createPort($slot, 1, InfrastructurePortKind::PON);
+                $slot = $olt->slots()->where('number', 1)->first() ?? $positions->createSlot($olt, 1);
+                $pon = $slot->positionPorts()->where('number', 1)->first() ?? $positions->createPort($slot, 1);
 
                 $switch = $this->node("SW-{$suffix}-01", "Switch {$branch->name} 01", (int) $types['switch_mini_pop'], $mini);
                 $switchSlot = $positions->ensureLogicalSlot($switch);
-                InfrastructurePort::query()->where('infrastructure_slot_id', $switchSlot->id)->where('number', 1)->exists()
-                    || $positions->createPort($switchSlot, 1, InfrastructurePortKind::SWITCH);
+                $switchSlot->positionPorts()->where('number', 1)->exists() || $positions->createPort($switchSlot, 1);
 
-                $existingOdp = NetworkNode::query()->where('code', "ODP-{$suffix}-01")->first();
-                $odp = $existingOdp ?? $this->node("ODP-{$suffix}-01", "ODP contoh {$branch->name} 01", (int) $types['odp'], $mini);
-                // ODP lama (bukan hasil seeder ini) tidak disambung otomatis —
-                // uplink-nya ambigu dan menunggu keputusan operator.
-                if ($existingOdp === null
-                    && ! InfrastructureConnection::query()->active()->where('target_network_node_id', $odp->id)->exists()) {
-                    $connections->connect($pon, $actor, targetNode: $odp, notes: 'Koneksi contoh seeder — verifikasi di lapangan.');
+                // ODP lama (bukan hasil seeder ini) tidak dipindah ke PON contoh —
+                // uplink-nya ambigu dan menunggu keputusan operator. ODP baru
+                // menggantung ke PON lewat parent_id tanpa anchor_pop_id: POP-nya
+                // diwariskan dari rantai induk (OLT → Mini POP).
+                if (NetworkNode::query()->where('code', "ODP-{$suffix}-01")->doesntExist()) {
+                    NetworkNode::create([
+                        'code' => "ODP-{$suffix}-01",
+                        'name' => "ODP contoh {$branch->name} 01",
+                        'node_type_id' => (int) $types['odp'],
+                        'parent_id' => $pon->id,
+                        'status' => 'inactive',
+                        'notes' => 'Kerangka topologi contoh; perangkat dan jalur fisik perlu diverifikasi.',
+                    ]);
                 }
             }
         });

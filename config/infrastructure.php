@@ -11,9 +11,10 @@ return [
     | NYATA (audit Task 1: topologi memegang assignment pelanggan), jalur tulis
     | lama HANYA boleh ditutup setelah ketujuh bukti cutover tertulis —
     | termasuk selisih rekonsiliasi nol selama satu siklus tutup periode
-    | penuh (`php artisan infrastructure:reconcile`).
-    |
-    | Penutupan normal: infrastructure:close-legacy-writes dengan tujuh bukti.
+    | penuh. CATATAN Task 14: perintah `infrastructure:reconcile` dan
+    | `infrastructure:close-legacy-writes` beserta tabel posisi lama sudah
+    | dipensiunkan (Slot/PON kini node), jadi penutupan lewat perintah itu tak
+    | tersedia lagi; saklar di bawah tetap dibaca guard penulis lama.
     | false di env hanya fallback darurat; alasan dan status bukan-cutover
     | dicatat saat saklar dibaca. Baris & histori lama tetap terbaca.
     |

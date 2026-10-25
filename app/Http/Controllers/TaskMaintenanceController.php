@@ -26,7 +26,6 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
-use App\Models\OltSlot;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TaskCreqDetail;
@@ -441,10 +440,6 @@ class TaskMaintenanceController extends Controller
             ? NetworkNodePort::query()->whereIn('network_node_id', $infraNodeIds)
                 ->orderBy('network_node_id')->orderBy('number')->get()
             : collect();
-        $infraSlotOptions = $showsInfraSection
-            ? OltSlot::query()->whereIn('chassis_node_id', $infraNodeIds)
-                ->orderBy('chassis_node_id')->orderBy('number')->get()
-            : collect();
 
         $infraMaterialActionKey = (string) Str::uuid();
 
@@ -467,7 +462,7 @@ class TaskMaintenanceController extends Controller
         $cabangPops = Pop::query()->where('type', 'cabang')->where('status', 'active')
             ->orderBy('name')->get(['id', 'name']);
 
-        return view($showsInfraSection ? 'tasks.infrastructure-report' : 'tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions', 'infraPortOptions', 'infraSlotOptions', 'infraMaterialSources', 'infraMaterialActionKey', 'infraScope'));
+        return view($showsInfraSection ? 'tasks.infrastructure-report' : 'tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions', 'infraPortOptions', 'infraMaterialSources', 'infraMaterialActionKey', 'infraScope'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
@@ -665,7 +660,6 @@ class TaskMaintenanceController extends Controller
             $rules['infra_actions.*.qty'] = ['nullable', 'numeric', 'min:0.01'];
             $rules['infra_actions.*.roll_id'] = ['nullable', 'integer', 'exists:inventory_rolls,id'];
             $rules['infra_actions.*.meters'] = ['nullable', 'numeric', 'min:0.01'];
-            $rules['infra_actions.*.slot_id'] = ['nullable', 'integer', 'exists:olt_slots,id'];
             $rules['infra_actions.*.port_id'] = ['nullable', 'integer', 'exists:network_node_ports,id'];
             $rules['infra_actions.*.target_node_id'] = ['nullable', 'integer', 'exists:network_nodes,id'];
             $rules['infra_actions.*.target_port_id'] = ['nullable', 'integer', 'exists:network_node_ports,id'];

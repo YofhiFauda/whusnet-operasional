@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -159,34 +158,6 @@ class NetworkNode extends Model
     public function anchorPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'anchor_pop_id');
-    }
-
-    public function oltSlot(): HasOne
-    {
-        return $this->hasOne(OltSlot::class, 'card_node_id');
-    }
-
-    /**
-     * Slot milik chassis OLT ini (node bertipe `olt_chassis`) — satu Mini POP
-     * bisa punya beberapa chassis, jadi nomor slot discope per-chassis lewat
-     * relasi ini, bukan lagi per-POP (`Pop::oltSlots()` dihapus Task 2).
-     *
-     * @return HasMany<OltSlot, $this>
-     */
-    public function oltSlots(): HasMany
-    {
-        return $this->hasMany(OltSlot::class, 'chassis_node_id');
-    }
-
-    /**
-     * Slot kanonis (OLT/Switch) — pengganti `oltSlots()` untuk struktur baru.
-     * `oltSlots()` tetap dibaca untuk histori/migrasi.
-     *
-     * @return HasMany<InfrastructureSlot, $this>
-     */
-    public function infrastructureSlots(): HasMany
-    {
-        return $this->hasMany(InfrastructureSlot::class)->orderBy('number');
     }
 
     /**

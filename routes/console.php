@@ -1,6 +1,5 @@
 <?php
 
-use App\Services\InfrastructureReconciliationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -27,12 +26,6 @@ Schedule::command('billing:close-period')->monthlyOn(1, '00:10');
 // bulan lalu — tapi tetap dijadwalkan sesudahnya supaya snapshot bulan lalu
 // dipastikan sudah selesai dibuat sebelum data invoice berubah.
 Schedule::command('billing:write-off-terminated')->monthlyOn(1, '00:20');
-// Bukti cutover hierarki infrastruktur (§16.4 #6): rekonsiliasi data lama vs
-// proyeksi baru untuk periode yang baru ditutup. Hanya membaca & mencatat.
-Schedule::call(fn () => app(InfrastructureReconciliationService::class)->observe(trigger: 'schedule'))
-    ->name('infrastructure:observe')->dailyAt('00:35')->withoutOverlapping();
-Schedule::call(fn () => app(InfrastructureReconciliationService::class)->run(now()->subMonthNoOverflow()->format('Y-m'), trigger: 'schedule'))
-    ->name('infrastructure:reconcile-closed-period')->monthlyOn(1, '00:40')->withoutOverlapping();
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
 Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();
 // '01:15' — hindari bentrok dgn billing:generate-monthly-invoices (01:00,
