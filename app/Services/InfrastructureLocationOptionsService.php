@@ -2,13 +2,9 @@
 
 namespace App\Services;
 
-use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureSlotKind;
 use App\Enums\SerialStatus;
 use App\Models\FopTask;
-use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\NetworkNode;
 use App\Models\Pop;
@@ -162,38 +158,35 @@ class InfrastructureLocationOptionsService
 
     /**
      * Resolve the canonical subtree once, then count deployed assets in SQL.
-     * Active PON uplinks replace legacy node placement; Switch links are not
-     * hierarchy edges. UNION deduplicates paths and terminates corrupt cycles.
+     * Hierarki murni dari `parent_id` (Slot, PON, dan Port Switch adalah node;
+     * ODP anak PON), jadi `anchor_pop_id` basi pada node berinduk tidak dipakai.
+     * Sambungan Switch bukan sisi hierarki. UNION menghapus duplikat dan
+     * menghentikan siklus korup.
      *
      * @return array<string, list<int>>
      */
     private function subtreeIds(InfrastructureLocation $location): array
     {
         $rows = DB::select(<<<'SQL'
-            WITH RECURSIVE pon_links AS (
-                SELECT connection.target_network_node_id AS node_id,
-                    connection.source_infrastructure_port_id AS port_id
-                FROM infrastructure_connections connection
-                JOIN infrastructure_ports port ON port.id = connection.source_infrastructure_port_id
-                WHERE connection.active_key = 1 AND port.kind = 'pon'
-                    AND connection.target_network_node_id IS NOT NULL
+            WITH RECURSIVE node_kinds AS (
+                SELECT node.id, node.parent_id, node.anchor_pop_id,
+                    CASE WHEN ntype.code IN ('olt_slot', 'switch_slot') THEN 'slot'
+                        WHEN ntype.code IN ('olt_pon', 'switch_port') THEN 'port'
+                        ELSE 'node' END AS kind
+                FROM network_nodes node LEFT JOIN network_node_types ntype ON ntype.id = node.node_type_id
             ), edges AS (
                 SELECT CASE WHEN parent.type = 'mini_pop' THEN 'mini_pop' ELSE 'pop' END AS parent_kind,
                     parent.id AS parent_id,
                     CASE WHEN child.type = 'mini_pop' THEN 'mini_pop' ELSE 'pop' END AS kind, child.id AS id
                 FROM pops child JOIN pops parent ON parent.id = child.parent_id
                 UNION ALL
-                SELECT CASE WHEN node.parent_id IS NOT NULL THEN 'node'
-                        WHEN pop.type = 'mini_pop' THEN 'mini_pop' ELSE 'pop' END,
-                    COALESCE(node.parent_id, node.anchor_pop_id), 'node', node.id
-                FROM network_nodes node LEFT JOIN pops pop ON pop.id = node.anchor_pop_id
-                WHERE NOT EXISTS (SELECT 1 FROM pon_links WHERE pon_links.node_id = node.id)
+                SELECT CASE WHEN pop.type = 'mini_pop' THEN 'mini_pop' ELSE 'pop' END,
+                    node.anchor_pop_id, node.kind, node.id
+                FROM node_kinds node JOIN pops pop ON pop.id = node.anchor_pop_id
+                WHERE node.parent_id IS NULL
                 UNION ALL
-                SELECT 'node', network_node_id, 'slot', id FROM infrastructure_slots
-                UNION ALL
-                SELECT 'slot', infrastructure_slot_id, 'port', id FROM infrastructure_ports
-                UNION ALL
-                SELECT 'port', port_id, 'node', node_id FROM pon_links
+                SELECT parent.kind, parent.id, node.kind, node.id
+                FROM node_kinds node JOIN node_kinds parent ON parent.id = node.parent_id
             ), subtree (kind, id) AS (
                 SELECT CAST(? AS CHAR(16)), ?
                 UNION
@@ -270,10 +263,10 @@ class InfrastructureLocationOptionsService
             'device' => [NetworkNode::query()->with('nodeType')->where('anchor_pop_id', $parent->id)
                 ->whereHas('nodeType', fn ($query) => $query->whereIn('code', ['olt_chassis', 'switch_mini_pop']))
                 ->orderBy('code')->get()->map(fn (NetworkNode $node) => $this->resolver->forNode($node)), false],
-            'slot' => [InfrastructureSlot::query()->with('device')->where('network_node_id', $parent->id)->orderBy('number')->get()
-                ->map(fn (InfrastructureSlot $slot) => $this->resolver->forSlot($slot)), false],
-            'port' => [InfrastructurePort::query()->with('slot.device')->where('infrastructure_slot_id', $parent->id)->orderBy('number')->get()
-                ->map(fn (InfrastructurePort $port) => $this->resolver->forPort($port)), false],
+            'slot' => [NetworkNode::query()->with('nodeType')->whereKey($parent->id)->firstOrFail()->slots()->with('nodeType')->get()
+                ->map(fn (NetworkNode $slot) => $this->resolver->forSlot($slot)), false],
+            'port' => [NetworkNode::query()->whereKey($parent->id)->firstOrFail()->positionPorts()->with('nodeType')->get()
+                ->map(fn (NetworkNode $port) => $this->resolver->forPort($port)), false],
             'odp' => $this->odpChildren($parent),
             default => throw ValidationException::withMessages(['level' => 'Tingkat lokasi tidak dikenal.']),
         };
@@ -284,14 +277,14 @@ class InfrastructureLocationOptionsService
      */
     private function odpChildren(InfrastructureLocation $port): array
     {
-        $model = InfrastructurePort::findOrFail($port->id);
-        if ($model->kind !== InfrastructurePortKind::PON) {
+        $model = NetworkNode::query()->with('nodeType')->findOrFail($port->id);
+        if (! $model->isPon()) {
             // Jalur Switch berhenti di Port (§10.2) — dropdown ODP disabled.
             return [collect(), true];
         }
 
-        $odps = NetworkNode::query()->with('nodeType')
-            ->whereIn('id', InfrastructureConnection::query()->active()->where('source_infrastructure_port_id', $model->id)->select('target_network_node_id'))
+        // ODP anak langsung PON (parent_id); InfrastructureConnection kini khusus Port Switch.
+        $odps = NetworkNode::query()->with('nodeType')->where('parent_id', $model->id)
             ->whereHas('nodeType', fn ($query) => $query->where('code', 'odp'))
             ->orderBy('code')->get();
 

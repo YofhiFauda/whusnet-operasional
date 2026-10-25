@@ -2,14 +2,10 @@
 
 namespace App\Services;
 
-use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureSlotKind;
 use App\Enums\TaskType;
 use App\Models\AuditLog;
 use App\Models\FopTask;
-use App\Models\InfrastructureConnection;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Models\User;
@@ -101,30 +97,29 @@ class FopTaskInfrastructureScopeService
             return $this->resolver->forNode($device);
         }
 
-        $slot = InfrastructureSlot::find($values['scope_slot_id']);
-        if ($slot === null || $slot->network_node_id !== $device->id) {
+        $slot = NetworkNode::query()->with('nodeType')->find($values['scope_slot_id']);
+        // Slot kini node anak langsung perangkat; "milik perangkat lain/cabang lain" cukup dicek lewat parent_id.
+        if ($slot === null || ! $slot->isSlot() || $slot->parent_id !== $device->id) {
             $this->fail('scope_slot_id', 'Slot harus milik perangkat terpilih.');
         }
         if ($values['scope_port_id'] === null) {
             return $this->resolver->forSlot($slot);
         }
 
-        $port = InfrastructurePort::find($values['scope_port_id']);
-        if ($port === null || $port->infrastructure_slot_id !== $slot->id) {
+        $port = NetworkNode::query()->with('nodeType')->find($values['scope_port_id']);
+        if ($port === null || ! $port->isPort() || $port->parent_id !== $slot->id) {
             $this->fail('scope_port_id', 'PON/Port harus milik slot terpilih.');
         }
         if ($values['scope_odp_id'] === null) {
             return $this->resolver->forPort($port);
         }
 
-        if ($port->kind !== InfrastructurePortKind::PON) {
+        if (! $port->isPon()) {
             $this->fail('scope_odp_id', 'Jalur Switch berhenti di Port — ODP tidak tersedia.');
         }
         $odp = NetworkNode::query()->with('nodeType')->find($values['scope_odp_id']);
-        $isChild = $odp !== null && $odp->nodeType?->code === 'odp'
-            && InfrastructureConnection::query()->active()
-                ->where('source_infrastructure_port_id', $port->id)
-                ->where('target_network_node_id', $odp->id)->exists();
+        // ODP anak langsung PON (parent_id), bukan lagi lewat InfrastructureConnection.
+        $isChild = $odp !== null && $odp->nodeType?->code === 'odp' && $odp->parent_id === $port->id;
         if (! $isChild) {
             $this->fail('scope_odp_id', 'ODP harus tersambung ke PON terpilih.');
         }

@@ -347,7 +347,8 @@ class TaskInfrastructureActionService
         if (OltSlot::query()->where('card_node_id', $card->id)->whereKeyNot($slot->id)->exists()) {
             throw new InvalidArgumentException('Kartu sudah terpasang di slot lain.');
         }
+        // Cermin ke Slot kanonis (syncOltSlot) sengaja dibuang: Slot kini node di network_nodes
+        // dan tabel pemetaan legacy sudah di-drop, jadi memanggilnya hanya melempar QueryException.
         $slot->update(['card_node_id' => $card->id]);
-        app(InfrastructureLegacyBackfillService::class)->syncOltSlot($slot);
     }
 }

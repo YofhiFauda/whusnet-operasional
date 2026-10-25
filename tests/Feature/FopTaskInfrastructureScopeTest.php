@@ -2,12 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Enums\InfrastructurePortKind;
 use App\Models\City;
 use App\Models\District;
 use App\Models\FopTask;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
@@ -20,7 +17,6 @@ use App\Models\UserRoleScopeTarget;
 use App\Models\Village;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskInfrastructureScopeService;
-use App\Services\InfrastructureConnectionService;
 use App\Services\InfrastructureLocationResolver;
 use App\Services\InfrastructurePositionService;
 use App\Support\InfrastructureLocation;
@@ -59,15 +55,15 @@ class FopTaskInfrastructureScopeTest extends TestCase
 
     private NetworkNode $switchA;
 
-    private InfrastructureSlot $slotA1;
+    private NetworkNode $slotA1;
 
-    private InfrastructureSlot $slotA2;
+    private NetworkNode $slotA2;
 
-    private InfrastructurePort $ponA11;
+    private NetworkNode $ponA11;
 
-    private InfrastructurePort $ponB11;
+    private NetworkNode $ponB11;
 
-    private InfrastructurePort $switchPort;
+    private NetworkNode $switchPort;
 
     private NetworkNode $odpA;
 
@@ -97,14 +93,14 @@ class FopTaskInfrastructureScopeTest extends TestCase
         $this->switchA = $this->node('switch_mini_pop', $this->miniA1, 'SW-A');
         $this->slotA1 = $positions->createSlot($this->oltA, 1);
         $this->slotA2 = $positions->createSlot($this->oltA, 2);
-        $this->ponA11 = $positions->createPort($this->slotA1, 1, InfrastructurePortKind::PON);
-        $this->ponB11 = $positions->createPort($positions->createSlot($this->oltB, 1), 1, InfrastructurePortKind::PON);
-        $this->switchPort = $positions->createPort($positions->ensureLogicalSlot($this->switchA), 1, InfrastructurePortKind::SWITCH);
+        $this->ponA11 = $positions->createPort($this->slotA1, 1);
+        $this->ponB11 = $positions->createPort($positions->createSlot($this->oltB, 1), 1);
+        $this->switchPort = $positions->createPort($positions->ensureLogicalSlot($this->switchA), 1);
         $this->odpA = $this->node('odp', $this->miniA1, 'ODP-A');
         $this->odpB = $this->node('odp', $this->miniA1, 'ODP-B');
-        $connections = app(InfrastructureConnectionService::class);
-        $connections->connect($this->ponA11, $this->owner, targetNode: $this->odpA, verified: true);
-        $connections->connect($this->ponB11, $this->owner, targetNode: $this->odpB, verified: true);
+        // ODP kini anak langsung PON (parent_id), bukan sambungan.
+        $this->odpA->update(['parent_id' => $this->ponA11->id]);
+        $this->odpB->update(['parent_id' => $this->ponB11->id]);
     }
 
     private function node(string $typeCode, Pop $anchor, string $code): NetworkNode
@@ -269,7 +265,7 @@ class FopTaskInfrastructureScopeTest extends TestCase
             'mini pop cabang lain' => ['scope_mini_pop_id' => $this->miniB1->id],
             'perangkat bukan anak mini pop' => ['scope_mini_pop_id' => $this->miniA2->id, 'scope_device_id' => $this->oltA->id],
             'slot milik perangkat lain' => ['scope_mini_pop_id' => $this->miniA1->id, 'scope_device_id' => $this->oltB->id, 'scope_slot_id' => $this->slotA1->id],
-            'odp di bawah switch' => ['scope_mini_pop_id' => $this->miniA1->id, 'scope_device_id' => $this->switchA->id, 'scope_slot_id' => $this->switchPort->infrastructure_slot_id, 'scope_port_id' => $this->switchPort->id, 'scope_odp_id' => $this->odpA->id],
+            'odp di bawah switch' => ['scope_mini_pop_id' => $this->miniA1->id, 'scope_device_id' => $this->switchA->id, 'scope_slot_id' => $this->switchPort->parent_id, 'scope_port_id' => $this->switchPort->id, 'scope_odp_id' => $this->odpA->id],
             'odp bukan turunan pon' => ['scope_mini_pop_id' => $this->miniA1->id, 'scope_device_id' => $this->oltA->id, 'scope_slot_id' => $this->slotA1->id, 'scope_port_id' => $this->ponA11->id, 'scope_odp_id' => $this->odpB->id],
             'odp bukan perangkat' => ['scope_mini_pop_id' => $this->miniA1->id, 'scope_device_id' => $this->odpA->id],
         ];

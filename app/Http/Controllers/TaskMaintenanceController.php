@@ -7,6 +7,8 @@ use App\Enums\CReqVerificationStatus;
 use App\Enums\DeviceOwnership;
 use App\Enums\EquipmentClass;
 use App\Enums\FopTaskPriority;
+use App\Enums\InfrastructurePortKind;
+use App\Enums\InfrastructureSlotKind;
 use App\Enums\InventoryTransactionType;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
@@ -17,8 +19,6 @@ use App\Enums\TaskType;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\FopTask;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
@@ -342,8 +342,12 @@ class TaskMaintenanceController extends Controller
         $nodeIds = $nodeQuery->pluck('id');
         $cabangId = Pop::resolveCabangId($task->pop_id);
         $popIds = Pop::query()->where('parent_id', $cabangId)->pluck('id');
-        $slotIds = InfrastructureSlot::query()->whereIn('network_node_id', $nodeIds)->pluck('id');
-        $portIds = InfrastructurePort::query()->whereIn('infrastructure_slot_id', $slotIds)->pluck('id');
+        // Slot = anak langsung perangkat, PON/Port = anak langsung Slot (semuanya node bertipe).
+        $slotTypes = array_map(fn (InfrastructureSlotKind $kind) => $kind->typeCode(), InfrastructureSlotKind::cases());
+        $slotIds = NetworkNode::query()->whereIn('parent_id', $nodeIds)
+            ->whereHas('nodeType', fn ($query) => $query->whereIn('code', $slotTypes))->pluck('id');
+        $portIds = NetworkNode::query()->whereIn('parent_id', $slotIds)
+            ->whereHas('nodeType', fn ($query) => $query->whereIn('code', array_map(fn (InfrastructurePortKind $kind) => $kind->typeCode(), InfrastructurePortKind::cases())))->pluck('id');
 
         return InventorySerial::query()
             ->where('status', SerialStatus::DEPLOYED->value)
@@ -352,7 +356,7 @@ class TaskMaintenanceController extends Controller
                 ->orWhereIn('current_mini_pop_id', $popIds)
                 ->orWhereIn('current_infrastructure_slot_id', $slotIds)
                 ->orWhereIn('current_infrastructure_port_id', $portIds))
-            ->with('item', 'currentNetworkNode', 'currentMiniPop', 'currentInfrastructureSlot.device', 'currentInfrastructurePort.slot.device')
+            ->with('item', 'currentNetworkNode', 'currentMiniPop', 'currentInfrastructureSlot', 'currentInfrastructurePort')
             ->get();
     }
 

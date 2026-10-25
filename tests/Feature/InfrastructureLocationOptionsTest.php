@@ -3,13 +3,10 @@
 namespace Tests\Feature;
 
 use App\Enums\FopTaskPriority;
-use App\Enums\InfrastructurePortKind;
 use App\Enums\ScopeType;
 use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Models\FopTask;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -23,7 +20,6 @@ use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskInfrastructureScopeService;
-use App\Services\InfrastructureConnectionService;
 use App\Services\InfrastructureLocationOptionsService;
 use App\Services\InfrastructurePositionService;
 use Database\Seeders\ActionSeeder;
@@ -63,11 +59,11 @@ class InfrastructureLocationOptionsTest extends TestCase
 
     private NetworkNode $switchB;
 
-    private InfrastructureSlot $slotA1;
+    private NetworkNode $slotA1;
 
-    private InfrastructurePort $ponA11;
+    private NetworkNode $ponA11;
 
-    private InfrastructurePort $switchPort;
+    private NetworkNode $switchPort;
 
     private NetworkNode $odpA;
 
@@ -101,11 +97,12 @@ class InfrastructureLocationOptionsTest extends TestCase
         $this->node('olt_chassis', $this->miniLain, 'OLT-LAIN');
         $this->slotA1 = $positions->createSlot($this->oltA, 1);
         $positions->createSlot($this->oltB, 1);
-        $this->ponA11 = $positions->createPort($this->slotA1, 1, InfrastructurePortKind::PON);
-        $this->switchPort = $positions->createPort($positions->ensureLogicalSlot($this->switchB), 4, InfrastructurePortKind::SWITCH);
+        $this->ponA11 = $positions->createPort($this->slotA1, 1);
+        $this->switchPort = $positions->createPort($positions->ensureLogicalSlot($this->switchB), 4);
         $this->odpA = $this->node('odp', $this->miniA1, 'ODP-A');
         $this->node('odp', $this->miniA1, 'ODP-LEPAS');
-        app(InfrastructureConnectionService::class)->connect($this->ponA11, $this->technician, targetNode: $this->odpA, verified: true);
+        // ODP anak langsung PON (parent_id), bukan sambungan.
+        $this->odpA->update(['parent_id' => $this->ponA11->id]);
     }
 
     private function node(string $typeCode, Pop $anchor, string $code): NetworkNode
@@ -307,9 +304,9 @@ class InfrastructureLocationOptionsTest extends TestCase
     {
         $fop = User::factory()->create(['role_id' => Role::where('code', 'fop')->firstOrFail()->id]);
         $this->giveAllPopScope($fop);
-        $ponKedua = app(InfrastructurePositionService::class)->createPort($this->slotA1, 2, InfrastructurePortKind::PON);
+        $ponKedua = app(InfrastructurePositionService::class)->createPort($this->slotA1, 2);
         $odpKedua = $this->node('odp', $this->miniA1, 'ODP-B');
-        app(InfrastructureConnectionService::class)->connect($this->ponA11, $fop, targetNode: $odpKedua, verified: true);
+        $odpKedua->update(['parent_id' => $this->ponA11->id]);
 
         $pons = $this->actingAs($fop)->getJson(route('fop-tasks.infrastructure-scope-options', [
             'pop_id' => $this->cabang->id,
@@ -388,7 +385,7 @@ class InfrastructureLocationOptionsTest extends TestCase
     }
 
     #[Test]
-    public function assets_at_follows_active_pon_uplink_and_ignores_released_connections(): void
+    public function assets_at_mengikuti_induk_pon_dan_kembali_ke_anchor_setelah_dilepas(): void
     {
         $category = ItemCategory::firstOrCreate(['code' => 'olt_module'], ['name' => 'OLT', 'default_unit' => 'pcs']);
         $item = Item::create(['code' => 'PON-ASSET', 'name' => 'Aset', 'unit' => 'pcs', 'item_category_id' => $category->id,
@@ -399,8 +396,8 @@ class InfrastructureLocationOptionsTest extends TestCase
         $this->assertSame(1, $service->assetsAt($fopTask, $this->technician, 'port', $this->ponA11->id)['descendant_count']);
         $this->assertSame(0, $service->assetsAt($fopTask, $this->technician, 'port', $this->switchPort->id)['descendant_count']);
 
-        $connections = app(InfrastructureConnectionService::class);
-        $connections->release($connections->activeUplinkFor($this->odpA), $this->technician, 'Uji pelepasan');
+        // Melepas ODP dari PON = induknya dikosongkan (anchor POP-nya yang berlaku lagi).
+        $this->odpA->update(['parent_id' => null]);
 
         $this->assertSame(0, $service->assetsAt($fopTask, $this->technician, 'port', $this->ponA11->id)['descendant_count']);
         $this->assertSame(['ON-ODP'], array_column($service->assetsAt($fopTask, $this->technician, 'node', $this->odpA->id)['direct'], 'serial_number'));
@@ -430,8 +427,8 @@ class InfrastructureLocationOptionsTest extends TestCase
         $this->assertSame(3, $service->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA1->id)['descendant_count']);
         $this->assertSame(0, $service->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA2->id)['descendant_count']);
 
-        $connections = app(InfrastructureConnectionService::class);
-        $connections->release($connections->activeUplinkFor($this->odpA), $this->technician, 'Uji anchor lama');
+        // Melepas ODP dari PON = induknya dikosongkan (anchor POP-nya yang berlaku lagi).
+        $this->odpA->update(['parent_id' => null]);
 
         $this->assertSame(2, $service->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA1->id)['descendant_count']);
         $this->assertSame(1, $service->assetsAt($fopTask, $this->technician, 'mini_pop', $this->miniA2->id)['descendant_count']);

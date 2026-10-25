@@ -320,6 +320,46 @@ class ExactInfrastructureAssetLocationTest extends TestCase
     }
 
     #[Test]
+    public function deploy_ke_pon_node_menyimpan_id_node_di_kolom_port_dan_menjaga_satu_aset_per_pon(): void
+    {
+        $pon = NetworkNode::factory()->pon($this->slot1, 1)->create();
+        $sfp = $this->item('SFP-PON', 'sfp_transceiver', 'company_asset', InfrastructureLocationKind::PORT);
+
+        $serial = $this->issued($sfp, 'SN-PON-1');
+        $tx = $this->deploy($serial, $this->loc(InfrastructureLocation::PORT, $pon->id));
+
+        $this->assertSame($pon->id, $serial->fresh()->current_infrastructure_port_id);
+        $this->assertNull($serial->fresh()->current_infrastructure_slot_id);
+        $this->assertSame($pon->id, $tx->to_infrastructure_port_id);
+
+        // Kolom current_network_node_id bukan penanda hunian PON; yang dihitung kolom port.
+        $this->expectException(InvalidArgumentException::class);
+        $this->deploy($this->issued($sfp, 'SN-PON-2'), $this->loc(InfrastructureLocation::PORT, $pon->id));
+    }
+
+    #[Test]
+    public function posisi_slot_atau_port_dengan_tipe_node_yang_salah_ditolak(): void
+    {
+        $pon = NetworkNode::factory()->pon($this->slot1, 2)->create();
+        $card = $this->item('CARD-SALAH', 'olt_module', 'infrastructure_asset', InfrastructureLocationKind::SLOT);
+        $sfp = $this->item('SFP-SALAH', 'sfp_transceiver', 'company_asset', InfrastructureLocationKind::PORT);
+
+        // Lokasi dirakit tangan dengan jenis yang tidak sesuai tipe node aslinya: guard Gudang
+        // tidak boleh percaya jenis lokasi dari pemanggil saja.
+        $ponAsSlot = new InfrastructureLocation(InfrastructureLocation::SLOT, $pon->id, $this->cabang->id, []);
+        $slotAsPort = new InfrastructureLocation(InfrastructureLocation::PORT, $this->slot1->id, $this->cabang->id, []);
+
+        foreach ([[$card, $ponAsSlot], [$sfp, $slotAsPort]] as [$item, $location]) {
+            try {
+                $this->inventory()->assertSerialItemFitsLocation($item, $location);
+                $this->fail('Tipe node yang salah seharusnya ditolak.');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('bukan', $e->getMessage());
+            }
+        }
+    }
+
+    #[Test]
     public function fk_menolak_slot_yang_bukan_node(): void
     {
         $card = $this->item('CARD-FK', 'olt_module', 'infrastructure_asset', InfrastructureLocationKind::SLOT);

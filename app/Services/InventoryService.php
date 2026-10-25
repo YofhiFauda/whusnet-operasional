@@ -21,8 +21,6 @@ use App\Models\CustomerDevice;
 use App\Models\DeviceRetrievalLog;
 use App\Models\FopTask;
 use App\Models\InfrastructureBalance;
-use App\Models\InfrastructurePort;
-use App\Models\InfrastructureSlot;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventorySerialSale;
@@ -707,21 +705,39 @@ class InventoryService
                 $this->assertNodeAcceptsSerialItem($item, NetworkNode::query()->with('nodeType')->findOrFail($location->id));
                 break;
             case InfrastructureLocation::SLOT:
-                $slot = InfrastructureSlot::query()->findOrFail($location->id);
-                if ($slot->kind === InfrastructureSlotKind::OLT && $item->category?->code !== 'olt_module') {
+                // Slot kini node bertipe olt_slot/switch_slot. Tipe dicek ulang walau resolver sudah
+                // menolak node non-Slot: guard ini berdiri sendiri dan dipanggil dari banyak jalur.
+                $slot = NetworkNode::query()->with('nodeType')->findOrFail($location->id);
+                if (! $slot->isSlot()) {
+                    throw new InvalidArgumentException("Node {$slot->code} bukan Slot — gak bisa dipasangi aset di posisi Slot.");
+                }
+                if ($slot->slotKind() === InfrastructureSlotKind::OLT && $item->category?->code !== 'olt_module') {
                     throw new InvalidArgumentException('Slot OLT hanya menerima modul/kartu OLT.');
                 }
-                if ($slot->deployedSerials()->where('status', SerialStatus::DEPLOYED->value)->exists()) {
+                if ($this->positionOccupied('current_infrastructure_slot_id', $slot->id)) {
                     throw new InvalidArgumentException("{$slot->displayName()} sudah memiliki satu aset terpasang.");
                 }
                 break;
             case InfrastructureLocation::PORT:
-                $port = InfrastructurePort::query()->findOrFail($location->id);
-                if ($port->deployedSerials()->where('status', SerialStatus::DEPLOYED->value)->exists()) {
+                $port = NetworkNode::query()->with('nodeType')->findOrFail($location->id);
+                if (! $port->isPort()) {
+                    throw new InvalidArgumentException("Node {$port->code} bukan PON/Port — gak bisa dipasangi aset di posisi Port.");
+                }
+                if ($this->positionOccupied('current_infrastructure_port_id', $port->id)) {
                     throw new InvalidArgumentException("{$port->displayName()} sudah memiliki satu aset terpasang.");
                 }
                 break;
         }
+    }
+
+    /**
+     * Posisi Slot/PON dipakai lewat kolom current_infrastructure_*_id, BUKAN
+     * current_network_node_id (itu milik relasi `NetworkNode::deployedSerials()`),
+     * jadi hitungnya terpisah supaya guard "satu aset per posisi" tidak selalu lolos.
+     */
+    private function positionOccupied(string $column, int $nodeId): bool
+    {
+        return InventorySerial::query()->where($column, $nodeId)->where('status', SerialStatus::DEPLOYED->value)->exists();
     }
 
     private function locations(): InfrastructureLocationResolver
@@ -736,9 +752,8 @@ class InventoryService
     private function lockLocation(InfrastructureLocation $location): void
     {
         match ($location->kind) {
-            InfrastructureLocation::NODE => NetworkNode::query()->whereKey($location->id)->lockForUpdate()->first(),
-            InfrastructureLocation::SLOT => InfrastructureSlot::query()->whereKey($location->id)->lockForUpdate()->first(),
-            InfrastructureLocation::PORT => InfrastructurePort::query()->whereKey($location->id)->lockForUpdate()->first(),
+            // Node, Slot, dan PON/Port semuanya baris network_nodes.
+            InfrastructureLocation::NODE, InfrastructureLocation::SLOT, InfrastructureLocation::PORT => NetworkNode::query()->whereKey($location->id)->lockForUpdate()->first(),
             default => Pop::query()->whereKey($location->id)->lockForUpdate()->first(),
         };
     }

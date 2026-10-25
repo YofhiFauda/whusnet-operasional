@@ -3,12 +3,10 @@
 namespace Tests\Feature\Warehouse;
 
 use App\Enums\CustodyStatus;
-use App\Enums\InfrastructurePortKind;
 use App\Enums\InventoryTransactionType;
 use App\Enums\RollStatus;
 use App\Models\FopTask;
 use App\Models\InfrastructureBalance;
-use App\Models\InfrastructureSlot;
 use App\Models\InventoryRoll;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -52,7 +50,7 @@ class InfrastructureCableConsumptionTest extends TestCase
 
     private InventoryRoll $roll;
 
-    private InfrastructureSlot $slot;
+    private NetworkNode $slot;
 
     protected function setUp(): void
     {
@@ -254,7 +252,7 @@ class InfrastructureCableConsumptionTest extends TestCase
             'anchor_pop_id' => $this->miniPop->id,
         ]);
         $positions = app(InfrastructurePositionService::class);
-        $port = $positions->createPort($positions->ensureLogicalSlot($switch), 1, InfrastructurePortKind::SWITCH);
+        $port = $positions->createPort($positions->ensureLogicalSlot($switch), 1);
 
         $tx = $this->consume(2, $this->loc(InfrastructureLocation::PORT, $port->id));
 
