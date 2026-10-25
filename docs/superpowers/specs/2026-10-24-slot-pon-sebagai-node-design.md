@@ -1,6 +1,6 @@
 # Slot, PON, dan Port Switch Menjadi Node Jaringan
 
-Tanggal: 2026-10-24. Status: menunggu review. Jalur: arsitektural.
+Tanggal: 2026-10-24. Status: diimplementasikan (ADHOC-213); lihat "Koreksi D1-D5" di akhir dokumen untuk penyimpangan dari teks di atas. Jalur: arsitektural.
 
 ## 1. Tujuan dan keputusan
 
@@ -151,3 +151,30 @@ PHPUnit, hanya file terdampak:
 
 Peta (selain penyesuaian sumber data), pelaporan INFR-REQ/O-REQ selain FK baru,
 penyederhanaan pasangan kolom slot/port, dan perubahan alur Gudang.
+
+## 12. Koreksi D1-D5 (ditemukan saat implementasi, disetujui user)
+
+Lima penyimpangan dari teks di atas. Bagian lain spec tetap berlaku. Jika ada
+pertentangan, bagian ini yang menang.
+
+| # | Temuan | Keputusan yang berlaku | Mengoreksi |
+|---|---|---|---|
+| D1 | `network_nodes.status` sudah berarti `active`/`inactive` (siklus hidup node). Spec §2.2 menyuruh memakai nilai `InfrastructureRecordStatus` (`belum_didata`/`terverifikasi`/`rusak_nonaktif`) di kolom yang sama: dua makna dalam satu kolom. | Kolom baru `record_status` (nullable string 30). `status` tetap `active`/`inactive`. `NULL` pada `record_status` dibaca sebagai `belum_didata`. | §2.2 |
+| D2 | `InfrastructureDummyResetService` mencatat database saat ini **bukan dummy murni** (ODP-JETIS-01 memegang pelanggan). Spec §2.4 menyuruh membuang ODP lama. Menghapus ODP berpelanggan melanggar aturan `restrictOnDelete`. | Migrasi **tidak pernah menghapus** `network_nodes`/ODP. Yang dibersihkan hanya baris slot/port/koneksi/mapping. ODP lama (anchor POP) dibiarkan; aturan anchor ODP ke Cabang/Mini POP dicabut hanya untuk penempatan baru. ODP lama masih boleh dipindah ke PON lewat `move()`, dan baru wajib berinduk PON saat dibuat atau dipindah. | §2.4, §3, §10 |
+| D3 | `code` `string(50)` tidak muat kode turunan (`{kode OLT}-S3-P5`). | `network_nodes.code` dilebarkan jadi `string(120)` (unique global tetap). Kode turunan > 120 karakter ditolak. Lebar ini hanya bisa diverifikasi di MySQL; tes lebar kolom di-skip pada sqlite. | §2.3 |
+| D4 | Spec diam soal `olt_slots`, `OltSlot`, `OltSlotController` (`attachCard`, kartu sudah tidak ada), dan alat legacy (`InfrastructureLegacyBackfillService`, `InfrastructureLegacyDecisionService`, `InfrastructureLegacyMappingsCommand`, `InfrastructureReconciliationService`, `InfrastructureDummyResetService`, `infrastructure_legacy_mappings`). Semuanya bergantung pada tabel yang dibuang. | Semua dipensiunkan atas **persetujuan eksplisit user** (kode dan tes legacy-nya dihapus); tabel `olt_slots` ikut di-drop. Dua perintah tambahan ikut dihapus karena meng-inject service yang dihapus: `InfrastructureReconcileCommand` dan `InfrastructureCloseLegacyWritesCommand` (+ jadwal rekonsiliasi di `routes/console.php`). Saklar `InfrastructureCutover` tetap ada. | §3, §11 |
+| D5 | Slot/PON/Port yang dipindah antar-induk merusak identitas (nomor, kode turunan). | `NetworkNodeService::move()` menolak node posisi (`olt_slot`, `olt_pon`, `switch_slot`, `switch_port`) dengan pesan "Slot/PON/Port tidak dapat dipindah — identitasnya mengikuti induk." Yang boleh dipindah: OLT/Switch (seluruh subtree ikut) dan ODP (antar-PON dalam Cabang yang sama). | §2.4, §9 |
+
+Rujukan tambahan hasil implementasi (bukan koreksi, tetapi perlu diketahui):
+
+- Kode turunan memakai satu helper `InfrastructurePositionService::derivedCode()`;
+  nama relasi anak PON/Port Switch pada model adalah `NetworkNode::positionPorts()`
+  (bukan `ports()`, yang sudah dipakai untuk `NetworkNodePort` milik ODP).
+- `InfrastructureHierarchyService::build()` menerima `bool $withPositions = false`.
+  Pohon Master Node memakai `false` (Slot/PON/Port tidak dimuat; ODP tetap dimuat dengan
+  jalur "OLT / Slot n / PON m"); Peta memakai `true`. Slot/PON dibuka lewat endpoint
+  `network.nodes.children`.
+- Migrasi `2026_10_24_000002` menolak jalan tanpa konfirmasi
+  (`INFRA_CONFIRM_DUMMY_RESET=true`) bila ada baris posisi lama yang akan dibuang, dan
+  tidak dapat di-rollback (`down()` melempar exception).
+- "Slot OLT kosong" di Peta kini berarti Slot tanpa PON (key ringkasan `free_olt_slots`).

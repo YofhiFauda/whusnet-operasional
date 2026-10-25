@@ -1,6 +1,6 @@
 # Manual Book Penataan Infrastruktur ISP: dari Awal sampai Selesai
 
-**Versi:** 2026-10-14  
+**Versi:** 2026-10-24 (diperbarui untuk Slot/PON sebagai node, ADHOC-213)  
 **Sasaran:** FOP, NOC, Admin/Operator Infrastruktur, Gudang, dan Teknisi.  
 **Status:** Panduan operasional untuk fitur yang tersedia di kode saat ini. Jalur yang belum lengkap diberi tanda **BELUM DIDUKUNG PENUH**; jangan dianggap sudah otomatis atau siap dipakai di setiap database target.
 
@@ -11,10 +11,10 @@ Peta Infrastruktur adalah **layar baca dan verifikasi**. Titik dan port disiapka
 | Istilah | Arti operasional |
 |---|---|
 | POP/Cabang atau Mini POP | Wilayah dan scope akses. Mini POP berada di bawah Cabang. |
-| Tipe node | Fungsi posisi: switch, chassis/kartu OLT, ODC, ODP, dan lain-lain. |
+| Tipe node | Fungsi posisi: Server, OLT, Switch Mini POP, Slot, PON, Port Switch, ODP. |
 | Node | Posisi/fungsi fisik yang tetap ada saat unit perangkat ber-SN diganti. |
 | Port node | Titik sambung bernomor. Port ODP untuk satu pelanggan; port hulu dapat diarahkan ke anak node. |
-| Slot OLT | Posisi kartu pada Mini POP; berbeda dari port PON dan port ODP. |
+| Slot / PON / Port Switch | Node di bawah OLT atau Switch (OLT -> Slot -> PON; Switch -> Slot -> Port). Dibuat massal lewat Generate Slot & PON, bukan lewat Tambah Node. Berbeda dari port ODP. |
 | SKU/SN/roll/qty Gudang | Identitas serta jumlah barang fisik, bukan identitas permanen node. |
 | Issue → custody → DEPLOY | Barang diserahkan ke teknisi, kemudian baru dinyatakan terpasang saat laporan fisik mencatat DEPLOY. |
 | Assignment | Hubungan port ke pelanggan atau anak node. Membuat anak node saja belum membuktikan kabel hulunya terhubung. |
@@ -46,9 +46,9 @@ Peta Infrastruktur adalah **layar baca dan verifikasi**. Titik dan port disiapka
 ### Langkah 2 — Siapkan POP dan tipe node
 
 1. Di **Master POP/Cabang**, pastikan Cabang sudah ada dan aktif. Jika lokasi merupakan Mini POP, buat/cek Mini POP di bawah Cabang yang benar.
-2. Di **Master Tipe Node Jaringan**, gunakan tipe yang sesuai. Tipe awal mencakup `core_router`, `aggregation_switch`, `olt_chassis`, `olt_card`, `pon_port`, `odc`, dan `odp`.
+2. Di **Master Tipe Node Jaringan**, gunakan tipe yang sesuai. Tipe yang berlaku: `server`, `olt_chassis` (artinya OLT), `switch_mini_pop`, `olt_slot`, `olt_pon`, `switch_slot`, `switch_port`, dan `odp`. Tipe lama (`core_router`, `aggregation_switch`, `olt_card`, `pon_port`, `odc`) sudah dihapus. Tipe Slot/PON/Port Switch dibuat otomatis oleh Generate massal (langkah 3A), jangan ditambah manual lewat Tambah Node.
 3. Periksa aturan penempatan tipe: apakah boleh langsung pada POP tertentu atau harus menjadi anak tipe node tertentu. Jika susunan lapangan berbeda, admin dapat mengelola aturan pada master tipe; jangan mengubah jenis fisik hanya supaya form lolos.
-4. Periksa `has_ports` dan `max_ports`. Tipe switch bawaan `core_router` dan `aggregation_switch` **belum memiliki port individual** (`has_ports=false`). Untuk switch yang port fisiknya harus dipetakan satu per satu, admin perlu mendefinisikan tipe/aturan kapasitas yang tepat lebih dulu; pengisian kapasitas ringkasan pada tipe bawaan bukan peta port.
+4. Periksa `has_ports` dan `max_ports`. Port individual Switch kini dipetakan sebagai node `switch_port` (di bawah `switch_slot`) lewat Generate massal, bukan lewat kapasitas ringkasan pada tipe. Port fisik ODP tetap tabel port ODP yang dibuat saat node ODP disimpan.
 
 ### Langkah 3 — Buat posisi node dan port
 
@@ -57,7 +57,16 @@ Peta Infrastruktur adalah **layar baca dan verifikasi**. Titik dan port disiapka
 3. Isi alamat/koordinat bila berbeda dari induk. Bila kosong, tampilan memakai lokasi efektif warisan.
 4. Untuk tipe berport, isi **jumlah port fisik yang benar**, misalnya ODP 8 port. Saat disimpan, sistem membuat port bernomor 1–8 dalam keadaan kosong. Penambahan kapasitas berikutnya memakai **Tambah Port**; port baru melanjutkan nomor terakhir dan tunduk pada batas tipe.
 5. Jika node anak mendapat sambungan dari port induk, buka detail **node induk** → pilih port kosong → **Hubungkan** ke anak langsung. Node anak dan assignment port hulu adalah dua catatan berbeda; keduanya perlu dicek.
-6. Periksa node dan port pada Peta. **Perhatian:** pembuatan node saat ini langsung memberi status `active`, meski pemasangan fisik belum selesai. Sampai tersedia status rencana/commissioning, operator harus mengoordinasikan waktu pembuatan node dengan pekerjaan lapangan dan tidak menafsirkan status aktif sebagai bukti perangkat sudah terpasang.
+6. **Penting untuk ODP:** ODP **wajib** berinduk satu **PON**. Di form Tambah Node pilih tipe `odp`, lalu pilih PON induknya (PON dibuka lewat pohon Slot/PON di Master Node; bila PON belum ada, buat dulu lewat langkah 3A). ODP tanpa PON ditolak. Tidak ada lagi langkah "hubungkan uplink ODP ke PON" atau status "uplink terverifikasi": induk PON itulah uplink-nya. ODP lama yang masih menempel langsung di POP tetap tampil dan masih bisa dipasang ke PON lewat aksi Pindah.
+7. Periksa node dan port pada Peta. **Perhatian:** pembuatan node saat ini langsung memberi status `active`, meski pemasangan fisik belum selesai. Sampai tersedia status rencana/commissioning, operator harus mengoordinasikan waktu pembuatan node dengan pekerjaan lapangan dan tidak menafsirkan status aktif sebagai bukti perangkat sudah terpasang.
+
+### Langkah 3A — Generate massal Slot dan PON (OLT) atau Port (Switch)
+
+1. Buka detail node **OLT** (atau **Switch Mini POP**) di Master Node, lalu pilih aksi **Generate Slot & PON** (Switch: **Generate Slot & Port**). Aksi ini membuka halaman tersendiri (bukan modal).
+2. Isi **jumlah slot** (1-64; khusus OLT wajib), **PON per slot** (Switch: port, 1-128), dan **kapasitas pelanggan aktif per PON baru** (opsional, khusus OLT). Switch memakai satu Slot 1 logis otomatis, jadi jumlah slot tidak perlu diisi.
+3. Simpan. Sistem membuat Slot, PON, atau Port sebagai node dengan kode turunan otomatis (`{kode OLT}-S3-P5`), dalam satu transaksi dan dengan satu entri audit. Aksi **aman diulang**: hanya nomor yang belum ada yang dibuat, nilai yang sudah diisi tidak ditimpa. Kapasitas OLT dinaikkan otomatis bila jumlah slot melebihi kapasitas terdata.
+4. Kode Slot/PON/Port **tidak bisa diketik** dan node ini **tidak bisa dipindah** antar-induk; yang dipindah adalah OLT/Switch (seluruh isinya ikut) atau ODP.
+5. Kapasitas dan ambang Red Zone PON diubah dari halaman detail PON/Slot; kapasitas tidak boleh di bawah pemakaian (pelanggan aktif pada ODP anaknya).
 
 ### Langkah 4 — Siapkan barang dan tugas lapangan
 
@@ -92,13 +101,13 @@ FOP/NOC menyatakan pekerjaan selesai secara operasional hanya setelah checklist 
 
 ## 5. Contoh kerja: menambah ODP baru
 
-**Contoh:** `ODP-SMN-04`, splitter 1:8, di bawah `ODC-SMN-01`.
+**Contoh:** `ODP-SMN-04`, splitter 1:8, di bawah PON 3 pada Slot 2 OLT `OLT-SMN-01`.
 
-1. Cek Cabang/Mini POP dan node `ODC-SMN-01`; cek port hulunya kosong serta jalur fisik tersedia.
-2. Buat node bertipe `odp`, induk `ODC-SMN-01`, kode `ODP-SMN-04`, nama dan lokasi lapangan, jumlah port **8**. Sistem menghasilkan port 1–8 kosong. Aturan master juga mengizinkan ODP langsung pada Cabang/Mini POP tertentu bila memang topologi fisiknya demikian.
-3. Pada detail ODC, hubungkan port hulu yang benar ke anak `ODP-SMN-04`. Jangan sekadar menandai port “terpakai” jika target anak diketahui; label terpakai manual berarti **belum terverifikasi**.
+1. Cek Cabang/Mini POP dan OLT `OLT-SMN-01`; pastikan Slot 2 dan PON 3 sudah ada (bila belum, Generate massal di langkah 3A) dan jalur fisik tersedia.
+2. Buat node bertipe `odp`, **induk = PON 3 (`OLT-SMN-01-S2-P3`)**, kode `ODP-SMN-04`, nama dan lokasi lapangan, jumlah port **8**. Sistem menghasilkan port 1–8 kosong. ODP tanpa PON induk ditolak.
+3. Uplink ODP ke PON adalah induknya; tidak ada langkah "hubungkan" terpisah dan tidak ada status "terverifikasi" untuk uplink. Pemakaian PON (pelanggan aktif pada semua ODP anaknya) tampil otomatis di detail PON.
 4. Gudang Issue ODP/splitter ber-SN dan material pendukung yang relevan ke tim. Teknisi memasang fisik, kemudian mencatat DEPLOY ke node ODP pada INFR REQ.
-5. Periksa di Peta: jalur ODC → ODP, port 1–8 kosong, aset/SN terpasang, dan riwayat Task. Setelah pelanggan benar-benar disambungkan, port ODP terkait baru ditandai terpakai melalui laporan pemasangan pelanggan.
+5. Periksa di Peta: jalur OLT → Slot → PON → ODP, port 1–8 kosong, aset/SN terpasang, dan riwayat Task. Setelah pelanggan benar-benar disambungkan, port ODP terkait baru ditandai terpakai melalui laporan pemasangan pelanggan.
 
 ## 6. Pelanggan, port ODP, slot OLT, dan perubahan sambungan
 
@@ -106,9 +115,15 @@ FOP/NOC menyatakan pekerjaan selesai secara operasional hanya setelah checklist 
 
 Pada **Laporan Pemasangan pelanggan** bagian **Distribusi Jaringan**, jika ODP terkelola tersedia, teknisi wajib memilih **ODP + port kosong**. Sistem membuat assignment port ke pelanggan dan menolak pemakaian ganda serta pelanggan yang sudah memakai port aktif lain. Nomor OLT, slot, port OLT, dan VLAN masih dicatat berdasarkan hasil konfigurasi NOC/lapangan sebagai **data teknis pelanggan**; teks itu belum otomatis mengisi pohon port OLT. Jika belum ada ODP terkelola, form masih menerima nomor/port ODP sebagai teks legacy; itu **belum** menjadi assignment port yang terverifikasi di Peta.
 
-### Slot dan kartu OLT
+### Slot, PON, dan Port Switch (tidak ada lagi kartu OLT)
 
-Di detail **Mini POP**, petugas berizin mengisi **jumlah total slot chassis yang akan dicatat** lalu menempatkan node `olt_card` yang bebas ke slot. Form saat ini menerima target total slot, bukan “tambah sekian slot”. Node kartu harus berada langsung pada Mini POP yang sama. Slot, port fisik kartu, dan batas ONT per PON berbeda satuan; jangan menafsirkan angka `max_ports=128` bawaan kartu sebagai bukti ada 128 port fisik. **Belum ada aksi lepas/ganti kartu dari slot yang lengkap**, sehingga penggantian kartu perlu verifikasi NOC dan tidak boleh disimulasikan dengan menghapus riwayat.
+Slot, PON, dan Port Switch adalah **node** di pohon Master Node, bukan tabel terpisah. **Tidak ada lagi alur kartu OLT**: form "jumlah slot chassis" dan aksi "tempatkan node `olt_card` ke slot" di detail Mini POP sudah dihapus. Chassis, rack, dan kartu OLT adalah **aset Gudang** (SN yang dipasang ke Slot lewat laporan DEPLOY), bukan node; mengganti kartu berarti mengganti SN pada Slot yang sama, sedangkan posisi Slot/PON/ODP di bawahnya tidak berubah.
+
+- Membuat struktur: pakai **Generate Slot & PON** (langkah 3A). Menambah satu slot/PON/port tambahan juga dari halaman detail Slot/PON yang bersangkutan (aksi tambah mengikuti konteks: perangkat -> tambah Slot, Slot -> tambah PON/Port).
+- **Pohon dimuat bertahap (lazy):** di Master Node, Mini POP dan OLT/Switch tampil langsung, sedangkan Slot, PON, dan ODP di bawahnya dimuat saat cabang dibuka. Buka cabang OLT di pohon sebelah kiri untuk menelusuri Slot/PON-nya. Panel komponen Slot/PON di dalam inspector perangkat sedang disusun ulang; sementara itu gunakan pohon dan halaman detail Slot/PON.
+- Slot, PON, dan Port Switch tidak bisa dipindah atau diberi kode manual. Memindahkan OLT/Switch antar Mini POP dalam satu Cabang ikut membawa seluruh isinya; pindah lintas Cabang ditolak bila masih ada aset/saldo di dalam subtree.
+- Batas ONT per PON adalah kapasitas pelanggan aktif PON (kolom kapasitas), dihitung dari pelanggan aktif pada ODP anaknya. Slot, PON, dan port ODP berbeda satuan; jangan menyamakannya.
+- "Slot OLT kosong" di Peta kini berarti Slot yang belum punya PON.
 
 ### Melepas atau mengganti port
 
@@ -153,11 +168,12 @@ Di detail **Mini POP**, petugas berizin mengisi **jumlah total slot chassis yang
 | Laporan gagal karena Task FOP | Task tanpa pelanggan belum mempunyai anchor transaksi yang diperlukan; hentikan submit dan eskalasi ke FOP/pengelola aplikasi, jangan buat data palsu. |
 | Port ODP tidak ada di pilihan pelanggan | Cek status ODP, port kosong, Cabang pelanggan, serta apakah node/port sudah menjadi data terkelola. |
 | Port tidak bisa dipakai | Cek assignment aktif pada port itu atau assignment aktif pelanggan pada port ODP lain. |
-| Slot/kartu OLT tidak dapat dipasang | Pastikan POP adalah Mini POP, kartu bertipe `olt_card`, anchor pada Mini POP yang sama, dan belum menempati slot lain. |
+| Slot/PON tidak muncul di Master Node | Pohon dimuat bertahap: buka cabang OLT/Switch di pohon agar Slot dan PON dimuat. Bila memang belum ada, jalankan Generate Slot & PON (langkah 3A). |
+| ODP ditolak saat disimpan | ODP wajib berinduk PON; pilih PON yang berada di Cabang yang sama. Slot/PON/Port tidak bisa dipindah atau diberi kode manual. |
 | Peta dan fisik berbeda | Hentikan klaim selesai; cocokkan kode node, serial, Task, transaksi Gudang, port dan kondisi lapangan. Koreksi melalui transaksi/alur yang tepat, bukan menghapus histori. |
 
 ## 10. Batas implementasi dan rujukan
 
-Panduan ini menggambarkan fitur aplikasi pada 2026-10-14. **BELUM DIDUKUNG PENUH:** commissioning/status rencana, port individual pada tipe switch bawaan, perpindahan port pelanggan secara atomik, pelepasan kartu OLT dari slot, batas ONT per PON yang terpisah, retur qty/roll dari node, registrasi aset lapangan lama, aksi multi-baris yang idempoten, dan rekonsiliasi API OLT. Jangan menyamakan prototipe HTML dengan fitur aplikasi yang sudah tersedia.
+Panduan ini menggambarkan fitur aplikasi pada 2026-10-24. **BELUM DIDUKUNG PENUH:** commissioning/status rencana, perpindahan port pelanggan secara atomik, panel komponen Slot/PON di dalam inspector Master Node (masih disusun ulang; gunakan pohon lazy-load dan halaman detail Slot/PON), kartu OLT (konsepnya sudah dihapus; kartu adalah aset Gudang), retur qty/roll dari node, registrasi aset lapangan lama, aksi multi-baris yang idempoten, dan rekonsiliasi API OLT. Jangan menyamakan prototipe HTML dengan fitur aplikasi yang sudah tersedia.
 
 Rujukan: `docs/plan/infrastruktur/rancangan-operasional-infrastruktur-dinamis.md`, `analisa-inventaris-infrastruktur.md`, `analisa-gap-peta-infrastruktur.md`, dan `docs/superpowers/specs/2026-10-12-laporan-oreq-infr-req-design.md`.

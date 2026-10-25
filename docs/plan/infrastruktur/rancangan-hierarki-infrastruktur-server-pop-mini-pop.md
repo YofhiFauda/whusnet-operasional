@@ -5,6 +5,22 @@ Status: rancangan untuk ditinjau; belum menjadi task implementasi.
 Ruang lingkup: Master Node, Peta Topologi, slot/port, relasi pelanggan, dan aset Gudang.  
 Klasifikasi: infrastruktur post-MVP. Sprint aktif tetap S8.10-T003 (FOP Notification Dashboard).
 
+> **Catatan pembalikan (2026-10-24, ADHOC-213 Slot/PON sebagai node).** Bagian
+> §2, §3, dan §17 dokumen ini semula menyatakan Slot dan PON/Port **bukan** baris
+> `network_nodes`, melainkan tabel terpisah `infrastructure_slots` dan
+> `infrastructure_ports`. Keputusan itu **dibalik**: Slot, PON, dan Port Switch kini
+> baris `network_nodes` sungguhan (tipe `olt_slot`, `olt_pon`, `switch_slot`,
+> `switch_port`) dengan `parent_id`, sehingga hierarki
+> `Mini POP -> OLT/Switch -> Slot -> PON/Port -> ODP` adalah **satu pohon**. Tabel
+> `infrastructure_slots`, `infrastructure_ports`, `infrastructure_legacy_mappings`, dan
+> `olt_slots` sudah dibuang; semua FK lokasi (`*_infrastructure_slot_id`,
+> `*_infrastructure_port_id`) kini menunjuk `network_nodes.id`. ODP **wajib** berinduk PON,
+> dan konsep "uplink ODP->PON terverifikasi" dihapus (uplink = `parent_id`). Teks lama di
+> bawah dipertahankan sebagai histori keputusan; bila ada kalimat yang bertentangan,
+> yang berlaku adalah catatan ini serta
+> `docs/superpowers/specs/2026-10-24-slot-pon-sebagai-node-design.md` (termasuk bagian
+> "Koreksi D1-D5"). Chassis/rack/kartu tetap aset Gudang (§17), bukan node.
+
 ## 1. Tujuan
 
 Master Node dan Peta harus memperlihatkan jalur infrastruktur dengan urutan yang sama. Setiap tingkat menjelaskan lokasi, perangkat, slot, port, distribusi, atau perangkat pelanggan. Perubahan struktur kelak harus mempertahankan pelanggan, stok, riwayat pekerjaan, dan batas akses POP.
@@ -32,20 +48,20 @@ POP mencakup POP Pusat dan POP Cabang yang sudah ada. Bila keduanya berlaku, tam
 | Server Utama | Titik sumber jaringan | Node server; barang fisik dari ledger Gudang |
 | POP dan Mini POP | Wilayah/lokasi, dasar POP scope | Relasi parent pada tabel pops; uplink menunjukkan sumber jaringan |
 | OLT dan Switch | Posisi perangkat yang dapat berganti unit fisik | Network node; SN/model dari aset Gudang terpasang |
-| Slot | Posisi di dalam OLT/Switch | Satu model slot perangkat, nomor unik per perangkat |
-| PON | Antarmuka keluaran OLT pada slot tertentu | Port bertipe PON milik slot OLT |
-| Port Switch | Antarmuka keluaran Switch | Port milik slot Switch |
-| ODP | Titik distribusi berlokasi dan berport | Network node ODP, ditautkan ke PON terverifikasi |
+| Slot | Posisi di dalam OLT/Switch | Baris `network_nodes` tipe `olt_slot`/`switch_slot`, anak langsung perangkat, nomor (`number`) unik per induk |
+| PON | Antarmuka keluaran OLT pada slot tertentu | Baris `network_nodes` tipe `olt_pon`, anak Slot OLT; kapasitas pelanggan aktif di kolom `capacity` |
+| Port Switch | Antarmuka keluaran Switch | Baris `network_nodes` tipe `switch_port`, anak `switch_slot` |
+| ODP | Titik distribusi berlokasi dan berport | Network node ODP, anak langsung PON (`parent_id`); tanpa status "terverifikasi" |
 | ONT pelanggan | Perangkat pelanggan pada port ODP | Assignment pelanggan dan data perangkat/serial INSTALLED; bukan network node |
 
-Pohon yang terlihat merupakan proyeksi beberapa relasi, bukan satu tabel pohon tunggal. POP/Mini POP tetap lokasi, slot dan port tetap bagian perangkat, serta ONT tetap milik pelanggan. Posisi jaringan tidak berganti identitas ketika barang fisiknya diganti.
+Sejak ADHOC-213, jalur OLT/Switch -> Slot -> PON/Port -> ODP adalah satu pohon `network_nodes` (lihat catatan pembalikan di atas); POP/Mini POP tetap berasal dari tabel `pops` sebagai lokasi dan scope, dan ONT tetap milik pelanggan (bukan node). Posisi jaringan tidak berganti identitas ketika barang fisiknya diganti.
 
 ### Keputusan rinci
 
 - OLT pada rancangan ini memetakan tipe olt_chassis yang ada. Kartu OLT lama dipetakan ke isi slot saat transisi; satu slot hanya memuat satu kartu aktif.
 - Switch operasional pada struktur baru hanya berada di Mini POP dan menjadi cabang sejajar OLT. Tipe aggregation_switch adalah representasi lama: data dummy yang diverifikasi boleh direset, sedangkan data nyata yang dipertahankan harus dipetakan ke Mini POP yang benar sebelum diubah.
 - Switch modular memakai nomor slot fisik. Switch port tetap memakai Slot 1 berlabel «slot internal/logis», agar urutan Switch → Slot → Port tetap konsisten tanpa mengesankan ada kartu yang bisa dicabut.
-- PON mempunyai identitas lengkap OLT / Slot / nomor PON. Satu PON dapat melayani beberapa ODP sesuai kapasitas yang dicatat. ODP dasar mempunyai satu uplink PON aktif yang terverifikasi.
+- PON mempunyai identitas lengkap OLT / Slot / nomor PON; kodenya diturunkan otomatis dari kode induk (`{kode OLT}-S3-P5`) dan tidak bisa diketik bebas. Satu PON dapat melayani beberapa ODP sesuai kapasitas yang dicatat. Setiap ODP wajib berinduk satu PON lewat `parent_id`; tidak ada lagi tahap "terverifikasi" terpisah dari struktur pohon.
 - Satu port ODP hanya boleh mempunyai satu assignment pelanggan aktif. ONT ditampilkan sebagai daun visual bila assignment aktif dan perangkat tersedia. Bila belum ada SN, tampilkan pelanggan dengan label «ONT belum tercatat».
 - Beberapa ONT terpasang milik satu pelanggan harus terlihat semua. Detail SN hanya terlihat bila aktor punya izin data perangkat sensitif.
 - OLT/Switch yang saat ini langsung berlokasi di POP Cabang masuk daftar verifikasi. Jangan membuat Mini POP fiktif atau memindahkan lokasi otomatis.
@@ -56,8 +72,8 @@ Pohon yang terlihat merupakan proyeksi beberapa relasi, bukan satu tabel pohon t
 |---|---|---|
 | pops sudah membentuk Pusat → Cabang → Mini POP | Pertahankan sebagai lokasi/scope | Jangan membuat node POP duplikat |
 | network_nodes memakai parent_id atau anchor_pop_id | Pertahankan untuk node fisik | Jangan memindah parent/anchor sebelum referensi baru diverifikasi |
-| olt_slots menghubungkan chassis dan kartu | Jadikan sumber migrasi slot perangkat yang konsisten | Audit slot/kartu ganda atau yatim; simpan ID dan histori lama |
-| olt_card dan pon_port dapat menjadi node | Kartu menjadi isi slot; PON menjadi port pada slot | Untuk data nyata gunakan pemetaan eksplisit; data topologi dummy yang terverifikasi boleh direset sesuai §16.4 |
+| olt_slots menghubungkan chassis dan kartu | **Dibuang** (migrasi `2026_10_25_000001_drop_olt_slots_table`); Slot OLT kini node `olt_slot` | Konsep kartu terpasang di slot tidak ada lagi; kartu adalah aset Gudang |
+| olt_card dan pon_port dapat menjadi node | Tipe lama sudah dihapus (ADHOC-212); PON kini node `olt_pon` anak `olt_slot` | Data posisi lama adalah dummy dan dibersihkan oleh migrasi `2026_10_24_000002` setelah konfirmasi `INFRA_CONFIRM_DUMMY_RESET=true` bila ada baris lama |
 | network_node_ports dan network_port_assignments menyimpan port/pemakaian | Bedakan port, koneksi antar-port, dan penghuni pelanggan | Jaga assignment aktif dan riwayat pelepasan |
 | Seeder lama memuat Backbone, Agregasi, Feeder, Drop Cable, ODC | Tinjau sebagai representasi lama; Switch operasional baru hanya berada di Mini POP | Ganti seeder dummy dengan struktur baru; petakan hanya relasi data nyata yang harus dipertahankan |
 | ONT tersimpan pada data pelanggan | Tetap menjadi perangkat pelanggan | Tampilkan melalui assignment ODP yang sah |
@@ -337,12 +353,13 @@ rancangan baru yang belum dikerjakan:
    nama *code* historis, artinya sekarang = OLT, bukan "pembungkus chassis
    yang menaungi node kartu terpisah").** Tidak ada lagi node chassis dan
    node kartu sebagai dua tingkat topologi berbeda.
-3. **Slot (`infrastructure_slots`) FK langsung ke node OLT/Switch itu**
-   (`network_node_id`, lihat `InfrastructureSlot::device()`), bukan ke node
-   chassis. Slot tetap ada walau unit fisiknya (chassis/kartu) diganti.
+3. **Slot adalah node `olt_slot`/`switch_slot` yang `parent_id`-nya node OLT/
+   Switch itu** (sejak ADHOC-213; dulu tabel `infrastructure_slots` dengan
+   `network_node_id` - sudah dibuang), bukan anak node chassis. Slot tetap ada
+   walau unit fisiknya (chassis/kartu) diganti.
 4. **Chassis, rack, dan kartu OLT adalah aset Gudang** (baris
    `inventory_serials`, tipe barang `olt_module`) yang **di-deploy ke slot**
-   lewat `InventoryService::deploySerial()` → `current_infrastructure_slot_id`.
+   lewat `InventoryService::deploySerial()` → `current_infrastructure_slot_id` (kolom ini kini FK ke `network_nodes.id`, node bertipe slot).
    Mereka **bukan** baris `network_nodes` — tidak punya `parent_id`/
    `anchor_pop_id` sendiri, tidak muncul sebagai cabang terpisah di Master
    Node. Mengganti unit fisik = ganti SN yang terpasang di slot yang sama;
@@ -361,4 +378,7 @@ Tidak ada perubahan skema/kode baru akibat penegasan ini — bagian ini
 mendokumentasikan ulang model yang sudah diimplementasikan, supaya dokumen
 lama (§16 di atas dan spec 2026-10-09/12) tidak lagi dibaca sebagai bertentangan.
 
-
+Pembaruan 2026-10-24 (ADHOC-213): butir 3 dan 4 di atas sudah disesuaikan dengan model
+Slot/PON sebagai node. Nama kolom `*_infrastructure_slot_id`/`*_infrastructure_port_id`
+dipertahankan (hanya target FK yang pindah ke `network_nodes`); artinya sekarang "node
+bertipe slot" dan "node bertipe PON/Port Switch".
