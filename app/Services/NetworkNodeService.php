@@ -63,6 +63,15 @@ class NetworkNodeService
                 );
             }
 
+            // ODP → PON ditegakkan EKSPLISIT, bukan cuma lewat
+            // `network_node_type_rules`: tabel aturan bersifat opt-in (kosong =
+            // bebas), jadi DB yang barisnya terhapus/belum di-seed akan
+            // meloloskan ODP pindah ke POP atau ke ODP lain. Sama dengan guard
+            // di `NetworkNodeController::store()`.
+            if ($node->nodeType?->code === 'odp' && ($newParent === null || ! $newParent->isPon())) {
+                throw new InvalidArgumentException('ODP wajib berinduk PON.');
+            }
+
             $this->assertTypePlacement($node->nodeType, $newParent, $newPop);
 
             $fromPopId = $node->resolvePop()?->id;

@@ -41,8 +41,12 @@ class GenerateInfrastructureStructureController extends Controller
         $isOlt = $kind === InfrastructureSlotKind::OLT;
         $validated = $request->validate([
             // Switch hanya punya satu Slot logis, jadi jumlah slot tidak ditanyakan.
-            'slot_count' => [$isOlt ? 'required' : 'nullable', 'integer', 'min:1', 'max:64'],
-            'ports_per_slot' => ['required', 'integer', 'min:1', 'max:128'],
+            // Batas 32 × 64 = 2.048 node per aksi, satu transaksi + lock perangkat:
+            // cukup untuk OLT terbesar yang realistis (16 slot × 16 PON), dan
+            // mencegah satu salah ketik (64 × 128 = 8.192 node) menahan lock lama
+            // serta menenggelamkan pohon dengan posisi fiktif.
+            'slot_count' => [$isOlt ? 'required' : 'nullable', 'integer', 'min:1', 'max:32'],
+            'ports_per_slot' => ['required', 'integer', 'min:1', 'max:64'],
             'pon_capacity' => [$isOlt ? 'nullable' : 'prohibited', 'integer', 'min:1', 'max:100000'],
         ]);
 
@@ -72,7 +76,14 @@ class GenerateInfrastructureStructureController extends Controller
 
         $user = auth()->user();
         if (! $this->access->hasAllPopAccess($user)) {
-            $popId = $this->resolver->forNode($node)->deepestPopId();
+            // Perangkat yang belum tertambat ke POP (resolver melempar) tidak
+            // pernah bisa dibuktikan masuk scope → 404 seperti node tak
+            // dikenal, bukan 500.
+            try {
+                $popId = $this->resolver->forNode($node)->deepestPopId();
+            } catch (InvalidArgumentException) {
+                abort(404);
+            }
             abort_unless($popId !== null && in_array($popId, $this->access->getAllowedPopIds($user), true), 403);
         }
 

@@ -71,6 +71,12 @@ class NetworkNodePlacementRuleTest extends TestCase
 
         app(NetworkNodeService::class)->assertTypePlacement($chassisType, null, $mini);
         app(NetworkNodeService::class)->assertTypePlacement($chassisType, null, $branch);
+
+        // Bukan lolos karena tabel aturan kosong (opt-in = bebas): aturan
+        // chassis memang ada, dan anchor yang tidak terdaftar (Pusat) ditolak.
+        $this->assertTrue(DB::table('network_node_type_rules')->where('child_type_id', $chassisType->id)->exists());
+        $this->expectException(InvalidArgumentException::class);
+        app(NetworkNodeService::class)->assertTypePlacement($chassisType, null, Pop::factory()->create(['type' => 'pusat']));
     }
 
     public function test_backbone_feeder_dan_drop_cable_bukan_tipe_node_lagi(): void

@@ -23,11 +23,11 @@
         @csrf
         @if($isOlt)
         <label class="block text-xs text-text-secondary">Jumlah slot (1–64)
-            <input type="number" name="slot_count" min="1" max="64" required value="{{ old('slot_count') }}" class="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+            <input type="number" name="slot_count" min="1" max="32" required value="{{ old('slot_count') }}" class="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
         </label>
         @endif
         <label class="block text-xs text-text-secondary">{{ $isOlt ? 'PON' : 'Port' }} per slot (1–128)
-            <input type="number" name="ports_per_slot" min="1" max="128" required value="{{ old('ports_per_slot') }}" class="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+            <input type="number" name="ports_per_slot" min="1" max="64" required value="{{ old('ports_per_slot') }}" class="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
         </label>
         @if($isOlt)
         <label class="block text-xs text-text-secondary">Kapasitas pelanggan aktif per PON baru (opsional)

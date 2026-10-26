@@ -20,6 +20,7 @@ use App\Services\NetworkPortAssignmentService;
 use Database\Seeders\NetworkNodeTypeSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -464,6 +465,39 @@ class NetworkNodeMoveTest extends TestCase
         } catch (InvalidArgumentException) {
             $this->assertSame($ponA->id, $odp->fresh()->parent_id);
             $this->assertSame($customer->id, $port->assignments()->where('active_key', 1)->firstOrFail()->customer_id);
+        }
+    }
+
+    /**
+     * Final review ADHOC-213 (minor): tabel `network_node_type_rules` opt-in
+     * — kosong berarti bebas. `move()` dulu bergantung penuh padanya, jadi
+     * DB tanpa baris aturan meloloskan ODP pindah ke POP / ke non-PON. Kini
+     * ODP→PON ditegakkan eksplisit seperti `store()`.
+     */
+    #[Test]
+    public function odp_tetap_wajib_berinduk_pon_walau_tabel_aturan_kosong(): void
+    {
+        $this->seed(NetworkNodeTypeSeeder::class);
+        DB::table('network_node_type_rules')->delete();
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $odpType = NetworkNodeType::where('code', 'odp')->firstOrFail();
+        $olt = NetworkNode::factory()->create(['node_type_id' => NetworkNodeType::where('code', 'olt_chassis')->firstOrFail()->id,
+            'anchor_pop_id' => $cabang->id]);
+        $slot = NetworkNode::factory()->slot($olt, 1)->create();
+        $pon = NetworkNode::factory()->pon($slot, 1)->create();
+        $odp = NetworkNode::factory()->create(['node_type_id' => $odpType->id, 'parent_id' => $pon->id, 'anchor_pop_id' => null]);
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+
+        foreach ([[null, $cabang], [$olt, null], [$slot, null]] as [$parent, $anchor]) {
+            try {
+                app(NetworkNodeService::class)->move($odp, $parent, $anchor, $actor);
+                $moved = true;
+            } catch (InvalidArgumentException $exception) {
+                $moved = false;
+                $this->assertSame('ODP wajib berinduk PON.', $exception->getMessage());
+            }
+            $this->assertFalse($moved);
+            $this->assertSame($pon->id, $odp->fresh()->parent_id);
         }
     }
 }

@@ -250,12 +250,39 @@ class GenerateInfrastructureStructureTest extends TestCase
         $olt = $this->device('olt_chassis');
         $url = route('network.nodes.generate-structure.store', $olt);
 
-        $this->actingAs($this->owner)->post($url, ['slot_count' => 65, 'ports_per_slot' => 8])
+        // Batas diturunkan 64×128 → 32×64 (final review ADHOC-213): satu
+        // salah ketik tidak boleh membuat 8.192 node dalam satu lock.
+        $this->actingAs($this->owner)->post($url, ['slot_count' => 33, 'ports_per_slot' => 8])
             ->assertSessionHasErrors('slot_count');
-        $this->actingAs($this->owner)->post($url, ['slot_count' => 64, 'ports_per_slot' => 129])
+        $this->actingAs($this->owner)->post($url, ['slot_count' => 32, 'ports_per_slot' => 65])
             ->assertSessionHasErrors('ports_per_slot');
         $this->actingAs($this->owner)->post($url, ['slot_count' => 1, 'ports_per_slot' => 1, 'pon_capacity' => 0])
             ->assertSessionHasErrors('pon_capacity');
         $this->assertSame(0, $this->typeCount('olt_slot'));
+    }
+
+    #[Test]
+    public function batas_atas_32_slot_64_pon_masih_diterima(): void
+    {
+        $olt = $this->device('olt_chassis');
+
+        $this->actingAs($this->owner)->post(route('network.nodes.generate-structure.store', $olt), ['slot_count' => 32, 'ports_per_slot' => 64])
+            ->assertSessionHasNoErrors()->assertRedirect(route('network.nodes.show', $olt));
+        $this->assertSame(32, $this->typeCount('olt_slot'));
+        $this->assertSame(32 * 64, $this->typeCount('olt_pon'));
+    }
+
+    #[Test]
+    public function perangkat_belum_tertambat_404_bukan_500_untuk_user_terbatas(): void
+    {
+        $actor = User::factory()->create(['role_id' => Role::where('code', 'fop')->sole()->id]);
+        $scope = UserRoleScope::create(['user_id' => $actor->id, 'role_id' => $actor->role_id, 'scope_type' => 'selected_pop']);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $this->miniA->id]);
+        app(EffectiveAccessService::class)->clearCache($actor);
+        // Data rusak/lama: OLT tanpa anchor & tanpa induk — resolver melempar.
+        $floating = $this->device('olt_chassis');
+        $floating->forceFill(['anchor_pop_id' => null])->saveQuietly();
+
+        $this->actingAs($actor)->get(route('network.nodes.generate-structure.create', $floating))->assertNotFound();
     }
 }
