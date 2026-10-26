@@ -102,10 +102,9 @@ class NetworkNodeController extends Controller
         $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
         $parentOptions = $nodes;
         // Target relokasi "node induk" = node non-ODP (perangkat/Server/node
-        // lama). ODP tidak pernah jadi induk node lain di model baru, dan PON
-        // tujuan ODP dimuat per OLT lewat `network.nodes.pon-options`.
+        // lama). ODP tidak pernah jadi induk node lain di model baru; PON
+        // tujuan relokasi ODP dicari di server (`network.nodes.pon-search`).
         $relocateTargets = $nodes->reject(fn (NetworkNode $node): bool => $node->nodeType?->code === 'odp')->values();
-        $ponDevices = $nodes->filter(fn (NetworkNode $node): bool => InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) === InfrastructureSlotKind::OLT)->values();
         $treeChildren = $parentOptions->groupBy(fn (NetworkNode $node) => $node->parent_id ?? 0);
         $nodesById = $parentOptions->keyBy('id');
         $topologyPops = Pop::forUser($user)
@@ -186,7 +185,47 @@ class NetworkNodeController extends Controller
         $selectedPosition = $requestedNodeId > 0 && ! $nodes->contains('id', $requestedNodeId)
             ? $this->selectedPositionPayload($requestedNodeId)
             : null;
-        $selectedNodeId = $requestedNodeId > 0 && ($nodes->contains('id', $requestedNodeId) || $selectedPosition !== null)
+
+        // ODP di bawah PON (umpan balik user 2026-10-26, putaran UI 3): ODP
+        // HARUS tampil dengan inspector ODP yang sama (grid port, Hubungkan,
+        // Tambah Port, modal port, tab Lokasi & Relokasi) dari mana pun dipilih.
+        // ODP anak PON sengaja tidak ada di `$nodes` (fix C2), jadi yang
+        // dipilih lewat `?node=` dimuat SENDIRIAN — tepat satu node, eager-load
+        // sama dengan `$nodes`, rantai induk disambung ke instance perangkat
+        // yang sudah dimuat. Jumlah query tambahan konstan, berapa pun ODP/PON-
+        // nya (dites). Ditaruh di `$inspectorNodes`, BUKAN di `$nodes`: `$nodes`
+        // juga sumber pohon/penghitung — induk PON-nya tidak ada di sana, jadi
+        // ODP itu akan muncul sebagai node akar palsu dan ikut terhitung.
+        $inspectorNodes = $nodes;
+        $inspectorPopLabels = [];
+        $treeOpenIds = [];
+        $selectedOdp = $requestedNodeId > 0 && $selectedPosition === null && ! $nodes->contains('id', $requestedNodeId)
+            ? $this->selectedOdpUnderPon($requestedNodeId)
+            : null;
+        if ($selectedOdp !== null) {
+            $pon = $selectedOdp->parent;
+            $slot = $pon->parent;
+            $device = $slot?->parent_id !== null ? $loadedById->get($slot->parent_id) : null;
+            if ($slot !== null && $device !== null) {
+                $slot->setRelation('parent', $device);
+            }
+            $devicePart = $device !== null ? $labelFor($device) : (string) $slot?->parent?->code;
+            $breadcrumbLabels[$selectedOdp->id] = trim(implode(' / ', array_filter([
+                $devicePart, $slot?->displayName(), $pon->displayName(), $selectedOdp->name,
+            ])), ' /');
+            $cabangByNodeId->put($selectedOdp->id, $device !== null && $cabangByNodeId->has($device->id)
+                ? $cabangByNodeId->get($device->id)
+                : Pop::resolveCabangId($selectedOdp->resolvePop()?->id));
+            // ODP anak PON tidak punya anchor sendiri — header "POP:" memakai
+            // cabang hasil resolusi rantai induk, bukan "—".
+            $inspectorPopLabels[$selectedOdp->id] = $selectedOdp->resolvePop()?->name;
+            $inspectorNodes = $nodes->concat([$selectedOdp]);
+            $treeOpenIds = array_values(array_filter([$slot?->parent_id, $slot?->id, $pon->id]));
+        } elseif ($selectedPosition !== null) {
+            $treeOpenIds = $this->ancestorIds($requestedNodeId);
+        }
+
+        $selectedNodeId = $requestedNodeId > 0 && ($nodes->contains('id', $requestedNodeId) || $selectedPosition !== null || $selectedOdp !== null)
             ? $requestedNodeId
             : $nodes->first(fn (NetworkNode $candidate): bool => ! in_array($candidate->nodeType?->code, ['pon_port', 'olt_card', 'aggregation_switch', 'backbone', 'feeder', 'drop_cable'], true))?->id;
 
@@ -194,8 +233,53 @@ class NetworkNodeController extends Controller
             'nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels',
             'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount',
             'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop', 'availableCustomers', 'hierarchy',
-            'unseenNodeIds', 'relocateTargets', 'ponDevices', 'cabangByNodeId', 'selectedNodeId', 'selectedPosition'
+            'unseenNodeIds', 'relocateTargets', 'cabangByNodeId', 'selectedNodeId', 'selectedPosition',
+            'inspectorNodes', 'inspectorPopLabels', 'treeOpenIds'
         ));
+    }
+
+    /**
+     * ODP anak PON yang diminta `?node=`, dimuat dengan eager-load yang sama
+     * dengan `$nodes` di `index()` (port + penghuni, aset, anchor) supaya blok
+     * inspector ODP-nya dirender tanpa query per port. Scope POP = `inPops()`
+     * yang sama dengan listing; di luar scope / bukan ODP / induknya bukan
+     * PON → null, diabaikan diam-diam seperti `?node=` lain (tidak 403, tidak
+     * membocorkan keberadaannya).
+     */
+    private function selectedOdpUnderPon(int $nodeId): ?NetworkNode
+    {
+        $user = auth()->user();
+        $odp = NetworkNode::query()
+            ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
+            ->whereHas('nodeType', fn ($query) => $query->where('code', 'odp'))
+            ->with(
+                'nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode',
+                'anchorPop.parent', 'parent.nodeType', 'parent.parent.nodeType', 'deployedSerials.item', 'infrastructureBalances.item'
+            )
+            ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
+            ->find($nodeId);
+
+        return $odp !== null && $odp->parent?->isPon() ? $odp : null;
+    }
+
+    /**
+     * Leluhur Slot/PON terpilih (paling banyak tiga langkah naik, satu query
+     * kecil per langkah) — dipakai pohon lazy untuk membuka cabang OLT → Slot
+     * sampai baris terpilih terlihat setelah PRG `?node=`.
+     *
+     * @return list<int>
+     */
+    private function ancestorIds(int $nodeId): array
+    {
+        $ids = [];
+        $parentId = NetworkNode::query()->whereKey($nodeId)->value('parent_id');
+        $guard = 0;
+        while ($parentId !== null && $guard++ < 3) {
+            $ids[] = (int) $parentId;
+            $parentId = NetworkNode::query()->whereKey($parentId)->value('parent_id');
+        }
+
+        return array_reverse($ids);
     }
 
     /**
@@ -450,6 +534,10 @@ class NetworkNodeController extends Controller
                 // Switch tidak lewat sini: mereka ada di `$nodes` dan dipilih
                 // lewat inspector biasa (`selectNode`).
                 'panel_url' => $child->isSlot() || $child->isPon() ? route('network.nodes.panel', $child) : null,
+                // ODP dipilih lewat Master Node `?node=` (putaran UI 3): index
+                // memuat SATU ODP itu dengan inspector ODP lengkap (grid port,
+                // modal port, relokasi). URL dirender di sini, bukan dirakit klien.
+                'select_url' => $child->nodeType?->code === 'odp' ? route('network.nodes.index', ['node' => $child->id]) : null,
                 'path' => $parentPath.' / '.($child->isPosition() ? $child->displayName() : $child->code),
             ];
         })->values()]);
@@ -751,7 +839,10 @@ class NetworkNodeController extends Controller
             throw ValidationException::withMessages(['parent_id' => $exception->getMessage()]);
         }
 
-        return redirect()->route('network.nodes.index')->with('success', 'Node berhasil dipindah.');
+        // Dari inspector Master Node (`master_node` = node yang dipindah) kembali
+        // ke node itu terpilih — ODP anak PON tidak ada di daftar default index,
+        // jadi tanpa ini user mendarat di node pertama dan kehilangan hasilnya.
+        return $this->redirectToNodeContext($request, redirect()->route('network.nodes.index')->with('success', 'Node berhasil dipindah.'));
     }
 
     public function addPorts(Request $request, NetworkNode $node): RedirectResponse
@@ -782,7 +873,7 @@ class NetworkNodeController extends Controller
             }
         });
 
-        return redirect()->route('network.nodes.index')->with('success', 'Kapasitas node berhasil ditambah.');
+        return $this->redirectToNodeContext($request, redirect()->route('network.nodes.index')->with('success', 'Kapasitas node berhasil ditambah.'));
     }
 
     public function updatePort(Request $request, NetworkNodePort $port, NetworkPortAssignmentService $assignments): RedirectResponse
@@ -798,7 +889,7 @@ class NetworkNodeController extends Controller
         if ((bool) $validated['is_used']) {
             $assignments->assignManual($port, 'Terpakai (belum diverifikasi)', $request->user());
 
-            return redirect()->route('network.nodes.index')->with('success', 'Port ditandai terpakai dan perlu diverifikasi.');
+            return $this->redirectToNodeContext($request, redirect()->route('network.nodes.index')->with('success', 'Port ditandai terpakai dan perlu diverifikasi.'));
         }
 
         $assignments->release($port, $request->user(), $validated['release_note']);

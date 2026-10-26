@@ -39,6 +39,9 @@
               — watcher tidak terpanggil untuk nilai awal, jadi anak tidak
               pernah dimuat sampai cabang ditutup lalu dibuka lagi. --}}
          x-data="lazyTreeNode(@js(route('network.nodes.children', $item['id'])))"
+         {{-- Buka otomatis bila perangkat ini leluhur Slot/PON/ODP terpilih
+              lewat `?node=` (`treeOpenIds`, dihitung server dalam scope). --}}
+         x-init="if (treeOpenIds.includes({{ (int) $item['id'] }})) setOpen(true)"
          @tree-toggle-all.window="setOpen($event.detail.open)"
      @else
          x-data="{ isOpen: {{ $item['type'] === 'odp' ? 'false' : 'true' }}, toggle() { this.isOpen = ! this.isOpen } }"

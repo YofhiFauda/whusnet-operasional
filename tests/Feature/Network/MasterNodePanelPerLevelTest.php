@@ -336,10 +336,14 @@ class MasterNodePanelPerLevelTest extends TestCase
         $this->assertSame(route('network.nodes.panel', $pon), $ponRow['panel_url']);
         $this->assertSame('OLT-SATU / Slot 2 / PON 5', $ponRow['path']);
 
-        // ODP: tidak punya panel — barisnya tetap tautan Detail.
+        // ODP: tidak punya panel posisi; dipilih lewat Master Node `?node=`
+        // (inspector ODP, putaran UI 3) — `url` Detail tetap ada.
         $odpRow = collect($this->getJson(route('network.nodes.children', $pon))->json('children'))->firstWhere('id', $odp->id);
         $this->assertNull($odpRow['panel_url']);
         $this->assertSame(route('network.nodes.show', $odp), $odpRow['url']);
+        $this->assertSame(route('network.nodes.index', ['node' => $odp->id]), $odpRow['select_url']);
+        $this->assertNull($slotRow['select_url']);
+        $this->assertNull($ponRow['select_url']);
     }
 
     #[Test]

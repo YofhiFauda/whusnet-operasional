@@ -39,6 +39,10 @@
     {{-- Slot/PON yang dipilih ulang lewat `?node=` setelah PRG dari panelnya
          (posisi tidak ada di $nodes — fix C2). Bentuk = baris JSON children. --}}
     selectedPosition: @js($selectedPosition),
+    {{-- Leluhur node terpilih (OLT → Slot → PON) yang cabang pohon lazy-nya
+         dibuka otomatis saat load, supaya baris ODP/Slot/PON terpilih setelah
+         `?node=` terlihat di pohon. Hanya id dalam scope (dihitung server). --}}
+    treeOpenIds: @js($treeOpenIds ?? []),
     {{-- Hanya form modal yang membawa `device_type`; error dari form panel
          perangkat (kapasitas, Tambah Slot/PON) yang back() ke sini tidak
          boleh membuka modal Tambah Titik — errornya tampil lewat toast. --}}
@@ -310,8 +314,11 @@
                  sudah DIBUANG: keduanya membaca Slot/PON dari `$hierarchy`, padahal
                  sejak Task 11 Master Node tidak memuat posisi sama sekali (lazy) —
                  tak pernah merender apa pun. Slot/PON kini tampil di panel
-                 perangkat lazy di bawah dan di halaman Detail masing-masing. --}}
-            @forelse($nodes as $node)
+                 perangkat lazy di bawah dan di halaman Detail masing-masing.
+                 `$inspectorNodes` = `$nodes` + paling banyak SATU ODP anak PON yang
+                 dipilih lewat `?node=` (putaran UI 3) — ODP itu memakai blok
+                 inspector yang sama persis (grid port, modal, relokasi). --}}
+            @forelse($inspectorNodes ?? $nodes as $node)
             @php
                 $usagePercent = $node->ports_count > 0 ? round($node->used_ports_count / $node->ports_count * 100) : 0;
                 $isRedZone = $node->isInRedZone();
@@ -443,7 +450,7 @@
                                 <div class="text-xs text-text-muted flex items-center gap-3 flex-wrap">
                                     <span class="flex items-center gap-1.5">
                                         <span class="text-text-disabled">POP:</span>
-                                        <strong class="text-text-main font-semibold">{{ $node->anchorPop?->name ?? '—' }}</strong>
+                                        <strong class="text-text-main font-semibold">{{ $node->anchorPop?->name ?? ($inspectorPopLabels[$node->id] ?? '—') }}</strong>
                                     </span>
                                     @if($location['address'])
                                     <span class="text-text-disabled">&bull;</span>
@@ -617,8 +624,10 @@
                                     @can('network_nodes.update')
                                     <div class="h-6 w-px bg-border mx-1 hidden sm:block"></div>
 
-                                    <form method="POST" action="{{ route('network.nodes.ports.add', $node) }}" class="flex items-center w-full sm:w-auto">
+                                    <form method="POST" action="{{ route('network.nodes.ports.add', $node) }}" class="flex items-center w-full sm:w-auto" data-add-ports-form>
                                         @csrf
+                                        {{-- PRG kembali ke node ini terpilih (ODP anak PON tidak ada di daftar default). --}}
+                                        <input type="hidden" name="master_node" value="{{ $node->id }}">
                                         <input type="number" name="additional_capacity" min="1" max="1000" value="4" required
                                                class="w-14 sm:w-16 px-2.5 py-1.5 text-xs font-mono tabular-nums font-semibold text-center bg-surface border border-r-0 border-border rounded-l-lg text-text-main focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none" title="Jumlah Port Tambahan">
                                         <button type="submit" class="flex-1 sm:flex-initial justify-center px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-r-lg transition flex items-center gap-1.5 shadow-xs cursor-pointer">
@@ -637,12 +646,19 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                     @forelse($node->ports->sortBy('number') as $port)
                                         @php($assignment = $port->activeAssignment->first())
+                                        {{-- Target form modal port (Lepas, Sambung Pelanggan, Hubungkan
+                                             Node, Tandai Manual) dirender server di data-* kartu ini lalu
+                                             diteruskan ke modal lewat `$el.dataset` — dulu modal merakit
+                                             `'/network/node-ports/' + portId` di klien (konvensi CLAUDE.md). --}}
                                         @can('network_nodes.update')
                                             @if($port->is_used)
                                                 {{-- Port Terpakai (High Contrast, Clean Badges) --}}
                                                 <div x-show="portFilter === 'ALL' || portFilter === 'USED'"
+                                                     data-odp-port="{{ $port->id }}" data-port-update-url="{{ route('network.node-ports.update', $port) }}"
+                                                     data-port-assign-customer-url="{{ route('network.node-ports.assign-customer', $port) }}" data-port-assign-node-url="{{ route('network.node-ports.assign-node', $port) }}"
                                                      @click="openAssignModal({
                                                          portId: {{ $port->id }},
+                                                         urls: $el.dataset,
                                                          portNumber: {{ $port->number }},
                                                          nodeId: {{ $node->id }},
                                                          nodeCode: @js($node->code),
@@ -693,8 +709,11 @@
                                             @else
                                                 {{-- Port Tersedia (Emerald Dashed, Actionable) --}}
                                                 <div x-show="portFilter === 'ALL' || portFilter === 'AVAILABLE'"
+                                                     data-odp-port="{{ $port->id }}" data-port-update-url="{{ route('network.node-ports.update', $port) }}"
+                                                     data-port-assign-customer-url="{{ route('network.node-ports.assign-customer', $port) }}" data-port-assign-node-url="{{ route('network.node-ports.assign-node', $port) }}"
                                                      @click="openAssignModal({
                                                          portId: {{ $port->id }},
+                                                         urls: $el.dataset,
                                                          portNumber: {{ $port->number }},
                                                          nodeId: {{ $node->id }},
                                                          nodeCode: @js($node->code),
@@ -879,37 +898,45 @@
 
                             <div class="p-4 rounded-lg border border-border bg-surface-muted/30">
                                 @if($typeCode === 'odp')
-                                {{-- ODP wajib berinduk PON: pilih OLT (server-rendered), lalu PON-nya
-                                     dimuat per OLT lewat `network.nodes.pon-options` — bukan seluruh
-                                     PON scope dirender di tiap blok inspector (dulu O(N²)). --}}
+                                {{-- ODP wajib berinduk PON (server menolak selain PON —
+                                     NetworkNodeService::move). PON tujuan dipilih lewat SATU field
+                                     bercari yang sama dengan Tambah ODP (`network.nodes.pon-search`,
+                                     ≤20 hasil, ter-scope POP, URL dari server) — dulu select OLT dari
+                                     semua OLT scope di tiap blok ODP lalu PON per OLT. Yang dikirim
+                                     hanya `parent_id` tersembunyi = PON terpilih. --}}
                                 <form method="POST" action="{{ route('network.nodes.move', $node) }}"
-                                      x-data="ponPicker()" class="space-y-4" data-odp-relocate>
+                                      data-odp-relocate data-pon-search-url="{{ route('network.nodes.pon-search') }}"
+                                      x-data="ponSearchField(null)" @click.outside="open = false" class="space-y-4">
                                     @csrf
                                     @method('PATCH')
-                                    <div class="grid gap-3 sm:grid-cols-2">
-                                        <div>
-                                            <label class="block text-xs font-bold text-text-secondary mb-1">OLT Tujuan</label>
-                                            <select @change="loadPons($event.target.selectedOptions[0]?.dataset.ponOptionsUrl)" required
-                                                    class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none cursor-pointer">
-                                                <option value="">Pilih OLT</option>
-                                                @foreach($ponDevices as $ponDevice)
-                                                <option value="{{ $ponDevice->id }}" data-pon-options-url="{{ route('network.nodes.pon-options', $ponDevice) }}">{{ $breadcrumbLabels[$ponDevice->id] ?? $ponDevice->code }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-bold text-text-secondary mb-1">PON Tujuan</label>
-                                            <select name="parent_id" required :disabled="pons.length === 0"
-                                                    class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none cursor-pointer disabled:opacity-50">
-                                                <option value="" x-text="loading ? 'Memuat PON...' : 'Pilih PON'"></option>
-                                                <template x-for="pon in pons" :key="pon.id">
-                                                    <option :value="pon.id" x-text="pon.label"></option>
-                                                </template>
-                                            </select>
-                                        </div>
+                                    <input type="hidden" name="master_node" value="{{ $node->id }}">
+                                    <input type="hidden" name="parent_id" :value="selectedId">
+                                    <p class="text-[11px] text-text-muted">Induk sekarang: <span class="font-mono text-text-secondary" data-current-uplink>{{ $node->parent_id ? (implode(' / ', array_slice(array_values($breadcrumbParts), 0, -1)) ?: '—') : '—' }}</span></p>
+                                    <div class="relative">
+                                        <label for="relocate-pon-search-{{ $node->id }}" class="block text-xs font-bold text-text-secondary mb-1">PON Tujuan <span class="text-rose-500">*</span></label>
+                                        <input id="relocate-pon-search-{{ $node->id }}" type="text" autocomplete="off" x-model="query"
+                                               @input="onInput()" @focus="focus()"
+                                               @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)"
+                                               @keydown.enter.prevent="chooseActive()" @keydown.escape.stop="open = false"
+                                               role="combobox" aria-autocomplete="list" aria-controls="relocate-pon-results-{{ $node->id }}" :aria-expanded="open"
+                                               placeholder="Ketik kode/nama OLT atau kode PON, mis. OLT-SIMAN-S1-P2"
+                                               class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-main text-xs font-mono focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none">
+                                        <ul id="relocate-pon-results-{{ $node->id }}" x-show="open" x-cloak role="listbox"
+                                            class="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
+                                            <li x-show="loading" class="px-3 py-2 text-[11px] text-text-muted">Mencari PON…</li>
+                                            <template x-for="(option, index) in options" :key="option.id">
+                                                <li role="option" :aria-selected="index === active"
+                                                    @mousedown.prevent="choose(option)" @mouseenter="active = index"
+                                                    :class="index === active ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300' : 'text-text-main'"
+                                                    class="cursor-pointer px-3 py-2 font-mono text-xs" x-text="option.label"></li>
+                                            </template>
+                                            <li x-show="!loading && options.length === 0" class="px-3 py-2 text-[11px] text-text-muted">Tidak ada PON yang cocok dalam scope Anda.</li>
+                                        </ul>
+                                        <p class="mt-1 text-[11px]" :class="selectedId ? 'text-emerald-600 dark:text-emerald-400' : 'text-text-muted'"
+                                           x-text="selectedId ? 'PON terpilih: ' + (selectedLabel || ('#' + selectedId)) : 'Pilih satu PON dari hasil pencarian (maks. 20 ditampilkan — persempit dengan mengetik).'"></p>
                                     </div>
                                     <div class="pt-2 flex justify-end">
-                                        <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition shadow-xs cursor-pointer">
+                                        <button type="submit" :disabled="!selectedId" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                                             Simpan Relokasi Uplink
                                         </button>
                                     </div>
@@ -920,6 +947,7 @@
                                       class="space-y-4">
                                     @csrf
                                     @method('PATCH')
+                                    <input type="hidden" name="master_node" value="{{ $node->id }}">
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <div>
                                             <label class="block text-xs font-bold text-text-secondary mb-1">Pindah Penempatan Ke</label>
@@ -1174,17 +1202,28 @@
                                 </a>
                             </template>
                         </div>
-
-                        <form :action="'/network/node-ports/' + assignModal.portId" method="POST" class="no-confirm">
-                            @csrf
-                            @method('PUT')
-                            <input type="hidden" name="is_used" value="0">
-                            <button type="submit"
-                                    class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs cursor-pointer transition">
+                    </div>
+                    {{-- Lepas port wajib konfirmasi fisik + catatan (`updatePort`:
+                         physical_removal_confirmed & release_note). Dulu form ini hanya
+                         mengirim is_used=0 → selalu gagal validasi, port tak pernah
+                         lepas dari Master Node. Isian sama dengan halaman Detail. --}}
+                    <form :action="assignModal.updateUrl" method="POST" class="no-confirm space-y-2 border-t border-border pt-3" data-port-release-form>
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="is_used" value="0">
+                        <label class="flex items-center gap-2 text-[11px] text-text-secondary">
+                            <input type="checkbox" name="physical_removal_confirmed" value="1" required>
+                            <span>Kabel fisik pelanggan/sambungan sudah dilepas dari port ini</span>
+                        </label>
+                        <input name="release_note" required maxlength="500" value="Pelepasan port kabel fisik" placeholder="Catatan pelepasan fisik"
+                               class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none">
+                        <div class="flex justify-end">
+                            <button type="submit" :disabled="!assignModal.updateUrl"
+                                    class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs cursor-pointer transition disabled:opacity-50">
                                 Lepas / Putus Port Ini
                             </button>
-                        </form>
-                    </div>
+                        </div>
+                    </form>
                 </div>
             </template>
 
@@ -1213,7 +1252,7 @@
                     {{-- Opsi 1: Sambung Pelanggan --}}
                     <div x-show="assignModal.type === 'customer'">
                         <template x-if="modalCustomers.length > 0">
-                            <form :action="'/network/node-ports/' + assignModal.portId + '/assign-customer'" method="POST" class="no-confirm space-y-3">
+                            <form :action="assignModal.assignCustomerUrl" method="POST" class="no-confirm space-y-3">
                                 @csrf
                                 <div>
                                     <label class="block text-xs font-bold text-text-secondary mb-1">Pilih Pelanggan <span class="text-rose-500">*</span></label>
@@ -1247,7 +1286,7 @@
                     {{-- Opsi 2: Hubungkan Anak Node (ODP / Sub-Node) --}}
                     <div x-show="assignModal.type === 'node'">
                         <template x-if="unconnectedChildren.length > 0">
-                            <form :action="'/network/node-ports/' + assignModal.portId + '/assign-node'" method="POST" class="no-confirm space-y-3">
+                            <form :action="assignModal.assignNodeUrl" method="POST" class="no-confirm space-y-3">
                                 @csrf
                                 <div>
                                     <label class="block text-xs font-bold text-text-secondary mb-1">Pilih Anak Langsung <span class="text-rose-500">*</span></label>
@@ -1298,10 +1337,11 @@
 
                     {{-- Opsi 3: Tandai Manual --}}
                     <div x-show="assignModal.type === 'manual'">
-                        <form :action="'/network/node-ports/' + assignModal.portId" method="POST" class="no-confirm space-y-3">
+                        <form :action="assignModal.updateUrl" method="POST" class="no-confirm space-y-3">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="is_used" value="1">
+                            <input type="hidden" name="master_node" :value="assignModal.nodeId">
                             <p class="text-xs text-text-muted leading-relaxed">
                                 Tandai port ini terpakai secara manual tanpa mengaitkannya ke data pelanggan atau anak node. Status akan tercatat sebagai <em>belum terverifikasi</em>.
                             </p>
@@ -1347,42 +1387,6 @@ async function loadNodeChildren(url) {
     } catch {
         return [];
     }
-}
-
-/**
- * Pilihan PON satu OLT (`network.nodes.pon-options`), label "OLT / Slot n /
- * PON m". `url` selalu dari atribut/payload yang dirender server.
- */
-async function loadPonOptions(url) {
-    if (!url) {
-        return [];
-    }
-    try {
-        const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-        if (!response.ok) {
-            return [];
-        }
-        const data = await response.json();
-
-        return data.options || [];
-    } catch {
-        return [];
-    }
-}
-
-/** Pemilih OLT → PON untuk relokasi ODP di blok inspector. */
-function ponPicker() {
-    return {
-        pons: [],
-        loading: false,
-        async loadPons(url) {
-            this.pons = [];
-            if (!url) return;
-            this.loading = true;
-            this.pons = await loadPonOptions(url);
-            this.loading = false;
-        },
-    };
 }
 
 /**
@@ -1482,7 +1486,8 @@ function panelSelectionFrom(event) {
 }
 
 /**
- * Field "PON induk" bercari di modal Tambah ODP. Pencarian di server
+ * Field "PON induk" bercari di modal Tambah ODP dan form Relokasi Uplink ODP
+ * di inspector (`data-pon-search-url` pada elemen x-data). Pencarian di server
  * (`network.nodes.pon-search`, ≤20 hasil, ter-scope POP) — URL dari
  * `data-pon-search-url` yang dirender server. Yang dikirim form hanya
  * `parent_id` tersembunyi = id PON terpilih; mengetik ulang membatalkan
@@ -1604,6 +1609,7 @@ function networkNodeManager(config) {
         openRelocateId: null,
         selectedNodeId: config.selectedNodeId,
         selectedPosition: config.selectedPosition || null,
+        treeOpenIds: config.treeOpenIds || [],
         showCreateModal: config.showCreateModal,
         createType: config.createType,
         createPopId: String(config.createPopId || ''),
@@ -1649,6 +1655,9 @@ function networkNodeManager(config) {
             tenantName: '',
             tenantSubtitle: '',
             customerUrl: '',
+            updateUrl: '',
+            assignCustomerUrl: '',
+            assignNodeUrl: '',
         },
 
         toggleRelocate(nodeId) {
@@ -1765,6 +1774,10 @@ function networkNodeManager(config) {
                 tenantName: data.tenantName || '',
                 tenantSubtitle: data.tenantSubtitle || '',
                 customerUrl: data.customerUrl || '',
+                // Target form dari data-* kartu port (dirender server lewat route()).
+                updateUrl: data.urls?.portUpdateUrl || '',
+                assignCustomerUrl: data.urls?.portAssignCustomerUrl || '',
+                assignNodeUrl: data.urls?.portAssignNodeUrl || '',
                 type: defaultType,
             };
         },
@@ -1875,6 +1888,20 @@ function networkNodeManager(config) {
             this.rememberSelection(position.id);
             this.activeMobileTab = 'inspector';
             this.$nextTick(() => document.getElementById('inspector-position')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+        },
+
+        // ODP (baris pohon lazy di bawah PON). Blok inspector ODP anak PON
+        // hanya dirender server untuk ODP yang dipilih lewat `?node=` (fix C2
+        // tetap: index tidak memuat semua ODP), jadi: kalau bloknya sudah ada
+        // di halaman cukup dipilih, kalau belum muat halaman `select_url`
+        // (index?node=<id>, dirender server di JSON children).
+        openOdp(child) {
+            if (!child) return;
+            if (document.getElementById('inspector-node-' + child.id)) {
+                this.selectNode(child.id);
+                return;
+            }
+            if (child.select_url) window.location.assign(child.select_url);
         },
 
         openPanelSelection(event) {

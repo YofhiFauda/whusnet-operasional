@@ -12,15 +12,22 @@
     Teks node (label/kode) hanya lewat x-text, tidak pernah x-html.
 
     Baris ber-`panel_url` (Slot, PON) DIPILIH saat diklik → inspector kanan
-    memuat panel "Manajemen Node — Slot/PON" (`selectPosition`). Baris lain
-    (ODP, Port Switch) tetap tautan ke halaman Detail-nya.
+    memuat panel "Manajemen Node — Slot/PON" (`selectPosition`). Baris ODP
+    (ber-`select_url` = index?node=<id>) membuka inspector ODP yang sama
+    dengan ODP lain — grid port, modal port, relokasi (`openOdp`, putaran UI
+    3). Port Switch tetap tautan ke halaman Detail-nya.
+
+    `x-init`: cabang leluhur node terpilih (`treeOpenIds` dari server) dibuka
+    otomatis, dan baris terpilih digulir ke pandangan — supaya setelah
+    `?node=` baris ODP/PON-nya terlihat, bukan hanya inspector-nya.
 --}}
 <template id="lazy-tree-node-template">
     <div class="tree-line select-none my-0.5" :data-hierarchy-key="child.key" :data-lazy-node-id="child.id"
-         x-data="lazyTreeNode(child.children_url)">
+         x-data="lazyTreeNode(child.children_url)"
+         x-init="if (child.children_url && treeOpenIds.includes(child.id)) setOpen(true); if (selectedNodeId === child.id) $nextTick(() => $el.scrollIntoView({ block: 'nearest' }))">
         <div class="tree-node-item group flex items-center justify-between gap-1.5 sm:gap-2 rounded-lg border border-transparent px-2 py-1.5 transition-colors hover:bg-surface-muted"
-             :class="{ 'cursor-pointer': child.panel_url, 'bg-sky-50 dark:bg-sky-950/60 border-l-2 border-l-sky-600 shadow-2xs': child.panel_url && selectedNodeId === child.id }"
-             @click="if (child.panel_url) selectPosition(child)"
+             :class="{ 'cursor-pointer': child.panel_url || child.select_url, 'bg-sky-50 dark:bg-sky-950/60 border-l-2 border-l-sky-600 shadow-2xs': (child.panel_url || child.select_url) && selectedNodeId === child.id }"
+             @click="if (child.panel_url) selectPosition(child); else if (child.select_url) openOdp(child)"
              :title="child.path || child.label">
             <div class="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
                 <template x-if="child.children_url">
@@ -35,7 +42,12 @@
                 <template x-if="child.panel_url">
                     <span class="min-w-0 truncate font-mono text-xs font-semibold text-text-main" x-text="child.label"></span>
                 </template>
-                <template x-if="!child.panel_url">
+                {{-- ODP: tautan asli ke index?node= (buka di tab baru tetap jalan);
+                     klik biasa dicegah di sini dan ditangani `openOdp` baris. --}}
+                <template x-if="!child.panel_url && child.select_url">
+                    <a :href="child.select_url" @click.prevent data-lazy-odp-link class="min-w-0 truncate font-mono text-xs font-semibold text-text-main hover:text-primary hover:underline" x-text="child.label"></a>
+                </template>
+                <template x-if="!child.panel_url && !child.select_url">
                     <a :href="child.url" @click.stop class="min-w-0 truncate font-mono text-xs font-semibold text-text-main hover:text-primary hover:underline" x-text="child.label"></a>
                 </template>
             </div>
