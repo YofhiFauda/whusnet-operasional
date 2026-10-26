@@ -239,6 +239,30 @@ class NetworkNodeController extends Controller
     }
 
     /**
+     * Potongan inspector untuk satu ODP anak PON. Memakai loader ter-scope
+     * yang sama dengan pemilihan langsung lewat ?node=, sehingga klik di
+     * pohon tidak perlu memuat ulang seluruh halaman Master Node. ODP di luar
+     * scope / bukan anak PON → 404 (tidak membocorkan keberadaannya).
+     */
+    public function inspector(NetworkNode $node): View
+    {
+        $odp = $this->selectedOdpUnderPon($node->id);
+        abort_if($odp === null, 404);
+
+        $pop = $odp->resolvePop();
+
+        return view('network.nodes._inspector-node', [
+            'inspectorNodes' => collect([$odp]),
+            'treeChildren' => collect(),
+            'breadcrumbLabels' => [$odp->id => $this->positionPath($odp->parent).' / '.$odp->name],
+            'cabangByNodeId' => collect([$odp->id => Pop::resolveCabangId($pop?->id)]),
+            'inspectorPopLabels' => [$odp->id => $pop?->name],
+            'relocateTargets' => collect(),
+            'pops' => collect(),
+        ]);
+    }
+
+    /**
      * ODP anak PON yang diminta `?node=`, dimuat dengan eager-load yang sama
      * dengan `$nodes` di `index()` (port + penghuni, aset, anchor) supaya blok
      * inspector ODP-nya dirender tanpa query per port. Scope POP = `inPops()`
@@ -540,6 +564,7 @@ class NetworkNodeController extends Controller
                 'select_url' => $child->nodeType?->code === 'odp' ? route('network.nodes.index', ['node' => $child->id]) : null,
                 'path' => $parentPath.' / '.($child->isPosition() ? $child->displayName() : $child->code),
             ];
+                'inspector_url' => $child->nodeType?->code === 'odp' ? route('network.nodes.inspector', $child) : null,
         })->values()]);
     }
 

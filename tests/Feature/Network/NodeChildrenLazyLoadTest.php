@@ -235,7 +235,10 @@ class NodeChildrenLazyLoadTest extends TestCase
         $this->assertStringContainsString('data-children-url="'.route('network.nodes.children', $this->olt1).'"', $html);
         $this->assertStringContainsString('x-data="lazyTreeNode(', $html);
         $this->assertStringContainsString('id="lazy-tree-node-template"', $html);
-        $this->assertStringContainsString('x-html="lazyTreeTemplate()"', $html);
+        // `x-init` sekali-jalan, bukan `x-html` reaktif: x-html ikut membaca
+        // `selectedNodeId` sehingga tiap klik node merender ulang cabang terbuka.
+        $this->assertStringContainsString('$el.innerHTML = lazyTreeTemplate()', $html);
+        $this->assertStringNotContainsString('x-html="lazyTreeTemplate()"', $html);
         $this->assertStringNotContainsString("\$watch('isOpen'", $html);
     }
 

@@ -244,6 +244,15 @@ Rujukan tambahan hasil implementasi (bukan koreksi, tetapi perlu diketahui):
   Tambah Port, dan Tandai Manual menerima `master_node` → PRG ke node yang sama. Target form
   modal port dari `data-*` kartu port (route()), dan Lepas Port kini mengirim
   `physical_removal_confirmed` + `release_note` (sebelumnya selalu gagal validasi).
+  **Koreksi putaran UI 4 (2026-10-26):** memilih ODP dari pohon/tombol "Kelola Port" **tidak
+  lagi memuat ulang halaman** — reload membangun ulang pohon dengan cabang tertutup sehingga
+  PON tampak collapse sampai Slot. Klik kini `fetch` ke `network.nodes.inspector`
+  (`GET /network/nodes/{node}/inspector`, loader ter-scope `selectedOdpUnderPon` yang sama,
+  404 bila di luar scope/bukan anak PON) dan menyuntik parsial `_inspector-node` ke
+  `#lazy-odp-inspector`; URL diperbarui via `history.replaceState`. `inspector_url` dirender
+  server (JSON `children` + `data-inspector-url`), klien tidak merakit path. `select_url` /
+  `?node=` tetap berlaku untuk muat langsung halaman. Anak pohon lazy dirender `x-init`
+  sekali-jalan, bukan `x-html` reaktif (yang merender ulang cabang terbuka tiap seleksi berganti).
   View `_slot-inspector` dan
   `_pon-inspector` (§7) **dihapus**: keduanya membaca Slot/PON dari `$hierarchy` yang di
   Master Node tidak memuat posisi, sehingga tak pernah merender apa pun. `network.nodes.store` menolak tipe posisi dan selalu

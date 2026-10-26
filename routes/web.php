@@ -1263,6 +1263,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/nodes/{node}/generate-structure', [GenerateInfrastructureStructureController::class, 'store'])->name('network.nodes.generate-structure.store');
         Route::post('/network/nodes/{node}/infrastructure-slots', [InfrastructurePositionController::class, 'storeSlot'])->name('network.nodes.infrastructure-slots.store');
         Route::post('/network/infrastructure-slots/{slot}/ports', [InfrastructurePositionController::class, 'storePort'])->name('network.infrastructure-slots.ports.store');
+        Route::get('/network/nodes/{node}/inspector', [NetworkNodeController::class, 'inspector'])->name('network.nodes.inspector');
         Route::post('/network/infrastructure-ports/{port}/connections', [InfrastructurePositionController::class, 'connect'])->name('network.infrastructure-ports.connections.store');
         Route::post('/network/infrastructure-connections/{connection}/verify', [InfrastructurePositionController::class, 'verifyConnection'])->name('network.infrastructure-connections.verify');
         Route::post('/network/infrastructure-connections/{connection}/release', [InfrastructurePositionController::class, 'releaseConnection'])->name('network.infrastructure-connections.release');

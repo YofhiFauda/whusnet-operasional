@@ -269,6 +269,32 @@ class OdpDiBawahPonTampilInspectorPortTest extends TestCase
     }
 
     #[Test]
+    public function inspector_odp_dapat_dimuat_tanpa_refresh_dan_tetap_terbatas_pop(): void
+    {
+        ['pon' => $pon, 'odp' => $odp] = $this->structure();
+        $oltB = $this->olt($this->cabangB, 'OLT-TERBATAS');
+        $ponB = $this->positions->createPort($this->positions->createSlot($oltB, 1), 1);
+        $odpB = $this->odp($ponB, 'ODP-TERBATAS', 2);
+        $this->actingAs($this->cabangUser($this->cabangA));
+
+        $children = collect($this->getJson(route('network.nodes.children', $pon))->assertOk()->json('children'));
+        $this->assertSame(route('network.nodes.inspector', $odp), $children->firstWhere('id', $odp->id)['inspector_url']);
+
+        $this->get(route('network.nodes.inspector', $odp))
+            ->assertOk()
+            ->assertSee('id="inspector-node-'.$odp->id.'"', false)
+            ->assertSee('data-odp-port=', false)
+            ->assertDontSee('inspector-node-'.$odpB->id, false);
+
+        $index = $this->get(route('network.nodes.index'))->assertOk()->getContent();
+        $this->assertStringContainsString('Penghuni Port Aktif', $index);
+        $this->assertStringContainsString('fetch(child.inspector_url', $index);
+        $this->assertStringNotContainsString('window.location.assign(child.select_url)', $index);
+
+        $this->get(route('network.nodes.inspector', $odpB))->assertNotFound();
+    }
+
+    #[Test]
     public function node_pon_membuka_cabang_leluhur_di_pohon(): void
     {
         ['olt' => $olt, 'slot' => $slot, 'pon' => $pon] = $this->structure();

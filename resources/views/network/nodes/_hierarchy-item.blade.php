@@ -114,8 +114,11 @@
              bawah PON bisa dicapai dari pohon. --}}
         <div x-show="isOpen" class="ml-2 sm:ml-3 space-y-0.5 pl-1 sm:pl-1.5 border-l border-border/50" data-lazy-children>
             <p x-show="lazyLoading" class="px-2 py-1 text-[11px] text-text-muted">Memuat…</p>
+            {{-- `x-init` sekali-jalan, bukan `x-html` reaktif — lihat
+                 penjelasan di `_lazy-tree-node-template.blade.php` (loop
+                 render-ulang + fetch berulang tiap `selectedNodeId` ganti). --}}
             <template x-for="child in lazyChildren" :key="child.key">
-                <div x-html="lazyTreeTemplate()"></div>
+                <div x-init="$el.innerHTML = lazyTreeTemplate(); Alpine.initTree($el)"></div>
             </template>
             <template x-if="lazyLoaded && lazyChildren.length === 0">
                 <p class="px-2 py-1 text-[11px] text-text-muted">Belum ada anak tercatat.</p>

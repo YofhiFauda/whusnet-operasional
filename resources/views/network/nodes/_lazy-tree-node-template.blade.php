@@ -60,8 +60,21 @@
         <template x-if="lazyLoaded || lazyLoading">
             <div x-show="isOpen" class="ml-2 sm:ml-3 space-y-0.5 pl-1 sm:pl-1.5 border-l border-border/50">
                 <p x-show="lazyLoading" class="px-2 py-1 text-[11px] text-text-muted">Memuat…</p>
+                {{-- `x-init` sekali-jalan, BUKAN `x-html` (directive reaktif).
+                     `lazyTreeTemplate()` isinya statis, tapi Alpine.initTree
+                     yang dipanggil di dalamnya membaca `selectedNodeId`/
+                     `treeOpenIds` (reactive) — kalau lewat `x-html`, bacaan
+                     itu ikut tercatat jadi dependency effect-nya, jadi SETIAP
+                     `selectedNodeId` berubah (klik node mana pun), seluruh
+                     cabang yang lagi kebuka ke-render ulang dari nol: innerHTML
+                     diganti tanpa `Alpine.destroyTree` dulu, `lazyTreeNode`
+                     baru dibikin, children di-fetch ULANG — DOM lama jadi
+                     detached (numpuk di memori) dan request `children`
+                     menumpuk tanpa henti tiap klik. `x-init` cuma jalan SEKALI
+                     saat elemen ini dibuat (konsisten dgn :key stabil di
+                     x-for), jadi render & fetch anak persis sekali. --}}
                 <template x-for="child in lazyChildren" :key="child.key">
-                    <div x-html="lazyTreeTemplate()"></div>
+                    <div x-init="$el.innerHTML = lazyTreeTemplate(); Alpine.initTree($el)"></div>
                 </template>
                 <p x-show="lazyLoaded && lazyChildren.length === 0" class="px-2 py-1 text-[11px] text-text-muted">Belum ada anak tercatat.</p>
             </div>

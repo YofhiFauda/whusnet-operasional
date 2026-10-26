@@ -61,7 +61,7 @@
                      lain (grid port, modal port, relokasi) lewat index?node=<id> —
                      tautan biasa (panel ini HTML tanpa Alpine), URL dari route(). --}}
                 @if($inMasterNode)
-                <a href="{{ route('network.nodes.index', ['node' => $odp->id]) }}" data-select-odp="{{ $odp->id }}" class="rounded-lg bg-sky-600 hover:bg-sky-700 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors shadow-2xs">Kelola Port</a>
+                <a href="{{ route('network.nodes.index', ['node' => $odp->id]) }}" data-select-odp="{{ $odp->id }}" data-inspector-url="{{ route('network.nodes.inspector', $odp) }}" class="rounded-lg bg-sky-600 hover:bg-sky-700 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors shadow-2xs">Kelola Port</a>
                 @endif
                 <a href="{{ route('network.nodes.show', $odp) }}" class="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:bg-surface-muted transition-colors shadow-2xs">Detail</a>
             </div>
