@@ -35,8 +35,11 @@
 
 @section('content')
 <div x-data="networkNodeManager({
-    selectedNodeId: @js($nodes->first(fn ($candidate) => ! in_array($candidate->nodeType?->code, ['pon_port', 'olt_card', 'aggregation_switch', 'backbone', 'feeder', 'drop_cable'], true))?->id),
-    showCreateModal: @js($errors->any() && !old('_method')),
+    selectedNodeId: @js($selectedNodeId),
+    {{-- Hanya form modal yang membawa `device_type`; error dari form panel
+         perangkat (kapasitas, Tambah Slot/PON) yang back() ke sini tidak
+         boleh membuka modal Tambah Titik — errornya tampil lewat toast. --}}
+    showCreateModal: @js($errors->any() && !old('_method') && old('device_type') !== null),
     createType: @js(old('device_type', '')),
     createPopId: @js(old('anchor_pop_id', '')),
     createDeviceId: @js(old('device_id', '')),
@@ -300,9 +303,11 @@
         <section :class="{ 'hidden lg:flex': activeMobileTab !== 'inspector', 'flex': activeMobileTab === 'inspector' }"
                  class="flex-1 w-full bg-surface rounded-lg border border-border shadow-2xs flex-col overflow-hidden" id="node-inspector">
 
-            @include('network.nodes._slot-inspector')
-            @include('network.nodes._pon-inspector')
-
+            {{-- Inspector Slot/PON terpisah (`_slot-inspector`/`_pon-inspector`)
+                 sudah DIBUANG: keduanya membaca Slot/PON dari `$hierarchy`, padahal
+                 sejak Task 11 Master Node tidak memuat posisi sama sekali (lazy) —
+                 tak pernah merender apa pun. Slot/PON kini tampil di panel
+                 perangkat lazy di bawah dan di halaman Detail masing-masing. --}}
             @forelse($nodes as $node)
             @php
                 $usagePercent = $node->ports_count > 0 ? round($node->used_ports_count / $node->ports_count * 100) : 0;
@@ -323,7 +328,7 @@
                 $nodeCabangId = $cabangByNodeId[$node->id] ?? null;
             @endphp
 
-            <div x-show="selectedSlotId === null && selectedPonId === null && selectedNodeId === {{ $node->id }}"
+            <div x-show="selectedNodeId === {{ $node->id }}"
                  x-transition:enter="transition ease-out duration-150"
                  x-transition:enter-start="opacity-0 translate-y-1"
                  x-transition:enter-end="opacity-100 translate-y-0"
@@ -357,7 +362,7 @@
                         {{-- Action Buttons --}}
                         <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto">
                             @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
-                            <a href="#device-components-{{ $node->id }}" class="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-surface-muted transition shadow-2xs">
+                            <a href="#device-panel-{{ $node->id }}" class="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-surface-muted transition shadow-2xs">
                                 Slot / {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port' }}
                             </a>
                             @else
@@ -537,18 +542,39 @@
 
                         {{-- Chassis / Switch Special Component Slots --}}
                         @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
-                            <div id="device-components-{{ $node->id }}" class="pb-2 rounded-lg border border-border bg-surface-muted/40 p-4 text-xs text-text-muted space-y-2">
-                                {{-- Slot/PON TIDAK dimuat di Master Node (lazy, §7): panel ini
-                                     sengaja hanya menautkan ke halaman Detail perangkat (daftar
-                                     Slot/PON lengkap + form Tambah Slot/PON) dan pohon kiri. --}}
-                                <p>Slot dan {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port Switch' }} perangkat ini dikelola di halaman Detail, atau telusuri lewat cabang <span class="font-mono font-semibold">{{ $node->code }}</span> di pohon kiri.</p>
-                                <div class="flex flex-wrap gap-2">
-                                    <a href="{{ route('network.nodes.show', $node) }}#device-components-{{ $node->id }}" class="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold text-sky-600 dark:text-sky-400 hover:bg-surface-muted shadow-2xs">Kelola Slot / {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port' }} &rarr;</a>
-                                    @can('network_nodes.update')
-                                    <a href="{{ route('network.nodes.generate-structure.create', $node) }}" class="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold text-text-secondary hover:bg-surface-muted shadow-2xs">Generate struktur</a>
-                                    @endcan
+                            {{-- Panel Manajemen Node (kartu Slot + PON/Port, form kapasitas &
+                                 Tambah Slot/PON) dimuat LAZY untuk perangkat yang DIPILIH saja,
+                                 dari `network.nodes.device-panel` (URL dirender server di
+                                 data-device-panel-url, tidak dirakit klien). Merender partial
+                                 `_device-slots` di sini untuk setiap perangkat = index O(N²)
+                                 (final review C2); tanpa panel sama sekali user kehilangan
+                                 kartu Slot/PON (umpan balik 2026-10-26). Isi sisipan adalah
+                                 HTML server biasa (form ber-@csrf, <details>) tanpa atribut
+                                 Alpine, jadi tidak perlu Alpine.initTree. --}}
+                            <section id="device-panel-{{ $node->id }}" data-device-panel
+                                     data-device-panel-url="{{ route('network.nodes.device-panel', $node) }}"
+                                     x-data="devicePanel()"
+                                     x-effect="if (selectedNodeId === {{ $node->id }}) load()"
+                                     class="pb-2 space-y-3">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-text-main flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-sky-600"></span>
+                                        <span>Manajemen Node — {{ $typeCode === 'olt_chassis' ? 'OLT' : 'Switch' }}</span>
+                                    </h3>
+                                    <div class="flex flex-wrap gap-2 text-xs">
+                                        @can('network_nodes.update')
+                                        <a href="{{ route('network.nodes.generate-structure.create', $node) }}" class="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold text-text-secondary hover:bg-surface-muted shadow-2xs">Generate struktur</a>
+                                        @endcan
+                                        <a href="{{ route('network.nodes.show', $node) }}#device-components-{{ $node->id }}" class="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold text-sky-600 dark:text-sky-400 hover:bg-surface-muted shadow-2xs">Buka Detail &rarr;</a>
+                                    </div>
                                 </div>
-                            </div>
+                                <p x-show="loading" class="rounded-lg border border-dashed border-border bg-surface-muted/40 p-4 text-xs text-text-muted">Memuat Slot / {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port' }}…</p>
+                                <div x-show="failed" x-cloak class="rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 p-4 text-xs text-rose-700 dark:text-rose-300 flex flex-wrap items-center justify-between gap-2">
+                                    <span>Gagal memuat panel perangkat.</span>
+                                    <button type="button" @click="load(true)" class="rounded-lg border border-rose-300 dark:border-rose-800 bg-surface px-3 py-1 font-semibold cursor-pointer">Coba lagi</button>
+                                </div>
+                                <div x-ref="body" x-show="loaded"></div>
+                            </section>
                         @endif
 
                         {{-- TAB 1: Manajemen Port & Sambungan --}}
@@ -1316,6 +1342,117 @@ function ponPicker() {
 }
 
 /**
+ * Panel Manajemen Node satu OLT/Switch, dimuat sekali saat perangkat itu
+ * pertama kali dipilih (x-effect di elemen panel). URL dibaca dari
+ * `data-device-panel-url` yang dirender server — di `init()`, karena di
+ * dalam handler `@click` `$el` menunjuk tombol, bukan elemen panel.
+ * Responsnya potongan HTML server (form biasa, tanpa atribut Alpine) dari
+ * endpoint kita sendiri; disisipkan apa adanya.
+ */
+function devicePanel() {
+    return {
+        url: null,
+        loaded: false,
+        loading: false,
+        failed: false,
+        init() {
+            this.url = this.$el.dataset.devicePanelUrl || null;
+        },
+        async load(force = false) {
+            // `failed` ikut dicek supaya x-effect tidak mengulang fetch tanpa
+            // henti setelah gagal — ulang hanya lewat tombol "Coba lagi".
+            if (!this.url || this.loading || (!force && (this.loaded || this.failed))) return;
+            this.loading = true;
+            this.failed = false;
+            try {
+                const response = await fetch(this.url, {
+                    headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                this.$refs.body.innerHTML = await response.text();
+                this.loaded = true;
+            } catch {
+                this.failed = true;
+            } finally {
+                this.loading = false;
+            }
+        },
+    };
+}
+
+/**
+ * Field "PON induk" bercari di modal Tambah ODP. Pencarian di server
+ * (`network.nodes.pon-search`, ≤20 hasil, ter-scope POP) — URL dari
+ * `data-pon-search-url` yang dirender server. Yang dikirim form hanya
+ * `parent_id` tersembunyi = id PON terpilih; mengetik ulang membatalkan
+ * pilihan supaya teks di kotak tidak pernah berbeda dari PON yang dikirim.
+ */
+function ponSearchField(initialId) {
+    return {
+        url: null,
+        query: '',
+        options: [],
+        selectedId: initialId ? String(initialId) : '',
+        selectedLabel: '',
+        open: false,
+        loading: false,
+        active: -1,
+        timer: null,
+        seq: 0,
+        init() {
+            this.url = this.$el.dataset.ponSearchUrl || null;
+        },
+        onInput() {
+            this.selectedId = '';
+            this.selectedLabel = '';
+            this.open = true;
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this.fetchOptions(), 250);
+        },
+        async fetchOptions() {
+            if (!this.url) return;
+            // Nomor urut permintaan: respons lama yang datang belakangan
+            // tidak boleh menimpa hasil ketikan terbaru.
+            const seq = ++this.seq;
+            this.loading = true;
+            try {
+                const target = new URL(this.url, window.location.origin);
+                target.searchParams.set('q', this.query.trim());
+                const response = await fetch(target, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                const data = response.ok ? await response.json() : { options: [] };
+                if (seq !== this.seq) return;
+                this.options = data.options || [];
+                this.active = this.options.length > 0 ? 0 : -1;
+            } catch {
+                if (seq === this.seq) this.options = [];
+            } finally {
+                if (seq === this.seq) this.loading = false;
+            }
+        },
+        focus() {
+            this.open = true;
+            if (this.options.length === 0) this.fetchOptions();
+        },
+        move(step) {
+            if (!this.open) { this.open = true; return; }
+            if (this.options.length === 0) return;
+            this.active = (this.active + step + this.options.length) % this.options.length;
+        },
+        choose(option) {
+            if (!option) return;
+            this.selectedId = String(option.id);
+            this.selectedLabel = option.label;
+            this.query = option.label;
+            this.open = false;
+        },
+        chooseActive() {
+            if (this.open && this.active >= 0) this.choose(this.options[this.active]);
+        },
+    };
+}
+
+/**
  * Satu cabang pohon yang anaknya dimuat saat DIBUKA (bukan saat init:
  * `$watch` tidak terpanggil untuk nilai awal, jadi cabang yang dirender
  * terbuka dulu tidak pernah memuat anaknya). Dipakai baik oleh item
@@ -1366,8 +1503,6 @@ function networkNodeManager(config) {
         inspectorTab: 'ports',
         openRelocateId: null,
         selectedNodeId: config.selectedNodeId,
-        selectedPonId: null,
-        selectedSlotId: null,
         showCreateModal: config.showCreateModal,
         createType: config.createType,
         createPopId: String(config.createPopId || ''),
@@ -1376,7 +1511,6 @@ function networkNodeManager(config) {
         createPonId: String(config.createPonId || ''),
         creationPops: config.creationPops || [],
         creationSlots: [],
-        creationPons: [],
         creationLoading: false,
         nodeTypeIds: config.nodeTypeIds || {},
         availableCustomers: config.availableCustomers || [],
@@ -1439,22 +1573,18 @@ function networkNodeManager(config) {
             return this.creationDevices.find(device => String(device.id) === String(this.createDeviceId)) || null;
         },
 
-        // Slot & PON TIDAK ada di pohon awal (lazy) — dimuat per perangkat saat
-        // dipilih, lewat URL yang dirender server pada item perangkat.
+        // Slot TIDAK ada di pohon awal (lazy) — dimuat per OLT saat dipilih
+        // (mode Tambah PON), lewat `children_url` yang dirender server pada
+        // item perangkat. PON induk ODP tidak lewat sini lagi: field bercari
+        // `ponSearchField()` mencari langsung ke server.
         async loadCreateOptions() {
             const device = this.selectedCreateDevice();
             this.createSlotId = '';
-            this.createPonId = '';
             this.creationSlots = [];
-            this.creationPons = [];
-            if (!device) return;
+            if (!device || this.createType !== 'pon') return;
             this.creationLoading = true;
-            if (this.createType === 'pon') {
-                const children = await loadNodeChildren(device.children_url);
-                this.creationSlots = children.filter(child => child.store_port_url);
-            } else if (this.createType === 'odp' && device.pon_options_url) {
-                this.creationPons = await loadPonOptions(device.pon_options_url);
-            }
+            const children = await loadNodeChildren(device.children_url);
+            this.creationSlots = children.filter(child => child.store_port_url);
             this.creationLoading = false;
         },
 
@@ -1475,7 +1605,6 @@ function networkNodeManager(config) {
             this.createSlotId = '';
             this.createPonId = '';
             this.creationSlots = [];
-            this.creationPons = [];
         },
 
         openCreateModalRoot() {
@@ -1585,26 +1714,6 @@ function networkNodeManager(config) {
             return true;
         },
 
-        selectSlot(id) {
-            this.selectedSlotId = id;
-            this.selectedPonId = null;
-            this.activeMobileTab = 'inspector';
-            this.$nextTick(() => {
-                const el = document.getElementById('inspector-slot-' + id);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            });
-        },
-
-        selectPon(id) {
-            this.selectedSlotId = null;
-            this.selectedPonId = id;
-            this.activeMobileTab = 'inspector';
-            this.$nextTick(() => {
-                const el = document.getElementById('inspector-pon-' + id);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            });
-        },
-
         markNodeSeen(id) {
             const row = document.querySelector('[data-tree-node-id="' + id + '"]');
             const unseenBadge = row?.querySelector('[data-unseen-badge]');
@@ -1633,9 +1742,16 @@ function networkNodeManager(config) {
 
         selectNode(id) {
             this.markNodeSeen(id);
-            this.selectedSlotId = null;
-            this.selectedPonId = null;
             this.selectedNodeId = id;
+            // Simpan pilihan di URL (`?node=`): form panel perangkat yang
+            // gagal validasi `back()` ke URL ini, dan index memilih ulang node
+            // yang sama (NetworkNodeController::index) — tanpa ini user
+            // dilempar ke node pertama dan kehilangan konteks.
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('node', id);
+                window.history.replaceState(window.history.state, '', url);
+            } catch {}
             this.portFilter = 'ALL';
             this.inspectorTab = 'ports';
             this.activeMobileTab = 'inspector';

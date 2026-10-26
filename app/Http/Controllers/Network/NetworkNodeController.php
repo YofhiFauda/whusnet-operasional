@@ -171,11 +171,22 @@ class NetworkNodeController extends Controller
         $hierarchy = app(InfrastructureHierarchyService::class)->build($user);
         $unseenNodeIds = $attention->unseenNodeIds($user);
 
+        // `?node=` memilih ulang node yang terakhir dibuka: inspector menulis
+        // parameter ini ke URL (history.replaceState) saat node dipilih, jadi
+        // form di panel perangkat yang gagal validasi lalu `back()` mendarat
+        // di node yang sama, bukan selalu node pertama. Hanya dipakai bila
+        // node itu memang ada di `$nodes` (sudah ter-scope POP) — id di luar
+        // scope diabaikan diam-diam, tidak 403 dan tidak membocorkan apa pun.
+        $requestedNodeId = request()->integer('node');
+        $selectedNodeId = $requestedNodeId > 0 && $nodes->contains('id', $requestedNodeId)
+            ? $requestedNodeId
+            : $nodes->first(fn (NetworkNode $candidate): bool => ! in_array($candidate->nodeType?->code, ['pon_port', 'olt_card', 'aggregation_switch', 'backbone', 'feeder', 'drop_cable'], true))?->id;
+
         return view('network.nodes.index', compact(
             'nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels',
             'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount',
             'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop', 'availableCustomers', 'hierarchy',
-            'unseenNodeIds', 'relocateTargets', 'ponDevices', 'cabangByNodeId'
+            'unseenNodeIds', 'relocateTargets', 'ponDevices', 'cabangByNodeId', 'selectedNodeId'
         ));
     }
 
@@ -413,6 +424,78 @@ class NetworkNodeController extends Controller
             'id' => $pon->id,
             'label' => "{$node->code} / Slot {$pon->parent?->number} / PON {$pon->number}",
         ])->values()]);
+    }
+
+    /**
+     * Pencarian PON untuk field "PON induk" di modal Tambah ODP (umpan balik
+     * user 2026-10-26: satu field bercari, bukan OLT → PON dua langkah).
+     * Dicari di SERVER dan dibatasi 20 baris karena satu deploy bisa punya
+     * ribuan PON — memuat semuanya ke halaman persis masalah O(N²) final
+     * review C2. Slot & perangkat diambil lewat JOIN (bukan eager-load per
+     * PON), jadi jumlah query konstan berapa pun PON-nya.
+     *
+     * Scope POP = `inPops()` yang SAMA dengan `authorizeNodeScope()`/listing:
+     * PON cabang lain tidak muncul walau kodenya diketik persis, dan scope
+     * kosong = deny-by-default (`inPops([])` → 1 = 0), bukan "semua".
+     */
+    public function ponSearch(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        $term = trim((string) ($validated['q'] ?? ''));
+        $user = $request->user();
+        $ponTypeId = NetworkNodeType::query()->where('code', InfrastructurePortKind::PON->typeCode())->value('id');
+
+        if ($ponTypeId === null) {
+            return response()->json(['options' => []]);
+        }
+
+        $pons = NetworkNode::query()
+            ->join('network_nodes as pon_slot', 'pon_slot.id', '=', 'network_nodes.parent_id')
+            ->join('network_nodes as pon_device', 'pon_device.id', '=', 'pon_slot.parent_id')
+            ->where('network_nodes.node_type_id', $ponTypeId)
+            ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
+            ->when($term !== '', function ($query) use ($term): void {
+                // `!` sebagai karakter escape LIKE, eksplisit lewat ESCAPE:
+                // SQLite tidak punya escape default (beda dengan MySQL), jadi
+                // tanpa ini "%"/"_" ketikan user jadi wildcard di satu DB saja.
+                $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term).'%';
+                $query->where(fn ($match) => $match
+                    ->whereRaw("network_nodes.code LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("pon_device.code LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("pon_device.name LIKE ? ESCAPE '!'", [$pattern]));
+            })
+            ->orderBy('pon_device.code')
+            ->orderBy('pon_slot.number')
+            ->orderBy('network_nodes.number')
+            ->limit(20)
+            ->get(['network_nodes.id', 'network_nodes.number', 'pon_slot.number as slot_number', 'pon_device.code as device_code']);
+
+        return response()->json(['options' => $pons->map(fn (NetworkNode $pon): array => [
+            'id' => $pon->id,
+            'label' => "{$pon->device_code} / Slot {$pon->slot_number} / PON {$pon->number}",
+        ])->values()]);
+    }
+
+    /**
+     * Panel "Manajemen Node — OLT/Switch" (kartu Slot + PON/Port, form
+     * kapasitas & Tambah Slot/PON) untuk SATU perangkat, dimuat inspector
+     * Master Node saat perangkat itu dipilih. Dulu partial ini dirender
+     * inline untuk SETIAP perangkat di index — itu yang membuat halaman
+     * O(N²) (final review C2) sehingga dicabut, lalu user kehilangan panelnya
+     * (umpan balik 2026-10-26). Lazy per klik menjaga keduanya.
+     *
+     * Mengembalikan potongan HTML server-rendered (partial yang sama dengan
+     * halaman Detail perangkat) — form di dalamnya form biasa ber-@csrf
+     * dengan target `route()`, jadi tetap jalan setelah disisipkan. Scope
+     * dicek dulu (403) baru tipe (404), sama urutannya dengan `ponOptions()`.
+     */
+    public function devicePanel(NetworkNode $node): View
+    {
+        $this->authorizeNodeScope($node);
+        $node->loadMissing('nodeType');
+        abort_if(InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) === null, 404);
+
+        return view('network.nodes._device-slots', ['device' => $node]);
     }
 
     public function markSeen(NetworkNode $node, NetworkNodeAttentionService $attention): JsonResponse

@@ -102,6 +102,46 @@ class OdpCreationPathFromUiTest extends TestCase
     }
 
     #[Test]
+    public function modal_tambah_odp_memakai_satu_field_pon_bercari_dengan_url_server(): void
+    {
+        $user = $this->cabangUser($this->cabangA);
+
+        // Umpan balik user 2026-10-26: OLT → PON dua langkah diganti SATU
+        // field PON bercari. URL pencarian dirender server di atribut data-,
+        // hasil memasok `parent_id` tersembunyi ke `network.nodes.store`.
+        $html = $this->actingAs($user)->get(route('network.nodes.index'))->assertOk()->getContent();
+        $this->assertStringContainsString('data-pon-search-url="'.route('network.nodes.pon-search').'"', $html);
+        $this->assertStringContainsString('data-odp-pon-search', $html);
+        $this->assertStringNotContainsString('data-odp-olt-select', $html);
+
+        // Hasil pencarian yang dipakai field itu: PON dalam scope saja.
+        $options = $this->getJson(route('network.nodes.pon-search', ['q' => 'OLT']))->assertOk()->json('options');
+        $this->assertSame([['id' => $this->ponA->id, 'label' => 'OLT-SATU / Slot 2 / PON 3']], $options);
+    }
+
+    #[Test]
+    public function tambah_odp_dari_modal_dengan_pon_hasil_pencarian_membuat_anak_pon(): void
+    {
+        $user = $this->cabangUser($this->cabangA);
+        $ponId = $this->actingAs($user)->getJson(route('network.nodes.pon-search', ['q' => 'S2-P3']))
+            ->assertOk()->json('options.0.id');
+        $this->assertSame($this->ponA->id, $ponId);
+
+        $response = $this->from(route('network.nodes.index'))->post(route('network.nodes.store'), [
+            'device_type' => 'odp',
+            'parent_id' => $ponId,
+            'node_type_id' => NetworkNodeType::where('code', 'odp')->value('id'),
+            'code' => 'ODP-DARI-MODAL',
+            'name' => 'ODP Dari Modal',
+            'capacity' => 8,
+        ]);
+
+        $odp = NetworkNode::where('code', 'ODP-DARI-MODAL')->firstOrFail();
+        $response->assertRedirect(route('network.nodes.show', $odp));
+        $this->assertSame($this->ponA->id, $odp->parent_id);
+    }
+
+    #[Test]
     public function pilihan_pon_berlabel_jalur_dan_terscope(): void
     {
         $user = $this->cabangUser($this->cabangA);
@@ -123,6 +163,8 @@ class OdpCreationPathFromUiTest extends TestCase
             ->assertOk()->json('children');
 
         $this->assertCount(1, $children);
+        // Form "Tambah PON" di modal tetap butuh OLT dipilih dulu → Slot dari
+        // endpoint children; target POST-nya dari server.
         $this->assertSame(route('network.infrastructure-slots.ports.store', $children[0]['id']), $children[0]['store_port_url']);
         $this->assertSame(route('network.nodes.children', $children[0]['id']), $children[0]['children_url']);
     }

@@ -1235,8 +1235,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/network/peta', [InfrastructureMapController::class, 'index'])->name('network.map.index');
         Route::get('/network/peta/ekspor', [InfrastructureMapController::class, 'export'])->name('network.map.export');
         Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
+        // Statis SEBELUM `{node}` — kalau tidak, "pon-search" ditelan route model binding.
+        Route::get('/network/nodes/pon-search', [NetworkNodeController::class, 'ponSearch'])->name('network.nodes.pon-search');
         Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
         Route::get('/network/nodes/{node}/children', [NetworkNodeController::class, 'children'])->name('network.nodes.children');
+        Route::get('/network/nodes/{node}/device-panel', [NetworkNodeController::class, 'devicePanel'])->name('network.nodes.device-panel');
         Route::get('/network/nodes/{node}/pon-options', [NetworkNodeController::class, 'ponOptions'])->name('network.nodes.pon-options');
         Route::get('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'create'])->name('network.nodes.register-asset.create');
         Route::post('/network/nodes/{node}/seen', [NetworkNodeController::class, 'markSeen'])->name('network.nodes.seen');
