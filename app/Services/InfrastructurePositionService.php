@@ -267,6 +267,38 @@ class InfrastructurePositionService
         });
     }
 
+    /**
+     * Turunkan ulang kode Slot/PON/Port di bawah `$parent` setelah kode
+     * induknya diganti (rename perangkat). Kode posisi = jalur induk
+     * (`derivedCode()`), jadi tanpa ini `OLT-LAMA-S3-P5` tetap menempel di
+     * bawah `OLT-BARU` dan pencarian/laporan berbasis kode menyesatkan.
+     * Pemanggil WAJIB membungkusnya dalam transaksi yang sama dengan rename:
+     * kalau satu kode bentrok (unique global) atau melewati 120 karakter,
+     * seluruh rename batal — tidak ada subtree setengah berganti kode.
+     *
+     * Tanpa audit per baris (saveQuietly): perubahan ini akibat mekanis dari
+     * rename induk yang sudah diaudit pemanggil.
+     *
+     * @return int jumlah posisi yang kodenya berubah
+     */
+    public function rederiveCodes(NetworkNode $parent): int
+    {
+        $changed = 0;
+        $children = NetworkNode::query()->where('parent_id', $parent->id)->with('nodeType')->get()
+            ->filter(fn (NetworkNode $child): bool => $child->isPosition());
+
+        foreach ($children as $child) {
+            $code = self::derivedCode($parent, $child->isSlot() ? 'S' : 'P', (int) $child->number);
+            if ($child->code !== $code) {
+                $this->guardUnique(fn () => $child->forceFill(['code' => $code])->saveQuietly());
+                $changed++;
+            }
+            $changed += $this->rederiveCodes($child);
+        }
+
+        return $changed;
+    }
+
     public function updateDeviceCapacity(NetworkNode $device, int $capacity, User $actor): NetworkNode
     {
         return DB::transaction(function () use ($device, $capacity, $actor): NetworkNode {

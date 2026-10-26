@@ -176,6 +176,19 @@ class NetworkNode extends Model
         return array_map(fn (InfrastructurePortKind $k) => $k->typeCode(), InfrastructurePortKind::cases());
     }
 
+    /**
+     * Code tipe Slot/PON/Port Switch — satu daftar turunan enum, dipakai
+     * query yang harus MENGECUALIKAN posisi (Master Node, proyeksi pohon
+     * default). Jangan tulis ulang daftar string-nya di controller/service:
+     * tipe posisi baru otomatis ikut terkecualikan lewat enum.
+     *
+     * @return list<string>
+     */
+    public static function positionTypeCodes(): array
+    {
+        return [...self::slotTypeCodes(), ...self::portTypeCodes()];
+    }
+
     private function typeCode(): ?string
     {
         return $this->relationLoaded('nodeType')

@@ -39,7 +39,52 @@ class PonCapacityService
      */
     public function summary(NetworkNode $pon): array
     {
-        $used = $this->used($pon);
+        return $this->summarize($pon, $this->used($pon));
+    }
+
+    /**
+     * Versi massal `summary()` untuk daftar PON (pohon lazy-load, Peta):
+     * SATU query agregat `COUNT(DISTINCT customer_id)` dikelompokkan per
+     * `parent_id` ODP, bukan satu query per PON. Tanpa ini halaman yang
+     * membuka satu Slot (16 PON) atau Peta penuh (ribuan PON) menembak query
+     * sebanyak jumlah PON. Semantik hitung WAJIB identik dengan
+     * `customersOn()` (ada tes kesetaraan) — kalau aturan "satu pelanggan =
+     * satu unit" berubah, ubah keduanya.
+     *
+     * @param  iterable<NetworkNode>  $pons
+     * @return array<int, array{used: int, capacity: ?int, threshold: ?int, unit: string, unit_label: string, red_zone: ?bool, is_full: bool, remaining: ?int}>
+     */
+    public function summaries(iterable $pons): array
+    {
+        $pons = collect($pons)->keyBy('id');
+        if ($pons->isEmpty()) {
+            return [];
+        }
+
+        $usedByPon = [];
+        foreach ($pons->keys()->chunk(500) as $chunk) {
+            $rows = DB::table('network_port_assignments as assignment')
+                ->join('network_node_ports as port', 'port.id', '=', 'assignment.network_node_port_id')
+                ->join('network_nodes as odp', 'odp.id', '=', 'port.network_node_id')
+                ->where('assignment.active_key', 1)
+                ->whereNotNull('assignment.customer_id')
+                ->whereIn('odp.parent_id', $chunk->all())
+                ->groupBy('odp.parent_id')
+                ->selectRaw('odp.parent_id as pon_id, COUNT(DISTINCT assignment.customer_id) as used')
+                ->get();
+            foreach ($rows as $row) {
+                $usedByPon[(int) $row->pon_id] = (int) $row->used;
+            }
+        }
+
+        return $pons->map(fn (NetworkNode $pon): array => $this->summarize($pon, $usedByPon[$pon->id] ?? 0))->all();
+    }
+
+    /**
+     * @return array{used: int, capacity: ?int, threshold: ?int, unit: string, unit_label: string, red_zone: ?bool, is_full: bool, remaining: ?int}
+     */
+    private function summarize(NetworkNode $pon, int $used): array
+    {
         $capacity = $pon->capacity;
         $threshold = $pon->red_zone_threshold;
 

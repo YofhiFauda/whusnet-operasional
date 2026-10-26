@@ -1237,6 +1237,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
         Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
         Route::get('/network/nodes/{node}/children', [NetworkNodeController::class, 'children'])->name('network.nodes.children');
+        Route::get('/network/nodes/{node}/pon-options', [NetworkNodeController::class, 'ponOptions'])->name('network.nodes.pon-options');
         Route::get('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'create'])->name('network.nodes.register-asset.create');
         Route::post('/network/nodes/{node}/seen', [NetworkNodeController::class, 'markSeen'])->name('network.nodes.seen');
         Route::get('/network/infrastructure-slots/{slot}', [InfrastructurePositionController::class, 'showSlot'])->name('network.infrastructure-slots.show');

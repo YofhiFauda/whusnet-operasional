@@ -50,9 +50,6 @@
             <label class="text-xs text-text-secondary">Nomor {{ $slotKind->portKind()->label() }}
                 <input type="number" name="number" min="1" required value="{{ old('number') }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
             </label>
-            <label class="text-xs text-text-secondary">Kode (opsional)
-                <input type="text" name="code" maxlength="50" value="{{ old('code') }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
-            </label>
             @if($slotKind === \App\Enums\InfrastructureSlotKind::OLT)
                 <label class="text-xs text-text-secondary">Kapasitas (pelanggan aktif)
                     <input type="number" name="capacity" min="1" value="{{ old('capacity') }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">

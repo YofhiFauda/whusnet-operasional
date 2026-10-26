@@ -103,7 +103,7 @@ class OdpNetworkManagementTest extends TestCase
             'city' => 'Ponorogo',
             'latitude' => -7.8660000,
             'longitude' => 111.4700000,
-        ])->assertRedirect(route('network.nodes.index'));
+        ])->assertRedirect(route('network.nodes.show', NetworkNode::where('code', 'ODP-LOC-A')->firstOrFail()));
 
         $parent = NetworkNode::where('code', 'ODP-LOC-A')->firstOrFail();
         $this->assertSame('Tiang RT 02', $parent->address);
@@ -135,7 +135,7 @@ class OdpNetworkManagementTest extends TestCase
             'code' => 'odp-test-01',
             'name' => 'ODP Test 01',
             'capacity' => 8,
-        ])->assertRedirect(route('network.nodes.index'));
+        ])->assertRedirect(route('network.nodes.show', NetworkNode::where('code', 'ODP-TEST-01')->firstOrFail()));
 
         $node = NetworkNode::where('code', 'ODP-TEST-01')->firstOrFail();
         $this->assertSame($pon->id, $node->parent_id);
@@ -210,7 +210,7 @@ class OdpNetworkManagementTest extends TestCase
             'code' => 'ODP-PON-1',
             'name' => 'ODP Di Bawah PON',
             'capacity' => 4,
-        ])->assertRedirect(route('network.nodes.index'));
+        ])->assertRedirect(route('network.nodes.show', NetworkNode::where('code', 'ODP-PON-1')->firstOrFail()));
 
         $odp = NetworkNode::where('code', 'ODP-PON-1')->firstOrFail();
         $this->assertSame($pon->id, $odp->parent_id);
@@ -335,7 +335,7 @@ class OdpNetworkManagementTest extends TestCase
             'code' => 'CR-01',
             'name' => 'Core',
             'capacity' => 8,
-        ])->assertRedirect(route('network.nodes.index'));
+        ])->assertRedirect(route('network.nodes.show', NetworkNode::where('code', 'CR-01')->firstOrFail()));
 
         $core = NetworkNode::where('code', 'CR-01')->firstOrFail();
         $this->assertSame(8, $core->capacity);
@@ -532,7 +532,7 @@ class OdpNetworkManagementTest extends TestCase
             'code' => 'CORE-1',
             'name' => 'Core Utama',
             'capacity' => 100,
-        ])->assertRedirect(route('network.nodes.index'));
+        ])->assertRedirect(route('network.nodes.show', NetworkNode::where('code', 'CORE-1')->firstOrFail()));
 
         $core = NetworkNode::where('code', 'CORE-1')->firstOrFail();
         $this->assertSame(0, $core->ports()->count());
@@ -558,7 +558,7 @@ class OdpNetworkManagementTest extends TestCase
             'anchor_pop_id' => $pop->id,
             'code' => 'OLT-TREE-1',
             'name' => 'OLT Pohon',
-        ])->assertRedirect(route('network.nodes.index'));
+        ])->assertRedirect(route('network.nodes.show', NetworkNode::where('code', 'OLT-TREE-1')->firstOrFail()));
         $olt = NetworkNode::where('code', 'OLT-TREE-1')->firstOrFail();
         $genericChildType = NetworkNodeType::create(['code' => 'test-child-no-port', 'name' => 'Anak Generik', 'has_ports' => false]);
         $this->actingAs($owner)->post(route('network.nodes.store'), [
@@ -567,7 +567,7 @@ class OdpNetworkManagementTest extends TestCase
             'code' => 'PON-CHILD-1',
             'name' => 'PON Anak',
             'capacity' => 4,
-        ])->assertRedirect(route('network.nodes.index'));
+        ])->assertRedirect(route('network.nodes.show', NetworkNode::where('code', 'PON-CHILD-1')->firstOrFail()));
 
         $child = NetworkNode::where('code', 'PON-CHILD-1')->firstOrFail();
         $this->assertSame($olt->id, $child->parent_id);

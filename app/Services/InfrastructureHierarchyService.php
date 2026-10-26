@@ -26,21 +26,26 @@ use Illuminate\Support\Facades\DB;
  * terpisah — item proyeksi karena itu hanya ada dua `kind`: `pop` dan `node`.
  * Tidak ada lagi `slot:`/`port:` sebagai kind terpisah.
  *
- * LAZY LOAD (§7 rancangan): tingkat Slot ke bawah (Slot, PON/Port Switch, ODP
- * yang jadi anak PON) TIDAK dimuat di proyeksi default (`$withPositions =
- * false`, dipakai Master Node) — perangkat (OLT/Switch) ditandai
- * `has_children` dan sisanya diambil lewat endpoint
- * `network.nodes.children` saat dibuka. `$withPositions = true` (dipakai
- * Peta & `metricsByCabang()`) memuat seluruh subtree seperti sebelumnya,
- * karena kanvas Peta & metrik ODP butuh rantai lengkap sekaligus.
+ * LAZY LOAD (§7 rancangan, koreksi final review ADHOC-213): tingkat Slot ke
+ * bawah (Slot, PON/Port Switch, dan ODP yang jadi anak PON) TIDAK dimuat di
+ * proyeksi default (`$withPositions = false`, dipakai Master Node) —
+ * perangkat (OLT/Switch) ditandai `has_children` dan sisanya diambil
+ * bertingkat lewat endpoint `network.nodes.children` saat dibuka (perangkat
+ * → Slot → PON → ODP). Rancangan awal R5 (ODP di bawah PON ikut dimuat
+ * dengan induk = OLT) DITINGGALKAN: dengan ~7.700 PON per deploy, ODP-nya
+ * bisa puluhan ribu baris di setiap muat halaman — persis beban yang mau
+ * dihindari lazy load. `$withPositions = true` (dipakai Peta &
+ * `metricsByCabang()`) memuat seluruh subtree seperti sebelumnya, karena
+ * kanvas Peta & metrik ODP butuh rantai lengkap sekaligus.
  *
  * ODP lama yang masih ditambatkan LANGSUNG ke POP (anchor_pop_id, bukan
  * PON) — peninggalan sebelum keputusan "ODP wajib punya PON" — tetap tampil
- * sejajar perangkat lain di bawah POP-nya; keduanya sama-sama node
- * top-level (parent_id null), jadi tidak kena lazy load.
+ * sejajar perangkat lain di bawah POP-nya, termasuk turunan non-posisinya.
  *
  * Scope: hanya POP yang boleh dilihat aktor (`Pop::forUser`) dan node di
- * dalamnya; SN ONT pelanggan butuh `customers.detail.devices.view_sensitive`.
+ * dalamnya. Proyeksi ini TIDAK memuat pelanggan/SN ONT (item `customer`
+ * sudah tidak dibangun); SN ONT bermasker `customers.detail.devices.view_sensitive`
+ * ada di Peta (`InfrastructureMapService`) dan Detail node.
  */
 class InfrastructureHierarchyService
 {
@@ -69,9 +74,10 @@ class InfrastructureHierarchyService
                 ->with('targetNode', 'targetPort')->get()
             : collect();
 
-        // $user null = proyeksi sistem (rekonsiliasi terjadwal), tanpa
-        // pembatasan POP — TIDAK pernah dipakai untuk tampilan pengguna.
-        $canSeeSerials = $user === null || $user->hasPermission('customers.detail.devices.view_sensitive');
+        // Ringkasan kapasitas SEMUA PON yang dimuat dalam satu query agregat
+        // — `summary()` per PON di loop bawah dulu jadi N+1 (Peta memuat
+        // ribuan PON sekaligus).
+        $ponSummaries = $this->ponCapacity->summaries($nodes->filter(fn (NetworkNode $node): bool => $node->isPon()));
 
         $items = [];
 
@@ -97,7 +103,7 @@ class InfrastructureHierarchyService
             $isSwitchPort = $node->portKind() === InfrastructurePortKind::SWITCH;
             $outgoing = $isSwitchPort ? $activeConnections->firstWhere('source_infrastructure_port_id', $node->id) : null;
             $capacity = match (true) {
-                $node->isPon() => $this->ponCapacity->summary($node),
+                $node->isPon() => $ponSummaries[$node->id],
                 (bool) $node->nodeType?->has_ports => [
                     'used' => (int) $node->used_ports_count,
                     'capacity' => (int) $node->ports_count,
@@ -209,9 +215,9 @@ class InfrastructureHierarchyService
 
     /**
      * Node yang boleh dilihat aktor. `$withPositions = false` (default,
-     * Master Node) HANYA memuat node top-level (`anchor_pop_id` terisi —
-     * perangkat OLT/Switch/Server, dan ODP lama yang masih anchor-POP
-     * langsung) sehingga Slot/PON/Port/ODP-di-bawah-PON tidak pernah ikut
+     * Master Node) memuat node non-posisi yang tidak berada di bawah posisi:
+     * perangkat OLT/Switch/Server, ODP lama anchor-POP, dan turunan non-posisi
+     * mereka — Slot/PON/Port beserta ODP di bawah PON tidak pernah ikut
      * sebelum diminta lewat endpoint lazy. `$withPositions = true` (Peta,
      * metrik) memuat seluruh subtree lewat CTE rekursif seperti proyeksi
      * lama.
@@ -225,18 +231,43 @@ class InfrastructureHierarchyService
             return collect();
         }
 
+        // Tanpa eager load pelanggan/ONT: proyeksi ini tidak lagi memuat item
+        // pelanggan (SN ONT bermasker izin hanya di Peta & Detail node), jadi
+        // memuat rantai port→assignment→customer→serial per node hanya beban.
         $query = NetworkNode::query()
-            ->with(['nodeType', 'ports.activeAssignment.customer.customerDevice', 'ports.activeAssignment.customer.customerTechnicalDetail',
-                'ports.activeAssignment.customer.inventorySerials' => fn ($q) => $q
-                    ->where('status', SerialStatus::INSTALLED->value)->with('item.category')])
+            ->with(['nodeType'])
             ->withCount(['ports', 'ports as used_ports_count' => fn ($q) => $q->where('is_used', true), 'children'])
             ->orderBy('code');
 
+        $placeholders = implode(',', array_fill(0, count($popIds), '?'));
+
         if (! $withPositions) {
-            return $query->whereIn('anchor_pop_id', $popIds)->get();
+            // Turun lewat node NON-posisi saja: begitu bertemu Slot/PON/Port
+            // rekursinya berhenti (anak posisi tidak pernah masuk `scoped`,
+            // jadi cucunya — termasuk ODP di bawah PON — juga tidak). Node
+            // non-posisi yang bertingkat tanpa posisi di tengah (ODP lama di
+            // bawah ODP lama, perangkat di bawah Server) tetap tampil
+            // bertingkat. Bagian di bawah perangkat dibuka lewat endpoint lazy
+            // `network.nodes.children` (Slot → PON → ODP).
+            $positionCodes = NetworkNode::positionTypeCodes();
+            $typePlaceholders = implode(',', array_fill(0, count($positionCodes), '?'));
+            $ids = array_map(static fn (object $row): int => (int) $row->id, DB::select(<<<SQL
+                WITH RECURSIVE scoped AS (
+                    SELECT n.id FROM network_nodes n
+                    JOIN network_node_types t ON t.id = n.node_type_id
+                    WHERE n.anchor_pop_id IN ({$placeholders}) AND t.code NOT IN ({$typePlaceholders})
+                    UNION
+                    SELECT child.id FROM network_nodes child
+                    JOIN scoped parent ON child.parent_id = parent.id
+                    JOIN network_node_types t ON t.id = child.node_type_id
+                    WHERE child.anchor_pop_id IS NULL AND t.code NOT IN ({$typePlaceholders})
+                )
+                SELECT id FROM scoped
+                SQL, [...array_values($popIds), ...$positionCodes, ...$positionCodes]));
+
+            return $query->whereIn('id', $ids)->get();
         }
 
-        $placeholders = implode(',', array_fill(0, count($popIds), '?'));
         $ids = array_map(static fn (object $row): int => (int) $row->id, DB::select(<<<SQL
             WITH RECURSIVE scoped AS (
                 SELECT id FROM network_nodes WHERE anchor_pop_id IN ({$placeholders})

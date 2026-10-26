@@ -73,10 +73,17 @@ class InfrastructureEndpointScopeTest extends TestCase
             'anchor_pop_id' => $pop->id, 'parent_id' => null, 'code' => $code, 'name' => $code]);
     }
 
+    /**
+     * Dikonversi ke model ODP-anak-PON (final review ADHOC-213): halaman PON
+     * dulu menampilkan "kandidat ODP" anchor-POP untuk disambungkan; sekarang
+     * ia menampilkan ODP yang SUDAH jadi anak PON itu. Yang dijaga tetap sama:
+     * ODP Mini POP saudara (di luar scope aktor) tidak pernah ikut tampil.
+     */
     #[Test]
     public function odp_candidates_exclude_sibling_mini_pop(): void
     {
-        $allowed = $this->node('odp', $this->miniA, 'ODP-ALLOWED');
+        $allowed = NetworkNode::factory()->create(['node_type_id' => NetworkNodeType::where('code', 'odp')->sole()->id,
+            'parent_id' => $this->pon->id, 'anchor_pop_id' => null, 'code' => 'ODP-ALLOWED', 'name' => 'ODP Allowed']);
         $hidden = $this->node('odp', $this->miniB, 'ODP-SECRET');
 
         $this->actingAs($this->actor)->get(route('network.infrastructure-ports.show', $this->pon))

@@ -33,14 +33,23 @@
          @if($lazyPending) data-children-url="{{ route('network.nodes.children', $item['id']) }}" @endif
          @if(str_starts_with((string) $item['parent'], 'node:')) data-tree-parent-id="{{ substr($item['parent'], 5) }}" @endif
      @endif
-     x-data="{ isOpen: {{ $item['type'] === 'odp' ? 'false' : 'true' }}, lazyLoaded: {{ $lazyPending ? 'false' : 'true' }}, lazyChildren: [] }"
-     @tree-toggle-all.window="isOpen = $event.detail.open">
+     @if($lazyPending)
+         {{-- Cabang lazy MULAI TERTUTUP dan memuat anak saat dibuka
+              (`lazyTreeNode.setOpen`). Dulu mulai terbuka + `$watch('isOpen')`
+              — watcher tidak terpanggil untuk nilai awal, jadi anak tidak
+              pernah dimuat sampai cabang ditutup lalu dibuka lagi. --}}
+         x-data="lazyTreeNode(@js(route('network.nodes.children', $item['id'])))"
+         @tree-toggle-all.window="setOpen($event.detail.open)"
+     @else
+         x-data="{ isOpen: {{ $item['type'] === 'odp' ? 'false' : 'true' }}, toggle() { this.isOpen = ! this.isOpen } }"
+         @tree-toggle-all.window="isOpen = $event.detail.open"
+     @endif>
     <div class="tree-node-item group flex items-center justify-between gap-1.5 sm:gap-2 rounded-lg border border-transparent px-2 py-1.5 transition-colors hover:bg-surface-muted {{ $isNode ? 'cursor-pointer' : '' }}"
          title="{{ $itemTooltip }}"
          @if($isNode) @click="selectNode({{ $item['id'] }}){{ $item['type'] === 'odp' ? '; isOpen = true' : '' }}" :class="{ 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-l-2 border-l-sky-600 font-semibold shadow-2xs': selectedNodeId === {{ $item['id'] }} }" @endif>
         <div class="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
             @if($childKeys !== [] || $lazyPending)
-                <button type="button" @click.stop="isOpen = !isOpen" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-text-main transition-colors cursor-pointer" title="Buka/Tutup Cabang">
+                <button type="button" @click.stop="toggle()" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-text-main transition-colors cursor-pointer" title="Buka/Tutup Cabang">
                     <svg class="h-3.5 w-3.5 transition-transform duration-150" :class="{ '-rotate-90': !isOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
                 </button>
             @else
@@ -94,34 +103,16 @@
             @endforeach
         </div>
     @elseif($lazyPending)
-        {{-- Slot ke bawah tidak dimuat di proyeksi default (Task 11, lazy
-             load) — baru diambil lewat `network.nodes.children` saat cabang
-             ini dibuka pertama kali. URL datang dari `data-children-url`
-             yang dirender server-side lewat `route()` di atas, Alpine cuma
-             membacanya (konvensi CLAUDE.md: aksi tidak merakit path). --}}
-        <div x-show="isOpen" class="ml-2 sm:ml-3 space-y-0.5 pl-1 sm:pl-1.5 border-l border-border/50"
-             x-init="$watch('isOpen', async (open) => {
-                 if (!open || lazyLoaded) return;
-                 lazyLoaded = true;
-                 lazyChildren = await loadNodeChildren($el.closest('[data-children-url]').dataset.childrenUrl);
-             })">
+        {{-- Slot ke bawah tidak dimuat di proyeksi default (lazy load) —
+             diambil lewat `network.nodes.children` saat cabang ini dibuka.
+             URL datang dari `data-children-url` yang dirender server-side
+             lewat `route()` di atas. Anak lazy dirender REKURSIF lewat
+             `#lazy-tree-node-template` (Slot → PON → ODP), jadi ODP di
+             bawah PON bisa dicapai dari pohon. --}}
+        <div x-show="isOpen" class="ml-2 sm:ml-3 space-y-0.5 pl-1 sm:pl-1.5 border-l border-border/50" data-lazy-children>
+            <p x-show="lazyLoading" class="px-2 py-1 text-[11px] text-text-muted">Memuat…</p>
             <template x-for="child in lazyChildren" :key="child.key">
-                <div class="tree-line select-none my-0.5" :data-hierarchy-key="child.key">
-                    <a :href="child.url"
-                       class="tree-node-item group flex items-center justify-between gap-1.5 sm:gap-2 rounded-lg border border-transparent px-2 py-1.5 transition-colors hover:bg-surface-muted"
-                       :title="child.label">
-                        <div class="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
-                            <span class="flex h-5 w-5 shrink-0 items-center justify-center text-xs text-text-disabled" x-text="child.has_children ? '›' : '•'"></span>
-                            <span class="shrink-0 rounded-md border border-border bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] font-bold text-text-secondary" x-text="child.type"></span>
-                            <span class="font-mono text-xs font-semibold text-text-main" x-text="child.label"></span>
-                        </div>
-                        <template x-if="child.capacity !== null">
-                            <span class="shrink-0 rounded-full border border-border bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-text-secondary">
-                                <span x-text="(child.used ?? '?') + '/' + (child.capacity ?? '?')"></span>
-                            </span>
-                        </template>
-                    </a>
-                </div>
+                <div x-html="lazyTreeTemplate()"></div>
             </template>
             <template x-if="lazyLoaded && lazyChildren.length === 0">
                 <p class="px-2 py-1 text-[11px] text-text-muted">Belum ada anak tercatat.</p>

@@ -7,6 +7,7 @@ use App\Enums\InfrastructureRecordStatus;
 use App\Enums\InfrastructureSlotKind;
 use App\Enums\ScopeType;
 use App\Models\AuditLog;
+use App\Models\InfrastructureConnection;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -460,5 +461,51 @@ class InfrastructurePositionTest extends TestCase
         $response->assertDontSee('SN-PON-1');
         $this->assertSame($onThisSlot->id, InventorySerial::where('status', 'deployed')
             ->where('current_infrastructure_slot_id', $slot->id)->sole()->id);
+    }
+
+    /**
+     * Final review ADHOC-213 (minor): tujuan sambungan yang BUKAN PON/Port
+     * Switch membuat resolver melempar InvalidArgumentException — dulu jadi
+     * 500. Kini 422 dengan pesan di field-nya, dan tidak ada sambungan tercatat.
+     */
+    #[Test]
+    public function sambungan_ke_tujuan_bukan_port_422_bukan_500(): void
+    {
+        $this->seedRbac();
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $switch = $this->device('switch_mini_pop');
+        $port = $this->service()->createPort($this->service()->ensureLogicalSlot($switch), 1);
+        $odp = $this->device('odp');
+
+        $this->actingAs($owner)->from(route('network.infrastructure-ports.show', $port))
+            ->post(route('network.infrastructure-ports.connections.store', $port), ['target_infrastructure_port_id' => $odp->id])
+            ->assertSessionHasErrors('target_infrastructure_port_id');
+        $this->assertSame(0, InfrastructureConnection::query()->count());
+    }
+
+    /**
+     * Minor final review: form Tambah Slot/PON dulu menampilkan "Kode
+     * (opsional)" yang divalidasi lalu dibuang diam-diam. Kode kiriman kini
+     * tidak diterima sama sekali; kode selalu turunan induk.
+     */
+    #[Test]
+    public function kode_kiriman_tambah_slot_dan_pon_diabaikan_kode_selalu_turunan(): void
+    {
+        $this->seedRbac();
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $olt = $this->device('olt_chassis', null, 'OLT-KODE');
+
+        $this->actingAs($owner)->post(route('network.nodes.infrastructure-slots.store', $olt), ['number' => 2, 'code' => 'BEBAS', 'label' => 'Kartu'])
+            ->assertSessionHasNoErrors();
+        $slot = NetworkNode::where('parent_id', $olt->id)->sole();
+        $this->assertSame('OLT-KODE-S2', $slot->code);
+
+        $this->actingAs($owner)->post(route('network.infrastructure-slots.ports.store', $slot), ['number' => 4, 'code' => 'BEBAS-PON'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('OLT-KODE-S2-P4', NetworkNode::where('parent_id', $slot->id)->sole()->code);
+        $this->assertFalse(NetworkNode::whereIn('code', ['BEBAS', 'BEBAS-PON'])->exists());
+
+        $this->actingAs($owner)->get(route('network.infrastructure-slots.show', $slot))->assertOk()
+            ->assertDontSee('name="code"', false);
     }
 }

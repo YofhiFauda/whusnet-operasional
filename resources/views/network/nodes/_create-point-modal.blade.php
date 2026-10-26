@@ -76,16 +76,31 @@
                         </template>
                     </select>
                 </div>
-                <div x-show="createType === 'odp'">
-                    <label class="block text-xs font-semibold text-text-secondary mb-1">2. PON induk <span class="text-rose-500">*</span></label>
-                    <select name="parent_id" x-model="createPonId" :required="createType === 'odp'"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
-                        <option value="">Pilih PON...</option>
-                        <template x-for="pon in creationPons" :key="pon.id">
-                            <option :value="pon.id" x-text="pon.breadcrumb"></option>
-                        </template>
-                    </select>
-                    <p class="mt-1 text-[11px] text-text-muted">ODP wajib anak langsung PON (Task 12) — tidak lagi ditambatkan ke POP.</p>
+                {{-- PON tidak ada di pohon awal (lazy): pilih OLT dulu (daftar dari
+                     pohon, sudah ter-scope POP), lalu PON-nya dimuat dari
+                     `network.nodes.pon-options` milik OLT itu (URL dari server). --}}
+                <div x-show="createType === 'odp'" class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-text-secondary mb-1">2. OLT <span class="text-rose-500">*</span></label>
+                        <select x-model="createDeviceId" @change="loadCreateOptions()" :required="createType === 'odp'" data-odp-olt-select
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
+                            <option value="">Pilih OLT...</option>
+                            <template x-for="device in creationOlts" :key="device.id">
+                                <option :value="device.id" x-text="device.breadcrumb"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-text-secondary mb-1">3. PON induk <span class="text-rose-500">*</span></label>
+                        <select name="parent_id" x-model="createPonId" :required="createType === 'odp'" :disabled="createType !== 'odp'"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
+                            <option value="" x-text="creationLoading ? 'Memuat PON...' : (createDeviceId && creationPons.length === 0 ? 'OLT ini belum punya PON' : 'Pilih PON...')"></option>
+                            <template x-for="pon in creationPons" :key="pon.id">
+                                <option :value="pon.id" x-text="pon.label"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <p class="sm:col-span-2 text-[11px] text-text-muted">ODP wajib anak langsung PON — tidak lagi ditambatkan ke POP. PON juga bisa ditambah ODP langsung dari halaman Detail PON.</p>
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -151,17 +166,12 @@
                         </template>
                     </select>
                 </div>
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <div>
-                        <label class="block text-xs font-semibold text-text-secondary mb-1">Nomor SLOT <span class="text-rose-500">*</span></label>
-                        <input name="number" type="number" min="1" max="999" value="{{ old('number') }}" required placeholder="Contoh: 1"
-                               class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-text-secondary mb-1">Label Kartu (Opsional)</label>
-                        <input name="label" value="{{ old('label') }}" maxlength="100" placeholder="Contoh: Kartu GPON 16-Port"
-                               class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
-                    </div>
+                {{-- Kode & nama Slot diturunkan otomatis (`{kode perangkat}-S{n}`);
+                     tidak ada isian kode/label bebas. --}}
+                <div>
+                    <label class="block text-xs font-semibold text-text-secondary mb-1">Nomor SLOT <span class="text-rose-500">*</span></label>
+                    <input name="number" type="number" min="1" max="999" value="{{ old('number') }}" required placeholder="Contoh: 1"
+                           class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-text-secondary mb-1">Kapasitas Port SLOT</label>
@@ -170,7 +180,7 @@
                 </div>
                 <div class="pt-3 border-t border-border flex items-center justify-end gap-2">
                     <button type="button" @click="showCreateModal = false" class="px-4 py-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary text-xs font-semibold cursor-pointer transition-colors">Batal</button>
-                    <button type="submit" :disabled="!createDeviceId" class="rounded-lg bg-sky-600 hover:bg-sky-700 px-5 py-2 text-xs font-bold text-white shadow-xs cursor-pointer transition-colors disabled:opacity-40">Simpan SLOT</button>
+                    <button type="submit" :disabled="!createSlotAction" class="rounded-lg bg-sky-600 hover:bg-sky-700 px-5 py-2 text-xs font-bold text-white shadow-xs cursor-pointer transition-colors disabled:opacity-40">Simpan SLOT</button>
                 </div>
             </form>
 
@@ -178,27 +188,34 @@
             <form x-show="createType === 'pon'" method="POST" :action="createPonAction" class="space-y-4 pt-1">
                 @csrf
                 <input type="hidden" name="device_type" value="pon">
-                <div>
-                    <label class="block text-xs font-semibold text-text-secondary mb-1">2. Slot OLT induk <span class="text-rose-500">*</span></label>
-                    <select name="slot_id" x-model="createSlotId" required
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
-                        <option value="">Pilih SLOT OLT...</option>
-                        <template x-for="slot in creationSlots" :key="slot.id">
-                            <option :value="slot.id" x-text="slot.breadcrumb"></option>
-                        </template>
-                    </select>
-                </div>
+                {{-- Slot dimuat per OLT lewat `children_url` item perangkat; target
+                     POST = `store_port_url` Slot terpilih (keduanya dari server). --}}
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
-                        <label class="block text-xs font-semibold text-text-secondary mb-1">Nomor PON <span class="text-rose-500">*</span></label>
-                        <input name="number" type="number" min="1" max="999" value="{{ old('number') }}" required placeholder="Contoh: 1"
-                               class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
+                        <label class="block text-xs font-semibold text-text-secondary mb-1">2. OLT <span class="text-rose-500">*</span></label>
+                        <select x-model="createDeviceId" @change="loadCreateOptions()" required
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
+                            <option value="">Pilih OLT...</option>
+                            <template x-for="device in creationOlts" :key="device.id">
+                                <option :value="device.id" x-text="device.breadcrumb"></option>
+                            </template>
+                        </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-text-secondary mb-1">Kode PON (Opsional)</label>
-                        <input name="code" value="{{ old('code') }}" maxlength="50" placeholder="Contoh: PON-01"
-                               class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
+                        <label class="block text-xs font-semibold text-text-secondary mb-1">3. Slot OLT induk <span class="text-rose-500">*</span></label>
+                        <select x-model="createSlotId" required
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
+                            <option value="" x-text="creationLoading ? 'Memuat Slot...' : (createDeviceId && creationSlots.length === 0 ? 'OLT ini belum punya Slot' : 'Pilih SLOT OLT...')"></option>
+                            <template x-for="slot in creationSlots" :key="slot.id">
+                                <option :value="slot.id" x-text="slot.label"></option>
+                            </template>
+                        </select>
                     </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-text-secondary mb-1">Nomor PON <span class="text-rose-500">*</span></label>
+                    <input name="number" type="number" min="1" max="999" value="{{ old('number') }}" required placeholder="Contoh: 1"
+                           class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-text-secondary mb-1">Kapasitas Pelanggan PON</label>
@@ -207,7 +224,7 @@
                 </div>
                 <div class="pt-3 border-t border-border flex items-center justify-end gap-2">
                     <button type="button" @click="showCreateModal = false" class="px-4 py-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary text-xs font-semibold cursor-pointer transition-colors">Batal</button>
-                    <button type="submit" :disabled="!createSlotId" class="rounded-lg bg-sky-600 hover:bg-sky-700 px-5 py-2 text-xs font-bold text-white shadow-xs cursor-pointer transition-colors disabled:opacity-40">Simpan PON</button>
+                    <button type="submit" :disabled="!createPonAction" class="rounded-lg bg-sky-600 hover:bg-sky-700 px-5 py-2 text-xs font-bold text-white shadow-xs cursor-pointer transition-colors disabled:opacity-40">Simpan PON</button>
                 </div>
             </form>
             @endcan

@@ -563,7 +563,12 @@ class InfrastructureMapTest extends TestCase
         $this->assertSame('pop_pusat', $payload['topologyDetails'][-$pusat->id]['type']);
         $this->assertSame(0, $payload['summary']['nodes']);
         $this->get(route('network.map.index'))->assertOk()->assertSee('WHUSNET')->assertSee('Jetis')->assertSee('C1');
-        $this->get(route('network.nodes.index'))->assertOk()->assertSee('Pusat / Server Utama')->assertSee('Mini POP');
+        // Label "Pusat / Server Utama" milik partial `_pop-tree` lama yang sudah
+        // diganti proyeksi hierarki tunggal (ADHOC-202 Task 10): pohon Master
+        // Node kini menulis label tipe POP dari `type_label` proyeksi, dan
+        // urutannya tetap Pusat → Cabang → Mini POP tanpa node perangkat.
+        $this->get(route('network.nodes.index'))->assertOk()
+            ->assertSeeInOrder(['WHUSNET', 'POP Pusat', 'Jetis', 'POP Cabang', 'C1', 'Mini POP']);
     }
 
     #[Test]

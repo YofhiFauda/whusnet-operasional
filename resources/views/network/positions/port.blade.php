@@ -54,6 +54,45 @@
     </section>
     @endif
 
+    @if($port->isPon())
+    {{-- ODP = anak langsung PON (`parent_id`). Form ini satu-satunya jalur
+         "hubungkan ODP" pengganti form sambungan lama: POST ke
+         `network.nodes.store` (route() server-side) dengan PON ini sebagai
+         induk; store mengarahkan ke Detail ODP baru (PRG). --}}
+    <section class="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-3" data-pon-odps>
+        <h2 class="text-sm font-black uppercase tracking-wider text-text-main">ODP pada PON ini</h2>
+        @forelse($odps as $odp)
+            <a href="{{ route('network.nodes.show', $odp) }}" class="flex items-center justify-between border-t border-border pt-2 text-sm hover:text-primary">
+                <span><span class="font-mono font-semibold">{{ $odp->code }}</span> <span class="text-text-muted">· {{ $odp->name }}</span></span>
+                <span class="text-xs font-mono text-text-muted">{{ (int) $odp->used_ports_count }}/{{ (int) $odp->ports_count }} port</span>
+            </a>
+        @empty
+            <p class="text-xs text-text-muted">Belum ada ODP yang tersambung ke PON ini.</p>
+        @endforelse
+
+        @if($canCreateNode && $odpTypeId)
+        <form method="POST" action="{{ route('network.nodes.store') }}" class="grid gap-3 border-t border-border pt-3 sm:grid-cols-3" data-add-odp-form>
+            @csrf
+            <input type="hidden" name="parent_id" value="{{ $port->id }}">
+            <input type="hidden" name="node_type_id" value="{{ $odpTypeId }}">
+            <label class="text-xs text-text-secondary">Kode ODP
+                <input type="text" name="code" required maxlength="50" value="{{ old('code') }}" placeholder="Contoh: ODP-SIMAN-01" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-mono uppercase text-text-main">
+            </label>
+            <label class="text-xs text-text-secondary">Nama ODP
+                <input type="text" name="name" required maxlength="150" value="{{ old('name') }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+            </label>
+            <label class="text-xs text-text-secondary">Jumlah port ODP
+                <input type="number" name="capacity" required min="1" max="1000" value="{{ old('capacity', 8) }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-mono text-text-main">
+            </label>
+            <label class="text-xs text-text-secondary sm:col-span-3">Alamat / patokan tiang (opsional)
+                <input type="text" name="address" maxlength="2000" value="{{ old('address') }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main">
+            </label>
+            <button type="submit" class="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover sm:col-span-3 sm:justify-self-start">Tambah ODP</button>
+        </form>
+        @endif
+    </section>
+    @endif
+
     @unless($port->isPon())
     {{-- ODP->PON murni lewat `parent_id` sejak Task 9 — bagian sambungan ini
     cuma berlaku untuk Port Switch (sambungan non-pohon, §3 rancangan). --}}

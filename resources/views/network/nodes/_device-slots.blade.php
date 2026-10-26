@@ -4,9 +4,12 @@
     // lama yang menunjuk tabel `infrastructure_slots`/`infrastructure_ports`
     // yang sudah dihapus. Kapasitas PON dihitung langsung di sini (N kecil
     // per perangkat — beda dari `$hierarchy` global yang lazy, §7).
-    $deviceSlots = $device->slots()->get();
-    $isOlt = $device->nodeType?->code === 'olt_chassis';
-    $ponCapacityService = app(\App\Services\PonCapacityService::class);
+    $deviceSlots = $device->slots()->with(['nodeType', 'positionPorts.nodeType'])->get();
+    $isOlt = \App\Enums\InfrastructureSlotKind::forDeviceTypeCode($device->nodeType?->code) === \App\Enums\InfrastructureSlotKind::OLT;
+    // Satu query agregat untuk semua PON perangkat (bukan summary() per PON).
+    $ponSummaries = app(\App\Services\PonCapacityService::class)->summaries(
+        $deviceSlots->flatMap(fn ($componentSlot) => $componentSlot->positionPorts)->filter(fn ($componentPort) => $componentPort->isPon())
+    );
     $connectionService = app(\App\Services\InfrastructureConnectionService::class);
 @endphp
 <section id="device-components-{{ $device->id }}" class="space-y-4 rounded-lg border border-border bg-surface p-4 sm:p-5 shadow-2xs">
@@ -34,7 +37,7 @@
     <div class="space-y-3 border-l-2 border-sky-300 dark:border-sky-800 pl-3">
         @forelse($deviceSlots as $componentSlot)
         @php
-            $componentPorts = $componentSlot->positionPorts()->get();
+            $componentPorts = $componentSlot->positionPorts;
             $portLabel = $componentSlot->slotKind()->portKind()->label();
         @endphp
         <details @if($componentPorts->isNotEmpty()) open @endif data-component-slot="{{ $componentSlot->id }}" class="rounded-lg border border-border bg-surface overflow-hidden">
@@ -60,7 +63,7 @@
                 <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                     @forelse($componentPorts as $componentPort)
                     @php
-                        $portCapacity = $componentPort->isPon() ? $ponCapacityService->summary($componentPort) : null;
+                        $portCapacity = $ponSummaries[$componentPort->id] ?? null;
                         $occupancy = $componentPort->isPon() ? null : $connectionService->occupancyOf($componentPort);
                         $connectionLabel = null;
                         if ($occupancy !== null && in_array($occupancy, [\App\Enums\InfrastructureOccupancy::TERPAKAI_TERVERIFIKASI, \App\Enums\InfrastructureOccupancy::TERPAKAI_BELUM_TERVERIFIKASI], true)) {
@@ -114,9 +117,6 @@
                         <label class="text-xs font-medium text-text-secondary">Nomor {{ $portLabel }} <span class="text-rose-500">*</span>
                             <input type="number" name="number" min="1" required class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                         </label>
-                        <label class="text-xs font-medium text-text-secondary">Kode (opsional)
-                            <input type="text" name="code" maxlength="50" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
-                        </label>
                         @if($isOlt)
                         <label class="text-xs font-medium text-text-secondary">Kapasitas PON (pelanggan aktif)
                             <input type="number" name="capacity" min="1" max="100000" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
@@ -143,9 +143,6 @@
             @csrf
             <label class="text-xs font-medium text-text-secondary">Nomor Slot <span class="text-rose-500">*</span>
                 <input type="number" name="number" min="1" required class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
-            </label>
-            <label class="text-xs font-medium text-text-secondary">Kode (opsional)
-                <input type="text" name="code" maxlength="50" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
             </label>
             <label class="text-xs font-medium text-text-secondary">Kapasitas ({{ $isOlt ? 'PON per slot' : 'port per slot' }})
                 <input type="number" name="capacity" min="1" max="9999" class="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">

@@ -10,12 +10,14 @@ use App\Models\ItemCategory;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
+use App\Models\NetworkPortAssignment;
 use App\Models\Pop;
 use App\Models\User;
 use App\Services\NetworkPortAssignmentService;
 use App\Services\PonCapacityService;
 use Database\Seeders\NetworkNodeTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -221,5 +223,55 @@ class PonCapacityTest extends TestCase
 
         $this->expectException(ValidationException::class);
         $this->capacity()->updateCapacity($port, 10, 80, $this->owner);
+    }
+
+    /**
+     * I6 final review ADHOC-213: `summaries()` (satu query agregat) WAJIB
+     * identik dengan `summary()` per PON untuk semua variasi — pelanggan
+     * ganda di dua port ODP yang sama, dua ODP, PON kosong, kapasitas/ambang
+     * null, PON penuh.
+     */
+    #[Test]
+    public function summaries_massal_identik_dengan_summary_per_pon(): void
+    {
+        $customers = $this->odpWithCustomers(3);
+        $this->odpWithCustomers(2);
+        // Riwayat assignment yang sudah dilepas (active_key null) untuk
+        // pelanggan yang sama di port lain: tidak boleh ikut terhitung.
+        $odp = NetworkNode::where('parent_id', $this->pon->id)->firstOrFail();
+        $extraPort = NetworkNodePort::create(['network_node_id' => $odp->id, 'number' => 99]);
+        NetworkPortAssignment::create(['network_node_port_id' => $extraPort->id, 'customer_id' => $customers[0]->id,
+            'active_key' => null, 'assigned_at' => now()]);
+        $empty = $this->makePon(capacity: null, threshold: null);
+        $full = $this->makePon(capacity: 1, threshold: 50);
+        $this->odpWithCustomers(1, $full);
+
+        $pons = collect([$this->pon, $empty, $full])->map->fresh();
+        $batch = $this->capacity()->summaries($pons);
+
+        foreach ($pons as $pon) {
+            $this->assertSame($this->capacity()->summary($pon), $batch[$pon->id], "Ringkasan PON {$pon->id} berbeda.");
+        }
+        $this->assertSame(5, $batch[$this->pon->id]['used']);
+        $this->assertSame(0, $batch[$empty->id]['used']);
+        $this->assertTrue($batch[$full->id]['is_full']);
+        $this->assertSame([], $this->capacity()->summaries([]));
+    }
+
+    #[Test]
+    public function summaries_massal_satu_query_berapa_pun_jumlah_pon(): void
+    {
+        $pons = collect(range(1, 12))->map(fn () => $this->makePon(capacity: 10, threshold: 80));
+        foreach ($pons->take(4) as $pon) {
+            $this->odpWithCustomers(1, $pon);
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->capacity()->summaries($pons);
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame(1, $queries);
     }
 }

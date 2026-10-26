@@ -41,13 +41,23 @@
     createPopId: @js(old('anchor_pop_id', '')),
     createDeviceId: @js(old('device_id', '')),
     createSlotId: @js(old('slot_id', '')),
-    createPonId: @js(old('uplink_pon_id', '')),
+    createPonId: @js(old('parent_id', '')),
     creationPops: @js($pops->map(fn ($pop) => ['id' => $pop->id, 'name' => $pop->name, 'type' => $pop->type, 'cabang_id' => \App\Models\Pop::resolveCabangId($pop->id)])->values()),
     nodeTypeIds: @js($nodeTypes->pluck('id', 'code')),
-    slotStoreUrl: @js(route('network.nodes.infrastructure-slots.store', ['node' => '__ID__'])),
-    ponStoreUrl: @js(route('network.infrastructure-slots.ports.store', ['slot' => '__ID__'])),
     availableCustomers: @js($availableCustomers),
-    hierarchyItems: @js(collect($hierarchy['items'])->map(fn ($item) => collect($item)->only(['id', 'label', 'name', 'kind', 'type', 'type_id', 'parent', 'breadcrumb']))),
+    {{-- URL per perangkat dirender server-side (route()); Alpine hanya
+         MEMILIH di antara URL ini, tidak merakit path dari id (CLAUDE.md). --}}
+    hierarchyItems: @js(collect($hierarchy['items'])->map(function ($item) {
+        $row = collect($item)->only(['id', 'label', 'name', 'kind', 'type', 'type_id', 'parent', 'breadcrumb'])->all();
+        $deviceKind = $item['kind'] === 'node' ? \App\Enums\InfrastructureSlotKind::forDeviceTypeCode($item['type']) : null;
+        if ($deviceKind !== null) {
+            $row['children_url'] = route('network.nodes.children', $item['id']);
+            $row['store_slot_url'] = route('network.nodes.infrastructure-slots.store', $item['id']);
+            $row['pon_options_url'] = $deviceKind === \App\Enums\InfrastructureSlotKind::OLT ? route('network.nodes.pon-options', $item['id']) : null;
+        }
+
+        return $row;
+    })),
     hierarchyChildren: @js($hierarchy['children']),
 })" class="space-y-5 pb-10">
 
@@ -234,7 +244,8 @@
                     <select x-model="typeFilter"
                             class="text-xs bg-surface-muted border border-border rounded-lg px-2.5 py-1.5 text-text-secondary font-medium focus:bg-surface focus:border-primary outline-none cursor-pointer">
                         <option value="all">Semua Tipe</option>
-                        @foreach($nodeTypes as $nodeType)
+                        {{-- Slot/PON/Port tidak ada di pohon awal (lazy), jadi tidak bisa difilter di sini. --}}
+                        @foreach($nodeTypes->reject(fn ($type) => in_array($type->code, \App\Models\NetworkNode::positionTypeCodes(), true)) as $nodeType)
                             <option value="{{ $nodeType->id }}">{{ $nodeType->name }}</option>
                         @endforeach
                     </select>
@@ -308,6 +319,8 @@
                 ])->values()->all();
                 $breadcrumbParts = array_filter(explode(' / ', $breadcrumbLabels[$node->id] ?? $node->name));
                 $typeCode = $node->nodeType?->code ?? 'other';
+                // Sekali per node, bukan per kartu port (dulu dihitung ulang di tiap port).
+                $nodeCabangId = $cabangByNodeId[$node->id] ?? null;
             @endphp
 
             <div x-show="selectedSlotId === null && selectedPonId === null && selectedNodeId === {{ $node->id }}"
@@ -524,16 +537,17 @@
 
                         {{-- Chassis / Switch Special Component Slots --}}
                         @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
-                            <div class="pb-2 rounded-lg border border-border bg-surface-muted/40 p-4 text-xs text-text-muted">
-                                {{-- Slot/PON perangkat kini baris `network_nodes` (`NetworkNode::slots()`/
-                                     `positionPorts()`). Panel inspector ini belum dirangkai ke lazy load,
-                                     dan memanggil relasi itu di sini tanpa eager load akan melempar
-                                     "lazy loading disabled" serta menjatuhkan seluruh halaman Master
-                                     Node. Buka pohon di sebelah kiri (lazy load Slot/PON lewat
-                                     `network.nodes.children`) untuk menelusuri komponen perangkat ini
-                                     sampai panel ini disusun ulang. --}}
-                                Panel komponen Slot/PON perangkat ini sedang disusun ulang untuk model node baru.
-                                Buka cabang <span class="font-mono font-semibold">{{ $node->code }}</span> di pohon sebelah kiri untuk menelusuri Slot/PON-nya.
+                            <div id="device-components-{{ $node->id }}" class="pb-2 rounded-lg border border-border bg-surface-muted/40 p-4 text-xs text-text-muted space-y-2">
+                                {{-- Slot/PON TIDAK dimuat di Master Node (lazy, §7): panel ini
+                                     sengaja hanya menautkan ke halaman Detail perangkat (daftar
+                                     Slot/PON lengkap + form Tambah Slot/PON) dan pohon kiri. --}}
+                                <p>Slot dan {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port Switch' }} perangkat ini dikelola di halaman Detail, atau telusuri lewat cabang <span class="font-mono font-semibold">{{ $node->code }}</span> di pohon kiri.</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <a href="{{ route('network.nodes.show', $node) }}#device-components-{{ $node->id }}" class="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold text-sky-600 dark:text-sky-400 hover:bg-surface-muted shadow-2xs">Kelola Slot / {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port' }} &rarr;</a>
+                                    @can('network_nodes.update')
+                                    <a href="{{ route('network.nodes.generate-structure.create', $node) }}" class="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold text-text-secondary hover:bg-surface-muted shadow-2xs">Generate struktur</a>
+                                    @endcan
+                                </div>
                             </div>
                         @endif
 
@@ -605,7 +619,7 @@
                                                          nodeCode: @js($node->code),
                                                          nodeName: @js($node->name),
                                                          nodeType: @js($node->nodeType?->code ?? ''),
-                                                         cabangId: @js(\App\Models\Pop::resolveCabangId($node->resolvePop()?->id)),
+                                                         cabangId: @js($nodeCabangId),
                                                          children: @js($availableChildren),
                                                          isUsed: true,
                                                          tenantType: @js($assignment?->customer ? 'customer' : ($assignment?->targetNode ? 'node' : ($assignment?->manual_label ? 'manual' : 'unknown'))),
@@ -657,7 +671,7 @@
                                                          nodeCode: @js($node->code),
                                                          nodeName: @js($node->name),
                                                          nodeType: @js($node->nodeType?->code ?? ''),
-                                                         cabangId: @js(\App\Models\Pop::resolveCabangId($node->resolvePop()?->id)),
+                                                         cabangId: @js($nodeCabangId),
                                                          children: @js($availableChildren),
                                                          isUsed: false,
                                                          tenantType: '',
@@ -835,6 +849,43 @@
                             </div>
 
                             <div class="p-4 rounded-lg border border-border bg-surface-muted/30">
+                                @if($typeCode === 'odp')
+                                {{-- ODP wajib berinduk PON: pilih OLT (server-rendered), lalu PON-nya
+                                     dimuat per OLT lewat `network.nodes.pon-options` — bukan seluruh
+                                     PON scope dirender di tiap blok inspector (dulu O(N²)). --}}
+                                <form method="POST" action="{{ route('network.nodes.move', $node) }}"
+                                      x-data="ponPicker()" class="space-y-4" data-odp-relocate>
+                                    @csrf
+                                    @method('PATCH')
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <div>
+                                            <label class="block text-xs font-bold text-text-secondary mb-1">OLT Tujuan</label>
+                                            <select @change="loadPons($event.target.selectedOptions[0]?.dataset.ponOptionsUrl)" required
+                                                    class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none cursor-pointer">
+                                                <option value="">Pilih OLT</option>
+                                                @foreach($ponDevices as $ponDevice)
+                                                <option value="{{ $ponDevice->id }}" data-pon-options-url="{{ route('network.nodes.pon-options', $ponDevice) }}">{{ $breadcrumbLabels[$ponDevice->id] ?? $ponDevice->code }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-text-secondary mb-1">PON Tujuan</label>
+                                            <select name="parent_id" required :disabled="pons.length === 0"
+                                                    class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none cursor-pointer disabled:opacity-50">
+                                                <option value="" x-text="loading ? 'Memuat PON...' : 'Pilih PON'"></option>
+                                                <template x-for="pon in pons" :key="pon.id">
+                                                    <option :value="pon.id" x-text="pon.label"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="pt-2 flex justify-end">
+                                        <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition shadow-xs cursor-pointer">
+                                            Simpan Relokasi Uplink
+                                        </button>
+                                    </div>
+                                </form>
+                                @else
                                 <form method="POST" action="{{ route('network.nodes.move', $node) }}"
                                       x-data="{ placement: @js($node->parent_id ? 'node' : 'pop') }"
                                       class="space-y-4">
@@ -865,7 +916,7 @@
                                             <select name="parent_id" x-bind:disabled="placement !== 'node'" x-bind:required="placement === 'node'"
                                                     class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none cursor-pointer">
                                                 <option value="">Pilih Node Induk</option>
-                                                @foreach($parentOptions as $parentOption)
+                                                @foreach($relocateTargets as $parentOption)
                                                 @if($parentOption->id !== $node->id)
                                                 <option value="{{ $parentOption->id }}" @selected($node->parent_id == $parentOption->id)>{{ $breadcrumbLabels[$parentOption->id] ?? $parentOption->name }}</option>
                                                 @endif
@@ -880,6 +931,7 @@
                                         </button>
                                     </div>
                                 </form>
+                                @endif
                             </div>
                         </div>
                         @endcan
@@ -897,6 +949,7 @@
     </div>
 
     @include('network.nodes._create-point-modal')
+    @include('network.nodes._lazy-tree-node-template')
 
     {{-- ========================================================================= --}}
     {{-- MODAL EDIT DETAIL NODE                                                   --}}
@@ -1226,6 +1279,79 @@ async function loadNodeChildren(url) {
     }
 }
 
+/**
+ * Pilihan PON satu OLT (`network.nodes.pon-options`), label "OLT / Slot n /
+ * PON m". `url` selalu dari atribut/payload yang dirender server.
+ */
+async function loadPonOptions(url) {
+    if (!url) {
+        return [];
+    }
+    try {
+        const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (!response.ok) {
+            return [];
+        }
+        const data = await response.json();
+
+        return data.options || [];
+    } catch {
+        return [];
+    }
+}
+
+/** Pemilih OLT → PON untuk relokasi ODP di blok inspector. */
+function ponPicker() {
+    return {
+        pons: [],
+        loading: false,
+        async loadPons(url) {
+            this.pons = [];
+            if (!url) return;
+            this.loading = true;
+            this.pons = await loadPonOptions(url);
+            this.loading = false;
+        },
+    };
+}
+
+/**
+ * Satu cabang pohon yang anaknya dimuat saat DIBUKA (bukan saat init:
+ * `$watch` tidak terpanggil untuk nilai awal, jadi cabang yang dirender
+ * terbuka dulu tidak pernah memuat anaknya). Dipakai baik oleh item
+ * server-rendered (`_hierarchy-item`) maupun anak lazy bertingkat
+ * (perangkat → Slot → PON → ODP) lewat template `#lazy-tree-node-template`.
+ */
+function lazyTreeNode(childrenUrl) {
+    return {
+        isOpen: false,
+        lazyLoaded: false,
+        lazyLoading: false,
+        lazyChildren: [],
+        childrenUrl: childrenUrl || null,
+        async setOpen(open) {
+            this.isOpen = open;
+            if (!open || this.lazyLoaded || this.lazyLoading || !this.childrenUrl) return;
+            this.lazyLoading = true;
+            this.lazyChildren = await loadNodeChildren(this.childrenUrl);
+            this.lazyLoaded = true;
+            this.lazyLoading = false;
+        },
+        toggle() {
+            return this.setOpen(!this.isOpen);
+        },
+    };
+}
+
+function lazyTreeTemplate() {
+    return document.getElementById('lazy-tree-node-template')?.innerHTML || '';
+}
+
+function lazyTreeBadge(type) {
+    return ({ olt_slot: 'SLOT', switch_slot: 'SLOT', olt_pon: 'PON', switch_port: 'PORT', odp: 'ODP' })[type]
+        || String(type || '').slice(0, 3).toUpperCase();
+}
+
 function networkNodeManager(config) {
     return {
         activeMobileTab: 'tree',
@@ -1249,9 +1375,10 @@ function networkNodeManager(config) {
         createSlotId: String(config.createSlotId || ''),
         createPonId: String(config.createPonId || ''),
         creationPops: config.creationPops || [],
+        creationSlots: [],
+        creationPons: [],
+        creationLoading: false,
         nodeTypeIds: config.nodeTypeIds || {},
-        slotStoreUrl: config.slotStoreUrl,
-        ponStoreUrl: config.ponStoreUrl,
         availableCustomers: config.availableCustomers || [],
         hierarchyItems: config.hierarchyItems || {},
         hierarchyChildren: config.hierarchyChildren || {},
@@ -1293,16 +1420,14 @@ function networkNodeManager(config) {
             this.openRelocateId = (this.openRelocateId === nodeId) ? null : nodeId;
         },
 
+        // Perangkat ber-Slot (OLT/Switch) dalam scope — hanya item pohon yang
+        // dikirim server membawa URL `children_url`/`store_slot_url`.
         get creationDevices() {
-            return Object.values(this.hierarchyItems).filter(item => item.kind === 'node' && ['olt_chassis', 'switch_mini_pop'].includes(item.type));
+            return Object.values(this.hierarchyItems).filter(item => item.kind === 'node' && item.store_slot_url);
         },
 
-        get creationSlots() {
-            return Object.values(this.hierarchyItems).filter(item => item.kind === 'slot' && item.type === 'olt');
-        },
-
-        get creationPons() {
-            return Object.values(this.hierarchyItems).filter(item => item.kind === 'port' && item.type === 'pon');
+        get creationOlts() {
+            return this.creationDevices.filter(item => item.pon_options_url);
         },
 
         get allowedCreationPops() {
@@ -1310,26 +1435,37 @@ function networkNodeManager(config) {
             return this.creationPops.filter(pop => allowed.includes(pop.type));
         },
 
-        cabangFor(item) {
-            let current = item;
-            while (current) {
-                if (current.kind === 'pop' && current.type === 'pop_cabang') return String(current.id);
-                current = this.hierarchyItems[current.parent];
+        selectedCreateDevice() {
+            return this.creationDevices.find(device => String(device.id) === String(this.createDeviceId)) || null;
+        },
+
+        // Slot & PON TIDAK ada di pohon awal (lazy) — dimuat per perangkat saat
+        // dipilih, lewat URL yang dirender server pada item perangkat.
+        async loadCreateOptions() {
+            const device = this.selectedCreateDevice();
+            this.createSlotId = '';
+            this.createPonId = '';
+            this.creationSlots = [];
+            this.creationPons = [];
+            if (!device) return;
+            this.creationLoading = true;
+            if (this.createType === 'pon') {
+                const children = await loadNodeChildren(device.children_url);
+                this.creationSlots = children.filter(child => child.store_port_url);
+            } else if (this.createType === 'odp' && device.pon_options_url) {
+                this.creationPons = await loadPonOptions(device.pon_options_url);
             }
-            return '';
+            this.creationLoading = false;
         },
 
-        get allowedCreationPons() {
-            const pop = this.creationPops.find(candidate => String(candidate.id) === this.createPopId);
-            return this.creationPons.filter(pon => pop && this.cabangFor(pon) === String(pop.cabang_id));
-        },
-
+        // Target POST dipilih dari URL kiriman server (item perangkat / anak
+        // Slot dari endpoint children), bukan dirakit dari id.
         get createSlotAction() {
-            return this.createDeviceId ? this.slotStoreUrl.replace('__ID__', this.createDeviceId) : '';
+            return this.selectedCreateDevice()?.store_slot_url || '';
         },
 
         get createPonAction() {
-            return this.createSlotId ? this.ponStoreUrl.replace('__ID__', this.createSlotId) : '';
+            return this.creationSlots.find(slot => String(slot.id) === String(this.createSlotId))?.store_port_url || '';
         },
 
         chooseCreateType(type) {
@@ -1338,6 +1474,8 @@ function networkNodeManager(config) {
             this.createDeviceId = '';
             this.createSlotId = '';
             this.createPonId = '';
+            this.creationSlots = [];
+            this.creationPons = [];
         },
 
         openCreateModalRoot() {
@@ -1348,7 +1486,7 @@ function networkNodeManager(config) {
         openAddChildModal(parentId, parentCode, parentName) {
             const parent = this.hierarchyItems['node:' + parentId];
             this.openCreateModalRoot();
-            if (parent && ['olt_chassis', 'switch_mini_pop'].includes(parent.type)) {
+            if (parent && parent.store_slot_url) {
                 this.createType = 'slot';
                 this.createDeviceId = String(parentId);
             }

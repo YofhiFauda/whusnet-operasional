@@ -194,4 +194,80 @@ class NodeChildrenLazyLoadTest extends TestCase
         // nyata (yang akan linear terhadap 12 anak kalau lolos).
         $this->assertLessThanOrEqual(6, $queryCount, 'Query log: '.json_encode(DB::getQueryLog()));
     }
+
+    /**
+     * Regresi final review ADHOC-213 (I1): anak lazy dulu dirender sebagai
+     * `<a>` datar tanpa tombol buka, sehingga PON dan ODP di bawahnya tidak
+     * pernah bisa dicapai dari pohon. Rantai OLT → Slot → PON → ODP harus bisa
+     * ditelusuri lewat `children_url` yang dirender server di tiap tingkat.
+     */
+    #[Test]
+    public function rantai_lazy_olt_slot_pon_odp_bisa_ditelusuri_lewat_children_url(): void
+    {
+        $this->actingAs($this->owner);
+
+        $slots = collect($this->getJson(route('network.nodes.children', $this->olt1))->assertOk()->json('children'))->keyBy('id');
+        $this->assertSame(route('network.nodes.children', $this->slot1), $slots[$this->slot1->id]['children_url']);
+        $this->assertNull($slots[$this->slot2->id]['children_url'], 'Slot tanpa anak tidak diberi URL buka.');
+        $this->assertSame(route('network.infrastructure-slots.show', $this->slot1), $slots[$this->slot1->id]['url']);
+
+        $pons = $this->getJson($slots[$this->slot1->id]['children_url'])->assertOk()->json('children');
+        $this->assertSame($this->pon->id, $pons[0]['id']);
+        $this->assertSame(route('network.infrastructure-ports.show', $this->pon), $pons[0]['url']);
+
+        $odps = collect($this->getJson($pons[0]['children_url'])->assertOk()->json('children'))->keyBy('id');
+        $this->assertSame(route('network.nodes.show', $this->odpSatu), $odps[$this->odpSatu->id]['url']);
+        $this->assertSame(route('network.nodes.show', $this->odpDua), $odps[$this->odpDua->id]['url']);
+    }
+
+    /**
+     * I1: cabang lazy dulu mulai `isOpen: true` + `$watch('isOpen')` — watcher
+     * tidak terpanggil untuk nilai awal, jadi anak tidak pernah dimuat sampai
+     * ditutup lalu dibuka lagi. Cabang lazy kini memakai `lazyTreeNode()` yang
+     * mulai TERTUTUP dan memuat saat dibuka, dan anaknya dirender rekursif
+     * lewat template bersama.
+     */
+    #[Test]
+    public function pohon_master_node_memakai_cabang_lazy_yang_mulai_tertutup_dan_rekursif(): void
+    {
+        $html = $this->actingAs($this->owner)->get(route('network.nodes.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-children-url="'.route('network.nodes.children', $this->olt1).'"', $html);
+        $this->assertStringContainsString('x-data="lazyTreeNode(', $html);
+        $this->assertStringContainsString('id="lazy-tree-node-template"', $html);
+        $this->assertStringContainsString('x-html="lazyTreeTemplate()"', $html);
+        $this->assertStringNotContainsString("\$watch('isOpen'", $html);
+    }
+
+    /**
+     * I6: membuka satu Slot (16 PON) dulu memanggil `PonCapacityService::summary()`
+     * per PON. Kini satu query agregat — jumlah query tidak tumbuh dengan
+     * jumlah PON.
+     */
+    #[Test]
+    public function children_slot_tidak_menghitung_kapasitas_pon_satu_per_satu(): void
+    {
+        $positions = app(InfrastructurePositionService::class);
+        $countFor = function (NetworkNode $slot): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($this->owner)->getJson(route('network.nodes.children', $slot))->assertOk();
+            $count = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $count;
+        };
+
+        $small = $positions->createSlot($this->olt1, 5);
+        $positions->createPort($small, 1, ['capacity' => 8]);
+        $big = $positions->createSlot($this->olt1, 6);
+        for ($number = 1; $number <= 16; $number++) {
+            $positions->createPort($big, $number, ['capacity' => 8]);
+        }
+
+        // Panggilan pemanasan: request pertama ikut memuat cache izin/scope,
+        // yang bukan bagian dari yang diukur.
+        $countFor($small);
+        $this->assertSame($countFor($small), $countFor($big));
+    }
 }

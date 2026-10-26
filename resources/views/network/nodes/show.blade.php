@@ -244,6 +244,26 @@
                                 @if($assignment->customer->customer_code || $assignment->customer->cid)
                                     <span class="block text-[11px] font-mono text-text-muted">{{ $assignment->customer->customer_code ?: $assignment->customer->cid }}</span>
                                 @endif
+                                {{-- SN Modem/ONT pelanggan = data sensitif: hanya dengan
+                                     `customers.detail.devices.view_sensitive` DAN pelanggan dalam
+                                     scope POP aktor. Blok ini sempat hilang saat redesign
+                                     (203a018) padahal controller tetap menyiapkan datanya —
+                                     dikembalikan beserta tesnya (InfrastructureMapTest). --}}
+                                @if($canViewDeviceSerials && ($allowedCustomerPopIds === null || in_array($assignment->customer->pop_id, $allowedCustomerPopIds)))
+                                    <div class="pt-1 border-t border-border/40">
+                                    @forelse($assignment->customer->networkPortModems() as $modem)
+                                        <div class="mt-1 p-1.5 rounded bg-surface/80 border border-border/60 text-[11px] text-text-secondary">
+                                            <span class="font-semibold text-text-main">Modem/ONT: {{ $modem['name'] }}</span>
+                                            <span class="block font-mono text-[10px] text-sky-700 dark:text-sky-300">SN {{ $modem['serial_number'] }}</span>
+                                            <span class="text-[9px] text-text-muted">({{ $modem['source'] }})</span>
+                                        </div>
+                                    @empty
+                                        <span class="block text-[11px] text-amber-700 dark:text-amber-400 font-medium">Modem belum tercatat</span>
+                                    @endforelse
+                                    </div>
+                                @else
+                                    <span class="block text-[11px] text-text-muted italic">SN modem dibatasi oleh izin perangkat pelanggan</span>
+                                @endif
                             </div>
                         @elseif($assignment?->targetNode)
                             <div>
@@ -345,6 +365,17 @@
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
+                @if($node->isPosition())
+                {{-- Kode & tipe Slot/PON/Port diturunkan dari induk; server
+                     mengabaikan kiriman keduanya (NetworkNodeController::update). --}}
+                <div class="text-xs font-semibold text-text-secondary">Kode Node
+                    <p data-derived-code class="mt-1 rounded-lg border border-border bg-surface-muted px-3.5 py-2 text-text-main text-xs font-mono break-all">{{ $node->code }}</p>
+                </div>
+                <div class="text-xs font-semibold text-text-secondary">Tipe Node
+                    <p class="mt-1 rounded-lg border border-border bg-surface-muted px-3.5 py-2 text-text-main text-xs">{{ $node->nodeType?->name }}</p>
+                </div>
+                <p class="sm:col-span-2 text-xs text-text-muted">Kode dan tipe Slot/PON/Port mengikuti perangkat induk dan tidak dapat diubah.</p>
+                @else
                 <label class="text-xs font-semibold text-text-secondary">Kode Node <span class="text-rose-500">*</span>
                     <input name="code" required maxlength="50" value="{{ old('code', $node->code) }}" class="mt-1 block w-full rounded-lg border border-border bg-surface px-3.5 py-2 text-text-main text-xs font-mono focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none">
                 </label>
@@ -355,7 +386,8 @@
                         @endforeach
                     </select>
                 </label>
-                <p class="sm:col-span-2 text-xs text-text-muted">Kode dan tipe hanya dapat diubah sebelum node memiliki port atau relasi lain.</p>
+                <p class="sm:col-span-2 text-xs text-text-muted">Kode dan tipe hanya dapat diubah sebelum node memiliki port atau relasi lain. Mengganti kode OLT/Switch ikut mengganti kode Slot/PON/Port di bawahnya.</p>
+                @endif
                 <label class="text-xs font-semibold text-text-secondary">Nama Node <span class="text-rose-500">*</span>
                     <input name="name" required value="{{ old('name', $node->name) }}"
                            class="mt-1 block w-full rounded-lg border border-border bg-surface px-3.5 py-2 text-text-main text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Network;
 
+use App\Enums\InfrastructurePortKind;
 use App\Enums\InfrastructureSlotKind;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
@@ -14,6 +15,7 @@ use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
 use App\Services\InfrastructureHierarchyService;
+use App\Services\InfrastructurePositionService;
 use App\Services\MasterRecordRemovalService;
 use App\Services\NetworkNodeAttentionService;
 use App\Services\NetworkNodeService;
@@ -47,18 +49,58 @@ class NetworkNodeController extends Controller
     public function index(NetworkNodeAttentionService $attention): View
     {
         $user = auth()->user();
+        $positionCodes = NetworkNode::positionTypeCodes();
+        // Slot/PON/Port dan apa pun yang tergantung di bawahnya (ODP anak PON)
+        // SENGAJA tidak dimuat: tiap node di sini dirender jadi satu blok
+        // inspector lengkap, jadi memuat ~10 ribu baris posisi (16 Slot × 8
+        // PON × 60 OLT, rancangan §8) membuat halaman O(N²) — inspector per
+        // node × select relokasi berisi semua node. Posisi & ODP-nya dibuka
+        // dari pohon (lazy) dan halaman Detail masing-masing.
         $nodes = NetworkNode::query()
             ->when(! $this->access->hasAllPopAccess($user), fn ($query) => $query->inPops($this->access->getAllowedPopIds($user)))
+            ->whereDoesntHave('nodeType', fn ($query) => $query->whereIn('code', $positionCodes))
+            ->where(fn ($query) => $query->whereNull('parent_id')
+                ->orWhereDoesntHave('parent.nodeType', fn ($type) => $type->whereIn('code', $positionCodes)))
             ->with(
                 'nodeType', 'ports.activeAssignment.customer', 'ports.activeAssignment.targetNode',
-                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item', 'children.nodeType'
+                'anchorPop.parent', 'parent', 'deployedSerials.item', 'infrastructureBalances.item'
             )
             ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
             ->orderBy('code')
             ->get();
+        // Sambungkan relasi `parent` ke instance yang SUDAH dimuat: tanpa ini
+        // `effectiveLocation()`/`resolvePop()` di tiap blok inspector naik
+        // rantai induk lewat `find()` per leluhur (N query per node).
+        $loadedById = $nodes->keyBy('id');
+        foreach ($nodes as $loaded) {
+            if ($loaded->parent_id !== null && $loadedById->has($loaded->parent_id)) {
+                $loaded->setRelation('parent', $loadedById->get($loaded->parent_id));
+            }
+        }
+        // Cabang tiap node dihitung SEKALI per anchor POP (memo), bukan
+        // `Pop::resolveCabangId($node->resolvePop()?->id)` di tiap blok
+        // inspector — itu 2-3 query per node.
+        $cabangIdByAnchor = [];
+        $cabangByNodeId = $nodes->mapWithKeys(function (NetworkNode $node) use (&$cabangIdByAnchor): array {
+            $top = $node;
+            $guard = 0;
+            while ($top->parent_id !== null && $top->relationLoaded('parent') && $top->parent !== null && $guard++ < 64) {
+                $top = $top->parent;
+            }
+            if ($top->anchor_pop_id === null) {
+                return [$node->id => Pop::resolveCabangId($node->resolvePop()?->id)];
+            }
+
+            return [$node->id => $cabangIdByAnchor[$top->anchor_pop_id] ??= Pop::resolveCabangId($top->anchor_pop_id)];
+        });
         $pops = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
         $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
         $parentOptions = $nodes;
+        // Target relokasi "node induk" = node non-ODP (perangkat/Server/node
+        // lama). ODP tidak pernah jadi induk node lain di model baru, dan PON
+        // tujuan ODP dimuat per OLT lewat `network.nodes.pon-options`.
+        $relocateTargets = $nodes->reject(fn (NetworkNode $node): bool => $node->nodeType?->code === 'odp')->values();
+        $ponDevices = $nodes->filter(fn (NetworkNode $node): bool => InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) === InfrastructureSlotKind::OLT)->values();
         $treeChildren = $parentOptions->groupBy(fn (NetworkNode $node) => $node->parent_id ?? 0);
         $nodesById = $parentOptions->keyBy('id');
         $topologyPops = Pop::forUser($user)
@@ -133,7 +175,7 @@ class NetworkNodeController extends Controller
             'nodes', 'pops', 'nodeTypes', 'parentOptions', 'treeChildren', 'breadcrumbLabels',
             'totalNodesCount', 'totalPortsCount', 'totalUsedPortsCount', 'redZoneNodesCount',
             'topologyPops', 'topologyPopChildren', 'uplinkPopChildren', 'rootNodesByPop', 'availableCustomers', 'hierarchy',
-            'unseenNodeIds'
+            'unseenNodeIds', 'relocateTargets', 'ponDevices', 'cabangByNodeId'
         ));
     }
 
@@ -169,6 +211,17 @@ class NetworkNodeController extends Controller
 
         $nodeType = NetworkNodeType::findOrFail($validated['node_type_id']);
 
+        // Slot/PON/Port Switch HANYA lewat InfrastructurePositionService
+        // (form Generate struktur / Tambah Slot / Tambah PON): di sana nomor
+        // unik per induk, kode turunan, dan satuan kapasitas dijaga. Lewat
+        // jalur generik ini POST buatan tangan bisa membuat "PON" tanpa
+        // nomor dengan kode bebas — identitas posisinya rusak sejak lahir.
+        if (in_array($nodeType->code, NetworkNode::positionTypeCodes(), true)) {
+            throw ValidationException::withMessages([
+                'node_type_id' => 'Slot/PON/Port dibuat lewat Generate struktur atau form Tambah Slot/PON pada perangkat, bukan form node umum.',
+            ]);
+        }
+
         // ODP wajib anak langsung PON (rancangan "Slot & PON sebagai node"
         // §2.4/§7, Task 12) — uplink sekarang murni `parent_id`, bukan lagi
         // sambungan `infrastructure_connections` terpisah (tabel itu + model
@@ -200,7 +253,7 @@ class NetworkNodeController extends Controller
             throw ValidationException::withMessages(['capacity' => "Kapasitas maksimal {$nodeType->max_ports} port."]);
         }
 
-        DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount, $hasLegacyPorts): void {
+        $node = DB::transaction(function () use ($validated, $parent, $anchor, $nodeType, $portCount, $hasLegacyPorts): NetworkNode {
             $node = NetworkNode::create([
                 'parent_id' => $parent?->id,
                 'anchor_pop_id' => $anchor?->id,
@@ -215,9 +268,15 @@ class NetworkNodeController extends Controller
             for ($number = 1; $number <= $portCount; $number++) {
                 $node->ports()->create(['number' => $number, 'is_used' => false]);
             }
+
+            return $node;
         });
 
-        return redirect()->route('network.nodes.index')->with('success', 'Node berhasil ditambahkan.');
+        // PRG ke Detail record baru (docs/PRG_REDIRECT_CONVENTION.md): form
+        // "Tambah ODP" di halaman PON tidak boleh mendarat di Master Node yang
+        // tidak memuat ODP anak PON sama sekali (lazy) — user tak bisa melihat
+        // hasilnya.
+        return redirect()->route('network.nodes.show', $node)->with('success', 'Node berhasil ditambahkan.');
     }
 
     public function show(NetworkNode $node, NetworkNodeAttentionService $attention): View
@@ -287,13 +346,16 @@ class NetworkNodeController extends Controller
             ->orderBy('code')
             ->get();
 
-        return response()->json(['children' => $children->map(function (NetworkNode $child) use ($ponCapacity): array {
+        // Satu query agregat untuk seluruh PON anak (Slot 16 PON = 1 query,
+        // bukan 16).
+        $ponSummaries = $ponCapacity->summaries($children->filter(fn (NetworkNode $child): bool => $child->isPon()));
+
+        return response()->json(['children' => $children->map(function (NetworkNode $child) use ($ponSummaries): array {
             $capacity = null;
             $used = null;
             if ($child->isPon()) {
-                $summary = $ponCapacity->summary($child);
-                $capacity = $summary['capacity'];
-                $used = $summary['used'];
+                $capacity = $ponSummaries[$child->id]['capacity'];
+                $used = $ponSummaries[$child->id]['used'];
             } elseif ((bool) $child->nodeType?->has_ports) {
                 $capacity = (int) $child->ports_count;
                 $used = (int) $child->used_ports_count;
@@ -310,9 +372,47 @@ class NetworkNodeController extends Controller
                 'capacity' => $capacity,
                 'used' => $used,
                 'record_status' => $child->record_status?->value,
-                'url' => route('network.nodes.show', $child),
+                'url' => match (true) {
+                    $child->isSlot() => route('network.infrastructure-slots.show', $child),
+                    $child->isPort() => route('network.infrastructure-ports.show', $child),
+                    default => route('network.nodes.show', $child),
+                },
+                // URL anak & target POST dirender DI SINI (server), bukan
+                // dirakit Alpine dari id — pohon lazy bertingkat dan form
+                // "Tambah PON" di modal hanya memilih di antara URL ini
+                // (konvensi CLAUDE.md, PostTargetRenderedServerSideTest).
+                'children_url' => (int) $child->children_count > 0 ? route('network.nodes.children', $child) : null,
+                'store_port_url' => $child->isSlot() ? route('network.infrastructure-slots.ports.store', $child) : null,
             ];
         })->values()]);
+    }
+
+    /**
+     * Daftar PON milik satu OLT, berlabel jalur "OLT / Slot n / PON m" —
+     * sumber pilihan "PON induk" di modal Tambah ODP dan relokasi ODP di
+     * Master Node. Dimuat per OLT (bukan semua PON sekaligus di halaman):
+     * satu deploy bisa punya ribuan PON. Scope POP sama dengan `children()`
+     * lewat `authorizeNodeScope()` — OLT cabang lain 403, jadi PON-nya tidak
+     * pernah bocor ke pilihan.
+     */
+    public function ponOptions(NetworkNode $node): JsonResponse
+    {
+        $this->authorizeNodeScope($node);
+        $node->loadMissing('nodeType');
+        abort_unless(InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) === InfrastructureSlotKind::OLT, 404);
+
+        $pons = NetworkNode::query()
+            ->whereIn('parent_id', $node->slots()->reorder()->select('network_nodes.id'))
+            ->whereHas('nodeType', fn ($query) => $query->where('code', InfrastructurePortKind::PON->typeCode()))
+            ->with('parent')
+            ->get()
+            ->sortBy(fn (NetworkNode $pon): array => [(int) $pon->parent?->number, (int) $pon->number])
+            ->values();
+
+        return response()->json(['options' => $pons->map(fn (NetworkNode $pon): array => [
+            'id' => $pon->id,
+            'label' => "{$node->code} / Slot {$pon->parent?->number} / PON {$pon->number}",
+        ])->values()]);
     }
 
     public function markSeen(NetworkNode $node, NetworkNodeAttentionService $attention): JsonResponse
@@ -323,10 +423,20 @@ class NetworkNodeController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function update(Request $request, NetworkNode $node, NetworkNodeService $service, MasterRecordRemovalService $removal): RedirectResponse
+    public function update(Request $request, NetworkNode $node, NetworkNodeService $service, MasterRecordRemovalService $removal, InfrastructurePositionService $positions): RedirectResponse
     {
         $this->authorizeNodeScope($node);
-        if ($request->exists('code')) {
+        $node->loadMissing('nodeType');
+
+        // Kode & tipe Slot/PON/Port DITURUNKAN dari induknya (`{OLT}-S3-P5`,
+        // bisa sampai 120 karakter) — bukan isian user. Nilai kiriman
+        // diabaikan di server, bukan cuma disembunyikan di form: tanpa ini
+        // aturan `max:50` menolak setiap simpan nama PON berkode panjang, dan
+        // POST buatan tangan bisa memutus kode dari jalurnya.
+        if ($node->isPosition()) {
+            $request->request->remove('code');
+            $request->request->remove('node_type_id');
+        } elseif ($request->exists('code')) {
             $request->merge(['code' => strtoupper(trim((string) $request->input('code')))]);
         }
 
@@ -368,9 +478,21 @@ class NetworkNodeController extends Controller
         }
 
         $oldValues = $node->only(array_keys($validated));
-        $node->update($validated);
-        if ($node->wasChanged()) {
-            AuditLog::log($node, 'update', $oldValues, $node->only(array_keys($validated)));
+        try {
+            DB::transaction(function () use ($node, $validated, $codeChanged, $positions, $oldValues): void {
+                $node->update($validated);
+                // Ganti kode perangkat → kode turunan Slot/PON/Port di bawahnya
+                // ikut diganti DALAM transaksi yang sama, supaya `{kode}-S3-P5`
+                // tidak menunjuk kode perangkat lama (identitas posisi = jalur).
+                if ($codeChanged) {
+                    $positions->rederiveCodes($node);
+                }
+                if ($node->wasChanged()) {
+                    AuditLog::log($node, 'update', $oldValues, $node->only(array_keys($validated)));
+                }
+            });
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['code' => $exception->getMessage()]);
         }
 
         return redirect()->route('network.nodes.show', $node)->with('success', 'Detail node berhasil diperbarui.');

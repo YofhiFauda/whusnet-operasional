@@ -58,4 +58,17 @@ enum InfrastructureSlotKind: string
             default => null,
         };
     }
+
+    /**
+     * Kebalikan `forDeviceTypeCode()` — code tipe perangkat pemilik Slot ini.
+     * Dipakai view/query yang butuh "daftar perangkat ber-Slot" supaya tidak
+     * menulis literal `olt_chassis`/`switch_mini_pop` di banyak tempat.
+     */
+    public function deviceTypeCode(): string
+    {
+        return match ($this) {
+            self::OLT => 'olt_chassis',
+            self::SWITCH => 'switch_mini_pop',
+        };
+    }
 }

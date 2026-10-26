@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Network;
 
 use App\Enums\InfrastructureRecordStatus;
 use App\Enums\InfrastructureSlotKind;
+use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
 use App\Models\InfrastructureConnection;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodeType;
 use App\Models\TaskInfrastructureAction;
 use App\Services\EffectiveAccessService;
 use App\Services\InfrastructureConnectionService;
@@ -91,23 +93,33 @@ class InfrastructurePositionController extends Controller
             'history' => $this->history('infrastructure_port_id', $port->id),
             'actions' => TaskInfrastructureAction::query()->where('work_infrastructure_port_id', $port->id)->with('technician')->latest('id')->limit(20)->get(),
             'canManage' => auth()->user()->hasPermission('network_nodes.update'),
+            // ODP = anak langsung PON (`parent_id`, rancangan §2.4). Hanya
+            // anak PON INI — scope-nya ikut PON yang sudah lolos
+            // `authorizeLocation()` di atas, tidak ada ODP cabang lain yang
+            // bisa ikut tampil.
+            'odps' => $port->isPon()
+                ? $port->children()->with('nodeType')
+                    ->withCount(['ports', 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true)])
+                    ->orderBy('code')->get()
+                : collect(),
+            'odpTypeId' => $port->isPon() ? NetworkNodeType::query()->where('code', 'odp')->where('is_active', true)->value('id') : null,
+            'canCreateNode' => auth()->user()->hasPermission('network_nodes.create'),
         ]);
     }
 
     public function storeSlot(Request $request, NetworkNode $node, InfrastructurePositionService $positions): RedirectResponse
     {
         $this->authorizeLocation($this->resolver->forNode($node));
+        // Kode & nama Slot diturunkan service (`derivedCode()`); `code`/`label`
+        // kiriman TIDAK diterima — dulu divalidasi lalu diam-diam dibuang,
+        // sehingga form menjanjikan kode yang tidak pernah tersimpan.
         $validated = $request->validate([
             'number' => ['required', 'integer', 'min:1', 'max:999'],
-            'code' => ['nullable', 'string', 'max:50'],
-            'label' => ['nullable', 'string', 'max:100'],
             'capacity' => ['nullable', 'integer', 'min:1', 'max:9999'],
             'is_logical' => ['nullable', 'boolean'],
         ]);
 
         $this->domain(fn () => $positions->createSlot($node, (int) $validated['number'], [
-            'code' => $validated['code'] ?? null,
-            'label' => ($validated['is_logical'] ?? false) ? InfrastructurePositionService::LOGICAL_SLOT_LABEL : ($validated['label'] ?? null),
             'capacity' => $validated['capacity'] ?? null,
             'is_logical' => (bool) ($validated['is_logical'] ?? false),
             'status' => InfrastructureRecordStatus::TERVERIFIKASI,
@@ -142,13 +154,11 @@ class InfrastructurePositionController extends Controller
         $isPon = $slot->slotKind() === InfrastructureSlotKind::OLT;
         $validated = $request->validate([
             'number' => ['required', 'integer', 'min:1', 'max:999'],
-            'code' => ['nullable', 'string', 'max:50'],
             'capacity' => [$isPon ? 'nullable' : 'prohibited', 'integer', 'min:1', 'max:100000'],
             'red_zone_threshold' => [$isPon ? 'nullable' : 'prohibited', 'integer', 'min:1', 'max:100'],
         ]);
 
         $this->domain(fn () => $positions->createPort($slot, (int) $validated['number'], [
-            'code' => $validated['code'] ?? null,
             'capacity' => isset($validated['capacity']) ? (int) $validated['capacity'] : null,
             'red_zone_threshold' => isset($validated['red_zone_threshold']) ? (int) $validated['red_zone_threshold'] : null,
             'status' => InfrastructureRecordStatus::TERVERIFIKASI,
@@ -175,12 +185,14 @@ class InfrastructurePositionController extends Controller
         ]);
         $target = isset($validated['target_network_node_id']) ? NetworkNode::findOrFail($validated['target_network_node_id']) : null;
         if ($target !== null) {
-            $this->authorizeLocation($this->resolver->forNode($target));
+            $this->authorizeLocation($this->resolveOr422(fn () => $this->resolver->forNode($target), 'target_network_node_id'));
         }
 
         $targetPort = isset($validated['target_infrastructure_port_id']) ? NetworkNode::findOrFail($validated['target_infrastructure_port_id']) : null;
         if ($targetPort !== null) {
-            $this->authorizeLocation($this->resolver->forPort($targetPort));
+            // Id node yang bukan PON/Port Switch (atau belum tertambat) adalah
+            // input salah dari klien → 422 berpesan, bukan 500 dari resolver.
+            $this->authorizeLocation($this->resolveOr422(fn () => $this->resolver->forPort($targetPort), 'target_infrastructure_port_id'));
         }
 
         $this->domain(fn () => $connections->connect($port, $request->user(), targetNode: $target, targetPort: $targetPort,
@@ -243,7 +255,7 @@ class InfrastructurePositionController extends Controller
      */
     private function directSerials(string $column, int $id)
     {
-        return InventorySerial::query()->with('item')->where('status', 'deployed')->where($column, $id)->orderBy('serial_number')->get();
+        return InventorySerial::query()->with('item')->where('status', SerialStatus::DEPLOYED->value)->where($column, $id)->orderBy('serial_number')->get();
     }
 
     /**
@@ -254,6 +266,18 @@ class InfrastructurePositionController extends Controller
         return InventoryTransaction::query()
             ->where(fn ($query) => $query->where("to_{$suffix}", $id)->orWhere("from_{$suffix}", $id))
             ->with('item', 'serial', 'fopTask', 'createdBy')->latest('id')->limit(30)->get();
+    }
+
+    /**
+     * @param  callable(): InfrastructureLocation  $resolve
+     */
+    private function resolveOr422(callable $resolve, string $field): InfrastructureLocation
+    {
+        try {
+            return $resolve();
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([$field => $exception->getMessage()]);
+        }
     }
 
     private function domain(callable $callback, string $field): mixed
