@@ -116,7 +116,9 @@ jadi satu kolom per grup bukan bagian pekerjaan ini.
   node, scope POP tetap dicek lewat `EffectiveAccessService`. Tingkat atas (POP,
   Mini POP, OLT/Switch) dimuat seperti sekarang.
 - View `_slot-inspector`, `_pon-inspector`, `_device-slots`, `positions/slot`,
-  `positions/port` disesuaikan ke `NetworkNode`; tidak dibuat ulang.
+  `positions/port` disesuaikan ke `NetworkNode`; tidak dibuat ulang. (Belakangan
+  `_slot-inspector`/`_pon-inspector`/`_device-slots` dihapus, diganti panel per level —
+  lihat §12.)
 - Target aksi POST/PUT/DELETE tetap dirender server-side.
 
 ## 8. Skala
@@ -189,14 +191,47 @@ Rujukan tambahan hasil implementasi (bukan koreksi, tetapi perlu diketahui):
   (scope kosong = kosong), cocok `q` ke kode PON turunan serta kode/nama OLT, urut
   kode OLT → Slot → PON, Slot & OLT lewat JOIN (jumlah query konstan). Hasilnya mengisi
   `parent_id` tersembunyi; URL pencarian dirender server di `data-pon-search-url`.
-- **Panel Manajemen Node OLT/Switch di inspector Master Node** (koreksi pasca-merge
-  2026-10-26, keputusan user): klik OLT/Switch menampilkan partial `_device-slots` (kartu
-  Slot + PON/Port, form kapasitas, Tambah Slot/PON, tombol Generate struktur) yang
-  dimuat **lazy** untuk perangkat terpilih saja lewat `GET network.nodes.device-panel`
-  (izin `network_nodes.view`; 403 di luar scope POP, 404 bukan OLT/Switch). Partial tidak
-  dirender saat load index (menjaga fix O(N²) final review C2). Pilihan node disimpan di
-  `?node=` (history.replaceState) sehingga `back()` setelah gagal validasi memilih ulang
-  node yang sama. Tree tetap: ODP hanya tampil di bawah PON. View `_slot-inspector` dan
+- **Panel "Manajemen Node — <tipe>" per level di inspector Master Node** (koreksi
+  pasca-merge 2026-10-26 putaran 1 + putaran UI 2, spesifikasi user): tiap level HANYA
+  menampilkan anak langsungnya beserta kapasitasnya, dimuat **lazy** untuk node terpilih
+  saja lewat `GET network.nodes.panel` (`/network/nodes/{node}/panel`, izin
+  `network_nodes.view`; 403 di luar scope POP via `authorizeNodeScope`, lalu 404 untuk
+  tipe di luar {`olt_chassis`, `switch_mini_pop`, `olt_slot`, `switch_slot`, `olt_pon`}).
+  Menggantikan `network.nodes.device-panel` + partial `_device-slots` (kartu PON bersarang
+  di tiap Slot — terlalu banyak; partial dihapus, halaman Detail perangkat memakai partial
+  level perangkat yang sama).
+  - OLT/Switch → `_panel-device-slots`: daftar Slot; perangkat terpakai = Slot terdata vs
+    kapasitas perangkat; tiap Slot terpakai = PON/Port terdata vs kapasitas Slot, sisa =
+    kapasitas − terpakai. Aksi: kapasitas perangkat, Tambah Slot, Generate struktur
+    (tautan di header inspector).
+  - Slot → `_panel-slot-ports`: daftar PON (Slot OLT) / Port Switch (Slot Switch) slot itu;
+    PON terpakai = pelanggan aktif (`PonCapacityService::summaries`, satu query), kapasitas
+    PON, sisa, Red Zone, status, jumlah ODP; Port Switch = status keterisian
+    (`InfrastructureConnectionService::occupanciesOf`, satu query). Aksi: kapasitas Slot,
+    Tambah PON/Port.
+  - PON → `_panel-pon-odps`: total PON (pelanggan aktif/kapasitas/sisa/Red Zone/ambang/
+    status) + daftar ODP anak langsung; ODP kapasitas = jumlah port ODP, terpakai = port
+    `is_used`, sisa, Red Zone = `isInRedZone()`, plus pelanggan aktif per ODP
+    (`PonCapacityService::customersPerOdp`, aturan hitung sama; jumlahnya = terpakai PON).
+    Aksi: kapasitas & ambang PON, Tambah ODP (`network.nodes.store`, `parent_id` = PON).
+  - Kapasitas null (atau ODP tanpa port) ditulis "Kapasitas belum didata", tidak pernah
+    "?"/NaN/sisa palsu (`App\Support\MasterNodeInspector::capacity`).
+  - Jumlah query tiap panel konstan terhadap jumlah anak (dites 1 vs 16 Slot, 1 vs 16 PON,
+    1 vs 24 Port Switch, 1 vs 30 ODP).
+  - Slot/PON di pohon lazy kini **bisa dipilih**: JSON `network.nodes.children` membawa
+    `panel_url` (route server; null untuk ODP/Port Switch yang tetap tautan Detail) dan
+    `path` ("OLT / Slot n / PON m"); inspector posisi generik (satu blok, bukan per posisi)
+    menampilkan badge, label, jalur, "Buka Detail", dan panel lazy. Tombol "Kelola …" di
+    panel OLT/Slot (`data-select-position`, JSON server ter-escape, listener delegasi)
+    turun ke level berikutnya. Token permintaan mencegah respons pilihan lama tampil.
+  - Form panel membawa `master_node` (id node yang dibuka) → PRG sukses ke
+    `network.nodes.index?node=<id>` (trait `RedirectsToMasterNode`; hanya integer, rute
+    tetap); dari halaman Detail tetap PRG ke Detail. `?node=` yang menunjuk Slot/PON dalam
+    scope diisi controller sebagai `selectedPosition` (tanpa memuat posisi ke `$nodes`);
+    di luar scope diabaikan.
+  Panel tidak dirender saat load index (menjaga fix O(N²) final review C2). Pilihan node
+  disimpan di `?node=` (history.replaceState) sehingga `back()` setelah gagal validasi
+  memilih ulang node yang sama. Tree tetap: ODP hanya tampil di bawah PON. View `_slot-inspector` dan
   `_pon-inspector` (§7) **dihapus**: keduanya membaca Slot/PON dari `$hierarchy` yang di
   Master Node tidak memuat posisi, sehingga tak pernah merender apa pun. `network.nodes.store` menolak tipe posisi dan selalu
   redirect ke detail node baru. Kode/tipe node posisi read-only di server; rename kode
