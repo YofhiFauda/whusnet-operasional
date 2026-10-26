@@ -19,8 +19,8 @@ use Tests\TestCase;
 /**
  * Task 5 ADHOC-213: FK lokasi "slot"/"port" diarahkan ke `network_nodes`,
  * tabel posisi lama dibuang. Migrasi destruktif — guard konfirmasi, NULL
- * kolom lama, saldo yatim, dan D2 (ODP berpelanggan tidak boleh ikut
- * terhapus) masing-masing diuji di sini.
+ * kolom lama, penyelamatan lokasi ke perangkat induk (final review I2), dan
+ * D2 (ODP berpelanggan tidak boleh ikut terhapus) masing-masing diuji di sini.
  *
  * RefreshDatabase sudah menjalankan migrasi ini sekali (lolos guard karena
  * env `testing`) sehingga tabel lama hilang. Tes yang butuh keadaan "lama"
@@ -266,14 +266,18 @@ class RetargetLocationForeignKeysTest extends TestCase
 
         $message = $this->captureRefusal()?->getMessage() ?? '';
 
-        // Satu baris per tabel; saldo: 1 dihapus (yatim) + 1 hanya di-NULL-kan.
+        // Satu baris per tabel di-NULL-kan; lokasi yang punya perangkat induk
+        // DIPINDAHKAN ke perangkat itu (serial 1, transaksi 2 sisi, saldo
+        // yatim 1), sehingga tidak ada saldo yang dihapus.
         foreach ([
             'inventory_serials 1 baris',
             'inventory_transactions 1 baris',
-            'infrastructure_balances 1 baris',
+            'infrastructure_balances 2 baris',
             'fop_tasks 1 baris',
             'task_infrastructure_actions 1 baris',
-            'MENGHAPUS 1 saldo infrastructure_balances',
+            'MEMINDAHKAN lokasi Slot/Port ke perangkat induknya pada: inventory_serials 1 lokasi, inventory_transactions 2 lokasi, infrastructure_balances 1 lokasi',
+            'TIDAK menemukan perangkat induk (lokasi dikosongkan) pada: (tidak ada)',
+            'MENGHAPUS 0 saldo infrastructure_balances',
         ] as $expected) {
             $this->assertStringContainsString($expected, $message);
         }
@@ -316,6 +320,8 @@ class RetargetLocationForeignKeysTest extends TestCase
         $this->migration()->assertConfirmed([
             'legacy' => ['slots' => 1, 'ports' => 0, 'connections' => 0, 'mappings' => 0],
             'affected' => [],
+            'repointed' => [],
+            'unresolved' => [],
             'balances_deleted' => 0,
         ]);
     }
@@ -373,20 +379,77 @@ class RetargetLocationForeignKeysTest extends TestCase
         $this->assertSame('deployed', DB::table('inventory_serials')->value('status'));
     }
 
+    /**
+     * Final review ADHOC-213 (I2): saldo yang satu-satunya lokasinya Slot/Port
+     * dulu DIHAPUS walau perangkat induknya masih tercatat di
+     * `infrastructure_slots.network_node_id`. Kini qty-nya pindah ke perangkat
+     * induk — digabung ke saldo perangkat yang sudah ada untuk barang & lot
+     * yang sama, supaya tidak ada dua baris saldo untuk satu lokasi.
+     */
     #[Test]
-    public function saldo_yang_hanya_berlokasi_slot_port_dihapus(): void
+    public function saldo_yang_hanya_berlokasi_slot_port_pindah_ke_perangkat_induk(): void
     {
         $state = $this->buildLegacyState();
 
         $this->runMigrationUp();
 
         $this->assertFalse(DB::table('infrastructure_balances')->where('id', $state['rows']['balance_orphan'])->exists(),
-            'Saldo yang satu-satunya lokasinya Slot/Port harus dihapus (tidak ada saldo hantu).');
+            'Baris saldo Slot lama digabung ke saldo perangkat, bukan dibiarkan jadi baris kedua.');
         $located = DB::table('infrastructure_balances')->where('id', $state['rows']['balance_located'])->first();
         $this->assertNotNull($located, 'Saldo yang masih punya lokasi node harus tetap ada.');
         $this->assertSame($state['chassis']->id, (int) $located->network_node_id);
         $this->assertNull($located->infrastructure_port_id);
-        $this->assertEquals(2, $located->qty);
+        $this->assertEquals(5, $located->qty, 'qty 3 dari Slot lama + qty 2 di perangkat — tidak ada qty yang hilang.');
+        $this->assertSame(1, DB::table('infrastructure_balances')->count());
+    }
+
+    #[Test]
+    public function saldo_slot_tanpa_saldo_perangkat_dipindah_utuh_ke_perangkat_induk(): void
+    {
+        $state = $this->buildLegacyState();
+        DB::table('infrastructure_balances')->where('id', $state['rows']['balance_located'])->delete();
+
+        $this->runMigrationUp();
+
+        $moved = DB::table('infrastructure_balances')->where('id', $state['rows']['balance_orphan'])->first();
+        $this->assertNotNull($moved);
+        $this->assertSame($state['chassis']->id, (int) $moved->network_node_id);
+        $this->assertNull($moved->infrastructure_slot_id);
+        $this->assertEquals(3, $moved->qty);
+    }
+
+    /**
+     * I2: serial DEPLOYED di Slot/Port lama dulu kehilangan lokasi total
+     * (tidak terlacak di mana pun). Kini tetap terlacak di perangkat induk.
+     */
+    #[Test]
+    public function serial_terpasang_dan_ledger_tetap_berlokasi_di_perangkat_induk(): void
+    {
+        $state = $this->buildLegacyState();
+
+        $this->runMigrationUp();
+
+        $serial = DB::table('inventory_serials')->where('id', $state['rows']['serial'])->first();
+        $this->assertSame('deployed', $serial->status);
+        $this->assertSame($state['chassis']->id, (int) $serial->current_network_node_id);
+        $this->assertNull($serial->current_infrastructure_slot_id);
+        $this->assertNull($serial->current_infrastructure_port_id);
+
+        $transaction = DB::table('inventory_transactions')->where('id', $state['rows']['transaction'])->first();
+        $this->assertSame($state['chassis']->id, (int) $transaction->from_network_node_id);
+        $this->assertSame($state['chassis']->id, (int) $transaction->to_network_node_id);
+    }
+
+    #[Test]
+    public function serial_yang_sudah_punya_lokasi_lain_tidak_ditimpa(): void
+    {
+        $state = $this->buildLegacyState();
+        $other = NetworkNode::factory()->create(['node_type_id' => $this->typeId('olt_chassis')]);
+        DB::table('inventory_serials')->where('id', $state['rows']['serial'])->update(['current_network_node_id' => $other->id]);
+
+        $this->runMigrationUp();
+
+        $this->assertSame($other->id, (int) DB::table('inventory_serials')->where('id', $state['rows']['serial'])->value('current_network_node_id'));
     }
 
     #[Test]

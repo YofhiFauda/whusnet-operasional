@@ -29,13 +29,19 @@ return [
     | Konfirmasi reset data posisi lama (ADHOC-213 Task 5)
     |--------------------------------------------------------------------------
     |
-    | Migrasi `2026_10_24_000002_retarget_location_foreign_keys_to_network_nodes`
-    | MENGHAPUS seluruh isi infrastructure_slots/ports/connections/legacy_mappings
-    | lalu men-drop tabel lama. Di luar env `testing` migrasi menolak jalan
-    | kecuali saklar ini true — operator wajib menyatakan sendiri bahwa
-    | database target dummy (spec §10). Migrasi membaca config(), bukan env(),
-    | supaya tetap benar saat config di-cache (`config:cache` → ubah env lalu
-    | cache ulang).
+    | Dibaca dua migrasi destruktif ADHOC-213:
+    | - `2026_10_24_000002_retarget_location_foreign_keys_to_network_nodes`:
+    |   memindahkan lokasi serial/ledger/saldo di Slot/Port lama ke perangkat
+    |   induknya, me-NULL kolom slot/port, MENGHAPUS isi
+    |   infrastructure_slots/ports/connections/legacy_mappings, lalu men-drop
+    |   tabel lama.
+    | - `2026_10_25_000001_drop_olt_slots_table`: men-drop `olt_slots` beserta
+    |   isinya (tidak dipetakan ke node Slot).
+    | Di luar env `testing` keduanya menolak jalan bila ada baris yang akan
+    | dibuang, kecuali saklar ini true — operator wajib menyatakan sendiri
+    | bahwa database target dummy (spec §10). Dibaca lewat config(), bukan
+    | env(), supaya tetap benar saat config di-cache (`config:cache` → ubah
+    | env lalu cache ulang).
     |
     */
 
