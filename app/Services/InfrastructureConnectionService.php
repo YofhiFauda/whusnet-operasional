@@ -175,6 +175,48 @@ class InfrastructureConnectionService
                 ->orWhere('target_infrastructure_port_id', $port->id))
             ->get(['verification_status']);
 
+        return $this->occupancyFrom($port, $active);
+    }
+
+    /**
+     * Versi massal `occupancyOf()` untuk daftar Port Switch satu Slot (panel
+     * Manajemen Node — Slot di Master Node): SATU query sambungan aktif untuk
+     * semua port, bukan satu per port — Slot 48 port = 1 query. Aturannya
+     * sengaja lewat `occupancyFrom()` yang sama supaya status di panel dan di
+     * halaman Detail Port tidak pernah berbeda.
+     *
+     * @param  iterable<NetworkNode>  $ports
+     * @return array<int, InfrastructureOccupancy>
+     */
+    public function occupanciesOf(iterable $ports): array
+    {
+        $ports = collect($ports)->keyBy('id');
+        if ($ports->isEmpty()) {
+            return [];
+        }
+
+        $ids = $ports->keys()->all();
+        $connections = InfrastructureConnection::query()->active()
+            ->where(fn ($query) => $query->whereIn('source_infrastructure_port_id', $ids)
+                ->orWhereIn('target_infrastructure_port_id', $ids))
+            ->get(['source_infrastructure_port_id', 'target_infrastructure_port_id', 'verification_status']);
+
+        return $ports->map(fn (NetworkNode $port): InfrastructureOccupancy => $this->occupancyFrom($port, $connections->filter(
+            fn (InfrastructureConnection $connection): bool => (int) $connection->source_infrastructure_port_id === $port->id
+                || (int) $connection->target_infrastructure_port_id === $port->id,
+        )))->all();
+    }
+
+    /**
+     * @param  iterable<InfrastructureConnection>  $active  sambungan aktif yang menyentuh port ini
+     */
+    private function occupancyFrom(NetworkNode $port, iterable $active): InfrastructureOccupancy
+    {
+        if ($port->record_status === InfrastructureRecordStatus::RUSAK_NONAKTIF) {
+            return InfrastructureOccupancy::RUSAK_NONAKTIF;
+        }
+
+        $active = collect($active);
         if ($active->isNotEmpty()) {
             return $active->contains(fn (InfrastructureConnection $connection): bool => $connection->isVerified())
                 ? InfrastructureOccupancy::TERPAKAI_TERVERIFIKASI

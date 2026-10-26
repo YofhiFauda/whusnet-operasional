@@ -102,9 +102,16 @@ class MasterNodeIndexTidakMemuatPosisiTest extends TestCase
         $this->assertStringNotContainsString('ODP-SKALA-0', $html);
         // Panel Manajemen Node OLT kembali (umpan balik user 2026-10-26) tapi
         // LAZY: index hanya membawa kait URL-nya, kartu Slot/PON tidak dirender.
-        $this->assertStringContainsString('data-device-panel-url="'.route('network.nodes.device-panel', $olt).'"', $html);
+        $this->assertStringContainsString('data-panel-url="'.route('network.nodes.panel', $olt).'"', $html);
         $this->assertStringNotContainsString('data-component-slot=', $html);
         $this->assertStringNotContainsString('data-component-port=', $html);
+        $this->assertStringNotContainsString('data-panel-slot=', $html);
+        $this->assertStringNotContainsString('data-panel-port=', $html);
+        // Slot/PON bisa dipilih (putaran UI 2) lewat SATU inspector generik
+        // yang memuat panel lazy — bukan satu blok per posisi, dan tidak ada
+        // URL panel Slot/PON yang dirender saat load.
+        $this->assertSame(1, substr_count($html, 'data-position-inspector'));
+        $this->assertStringNotContainsString(route('network.nodes.panel', $pons->first()), $html);
         // Tambahan 16 Slot + 256 PON + 20 ODP tidak boleh menambah query
         // (paling banyak selisih kecil konstan, bukan linear terhadap ~290 node).
         $this->assertLessThanOrEqual($baselineQueries + 3, $queries,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Network;
 
+use App\Http\Controllers\Concerns\RedirectsToMasterNode;
 use App\Http\Controllers\Controller;
 use App\Models\NetworkNode;
 use App\Services\EffectiveAccessService;
@@ -20,6 +21,8 @@ use Illuminate\Http\Request;
  */
 class InfrastructurePortController extends Controller
 {
+    use RedirectsToMasterNode;
+
     public function __construct(
         private readonly EffectiveAccessService $access,
         private readonly InfrastructureLocationResolver $resolver,
@@ -37,8 +40,8 @@ class InfrastructurePortController extends Controller
 
         $capacity->updateCapacity($port, (int) $validated['capacity'], (int) $validated['red_zone_threshold'], $request->user());
 
-        return redirect()->route('network.infrastructure-ports.show', $port)
-            ->with('success', "Kapasitas {$port->displayName()} diperbarui.");
+        return $this->redirectToNodeContext($request, redirect()->route('network.infrastructure-ports.show', $port)
+            ->with('success', "Kapasitas {$port->displayName()} diperbarui."));
     }
 
     private function authorizePortScope(NetworkNode $port): void

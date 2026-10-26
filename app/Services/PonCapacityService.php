@@ -81,6 +81,42 @@ class PonCapacityService
     }
 
     /**
+     * Pelanggan aktif per ODP (panel Manajemen Node — PON): aturan hitung
+     * SAMA dengan `summaries()` — satu pelanggan = satu unit, hanya
+     * assignment aktif ber-customer — tapi dikelompokkan per ODP, bukan per
+     * PON induknya. Karena itu jumlah angka ini atas semua ODP anak sebuah
+     * PON selalu sama dengan `used` PON itu (ada tes kesetaraan); kalau
+     * aturan berubah, ubah ketiganya. Satu query berapa pun jumlah ODP-nya.
+     *
+     * @param  iterable<NetworkNode>  $odps
+     * @return array<int, int> id ODP => jumlah pelanggan aktif
+     */
+    public function customersPerOdp(iterable $odps): array
+    {
+        $ids = collect($odps)->pluck('id')->all();
+        if ($ids === []) {
+            return [];
+        }
+
+        $counts = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $rows = DB::table('network_port_assignments as assignment')
+                ->join('network_node_ports as port', 'port.id', '=', 'assignment.network_node_port_id')
+                ->where('assignment.active_key', 1)
+                ->whereNotNull('assignment.customer_id')
+                ->whereIn('port.network_node_id', $chunk)
+                ->groupBy('port.network_node_id')
+                ->selectRaw('port.network_node_id as odp_id, COUNT(DISTINCT assignment.customer_id) as used')
+                ->get();
+            foreach ($rows as $row) {
+                $counts[(int) $row->odp_id] = (int) $row->used;
+            }
+        }
+
+        return array_replace(array_fill_keys($ids, 0), $counts);
+    }
+
+    /**
      * @return array{used: int, capacity: ?int, threshold: ?int, unit: string, unit_label: string, red_zone: ?bool, is_full: bool, remaining: ?int}
      */
     private function summarize(NetworkNode $pon, int $used): array

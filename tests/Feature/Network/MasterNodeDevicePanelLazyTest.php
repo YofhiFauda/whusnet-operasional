@@ -26,7 +26,7 @@ use Tests\TestCase;
  * Master Node cuma menampilkan dua tautan — panel "Manajemen Perangkat"
  * (kartu Slot/PON inline + form Tambah PON) hilang karena dicabut demi fix
  * O(N²) (final review C2). Panel dikembalikan LAZY: dirender server untuk
- * SATU perangkat lewat `network.nodes.device-panel`, diambil inspector saat
+ * SATU perangkat lewat `network.nodes.panel`, diambil inspector saat
  * perangkat dipilih. Tes ini menjaga endpoint (isi, scope, tipe, izin) dan
  * kaitnya di index (URL dari server, partial tidak dirender saat load).
  */
@@ -76,62 +76,110 @@ class MasterNodeDevicePanelLazyTest extends TestCase
         return $user;
     }
 
+    /**
+     * Putaran UI 2 (spesifikasi user 2026-10-26): panel OLT berisi HANYA
+     * daftar Slot + kapasitas tiap Slot — kartu PON bersarang (versi
+     * putaran 1) sekarang harus TIDAK ada; PON dibuka di panel Slot.
+     */
     #[Test]
-    public function panel_olt_dalam_scope_berisi_slot_dan_pon_milik_olt_itu_saja(): void
+    public function panel_olt_dalam_scope_hanya_berisi_slot_milik_olt_itu_dengan_kapasitas(): void
     {
         $user = $this->cabangUser($this->cabangA);
         $slotA = $this->ponA->parent;
+        $slotA->update(['capacity' => 16]);
+        $emptySlot = app(InfrastructurePositionService::class)->createSlot($this->oltA, 4);
 
-        $html = $this->actingAs($user)->get(route('network.nodes.device-panel', $this->oltA))
+        $html = $this->actingAs($user)->get(route('network.nodes.panel', $this->oltA))
             ->assertOk()
             ->assertSee('id="device-components-'.$this->oltA->id.'"', false)
-            ->assertSee('data-component-slot="'.$slotA->id.'"', false)
-            ->assertSee('data-component-port="'.$this->ponA->id.'"', false)
+            ->assertSee('data-node-panel="device"', false)
+            ->assertSee('data-panel-slot="'.$slotA->id.'"', false)
+            ->assertSee('data-panel-slot="'.$emptySlot->id.'"', false)
             ->assertSee('Slot 2')
-            ->assertSee('PON 3')
             // Form di dalam panel tetap form server biasa: target dari route(), token CSRF ada.
-            ->assertSee('action="'.route('network.infrastructure-slots.ports.store', $slotA).'"', false)
+            ->assertSee('action="'.route('network.nodes.infrastructure-slots.store', $this->oltA).'"', false)
             ->assertSee('action="'.route('network.nodes.capacity', $this->oltA).'"', false)
+            ->assertSee('name="master_node" value="'.$this->oltA->id.'"', false)
             ->assertSee('name="_token"', false)
-            ->assertSee('Tambah PON')
+            ->assertSee('Tambah Slot')
             ->getContent();
 
-        // Potongan HTML, bukan halaman penuh (disisipkan ke inspector).
+        // Slot 2: 1 PON terdata / kapasitas 16 (sisa 15); Slot 4: kapasitas belum didata.
+        $this->assertMatchesRegularExpression('/data-panel-slot="'.$slotA->id.'".*?data-capacity-used="1" data-capacity-total="16"/s', $html);
+        $this->assertStringContainsString('>15<', $html);
+        $this->assertMatchesRegularExpression('/data-panel-slot="'.$emptySlot->id.'".*?data-capacity-used="0" data-capacity-total=""/s', $html);
+        $this->assertStringContainsString('Kapasitas belum didata', $html);
+        // Perangkat: 2 Slot terdata, kapasitas perangkat belum didata.
+        $this->assertMatchesRegularExpression('/data-capacity-used="2" data-capacity-total=""/', $html);
+        // TIDAK ada kartu PON/form Tambah PON di level OLT.
+        $this->assertStringNotContainsString('PON 3', $html);
+        $this->assertStringNotContainsString('data-panel-port=', $html);
+        $this->assertStringNotContainsString('data-component-port=', $html);
+        $this->assertStringNotContainsString('Tambah PON', $html);
+        $this->assertStringNotContainsString(route('network.infrastructure-slots.ports.store', $slotA), $html);
+        // Drill-down "Kelola" membawa panel_url Slot yang dirender server.
+        $this->assertStringContainsString('data-select-position=', $html);
+        $this->assertStringContainsString(e(json_encode(route('network.nodes.panel', $slotA))), $html);
+        // Potongan HTML, bukan halaman penuh; tanpa atribut Alpine (disisipkan via innerHTML).
         $this->assertStringNotContainsString('<html', $html);
+        $this->assertStringNotContainsString('x-data', $html);
+        $this->assertStringNotContainsString('@click', $html);
         // Panel OLT lain tidak ikut.
         $this->assertStringNotContainsString('OLT-DUA', $html);
         $this->assertStringNotContainsString('Slot 5', $html);
     }
 
     #[Test]
-    public function panel_switch_berisi_slot_dan_port_switch(): void
+    public function panel_switch_hanya_berisi_slot_tanpa_port_switch(): void
     {
         $positions = app(InfrastructurePositionService::class);
         $mini = Pop::factory()->create(['type' => 'mini_pop', 'parent_id' => $this->cabangA->id]);
         $switch = $this->device('switch_mini_pop', $mini, 'SW-SATU');
-        $port = $positions->createPort($positions->createSlot($switch, 1), 4);
+        $slot = $positions->createSlot($switch, 1);
+        $port = $positions->createPort($slot, 4);
 
         $this->loginAsAdmin();
-        $this->get(route('network.nodes.device-panel', $switch))
+        $this->get(route('network.nodes.panel', $switch))
             ->assertOk()
-            ->assertSee('data-component-port="'.$port->id.'"', false)
+            ->assertSee('data-panel-slot="'.$slot->id.'"', false)
             ->assertSee('Setiap Slot memuat Port Switch.')
+            ->assertSee('Port Switch terdata')
+            ->assertDontSee('data-panel-port="'.$port->id.'"', false)
             ->assertDontSee('Kapasitas PON (pelanggan aktif)');
+    }
+
+    #[Test]
+    public function halaman_detail_perangkat_memakai_partial_level_perangkat_tanpa_kembali_ke_master_node(): void
+    {
+        $this->loginAsAdmin();
+
+        $html = $this->get(route('network.nodes.show', $this->oltA))->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-panel-slot="'.$this->ponA->parent_id.'"', $html);
+        $this->assertStringNotContainsString('data-panel-port=', $html);
+        // Form Detail tetap PRG ke Detail: tidak membawa `master_node`.
+        $this->assertStringNotContainsString('name="master_node"', $html);
+        $this->assertStringNotContainsString('data-select-position=', $html);
     }
 
     #[Test]
     public function panel_olt_cabang_lain_403(): void
     {
         $this->actingAs($this->cabangUser($this->cabangA))
-            ->get(route('network.nodes.device-panel', $this->oltB))
+            ->get(route('network.nodes.panel', $this->oltB))
             ->assertForbidden();
     }
 
     #[Test]
-    public function bukan_perangkat_404(): void
+    public function tipe_di_luar_perangkat_slot_pon_404(): void
     {
+        // PON kini PUNYA panel (level PON); yang 404 adalah tipe di luar
+        // {olt_chassis, switch_mini_pop, olt_slot, switch_slot, olt_pon}.
+        $odp = NetworkNode::create(['node_type_id' => NetworkNodeType::where('code', 'odp')->value('id'),
+            'parent_id' => $this->ponA->id, 'anchor_pop_id' => null, 'code' => 'ODP-404', 'name' => 'ODP 404', 'status' => 'active']);
+
         $this->actingAs($this->cabangUser($this->cabangA))
-            ->get(route('network.nodes.device-panel', $this->ponA))
+            ->get(route('network.nodes.panel', $odp))
             ->assertNotFound();
     }
 
@@ -140,7 +188,7 @@ class MasterNodeDevicePanelLazyTest extends TestCase
     {
         $user = User::factory()->create(['role_id' => Role::where('code', 'helpdesk')->firstOrFail()->id, 'status' => 'active']);
 
-        $this->actingAs($user)->get(route('network.nodes.device-panel', $this->oltA))->assertForbidden();
+        $this->actingAs($user)->get(route('network.nodes.panel', $this->oltA))->assertForbidden();
     }
 
     #[Test]
@@ -150,17 +198,20 @@ class MasterNodeDevicePanelLazyTest extends TestCase
 
         $html = $this->actingAs($user)->get(route('network.nodes.index'))->assertOk()->getContent();
 
-        $this->assertStringContainsString('data-device-panel-url="'.route('network.nodes.device-panel', $this->oltA).'"', $html);
+        $this->assertStringContainsString('data-panel-url="'.route('network.nodes.panel', $this->oltA).'"', $html);
         $this->assertStringContainsString('Manajemen Node — OLT', $html);
         $this->assertStringContainsString(route('network.nodes.generate-structure.create', $this->oltA), $html);
         // Partial TIDAK dirender saat load (itu yang membuat index O(N²)).
         $this->assertStringNotContainsString('data-component-slot=', $html);
         $this->assertStringNotContainsString('id="device-components-', $html);
         // OLT cabang lain tidak punya kait.
-        $this->assertStringNotContainsString(route('network.nodes.device-panel', $this->oltB), $html);
+        $this->assertStringNotContainsString(route('network.nodes.panel', $this->oltB), $html);
         // Klien tidak merakit path panel dari id.
-        $this->assertStringNotContainsString("'/device-panel'", $html);
-        $this->assertStringNotContainsString('+ \'/device-panel', $html);
+        $this->assertStringNotContainsString("'/panel'", $html);
+        $this->assertStringNotContainsString('+ \'/panel', $html);
+        // Satu inspector posisi generik (bukan satu per Slot/PON), tanpa isi panel.
+        $this->assertSame(1, substr_count($html, 'data-position-inspector'));
+        $this->assertStringNotContainsString('data-panel-slot=', $html);
     }
 
     #[Test]

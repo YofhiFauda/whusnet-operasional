@@ -155,7 +155,7 @@
         {{-- Special Chassis / Switch Slots --}}
         @if(in_array($node->nodeType?->code, ['olt_chassis', 'switch_mini_pop'], true))
         <div class="p-6">
-            @include('network.nodes._device-slots', ['device' => $node])
+            @include('network.nodes._panel-device-slots', ['device' => $node, 'slots' => $deviceSlots, 'inMasterNode' => false])
         </div>
         @endif
 

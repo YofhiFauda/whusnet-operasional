@@ -6,15 +6,22 @@
     Rekursi berhenti sendiri: kontainer anak hanya dirender (`x-if`) setelah
     cabang dibuka & dimuat, jadi tidak ada sisipan tak berujung.
 
-    Semua URL (`child.url`, `child.children_url`) datang dari JSON
-    `network.nodes.children` yang dirender server via `route()` — template
-    ini tidak pernah merakit path dari id (konvensi CLAUDE.md).
+    Semua URL (`child.url`, `child.children_url`, `child.panel_url`) datang
+    dari JSON `network.nodes.children` yang dirender server via `route()` —
+    template ini tidak pernah merakit path dari id (konvensi CLAUDE.md).
+    Teks node (label/kode) hanya lewat x-text, tidak pernah x-html.
+
+    Baris ber-`panel_url` (Slot, PON) DIPILIH saat diklik → inspector kanan
+    memuat panel "Manajemen Node — Slot/PON" (`selectPosition`). Baris lain
+    (ODP, Port Switch) tetap tautan ke halaman Detail-nya.
 --}}
 <template id="lazy-tree-node-template">
     <div class="tree-line select-none my-0.5" :data-hierarchy-key="child.key" :data-lazy-node-id="child.id"
          x-data="lazyTreeNode(child.children_url)">
         <div class="tree-node-item group flex items-center justify-between gap-1.5 sm:gap-2 rounded-lg border border-transparent px-2 py-1.5 transition-colors hover:bg-surface-muted"
-             :title="child.label">
+             :class="{ 'cursor-pointer': child.panel_url, 'bg-sky-50 dark:bg-sky-950/60 border-l-2 border-l-sky-600 shadow-2xs': child.panel_url && selectedNodeId === child.id }"
+             @click="if (child.panel_url) selectPosition(child)"
+             :title="child.path || child.label">
             <div class="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
                 <template x-if="child.children_url">
                     <button type="button" @click.stop="toggle()" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-text-main transition-colors cursor-pointer" title="Buka/Tutup Cabang">
@@ -25,11 +32,16 @@
                     <span class="flex h-5 w-5 shrink-0 items-center justify-center text-xs text-text-disabled">•</span>
                 </template>
                 <span class="shrink-0 rounded-md border border-border bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] font-bold text-text-secondary" x-text="lazyTreeBadge(child.type)"></span>
-                <a :href="child.url" class="min-w-0 truncate font-mono text-xs font-semibold text-text-main hover:text-primary hover:underline" x-text="child.label"></a>
+                <template x-if="child.panel_url">
+                    <span class="min-w-0 truncate font-mono text-xs font-semibold text-text-main" x-text="child.label"></span>
+                </template>
+                <template x-if="!child.panel_url">
+                    <a :href="child.url" @click.stop class="min-w-0 truncate font-mono text-xs font-semibold text-text-main hover:text-primary hover:underline" x-text="child.label"></a>
+                </template>
             </div>
-            <template x-if="child.capacity !== null">
+            <template x-if="child.capacity !== null || child.used !== null">
                 <span class="shrink-0 rounded-full border border-border bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-text-secondary">
-                    <span x-text="(child.used ?? '?') + '/' + (child.capacity ?? '?')"></span>
+                    <span x-text="child.capacity === null ? (child.used ?? '–') + ' · belum didata' : (child.used ?? '–') + '/' + child.capacity"></span>
                 </span>
             </template>
         </div>

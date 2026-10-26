@@ -36,6 +36,9 @@
 @section('content')
 <div x-data="networkNodeManager({
     selectedNodeId: @js($selectedNodeId),
+    {{-- Slot/PON yang dipilih ulang lewat `?node=` setelah PRG dari panelnya
+         (posisi tidak ada di $nodes — fix C2). Bentuk = baris JSON children. --}}
+    selectedPosition: @js($selectedPosition),
     {{-- Hanya form modal yang membawa `device_type`; error dari form panel
          perangkat (kapasitas, Tambah Slot/PON) yang back() ke sini tidak
          boleh membuka modal Tambah Titik — errornya tampil lewat toast. --}}
@@ -363,7 +366,7 @@
                         <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto">
                             @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
                             <a href="#device-panel-{{ $node->id }}" class="flex-1 sm:flex-initial inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-primary hover:bg-surface-muted transition shadow-2xs">
-                                Slot / {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port' }}
+                                Daftar Slot
                             </a>
                             @else
                             @can('network_nodes.create')
@@ -542,18 +545,18 @@
 
                         {{-- Chassis / Switch Special Component Slots --}}
                         @if(in_array($typeCode, ['olt_chassis', 'switch_mini_pop'], true))
-                            {{-- Panel Manajemen Node (kartu Slot + PON/Port, form kapasitas &
-                                 Tambah Slot/PON) dimuat LAZY untuk perangkat yang DIPILIH saja,
-                                 dari `network.nodes.device-panel` (URL dirender server di
-                                 data-device-panel-url, tidak dirakit klien). Merender partial
-                                 `_device-slots` di sini untuk setiap perangkat = index O(N²)
-                                 (final review C2); tanpa panel sama sekali user kehilangan
-                                 kartu Slot/PON (umpan balik 2026-10-26). Isi sisipan adalah
-                                 HTML server biasa (form ber-@csrf, <details>) tanpa atribut
-                                 Alpine, jadi tidak perlu Alpine.initTree. --}}
-                            <section id="device-panel-{{ $node->id }}" data-device-panel
-                                     data-device-panel-url="{{ route('network.nodes.device-panel', $node) }}"
-                                     x-data="devicePanel()"
+                            {{-- Panel Manajemen Node — OLT/Switch (HANYA daftar Slot + kapasitas
+                                 tiap Slot, form kapasitas & Tambah Slot) dimuat LAZY untuk
+                                 perangkat yang DIPILIH saja, dari `network.nodes.panel` (URL
+                                 dirender server di data-panel-url, tidak dirakit klien).
+                                 Merender panel di sini untuk setiap perangkat = index O(N²)
+                                 (final review C2). Isi sisipan adalah HTML server biasa (form
+                                 ber-@csrf, <details>) tanpa atribut Alpine, jadi tidak perlu
+                                 Alpine.initTree; tombol "Kelola" di dalamnya ditangani
+                                 listener delegasi `@click` di kontainer ini. --}}
+                            <section id="device-panel-{{ $node->id }}" data-node-panel-host
+                                     data-panel-url="{{ route('network.nodes.panel', $node) }}"
+                                     x-data="nodePanel()"
                                      x-effect="if (selectedNodeId === {{ $node->id }}) load()"
                                      class="pb-2 space-y-3">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -568,12 +571,12 @@
                                         <a href="{{ route('network.nodes.show', $node) }}#device-components-{{ $node->id }}" class="inline-flex items-center rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold text-sky-600 dark:text-sky-400 hover:bg-surface-muted shadow-2xs">Buka Detail &rarr;</a>
                                     </div>
                                 </div>
-                                <p x-show="loading" class="rounded-lg border border-dashed border-border bg-surface-muted/40 p-4 text-xs text-text-muted">Memuat Slot / {{ $typeCode === 'olt_chassis' ? 'PON' : 'Port' }}…</p>
+                                <p x-show="loading" class="rounded-lg border border-dashed border-border bg-surface-muted/40 p-4 text-xs text-text-muted">Memuat daftar Slot…</p>
                                 <div x-show="failed" x-cloak class="rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 p-4 text-xs text-rose-700 dark:text-rose-300 flex flex-wrap items-center justify-between gap-2">
                                     <span>Gagal memuat panel perangkat.</span>
-                                    <button type="button" @click="load(true)" class="rounded-lg border border-rose-300 dark:border-rose-800 bg-surface px-3 py-1 font-semibold cursor-pointer">Coba lagi</button>
+                                    <button type="button" @click="retry()" class="rounded-lg border border-rose-300 dark:border-rose-800 bg-surface px-3 py-1 font-semibold cursor-pointer">Coba lagi</button>
                                 </div>
-                                <div x-ref="body" x-show="loaded"></div>
+                                <div x-ref="body" x-show="loadedUrl" @click="openPanelSelection($event)"></div>
                             </section>
                         @endif
 
@@ -971,6 +974,47 @@
                 <p>Klik tombol "+ Tambah Titik Node Baru" di atas untuk menambahkan titik jaringan pertama Anda.</p>
             </div>
             @endforelse
+
+            {{-- Inspector Slot/PON (putaran UI 2): SATU blok generik untuk posisi
+                 yang dipilih — bukan satu blok per posisi (posisi tidak dimuat ke
+                 $nodes, fix C2). Header diisi dari data pilihan (JSON children /
+                 tombol "Kelola" / `selectedPosition`) lewat x-text saja; isi panel
+                 "Manajemen Node — Slot/PON" diambil dari `panel_url` yang dirender
+                 server. Token permintaan di `nodePanel()` mencegah respons pilihan
+                 lama (klik cepat A lalu B) tampil di bawah header B. --}}
+            <div x-show="selectedPosition && selectedPosition.id === selectedNodeId" x-cloak
+                 id="inspector-position" data-position-inspector
+                 x-data="nodePanel()"
+                 x-effect="load(selectedPosition && selectedPosition.id === selectedNodeId ? selectedPosition.panel_url : null)">
+                <div class="px-4 sm:px-6 py-3.5 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-surface-muted/40">
+                    <div class="flex items-center flex-wrap gap-1.5 text-xs text-text-muted min-w-0">
+                        <button type="button" @click="activeMobileTab = 'tree'"
+                                class="lg:hidden inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border text-xs font-semibold text-text-main hover:bg-surface-muted shadow-2xs mr-1 cursor-pointer shrink-0">
+                            <span>Pohon</span>
+                        </button>
+                        <span class="font-mono text-text-secondary" data-position-path x-text="selectedPosition ? selectedPosition.path : ''"></span>
+                    </div>
+                    <a :href="selectedPosition ? selectedPosition.url : '#'"
+                       class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:bg-surface-muted shadow-2xs">Buka Detail &rarr;</a>
+                </div>
+                <div class="p-4 sm:p-6 space-y-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border bg-amber-50 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                              x-text="selectedPosition ? lazyTreeBadge(selectedPosition.type) : ''"></span>
+                        <h2 class="text-xl font-bold font-mono text-text-main tracking-tight" x-text="selectedPosition ? selectedPosition.label : ''"></h2>
+                    </div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-text-main flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-sky-600"></span>
+                        <span x-text="'Manajemen Node — ' + (selectedPosition && ['olt_pon'].includes(selectedPosition.type) ? 'PON' : 'Slot')"></span>
+                    </h3>
+                    <p x-show="loading" class="rounded-lg border border-dashed border-border bg-surface-muted/40 p-4 text-xs text-text-muted">Memuat…</p>
+                    <div x-show="failed" class="rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 p-4 text-xs text-rose-700 dark:text-rose-300 flex flex-wrap items-center justify-between gap-2">
+                        <span>Gagal memuat panel.</span>
+                        <button type="button" @click="retry()" class="rounded-lg border border-rose-300 dark:border-rose-800 bg-surface px-3 py-1 font-semibold cursor-pointer">Coba lagi</button>
+                    </div>
+                    <div x-ref="body" x-show="loadedUrl" @click="openPanelSelection($event)"></div>
+                </div>
+            </div>
         </section>
     </div>
 
@@ -1342,43 +1386,99 @@ function ponPicker() {
 }
 
 /**
- * Panel Manajemen Node satu OLT/Switch, dimuat sekali saat perangkat itu
- * pertama kali dipilih (x-effect di elemen panel). URL dibaca dari
- * `data-device-panel-url` yang dirender server — di `init()`, karena di
- * dalam handler `@click` `$el` menunjuk tombol, bukan elemen panel.
- * Responsnya potongan HTML server (form biasa, tanpa atribut Alpine) dari
- * endpoint kita sendiri; disisipkan apa adanya.
+ * Panel "Manajemen Node — <tipe>" (`network.nodes.panel`), dipakai dua
+ * tempat: panel OLT/Switch di blok inspector perangkat (URL tetap dari
+ * `data-panel-url`, dibaca di `init()` karena di handler `@click` `$el`
+ * menunjuk tombol) dan inspector Slot/PON generik (URL = `panel_url` pilihan
+ * saat ini, dikirim x-effect). URL selalu dari server, tidak dirakit di sini.
+ *
+ * Respons = potongan HTML server dari endpoint kita sendiri (Blade ter-escape,
+ * tanpa atribut Alpine) — disisipkan apa adanya, tanpa Alpine.initTree.
+ *
+ * Balapan klik cepat A lalu B: tiap permintaan dapat nomor `seq`; respons
+ * yang nomornya bukan yang terbaru dibuang, dan isi lama dikosongkan begitu
+ * permintaan baru mulai — panel A tidak pernah tampil di bawah header B.
+ * `failed` untuk URL yang sama menghentikan x-effect mengulang fetch tanpa
+ * henti; ulang hanya lewat "Coba lagi" (`retry()`).
  */
-function devicePanel() {
+function nodePanel() {
     return {
-        url: null,
-        loaded: false,
+        fixedUrl: null,
+        currentUrl: null,
+        loadedUrl: null,
         loading: false,
         failed: false,
+        seq: 0,
         init() {
-            this.url = this.$el.dataset.devicePanelUrl || null;
+            this.fixedUrl = this.$el.dataset.panelUrl || null;
         },
-        async load(force = false) {
-            // `failed` ikut dicek supaya x-effect tidak mengulang fetch tanpa
-            // henti setelah gagal — ulang hanya lewat tombol "Coba lagi".
-            if (!this.url || this.loading || (!force && (this.loaded || this.failed))) return;
+        async load(url = this.fixedUrl, force = false) {
+            if (!url) {
+                // Pilihan dilepas: batalkan permintaan yang masih jalan dan
+                // kosongkan isi supaya pilihan berikutnya tidak sempat melihatnya.
+                if (this.currentUrl !== null || this.loading) {
+                    this.seq++;
+                    this.currentUrl = null;
+                    this.loadedUrl = null;
+                    this.loading = false;
+                    this.failed = false;
+                    this.setBody('');
+                }
+                return;
+            }
+            if (!force && url === this.currentUrl && (this.loading || this.loadedUrl === url || this.failed)) return;
+
+            const seq = ++this.seq;
+            this.currentUrl = url;
+            this.loadedUrl = null;
             this.loading = true;
             this.failed = false;
+            this.setBody('');
             try {
-                const response = await fetch(this.url, {
+                const response = await fetch(url, {
                     headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
                     credentials: 'same-origin',
                 });
                 if (!response.ok) throw new Error('HTTP ' + response.status);
-                this.$refs.body.innerHTML = await response.text();
-                this.loaded = true;
+                const html = await response.text();
+                if (seq !== this.seq) return;
+                this.setBody(html);
+                this.loadedUrl = url;
             } catch {
-                this.failed = true;
+                if (seq === this.seq) this.failed = true;
             } finally {
-                this.loading = false;
+                if (seq === this.seq) this.loading = false;
             }
         },
+        retry() {
+            return this.load(this.currentUrl || this.fixedUrl, true);
+        },
+        // x-effect di elemen akar komponen jalan SEBELUM anak-anaknya
+        // diinisialisasi, jadi `x-ref="body"` belum terdaftar pada panggilan
+        // pertama (node terpilih sejak load halaman). Saat itu body memang
+        // masih kosong, jadi cukup dilewati; setelah `await fetch` ref sudah ada.
+        setBody(html) {
+            const body = this.$refs.body;
+            if (body) body.innerHTML = html;
+        },
     };
+}
+
+/**
+ * Data pilihan dari tombol "Kelola …" di dalam panel sisipan
+ * (`data-select-position`, JSON ter-escape yang dirender server). Panel tidak
+ * memuat atribut Alpine, jadi klik ditangkap listener delegasi di kontainer.
+ */
+function panelSelectionFrom(event) {
+    const trigger = event.target.closest('[data-select-position]');
+    if (!trigger) return null;
+    try {
+        const payload = JSON.parse(trigger.dataset.selectPosition);
+
+        return payload && payload.id && payload.panel_url ? payload : null;
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -1503,6 +1603,7 @@ function networkNodeManager(config) {
         inspectorTab: 'ports',
         openRelocateId: null,
         selectedNodeId: config.selectedNodeId,
+        selectedPosition: config.selectedPosition || null,
         showCreateModal: config.showCreateModal,
         createType: config.createType,
         createPopId: String(config.createPopId || ''),
@@ -1742,16 +1843,9 @@ function networkNodeManager(config) {
 
         selectNode(id) {
             this.markNodeSeen(id);
+            this.selectedPosition = null;
             this.selectedNodeId = id;
-            // Simpan pilihan di URL (`?node=`): form panel perangkat yang
-            // gagal validasi `back()` ke URL ini, dan index memilih ulang node
-            // yang sama (NetworkNodeController::index) — tanpa ini user
-            // dilempar ke node pertama dan kehilangan konteks.
-            try {
-                const url = new URL(window.location.href);
-                url.searchParams.set('node', id);
-                window.history.replaceState(window.history.state, '', url);
-            } catch {}
+            this.rememberSelection(id);
             this.portFilter = 'ALL';
             this.inspectorTab = 'ports';
             this.activeMobileTab = 'inspector';
@@ -1761,6 +1855,44 @@ function networkNodeManager(config) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             });
+        },
+
+        // Slot/PON (dari pohon lazy, tombol "Kelola" di panel, atau
+        // `selectedPosition` server). `position` membawa `panel_url`/`url`
+        // yang dirender server; objek disalin supaya state inspector tidak
+        // berbagi referensi dengan baris pohon.
+        selectPosition(position) {
+            if (!position || !position.panel_url) return;
+            this.selectedPosition = {
+                id: position.id,
+                type: position.type,
+                label: position.label,
+                path: position.path,
+                url: position.url,
+                panel_url: position.panel_url,
+            };
+            this.selectedNodeId = position.id;
+            this.rememberSelection(position.id);
+            this.activeMobileTab = 'inspector';
+            this.$nextTick(() => document.getElementById('inspector-position')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+        },
+
+        openPanelSelection(event) {
+            const position = panelSelectionFrom(event);
+            if (position) this.selectPosition(position);
+        },
+
+        // Simpan pilihan di URL (`?node=`): form panel yang gagal validasi
+        // `back()` ke URL ini, dan index memilih ulang node yang sama —
+        // perangkat lewat `$nodes`, Slot/PON lewat `selectedPosition`
+        // (NetworkNodeController::index). Tanpa ini user dilempar ke node
+        // pertama dan kehilangan konteks.
+        rememberSelection(id) {
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('node', id);
+                window.history.replaceState(window.history.state, '', url);
+            } catch {}
         }
     };
 }

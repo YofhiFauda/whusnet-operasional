@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Network;
 use App\Enums\InfrastructureRecordStatus;
 use App\Enums\InfrastructureSlotKind;
 use App\Enums\SerialStatus;
+use App\Http\Controllers\Concerns\RedirectsToMasterNode;
 use App\Http\Controllers\Controller;
 use App\Models\InfrastructureConnection;
 use App\Models\InventorySerial;
@@ -43,6 +44,8 @@ use InvalidArgumentException;
  */
 class InfrastructurePositionController extends Controller
 {
+    use RedirectsToMasterNode;
+
     public function __construct(
         private readonly EffectiveAccessService $access,
         private readonly InfrastructureLocationResolver $resolver,
@@ -125,7 +128,7 @@ class InfrastructurePositionController extends Controller
             'status' => InfrastructureRecordStatus::TERVERIFIKASI,
         ]), 'number');
 
-        return redirect()->route('network.nodes.show', $node)->with('success', "Slot {$validated['number']} ditambahkan.");
+        return $this->redirectToNodeContext($request, redirect()->route('network.nodes.show', $node)->with('success', "Slot {$validated['number']} ditambahkan."));
     }
 
     public function updateDeviceCapacity(Request $request, NetworkNode $node, InfrastructurePositionService $positions): RedirectResponse
@@ -134,7 +137,7 @@ class InfrastructurePositionController extends Controller
         $validated = $request->validate(['capacity' => ['required', 'integer', 'min:1', 'max:1000']]);
         $positions->updateDeviceCapacity($node, (int) $validated['capacity'], $request->user());
 
-        return redirect()->route('network.nodes.show', $node)->with('success', 'Kapasitas slot perangkat diperbarui.');
+        return $this->redirectToNodeContext($request, redirect()->route('network.nodes.show', $node)->with('success', 'Kapasitas slot perangkat diperbarui.'));
     }
 
     public function updateSlotCapacity(Request $request, NetworkNode $slot, InfrastructurePositionService $positions): RedirectResponse
@@ -144,7 +147,7 @@ class InfrastructurePositionController extends Controller
         $validated = $request->validate(['capacity' => ['required', 'integer', 'min:1', 'max:9999']]);
         $positions->updateSlotCapacity($slot, (int) $validated['capacity'], $request->user());
 
-        return redirect()->route('network.infrastructure-slots.show', $slot)->with('success', 'Kapasitas slot diperbarui.');
+        return $this->redirectToNodeContext($request, redirect()->route('network.infrastructure-slots.show', $slot)->with('success', 'Kapasitas slot diperbarui.'));
     }
 
     public function storePort(Request $request, NetworkNode $slot, InfrastructurePositionService $positions): RedirectResponse
@@ -164,7 +167,7 @@ class InfrastructurePositionController extends Controller
             'status' => InfrastructureRecordStatus::TERVERIFIKASI,
         ]), 'number');
 
-        return redirect()->route('network.infrastructure-slots.show', $slot)->with('success', $slot->slotKind()->portKind()->label()." {$validated['number']} ditambahkan.");
+        return $this->redirectToNodeContext($request, redirect()->route('network.infrastructure-slots.show', $slot)->with('success', $slot->slotKind()->portKind()->label()." {$validated['number']} ditambahkan."));
     }
 
     /**

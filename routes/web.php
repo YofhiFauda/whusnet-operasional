@@ -1239,7 +1239,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/network/nodes/pon-search', [NetworkNodeController::class, 'ponSearch'])->name('network.nodes.pon-search');
         Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
         Route::get('/network/nodes/{node}/children', [NetworkNodeController::class, 'children'])->name('network.nodes.children');
-        Route::get('/network/nodes/{node}/device-panel', [NetworkNodeController::class, 'devicePanel'])->name('network.nodes.device-panel');
+        Route::get('/network/nodes/{node}/panel', [NetworkNodeController::class, 'panel'])->name('network.nodes.panel');
         Route::get('/network/nodes/{node}/pon-options', [NetworkNodeController::class, 'ponOptions'])->name('network.nodes.pon-options');
         Route::get('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'create'])->name('network.nodes.register-asset.create');
         Route::post('/network/nodes/{node}/seen', [NetworkNodeController::class, 'markSeen'])->name('network.nodes.seen');
