@@ -171,10 +171,26 @@ Rujukan tambahan hasil implementasi (bukan koreksi, tetapi perlu diketahui):
   nama relasi anak PON/Port Switch pada model adalah `NetworkNode::positionPorts()`
   (bukan `ports()`, yang sudah dipakai untuk `NetworkNodePort` milik ODP).
 - `InfrastructureHierarchyService::build()` menerima `bool $withPositions = false`.
-  Pohon Master Node memakai `false` (Slot/PON/Port tidak dimuat; ODP tetap dimuat dengan
-  jalur "OLT / Slot n / PON m"); Peta memakai `true`. Slot/PON dibuka lewat endpoint
-  `network.nodes.children`.
+  Pohon Master Node memakai `false`: Slot/PON/Port **dan ODP di bawah PON** tidak dimuat
+  (node non-posisi di luar posisi, mis. ODP lama anchor POP, tetap dimuat bertingkat);
+  Peta memakai `true`. Rancangan awal (ODP ikut dimuat dengan jalur "OLT / Slot n / PON m",
+  ruling R5) ditinggalkan pada final fix round karena memuat puluhan ribu ODP di tiap
+  halaman. Seluruh rantai OLT → Slot → PON → ODP dibuka bertingkat lewat endpoint
+  `network.nodes.children` (tiap anak membawa `children_url`/`url` dari server). Label
+  "OLT / Slot n / PON m" kini dipakai endpoint `network.nodes.pon-options` (pilihan PON
+  induk per OLT untuk modal Tambah ODP dan relokasi ODP).
+- Master Node `index` hanya memuat node non-posisi (bukan Slot/PON/Port dan bukan anak
+  posisi) untuk daftar inspector; jalur UI membuat ODP: form **Tambah ODP** di detail PON
+  (POST `network.nodes.store` + `parent_id`, PRG ke detail ODP) dan modal Tambah Titik
+  (OLT → PON via `pon-options`). `network.nodes.store` menolak tipe posisi dan selalu
+  redirect ke detail node baru. Kode/tipe node posisi read-only di server; rename kode
+  perangkat menurunkan ulang kode Slot/PON/Port di bawahnya dalam satu transaksi.
 - Migrasi `2026_10_24_000002` menolak jalan tanpa konfirmasi
   (`INFRA_CONFIRM_DUMMY_RESET=true`) bila ada baris posisi lama yang akan dibuang, dan
-  tidak dapat di-rollback (`down()` melempar exception).
+  tidak dapat di-rollback (`down()` melempar exception). Sebelum kolom slot/port di-NULL,
+  serial (`current_network_node_id`), sisi ledger (`from_/to_network_node_id`), dan saldo
+  yatim (`network_node_id`, digabung per barang+lot) dipindah ke **perangkat induk**
+  (dibaca dari `infrastructure_slots.network_node_id`); hanya yang tanpa perangkat induk
+  dikosongkan/dihapus dan dihitung di pesan guard. `2026_10_25_000001` (drop `olt_slots`)
+  memakai saklar yang sama bila tabel masih berisi baris.
 - "Slot OLT kosong" di Peta kini berarti Slot tanpa PON (key ringkasan `free_olt_slots`).
