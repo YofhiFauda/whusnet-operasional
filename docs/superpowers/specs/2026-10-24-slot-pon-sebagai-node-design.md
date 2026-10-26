@@ -231,7 +231,20 @@ Rujukan tambahan hasil implementasi (bukan koreksi, tetapi perlu diketahui):
     di luar scope diabaikan.
   Panel tidak dirender saat load index (menjaga fix O(N²) final review C2). Pilihan node
   disimpan di `?node=` (history.replaceState) sehingga `back()` setelah gagal validasi
-  memilih ulang node yang sama. Tree tetap: ODP hanya tampil di bawah PON. View `_slot-inspector` dan
+  memilih ulang node yang sama. Tree tetap: ODP hanya tampil di bawah PON.
+  **Putaran UI 3 (2026-10-26, umpan balik user):** ODP di bawah PON wajib tampil dengan
+  inspector ODP yang sama dengan ODP lain (grid port, modal port, Lokasi, Relokasi). Pilihan
+  ODP = muat halaman `network.nodes.index?node=<ODP>`: controller memuat TEPAT SATU ODP itu
+  (scope `inPops`, eager-load sama dengan `$nodes`, rantai induk disambung ke OLT yang sudah
+  dimuat) ke `$inspectorNodes` — `$nodes` (pohon/penghitung) tetap tanpa ODP anak PON, query
+  tambahan konstan. URL datang dari server: `select_url` di JSON `children` (pohon lazy,
+  `openOdp`) dan tombol "Kelola Port" di panel PON. `treeOpenIds` (leluhur dalam scope)
+  membuka cabang pohon lazy otomatis, juga untuk `?node=` Slot/PON. Relokasi ODP memakai
+  field PON bercari (`network.nodes.pon-search`), bukan select OLT → `pon-options`; move,
+  Tambah Port, dan Tandai Manual menerima `master_node` → PRG ke node yang sama. Target form
+  modal port dari `data-*` kartu port (route()), dan Lepas Port kini mengirim
+  `physical_removal_confirmed` + `release_note` (sebelumnya selalu gagal validasi).
+  View `_slot-inspector` dan
   `_pon-inspector` (§7) **dihapus**: keduanya membaca Slot/PON dari `$hierarchy` yang di
   Master Node tidak memuat posisi, sehingga tak pernah merender apa pun. `network.nodes.store` menolak tipe posisi dan selalu
   redirect ke detail node baru. Kode/tipe node posisi read-only di server; rename kode
