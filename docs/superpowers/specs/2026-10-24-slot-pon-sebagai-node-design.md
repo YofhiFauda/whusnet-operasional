@@ -178,11 +178,27 @@ Rujukan tambahan hasil implementasi (bukan koreksi, tetapi perlu diketahui):
   halaman. Seluruh rantai OLT → Slot → PON → ODP dibuka bertingkat lewat endpoint
   `network.nodes.children` (tiap anak membawa `children_url`/`url` dari server). Label
   "OLT / Slot n / PON m" kini dipakai endpoint `network.nodes.pon-options` (pilihan PON
-  induk per OLT untuk modal Tambah ODP dan relokasi ODP).
+  per OLT untuk relokasi ODP) dan `network.nodes.pon-search` (field PON bercari di modal
+  Tambah ODP, lihat di bawah).
 - Master Node `index` hanya memuat node non-posisi (bukan Slot/PON/Port dan bukan anak
   posisi) untuk daftar inspector; jalur UI membuat ODP: form **Tambah ODP** di detail PON
   (POST `network.nodes.store` + `parent_id`, PRG ke detail ODP) dan modal Tambah Titik
-  (OLT → PON via `pon-options`). `network.nodes.store` menolak tipe posisi dan selalu
+  dengan **satu field PON bercari** (koreksi pasca-merge 2026-10-26, keputusan user;
+  menggantikan OLT → PON dua langkah): `GET network.nodes.pon-search?q=` (izin
+  `network_nodes.view`) mengembalikan ≤ 20 PON `{id, label}` ter-scope `inPops()`
+  (scope kosong = kosong), cocok `q` ke kode PON turunan serta kode/nama OLT, urut
+  kode OLT → Slot → PON, Slot & OLT lewat JOIN (jumlah query konstan). Hasilnya mengisi
+  `parent_id` tersembunyi; URL pencarian dirender server di `data-pon-search-url`.
+- **Panel Manajemen Node OLT/Switch di inspector Master Node** (koreksi pasca-merge
+  2026-10-26, keputusan user): klik OLT/Switch menampilkan partial `_device-slots` (kartu
+  Slot + PON/Port, form kapasitas, Tambah Slot/PON, tombol Generate struktur) yang
+  dimuat **lazy** untuk perangkat terpilih saja lewat `GET network.nodes.device-panel`
+  (izin `network_nodes.view`; 403 di luar scope POP, 404 bukan OLT/Switch). Partial tidak
+  dirender saat load index (menjaga fix O(N²) final review C2). Pilihan node disimpan di
+  `?node=` (history.replaceState) sehingga `back()` setelah gagal validasi memilih ulang
+  node yang sama. Tree tetap: ODP hanya tampil di bawah PON. View `_slot-inspector` dan
+  `_pon-inspector` (§7) **dihapus**: keduanya membaca Slot/PON dari `$hierarchy` yang di
+  Master Node tidak memuat posisi, sehingga tak pernah merender apa pun. `network.nodes.store` menolak tipe posisi dan selalu
   redirect ke detail node baru. Kode/tipe node posisi read-only di server; rename kode
   perangkat menurunkan ulang kode Slot/PON/Port di bawahnya dalam satu transaksi.
 - Migrasi `2026_10_24_000002` menolak jalan tanpa konfirmasi
