@@ -1,368 +1,268 @@
-services:
-  # ── Build aset frontend (Vite: CSS Tailwind + JS termasuk Alpine) ──
-  #
-  # KENAPA ADA DI SINI, padahal Dockerfile sudah punya tahap `assets`:
-  # service app & nginx bind-mount `./:/var/www`, dan bind-mount MENUTUPI isi
-  # image di path yang sama. Artinya `public/build` yang benar-benar dilayani
-  # nginx (`root /var/www/public`) SELALU milik host, bukan hasil build image.
-  # Tahap di Dockerfile cuma menolong deploy berbasis image murni (tanpa mount).
-  #
-  # Sejak Alpine dicabut dari CDN (ADHOC-20), tidak adanya `public/build` bukan
-  # lagi sekadar "tampilan berantakan": Laravel melempar ViteException dan
-  # seluruh interaksi Alpine mati. Jadi build dijadikan SYARAT START, bukan
-  # langkah manual yang bisa terlupakan — app & nginx menunggu service ini
-  # keluar dengan sukses (`service_completed_successfully`).
-  #
-  # `npm install` (bukan `npm ci`) disengaja: ini jalan tiap `up`, dan install
-  # yang sudah sinkron selesai dalam hitungan detik, sementara `npm ci` selalu
-  # menghapus lalu memasang ulang node_modules di direktori host.
-  #
-  # Jalan sebagai root LALU `chown` hasilnya ke pemilik repo di host. Bukan
-  # `user:` sejak awal, karena build yang lama meninggalkan `public/build`
-  # milik root: user non-root tak bisa menghapusnya (direktorinya root, mode
-  # 755) dan Vite gagal EACCES saat mengosongkan outDir. Pola root+chown ini
-  # memperbaiki keadaan yang sudah terlanjur TANPA perlu sudo di host, dan
-  # mencegahnya terulang. Override HOST_UID/HOST_GID lewat .env kalau UID host
-  # bukan 1000 (`id -u; id -g`).
-  #
-  # `storage/framework/testing` ikut di-chown karena kena jebakan yang sama:
-  # `php artisan test` dari host memakai direktori itu sebagai disk sementara,
-  # dan begitu ada proses root (docker) yang menulis duluan, seluruh test yang
-  # menyentuh unggahan berkas gagal `Permission denied` — kegagalan yang sama
-  # sekali tidak ada hubungannya dengan kode yang sedang diuji. Bind mount di
-  # service ini adalah direktori HOST (service app memakai named volume untuk
-  # storage), jadi yang diperbaiki memang berkas yang dipakai test.
-  assets:
-    image: node:26-alpine
-    working_dir: /var/www
-    restart: "no"
-    command: >
-      sh -c "
-        echo '📦 Membangun aset frontend (Vite)...';
-        npm install --no-audit --no-fund &&
-        npm run build &&
-        chown -R ${HOST_UID:-1000}:${HOST_GID:-1000} public/build node_modules &&
-        if [ -d storage/framework/testing ]; then
-          chown -R ${HOST_UID:-1000}:${HOST_GID:-1000} storage/framework/testing;
-          echo '🧹 storage/framework/testing dikembalikan ke pemilik host.';
-        fi &&
-        echo '✅ Aset siap di public/build.'
-      "
-    volumes:
-      - ./:/var/www
-    networks:
-      - app_network
+# ═══════════════════════════════════════════════════════════════════════════
+#  docker-compose PRODUKSI — dipakai Coolify (git-based build, bukan
+#  bind-mount seperti docker-compose.yml dev)
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Deploy di Coolify: New Resource → Docker Compose → arahkan ke file ini.
+# Isi semua ${VAR} lewat tab "Environment Variables" Coolify (bukan .env yang
+# ikut commit) — pakai `.env.production.example` di repo ini sebagai daftar
+# variabel yang wajib diisi.
+#
+# Domain publik: set FQDN di service `nginx` lewat UI Coolify (Coolify
+# menyuntikkan proxy Traefik-nya sendiri di depan port yang di-`expose`,
+# JANGAN pakai `ports:` host-mapped seperti di compose dev — itu untuk akses
+# langsung tanpa reverse proxy Coolify).
+#
+# DB & Redis: sengaja TIDAK disertakan di sini — keduanya resource terpisah
+# (MySQL managed Coolify / server sendiri, dan Redis sendiri). Isi
+# DB_HOST/DB_PORT/dst dan REDIS_HOST/REDIS_PORT/REDIS_PASSWORD lewat env.
+# Alasannya: data pelanggan/billing dan antrean tidak boleh menyatu siklus
+# hidupnya dengan redeploy image app. Stack ini (app, nginx, horizon, reverb,
+# scheduler) wajib bisa MENJANGKAU keduanya: di Coolify aktifkan "Connect to
+# Predefined Network" atau pakai hostname/IP privat; jangan buka 3306 dan
+# 6379 ke publik.
 
+services:
   app:
-    image: app:${APP_VERSION:-latest}
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: whusnet-app
+      dockerfile: Dockerfile.prod
+      target: runtime
+      # VITE_REVERB_APP_KEY WAJIB lewat build arg, bukan `environment:` biasa —
+      # Vite meng-inline VITE_* ke bundle JS SAAT BUILD image, sudah lewat masa
+      # baca env runtime container. Lihat catatan di Dockerfile.prod stage `assets`.
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
-    working_dir: /var/www
-    command: >
-      sh -c "
-        echo '⏳ Initializing App...';
-        if [ ! -f vendor/autoload.php ]; then
-          echo '📦 Vendor not found, installing...';
-          composer install --no-interaction --optimize-autoloader;
-        fi &&
-        echo '🚀 Starting PHP-FPM...';
-        php-fpm
-      "
+    environment: &app_env
+      CONTAINER_ROLE: app
+      APP_NAME: ${APP_NAME:-Whusnet-Operasional}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY}
+      APP_URL: ${APP_URL}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-*}
+      FORCE_HTTPS: ${FORCE_HTTPS:-true}
+      APP_TIMEZONE: Asia/Jakarta
+      APP_LOCALE: id
+      APP_FALLBACK_LOCALE: id
+      APP_FAKER_LOCALE: id_ID
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      LOG_CHANNEL: stack
+      LOG_STACK: single
+      LOG_DEPRECATIONS_CHANNEL: "null"
+      LOG_LEVEL: ${LOG_LEVEL:-warning}
+      DB_CONNECTION: mysql
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SESSION_DRIVER: redis
+      SESSION_LIFETIME: ${SESSION_LIFETIME:-120}
+      SESSION_ENCRYPT: "false"
+      SESSION_SECURE_COOKIE: "true"
+      SESSION_SAME_SITE: lax
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      # Redis TIDAK ada di compose ini — resource terpisah (Coolify/server lain).
+      # Tanpa default: host salah/kosong harus gagal keras di entrypoint
+      # (wait_for_tcp, 60 detik lalu keluar), bukan diam-diam menyambung ke
+      # "redis" yang tak ada.
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # WAJIB diisi dan HARUS sama dengan `requirepass` di server Redis-nya.
+      # Tanpa default palsu ("null" string, dsb): kalau kosong, AUTH gagal keras
+      # & container unhealthy — lebih baik daripada diam-diam connect tanpa
+      # password. Redis menyimpan session/cache/queue/broadcasting, jadi server
+      # Redis wajib menyalakan `requirepass` dan TIDAK dibuka ke internet.
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Harus lebih besar dari timeout job terpanjang (MatchPaymentReceipt =
+      # 240s, supervisor kwitansi = 300s) — lihat catatan di docker-compose.yml dev.
+      REDIS_QUEUE_RETRY_AFTER: 360
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: reverb
+      REVERB_PORT: 8081
+      REVERB_SCHEME: http
+      REVERB_SERVER_HOST: 0.0.0.0
+      REVERB_SERVER_PORT: 8081
+      MAIL_MAILER: ${MAIL_MAILER:-log}
+      MAIL_SCHEME: ${MAIL_SCHEME:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+      MAIL_FROM_NAME: ${APP_NAME:-Whusnet-Operasional}
+      FILESYSTEM_DISK: local
+      QR_HMAC_SECRET: ${QR_HMAC_SECRET}
+      QR_BASE_URL: ${APP_URL}
+      PORTAL_BASE_URL: ${PORTAL_BASE_URL:-}
+      PORTAL_ALLOWED_ORIGIN: ${PORTAL_ALLOWED_ORIGIN:-}
+      PORTAL_CLIENT_SECRET: ${PORTAL_CLIENT_SECRET:-}
+      PORTAL_WEBHOOK_URL: ${PORTAL_WEBHOOK_URL:-}
+      PORTAL_WEBHOOK_SECRET: ${PORTAL_WEBHOOK_SECRET:-}
+      COLLECTOR_DUE_WINDOW_DAYS: ${COLLECTOR_DUE_WINDOW_DAYS:-7}
+      # Notifikasi teknisi in-app (TelegramBotService, config/services.php) —
+      # BEDA dari TELEGRAM_EXTERNAL_* di bawah, lihat catatan config/webhooks.php.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # Webhook keluar API 1 (docs/api/) — tujuan Website B / Telegram pihak
+      # luar. Kosong = fitur nonaktif diam-diam (listener skip), bukan error.
+      WEBHOOK_WEBSITE_B_URL: ${WEBHOOK_WEBSITE_B_URL:-}
+      WEBHOOK_WEBSITE_B_SECRET: ${WEBHOOK_WEBSITE_B_SECRET:-}
+      TELEGRAM_EXTERNAL_BOT_TOKEN: ${TELEGRAM_EXTERNAL_BOT_TOKEN:-}
+      TELEGRAM_EXTERNAL_CHAT_ID: ${TELEGRAM_EXTERNAL_CHAT_ID:-}
+      # API masuk POP-distribusi (docs/api/api-pop-distribusi/) — Website B
+      # connect ke sini. Dua token terpisah, lihat config/webhooks.php.
+      POP_DISTRIBUSI_READ_TOKEN: ${POP_DISTRIBUSI_READ_TOKEN:-}
+      NETWORK_ASSIGNMENT_WRITE_TOKEN: ${NETWORK_ASSIGNMENT_WRITE_TOKEN:-}
     volumes:
-      - ./:/var/www
-      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
       - storage_data:/var/www/storage
       - cache_data:/var/www/bootstrap/cache
-    depends_on:
-      db:
-        condition: service_healthy
-      # Tanpa manifest Vite, halaman apa pun yang meng-@vite langsung 500
-      # (ViteException) — jadi PHP-FPM tidak boleh melayani sebelum aset jadi.
-      assets:
-        condition: service_completed_successfully
-    environment:
-      APP_NAME: "RUANG KERJA WHUSNET"
-      # DB_* SENGAJA tak diulang di sini (2026-08-03). Compose `environment:`
-      # jadi env var level-OS container — lapisan ini menang atas .env DAN
-      # atas .env.testing/phpunit.xml `force="true"` saat `php artisan test`
-      # dijalankan lewat `docker exec`, karena sudah ada di process env
-      # SEBELUM PHP/Dotenv jalan. Akibatnya semua test RefreshDatabase
-      # nyasar ke MySQL asli, bukan sqlite :memory: — ditemukan 2026-08-03.
-      # .env sudah punya DB_CONNECTION=mysql/DB_HOST=db yang identik untuk
-      # runtime normal, jadi menghapus baris ini di compose TIDAK mengubah
-      # perilaku container saat jalan biasa — cuma membuka jalan supaya
-      # .env.testing bisa menang saat testing.
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      # SESSION_DRIVER & CACHE_STORE SENGAJA tidak diulang di sini — pelajaran
-      # yang sama dengan DB_* dan QUEUE_CONNECTION di atas.
-      #
-      # `CACHE_STORE: file` di lapisan ini mengisi $_SERVER, dan `env()` Laravel
-      # membaca $_SERVER LEBIH DULU daripada putenv() — sehingga
-      # `force="true"` pada phpunit.xml kalah. Akibatnya SELURUH test berbagi
-      # cache file yang PERSISTEN lintas run: `user.1.permissions` yang
-      # ter-cache sebagai `["*"]` di satu run membuat test RBAC di run
-      # berikutnya melihat user biasa punya akses penuh. Itu penyebab 9 test
-      # RBAC merah — bukan logika permission-nya.
-      #
-      # Nilainya ada di `.env` (file), jadi runtime tidak berubah.
-      # QUEUE_CONNECTION SENGAJA tidak diulang di sini — sama alasannya dengan
-      # DB_* di atas. Nilainya sudah `redis` di .env, jadi runtime tidak
-      # berubah; yang berubah cuma siapa yang menang saat testing.
-      #
-      # Waktu baris `QUEUE_CONNECTION: redis` pernah ada di sini, ia jadi env
-      # var level-OS dan mengisi $_SERVER. `env()` Laravel membaca $_SERVER
-      # LEBIH DULU daripada putenv(), sementara `force="true"` di phpunit.xml
-      # hanya menulis putenv() — jadi test yang seharusnya `sync` justru
-      # mendorong job ke Redis ASLI. Horizon lalu menjalankan job berisi model
-      # yang di-serialize dengan koneksi sqlite milik test: 576 job gagal
-      # dengan SQLiteDatabaseDoesNotExistException, dan bertambah tiap kali
-      # suite dijalankan.
-      #
-      # Harus LEBIH BESAR dari timeout job terpanjang (MatchPaymentReceipt =
-      # 240 dtk, supervisor kwitansi = 300 dtk). Kalau lebih kecil, job yang
-      # masih berjalan sudah dianggap mati dan diambil worker kedua — satu
-      # berkas kwitansi dibaca dua kali.
-      REDIS_QUEUE_RETRY_AFTER: 360
-      LOG_CHANNEL: stack
-      LOG_LEVEL: debug
     healthcheck:
-      test: ["CMD-SHELL", "php artisan --version || exit 1"]
+      # `php artisan --version` cuma butuh vendor/autoload buat jalan — lolos
+      # detik pertama walau migrate/storage:link/cache masih JALAN di
+      # entrypoint (proses PID 1 yang sama, tapi HEALTHCHECK exec terpisah
+      # dan concurrent). horizon/reverb/scheduler/nginx semua gate di
+      # `app: service_healthy`, jadi healthcheck lemah = mereka bisa start
+      # sebelum migrasi kelar (job jalan di skema lama) atau sebelum php-fpm
+      # benar-benar listen (nginx dapat 502). Entrypoint nulis marker
+      # /tmp/app-ready SETELAH migrate+cache selesai & TEPAT SEBELUM exec
+      # php-fpm — healthcheck nunggu marker itu, bukan cuma artisan bisa jalan.
+      test: ["CMD-SHELL", "test -f /tmp/app-ready && php artisan --version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 180s
+      start_period: 120s
     networks:
       - app_network
 
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: web
+      # Sama nilainya dengan build arg service `app` — WAJIB identik supaya
+      # Docker build cache stage `assets` (shared, dipakai `app` DAN `nginx`)
+      # tidak invalidasi/duplikat build cuma karena arg beda.
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
+    image: whusnet-nginx:${APP_VERSION:-latest}
     restart: unless-stopped
-    ports:
-      - "8000:80"
+    # Port yang dibaca Coolify buat routing domain (Traefik). JANGAN tambah
+    # `ports:` host-mapped di sini — biarkan Coolify yang mem-proxy.
+    expose:
+      - "80"
     volumes:
-      - ./:/var/www
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
       - storage_data:/var/www/storage
     depends_on:
       app:
         condition: service_healthy
       reverb:
         condition: service_started
-      # nginx yang melayani /build/* langsung dari disk — kalau berkasnya belum
-      # ada, aset 404 sementara halamannya sendiri sudah tampil (gaya & Alpine
-      # hilang tanpa error yang jelas).
-      assets:
-        condition: service_completed_successfully
     networks:
       - app_network
 
-  db:
-    image: mysql:8.0
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: whusnet_operasional
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_PASSWORD: root
-      MYSQL_USER: admin
-    ports:
-      - "3306:3306"
-    volumes:
-      - dbdata:/var/lib/mysql
-    networks:
-      - app_network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:alpine
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - app_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-  # ─────────────────────────────────────────
-  #  HORIZON — Queue Worker
-  # ─────────────────────────────────────────
   horizon:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: runtime
     image: app:${APP_VERSION:-latest}
     restart: unless-stopped
-    working_dir: /var/www
-    networks:
-      - app_network
-    env_file:
-      - .env
+    environment:
+      <<: *app_env
+      CONTAINER_ROLE: horizon
     volumes:
-      - ./:/var/www
       - storage_data:/var/www/storage
       - cache_data:/var/www/bootstrap/cache
-    environment:
-      CONTAINER_ROLE: horizon
-      DB_CONNECTION: mysql
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_DATABASE: whusnet_operasional
-      DB_USERNAME: root
-      DB_PASSWORD: root
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      # Sejajar dengan service `app` — lihat catatan di sana.
-      REDIS_QUEUE_RETRY_AFTER: 360
-    command: php artisan horizon
     depends_on:
       app:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          cpus: '0.50'
+          cpus: "0.50"
           memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'horizon' >/dev/null || exit 1"]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 30s
-
-  # ─────────────────────────────────────────
-  #  REVERB — WebSocket Server
-  # ─────────────────────────────────────────
-  reverb:
-    image: app:${APP_VERSION:-latest}
-    restart: unless-stopped
-    working_dir: /var/www
     networks:
       - app_network
-    ports:
-      - "8081:8081"
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: runtime
+    image: app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+      CONTAINER_ROLE: reverb
     volumes:
-      - ./:/var/www
       - storage_data:/var/www/storage
       - cache_data:/var/www/bootstrap/cache
-    environment:
-      CONTAINER_ROLE: reverb
-      DB_CONNECTION: mysql
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_DATABASE: whusnet_operasional
-      DB_USERNAME: root
-      DB_PASSWORD: root
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-    command: php artisan reverb:start --host="0.0.0.0" --port=8081
-    env_file:
-      - .env
     depends_on:
       app:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          cpus: '0.20'
+          cpus: "0.20"
           memory: 256M
-        reservations:
-          cpus: '0.10'
-          memory: 128M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     healthcheck:
-      # nc (netcat) lebih tepat untuk WebSocket — cukup cek port TCP terbuka
-      # curl bisa return non-200 pada WebSocket server meski sebenarnya healthy
+      # nc lebih tepat dari curl buat WebSocket — cek port TCP terbuka saja.
       test: ["CMD-SHELL", "nc -z 127.0.0.1 8081 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-
-  # ─────────────────────────────────────────
-  #  SCHEDULER — Laravel Cron
-  # ─────────────────────────────────────────
-  scheduler:
-    image: app:${APP_VERSION:-latest}
-    restart: unless-stopped
-    working_dir: /var/www
     networks:
       - app_network
-    env_file:
-      - .env
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: runtime
+    image: app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+      CONTAINER_ROLE: scheduler
     volumes:
-      - ./:/var/www
       - storage_data:/var/www/storage
       - cache_data:/var/www/bootstrap/cache
-    environment:
-      CONTAINER_ROLE: scheduler
-      DB_CONNECTION: mysql
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_DATABASE: whusnet_operasional
-      DB_USERNAME: root
-      DB_PASSWORD: root
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      # Sejajar dengan service `app` — lihat catatan di sana.
-      REDIS_QUEUE_RETRY_AFTER: 360
-    command: php artisan schedule:work
     depends_on:
       app:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          cpus: '0.10'
+          cpus: "0.10"
           memory: 192M
-        reservations:
-          cpus: '0.05'
-          memory: 96M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "3"
     healthcheck:
-      # schedule:work adalah long-running process — pgrep lebih tepat dari 'ps aux | grep php'
-      # 'ps aux | grep php' hampir selalu true karena grep itu sendiri muncul sebagai proses
       test: ["CMD-SHELL", "pgrep -f 'schedule:work' >/dev/null || exit 1"]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 30s
-      
+    networks:
+      - app_network
+
 networks:
   app_network:
     driver: bridge
 
 volumes:
-  dbdata:
   storage_data:
   cache_data:
-  redis_data:

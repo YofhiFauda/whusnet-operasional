@@ -940,10 +940,7 @@
                     </svg>
                 </button>
 
-                <a href="<?php echo e(route('manuals.index')); ?>" aria-label="Pusat Panduan" title="Pusat Panduan" class="flex items-center gap-1 rounded-lg px-2 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-sky-50 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-sky-900/30 dark:hover:text-sky-300">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v17H6.5A2.5 2.5 0 0 0 4 22V5.5ZM20 5.5A2.5 2.5 0 0 0 17.5 3H12v17h5.5A2.5 2.5 0 0 1 20 22V5.5Z"/></svg>
-                    <span class="hidden lg:inline">Panduan</span>
-                </a>
+                
 
                 
                 <button onclick="openHelp()" aria-label="Bantuan dan pintasan keyboard" title="Bantuan (?)"

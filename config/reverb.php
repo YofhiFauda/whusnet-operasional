@@ -82,7 +82,16 @@ return [
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
                 ],
-                'allowed_origins' => ['*'],
+                // Produksi: hanya host APP_URL (atau daftar REVERB_ALLOWED_ORIGINS, dipisah
+                // koma) yang boleh membuka WebSocket. Non-produksi tetap '*' karena dev
+                // dipakai lewat localhost dan Cloudflare Tunnel yang hostnya berubah-ubah
+                // (lihat resources/js/echo.js). Channel privat tetap dijaga auth; ini
+                // lapisan tambahan supaya situs lain tak bisa menyambung ke server kita.
+                'allowed_origins' => env('REVERB_ALLOWED_ORIGINS')
+                    ? array_values(array_filter(array_map('trim', explode(',', (string) env('REVERB_ALLOWED_ORIGINS')))))
+                    : (env('APP_ENV') === 'production' && parse_url((string) env('APP_URL'), PHP_URL_HOST)
+                        ? [parse_url((string) env('APP_URL'), PHP_URL_HOST)]
+                        : ['*']),
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
                 'activity_timeout' => env('REVERB_APP_ACTIVITY_TIMEOUT', 30),
                 'max_connections' => env('REVERB_APP_MAX_CONNECTIONS'),
