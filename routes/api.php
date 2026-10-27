@@ -58,22 +58,31 @@ Route::prefix('v1')->group(function () {
 |
 */
 
-Route::prefix('customer-portal')->middleware(['throttle:customer-portal-api'])->group(function () {
+Route::prefix('customer-portal')->group(function () {
     Route::get('/ping', fn () => response()->json(['data' => ['status' => 'ok']]))
+        ->middleware(['throttle:customer-portal-api'])
         ->name('api.customer-portal.ping');
 
     // Fase 2 — semua route di bawah ini butuh client secret portal
     // (lapis pertama). Token per-pelanggan (lapis kedua) disisip per-route
     // yang memang butuh identitas pelanggan — /auth/login, /auth/claim, dan
     // /auth/refresh justru BELUM punya identitas pelanggan saat dipanggil.
-    Route::middleware(['portal_client'])->group(function () {
+    //
+    // URUTAN middleware PENTING: `portal_client` SEBELUM throttle. Dulu throttle
+    // jalan lebih dulu dengan kunci `Authorization: Bearer` mentah dari klien —
+    // penyerang tinggal mengirim Bearer acak baru tiap request untuk selalu
+    // mendapat ember kosong (limiter tak pernah terpicu) sementara tiap request
+    // tetap memakan satu worker php-fpm. Sekarang pemanggil tanpa secret ditolak
+    // 401 murah sebelum menyentuh limiter, dan IP pelanggan (X-Portal-Client-IP)
+    // baru dipercaya sesudah secret terbukti valid (App\Support\PortalClientIp).
+    Route::middleware(['portal_client', 'throttle:customer-portal-api', 'throttle:customer-portal-total'])->group(function () {
         Route::prefix('auth')->group(function () {
             Route::post('/login', [PortalAuthController::class, 'login'])
-                ->middleware(['throttle:customer-portal-auth', 'throttle:customer-portal-auth-ip'])
+                ->middleware(['throttle:customer-portal-login-total', 'throttle:customer-portal-auth', 'throttle:customer-portal-auth-ip'])
                 ->name('api.customer-portal.auth.login');
 
             Route::post('/claim', [PortalAuthController::class, 'claim'])
-                ->middleware(['throttle:customer-portal-auth', 'throttle:customer-portal-auth-ip'])
+                ->middleware(['throttle:customer-portal-login-total', 'throttle:customer-portal-auth', 'throttle:customer-portal-auth-ip'])
                 ->name('api.customer-portal.auth.claim');
 
             // BUKAN 'portal_token' — refresh token beda jenis dari access

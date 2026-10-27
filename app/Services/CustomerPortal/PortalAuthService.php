@@ -8,6 +8,7 @@ use App\Models\CustomerPortalAccount;
 use App\Models\CustomerPortalToken;
 use App\Models\User;
 use App\Services\CustomerQrTokenService;
+use App\Support\PortalClientIp;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -137,7 +138,7 @@ class PortalAuthService
                 'auditable_id' => $account->id,
                 'old_values' => null,
                 'new_values' => null,
-                'ip_address' => request()?->ip(),
+                'ip_address' => request() ? PortalClientIp::resolve(request()) : null,
                 'user_agent' => substr((string) request()?->userAgent(), 0, 255),
             ]);
         });
@@ -191,7 +192,7 @@ class PortalAuthService
                     'auditable_id' => $account->id,
                     'old_values' => null,
                     'new_values' => null,
-                    'ip_address' => request()?->ip(),
+                    'ip_address' => request() ? PortalClientIp::resolve(request()) : null,
                     'user_agent' => substr((string) request()?->userAgent(), 0, 255),
                 ]);
             });

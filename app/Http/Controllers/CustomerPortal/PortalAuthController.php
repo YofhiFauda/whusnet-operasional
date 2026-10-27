@@ -7,6 +7,7 @@ use App\Http\Requests\CustomerPortal\PortalClaimRequest;
 use App\Http\Requests\CustomerPortal\PortalLoginRequest;
 use App\Http\Requests\CustomerPortal\PortalRefreshRequest;
 use App\Services\CustomerPortal\PortalAuthService;
+use App\Support\PortalClientIp;
 use Dedoc\Scramble\Attributes\BodyParameter;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\Response;
@@ -50,7 +51,7 @@ class PortalAuthController extends Controller
         $result = $this->service->login(
             $request->string('login_id')->toString(),
             $request->string('password')->toString(),
-            $request->ip(),
+            PortalClientIp::resolve($request),
         );
 
         return match ($result['outcome']) {
@@ -89,7 +90,7 @@ class PortalAuthController extends Controller
             $request->string('login_id')->toString(),
             $request->string('pin')->toString(),
             $request->string('new_password')->toString(),
-            $request->ip(),
+            PortalClientIp::resolve($request),
         );
 
         return match ($result['outcome']) {
@@ -119,7 +120,7 @@ class PortalAuthController extends Controller
     {
         $result = $this->service->refresh(
             $request->string('refresh_token')->toString(),
-            $request->ip(),
+            PortalClientIp::resolve($request),
         );
 
         return match ($result['outcome']) {

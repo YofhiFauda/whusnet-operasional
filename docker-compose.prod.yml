@@ -141,6 +141,7 @@ services:
       start_period: 120s
     networks:
       - app_network
+      - coolify
 
   nginx:
     build:
@@ -167,6 +168,7 @@ services:
         condition: service_started
     networks:
       - app_network
+      - coolify
 
   horizon:
     build:
@@ -197,6 +199,7 @@ services:
       start_period: 30s
     networks:
       - app_network
+      - coolify
 
   reverb:
     build:
@@ -228,6 +231,7 @@ services:
       start_period: 30s
     networks:
       - app_network
+      - coolify
 
   scheduler:
     build:
@@ -258,10 +262,23 @@ services:
       start_period: 30s
     networks:
       - app_network
+      - coolify
 
 networks:
   app_network:
     driver: bridge
+  # Network shared Coolify tempat resource managed (DB/Redis) hidup. Nama
+  # digenerate Coolify per instalasi — biasanya `coolify`, tapi BISA BEDA.
+  # Cek nama asli: `docker network ls` di server Coolify, cari yang dipakai
+  # bareng resource DB/Redis managed-nya. Kalau beda dari `coolify`, override
+  # lewat env COOLIFY_NETWORK_NAME di tab Environment Variables Coolify.
+  # Tanpa network ini, app/horizon/reverb/scheduler cuma bisa saling lihat
+  # sesama container compose ini sendiri (app_network) — gak bisa jangkau
+  # DB/Redis managed Coolify, persis gejala "database tidak siap setelah 60
+  # detik" di entrypoint (wait_for_tcp gagal karena DNS/route beda network).
+  coolify:
+    external: true
+    name: ${COOLIFY_NETWORK_NAME:-coolify}
 
 volumes:
   storage_data:
