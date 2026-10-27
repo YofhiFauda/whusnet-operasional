@@ -8,6 +8,7 @@ use App\Http\Resources\CustomerPortal\CustomerPortalProfileResource;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerPortalToken;
+use App\Support\PortalClientIp;
 use Dedoc\Scramble\Attributes\BodyParameter;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\Response;
@@ -95,7 +96,7 @@ class PortalMeController extends Controller
             'auditable_id' => $account->id,
             'old_values' => null,
             'new_values' => ['changed_at' => now()->toIso8601String()],
-            'ip_address' => $request->ip(),
+            'ip_address' => PortalClientIp::resolve($request),
             'user_agent' => $request->userAgent(),
             'created_at' => now(),
         ]);

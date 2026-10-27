@@ -128,4 +128,11 @@ FROM nginx:1.31-alpine AS web
 COPY docker/nginx/default.prod.conf /etc/nginx/conf.d/default.conf
 COPY --from=assets /app/public/build /var/www/public/build
 COPY public/favicon.ico public/robots.txt /var/www/public/
+# index.php TIDAK dieksekusi di sini (nginx cuma fastcgi_pass ke app:9000),
+# tapi WAJIB ada secara fisik — directive `index index.php ...;` di
+# default.prod.conf butuh file ini KETEMU di filesystem buat bikin internal
+# redirect ke location ~ \.php$. Tanpa ini: request "/" nemu direktori root
+# (ada), nginx coba resolve index, index.php/index.html gak ketemu, autoindex
+# off → 403 Forbidden duluan sebelum sempat sampai fallback try_files.
+COPY public/index.php /var/www/public/index.php
 EXPOSE 80

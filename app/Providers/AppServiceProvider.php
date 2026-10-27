@@ -28,6 +28,7 @@ use App\Services\BusinessDevelopmentVerificationQueue;
 use App\Services\EffectiveAccessService;
 use App\Services\NetworkNodeAttentionService;
 use App\Services\WarehouseTransferActionQueue;
+use App\Support\PortalClientIp;
 use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -224,9 +225,18 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by(($request->bearerToken() ?? 'anon').'|'.$request->ip());
         });
 
-        // API Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 0). Tiga
-        // limiter beda kelas risiko — pola RateLimiter::for-nya sama seperti
-        // tiga di atas, bukan pola baru di repo.
+        // API Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 0). Limiter
+        // beda kelas risiko — pola RateLimiter::for-nya sama seperti tiga di atas.
+        //
+        // Ukuran angka (ADHOC-224, basis ±30.000 pelanggan): puncak realistis
+        // setelah notifikasi tagihan ≈ 5 login/detik dan ≈ 40 req/detik API
+        // (3.000 pelanggan membuka portal dalam ±10 menit). Batas dipasang di
+        // ATAS angka itu supaya pelanggan sah tidak kena 429, dan di BAWAH
+        // kapasitas php-fpm supaya lonjakan palsu tidak menjenuhkan worker.
+        //
+        // KUNCI IP memakai PortalClientIp::resolve(): Portal adalah BFF, jadi
+        // `$request->ip()` = IP server portal untuk SEMUA pelanggan. Header
+        // X-Portal-Client-IP hanya dipercaya bila X-Portal-Client valid.
         RateLimiter::for('customer-portal-api', function (Request $request) {
             // Lokal (dev): limiter DIMATIKAN — tes manual berulang-ulang dari
             // Portal Next.js gak keblokir 429 gara-gara reload/testing.
@@ -237,46 +247,104 @@ class AppServiceProvider extends ServiceProvider
                 return Limit::none();
             }
 
-            return Limit::perMinute(120)->by($request->bearerToken() ?? $request->ip());
+            // Per pelanggan (access token) 120/menit — manusia hampir tak
+            // pernah lewat 20/menit. Tanpa token (login/claim/refresh, ping)
+            // kuncinya IP pelanggan; jatahnya lebih longgar karena banyak
+            // pelanggan bisa berbagi satu IP publik (NAT/CGNAT jaringan ISP).
+            $token = $request->bearerToken();
+
+            return $token
+                ? Limit::perMinute(120)->by('portal-token:'.sha1($token))
+                : Limit::perMinute(300)->by('portal-ip:'.PortalClientIp::resolve($request));
+        });
+
+        // Pelindung server: SATU ember untuk seluruh lalu lintas Portal (semua
+        // pelanggan digabung) ≈ 50 req/detik, sedikit di atas puncak 40 req/detik
+        // yang diperkirakan. Di atas itu php-fpm antre dan staf ikut lambat.
+        RateLimiter::for('customer-portal-total', function () {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(3000)->by('portal-total');
         });
 
         // Jauh lebih ketat dari customer-portal-api — endpoint kredensial
-        // (login/claim/ganti password, Fase 2) TIDAK BOLEH pakai limiter data
-        // biasa: 120 req/menit di situ setara brute-force yang diizinkan
-        // (business-logic.md §6.6.3). Belum diattach ke route nyata sampai
-        // Fase 2 — didaftarkan sekarang supaya namanya siap dipakai.
+        // (login/claim/ganti password) TIDAK BOLEH pakai limiter data biasa:
+        // 120 req/menit di situ setara brute-force yang diizinkan
+        // (business-logic.md §6.6.3). Per AKUN (login_id) + IP: menahan tebakan
+        // password pada satu akun, tidak bergantung pada banyaknya IP.
         RateLimiter::for('customer-portal-auth', function (Request $request) {
             if (app()->environment('local')) {
                 return Limit::none();
             }
 
-            return Limit::perMinutes(15, 5)->by($request->ip().'|'.$request->input('login_id'));
+            return Limit::perMinutes(15, 5)->by(PortalClientIp::resolve($request).'|'.$request->input('login_id'));
         });
 
         // Limiter KEDUA, murni per-IP tanpa login_id — menutup penyapuan
         // banyak login_id dari satu IP yang tidak pernah menyentuh limiter
         // di atas (keputusan.md §1: limiter keyed login_id+IP saja ditolak,
-        // "memberi ember baru untuk tiap login ID").
+        // "memberi ember baru untuk tiap login ID"). 150/15 menit (dulu 30):
+        // pelanggan Whusnet bisa berbagi satu IP publik lewat NAT, dan dulu
+        // seluruh pelanggan dihitung SATU IP (IP server portal).
         RateLimiter::for('customer-portal-auth-ip', function (Request $request) {
             if (app()->environment('local')) {
                 return Limit::none();
             }
 
-            return Limit::perMinutes(15, 30)->by($request->ip());
+            return Limit::perMinutes(15, 150)->by(PortalClientIp::resolve($request));
+        });
+
+        // Batas atas login+aktivasi dari SEMUA pelanggan ≈ 5/detik (puncak
+        // setelah notifikasi tagihan). Login memakai bcrypt (±250 ms CPU), jadi
+        // tanpa batas global ini lonjakan login palsu langsung menghabiskan
+        // worker php-fpm.
+        RateLimiter::for('customer-portal-login-total', function () {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(300)->by('portal-login-total');
         });
 
         // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md
         // §10 Fase 1) — endpoint publik TANPA auth, jadi limiter per-IP
         // adalah satu-satunya penjaga sebelum request sampai ke query DB.
-        // Baseline longgar (60/menit) karena satu HP bisa scan berkali-kali
-        // wajar (staf bolak-balik antar pelanggan); limiter PIN yang jauh
-        // lebih ketat menyusul di Fase 2 (§10), terpisah dari yang ini.
+        // 150/menit (dulu 60): satu kantor di balik satu IP publik bisa berisi
+        // ±20 staf × ±3 scan/menit; limiter PIN yang jauh lebih ketat menyusul
+        // di Fase 2 (§10), terpisah dari yang ini.
         RateLimiter::for('qr-public', function (Request $request) {
             if (app()->environment('local')) {
                 return Limit::none();
             }
 
-            return Limit::perMinute(60)->by($request->ip());
+            return Limit::perMinute(150)->by(PortalClientIp::resolve($request));
+        });
+
+        // Login STAF (POST /login). Dulu TANPA limiter: tebak password tak
+        // terbatas, dan tiap percobaan memakai bcrypt (±250 ms CPU) — satu
+        // klien ±20 req/detik cukup menjenuhkan lima worker php-fpm.
+        // Dua lapis: per email+IP (tebak satu akun) dan per IP (penyapuan
+        // banyak email; 60/menit karena satu kantor berbagi satu IP publik).
+        // Respons = redirect ke form dengan pesan, bukan halaman 429 kosong.
+        $staffLoginDenied = function (Request $request, array $headers) {
+            $seconds = (int) ($headers['Retry-After'] ?? 60);
+
+            return redirect()->route('login')
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => "Terlalu banyak percobaan login. Coba lagi dalam {$seconds} detik."])
+                ->withHeaders($headers);
+        };
+
+        RateLimiter::for('staff-login', function (Request $request) use ($staffLoginDenied) {
+            return Limit::perMinute(10)
+                ->by('staff-login:'.mb_strtolower((string) $request->input('email')).'|'.$request->ip())
+                ->response($staffLoginDenied);
+        });
+
+        RateLimiter::for('staff-login-ip', function (Request $request) use ($staffLoginDenied) {
+            return Limit::perMinute(60)->by('staff-login-ip:'.$request->ip())->response($staffLoginDenied);
         });
 
         // qr-billing-verify DICABUT 2026-08-27 bareng QrBillingController

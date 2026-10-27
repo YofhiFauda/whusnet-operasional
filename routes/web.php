@@ -129,7 +129,10 @@ use Illuminate\Support\Facades\Route;
 // Guest Routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [LoginController::class, 'login']);
+    // Dua lapis limiter (AppServiceProvider): per email+IP dan per IP — dulu
+    // tanpa batas, padahal tiap percobaan memakan ±250 ms CPU bcrypt.
+    Route::post('/login', [LoginController::class, 'login'])
+        ->middleware(['throttle:staff-login', 'throttle:staff-login-ip']);
 });
 
 // QR Pelanggan — dispatcher publik (docs/plan/qr-code/rancangan-qr-
