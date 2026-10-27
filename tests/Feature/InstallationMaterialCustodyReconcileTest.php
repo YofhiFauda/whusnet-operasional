@@ -21,7 +21,9 @@ use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Services\InventoryIssueService;
 use App\Services\InventoryReceiveService;
+use App\Services\InventoryService;
 use App\Services\InventoryTransferService;
+use App\Services\TaskMaterialService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\ItemCategorySeeder;
@@ -104,6 +106,57 @@ class InstallationMaterialCustodyReconcileTest extends TestCase
         $task->teamMembers()->create(['user_id' => $technician->id, 'role_in_task' => 'lead']);
 
         return [$customer, $technician, $task, $pusat, $pop];
+    }
+
+    #[Test]
+    public function revisi_instalasi_tidak_memotong_custody_dua_kali(): void
+    {
+        [$customer, $technician, , , $cabang] = $this->setupInProgressInstallation();
+        $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $item = Item::create([
+            'code' => 'AUDIT-REVISION',
+            'name' => 'Material Revisi',
+            'item_category_id' => $category->id,
+            'unit' => 'pcs',
+            'tracking_type' => 'quantity',
+            'ownership_mode' => 'installable',
+        ]);
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-AUDIT-REVISION',
+            'task_date' => now(),
+            'category' => TaskType::PEMASANGAN->value,
+            'tugas' => 'Revisi material',
+            'pop_id' => $cabang->id,
+            'customer_id' => $customer->id,
+            'issue' => 'Uji',
+            'status' => 'draft',
+            'priority' => 'Medium',
+        ]);
+        $custody = TechnicianCustody::create([
+            'technician_id' => $technician->id,
+            'issued_from_pop_id' => $cabang->id,
+            'item_id' => $item->id,
+            'lot_no' => 'AUDIT-LOT',
+            'qty_remaining' => 10,
+            'unit_price_snapshot' => 100,
+            'status' => 'issued',
+            'issued_at' => now(),
+        ]);
+
+        $inventory = app(InventoryService::class);
+        $materials = app(TaskMaterialService::class);
+        $inventory->consumeFromCustody([$technician], $item, 5, $fopTask, $customer, $technician);
+        $this->assertEquals(5, (float) $custody->fresh()->qty_remaining);
+
+        $materials->sync($fopTask, MaterialKind::TERPAKAI, [['item_id' => $item->id, 'qty' => 5]], $technician->id);
+        $inventory->reconcileMaterialsAgainstCustody($fopTask, $customer, [$technician], $technician);
+        $this->assertEquals(5, (float) $custody->fresh()->qty_remaining);
+        $inventory->reconcileMaterialsAgainstCustody($fopTask, $customer, [$technician], $technician);
+        $this->assertEquals(5, (float) $custody->fresh()->qty_remaining);
+
+        $materials->sync($fopTask, MaterialKind::TERPAKAI, [['item_id' => $item->id, 'qty' => 3]], $technician->id);
+        $inventory->reconcileMaterialsAgainstCustody($fopTask, $customer, [$technician], $technician);
+        $this->assertEquals(7, (float) $custody->fresh()->qty_remaining);
     }
 
     private function basePemasanganPayload(User $technician, Pop $pusat, Pop $cabang): array

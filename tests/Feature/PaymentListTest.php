@@ -135,6 +135,64 @@ class PaymentListTest extends TestCase
         $this->actingAs($teknisi)->get(route('payments.show', $payment->id))->assertForbidden();
     }
 
+    public function test_payment_list_renders_action_links_and_respects_update_permission(): void
+    {
+        $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
+        $pop = $this->createPop('POP-PAY-PERM', 'PPP', 'POP Payment Permission');
+        $invoice = $this->createInvoice($pop, 'Perm Payment Customer', 'INV-202606-7401');
+        $payment = $this->createPayment($invoice, 'PAY-202606-7401', now()->format('Y-m-d'), 'cash', 'valid');
+
+        // Owner has payments.update, so editUrl should be present in the action dataset
+        $ownerResponse = $this->actingAs($owner)->get(route('payments.index'));
+        $ownerResponse->assertOk();
+        $ownerResponse->assertSee(route('payments.overpay'));
+        $ownerResponse->assertSee(route('invoices.belum-lunas'));
+        $ownerResponse->assertSee(route('payments.receipt', $payment->id));
+        $ownerResponse->assertSee(route('payments.edit', $payment->id));
+
+        // POP Admin has payments.view but NOT payments.update
+        $popAdminRole = Role::where('name', 'POP Admin')->firstOrFail();
+        $popAdmin = User::factory()->create([
+            'status' => 'active',
+            'role_id' => $popAdminRole->id,
+        ]);
+        $popAdmin->pops()->attach($pop->id);
+        $scope = UserRoleScope::create([
+            'user_id' => $popAdmin->id,
+            'role_id' => $popAdminRole->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $pop->id,
+        ]);
+
+        $popAdminResponse = $this->actingAs($popAdmin)->get(route('payments.index'));
+        $popAdminResponse->assertOk();
+        $popAdminResponse->assertSee(route('payments.receipt', $payment->id));
+        // editUrl should be empty for popAdmin without payments.update
+        $popAdminResponse->assertDontSee(route('payments.edit', $payment->id));
+    }
+
+    public function test_payment_list_renders_summary_metrics(): void
+    {
+        $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
+        $pop = $this->createPop('POP-PAY-SUMMARY', 'PPS', 'POP Payment Summary');
+        $invoice = $this->createInvoice($pop, 'Summary Customer', 'INV-202606-7501');
+        $payment = $this->createPayment($invoice, 'PAY-202606-7501', '2026-06-13', 'cash', 'valid');
+        $payment->update(['overpay_amount' => 25000]);
+
+        $response = $this->actingAs($owner)->get(route('payments.index'));
+
+        $response->assertOk();
+        $response->assertSee('TOTAL TRANSAKSI', false);
+        $response->assertSee('NOMINAL HAL. INI', false);
+        $response->assertSee('METODE BAYAR (HAL. INI)', false);
+        $response->assertSee('LEBIH BAYAR (HAL. INI)', false);
+        $response->assertSee(number_format(150000, 0, ',', '.'));
+        $response->assertSee(number_format(25000, 0, ',', '.'));
+    }
+
     protected function createPop(string $code, string $popCode, string $name): Pop
     {
         return Pop::create([

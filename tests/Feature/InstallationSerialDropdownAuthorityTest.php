@@ -14,6 +14,9 @@ use App\Models\FopTask;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NetworkNode;
+use App\Models\NetworkNodeType;
+use App\Models\NetworkPortAssignment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -165,6 +168,57 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
     }
 
     #[Test]
+    public function pemasangan_memilih_port_odp_terkelola_dan_mengabaikan_teks_yang_berbeda(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInProgressInstallation();
+        $odpType = NetworkNodeType::create(['code' => 'odp', 'name' => 'ODP', 'has_ports' => true]);
+        $odp = NetworkNode::create([
+            'anchor_pop_id' => $cabang->id, 'node_type_id' => $odpType->id,
+            'code' => 'ODP-MANAGED-01', 'name' => 'ODP Terkelola', 'status' => 'active',
+        ]);
+        $port = $odp->ports()->create(['number' => 3]);
+
+        $category = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $ont = Item::create([
+            'code' => 'ONT-PORT-01', 'name' => 'ONT Port Test', 'item_category_id' => $category->id,
+            'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => OwnershipMode::INSTALLABLE->value,
+        ]);
+        $admin = User::factory()->create();
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($pusat, $ont, ['SN-PORT-001'], 250000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $ont->id, 'serial_numbers' => ['SN-PORT-001']]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, ['SN-PORT-001'], [], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $ont->id, 'serial_numbers' => ['SN-PORT-001']]], $admin);
+
+        $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer), $this->basePayload() + [
+            'selected_inventory_serial_id' => $serial->id,
+            'network_node_port_id' => $port->id,
+        ]);
+        $response->assertSessionHasNoErrors();
+        $this->assertTrue($port->fresh()->is_used);
+        $this->assertSame($customer->id, NetworkPortAssignment::where('network_node_port_id', $port->id)->where('active_key', 1)->firstOrFail()->customer_id);
+        $detail = CustomerTechnicalDetail::where('customer_id', $customer->id)->firstOrFail();
+        $this->assertSame('ODP-MANAGED-01', $detail->odp_number);
+        $this->assertSame('3', $detail->odp_port);
+    }
+
+    #[Test]
+    public function odp_terkelola_yang_penuh_tidak_boleh_dilewati_dengan_input_teks(): void
+    {
+        [$customer, $technician, , , $cabang] = $this->setupInProgressInstallation();
+        $odpType = NetworkNodeType::create(['code' => 'odp', 'name' => 'ODP', 'has_ports' => true]);
+        $odp = NetworkNode::create([
+            'anchor_pop_id' => $cabang->id, 'node_type_id' => $odpType->id,
+            'code' => 'ODP-FULL', 'name' => 'ODP Penuh', 'status' => 'active',
+        ]);
+        $odp->ports()->create(['number' => 1, 'is_used' => true]);
+
+        $this->actingAs($technician)
+            ->post(route('customers.installation.pemasangan', $customer), $this->basePayload())
+            ->assertSessionHasErrors('network_node_port_id');
+    }
+
+    #[Test]
     public function tanpa_custody_eligible_ditolak_tidak_ada_fallback_manual(): void
     {
         Storage::fake('public');
@@ -308,6 +362,40 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
         $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-LAIN-001']]], $admin);
         app(InventoryTransferService::class)->receiveTransfer($transfer, ['ZTE-LAIN-001'], [], $admin);
         app(InventoryIssueService::class)->issue($cabang, $otherTechnician, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-LAIN-001']]], $admin);
+
+        $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePayload() + [
+            'selected_inventory_serial_id' => $serial->id,
+        ]);
+
+        $response->assertSessionHasErrors('selected_inventory_serial_id');
+    }
+
+    /**
+     * Laporan user: modem yang diissue dari Cabang Jetis kepakai buat
+     * pemasangan di Cabang Sandya. SN ini di custody TIM task ini (bukan
+     * teknisi lain seperti test di atas), tapi berasal dari cabang BEDA
+     * dengan cabang task — tetap wajib ditolak.
+     */
+    #[Test]
+    public function sn_dropdown_dari_cabang_lain_ditolak(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabangTask] = $this->setupInProgressInstallation();
+
+        $cabangLain = Pop::create(['code' => 'CABANG-LAIN-SN', 'pop_code' => 'CBL', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'Cabang Lain SN Test', 'type' => 'cabang', 'status' => 'active']);
+
+        $catAktif = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $ont = Item::create([
+            'code' => 'ONT-SN-XBR', 'name' => 'ONT Lintas Cabang Test', 'item_category_id' => $catAktif->id,
+            'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => OwnershipMode::INSTALLABLE->value,
+        ]);
+
+        $admin = User::factory()->create();
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($pusat, $ont, ['ZTE-XBR-001'], 250000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabangLain, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-XBR-001']]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, ['ZTE-XBR-001'], [], $admin);
+        // Issue dari Cabang Lain, bukan dari $cabangTask (cabang task ini).
+        app(InventoryIssueService::class)->issue($cabangLain, $technician, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-XBR-001']]], $admin);
 
         $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePayload() + [
             'selected_inventory_serial_id' => $serial->id,

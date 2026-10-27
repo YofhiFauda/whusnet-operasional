@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Worksheet Admin - Kolektor - Whusnet Operasional')
+@section('title', 'Worksheet Admin - Pembayaran Lapangan - Whusnet Operasional')
 @section('page_title', 'Worksheet Admin — Kolektor')
 
 @section('content')
@@ -18,7 +18,7 @@
                 <span class="text-sky-600 dark:text-sky-400 font-semibold">Worksheet Admin</span>
             </div>
             <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Worksheet Admin — Kolektor</h1>
-            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola penugasan kolektor, distribusikan pelanggan belum ber-kolektor, dan awasi tagihan belum dibayar di rute.</p>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola petugas Kolektor dan Teknisi, pantau pembayaran serta setoran, dan atur penugasan pelanggan Kolektor.</p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
             <a href="{{ route('invoices.index') }}" class="inline-flex items-center gap-2 px-3.5 py-2 border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 rounded-xl transition-all text-xs font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20">
@@ -69,6 +69,23 @@
             ])
             @include('partials.admin-cash-deposit-history', ['riwayat' => $kasRiwayat])
         </div>
+    @endif
+
+    @if(auth()->user()->hasPermission('collector_worksheet.validate') && ($pendingDeposits->total() > 0 || request()->boolean('pending_deposits')))
+        <section id="pending-deposits" class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+            <h2 class="mb-3 text-sm font-bold text-amber-800 dark:text-amber-300">Setoran Menunggu Verifikasi ({{ $pendingDeposits->total() }})</h2>
+            <div class="space-y-2">
+                @forelse($pendingDeposits as $deposit)
+                    <a href="{{ $deposit->collector?->isTechnician() ? route('collector-worksheet.technicians.show', ['technician' => $deposit->collector_id, 'tab' => 'setor']) : route('collector-worksheet.show', ['collector' => $deposit->collector_id, 'tab' => 'setoran']) }}" class="flex items-center justify-between rounded-lg bg-white p-3 text-xs text-slate-700 hover:text-sky-700 dark:bg-slate-800 dark:text-slate-200">
+                        <span>{{ $deposit->deposit_number }} : {{ $deposit->collector?->name }}</span>
+                        <span>Periksa</span>
+                    </a>
+                @empty
+                    <p class="text-xs text-slate-600 dark:text-slate-300">Tidak ada setoran yang perlu diverifikasi.</p>
+                @endforelse
+            </div>
+            {{ $pendingDeposits->links() }}
+        </section>
     @endif
 
     {{-- Summary Stat Cards --}}
@@ -142,55 +159,15 @@
         </div>
     </div>
 
-    {{-- Teknisi pemegang uang pembayaran lapangan (ADHOC-122). Peringatan saja. --}}
-    <div class="rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-white dark:bg-slate-800 p-4 space-y-3">
-        <div class="flex items-center justify-between">
-            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Teknisi — Saldo Belum Disetor</div>
-            <span class="text-[11px] text-slate-500">Peringatan tutup hari: {{ config('billing.technician_close_time') }}</span>
-        </div>
-        @if($technicianStatus->isEmpty())
-            <p class="text-xs text-slate-500">Tidak ada teknisi yang memegang saldo.</p>
-        @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="text-[11px] uppercase text-slate-500">
-                        <tr>
-                            <th class="px-3 py-2 text-left">Teknisi</th>
-                            <th class="px-3 py-2 text-right">Saldo</th>
-                            <th class="px-3 py-2 text-left">Tertua dari</th>
-                            <th class="px-3 py-2 text-left">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
-                        @foreach($technicianStatus as $row)
-                            <tr>
-                                <td class="px-3 py-2 font-semibold">{{ $row['user']->name }}</td>
-                                <td class="px-3 py-2 text-right font-mono">Rp {{ number_format($row['balance'], 0, ',', '.') }}</td>
-                                <td class="px-3 py-2">{{ $row['oldest_collected_date'] ? \Carbon\Carbon::parse($row['oldest_collected_date'])->translatedFormat('d M Y') : '-' }}</td>
-                                <td class="px-3 py-2">
-                                    @if($row['overdue'])
-                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Belum setor</span>
-                                    @else
-                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Berjalan</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @endif
-    </div>
-
     {{-- Main Worksheet Layout (Mobile Tabs + Desktop 2 Columns) --}}
-    <div x-data="{ activeMobileTab: 'collectors', searchFilter: '' }" class="space-y-4">
+    <div x-data="{ activeMobileTab: 'collectors', activeStaffTab: 'collectors', searchFilter: '' }" class="space-y-4">
         {{-- Mobile Switcher Buttons (Hidden on LG screens) --}}
         <div class="lg:hidden flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
             <button type="button" @click="activeMobileTab = 'collectors'"
                     :class="activeMobileTab === 'collectors' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs font-bold' : 'text-slate-500 dark:text-slate-400 font-medium hover:text-slate-700 dark:hover:text-slate-200'"
                     class="flex-1 py-2 text-xs rounded-lg transition-all text-center flex items-center justify-center gap-1.5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                <span>Daftar Kolektor ({{ $collectors->count() }})</span>
+                <span>Daftar Petugas ({{ $collectors->count() + $technicianRows->count() }})</span>
             </button>
             <button type="button" @click="activeMobileTab = 'unassigned'"
                     :class="activeMobileTab === 'unassigned' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs font-bold' : 'text-slate-500 dark:text-slate-400 font-medium hover:text-slate-700 dark:hover:text-slate-200'"
@@ -206,33 +183,41 @@
             <div :class="activeMobileTab === 'collectors' ? 'block' : 'hidden lg:block'"
                  class="lg:col-span-5 bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-xs overflow-hidden">
                 
-                {{-- Panel Header --}}
+                {{-- Satu daftar petugas dengan dua tab. Assignment tetap di panel kanan khusus Kolektor. --}}
                 <div class="p-4 border-b border-slate-100 dark:border-slate-700/80 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full bg-violet-500"></div>
-                            <h2 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                                Daftar Kolektor ({{ $collectors->count() }})
-                            </h2>
-                        </div>
+                    <div class="flex items-center justify-between gap-2">
+                        <h2 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Daftar Petugas Pembayaran</h2>
                         <span class="text-[10px] text-slate-400 dark:text-slate-500">Pilih untuk detail</span>
                     </div>
-
-                    {{-- Quick Search Input --}}
-                    @if($collectors->isNotEmpty())
+                    <div role="tablist" aria-label="Jenis petugas pembayaran" class="grid grid-cols-2 gap-1 rounded-xl bg-slate-200/70 dark:bg-slate-900/70 p-1">
+                        <button type="button" role="tab" id="staff-tab-collectors" aria-controls="staff-list-collectors"
+                                :aria-selected="activeStaffTab === 'collectors'"
+                                @click="activeStaffTab = 'collectors'; searchFilter = ''"
+                                :class="activeStaffTab === 'collectors' ? 'bg-white dark:bg-slate-700 text-violet-700 dark:text-violet-300 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                                class="rounded-lg px-3 py-2 text-xs font-semibold transition-colors">Kolektor ({{ $collectors->count() }})</button>
+                        <button type="button" role="tab" id="staff-tab-technicians" aria-controls="staff-list-technicians"
+                                :aria-selected="activeStaffTab === 'technicians'"
+                                @click="activeStaffTab = 'technicians'; searchFilter = ''"
+                                :class="activeStaffTab === 'technicians' ? 'bg-white dark:bg-slate-700 text-amber-700 dark:text-amber-300 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                                class="rounded-lg px-3 py-2 text-xs font-semibold transition-colors">Teknisi ({{ $technicianRows->count() }})</button>
+                    </div>
+                    @if ($collectors->isNotEmpty() || $technicianRows->isNotEmpty())
                         <div class="relative">
-                            <input type="text" x-model="searchFilter" placeholder="Filter kolektor..."
-                                   class="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                            <input type="search" x-model="searchFilter" :placeholder="activeStaffTab === 'collectors' ? 'Filter kolektor...' : 'Filter teknisi...'"
+                                   aria-label="Cari petugas pembayaran"
+                                   class="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
                             <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </div>
                     @endif
                 </div>
 
-                {{-- Collector List Body --}}
-                <div class="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-[36rem] overflow-y-auto custom-scrollbar">
+                {{-- Daftar Kolektor --}}
+                <div id="staff-list-collectors" role="tabpanel" aria-labelledby="staff-tab-collectors"
+                     x-show="activeStaffTab === 'collectors'"
+                     class="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-[36rem] overflow-y-auto custom-scrollbar">
                     @forelse ($collectors as $collector)
                         <a href="{{ route('collector-worksheet.show', $collector->id) }}"
-                           x-show="searchFilter === '' || '{{ strtolower($collector->name) }}'.includes(searchFilter.toLowerCase())"
+                           x-show="searchFilter === '' || @js(mb_strtolower($collector->name)).includes(searchFilter.toLowerCase())"
                            class="group block p-4 hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-all border-l-2 border-transparent hover:border-violet-500">
                             <div class="flex items-center gap-3">
                                 {{-- Avatar Initial --}}
@@ -289,6 +274,37 @@
                             <p class="text-xs font-semibold text-slate-700 dark:text-slate-300">Belum Ada Kolektor</p>
                             <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Tambahkan user ber-role Kolektor melalui modul User Management.</p>
                         </div>
+                    @endforelse
+                </div>
+
+                <div id="staff-list-technicians" role="tabpanel" aria-labelledby="staff-tab-technicians"
+                     x-show="activeStaffTab === 'technicians'" x-cloak
+                     class="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-[36rem] overflow-y-auto custom-scrollbar">
+                    <p class="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">Pilih Teknisi untuk membuka Pembayaran, Sudah Dibayar, Setor, dan Riwayat Pembayaran.</p>
+                    @forelse ($technicianRows as $row)
+                        <a href="{{ route('collector-worksheet.technicians.show', $row['user']->id) }}"
+                           x-show="searchFilter === '' || @js(mb_strtolower($row['user']->name)).includes(searchFilter.toLowerCase())"
+                           class="group block p-4 hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-all border-l-2 border-transparent hover:border-amber-500">
+                            <div class="flex items-center gap-3">
+                                <div class="h-10 w-10 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm flex items-center justify-center shrink-0">
+                                    {{ strtoupper(substr($row['user']->name, 0, 1)) }}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-bold text-sm text-slate-900 dark:text-slate-100 truncate group-hover:text-amber-700 dark:group-hover:text-amber-300">{{ $row['user']->name }}</div>
+                                    <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
+                                        <span class="{{ $row['user']->status === 'active' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400' }}">{{ $row['user']->status === 'active' ? 'Aktif' : 'Nonaktif' }}</span>
+                                        <span class="{{ $row['overdue'] ? 'text-amber-700 dark:text-amber-300' : 'text-slate-500 dark:text-slate-400' }}">{{ $row['overdue'] ? 'Melewati batas setor' : ($row['balance'] > 0 ? 'Belum disetor' : 'Tidak ada saldo') }}</span>
+                                    </div>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">Belum Disetor</div>
+                                    <div class="font-bold text-sm text-amber-700 dark:text-amber-300 font-mono">Rp {{ number_format($row['balance'], 0, ',', '.') }}</div>
+                                </div>
+                                <svg class="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </div>
+                        </a>
+                    @empty
+                        <div class="p-8 text-center text-xs text-slate-500 dark:text-slate-400">Belum ada Teknisi dalam POP yang dapat Anda kelola.</div>
                     @endforelse
                 </div>
             </div>

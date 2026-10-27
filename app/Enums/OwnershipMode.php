@@ -28,11 +28,21 @@ enum OwnershipMode: string
      */
     case COMPANY_ASSET = 'company_asset';
 
+    /**
+     * Boleh transisi ke DEPLOYED (bukan INSTALLED) — aset netap di infrastruktur
+     * jaringan (ODC, ODP, splitter, dll). Custody-nya berpindah ke titik
+     * infrastruktur, BUKAN ke pelanggan, jadi tidak boleh masuk
+     * `customer_technical_details`. Kalau dicampur dengan INSTALLABLE, aset
+     * ODC bakal tercatat seolah milik pelanggan tertentu.
+     */
+    case INFRASTRUCTURE_ASSET = 'infrastructure_asset';
+
     public function label(): string
     {
         return match ($this) {
             self::INSTALLABLE => 'Dipasang ke Pelanggan',
             self::COMPANY_ASSET => 'Aset Perusahaan (Alat Kerja)',
+            self::INFRASTRUCTURE_ASSET => 'Aset Infrastruktur (Terpasang Netap)',
         };
     }
 }

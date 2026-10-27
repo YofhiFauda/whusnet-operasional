@@ -140,6 +140,25 @@
                     </span>
                     @endif
                 </button>
+
+                {{-- Sub-permission TERPISAH (warehouse_report.sold_to_customer.view)
+                     dari dua tab di atas (warehouse_report.view) — tombol tab
+                     disembunyikan total kalau gak ada izinnya, bukan cuma
+                     dibikin disabled. --}}
+                @can('warehouse_report.sold_to_customer.view')
+                <button @click="activeTab = 'sold_to_customer'" type="button"
+                        :class="activeTab === 'sold_to_customer' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'"
+                        class="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs transition-all cursor-pointer">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="truncate">Barang Terjual</span>
+                    @if(count($soldToCustomerSales) > 0)
+                    <span class="hidden xs:inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold"
+                          :class="activeTab === 'sold_to_customer' ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'">
+                        {{ count($soldToCustomerSales) }}
+                    </span>
+                    @endif
+                </button>
+                @endcan
             </div>
         </div>
     </div>
@@ -223,7 +242,7 @@
         <div class="col-span-2 sm:col-span-1 bg-white dark:bg-slate-800/90 border {{ $kpi['total_loss_value'] > 0 ? 'border-rose-300 dark:border-rose-800 bg-rose-50/20 dark:bg-rose-950/20' : 'border-slate-200/80 dark:border-slate-700/80' }} rounded-xl p-3 sm:p-3.5 shadow-xs flex flex-col justify-between">
             <div class="flex items-center justify-between gap-1 mb-1">
                 <span class="text-[10px] sm:text-[11px] font-bold {{ $kpi['total_loss_value'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500' }} uppercase tracking-wider truncate">
-                    Estimasi Nilai Rugi
+                    Estimasi Rugi Bersih
                 </span>
                 <div class="w-5 h-5 rounded-md {{ $kpi['total_loss_value'] > 0 ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500' }} flex items-center justify-center shrink-0">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -233,7 +252,7 @@
                 <span class="text-base sm:text-lg font-extrabold font-mono {{ $kpi['total_loss_value'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-100' }} tabular-nums">
                     Rp {{ number_format($kpi['total_loss_value'], 0, ',', '.') }}
                 </span>
-                <span class="block text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">Rusak & Hilang</span>
+                <span class="block text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">Rusak, Hilang & Sisa Kabel Dimusnahkan</span>
             </div>
         </div>
 
@@ -529,7 +548,7 @@
                             <th class="px-5 py-3.5 text-left">Barang</th>
                             <th class="px-5 py-3.5 text-right">Jumlah Trx</th>
                             <th class="px-5 py-3.5 text-right">Total Qty</th>
-                            <th class="px-5 py-3.5 text-right">Estimasi Nilai Rugi</th>
+                            <th class="px-5 py-3.5 text-right">Estimasi Rugi Bersih</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -568,7 +587,7 @@
             
             <div class="px-5 py-3 bg-slate-50/50 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-700/60 text-[11px] text-slate-400 dark:text-slate-500 flex items-start gap-2">
                 <svg class="w-4 h-4 text-slate-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span><strong>Catatan:</strong> "— (Custody Teknisi)" menandakan kerugian terjadi saat barang di tangan teknisi (bukan di gudang fisik cabang). Nilai Rugi dihitung khusus untuk kategori Rusak & Hilang berdasarkan harga unit RECEIVE terakhir.</span>
+                <span><strong>Catatan:</strong> "— (Custody Teknisi)" menandakan kerugian terjadi saat barang di tangan teknisi (bukan di gudang fisik cabang). Nilai rugi mencakup Rusak, Hilang, dan sisa roll yang dimusnahkan. Pemulihan barang rusak mengurangi rugi; nilai unit SN/roll mengikuti harga perolehannya.</span>
             </div>
         </div>
 
@@ -630,13 +649,22 @@
             <!-- Mobile Footer Note -->
             <div class="p-3 bg-white dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 rounded-xl text-[11px] text-slate-400 dark:text-slate-500 flex items-start gap-2">
                 <svg class="w-4 h-4 text-slate-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span><strong>Keterangan:</strong> Nilai Kerugian dihitung berdasarkan harga beli terakhir dari transaksi RECEIVE untuk kategori Rusak & Hilang.</span>
+                <span><strong>Keterangan:</strong> Rugi bersih memperhitungkan pemulihan barang rusak. Unit SN/roll memakai harga perolehan unit; material kuantitas memakai harga beli terakhir.</span>
             </div>
         </div>
 
         @endif
 
     </div>
+
+    <!-- =========================================================================
+         TAB 3: BARANG TERJUAL KE PELANGGAN
+         ========================================================================= -->
+    @can('warehouse_report.sold_to_customer.view')
+    <div x-show="activeTab === 'sold_to_customer'" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;" class="space-y-4">
+        @include('warehouse.reports.partials._sold_to_customer_table', ['sales' => $soldToCustomerSales])
+    </div>
+    @endcan
 
 </div>
 

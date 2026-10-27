@@ -20,13 +20,14 @@ use Illuminate\Http\Request;
  *   - cuma dalam POP scope dirinya — `applyUserScope($actor)` di service yang
  *     sama, jadi pelanggan yang terlanjur ter-assign lalu POP-nya keluar dari
  *     scope tetap ditolak;
- *   - nominal BOLEH melebihi sisa tagihan (ADHOC-84 §2.5, ganti aturan lama
- *     "kelebihan dikembalikan fisik") — kelebihannya otomatis kredit saldo
- *     pelanggan, sama seperti jalur admin `PaymentService::record()`. Yang
- *     beda dua jalur ini cuma SIAPA yang membayar (admin di kantor vs
- *     kolektor di lapangan), bukan cara kelebihan bayarnya diperlakukan.
+ *   - nominal TIDAK BOLEH melebihi sisa tagihan (keputusan user 2026-10-05,
+ *     ganti niat awal ADHOC-84 §2.5 yang sempat mengizinkan lebih bayar
+ *     auto-kredit saldo dari batch). Tunai + saldo per tagihan wajib ≤ sisa
+ *     tagihan — ditegakkan `CollectorPaymentService::validateRows()` (UX,
+ *     tanpa lock) DAN `record()` (otoritatif, di bawah lock). Lebih bayar
+ *     cuma bisa dicatat lewat form Tagihan admin (`PaymentService::record()`),
+ *     bukan dari kolektor/teknisi/portal. Lihat CLAUDE.md §"Pembayaran".
  *
-
  * docs/plan/kolektor/analisa-alur-kolektor-2.0.md §9, §14.
  */
 class CollectorPaymentController extends Controller

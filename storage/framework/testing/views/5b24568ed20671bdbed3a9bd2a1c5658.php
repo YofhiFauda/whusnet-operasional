@@ -18,7 +18,7 @@
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
          
-         class="fixed top-16 right-0 bottom-0 h-[calc(100dvh-4rem)] w-full max-w-2xl bg-surface border-l border-border shadow-2xl z-[60] flex flex-col overflow-hidden"
+         class="fixed top-16 right-0 bottom-0 h-[calc(100dvh-4rem)] w-full max-w-2xl bg-surface border-l border-border shadow-md z-[60] flex flex-col overflow-hidden"
          role="dialog" aria-modal="true" aria-label="Detail Ticket">
 
         
@@ -48,14 +48,14 @@
 
             <template x-if="loading">
                 <div class="space-y-3">
-                    <div class="h-20 rounded-xl bg-surface-muted animate-pulse"></div>
-                    <div class="h-32 rounded-xl bg-surface-muted animate-pulse"></div>
-                    <div class="h-24 rounded-xl bg-surface-muted animate-pulse"></div>
+                    <div class="h-20 rounded-lg bg-surface-muted animate-pulse"></div>
+                    <div class="h-32 rounded-lg bg-surface-muted animate-pulse"></div>
+                    <div class="h-24 rounded-lg bg-surface-muted animate-pulse"></div>
                 </div>
             </template>
 
             <template x-if="!loading && failed">
-                <p class="p-4 rounded-xl border border-border bg-surface-muted text-text-muted">
+                <p class="p-4 rounded-lg border border-border bg-surface-muted text-text-muted">
                     Gagal memuat detail ticket. Tutup drawer dan coba lagi.
                 </p>
             </template>
@@ -64,7 +64,7 @@
                 <div class="space-y-4">
 
                     
-                    <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">
+                    <div class="rounded-lg border border-border bg-surface-muted p-4 space-y-3">
                         <div class="flex items-center justify-between gap-2 border-b border-border pb-2.5 flex-wrap">
                             <div class="flex items-center gap-2">
                                 <span class="text-xs font-semibold text-text-muted">Status:</span>
@@ -101,7 +101,7 @@
 
                     
                     <template x-if="ticket.fop_task">
-                        <div class="rounded-xl border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-slate-900/40 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-slate-900/40 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div class="flex items-center gap-3 min-w-0">
                                 <div class="p-2 rounded-lg bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 shrink-0">
                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -129,7 +129,7 @@
 
                     
                     <template x-if="ticket.fop_task_orphan">
-                        <div class="rounded-xl border border-border bg-surface-muted p-3.5 flex items-center gap-2 text-text-muted">
+                        <div class="rounded-lg border border-border bg-surface-muted p-3.5 flex items-center gap-2 text-text-muted">
                             <svg class="h-4 w-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -138,7 +138,7 @@
                     </template>
 
                     
-                    <div class="rounded-xl border border-border bg-surface-muted p-4">
+                    <div class="rounded-lg border border-border bg-surface-muted p-4">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2.5">Aksi Ticket</p>
 
                         <div class="flex items-center gap-2 flex-wrap">
@@ -181,7 +181,7 @@
 
                     
                     <template x-if="ticket.is_batch">
-                        <div class="rounded-xl border border-violet-300 dark:border-violet-800/80 bg-violet-50/40 dark:bg-violet-950/20 p-4 space-y-3">
+                        <div class="rounded-lg border border-violet-300 dark:border-violet-800/80 bg-violet-50/40 dark:bg-violet-950/20 p-4 space-y-3">
                             <div class="flex items-center justify-between border-b border-violet-200 dark:border-violet-800/60 pb-2.5">
                                 <div class="flex items-center gap-2">
                                     <span class="w-2 h-2 rounded-full bg-violet-500 animate-pulse"></span>
@@ -199,7 +199,7 @@
 
                             <div class="space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                                 <template x-for="(m, i) in ticket.batch_members" :key="m.id">
-                                    <div class="p-2 rounded-xl border border-border bg-surface hover:bg-surface-muted/50 transition-colors flex items-center justify-between gap-2 shadow-2xs">
+                                    <div class="p-2 rounded-lg border border-border bg-surface hover:bg-surface-muted/50 transition-colors flex items-center justify-between gap-2 shadow-2xs">
                                         <div class="min-w-0 flex items-center gap-2">
                                             <span class="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-900 shrink-0"
                                                   x-text="m.cid"></span>
@@ -231,7 +231,7 @@
 
                     
                     <template x-if="!ticket.is_batch">
-                        <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">
+                        <div class="rounded-lg border border-border bg-surface-muted p-4 space-y-3">
                             <h3 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border-b border-border pb-2">
                                 Snapshot Pelanggan
                             </h3>
@@ -290,7 +290,7 @@
                     </template>
 
                     
-                    <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-3">
+                    <div class="rounded-lg border border-border bg-surface-muted p-4 space-y-3">
                         <h3 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border-b border-border pb-2">
                             Keluhan &amp; Catatan
                         </h3>
@@ -307,7 +307,7 @@
                     </div>
 
                     
-                    <div x-show="ticket.attachments.length" class="rounded-xl border border-border bg-surface-muted p-4 space-y-2">
+                    <div x-show="ticket.attachments.length" class="rounded-lg border border-border bg-surface-muted p-4 space-y-2">
                         <h3 class="text-[11px] font-bold uppercase tracking-wider text-text-secondary border-b border-border pb-2">Lampiran</h3>
                         <template x-for="file in ticket.attachments" :key="file.url">
                             <a :href="file.url" target="_blank" rel="noopener"
@@ -332,7 +332,7 @@
 
                     
                     <template x-if="ticket.fop_task && ticket.fop_task.histories && ticket.fop_task.histories.length">
-                        <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-2">
+                        <div class="rounded-lg border border-border bg-surface-muted p-4 space-y-2">
                             <h3 class="text-[11px] font-bold uppercase tracking-wider text-text-secondary border-b border-border pb-2">
                                 Riwayat Task FOP (Teknisi Lapangan)
                             </h3>
@@ -349,7 +349,7 @@
                     </template>
 
                     
-                    <div class="rounded-xl border border-border bg-surface-muted p-4 space-y-2">
+                    <div class="rounded-lg border border-border bg-surface-muted p-4 space-y-2">
                         <h3 class="text-[11px] font-bold uppercase tracking-wider text-text-secondary border-b border-border pb-2">
                             Riwayat Ticket &amp; Audit
                         </h3>

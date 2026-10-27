@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DeviceOwnership;
 use App\Enums\ItemCondition;
 use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
@@ -32,7 +33,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'condition',
     'condition_checked_at',
     'condition_checked_by',
+    'ownership',
     'current_pop_id',
+    'current_network_node_id',
+    'current_mini_pop_id',
+    'current_infrastructure_pop_id',
+    'current_infrastructure_slot_id',
+    'current_infrastructure_port_id',
     'current_technician_id',
     'issued_from_pop_id',
     'customer_id',
@@ -49,9 +56,41 @@ class InventorySerial extends Model
         return [
             'status' => SerialStatus::class,
             'condition' => ItemCondition::class,
+            'ownership' => DeviceOwnership::class,
             'condition_checked_at' => 'datetime',
             'installed_at' => 'datetime',
+            'current_network_node_id' => 'integer',
+            'current_mini_pop_id' => 'integer',
+            'current_infrastructure_pop_id' => 'integer',
+            'current_infrastructure_slot_id' => 'integer',
+            'current_infrastructure_port_id' => 'integer',
         ];
+    }
+
+    /**
+     * Mini POP tempat SN ini DEPLOYED langsung (tanpa OLT/Switch tujuan).
+     * Bukan `currentPop` — itu Gudang (§16.1).
+     */
+    public function currentMiniPop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'current_mini_pop_id');
+    }
+
+    public function currentInfrastructurePop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'current_infrastructure_pop_id');
+    }
+
+    // Nama kolom *_slot_id/*_port_id bersifat historis: kini berisi id node bertipe
+    // Slot / PON / Port Switch di network_nodes (FK ke network_nodes.id).
+    public function currentInfrastructureSlot(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'current_infrastructure_slot_id');
+    }
+
+    public function currentInfrastructurePort(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'current_infrastructure_port_id');
     }
 
     public function item(): BelongsTo
@@ -62,6 +101,11 @@ class InventorySerial extends Model
     public function currentPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'current_pop_id');
+    }
+
+    public function currentNetworkNode(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'current_network_node_id');
     }
 
     public function currentTechnician(): BelongsTo
@@ -106,16 +150,13 @@ class InventorySerial extends Model
     }
 
     /**
-     * Gate `InventoryIssueService::issueSerialized()` (analisa-gap-kondisi-barang.md
-     * rancangan poin 4) — SN `new` gak pernah butuh cek ulang. SN bekas
-     * (`used_good`/`used_damaged`) BOLEH diissue lagi kalau SUDAH dicek
-     * fisik (`condition_checked_at` terisi, gak peduli hasil akhirnya baik
-     * atau rusak — itu keputusan staf lewat aksi "Sudah Dicek", bukan
-     * dihakimi otomatis di sini).
+     * Kondisi baru lolos langsung. Kondisi bekas baik perlu pemeriksaan,
+     * sedangkan kondisi rusak selalu ditolak walau sudah diperiksa.
      */
     public function isClearedForIssue(): bool
     {
-        return ($this->condition ?? ItemCondition::NEW) === ItemCondition::NEW || $this->condition_checked_at !== null;
+        return $this->condition !== ItemCondition::USED_DAMAGED
+            && (($this->condition ?? ItemCondition::NEW) === ItemCondition::NEW || $this->condition_checked_at !== null);
     }
 
     public function scopeStatus($query, SerialStatus $status)

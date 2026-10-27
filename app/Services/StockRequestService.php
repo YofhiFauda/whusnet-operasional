@@ -42,7 +42,7 @@ class StockRequestService
 
         return DB::transaction(function () use ($cabang, $lines, $actor, $notes) {
             $request = StockRequest::create([
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('PST'),
                 'cabang_pop_id' => $cabang->id,
                 'status' => StockRequestStatus::PENDING,
                 'notes' => $notes,
@@ -197,25 +197,5 @@ class StockRequestService
         if (! $request->status->canRejectOrCancel()) {
             throw new InvalidArgumentException("Permintaan {$request->reference_number} udah berstatus {$request->status->label()} — gak bisa ditolak/dibatalkan lagi.");
         }
-    }
-
-    /**
-     * `PST-YYYYMMDD-NNNNNN` — prefix Permintaan Stok, sengaja bukan `REQ`
-     * biar gak ambigu sama istilah generik "request" (request ID/log HTTP,
-     * dll — rancangan-layout.md §5.1). Pola nomor sama
-     * `InventoryReceiveService::generateReferenceNumber()` dkk, reset
-     * counter per bulan.
-     */
-    private function generateReferenceNumber(): string
-    {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
-
-        $lastNum = StockRequest::where('reference_number', 'like', "PST-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('PST-%s-%06d', $today, $lastNum + 1);
     }
 }

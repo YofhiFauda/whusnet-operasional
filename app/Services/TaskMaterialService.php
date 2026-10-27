@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\CustodyStatus;
 use App\Enums\MaterialKind;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
@@ -9,9 +10,12 @@ use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\Pop;
 use App\Models\TaskMaterial;
+use App\Models\TechnicianCustody;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * Penulisan & pembacaan baris material task.
@@ -36,6 +40,43 @@ class TaskMaterialService
     public function sync(FopTask $fopTask, MaterialKind $kind, array $rows, ?int $recordedBy = null): void
     {
         DB::transaction(function () use ($fopTask, $kind, $rows, $recordedBy) {
+            if ($kind === MaterialKind::TERPAKAI) {
+                $consumedRows = $fopTask->materials()->where('kind', $kind->value)
+                    ->whereNotNull('item_id')
+                    ->where(fn ($query) => $query->whereNotNull('source_custody_id')
+                        ->orWhereNotNull('lot_no')
+                        ->orWhereNotNull('unit_price_snapshot'))
+                    ->lockForUpdate()->get();
+
+                foreach ($consumedRows as $material) {
+                    if ($material->source_custody_id) {
+                        $custody = TechnicianCustody::query()->lockForUpdate()->findOrFail($material->source_custody_id);
+                    } else {
+                        $matches = TechnicianCustody::query()
+                            ->where('item_id', $material->item_id)
+                            ->where('lot_no', $material->lot_no)
+                            ->where('unit_price_snapshot', $material->unit_price_snapshot)
+                            ->where('issued_from_pop_id', Pop::resolveCabangId($fopTask->pop_id))
+                            ->lockForUpdate()->get();
+
+                        if ($matches->count() !== 1) {
+                            throw new InvalidArgumentException('Custody asal material lama tidak dapat dipastikan; revisi perlu pemeriksaan admin gudang.');
+                        }
+
+                        $custody = $matches->first();
+                    }
+
+                    if ($custody->status === CustodyStatus::RETURNED) {
+                        throw new InvalidArgumentException('Custody material sudah dikembalikan ke gudang; revisi perlu pemeriksaan admin gudang.');
+                    }
+
+                    $custody->update([
+                        'qty_remaining' => (float) $custody->qty_remaining + (float) $material->qty,
+                        'status' => CustodyStatus::PARTIALLY_USED,
+                    ]);
+                }
+            }
+
             $fopTask->materials()->where('kind', $kind->value)->delete();
 
             foreach ($rows as $row) {

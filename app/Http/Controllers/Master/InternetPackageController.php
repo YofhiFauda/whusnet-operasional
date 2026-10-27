@@ -156,7 +156,30 @@ class InternetPackageController extends Controller
             'ppn' => 'nullable|numeric|min:0|max:100',
             'discount_default' => 'nullable|numeric|min:0|max:100',
             'modem' => 'nullable|string|max:100',
+            'features_text' => [
+                'nullable',
+                'string',
+                'max:4000',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value)) {
+                        return;
+                    }
+
+                    $features = $this->parseFeatures($value);
+                    if (count($features) > 20) {
+                        $fail('Maksimal 20 fitur dapat ditambahkan.');
+                    }
+
+                    foreach ($features as $feature) {
+                        if (mb_strlen($feature) > 150) {
+                            $fail('Setiap fitur maksimal 150 karakter.');
+                            break;
+                        }
+                    }
+                },
+            ],
             'max_users' => 'nullable|integer|min:1',
+            'max_additional_devices' => 'nullable|integer|min:0|max:20',
             'ip_address_type' => 'nullable|string|max:100',
             'contract_period_months' => 'nullable|integer|min:1|max:120',
             'installation_fee' => 'nullable|numeric|min:0',
@@ -168,9 +191,28 @@ class InternetPackageController extends Controller
             'is_active' => 'required|boolean',
         ]);
 
+        if (array_key_exists('features_text', $validated)) {
+            $validated['features'] = $this->parseFeatures($validated['features_text']);
+            unset($validated['features_text']);
+        }
+
         $validated['ppn'] = $validated['ppn'] ?? 0;
         $validated['discount_default'] = $validated['discount_default'] ?? 0;
+        $validated['max_additional_devices'] = $validated['max_additional_devices'] ?? 0;
 
         return $validated;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function parseFeatures(?string $text): array
+    {
+        $lines = preg_split('/\R/u', $text ?? '') ?: [];
+
+        return array_values(array_filter(
+            array_map(trim(...), $lines),
+            static fn (string $feature): bool => $feature !== ''
+        ));
     }
 }

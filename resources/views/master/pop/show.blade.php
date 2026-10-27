@@ -14,6 +14,26 @@
     </a>
 </div>
 
+@if(in_array($pop->type, ['mini_pop', 'cabang'], true))
+@can('network_nodes.view')
+<section class="mb-6 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+    <h3 class="text-xs font-bold uppercase text-slate-700 dark:text-slate-300">OLT terpasang</h3>
+    @forelse($chassisNodes as $chassis)
+    <div class="mt-2 text-xs text-slate-700 dark:text-slate-300">
+        <a href="{{ route('network.nodes.show', $chassis) }}" class="font-semibold text-sky-700 hover:underline dark:text-sky-400">{{ $chassis->code }} · {{ $chassis->name }}</a>
+        @forelse($chassis->deployedSerials as $serial)
+        <span class="ml-2">{{ $serial->item?->name }} · SN {{ $serial->serial_number }}</span>
+        @empty
+        <span class="ml-2 text-amber-600">Belum memiliki SN terpasang</span>
+        @endforelse
+    </div>
+    @empty
+    <p class="mt-2 text-xs text-slate-500">Belum ada OLT tercatat.</p>
+    @endforelse
+</section>
+@endcan
+@endif
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Left Column: Profile Card & Location Details -->
     <div class="lg:col-span-2 space-y-6">

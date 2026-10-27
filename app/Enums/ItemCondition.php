@@ -37,7 +37,7 @@ enum ItemCondition: string
     {
         return match ($this) {
             self::NEW => 'success',
-            self::USED_GOOD => 'info',
+            self::USED_GOOD => 'warning',
             self::USED_DAMAGED => 'error',
         };
     }

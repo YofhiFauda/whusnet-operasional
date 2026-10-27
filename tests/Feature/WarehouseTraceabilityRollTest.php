@@ -2,11 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Enums\MaterialKind;
 use App\Enums\ScopeType;
+use App\Models\FopTask;
+use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Role;
+use App\Models\TaskMaterial;
 use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
@@ -99,5 +103,60 @@ class WarehouseTraceabilityRollTest extends TestCase
         $this->actingAs($this->owner)->get(route('warehouse.traceability.index', ['sn' => 'TIDAK-ADA-SN']))
             ->assertOk()
             ->assertSee('tidak ditemukan');
+    }
+
+    #[Test]
+    public function lacak_roll_menampilkan_setiap_pemakaian_dan_total_meternya(): void
+    {
+        $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $item = Item::create(['code' => 'TR-ROLL-USED', 'name' => 'Kabel Jejak Pemakaian', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'roll', 'meter_per_roll' => 1000]);
+        $roll = app(InventoryReceiveService::class)->receiveRoll($this->pusat, $item, 1, null, 770000, $this->owner)[0];
+        $firstTask = FopTask::create(['task_number' => 'TRACE-USED-1', 'category' => 'MTN', 'tugas' => 'Pasang ODP A', 'pop_id' => $this->pusat->id]);
+        $secondTask = FopTask::create(['task_number' => 'TRACE-USED-2', 'category' => 'MTN', 'tugas' => 'Pasang ODP B', 'pop_id' => $this->pusat->id]);
+
+        foreach ([[$firstTask, 600], [$secondTask, 380]] as [$task, $qty]) {
+            TaskMaterial::create([
+                'fop_task_id' => $task->id,
+                'kind' => MaterialKind::TERPAKAI,
+                'item_id' => $item->id,
+                'item_type' => $category->code,
+                'item_name' => $item->name,
+                'lot_no' => $roll->roll_code,
+                'qty' => $qty,
+                'unit' => 'meter',
+                'unit_price_snapshot' => 770,
+                'recorded_by' => $this->owner->id,
+            ]);
+        }
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.traceability.index', ['roll' => $roll->roll_code]));
+
+        $response->assertOk()->assertSee('TRACE-USED-1')->assertSee('TRACE-USED-2')->assertSee('980 meter');
+        $this->assertEquals(980, $response->viewData('rollUsage')->sum('qty'));
+    }
+
+    #[Test]
+    public function jejak_roll_juga_menampilkan_meter_yang_dipakai_di_infrastruktur(): void
+    {
+        $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $item = Item::create(['code' => 'TR-INFRA-USED', 'name' => 'Kabel Infra Trace', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'roll', 'meter_per_roll' => 1000]);
+        $roll = app(InventoryReceiveService::class)->receiveRoll($this->pusat, $item, 1, null, 770000, $this->owner)[0];
+
+        InventoryTransaction::create([
+            'type' => 'deploy',
+            'reference_number' => 'DPL-TRACE-1',
+            'item_id' => $item->id,
+            'roll_id' => $roll->id,
+            'qty' => 25,
+            'unit_price_snapshot' => 770,
+            'to_pop_id' => $this->pusat->id,
+            'reason' => 'infra_cable_consumption',
+            'notes' => '25 meter dipakai di ODP Selatan',
+            'created_by' => $this->owner->id,
+        ]);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.traceability.index', ['roll' => $roll->roll_code]));
+
+        $response->assertOk()->assertSee('Pemakaian Infrastruktur')->assertSee('ODP Selatan')->assertSee('25 meter');
     }
 }

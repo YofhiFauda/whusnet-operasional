@@ -88,6 +88,45 @@ Migrasi: `2026_09_26_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe `CR
 
 Relasi: `Task::creqDetail()` (HasOne), `TaskCreqDetail::task()`, `TaskCreqDetail::verifier()` (BelongsTo `User`, `verified_by`), `TaskCreqDetail::invoice()` (BelongsTo `Invoice`).
 
+## Tabel `task_maintenance_billing_details` (2026-10-10)
+
+Migrasi: `2026_10_10_090000_create`. 1:1 dengan `tasks` (**hanya** task tipe `MAINTENANCE` polos yang ditandai berbayar) — mirror subset generik `task_creq_details` tanpa field khusus C-REQ. Lihat [business-logic.md § 7b](business-logic.md#7b-kategori-c-req--verifikasi-biaya-2026-09-26).
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `task_id` | FK → `tasks.id`, **unique**, cascade delete | Satu detail per task |
+| `is_billable` | boolean, default false | Checkbox "Task ini berbayar" (`mtn_is_billable`) |
+| `billing_note` | text nullable | Wajib kalau `is_billable=true` |
+| `verification_status` | string, default `pending` | Reuse enum `App\Enums\CReqVerificationStatus` (pending/verified/rejected) |
+| `verified_by` | FK → `users.id`, null on delete | CS yang approve/reject |
+| `verified_at` | timestamp nullable | |
+| `rejection_reason` | text nullable | Wajib saat reject |
+| `invoice_id` | FK → `invoices.id`, null on delete | Tagihan Manual yang terbit saat approve |
+
+Baris **tidak** dibuat kalau laporan MTN tidak dicentang berbayar (beda dari C-REQ yang selalu punya baris).
+
+## Tabel `task_billing_items` (2026-10-10)
+
+Migrasi: `2026_10_10_090100_create`. Baris breakdown per-item untuk Verifikasi Biaya — dipakai bersama oleh C-REQ dan MTN. Satu-satunya rincian biaya per baris; `invoices` tetap flat (`amount` + `description` gabungan).
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | bigint PK | |
+| `task_id` | FK → `tasks.id`, **restrictOnDelete** | Tabel finansial — tidak boleh cascade |
+| `invoice_id` | FK → `invoices.id`, **NOT NULL**, restrictOnDelete | Ditulis dalam transaksi yang sama, setelah invoice terbit |
+| `name` | string(150) | Nama baris ("Jual Modem", "Pasang Kabel", dst) |
+| `amount` | decimal(12,2) | `min:0.01` per baris |
+| `inventory_serial_sale_id` | FK → `inventory_serial_sales.id`, nullable, restrictOnDelete | Terisi hanya untuk baris "Jual Modem" yang auto-seed |
+| `created_by` | FK → `users.id`, restrictOnDelete | |
+| `timestamps` | | |
+
+Relasi: `Task::billingItems()` (HasMany), `TaskBillingItem::task()`, `::invoice()`, `::inventorySerialSale()`, `::createdBy()`.
+
+## Penjualan modem — `inventory_serials.ownership`, `customer_devices.acquisition_source`, `inventory_serial_sales` (2026-10-09)
+
+- `inventory_serials.ownership` — string(20), default `company` (enum `App\Enums\DeviceOwnership`: `company`/`customer`). Penanda SATU-SATUNYA "modem ini wajib balik pas putus atau tidak". Data lama dibiarkan default `company` (tanpa backfill).
+- `customer_devices.acquisition_source` — string(20), default `sewa` (enum `App\Enums\DeviceAcquisitionSource`: `sewa`/`beli_sendiri`/`beli_gudang`). Dipakai untuk badge Sewa/Beli Sendiri/Beli dari Gudang.
+- `inventory_serial_sales` — ledger penjualan modem ke pelanggan. Kolom: `inventory_serial_id`, `customer_id`, `fop_task_id` (nullable), `price` decimal(12,2), `created_by`, timestamps. Semua FK `restrictOnDelete()`. Ditulis lewat `InventoryService::recordSerialSale()` (harga harus > 0). Sumber Laporan Barang Terjual ke Pelanggan.
 ## Tabel `task_device_retrievals` (ADHOC-86)
 
 Migrasi: `2026_09_19_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe Ambil Modem / `DEAC`) — laporan lapangan pengambilan alat. Tabel sendiri, bukan numpang `task_maintenances`, karena form DEAC tidak punya kendala teknis / foto OPM / speedtest — memaksa kolom itu terisi berarti data palsu.
@@ -123,6 +162,8 @@ teamMembers(): HasMany(TaskTeam::class)
 maintenanceReport(): HasOne(TaskMaintenance::class)
 creqDetail(): HasOne(TaskCreqDetail::class)             // khusus task C-REQ, 2026-09-26
 deviceRetrieval(): HasOne(TaskDeviceRetrieval::class)   // khusus task Ambil Modem (DEAC), ADHOC-86
+maintenanceBillingDetail(): HasOne(TaskMaintenanceBillingDetail::class) // MTN polos berbayar, 2026-10-10
+billingItems(): HasMany(TaskBillingItem::class)         // breakdown per-item Verifikasi Biaya (C-REQ & MTN), 2026-10-10
 auditLogs(): MorphMany(AuditLog::class, 'auditable')
 
 // TaskTeam

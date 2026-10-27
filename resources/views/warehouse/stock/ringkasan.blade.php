@@ -193,7 +193,7 @@
                     @else
                     <div class="flex flex-wrap gap-1">
                         @foreach($row['condition_summary'] as $c)
-                        <x-ui.badge :variant="$c['condition']->badgeVariant()">{{ $c['condition']->label() }}: {{ $c['count'] }}</x-ui.badge>
+                        <x-warehouse.condition-badge :condition="$c['condition']" :checked="$c['checked']" :count="$c['count']" />
                         @endforeach
                     </div>
                     @endif

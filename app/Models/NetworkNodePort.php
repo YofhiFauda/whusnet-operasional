@@ -1,0 +1,63 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\RecordsAuditLogs;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+/**
+ * Port generik milik sebuah `NetworkNode` (ODC/ODP/splitter/dst). Nomor port
+ * unik per node — ditegakkan unique index `(network_node_id, number)`, bukan
+ * hanya validasi aplikasi, supaya jalur import/tinker juga tidak bisa
+ * menduplikasi nomor.
+ */
+#[Fillable([
+    'network_node_id',
+    'number',
+    'is_used',
+])]
+class NetworkNodePort extends Model
+{
+    use HasFactory, RecordsAuditLogs;
+
+    // Padanan `OdpPort` lama (created + updated) — toggle is_used port itu
+    // perubahan kapasitas yang dipakai Red Zone FOP; tanpa jejak, gak bisa
+    // dilacak siapa yang menandai port terpakai/kosong.
+    protected string $auditModule = 'Port Node Jaringan';
+
+    protected array $auditEvents = ['created', 'updated'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'network_node_id' => 'integer',
+            'number' => 'integer',
+            'is_used' => 'boolean',
+        ];
+    }
+
+    /**
+     * @return HasMany<NetworkPortAssignment, $this>
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(NetworkPortAssignment::class, 'network_node_port_id');
+    }
+
+    public function activeAssignment(): HasMany
+    {
+        return $this->assignments()->where('active_key', 1);
+    }
+
+    public function node(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'network_node_id');
+    }
+}

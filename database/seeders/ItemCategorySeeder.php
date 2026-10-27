@@ -48,6 +48,10 @@ class ItemCategorySeeder extends Seeder
 
     public const CODE_ACCESS_POINT = 'access_point';
 
+    public const CODE_STB = 'stb';
+
+    public const CODE_CUSTOMER_ROUTER = 'customer_router';
+
     public function run(): void
     {
         $categories = [
@@ -65,7 +69,12 @@ class ItemCategorySeeder extends Seeder
             ['code' => self::CODE_ROUTER_GATEWAY, 'name' => 'Router/Gateway', 'default_unit' => 'pcs', 'sort_order' => 45, 'equipment_class' => 'aktif'],
             // sort_order 47 — Access Point WiFi, dekat Router/Gateway (45) tapi
             // beda barang (AP murni, bukan gateway/PPPoE server).
-            ['code' => self::CODE_ACCESS_POINT, 'name' => 'Access Point WiFi', 'default_unit' => 'pcs', 'sort_order' => 47, 'equipment_class' => 'aktif'],
+            // is_customer_extra_device — AP & STB dipasang ke pelanggan sebagai
+            // perangkat tambahan, jadi hanya kategori ini yang muncul di pilihan
+            // stok Gudang untuk perangkat tambahan.
+            ['code' => self::CODE_ACCESS_POINT, 'name' => 'Access Point WiFi', 'default_unit' => 'pcs', 'sort_order' => 47, 'equipment_class' => 'aktif', 'is_customer_extra_device' => true],
+            ['code' => self::CODE_STB, 'name' => 'Set Top Box (STB)', 'default_unit' => 'pcs', 'sort_order' => 48, 'equipment_class' => 'aktif', 'is_customer_extra_device' => true],
+            ['code' => self::CODE_CUSTOMER_ROUTER, 'name' => 'Router Pelanggan', 'default_unit' => 'pcs', 'sort_order' => 49, 'equipment_class' => 'aktif', 'is_customer_extra_device' => true],
         ];
 
         foreach ($categories as $category) {
@@ -76,6 +85,7 @@ class ItemCategorySeeder extends Seeder
                     'default_unit' => $category['default_unit'],
                     'sort_order' => $category['sort_order'],
                     'equipment_class' => $category['equipment_class'],
+                    'is_customer_extra_device' => $category['is_customer_extra_device'] ?? false,
                     'is_active' => true,
                 ]
             );
@@ -83,6 +93,6 @@ class ItemCategorySeeder extends Seeder
 
         ItemCategory::flushLabelCache();
 
-        $this->command?->info('ItemCategorySeeder: 6 kategori tambahan (modem_ont, olt_module, switch_jaringan, sfp_transceiver, router_gateway, access_point) tersedia.');
+        $this->command?->info('ItemCategorySeeder: 8 kategori tambahan (modem_ont, olt_module, switch_jaringan, sfp_transceiver, router_gateway, access_point, stb, customer_router) tersedia.');
     }
 }

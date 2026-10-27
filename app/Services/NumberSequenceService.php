@@ -4,8 +4,11 @@ namespace App\Services;
 
 use App\Enums\PaymentMethod;
 use App\Models\FopTask;
+use App\Models\InventoryTransaction;
+use App\Models\InventoryTransfer;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\StockRequest;
 use App\Models\Task;
 use App\Models\Ticket;
 use Closure;
@@ -43,6 +46,23 @@ class NumberSequenceService
         ));
 
         return sprintf('TKT-%s-%06d', $ymd, $value);
+    }
+
+    public function ledgerNumber(string $prefix): string
+    {
+        if (! preg_match('/^[A-Z]{3}$/', $prefix)) {
+            throw new \InvalidArgumentException('Prefix nomor ledger harus tiga huruf kapital.');
+        }
+
+        $ymd = date('Ymd');
+        $pattern = "{$prefix}-{$ymd}-%";
+        $value = $this->next("LEDGER:{$prefix}:{$ymd}", fn () => $this->lastSuffix(
+            InventoryTransaction::where('reference_number', 'like', $pattern)->pluck('reference_number')
+                ->merge(InventoryTransfer::where('reference_number', 'like', $pattern)->pluck('reference_number'))
+                ->merge(StockRequest::where('reference_number', 'like', $pattern)->pluck('reference_number'))
+        ));
+
+        return sprintf('%s-%s-%06d', $prefix, $ymd, $value);
     }
 
     public function fopTaskNumber(): string

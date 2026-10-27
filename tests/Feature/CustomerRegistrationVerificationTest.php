@@ -101,6 +101,28 @@ class CustomerRegistrationVerificationTest extends TestCase
         $this->assertDatabaseMissing('fop_tasks', ['customer_id' => $customer->id]);
     }
 
+    public function test_index_verifikasi_registrasi_dapat_dibuka_tanpa_lazy_loading_violation(): void
+    {
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $package = $this->makePackage();
+        $this->loginAsAdmin();
+
+        Customer::factory()->create([
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+            'internet_package_id' => $package->id,
+        ]);
+        Customer::factory()->create([
+            'pop_id' => $pop->id,
+            'status' => 'registered',
+            'internet_package_id' => $package->id,
+        ]);
+
+        $this->withoutExceptionHandling();
+        $response = $this->get(route('customer-registration-verifications.index'));
+        $response->assertOk();
+    }
+
     public function test_buka_task_fop_tidak_membuat_foptask_survey_untuk_pelanggan_yang_masih_verifikasi_registrasi(): void
     {
         $pop = Pop::factory()->create(['type' => 'cabang']);

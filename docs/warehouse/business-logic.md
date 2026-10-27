@@ -80,6 +80,14 @@ Saat teknisi submit laporan (Pemasangan/Maintenance/INFR/O-REQ), `InventoryServi
 - **`installSerial()`** — transisi SN ke `INSTALLED`. Guard `OwnershipMode::INSTALLABLE` ditegakkan **di sini** (satu-satunya pintu transisi), bukan hanya predikat yang bisa diabaikan pemanggilnya. Re-fetch + `lockForUpdate()` mencegah race dua submit bersamaan untuk SN yang sama.
 - **`reconcileMaterialsAgainstCustody()`** — rekonsiliasi baris `task_materials` generik (dari form, tanpa lot/harga) ke custody sungguhan; dipanggil sekali di titik penyelesaian laporan (bukan tiap resubmit draft).
 
+**Guard lintas-cabang (2026-10-12)** — laporan user: modem yang diissue dari Cabang Jetis kepakai buat pemasangan di Cabang Sandya. Barang yang `issued_from_pop_id`-nya Cabang A **tidak boleh** dipasang/dipakai di Task Cabang B, walau teknisinya scope `all_pop` dan secara fisik pegang custody dari banyak cabang sekaligus:
+- Pembanding selalu `issued_from_pop_id` barang vs **cabang induk** `$fopTask->pop_id`/`$task->pop_id` (`Pop::resolveCabangId()` — naik ke akar pohon POP, jadi Task di Mini POP tetap dianggap satu Cabang dengan gudang induknya).
+- Ditegakkan di `installSerial()` (lempar `InvalidArgumentException`), `consumeFromCustody()` (lot cabang lain di-**skip** dari FIFO, bukan dilempar langsung — kalau total custody cabang yang cocok tidak cukup, `InsufficientCustodyException` biasa yang jalan), dan `consumeFromRoll()` (lempar `InvalidArgumentException`) — satu-satunya titik pakai, sama prinsipnya dengan guard `OwnershipMode` di atas.
+- `issued_from_pop_id`/`pop_id` yang masih `null` (data legacy sebelum kolom ini ada) **fail-open** — tidak retroaktif menolak data lama yang tidak kebaca cabangnya.
+- Lapis UX: `eligibleSerialsForTeam()`/`eligiblePassiveCustodyForTeam()`/`eligibleRollsForTeam()` di `CustomerInstallationController` & `TaskMaintenanceController` ikut difilter cabang yang sama — dropdown tidak menampilkan barang cabang lain sama sekali, supaya teknisi tidak ketolak belakangan pas sudah isi laporan. Ini cuma UX; penegakan sebenarnya tetap di Service.
+- **Issue (Cabang → Teknisi) sengaja tidak digerbangi** — issue itu generik, tidak terikat task spesifik (teknisi ambil barang duluan, baru dipakai untuk task manapun belakangan), jadi tidak ada "cabang task" yang bisa dibandingkan di titik itu.
+- Test: `tests/Feature/InventoryServiceCrossBranchGuardTest.php`, skenario tambahan di `InstallationSerialDropdownAuthorityTest::sn_dropdown_dari_cabang_lain_ditolak()`.
+
 ## 7. Adjustment & Stock Opname
 
 4 varian, semua lewat `InventoryAdjustmentService`, **tanpa gerbang approval berjenjang** (keputusan produk sadar — threshold nominal belum bisa ditentukan tanpa data operasional riil; monitoring saat ini berbasis status barang yang tercatat di ledger, visible di dashboard):
@@ -232,6 +240,8 @@ TAHAP 3 — Pusat konfirmasi (BARU — InventoryReturnTransferService::
   ditutup RECEIVED begitu semua baris dispatch-nya sudah dikonfirmasi.
 ```
 
+**Harga modem retur hanya boleh diinput di Tahap 3 (Pusat)** (2026-10-12, ditegaskan ulang user: "PIC Gudang tidak bisa input Harga modem, yang bisa hanyalah Gudang Pusat") — `estimated_value` jadi `prohibited` di Tahap 1 (`WarehouseReturnReceiveController::store()`) & walk-in (`WarehouseCustomerReturnController::store()`); field inputnya DIHAPUS dari view kedua halaman itu, diganti teks "Harga modem retur ditentukan oleh Gudang Pusat". Satu-satunya input harga ada di Tahap 3 (`WarehouseReturnPusatController::store()`, `pusat-receive.blade.php`), digerbangi `Gate::authorize('warehouse_transfer.create')` **dan** diulang lagi di `InventoryReturnTransferService::confirmAtPusat()` sendiri (`abort_unless($actor->hasPermission(...), 403)` + `$pusat->isPusat()` + scope POP actor ke Pop Pusat tujuan) — role `pic_gudang` SENGAJA tidak pegang permission ini (lihat komentar di `RolePermissionSeeder`), jadi 403 di `index()`/`create()`/`store()` ketiganya walau scope-nya `all_pop`. Harga tersimpan di `inventory_transactions.unit_price_snapshot` baris konfirmasi Pusat, disinkronkan ke `DeviceRetrievalLog.estimated_value` (dipakai Laporan Nilai Inventori). Test: `WarehouseReturnToPusatTest` (+5 skenario, termasuk guard permission & scope POP operator Pusat).
+
 **Label asal modem retur** (Migrasi/Ganti Modem/Deaktivasi/Diantar Pelanggan) — `DeviceRetrievalLog::originLabel()`, derivasi dari `source` (`DeviceRetrievalSource::DEAC`/`WALK_IN`/`CREQ_SWAP`) + `task->creqDetail->category` kalau `CREQ_SWAP` (bedain Ganti Modem vs Migrasi). Ditampilkan lewat `<x-warehouse.origin-badge>` di Terima Retur, Kirim ke Pusat, Terima di Pusat, dan Modem Rusak.
 
 **Halaman Modem Rusak** (`/warehouse/damaged`, `WarehouseDamagedStockController`, permission `warehouse.view`, read-only) — listing SN `DAMAGED`/`QUARANTINE`/`SCRAPPED` atau `condition=used_damaged`, gabungan hasil retur rusak (Tahap 3) dan Lapor Rusak barang biasa (`InventoryAdjustmentService::adjustSerialStatus()`).
@@ -246,6 +256,21 @@ Rancangan & data lama: `docs/plan/warehouse/analisa-riwayat-dan-terima-modem-dar
 
 **Belum dikerjakan:** BAP, jalur balik barang non-SN (roll/material), backfill massal SN legacy (sengaja tidak — 273 SN kosong, 93 SN dobel), export Excel riwayat, laporan agregat per teknisi.
 
+## 12c. Ownership Modem & Penjualan ke Pelanggan (2026-10-09 / 2026-10-10)
+
+Sumbu baru di SN: `inventory_serials.ownership` (`DeviceOwnership`: `company` / `customer`) — **satu-satunya** penanda apakah modem wajib balik ke gudang saat pelanggan putus. Beda dari `OwnershipMode` (`installable`/`company_asset`), itu sumbu lain, tidak disentuh.
+
+- **Sewa (default)** — `ownership=company`. Modem dipasang lewat Issue → Install seperti biasa, diretur saat DEAC/swap (§12a/§12b).
+- **Beli dari Gudang** — SN tetap dari custody teknisi/gudang kita (mekanisme sama dengan Sewa), tapi `installSerial(..., ownership=CUSTOMER)` menandai SN `customer`, lalu `recordSerialSale()` menulis baris `inventory_serial_sales` dengan harga jual. Modem ini TIDAK diretur saat DEAC atau saat swap modem lain (auto-return di `installSerial()` melewati SN `customer`; `InventoryReassignService::pickupSerialFromCustomer()` menolak SN `customer`).
+- **Beli Sendiri** — modem dari luar, tidak pernah masuk `inventory_serials`. Hanya tercatat di `customer_devices` (`acquisition_source=beli_sendiri`) via `InventoryService::recordCustomerOwnedDevice()`. Tidak ada tagihan dari kita.
+
+`customer_devices.acquisition_source` (`DeviceAcquisitionSource`: `sewa`/`beli_sendiri`/`beli_gudang`) adalah turunan untuk label/badge di Detail & List Pelanggan. Kombinasi yang valid: `customer` ↔ `beli_gudang`, `company` ↔ `sewa`. Penulisan keduanya di satu transaksi (`installSerial()`).
+
+**DEAC (Ambil Modem) dan SN `customer`.** Daftar wajib tarik hanya SN `company`. Kalau pelanggan semua SN-nya `customer` (atau tidak pernah punya SN sama sekali tapi `acquisition_source=beli_sendiri`), banner "tidak perlu ditarik" muncul dan laporan DEAC bisa disubmit tanpa SN. Kalau campuran (sebagian company), SN company tetap wajib ditarik.
+
+**Laporan Barang Terjual ke Pelanggan** (`warehouse.reports.sold-to-customer`, permission `warehouse_report.sold_to_customer.view`): daftar `inventory_serial_sales`, POP-scoped lewat `customer.pop_id` (`hasAllPopAccess()` / `getAllowedPopIds()`, deny-by-default). Kolom: tanggal, SN, nama barang, pelanggan, cabang, harga final, sumber (PSB / C-REQ-MTN), diinput oleh. Harga dibaca dari `inventory_serial_sales.price` yang sudah di-write-back dari koreksi CS, jadi selalu sama dengan nominal yang ditagih.
+
+Modem sewa/beli lama (sebelum 2026-10-09) tetap `company`/Sewa — tidak ada backfill, sesuai keputusan.
 ## 13. Kontrol Anti-Manipulasi
 
 - **Ledger append-only** — `InventoryTransactionObserver` melempar `LogicException` di `updating()`/`deleting()`, tanpa kecuali (termasuk owner). Batasan yang diakui: tidak menangkap bulk query builder update/raw SQL.

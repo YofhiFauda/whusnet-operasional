@@ -6,11 +6,24 @@
 @section('breadcrumb_parent_url', route('tasks.creq-billing.index'))
 
 @php
-    $detail = $task->creqDetail;
+    // Dua tabel detail BEDA per task_type (C-REQ vs MTN polos) — baca relasi
+    // yang salah bikin $detail null untuk task MTN (task MTN tidak punya
+    // TaskCreqDetail sama sekali), dan setiap akses properti di bawah
+    // ($detail->verification_status, dst) fatal. Sama perbaikan yang sudah
+    // diterapkan di index.blade.php, mirror logic authorizeBillable()/
+    // approve() di controller.
+    $isCreqTask = $task->task_type === \App\Enums\TaskType::CREQ;
+    $detail = $isCreqTask ? $task->creqDetail : $task->maintenanceBillingDetail;
     $customer = $task->customer;
     $service = $customer?->customerService;
     $maintenance = $task->maintenanceReport;
-    $manualCategory = $detail->category?->toManualInvoiceCategory();
+    // Task MTN polos tidak punya kategori C-REQ (TaskMaintenanceBillingDetail
+    // tidak punya kolom `category`) — kategori tagihannya SELALU PERBAIKAN,
+    // hardcode, sama persis logic approve() di controller. Jangan ditebak
+    // dari category null (toManualInvoiceCategory() hanya ada di CReqCategory).
+    $manualCategory = $isCreqTask
+        ? $detail->category?->toManualInvoiceCategory()
+        : \App\Enums\ManualInvoiceCategory::PERBAIKAN;
     $customerHasService = (bool) $service;
 
     // Formatting Status Badges
@@ -48,7 +61,64 @@
         : collect();
     $reportWorkTools = $reportFopTask ? $reportFopTask->workTools()->orderBy('id')->get() : collect();
 
-    $approveHasErrors = $errors->hasAny(['amount', 'description', 'manual_subtype_name', 'customer_id']);
+    // Penjualan modem (ownership modem sewa/beli, 2026-10-09) — kalau
+    // laporan "Beli dari Gudang" sudah menulis InventorySerialSale buat
+    // task ini, breakdown per-item generik (Task 4, 2026-10-10, lihat
+    // $initialItems di bawah) SELALU menyisipkan baris "Jual Modem" terkunci
+    // di urutan pertama, nilainya di-seed dari `$modemSale->price`. Mekanisme
+    // 2-input terpisah "Harga Modem + Biaya Jasa" (Task 6 lama,
+    // `ownership-modem-sewa-beli`) SUDAH DIGANTI sepenuhnya oleh breakdown
+    // N-baris generik ini — jangan hidupkan lagi mekanisme 2-input itu.
+    // $reportFopTask dipakai lagi (SAMA anchor dengan material/SN di atas)
+    // biar gak ada dua cara berbeda nebak FopTask mana yang relevan.
+    $modemSale = $reportFopTask
+        ? \App\Models\InventorySerialSale::where('fop_task_id', $reportFopTask->id)->first()
+        : null;
+
+    // Breakdown per-item generik (Task 4, 2026-10-10) — bukan lagi satu
+    // `amount`/`description` tunggal atau pasangan `modem_price`/`service_fee`
+    // (Task 6 lama). State awal Alpine `items`: kalau request gagal validasi
+    // `old('items')` dipakai lagi (termasuk baris yang user tambah/hapus
+    // sendiri sebelum submit); kalau belum pernah submit, di-seed baris
+    // modem terkunci (kalau $modemSale ada) atau satu baris kosong.
+    $oldItems = old('items');
+    if (is_array($oldItems) && count($oldItems) > 0) {
+        $initialItems = collect($oldItems)->values()->map(fn ($item) => [
+            'name' => $item['name'] ?? '',
+            'amount' => $item['amount'] ?? '',
+            'inventory_serial_sale_id' => $item['inventory_serial_sale_id'] ?? null,
+            'locked' => $modemSale && (string) ($item['inventory_serial_sale_id'] ?? '') === (string) $modemSale->id,
+        ])->all();
+    } elseif ($modemSale) {
+        $initialItems = [[
+            'name' => 'Jual Modem',
+            // FormatHelper::rupiahInput(), BUKAN (string) $modemSale->price
+            // mentah (final review 2026-10-10, finding #2) — kolom DB
+            // berbentuk desimal mesin (mis. "150000.00"), sementara mask
+            // `data-rupiah` & regex parsing di Alpine (lihat parsedAmount()
+            // di bawah) mengasumsikan bentuk TAMPILAN Indonesia
+            // ("150.000"). Men-seed bentuk mesin langsung ke item.amount
+            // membuat Alpine model & DOM (yang diformat ulang oleh mask
+            // saat halaman dimuat) mulai dari representasi yang BEDA —
+            // sumber potensi salah baca kalau baris ini sempat tersentuh
+            // sebelum mask & Alpine benar-benar selaras. rupiahInput()
+            // menghasilkan bentuk tampilan yang SAMA dengan yang akan
+            // ditulis mask, jadi item.amount konsisten sejak render awal.
+            'amount' => \App\Helpers\FormatHelper::rupiahInput($modemSale->price),
+            'inventory_serial_sale_id' => $modemSale->id,
+            'locked' => true,
+        ]];
+    } else {
+        $initialItems = [[
+            'name' => '',
+            'amount' => '',
+            'inventory_serial_sale_id' => null,
+            'locked' => false,
+        ]];
+    }
+
+    $approveHasErrors = $errors->hasAny(['manual_subtype_name', 'customer_id'])
+        || collect($errors->keys())->contains(fn ($key) => $key === 'items' || str_starts_with($key, 'items.'));
     $rejectHasErrors = $errors->has('reason');
 @endphp
 
@@ -97,9 +167,10 @@
                     {{ $detail->verification_status->label() }}
                 </span>
 
-                {{-- Category Tag --}}
+                {{-- Category Tag — task MTN polos tidak punya kategori C-REQ,
+                     fallback ke label task_type (sama fallback dengan index.blade.php). --}}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
-                    {{ $detail->category?->label() }}
+                    {{ $detail->category?->label() ?? $task->task_type->label() }}
                 </span>
             </div>
 
@@ -196,11 +267,11 @@
 
             {{-- Col 3: Kategori Pekerjaan --}}
             <div class="p-3.5 sm:p-4 flex flex-col justify-between min-w-0">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">KATEGORI C-REQ</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">{{ $isCreqTask ? 'KATEGORI C-REQ' : 'KATEGORI TASK' }}</span>
                 <div class="mt-1">
-                    <span class="text-xs font-bold text-sky-700 dark:text-sky-400 truncate block">{{ $detail->category?->label() }}</span>
+                    <span class="text-xs font-bold text-sky-700 dark:text-sky-400 truncate block">{{ $detail->category?->label() ?? $task->task_type->label() }}</span>
                     <span class="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5 truncate">
-                        {{ $detail->category_custom_name ?: 'Standar C-REQ' }}
+                        {{ $isCreqTask ? ($detail->category_custom_name ?: 'Standar C-REQ') : 'Maintenance berbayar' }}
                     </span>
                 </div>
             </div>
@@ -277,13 +348,15 @@
                         </div>
                     </div>
 
-                    {{-- Kategori & Spesifikasi Perubahan --}}
+                    {{-- Kategori & Spesifikasi Perubahan — task MTN polos tidak punya
+                         kategori C-REQ (TaskMaintenanceBillingDetail tidak punya kolom
+                         `category`/`category_custom_name`), fallback ke label task_type. --}}
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         <div class="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3 border border-slate-200/80 dark:border-slate-700/80">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block select-none">Kategori Pekerjaan</span>
-                            <span class="font-bold text-slate-800 dark:text-slate-200 text-xs mt-1 block">{{ $detail->category?->label() }}</span>
+                            <span class="font-bold text-slate-800 dark:text-slate-200 text-xs mt-1 block">{{ $detail->category?->label() ?? $task->task_type->label() }}</span>
                         </div>
-                        @if($detail->category_custom_name)
+                        @if($isCreqTask && $detail->category_custom_name)
                         <div class="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3 border border-slate-200/80 dark:border-slate-700/80">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block select-none">Nama Kategori Kustom</span>
                             <span class="font-bold text-slate-800 dark:text-slate-200 text-xs mt-1 block">{{ $detail->category_custom_name }}</span>
@@ -291,8 +364,13 @@
                         @endif
                     </div>
 
-                    {{-- Titik Koordinat (Tikor Lama vs Baru jika ada) --}}
-                    @if($detail->tikor_lama_lat || $detail->tikor_baru_lat)
+                    {{-- Titik Koordinat (Tikor Lama vs Baru jika ada) — kolom ini cuma
+                         ada di TaskCreqDetail (tikor_lama_lat dst), TIDAK ada sama sekali
+                         di TaskMaintenanceBillingDetail. Eloquent mengembalikan null untuk
+                         atribut yang tidak dikenal (bukan fatal), tapi $isCreqTask dicek
+                         eksplisit di sini supaya niatnya jelas — section ini murni milik
+                         C-REQ, bukan "kebetulan selalu null" untuk MTN. --}}
+                    @if($isCreqTask && ($detail->tikor_lama_lat || $detail->tikor_baru_lat))
                     <div class="space-y-1.5 pt-1">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none">TITIK KOORDINAT (GPS)</span>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -516,7 +594,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-slate-500">Kategori:</span>
-                                <span class="font-semibold text-slate-800 dark:text-slate-200">{{ $detail->invoice->manual_category?->label() ?? $detail->category?->label() }}</span>
+                                <span class="font-semibold text-slate-800 dark:text-slate-200">{{ $detail->invoice->manual_category?->label() ?? $detail->category?->label() ?? $task->task_type->label() }}</span>
                             </div>
                             @if($detail->invoice->manual_subtype_name)
                             <div class="flex items-center justify-between">
@@ -633,41 +711,119 @@
                             </div>
                             @endif
 
-                            {{-- Description --}}
-                            <div class="space-y-1">
-                                <label for="description" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Deskripsi Tagihan <span class="text-rose-500">*</span>
+                            {{-- Breakdown per-item generik (Task 4, 2026-10-10) — ganti satu
+                                 `amount`/`description` tunggal (flow lama) DAN pasangan
+                                 `modem_price`/`service_fee` (Task 6 lama). CS merinci tagihan
+                                 jadi N baris {nama, nominal}; kalau task ini punya penjualan
+                                 modem (Beli dari Gudang), baris pertama "Jual Modem" SELALU ada,
+                                 terkunci (nama tidak bisa diubah/dihapus) — server menolak
+                                 breakdown yang tidak menyertakan baris itu (lihat approve()). --}}
+                            <div x-data="{
+                                    items: @js($initialItems),
+                                    addItem() {
+                                        this.items.push({ name: '', amount: '', inventory_serial_sale_id: null, locked: false });
+                                    },
+                                    removeItem(index) {
+                                        this.items.splice(index, 1);
+                                    },
+                                    parsedAmount(value) {
+                                        const bersih = String(value ?? '').trim().replace(/Rp|rp/gi, '').trim();
+                                        if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(bersih)) {
+                                            return parseFloat(bersih.replace(/\./g, '').replace(',', '.')) || 0;
+                                        }
+                                        if (/^-?\d+,\d+$/.test(bersih)) {
+                                            return parseFloat(bersih.replace(',', '.')) || 0;
+                                        }
+                                        return parseFloat(bersih) || 0;
+                                    },
+                                    get total() {
+                                        return this.items.reduce((sum, item) => sum + this.parsedAmount(item.amount), 0);
+                                    },
+                                    formatTotal() {
+                                        return 'Rp' + this.total.toLocaleString('id-ID');
+                                    },
+                                 }" class="space-y-2.5">
+
+                                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Rincian Tagihan <span class="text-rose-500">*</span>
                                 </label>
-                                <textarea name="description" id="description" rows="3" maxlength="1000" required
-                                          placeholder="Uraikan detail pekerjaan yang ditagihkan kepada pelanggan..."
-                                          class="w-full text-xs px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs leading-relaxed">{{ old('description', $detail->billing_note) }}</textarea>
-                                <div class="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
-                                    <span>Pra-terisi dari catatan teknisi &bull; dapat disunting</span>
-                                    <span>Maks. 1000 karakter</span>
+
+                                <template x-for="(item, index) in items" :key="index">
+                                    <div class="flex items-start gap-2 bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5">
+                                        <div class="flex-1 min-w-0">
+                                            <template x-if="item.locked">
+                                                <div>
+                                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-100 py-2" x-text="item.name"></span>
+                                                    <input type="hidden" :name="`items[${index}][name]`" :value="item.name">
+                                                    <input type="hidden" :name="`items[${index}][inventory_serial_sale_id]`" :value="item.inventory_serial_sale_id">
+                                                </div>
+                                            </template>
+                                            <template x-if="!item.locked">
+                                                <input type="text" :name="`items[${index}][name]`" x-model="item.name" maxlength="150"
+                                                       placeholder="Nama biaya, mis. Ongkos Jasa"
+                                                       class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors">
+                                            </template>
+                                        </div>
+                                        <div class="w-32 sm:w-36 shrink-0">
+                                            <div class="relative">
+                                                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-mono text-[11px] font-bold">Rp</div>
+                                                {{-- :value + @input(nextTick), BUKAN x-model polos (final review
+                                                     2026-10-10, finding #2) — `data-rupiah` mask di layouts/app.blade.php
+                                                     adalah listener `input` di level DOCUMENT (bubble phase), sedangkan
+                                                     x-model memasang listener `input` di level ELEMENT ini sendiri.
+                                                     Listener element selalu lebih dulu jalan daripada listener document
+                                                     untuk event yang sama (bubbling), jadi x-model akan MENANGKAP nilai
+                                                     SEBELUM mask merapikannya — model Alpine selalu "satu ketikan
+                                                     ketinggalan" dari yang tampil di DOM, dan preview Total Tagihan jadi
+                                                     salah (lihat parsedAmount()/get total() di bawah). `$nextTick()`
+                                                     menunda pembacaan `$event.target.value` ke microtask SESUDAH mask
+                                                     document-level selesai jalan (keduanya tetap dalam siklus sinkron
+                                                     event yang sama), jadi item.amount yang disimpan SELALU nilai yang
+                                                     sudah bermasking, bukan nilai mentah sebelum mask. --}}
+                                                <input type="text" inputmode="numeric" data-rupiah :name="`items[${index}][amount]`" :value="item.amount"
+                                                       @input="$nextTick(() => { item.amount = $event.target.value })"
+                                                       placeholder="0"
+                                                       class="w-full pl-7 pr-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors">
+                                            </div>
+                                        </div>
+                                        <button type="button" x-show="!item.locked" @click="removeItem(index)"
+                                                class="text-rose-500 hover:text-rose-700 dark:hover:text-rose-400 p-1.5 rounded hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors shrink-0 cursor-pointer"
+                                                title="Hapus baris">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+
+                                <button type="button" @click="addItem()"
+                                        class="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/50 px-3 py-1.5 rounded-md transition-colors cursor-pointer">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Tambah Baris
+                                </button>
+
+                                <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Tagihan (Preview)</span>
+                                    <span class="text-sm font-extrabold font-mono text-slate-900 dark:text-slate-100" x-text="formatTotal()"></span>
                                 </div>
-                                @error('description')
+
+                                @error('items')
                                 <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
                                 @enderror
+                                @foreach ($errors->get('items.*') as $fieldErrors)
+                                    @foreach ($fieldErrors as $fieldError)
+                                    <p class="text-[11px] text-rose-600 font-semibold">{{ $fieldError }}</p>
+                                    @endforeach
+                                @endforeach
                             </div>
 
-                            {{-- Nominal Tagihan (Currency Input) --}}
-                            <div class="space-y-1">
-                                <label for="amount" class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Nominal Tagihan (Rupiah) <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-mono text-xs font-bold">
-                                        Rp
-                                    </div>
-                                    <input type="text" inputmode="numeric" name="amount" id="amount" data-rupiah
-                                           value="{{ old('amount') }}" required placeholder="0"
-                                           class="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors shadow-2xs">
-                                </div>
-                                <p class="text-[10px] text-slate-400 dark:text-slate-500">Wajib diinput CS sesuai tarif resmi (tidak otomatis dari teknisi).</p>
-                                @error('amount')
-                                <p class="text-[11px] text-rose-600 font-semibold">{{ $message }}</p>
-                                @enderror
+                            @if($modemSale)
+                            <div class="bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/80 dark:border-sky-900/60 rounded-lg p-3 text-[11px] text-sky-800 dark:text-sky-300">
+                                Task ini punya penjualan modem (Beli dari Gudang) — baris "Jual Modem" wajib ada, nilainya ikut ditulis balik ke catatan penjualan modem.
                             </div>
+                            @endif
 
                             {{-- Action Submit Button --}}
                             <div class="pt-2">

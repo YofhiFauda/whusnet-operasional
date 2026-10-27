@@ -15,8 +15,10 @@ use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryReturnTransferService;
+use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use InvalidArgumentException;
@@ -58,6 +60,7 @@ class WarehouseReturnPusatController extends Controller
 
     public function index(Request $request, EffectiveAccessService $access): View
     {
+        Gate::authorize('warehouse_transfer.create');
         $user = auth()->user();
 
         $serialIds = $this->pendingSerialIdsQuery($access, $user);
@@ -65,7 +68,7 @@ class WarehouseReturnPusatController extends Controller
         $serials = InventorySerial::query()
             ->whereIn('id', $serialIds)
             ->where('status', SerialStatus::TRANSFERRED->value)
-            ->with(['item', 'latestRetrievalLog'])
+            ->with(['item', 'latestRetrievalLog.task.creqDetail'])
             ->orderByDesc('updated_at')
             ->get();
 
@@ -74,6 +77,7 @@ class WarehouseReturnPusatController extends Controller
 
     public function create(InventorySerial $serial, EffectiveAccessService $access): View|RedirectResponse
     {
+        Gate::authorize('warehouse_transfer.create');
         $user = auth()->user();
 
         if ($serial->status !== SerialStatus::TRANSFERRED || ! $this->pendingSerialIdsQuery($access, $user)->contains($serial->id)) {
@@ -91,11 +95,28 @@ class WarehouseReturnPusatController extends Controller
         return view('warehouse.returns.pusat-receive', compact('serial', 'items'));
     }
 
-    public function store(Request $request, InventorySerial $serial, InventoryReturnTransferService $service): RedirectResponse
+    private function returnDestinationPopId(InventorySerial $serial): ?int
     {
+        return InventoryTransaction::query()
+            ->where('serial_id', $serial->id)
+            ->where('type', InventoryTransactionType::TRANSFER->value)
+            ->whereNotNull('from_pop_id')
+            ->whereNull('to_pop_id')
+            ->latest('id')
+            ->with('transfer')
+            ->first()?->transfer?->to_pop_id;
+    }
+
+    public function store(Request $request, InventorySerial $serial, InventoryReturnTransferService $service, EffectiveAccessService $access): RedirectResponse
+    {
+        Gate::authorize('warehouse_transfer.create');
+        $this->assertPopIdInScope($this->returnDestinationPopId($serial), auth()->user(), $access);
+
+        $request->merge(['estimated_value' => RupiahInput::parse($request->input('estimated_value'))]);
         $validated = $request->validate([
             'condition' => ['required', Rule::in([ItemCondition::USED_GOOD->value, ItemCondition::USED_DAMAGED->value])],
             'item_id' => ['nullable', 'integer', 'exists:items,id'],
+            'estimated_value' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -106,6 +127,7 @@ class WarehouseReturnPusatController extends Controller
                 ! empty($validated['item_id']) ? Item::findOrFail($validated['item_id']) : null,
                 auth()->user(),
                 $validated['notes'] ?? null,
+                isset($validated['estimated_value']) ? (float) $validated['estimated_value'] : null,
             );
         } catch (InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());

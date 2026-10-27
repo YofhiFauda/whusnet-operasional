@@ -77,6 +77,7 @@ class CollectorPaymentService
 
         $invoices = Invoice::query()
             ->applyUserScope($viewer)
+            ->applyUserScope($collector)
             ->with('customer')
             ->whereIn('id', array_column($rows, 'invoice_id'))
             ->get()
@@ -301,17 +302,15 @@ class CollectorPaymentService
                 }
 
                 // Auto-split: bagian yang menutup tagihan dulu, sisanya (kalau
-                // ada) jadi overpay_amount — pola sama persis
-                // PaymentService::record() jalur admin (ADHOC-84 §2.5, §4.4).
-                // Dipisah di ranah sen (lihat Money::class) supaya "bayar pas"
-                // tak melahirkan lebih bayar Rp0,000001 hantu.
+                // ada) jadi overpay_amount — rumus SAMA dengan
+                // PaymentService::record() jalur admin, satu sumber lewat
+                // Money::splitApplied() supaya definisi "lebih bayar" tak
+                // pernah menyimpang antara dua jalur (ADHOC-84 §2.5, §4.4).
                 // Uang TUNAI yang diserahkan (di luar saldo). Dipakai juga
                 // untuk notifikasi & total setoran — saldo bukan uang fisik.
                 $cashReceived = Money::of($row['amount']);
                 $useBalance = Money::of($row['use_balance_amount'] ?? 0);
-                $totalReceived = Money::add($cashReceived, $useBalance);
-                $appliedAmount = Money::min($totalReceived, $lockedInvoice->remaining_amount);
-                $overpayAmount = Money::sub($totalReceived, $appliedAmount);
+                [$appliedAmount, $overpayAmount] = Money::splitApplied($cashReceived, $useBalance, $lockedInvoice->remaining_amount);
 
                 // Batch tidak boleh menghasilkan lebih bayar sama sekali. validateRows()
                 // sudah menolaknya, tapi di sini yang otoritatif: kalau sisa tagihan
@@ -332,8 +331,14 @@ class CollectorPaymentService
                 $method = $isFullSaldo ? PaymentMethod::SALDO : PaymentMethod::from($row['payment_method']);
 
                 // Snapshot rekening dari master, bukan dari input — sama dengan
-                // jalur admin (ADHOC-95).
-                $bankAccount = $method->requiresBankDetails() ? BankAccount::find($row['bank_account_id']) : null;
+                // jalur admin (ADHOC-95). DIKUNCI & direcek aktif di sini
+                // (BankAccount::lockActiveOrNull, satu sumber dengan
+                // PaymentService::resolveActiveBankAccount()): validateRows()
+                // cuma mengecek is_active tanpa lock, admin bisa menonaktifkan
+                // rekening di antara validasi optimis itu dan commit batch ini.
+                $bankAccount = $method->requiresBankDetails()
+                    ? BankAccount::lockActiveOrNull($row['bank_account_id'] ?? null)
+                    : null;
 
                 // 'Batch kolektor: ...' dipertahankan sebagai penanda sumber
                 // (dipakai pembaca lain yang mengharap format ini) — keterangan
@@ -344,7 +349,7 @@ class CollectorPaymentService
                 }
 
                 if ($method->requiresBankDetails() && ! $bankAccount) {
-                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: pilih rekening tujuan untuk metode Transfer.");
+                    throw new \RuntimeException("Invoice {$lockedInvoice->invoice_number}: rekening tujuan transfer tidak ditemukan atau sudah tidak aktif.");
                 }
 
                 $payment = Payment::create([
@@ -501,12 +506,17 @@ class CollectorPaymentService
             // jumlah baris yang benar-benar tercatat.
             $total = Money::sum($rowsInPop->pluck('amount'));
 
+            $isTechnician = $collector->isTechnician();
+            $sourceLabel = $isTechnician ? 'Teknisi' : 'Kolektor';
+
             $this->notifyRoleUsersInPop(
                 (int) $popId,
                 'pop_admin',
-                'Setoran Kolektor: '.$collector->name,
-                $rowsInPop->count().' pembayaran (total Rp'.number_format($total, 0, ',', '.').") dicatat kolektor {$collector->name}.",
-                route('collector-worksheet.show', $collector->id)
+                'Pembayaran '.$sourceLabel.': '.$collector->name,
+                $rowsInPop->count().' pembayaran (total Rp'.number_format($total, 0, ',', '.').") dicatat {$sourceLabel} {$collector->name}.",
+                $isTechnician
+                    ? route('collector-worksheet.technicians.show', $collector->id)
+                    : route('collector-worksheet.show', $collector->id)
             );
 
             // Notifikasi saja tidak cukup: ia mendarat di lonceng, sementara

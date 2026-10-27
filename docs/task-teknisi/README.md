@@ -9,7 +9,7 @@
 | [business-logic.md](business-logic.md) | State machine Task, aturan konflik jadwal, guard tiap transisi, integrasi review FOP, laporan pekerjaan di Detail Task |
 | [flowchart.md](flowchart.md) | Alur create→jadwal→start→complete/pending/cancel, alur reassign tim, alur review FOP |
 | [user-flow.md](user-flow.md) | Langkah Teknisi & FOP di dashboard `/tasks-saya`, `/tasks-saya/riwayat`, `/tasks/{id}` |
-| [database-schema.md](database-schema.md) | Tabel `tasks`, `task_teams`, `task_maintenances`, `task_creq_details` |
+| [database-schema.md](database-schema.md) | Tabel `tasks`, `task_teams`, `task_maintenances`, `task_creq_details`, `task_maintenance_billing_details`, `task_billing_items`, ledger penjualan modem (`inventory_serial_sales`) |
 | [bug.md](bug.md) | ⚠️ Bug ditemukan: 2 jalur aktivasi pelanggan yang gak konsisten (approve via Task vs via Verifikasi Admin) |
 
 ## Konsep Inti
@@ -19,6 +19,8 @@ Task (1 pekerjaan lapangan)
   ├── teamMembers (1-3 teknisi, task_teams pivot, role: lead/teknisi)
   ├── maintenanceReport (task_maintenances, khusus task_type non-Survey/Pemasangan)
   ├── creqDetail (task_creq_details, khusus task_type CREQ — kategori + tikor + verifikasi biaya)
+  ├── maintenanceBillingDetail (task_maintenance_billing_details, MTN polos berbayar — verifikasi biaya, 2026-10-10)
+  ├── billingItems (task_billing_items, breakdown per-item verifikasi biaya C-REQ & MTN, 2026-10-10)
   └── fop_review_status (pending/approved/rejected — FOP review laporan setelah Selesai)
 ```
 

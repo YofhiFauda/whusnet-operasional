@@ -212,433 +212,38 @@
         </div>
     </div>
 
-    {{-- Visual Analytics Grid --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {{-- Grafik / Meter Statistik per Daerah --}}
-        <div id="region-stats-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs flex flex-col">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-                    Statistik Tiket per Daerah (POP / Kec)
-                </h2>
-                <span class="text-[10px] font-bold text-text-muted bg-slate-200/60 dark:bg-slate-800 px-2 py-0.5 rounded">Top {{ count($regionStats) }}</span>
-            </div>
-            <div class="p-5 space-y-3.5 flex-1">
-                @forelse($regionStats as $regionName => $data)
-                    <div>
-                        <div class="flex items-center justify-between text-xs mb-1 font-semibold">
-                            <span class="text-text-main truncate max-w-[200px]">{{ $regionName }}</span>
-                            <div class="flex items-center gap-2 shrink-0">
-                                <span class="text-text-muted text-[11px] font-mono">{{ $data['percentage'] }}%</span>
-                                <span class="font-mono font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded text-[11px]">{{ $data['count'] }} Tiket</span>
-                            </div>
-                        </div>
-                        <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-sky-500 to-indigo-500 rounded-full transition-all duration-500" style="width: {{ $data['percentage'] }}%"></div>
-                        </div>
-                    </div>
-                @empty
-                    <div class="py-8 text-center text-xs text-text-muted">Tidak ada data tiket untuk periode terpilih.</div>
-                @endforelse
-            </div>
+    {{-- Dual Mode Switcher: Live Command Center vs Deep Analytics & Audit Solving --}}
+    <div class="flex items-center justify-between gap-4 border-b border-border/80 pb-3 pt-2">
+        <div class="inline-flex rounded-xl border border-border bg-surface p-1 shadow-2xs">
+            <button type="button"
+                    @click="activeTab = 'live'"
+                    :class="activeTab === 'live' ? 'bg-sky-600 text-white shadow-xs font-black' : 'text-text-muted hover:text-text-main font-semibold'"
+                    class="px-4 py-2 text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer">
+                <span class="w-2 h-2 rounded-full" :class="activeTab === 'live' ? 'bg-white animate-pulse' : 'bg-sky-500'"></span>
+                <span>⚡ Live Command Center (Shift Monitor)</span>
+            </button>
+            <button type="button"
+                    @click="activeTab = 'analytics'; $nextTick(() => window.nocDashboardRenderCharts && window.nocDashboardRenderCharts())"
+                    :class="activeTab === 'analytics' ? 'bg-sky-600 text-white shadow-xs font-black' : 'text-text-muted hover:text-text-main font-semibold'"
+                    class="px-4 py-2 text-xs rounded-lg transition-all flex items-center gap-2 cursor-pointer">
+                <span class="w-2 h-2 rounded-full" :class="activeTab === 'analytics' ? 'bg-white' : 'bg-emerald-500'"></span>
+                <span>📊 Analitik &amp; Audit Solving</span>
+            </button>
         </div>
-
-        {{-- Grafik / Meter Statistik per Issue --}}
-        <div id="issue-stats-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs flex flex-col">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Statistik Tiket per Kategori Issue
-                </h2>
-                <span class="text-[10px] font-bold text-text-muted bg-slate-200/60 dark:bg-slate-800 px-2 py-0.5 rounded">Top {{ count($issueStats) }}</span>
-            </div>
-            <div class="p-5 space-y-3.5 flex-1">
-                @forelse($issueStats as $issueName => $data)
-                    <div>
-                        <div class="flex items-center justify-between text-xs mb-1 font-semibold">
-                            <span class="text-text-main truncate max-w-[200px]">{{ $issueName }}</span>
-                            <div class="flex items-center gap-2 shrink-0">
-                                <span class="text-text-muted text-[11px] font-mono">{{ $data['percentage'] }}%</span>
-                                <span class="font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded text-[11px]">{{ $data['count'] }} Tiket</span>
-                            </div>
-                        </div>
-                        <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-amber-500 to-rose-500 rounded-full transition-all duration-500" style="width: {{ $data['percentage'] }}%"></div>
-                        </div>
-                    </div>
-                @empty
-                    <div class="py-8 text-center text-xs text-text-muted">Tidak ada data issue untuk periode terpilih.</div>
-                @endforelse
-            </div>
+        <div class="text-[11px] text-text-muted font-medium hidden sm:block">
+            <span x-show="activeTab === 'live'">Mode Operasional Shift Realtime &amp; Antrean Kritis</span>
+            <span x-show="activeTab === 'analytics'" style="display: none;">Mode Investigasi Masalah, MTTR &amp; Evaluasi Audit</span>
         </div>
-
-        {{-- Trend Matrix: Daerah dengan Issue (Analisa Hotspot) --}}
-        <div id="trend-matrix-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs lg:col-span-2">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
-                <div>
-                    <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-                        Tren Matriks: Daerah dengan Issue Terbanyak (Hotspot Trend)
-                    </h2>
-                    <p class="text-[11px] text-text-muted mt-0.5">Pemetaan konsentrasi keluhan untuk deteksi dini daerah bermasalah.</p>
-                </div>
-                <span class="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20">
-                    STACKED BAR
-                </span>
-            </div>
-
-            <div class="p-4">
-                @if(count($trendMatrix['regions']) > 0 && count($trendMatrix['issues']) > 0)
-                    {{-- Chart.js responsive:true + maintainAspectRatio:false WAJIB
-                         punya parent dengan CSS height eksplisit — tanpa ini
-                         Chart.js gak tau harus setinggi apa dan bar-nya gepeng
-                         jadi garis tipis (kejadian nyata, bukan teori). --}}
-                    <div class="h-72">
-                        <canvas id="chart-trend-matrix"></canvas>
-                    </div>
-                    <script type="application/json" id="data-trend-matrix">@json($trendMatrix)</script>
-                @else
-                    <div class="py-8 text-center text-xs text-text-muted">Tidak cukup data untuk menampilkan matriks tren issue daerah.</div>
-                @endif
-            </div>
-        </div>
-
     </div>
 
-    {{-- Tren Harian, SLA Compliance & Distribusi Aging --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {{-- Tren Harian Volume Tiket (Line Chart) --}}
-        <div id="daily-trend-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs lg:col-span-2">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-                    Tren Harian Volume Tiket
-                </h2>
-                <p class="text-[11px] text-text-muted mt-0.5">Masuk vs selesai vs dibatalkan, maks. 60 hari terakhir dari rentang terpilih.</p>
-            </div>
-            <div class="p-4">
-                <div class="h-64">
-                    <canvas id="chart-daily-trend"></canvas>
-                </div>
-                <script type="application/json" id="data-daily-trend">@json($dailyTrend)</script>
-            </div>
-        </div>
-
-        {{-- SLA Compliance (Donut) --}}
-        <div id="sla-compliance-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs flex flex-col">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    SLA Compliance
-                </h2>
-                <p class="text-[11px] text-text-muted mt-0.5">Dari {{ $slaCompliance['total'] }} tiket resolved berSLA.</p>
-            </div>
-            <div class="p-4 flex-1 flex flex-col items-center justify-center">
-                @if($slaCompliance['total'] > 0)
-                    <canvas id="chart-sla-compliance" width="180" height="180"></canvas>
-                    <script type="application/json" id="data-sla-compliance">@json($slaCompliance)</script>
-                    <p class="text-2xl font-black mt-3 {{ $slaCompliance['ontime_pct'] >= 80 ? 'text-emerald-600 dark:text-emerald-400' : ($slaCompliance['ontime_pct'] >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400') }} font-mono">
-                        {{ $slaCompliance['ontime_pct'] }}%
-                    </p>
-                    <p class="text-[10px] text-text-muted">On-time ({{ $slaCompliance['ontime'] }} dari {{ $slaCompliance['total'] }})</p>
-                @else
-                    <div class="py-8 text-center text-xs text-text-muted">Belum ada tiket resolved ber-SLA pada periode ini.</div>
-                @endif
-            </div>
-        </div>
-
-        {{-- Distribusi Aging Tiket Aktif (Bar Chart) --}}
-        <div id="aging-buckets-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs lg:col-span-3">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Distribusi Aging Tiket Aktif NOC
-                </h2>
-                <p class="text-[11px] text-text-muted mt-0.5">Seluruh antrean handler=NOC berstatus terbuka, bukan cuma yang tampil di list di bawah.</p>
-            </div>
-            <div class="p-4">
-                <div class="h-40">
-                    <canvas id="chart-aging-buckets"></canvas>
-                </div>
-                <script type="application/json" id="data-aging-buckets">@json($agingBuckets)</script>
-            </div>
-        </div>
-
+    {{-- Content Tab 1: Live Command Center --}}
+    <div x-show="activeTab === 'live'" class="space-y-6">
+        @include('noc.partials.command-center-live')
     </div>
 
-    {{-- Tren Bulanan Komplain Pelanggan — Semua POP (independen filter periode/POP di atas).
-         Satu card SATU baris (bukan 2 kolom) — dua chart ini nampung 6 series
-         (top 5 + Lainnya) x 12 bulan, lebar penuh jauh lebih kebaca daripada
-         dipepetin setengah layar. --}}
-    <div class="space-y-6">
-
-        {{-- Tren Bulanan per Daerah --}}
-        <div id="monthly-complaint-region-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                    Tren Bulanan Komplain per Daerah (Semua POP)
-                </h2>
-                <p class="text-[11px] text-text-muted mt-0.5">
-                    12 bulan terakhir, lintas semua POP dalam scope Anda — dipakai buat cari daerah paling sering komplain, tidak terikat filter periode/POP di atas.
-                    "Komplain" = Ticket Maintenance ({{ $monthlyComplaintTrend['total'] }} tiket).
-                </p>
-            </div>
-            <div class="p-4">
-                <div class="h-80">
-                    <canvas id="chart-monthly-complaint-region"></canvas>
-                </div>
-                <script type="application/json" id="data-monthly-complaint">@json($monthlyComplaintTrend)</script>
-            </div>
-        </div>
-
-        {{-- Tren Bulanan per Kategori Issue --}}
-        <div id="monthly-complaint-issue-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Tren Bulanan Komplain per Kategori Issue (Semua POP)
-                </h2>
-                <p class="text-[11px] text-text-muted mt-0.5">
-                    Komplainnya soal apa saja tiap bulan — top 5 kategori + Lainnya, sumber sama dengan chart daerah di atas.
-                </p>
-            </div>
-            <div class="p-4">
-                <div class="h-80">
-                    <canvas id="chart-monthly-complaint-issue"></canvas>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-    {{-- Performa & Analisa per POP — Bar (Jumlah Komplain) + Line (Total
-         Pelanggan) dual-axis, plus insight teks rule-based di bawah tiap
-         chart. Sama independen filter periode/POP di atas kayak dua chart
-         "Semua POP" sebelum ini — sumber datanya satu window (lihat
-         NocDashboardController::loadComplaintWindow()). POP tanpa pelanggan
-         sama sekali (mis. POP demo/gudang) SENGAJA gak dikirim dari
-         controller (bukan ditampilkan kosong). --}}
-    <div id="per-pop-analytics-container">
-        @if(count($perPopAnalytics) > 0)
-            <div class="flex items-center gap-2 mb-3">
-                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main">Performa &amp; Analisa per POP</h2>
-            </div>
-            <script type="application/json" id="data-per-pop-analytics">@json($perPopAnalytics)</script>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                @foreach($perPopAnalytics as $pop)
-                    <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
-                        <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
-                            <h3 class="text-xs font-black uppercase tracking-wider text-text-main">{{ $pop['pop_name'] }}</h3>
-                            <p class="text-[11px] text-text-muted mt-0.5">Jumlah Komplain (bar) vs Total Pelanggan (garis) — 12 bulan terakhir.</p>
-                        </div>
-                        <div class="p-4">
-                            <div class="h-64">
-                                <canvas id="chart-pop-{{ $pop['pop_id'] }}"></canvas>
-                            </div>
-                        </div>
-                        <div class="px-5 py-3.5 border-t border-border bg-indigo-500/5">
-                            <p class="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">Analisa</p>
-                            <p class="text-xs text-text-main leading-relaxed">{{ $pop['analysis'] }}</p>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        @endif
-    </div>
-
-    {{-- Leaderboard Performa Individu Helpdesk & NOC --}}
-    @if($canViewPerformance)
-        <div id="leaderboard-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <svg class="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    Leaderboard Performa Individu
-                </h2>
-                <p class="text-[11px] text-text-muted mt-0.5">Diukur dari riwayat tiket (ticket_histories) per aktor — satu tiket bisa dipegang lebih dari satu orang, jadi atribusinya per aksi, bukan per tiket.</p>
-            </div>
-            <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border">
-                {{-- Helpdesk --}}
-                <div class="p-4">
-                    <h3 class="text-[11px] font-extrabold uppercase text-sky-600 dark:text-sky-400 mb-2 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Helpdesk
-                    </h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs text-left">
-                            <thead>
-                                <tr class="border-b border-border text-[10px] uppercase text-text-muted font-extrabold">
-                                    <th class="py-2 pr-2">Nama</th>
-                                    <th class="py-2 px-2 text-center">Selesai</th>
-                                    <th class="py-2 px-2 text-center">Eskalasi NOC</th>
-                                    <th class="py-2 px-2 text-center">Avg. Durasi</th>
-                                    <th class="py-2 pl-2 text-center">SLA Breach</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border/60">
-                                @forelse($leaderboard['helpdesk'] as $row)
-                                    <tr>
-                                        <td class="py-2 pr-2 font-bold text-text-main truncate max-w-[140px]">{{ $row['name'] }}</td>
-                                        <td class="py-2 px-2 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">{{ $row['jumlah_selesai'] }}</td>
-                                        <td class="py-2 px-2 text-center font-mono">{{ $row['jumlah_eskalasi_noc'] }}</td>
-                                        <td class="py-2 px-2 text-center font-mono text-text-muted">
-                                            {{ $row['avg_durasi_menit'] !== null ? ($row['avg_durasi_menit'] < 60 ? $row['avg_durasi_menit'].'m' : intdiv($row['avg_durasi_menit'], 60).'j '.($row['avg_durasi_menit'] % 60).'m') : '-' }}
-                                        </td>
-                                        <td class="py-2 pl-2 text-center font-mono {{ $row['sla_breach_count'] > 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-text-muted' }}">{{ $row['sla_breach_count'] }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="5" class="py-6 text-center text-text-muted">Belum ada data pada periode ini.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {{-- NOC --}}
-                <div class="p-4">
-                    <h3 class="text-[11px] font-extrabold uppercase text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> NOC
-                    </h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs text-left">
-                            <thead>
-                                <tr class="border-b border-border text-[10px] uppercase text-text-muted font-extrabold">
-                                    <th class="py-2 pr-2">Nama</th>
-                                    <th class="py-2 px-2 text-center">Selesai</th>
-                                    <th class="py-2 px-2 text-center">Eskalasi FOP</th>
-                                    <th class="py-2 px-2 text-center">Avg. Durasi</th>
-                                    <th class="py-2 pl-2 text-center">SLA Breach</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border/60">
-                                @forelse($leaderboard['noc'] as $row)
-                                    <tr>
-                                        <td class="py-2 pr-2 font-bold text-text-main truncate max-w-[140px]">{{ $row['name'] }}</td>
-                                        <td class="py-2 px-2 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">{{ $row['jumlah_selesai'] }}</td>
-                                        <td class="py-2 px-2 text-center font-mono">{{ $row['jumlah_eskalasi_fop'] }}</td>
-                                        <td class="py-2 px-2 text-center font-mono text-text-muted">
-                                            {{ $row['avg_durasi_menit'] !== null ? ($row['avg_durasi_menit'] < 60 ? $row['avg_durasi_menit'].'m' : intdiv($row['avg_durasi_menit'], 60).'j '.($row['avg_durasi_menit'] % 60).'m') : '-' }}
-                                        </td>
-                                        <td class="py-2 pl-2 text-center font-mono {{ $row['sla_breach_count'] > 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-text-muted' }}">{{ $row['sla_breach_count'] }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="5" class="py-6 text-center text-text-muted">Belum ada data pada periode ini.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    {{-- Main Operational Section: Tiket Aktif NOC & Feed --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {{-- List Tiket Aktif NOC (Paling Lama Nunggu di Atas) --}}
-        <div id="active-tickets-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs lg:col-span-2">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
-                <div>
-                    <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                        <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Tiket Aktif NOC (Paling Lama Menunggu di Atas)
-                    </h2>
-                    <p class="text-[11px] text-text-muted mt-0.5">Urutan berdasarkan prioritas aging (tiket yang paling lama diproses NOC di posisi teratas).</p>
-                </div>
-                <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-                    {{ count($activeTickets) }} Tiket Aktif
-                </span>
-            </div>
-
-            <div class="divide-y divide-border max-h-[520px] overflow-y-auto">
-                @forelse($activeTickets as $ticket)
-                    @php
-                        $waitingHours = $ticket->created_at->diffInHours(now());
-                        $agingBadgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
-                        if ($waitingHours >= 24) {
-                            $agingBadgeClass = 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 animate-pulse font-extrabold';
-                        } elseif ($waitingHours >= 8) {
-                            $agingBadgeClass = 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 font-bold';
-                        }
-                    @endphp
-                    <div class="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-900/40 transition-colors cursor-pointer"
-                         onclick="window.dispatchEvent(new CustomEvent('open-ticket-drawer', { detail: { id: {{ $ticket->id }} } }))">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2 text-xs flex-wrap">
-                                <span class="font-mono font-bold text-sky-600 dark:text-sky-400">#{{ $ticket->ticket_number }}</span>
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded border {{ $ticket->statusBadgeClasses() }}">{{ $ticket->statusLabel() }}</span>
-                                @if($ticket->priority)
-                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-100 dark:bg-slate-800 text-text-muted">{{ $ticket->priority->value }}</span>
-                                @endif
-                                <span class="text-[10px] font-medium text-text-muted">POP: {{ $ticket->pop->name ?? '—' }}</span>
-                            </div>
-                            <p class="text-xs font-extrabold text-text-main truncate mt-1">
-                                {{ $ticket->customer->full_name ?? $ticket->customer_name ?? '—' }}
-                                @if($ticket->customer?->cid)
-                                    <span class="font-mono text-text-muted text-[11px] font-normal">({{ $ticket->customer->cid }})</span>
-                                @endif
-                            </p>
-                            <p class="text-[11px] text-text-muted mt-0.5 truncate">
-                                <span class="font-semibold text-text-secondary">{{ $ticket->issueCategory?->name ?? 'Issue' }}:</span>
-                                {{ \Illuminate\Support\Str::limit($ticket->detail_keluhan, 75) }}
-                            </p>
-                        </div>
-
-                        <div class="shrink-0 text-right flex flex-col items-end gap-1">
-                            <span class="text-[10px] px-2.5 py-1 rounded-md border font-mono {{ $agingBadgeClass }}">
-                                Menunggu {{ $ticket->created_at->diffForHumans(null, true) }}
-                            </span>
-                            <span class="text-[10px] text-text-muted">Oleh: {{ $ticket->creator->name ?? '—' }}</span>
-                        </div>
-                    </div>
-                @empty
-                    <div class="p-12 text-center text-xs text-text-muted flex flex-col items-center justify-center gap-2">
-                        <svg class="w-8 h-8 text-emerald-500/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>Tidak ada tiket aktif yang menggantung di NOC.</span>
-                    </div>
-                @endforelse
-            </div>
-        </div>
-
-        {{-- Activity Feed --}}
-        <div id="activity-feed-container" class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs flex flex-col">
-            <div class="px-5 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
-                <h2 class="text-xs font-black uppercase tracking-wider text-text-main flex items-center gap-2">
-                    <svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Aktivitas Terbaru
-                </h2>
-                <span class="text-[10px] font-bold text-text-muted bg-slate-200/60 dark:bg-slate-800 px-2 py-0.5 rounded">Log Live</span>
-            </div>
-            <ul class="divide-y divide-border max-h-[520px] overflow-y-auto p-2">
-                @forelse($activityFeed as $history)
-                    <li class="p-3 text-xs hover:bg-slate-50/60 dark:hover:bg-slate-900/30 rounded-lg transition-colors">
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="font-mono font-extrabold text-sky-600 dark:text-sky-400">#{{ $history->ticket->ticket_number ?? '—' }}</span>
-                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded border {{ $history->action->badgeClasses() }}">{{ $history->action->label() }}</span>
-                        </div>
-                        <p class="text-text-muted mt-1 text-[11px]">
-                            Oleh <span class="font-semibold text-text-main">{{ $history->actor->name ?? 'Sistem' }}</span>
-                        </p>
-                        <p class="text-[10px] text-text-muted/80 mt-0.5 font-mono">
-                            {{ \App\Support\IndonesianDate::dateTime($history->happened_at) }}
-                        </p>
-                    </li>
-                @empty
-                    <li class="p-8 text-center text-xs text-text-muted">Belum ada aktivitas tercatat.</li>
-                @endforelse
-            </ul>
-        </div>
-
+    {{-- Content Tab 2: Deep Analytics & Audit Solving --}}
+    <div x-show="activeTab === 'analytics'" class="space-y-6" style="display: none;">
+        @include('noc.partials.deep-analytics')
     </div>
 
 </div>
@@ -657,6 +262,7 @@
 
     function nocDashboardHandler() {
         return {
+            activeTab: 'live',
             init() {
                 if (window.initNocDashboardEcho) {
                     window.initNocDashboardEcho();

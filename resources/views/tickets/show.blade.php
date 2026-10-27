@@ -50,11 +50,11 @@
 
     @if($isBatch)
         {{-- ========================================================================= --}}
-        {{-- ⚡ BATCH INCIDENT COMMAND HUB (TAMPILAN TIKET MASSAL SEPERTI TKT-2026-0328) --}}
+        {{-- BATCH INCIDENT COMMAND HUB (TAMPILAN TIKET MASSAL SEPERTI TKT-2026-0328) --}}
         {{-- ========================================================================= --}}
         
         {{-- Hero Banner Insiden Massal --}}
-        <div class="relative overflow-hidden rounded-2xl border border-violet-300/80 dark:border-violet-800/60 bg-gradient-to-br from-violet-50/90 via-surface to-surface dark:from-violet-950/30 dark:via-surface dark:to-surface p-6 shadow-sm">
+        <div class="relative overflow-hidden rounded-lg border border-violet-300/80 dark:border-violet-800/60 bg-gradient-to-br from-violet-50/90 via-surface to-surface dark:from-violet-950/30 dark:via-surface dark:to-surface p-6 shadow-sm">
             {{-- Background decorative ambient lights --}}
             <div class="absolute -top-16 -right-16 w-64 h-64 bg-violet-400/10 dark:bg-violet-600/10 rounded-full blur-3xl pointer-events-none"></div>
             <div class="absolute -bottom-16 -left-16 w-64 h-64 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -138,7 +138,7 @@
                 </div>
 
                 {{-- Creator & Meta Atribusi --}}
-                <div class="shrink-0 p-3.5 rounded-xl bg-surface/80 dark:bg-slate-900/60 border border-border backdrop-blur-xs space-y-1.5 text-xs">
+                <div class="shrink-0 p-3.5 rounded-lg bg-surface/80 dark:bg-slate-900/60 border border-border backdrop-blur-xs space-y-1.5 text-xs">
                     <div class="flex items-center justify-between gap-3">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Assigned by:</span>
                         <span class="font-bold text-text-main">{{ $ticket->creator->name ?? '—' }}</span>
@@ -158,9 +158,9 @@
 
             {{-- Linked FOP Task Bar --}}
             @if($ticket->fopTask)
-                <div class="mt-5 pt-4 border-t border-violet-200/60 dark:border-violet-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-violet-100/50 dark:bg-violet-950/40 rounded-xl p-3.5 border">
+                <div class="mt-5 pt-4 border-t border-violet-200/60 dark:border-violet-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-violet-100/50 dark:bg-violet-950/40 rounded-lg p-3.5 border">
                     <div class="flex items-center gap-3">
-                        <div class="p-2.5 rounded-xl bg-violet-600 text-white shadow-xs shrink-0">
+                        <div class="p-2.5 rounded-lg bg-violet-600 text-white shadow-xs shrink-0">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
@@ -193,7 +193,7 @@
         {{-- KPI Overview Grid --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {{-- Card 1: Total Pelanggan --}}
-            <div class="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-1">
+            <div class="p-4 rounded-lg border border-border bg-surface shadow-2xs space-y-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
                     <span>Pelanggan Terdampak</span>
                     <span class="w-2 h-2 rounded-full bg-violet-500"></span>
@@ -205,7 +205,7 @@
             </div>
 
             {{-- Card 2: POP & Lokasi --}}
-            <div class="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-1">
+            <div class="p-4 rounded-lg border border-border bg-surface shadow-2xs space-y-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
                     <span>Wilayah & POP</span>
                     <span class="w-2 h-2 rounded-full bg-sky-500"></span>
@@ -219,7 +219,7 @@
             </div>
 
             {{-- Card 3: Handling Duration --}}
-            <div class="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-1">
+            <div class="p-4 rounded-lg border border-border bg-surface shadow-2xs space-y-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
                     <span>Durasi Penanganan</span>
                     <span class="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -233,7 +233,7 @@
             </div>
 
             {{-- Card 4: Handler Status --}}
-            <div class="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-1">
+            <div class="p-4 rounded-lg border border-border bg-surface shadow-2xs space-y-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
                     <span>Meja Penanggungjawab</span>
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -251,7 +251,7 @@
         {{-- ========================================================================= --}}
         {{-- 👤 NON-BATCH TICKET HEADER BANNER (SINGLE CUSTOMER TICKET) --}}
         {{-- ========================================================================= --}}
-        <div class="bg-surface border border-border rounded-xl p-6 shadow-sm space-y-4">
+        <div class="bg-surface border border-border rounded-lg p-6 shadow-sm space-y-4">
             <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div class="min-w-0 space-y-2">
                     <div class="flex items-center gap-2.5 flex-wrap">
@@ -350,7 +350,7 @@
 
     {{-- Aksi Tiket — Close/Escalate (docs/plan/RANCANGAN_WORKSHEET_TICKETING.MD) --}}
     @if($ticketActions['can_close'] || $ticketActions['can_escalate_noc'] || $ticketActions['can_escalate_fop'] || $ticketActions['can_return_to_helpdesk'] || $ticketActions['can_cancel'])
-    <div class="bg-surface border border-amber-200 dark:border-amber-900/50 rounded-xl p-5 shadow-xs">
+    <div class="bg-surface border border-amber-200 dark:border-amber-900/50 rounded-lg p-5 shadow-xs">
         <div class="flex items-center justify-between gap-2 mb-3">
             <div class="flex items-center gap-2">
                 <span class="w-1.5 h-4 bg-amber-500 rounded-full"></span>
@@ -426,12 +426,12 @@
                 'added_by' => $m->addedBy?->name ?? 'Sistem',
                 'created_at' => \App\Support\IndonesianDate::dateTime($m->created_at),
             ])) }}
-        })" class="bg-surface border border-violet-200 dark:border-violet-900/50 rounded-2xl overflow-hidden shadow-sm space-y-4">
+        })" class="bg-surface border border-violet-200 dark:border-violet-900/50 rounded-lg overflow-hidden shadow-sm space-y-4">
             
             {{-- Roster Header & Quick Tools Bar --}}
             <div class="px-6 py-4 border-b border-border bg-violet-50/50 dark:bg-violet-950/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
-                    <div class="p-2 rounded-xl bg-violet-600 text-white shadow-xs">
+                    <div class="p-2 rounded-lg bg-violet-600 text-white shadow-xs">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
@@ -484,7 +484,7 @@
                     </svg>
                     <input type="text" x-model="searchQuery"
                            placeholder="Filter pelanggan terdampak (ketik CID, nama, nomor HP, atau alamat)..."
-                           class="w-full text-xs rounded-xl border border-border bg-background pl-9 pr-4 py-2.5 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
+                           class="w-full text-xs rounded-lg border border-border bg-background pl-9 pr-4 py-2.5 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
                     <button type="button" x-show="searchQuery" @click="searchQuery = ''" class="absolute right-3 top-2.5 text-text-muted hover:text-text-main text-xs font-bold">×</button>
                 </div>
             </div>
@@ -492,7 +492,7 @@
             {{-- Impacted Customers 1-Row Table Roster --}}
             <div class="px-6 pb-6">
                 <template x-if="filteredMembers.length > 0">
-                    <div class="overflow-x-auto rounded-xl border border-border bg-surface shadow-2xs">
+                    <div class="overflow-x-auto rounded-lg border border-border bg-surface shadow-2xs">
                         <table class="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr class="border-b border-border bg-slate-50/80 dark:bg-slate-900/60 text-[10px] font-black uppercase tracking-wider text-text-muted">
@@ -572,7 +572,7 @@
 
                 {{-- Empty State Roster --}}
                 <template x-if="filteredMembers.length === 0">
-                    <div class="text-center py-10 px-4 rounded-xl border border-dashed border-border space-y-3">
+                    <div class="text-center py-10 px-4 rounded-lg border border-dashed border-border space-y-3">
                         <div class="w-12 h-12 rounded-full bg-violet-100 dark:bg-violet-950 text-violet-600 dark:text-violet-400 mx-auto flex items-center justify-center">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -594,7 +594,7 @@
             <div x-show="addModal.open" x-cloak
                  class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs"
                  @keydown.escape.window="closeAddModal()">
-                <div @click.outside="closeAddModal()" class="w-full max-w-lg rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
+                <div @click.outside="closeAddModal()" class="w-full max-w-lg rounded-lg bg-surface border border-border shadow-md overflow-hidden animate-in fade-in zoom-in duration-150">
                     <div class="px-5 py-4 border-b border-border bg-violet-50/50 dark:bg-violet-950/30 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full bg-violet-500"></span>
@@ -615,7 +615,7 @@
                                 <input type="text" x-model="addModal.cidQuery" @input.debounce.300ms="searchCustomer()"
                                        :disabled="addModal.selected !== null"
                                        placeholder="Ketik CID, nama, atau no. HP..."
-                                       class="w-full text-xs rounded-xl border border-border bg-background px-3.5 py-2.5 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 disabled:bg-surface-muted transition-all">
+                                       class="w-full text-xs rounded-lg border border-border bg-background px-3.5 py-2.5 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 disabled:bg-surface-muted transition-all">
                                 <button type="button" x-show="addModal.selected" x-cloak
                                         @click="resetSelectedCustomer()"
                                         class="absolute right-3 top-2.5 text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline cursor-pointer">
@@ -625,7 +625,7 @@
 
                             {{-- Autocomplete Results Dropdown --}}
                             <div x-show="addModal.results.length > 0 && !addModal.selected" x-cloak
-                                 class="absolute z-20 mt-1 w-full bg-surface border border-border rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-border">
+                                 class="absolute z-20 mt-1 w-full bg-surface border border-border rounded-lg shadow-md max-h-56 overflow-y-auto divide-y divide-border">
                                 <template x-for="r in addModal.results" :key="r.id">
                                     <button type="button" @click="pickCustomer(r)"
                                             class="w-full text-left px-3.5 py-2.5 text-xs hover:bg-violet-50 dark:hover:bg-violet-950/40 transition-colors cursor-pointer flex items-center justify-between gap-2">
@@ -645,12 +645,12 @@
                             <div class="space-y-1.5">
                                 <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">Nama Pelanggan <span class="text-rose-500">*</span></label>
                                 <input type="text" x-model="addModal.customerName" placeholder="Nama lengkap..."
-                                       class="w-full text-xs rounded-xl border border-border bg-background px-3 py-2 text-text-main focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
+                                       class="w-full text-xs rounded-lg border border-border bg-background px-3 py-2 text-text-main focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
                             </div>
                             <div class="space-y-1.5">
                                 <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">Nomor HP</label>
                                 <input type="text" x-model="addModal.phone" placeholder="Contoh: 08123456789..."
-                                       class="w-full text-xs rounded-xl border border-border bg-background px-3 py-2 text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
+                                       class="w-full text-xs rounded-lg border border-border bg-background px-3 py-2 text-text-main font-mono focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
                             </div>
                         </div>
 
@@ -658,11 +658,11 @@
                     </div>
 
                     <div class="px-5 py-3.5 border-t border-border flex items-center justify-end gap-2 bg-surface-muted/60 dark:bg-slate-900/40">
-                        <button type="button" @click="closeAddModal()" class="px-3.5 py-2 rounded-xl text-xs font-bold text-text-muted hover:bg-surface border border-transparent hover:border-border cursor-pointer transition-colors">
+                        <button type="button" @click="closeAddModal()" class="px-3.5 py-2 rounded-lg text-xs font-bold text-text-muted hover:bg-surface border border-transparent hover:border-border cursor-pointer transition-colors">
                             Batal
                         </button>
                         <button type="button" @click="submitBatchMember()" :disabled="addModal.submitting || !addModal.customerName"
-                                class="px-4 py-2 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50 cursor-pointer shadow-xs transition-all">
+                                class="px-4 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50 cursor-pointer shadow-xs transition-all">
                             <span x-show="!addModal.submitting">Simpan Pelanggan</span>
                             <span x-show="addModal.submitting" x-cloak>Menyimpan...</span>
                         </button>
@@ -678,7 +678,7 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100 translate-y-0"
                  x-transition:leave-end="opacity-0 -translate-y-2"
-                 class="fixed top-4 left-4 right-4 sm:left-auto sm:top-6 sm:right-6 z-50 max-w-sm rounded-xl bg-slate-900 text-white px-4 py-3 shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700">
+                 class="fixed top-4 left-4 right-4 sm:left-auto sm:top-6 sm:right-6 z-50 max-w-sm rounded-lg bg-slate-900 text-white px-4 py-3 shadow-md flex items-center gap-2.5 text-xs font-semibold border border-slate-700">
                 <svg class="h-4 w-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
@@ -689,7 +689,7 @@
         {{-- ========================================================================= --}}
         {{-- 👤 CUSTOMER TECHNICAL SNAPSHOT (KHUSUS TIKET NON-BATCH) --}}
         {{-- ========================================================================= --}}
-        <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+        <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-xs">
             <div class="px-6 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="w-1.5 h-4 bg-sky-600 rounded-full"></span>
@@ -785,7 +785,7 @@
     @endif
 
     {{-- Detail Keluhan & Catatan Teknis --}}
-    <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs space-y-4">
+    <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-xs space-y-4">
         <div class="px-6 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <span class="w-1.5 h-4 {{ $isBatch ? 'bg-violet-600' : 'bg-sky-600' }} rounded-full"></span>
@@ -798,7 +798,7 @@
             {{-- Detail Keluhan --}}
             <div class="space-y-1.5">
                 <span class="block text-[11px] font-bold text-text-muted uppercase tracking-wider">{{ $isBatch ? 'Detail Dampak Gangguan (Mass Outage Description)' : 'Detail Keluhan (Customer Complaint)' }}</span>
-                <div class="p-4 bg-background border border-border rounded-xl text-xs text-text-main leading-relaxed whitespace-pre-line">
+                <div class="p-4 bg-background border border-border rounded-lg text-xs text-text-main leading-relaxed whitespace-pre-line">
                     {{ $ticket->detail_keluhan }}
                 </div>
             </div>
@@ -806,7 +806,7 @@
             {{-- Catatan Teknis (NOC Monospace Box) --}}
             <div class="space-y-1.5">
                 <span class="block text-[11px] font-bold text-text-muted uppercase tracking-wider">Catatan Teknis &amp; Analisa Jaringan (NOC Engineering Notes)</span>
-                <div class="p-4 bg-slate-900/5 dark:bg-slate-900/40 border border-border rounded-xl text-xs font-mono text-text-main italic leading-relaxed whitespace-pre-line">
+                <div class="p-4 bg-slate-900/5 dark:bg-slate-900/40 border border-border rounded-lg text-xs font-mono text-text-main italic leading-relaxed whitespace-pre-line">
                     {{ $ticket->catatan_teknis ?: 'Tidak ada catatan teknis awal.' }}
                 </div>
             </div>
@@ -817,7 +817,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {{-- Riwayat Ticketing --}}
-        <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+        <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-xs">
             <div class="px-6 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
                 <div>
                     <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">Riwayat Ticketing (Service Desk)</h2>
@@ -855,7 +855,7 @@
         </div>
 
         {{-- Riwayat Task FOP --}}
-        <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+        <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-xs">
             <div class="px-6 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
                 <div>
                     <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">Riwayat Task FOP (Teknisi Lapangan)</h2>
@@ -891,7 +891,7 @@
 
     {{-- Lampiran Panel --}}
     @if($ticket->attachments->isNotEmpty())
-    <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+    <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-xs">
         <div class="px-6 py-3.5 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <span class="w-1.5 h-4 bg-sky-600 rounded-full"></span>

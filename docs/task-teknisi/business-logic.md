@@ -112,19 +112,30 @@ Task tipe `C-REQ` pakai form yang **sama persis** dengan §7 di atas (`TaskMaint
 
 Disimpan di tabel terpisah `task_creq_details` (lihat [database-schema.md](database-schema.md#tabel-task_creq_details-2026-09-26)) — bukan kolom tambahan di `task_maintenances`, karena field ini murni khusus C-REQ dan tak relevan buat MTN/O-REQ/INFR REQ yang berbagi controller/view yang sama.
 
-**Alur verifikasi** (sejak 2026-09-28 — "Setujui & Terbitkan Tagihan"):
+**Billing MTN polos (2026-10-10).** Task `MAINTENANCE` polos (sebelumnya TIDAK PUNYA jalur ke billing sama sekali) sekarang juga bisa ditandai berbayar lewat checkbox `mtn_is_billable` + `mtn_billing_note` di laporan. Tersimpan di tabel terpisah `task_maintenance_billing_details` (mirror subset generik `task_creq_details`, tanpa field khusus C-REQ) dan masuk antrean Verifikasi Biaya yang SAMA dengan C-REQ. Nama controller/route/permission (`TaskCreqBillingController`, `tasks.creq-billing.*`, `creq_billing_verification.*`) TIDAK diubah. Kategori invoice MTN berbayar di-hardcode `ManualInvoiceCategory::PERBAIKAN` ("Tagihan Perbaikan") — CS tidak memilih kategori. **O-REQ dan INFR REQ sengaja TIDAK ikut** (checkbox disembunyikan, dan execution-gate di `TaskMaintenanceController::store()` hanya untuk `task_type = MAINTENANCE`) — kalau dibuka, butuh keputusan produk dulu soal kategori invoice-nya.
+
+**Alur verifikasi** (sejak 2026-09-28 — ""Setujui & Terbitkan Tagihan""; diperbarui 2026-10-10 — breakdown per-item):
 
 ```
 Teknisi submit (is_billable=true) → verification_status=pending (task tetap selesai seperti biasa)
 CS (role helpdesk, permission creq_billing_verification.*) buka /tasks-creq-billing/{task}
-  → Setujui → CS isi nominal + deskripsi (+ nama sub kalau Lainnya) DI HALAMAN INI,
-              SATU transaksi: Tagihan Manual terbit (ManualCategoryInvoiceService::issue()),
-              verification_status=verified, task_creq_details.invoice_id = tagihan itu
+  → Setujui → CS isi N baris breakdown (nama + nominal per baris) DI HALAMAN INI,
+              SATU transaksi: Tagihan Manual terbit (ManualCategoryInvoiceService::issue())
+              dengan amount = SUM baris dan description = "Nama1: RpX + Nama2: RpY",
+              baris tersimpan di task_billing_items (invoice_id, restrictOnDelete),
+              verification_status=verified, detail.invoice_id = tagihan itu
   → Tolak   → verification_status=rejected + rejection_reason (wajib), tanpa tagihan
 ```
 
 Awalnya (2026-09-26) Setujui cuma menandai verified lalu redirect ke `/invoices/create` dengan prefill. Diganti karena tagihannya tidak tertaut ke task, dan kalau CS tidak menuntaskan form itu, biaya tercatat "disetujui" tapi tidak pernah ditagih. Sekarang gagal di titik mana pun (mis. pelanggan belum punya layanan) = tidak ada yang berubah.
 
+**Breakdown per-item (2026-10-10).** Verifikasi Biaya tidak lagi memakai satu field nominal atau dua field khusus "Harga Modem + Jasa" (mekanisme Task 6 plan ownership-modem, sudah digantikan total). Aturannya:
+
+- CS mengisi **N baris** (nama + nominal). Tiap baris wajib nominal `min:0.01` — tidak ada baris Rp0; kalau layanan gratis, baris itu tidak ditambahkan.
+- Minimal **1 baris** kalau task ditandai berbayar.
+- Kalau task punya penjualan modem (`InventorySerialSale` untuk `fop_task`-nya), **baris "Jual Modem" otomatis muncul** dengan nominal dari laporan teknisi. Baris ini dikunci namanya (tidak bisa diubah/dihapus); nominalnya boleh dikoreksi CS, dan nilai final ditulis balik ke `inventory_serial_sales.price`. Submit yang tidak menyertakan tepat **satu** baris bertaut ke sale itu ditolak sebelum transaksi dimulai.
+- Total invoice = SUM semua baris. Skema `Invoice` TIDAK diubah (tetap flat `amount` + `description`); rincian per-baris hanya tersimpan di `task_billing_items`.
+- Input rupiah diparse server-side (`RupiahInput`). Preview total di layar CS dibaca dari nilai yang sudah diformat mask, bukan dari angka mentah.
 Kontrol race-condition: `approve()`/`reject()` (`TaskCreqBillingController`) mengunci baris (`lockForUpdate()`) **di dalam** `DB::transaction()` dan mengecek ulang `verification_status=pending` di situ — mencegah dua request bersamaan saling menimpa hasil verifikasi atau menerbitkan tagihan dua kali.
 
 **Jenis Tagihan diturunkan dari Jenis Permintaan, bukan input CS.** `ManualInvoiceCategory` (enum FINAL 3 nilai, ADHOC-70) **tidak ditambah**; `CReqCategory::toManualInvoiceCategory()`: `pindah_lokasi`/`migrasi`→`pindah_lokasi`, `pindah_kabel`/`tambah_modem`→`perbaikan`, `lainnya`→`lainnya` (nama sub diisi awal dari `category_custom_name`). Konsekuensi: kategori salah pilih oleh teknisi = jenis tagihan ikut salah; koreksinya lewat **Tolak**, bukan ganti jenis tagihan.

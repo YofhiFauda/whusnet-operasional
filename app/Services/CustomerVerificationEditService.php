@@ -28,6 +28,10 @@ use App\Models\Village;
  */
 class CustomerVerificationEditService
 {
+    public function __construct(
+        private readonly CustomerPackageService $customerPackageService,
+    ) {}
+
     /**
      * Data Diri — identitas & alamat dasar. TIDAK termasuk `customer_type`:
      * mengubahnya di tengah alur bisa memindahkan pelanggan ke jalur
@@ -81,6 +85,9 @@ class CustomerVerificationEditService
      * biaya lain DIPERTAHANKAN dari `customer_services` yang ada (CS tidak
      * dikasih kontrol nominal diskon/pajak lewat form ini) — formula sama
      * persis dengan koreksi paket di `CustomerSurveyController::store()`.
+     *
+     * @throws \RuntimeException lewat CustomerPackageService::assertAdditionalDevicesWithinLimit()
+     *                           kalau perangkat tambahan pelanggan melebihi batas paket baru
      */
     public function updatePackage(Customer $customer, int $internetPackageId, User $actor): Customer
     {
@@ -89,6 +96,14 @@ class CustomerVerificationEditService
         }
 
         $package = InternetPackage::findOrFail($internetPackageId);
+
+        // Guard yang sama dipakai CustomerPackageService::change() — koreksi
+        // paket dari layar Verifikasi juga menulis
+        // `customer_services.internet_package_id` langsung, jadi harus lewat
+        // guard yang sama supaya tidak jadi jalur bypass limit perangkat
+        // tambahan paket.
+        $this->customerPackageService->assertAdditionalDevicesWithinLimit($customer, $package);
+
         $service = $customer->customerService()->first();
 
         $discount = (float) ($service->discount ?? 0);

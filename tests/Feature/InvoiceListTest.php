@@ -106,6 +106,39 @@ class InvoiceListTest extends TestCase
         $response->assertSee('Tidak dikenakan'); // ppn=0 maka tampil "Tidak dikenakan"
         $response->assertSee('150.000');
         $response->assertSee('Sebagian');
+
+        // Type B architecture & print controls assertions
+        $response->assertSee('Detail Tagihan');
+        $response->assertSee('Cetak Invoice A4 (PDF)');
+        $response->assertSee('window.print()', false);
+        $response->assertSee('printDropdownBtn');
+        $response->assertSee('FAKTUR INVOICE / KWITANSI');
+        $response->assertSee('Rincian Kalkulasi Biaya');
+
+        // Tombol kembali dan breadcrumb harus mengarah ke /invoices/belum-lunas, bukan query semua tagihan (/invoices)
+        $response->assertSee(route('invoices.belum-lunas'));
+        $response->assertDontSee('href="'.route('invoices.index').'"', false);
+    }
+
+    public function test_invoice_detail_back_button_defaults_to_belum_lunas_and_preserves_referrer_filter(): void
+    {
+        $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
+        $pop = $this->createPop('POP-BACK', 'PNBK', 'POP Back');
+        $invoice = $this->createInvoice($pop, 'Customer Back', 'INV-202608-9210', '2026-08', 'belum_dibayar');
+
+        // 1. Default fallback tanpa referrer harus ke /invoices/belum-lunas
+        $response = $this->actingAs($owner)->get(route('invoices.show', $invoice->id));
+        $response->assertOk();
+        $response->assertSee('href="'.route('invoices.belum-lunas').'"', false);
+        $response->assertDontSee('href="'.route('invoices.index').'"', false);
+
+        // 2. Jika perujuk adalah list tagihan belum lunas dengan query filter, pertahankan query tersebut
+        $filteredUrl = route('invoices.belum-lunas', ['search' => 'Customer Back', 'pop_id' => $pop->id]);
+        $responseWithReferer = $this->actingAs($owner)
+            ->from($filteredUrl)
+            ->get(route('invoices.show', $invoice->id));
+        $responseWithReferer->assertOk();
+        $responseWithReferer->assertSee('href="'.e($filteredUrl).'"', false);
     }
 
     public function test_invoice_list_lunas_shows_only_lunas(): void

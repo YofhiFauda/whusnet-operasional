@@ -9,6 +9,8 @@ perbaikannya.
 
 ---
 
+**Catatan status 2026-10-23:** User menganggap BILLING-B0e selesai dalam konteks perkembangan proyek dan menutupnya dari task aktif. Bagian di bawah mempertahankan hasil audit lama; jangan menafsirkan penutupan administratif sebagai bukti bahwa grup dobel sudah bersih atau unique index sudah ada pada database yang berjalan.
+
 ## 1. Gejala
 
 Pelanggan menerima dua tagihan untuk periode yang sama:
@@ -121,10 +123,10 @@ Dikunci `tests/Feature/SatuTagihanLanggananPerPeriodeTest.php` — 6 kasus,
 termasuk yang sengaja merusak `activation_date` untuk membuktikan lapis 2
 berdiri sendiri tanpa bergantung lapis 1.
 
-### Lapis 4 — Jaring database ⬜ BELUM (BILLING-B0e)
+### Lapis 4 — Jaring database (BILLING-B0e ditutup dari backlog aktif 2026-10-23; status teknis belum diverifikasi ulang)
 
-Unique index `(customer_id, billing_period)` untuk jenis langganan. Belum bisa
-dipasang karena data legacy masih menyimpan pelanggaran historis, jadi urutannya
+Pada audit 2026-07-21, unique index `(customer_id, billing_period)` untuk jenis langganan belum bisa
+dipasang karena data legacy menyimpan pelanggaran historis. Jika pekerjaan ini dibuka kembali, urutannya
 wajib:
 
 1. bereskan grup dobel legacy dulu
@@ -209,7 +211,7 @@ mencicil 50.000 dua kali di hari yang sama. Jarang, tapi kalau kasir melapor
 | 1 | BILLING-B0c ✅ | Lapis 2 + 3, guard lintas-jenis | Rendah — murni kode + test | Selesai 2026-07-21 |
 | 2 | BILLING-B0d ✅ | Command audit (read-only) | Nol | Selesai 2026-07-21 |
 | 3 | BILLING-B0b ✅ | Backfill `activation_date` (dry-run default) | Nol sampai `--force` | Command selesai 2026-07-21; eksekusi produksi menunggu owner |
-| 4 | BILLING-B0e | Bersihkan dobel legacy + unique index | Sedang — sentuh data | Ya — per kasus |
+| 4 | BILLING-B0e (ditutup atas keputusan user 2026-10-23) | Audit historis: bersihkan dobel legacy + unique index; bukti penyelesaian teknis belum diverifikasi ulang | Tinggi bila menyentuh data | Ya — per kasus bila dibuka kembali |
 
 **Kerjakan 1 dan 2 lebih dulu.** Keduanya tidak menyentuh data sama sekali tapi
 langsung menghentikan pendarahan: begitu lapis 2 lintas-jenis masuk,

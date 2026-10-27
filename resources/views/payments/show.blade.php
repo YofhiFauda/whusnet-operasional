@@ -8,9 +8,9 @@
 @section('content')
 @php
     $badgeClass = match($payment->payment_status->value ?? $payment->payment_status) {
-        'valid' => 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60',
-        'ditolak' => 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60',
-        default => 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60',
+        'valid' => 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        'ditolak' => 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+        default => 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
     };
     $totalMoneyReceived = (float) $payment->amount + (float) $payment->overpay_amount;
 
@@ -58,26 +58,23 @@
     @include('payments.partials.kwitansi')
 </div>
 
-<!-- SCREEN ONLY ENTERPRISE VIEW -->
-<div class="screen-only space-y-6">
-
-    <!-- TOP NOTICE BANNER -->
-    @include('payments.partials.riwayat-banner')
+<!-- SCREEN ONLY ENTERPRISE VIEW (Type B: Record Detail Page — Single Panel Architecture) -->
+<div class="screen-only space-y-4 max-w-full pb-16">
 
     @if($payment->payment_status->value === 'ditolak')
-        <div class="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl p-4 text-xs text-rose-700 dark:text-rose-300 shadow-2xs">
-            <div class="flex items-center gap-3">
-                <div class="p-2 rounded-xl bg-rose-600 text-white shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <div class="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-lg p-3.5 text-xs text-rose-700 dark:text-rose-300">
+            <div class="flex items-start gap-3">
+                <div class="p-1.5 rounded-md bg-rose-600 text-white shrink-0 mt-0.5">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                     </svg>
                 </div>
-                <div>
-                    <h4 class="font-bold text-sm text-rose-900 dark:text-rose-200">Pembayaran ini telah dikembalikan</h4>
+                <div class="space-y-0.5 min-w-0">
+                    <h4 class="font-semibold text-rose-900 dark:text-rose-200 text-sm">Pembayaran ini telah dikembalikan</h4>
                     @if($payment->reject_reason)
-                        <p class="mt-0.5">Alasan: <strong>{{ $payment->reject_reason }}</strong></p>
+                        <p class="text-xs text-rose-800 dark:text-rose-300">Alasan: <strong class="font-medium">{{ $payment->reject_reason }}</strong></p>
                     @endif
-                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-1">
+                    <p class="text-[11px] text-rose-600 dark:text-rose-400">
                         Dikembalikan oleh {{ $payment->rejecter->name ?? '-' }} pada {{ optional($payment->rejected_at)->format('d/m/Y H:i') }} WIB
                     </p>
                 </div>
@@ -85,298 +82,260 @@
         </div>
     @endif
 
-    <!-- PAGE TITLE BAR & ACTION BUTTONS WITH INTEGRATED CUSTOMER IDENTITY -->
-    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs space-y-4">
-        <!-- Header Top Row: Title, Badges & Action Buttons -->
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-                <!-- Title & ID Badge -->
-                <div class="flex items-center gap-2.5 flex-wrap">
-                    <a href="{{ route('payments.index') }}" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors" title="Kembali ke Daftar">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+    <!-- LAYER 1: NAKED PAGE HEADER (Card Budget = 0, no card background, no card border) -->
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-1">
+        <div class="space-y-1.5 flex-1 min-w-0">
+            <!-- Row: Title, Technical ID Badge & Status -->
+            <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+                <a href="{{ route('payments.index') }}" class="p-1.5 text-text-muted hover:text-text-main rounded-lg hover:bg-surface-muted transition-colors" title="Kembali ke Daftar">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                </a>
+                
+                <h1 class="text-lg sm:text-xl font-bold text-text-main tracking-tight leading-tight">
+                    Detail Pembayaran
+                </h1>
+
+                <!-- Payment Technical ID Badge + Copy -->
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-muted border border-border font-mono text-xs font-semibold text-text-main">
+                    <span>{{ $payment->payment_number }}</span>
+                    <button type="button" onclick="copyText('{{ $payment->payment_number }}', 'No. Pembayaran')" title="Salin Kode Pembayaran" class="text-text-muted hover:text-primary transition-colors cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                         </svg>
-                    </a>
-                    
-                    <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                        Detail Pembayaran
-                    </h1>
-
-                    <!-- Payment Code Badge -->
-                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs">
-                        <span>{{ $payment->payment_number }}</span>
-                        <button onclick="copyText('{{ $payment->payment_number }}', 'No. Pembayaran')" title="Salin Kode Pembayaran" class="text-slate-400 hover:text-sky-600 transition-colors cursor-pointer">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <!-- Status Badges -->
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border {{ $badgeClass }}">
-                        <span class="w-2 h-2 rounded-full bg-current"></span>
-                        <span>{{ $payment->payment_status->label() }}</span>
-                    </span>
-
-                    @if($installmentContext)
-                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold {{ $installmentContext['settles'] ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800' }}">
-                        {{ $installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number'] }}
-                    </span>
-                    @endif
-
-                    @if((float) $payment->overpay_amount > 0)
-                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800" title="Deposit lebih bayar dari pelanggan">
-                        Lebih Bayar Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}
-                    </span>
-                    @endif
+                    </button>
                 </div>
 
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-                    Tercatat pada <strong>{{ optional($payment->payment_date)->format('d/m/Y H:i') }} WIB</strong> • Diterima oleh <strong>{{ $payment->receiver->name ?? 'System' }}</strong> • Lokasi Kas <strong>POP {{ $payment->pop->name ?? '-' }}</strong>
-                </p>
+                <!-- Status Badge -->
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border {{ $badgeClass }}">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                    <span>{{ $payment->payment_status->label() }}</span>
+                </span>
+
+                @if($installmentContext)
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border {{ $installmentContext['settles'] ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' }}">
+                    {{ $installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number'] }}
+                </span>
+                @endif
+
+                @if((float) $payment->overpay_amount > 0)
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20" title="Deposit lebih bayar dari pelanggan">
+                    Lebih Bayar Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}
+                </span>
+                @endif
             </div>
 
-            <!-- Right Action Bar -->
-            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
-                @if($payment->invoice_id)
-                <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="inline-flex items-center gap-2 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95">
+            <!-- Metadata Subtitle -->
+            <p class="text-xs text-text-muted mt-1 leading-normal">
+                Tercatat pada <strong class="text-text-main font-medium">{{ optional($payment->payment_date)->format('d/m/Y H:i') }} WIB</strong> • Diterima oleh <strong class="text-text-main font-medium">{{ $payment->receiver->name ?? 'System' }}</strong> • Lokasi Kas <strong class="text-text-main font-medium">POP {{ $payment->pop->name ?? '-' }}</strong>
+            </p>
+        </div>
+
+        <!-- Right Action Toolbar -->
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+            @if($payment->invoice_id)
+            <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-medium transition-colors shadow-xs">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span>Detail Tagihan</span>
+            </a>
+            @endif
+
+            <!-- Print Kwitansi Button -->
+            <button type="button" onclick="window.print()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-muted text-text-main rounded-lg text-xs font-medium transition-colors border border-border shadow-xs cursor-pointer">
+                <svg class="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                <span>Cetak Kwitansi</span>
+            </button>
+
+            {{-- Edit Pembayaran (ADHOC-108) --}}
+            @can('payments.update')
+                @if($payment->isEditable())
+                <a href="{{ route('payments.edit', $payment->id) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium transition-colors shadow-xs">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path>
                     </svg>
-                    <span>Detail Tagihan</span>
+                    <span>Edit Pembayaran</span>
                 </a>
                 @endif
+            @endcan
 
-                <!-- Print Kwitansi Button -->
-                <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-600 active:scale-95 cursor-pointer">
-                    <svg class="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            <!-- Kembalikan Button -->
+            @can('payments.reject')
+                @if($payment->payment_status->value === 'valid')
+                <button type="button" onclick="openRejectModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium rounded-lg shadow-xs transition-colors cursor-pointer">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
-                    <span>Cetak Kwitansi</span>
+                    <span>Kembalikan Pembayaran</span>
                 </button>
-
-                {{-- Edit Pembayaran (ADHOC-108) — gerbang ganda: permission
-                     `payments.update` (siapa boleh mencoba) DAN
-                     Payment::isEditable() (apakah payment INI sedang boleh —
-                     bulan berjalan, bukan Saldo, setoran belum terverifikasi). --}}
-                @can('payments.update')
-                    @if($payment->isEditable())
-                    <a href="{{ route('payments.edit', $payment->id) }}" class="inline-flex items-center gap-2 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path>
-                        </svg>
-                        <span>Edit Pembayaran</span>
-                    </a>
-                    @endif
-                @endcan
-
-                <!-- Kembalikan Button — juga untuk pembayaran bulan yang sudah tutup buku;
-                     pengembaliannya dibukukan di bulan berjalan. -->
-                @can('payments.reject')
-                    @if($payment->payment_status->value === 'valid')
-                    <button type="button" onclick="openRejectModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                        <span>Kembalikan Pembayaran</span>
-                    </button>
-                    @endif
-                @endcan
-            </div>
-        </div>
-
-        <!-- Integrated Customer Identity Card in Header -->
-        <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60">
-            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <!-- Customer Details -->
-                <div class="flex items-start sm:items-center gap-3.5">
-                    <div class="w-12 h-12 rounded-2xl bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-extrabold text-base flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800 shadow-2xs">
-                        {{ strtoupper(substr($payment->customer->full_name ?? 'P', 0, 2)) }}
-                    </div>
-                    <div class="space-y-1">
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span class="text-[10px] font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/80 px-2 py-0.5 rounded-md border border-sky-200/60 dark:border-sky-800/60">Identitas Pelanggan</span>
-                            @if($payment->customer && ($payment->customer->cid || $payment->customer->customer_code))
-                            <div class="inline-flex items-center gap-1 font-mono text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 shadow-2xs">
-                                <span>CID: {{ $payment->customer->cid ?? $payment->customer->customer_code }}</span>
-                                <button onclick="copyText('{{ $payment->customer->cid ?? $payment->customer->customer_code }}', 'CID')" title="Salin CID" class="text-slate-400 hover:text-sky-600 cursor-pointer">
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                </button>
-                            </div>
-                            @endif
-                        </div>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            @if($payment->customer_id)
-                            <a href="{{ route('customers.show', $payment->customer_id) }}" class="font-bold text-slate-900 dark:text-white text-base hover:text-sky-600 transition-colors">
-                                {{ $payment->customer->full_name ?? '-' }}
-                            </a>
-                            @else
-                            <span class="font-bold text-slate-900 dark:text-white text-base">{{ $payment->customer->full_name ?? '-' }}</span>
-                            @endif
-                        </div>
-                        <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
-                            <div class="flex items-center gap-1.5 font-mono font-medium text-slate-700 dark:text-slate-300">
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
-                                <span>{{ $payment->customer->primary_phone ?? $payment->customer->phone ?? '-' }}</span>
-                            </div>
-                            <span>•</span>
-                            <div class="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                                <span>{{ $payment->pop->name ?? '-' }}</span>
-                            </div>
-                            @if($payment->customer && $payment->customer->address)
-                            <span>•</span>
-                            <div class="flex items-center gap-1 text-slate-600 dark:text-slate-400 max-w-md truncate" title="{{ $payment->customer->address }}">
-                                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                <span class="truncate">{{ $payment->customer->address }}</span>
-                            </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Action: Full Profile Link -->
-                @if($payment->customer_id)
-                <div class="shrink-0 self-end md:self-center">
-                    <a href="{{ route('customers.show', $payment->customer_id) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all shadow-2xs">
-                        <span>Profil Pelanggan</span>
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                    </a>
-                </div>
                 @endif
-            </div>
+            @endcan
         </div>
     </div>
 
-    <!-- HERO METRIC SUMMARY CARDS GRID -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Card 1: Nominal Bayar -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs relative overflow-hidden group hover:border-emerald-500/50 transition-all duration-300">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nominal Diterima</span>
-                <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="font-mono text-2xl lg:text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                    Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}
-                </div>
-                @if((float) $payment->overpay_amount > 0)
-                <div class="text-[11px] font-bold text-sky-600 dark:text-sky-400 mt-1 flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                    <span>Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }} Tercatat Overpay</span>
-                </div>
-                @else
-                <div class="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1">
-                    Terverifikasi Sistem
-                </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- Card 2: Tanggal & Metode -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs relative overflow-hidden group hover:border-sky-500/50 transition-all duration-300">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tanggal & Metode</span>
-                <div class="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="font-mono text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                    {{ optional($payment->payment_date)->format('d/m/Y') }}
-                </div>
-                <div class="mt-1">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 uppercase">
-                        {{ strtoupper($payment->payment_method) }}
-                    </span>
-                </div>
-                {{-- Rekening = snapshot di payment (bukan relasi master) —
-                     tetap benar walau rekening di master diedit belakangan. --}}
-                @if($payment->bank_name || $payment->account_number)
-                    <div class="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        Rekening: <strong class="text-slate-700 dark:text-slate-200">{{ $payment->bank_name }}</strong>
-                        <span class="font-mono">{{ $payment->account_number }}</span>
-                    </div>
-                @endif
-                {{-- Nama Pengirim (ADHOC-95) — internal saja, tidak dicetak di kwitansi. --}}
-                @if($payment->sender_name)
-                    <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Pengirim: <strong class="text-slate-700 dark:text-slate-200">{{ $payment->sender_name }}</strong>
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- Card 3: Operator Kasir -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs relative overflow-hidden group hover:border-indigo-500/50 transition-all duration-300">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Operator Kasir</span>
-                <div class="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="font-bold text-slate-900 dark:text-white text-base truncate">
-                    {{ $payment->receiver->name ?? '-' }}
-                </div>
-                <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Cabang / POP: <strong>{{ $payment->pop->name ?? '-' }}</strong>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 4: Kolektor Lapangan -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs relative overflow-hidden group hover:border-amber-500/50 transition-all duration-300">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Kolektor</span>
-                <div class="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="font-bold text-slate-900 dark:text-white text-base truncate">
-                    {{ $payment->collector ? $payment->collector->name : 'Bayar Langsung' }}
-                </div>
-                <div class="mt-1">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                        {{ $payment->collector ? ($payment->collected_by_role === \App\Enums\CollectorRole::TEKNISI->value ? 'Teknisi Lapangan' : 'Kolektor Lapangan') : 'Tanpa Kolektor Lapangan' }}
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MAIN ENTERPRISE 2-COLUMN GRID (EQUAL HEIGHT) -->
-    <!-- MAIN ENTERPRISE 2-COLUMN GRID (JOINED CONTAINER WITH DIVIDE) -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-700 items-stretch bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-2xs">
+    <!-- LAYER 2: DETAIL PANEL (Strict Single Card Architecture — Card Budget = 1) -->
+    <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-xs">
         
-        <!-- LEFT MAIN TABBED CONTENT (8 cols) -->
-        <div class="lg:col-span-8 flex flex-col min-w-0">
+        <!-- TOP SEGMENT: Customer Identity Strip (Flat, divided) -->
+        <div class="p-4 border-b border-border bg-surface flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div class="flex items-start sm:items-center gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary font-bold text-sm flex items-center justify-center shrink-0 border border-primary/20">
+                    {{ strtoupper(substr($payment->customer->full_name ?? 'P', 0, 2)) }}
+                </div>
+                <div class="space-y-0.5 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">Identitas Pelanggan</span>
+                        @if($payment->customer && ($payment->customer->cid || $payment->customer->customer_code))
+                        <div class="inline-flex items-center gap-1 font-mono text-xs text-text-muted bg-surface-muted px-2 py-0.5 rounded border border-border">
+                            <span>CID: {{ $payment->customer->cid ?? $payment->customer->customer_code }}</span>
+                            <button type="button" onclick="copyText('{{ $payment->customer->cid ?? $payment->customer->customer_code }}', 'CID')" title="Salin CID" class="text-text-muted hover:text-primary cursor-pointer">
+                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            </button>
+                        </div>
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        @if($payment->customer_id)
+                        <a href="{{ route('customers.show', $payment->customer_id) }}" class="font-semibold text-text-main text-sm hover:text-primary transition-colors">
+                            {{ $payment->customer->full_name ?? '-' }}
+                        </a>
+                        @else
+                        <span class="font-semibold text-text-main text-sm">{{ $payment->customer->full_name ?? '-' }}</span>
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-2.5 text-xs text-text-muted flex-wrap">
+                        <div class="flex items-center gap-1 font-mono">
+                            <svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                            <span>{{ $payment->customer->primary_phone ?? $payment->customer->phone ?? '-' }}</span>
+                        </div>
+                        <span>•</span>
+                        <div class="flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                            <span>{{ $payment->pop->name ?? '-' }}</span>
+                        </div>
+                        @if($payment->customer && $payment->customer->address)
+                        <span>•</span>
+                        <div class="flex items-center gap-1 max-w-sm truncate" title="{{ $payment->customer->address }}">
+                            <svg class="w-3.5 h-3.5 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <span class="truncate">{{ $payment->customer->address }}</span>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action: Full Profile Link -->
+            @if($payment->customer_id)
+            <div class="shrink-0 self-end md:self-center">
+                <a href="{{ route('customers.show', $payment->customer_id) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-muted text-text-main border border-border rounded-lg text-xs font-medium transition-colors shadow-xs">
+                    <span>Profil Pelanggan</span>
+                    <svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+            @endif
+        </div>
+
+        <!-- MIDDLE SEGMENT: Hairline Metric Strip (Flat bar with dividers, Card Budget preserved) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border bg-surface-muted/30 border-b border-border">
+            <!-- Metric 1: Nominal Diterima -->
+            <div class="p-4 flex flex-col justify-between">
+                <span class="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Nominal Diterima</span>
+                <div class="mt-2">
+                    <div class="font-mono text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight tabular-nums">
+                        Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}
+                    </div>
+                    @if((float) $payment->overpay_amount > 0)
+                    <div class="text-[11px] font-medium text-sky-600 dark:text-sky-400 mt-0.5 flex items-center gap-1 font-mono">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        <span>Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }} Overpay</span>
+                    </div>
+                    @else
+                    <div class="text-[11px] text-text-muted mt-0.5">
+                        Terverifikasi Sistem
+                    </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Metric 2: Tanggal & Metode -->
+            <div class="p-4 flex flex-col justify-between">
+                <span class="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Tanggal & Metode</span>
+                <div class="mt-2">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-base font-bold text-text-main tabular-nums">
+                            {{ optional($payment->payment_date)->format('d/m/Y') }}
+                        </span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase">
+                            {{ strtoupper($payment->payment_method) }}
+                        </span>
+                    </div>
+                    {{-- Rekening snapshot --}}
+                    @if($payment->bank_name || $payment->account_number)
+                        <div class="text-xs text-text-muted mt-1">
+                            Rekening: <strong class="text-text-main font-medium">{{ $payment->bank_name }}</strong>
+                            <span class="font-mono">{{ $payment->account_number }}</span>
+                        </div>
+                    @endif
+                    {{-- Nama Pengirim (ADHOC-95) --}}
+                    @if($payment->sender_name)
+                        <div class="text-xs text-text-muted mt-0.5">
+                            Pengirim: <strong class="text-text-main font-medium">{{ $payment->sender_name }}</strong>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Metric 3: Operator Kasir -->
+            <div class="p-4 flex flex-col justify-between">
+                <span class="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Operator Kasir</span>
+                <div class="mt-2">
+                    <div class="font-semibold text-text-main text-sm truncate">
+                        {{ $payment->receiver->name ?? '-' }}
+                    </div>
+                    <div class="text-xs text-text-muted mt-0.5">
+                        Cabang / POP: <strong class="text-text-main font-medium">{{ $payment->pop->name ?? '-' }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metric 4: Kolektor Lapangan -->
+            <div class="p-4 flex flex-col justify-between">
+                <span class="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Kolektor</span>
+                <div class="mt-2">
+                    <div class="font-semibold text-text-main text-sm truncate">
+                        {{ $payment->collector ? $payment->collector->name : 'Bayar Langsung' }}
+                    </div>
+                    <div class="mt-1">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-surface-muted text-text-muted border border-border">
+                            {{ $payment->collector ? ($payment->collected_by_role === \App\Enums\CollectorRole::TEKNISI->value ? 'Teknisi Lapangan' : 'Kolektor Lapangan') : 'Tanpa Kolektor Lapangan' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM SEGMENT: Main 2-Column Joined Area (Divided with hairline) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-border items-stretch">
             
-            <div class="flex-1 flex flex-col min-w-0">
+            <!-- LEFT MAIN TABBED CONTENT (8 cols) -->
+            <div class="lg:col-span-8 flex flex-col min-w-0">
                 
                 <!-- Tab Bar Header -->
-                <div class="border-b border-slate-100 dark:border-slate-700/60 px-6 flex items-center gap-6 text-xs bg-slate-50/50 dark:bg-slate-900/40 custom-scrollbar overflow-x-auto">
-                    <button onclick="switchTab('info')" id="tab-info" class="py-4 border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
+                <div class="border-b border-border px-4 flex items-center gap-4 text-xs bg-surface-muted/30 overflow-x-auto">
+                    <button type="button" onclick="switchTab('info')" id="tab-info" class="py-3 border-b-2 border-primary text-primary font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span>Informasi & Catatan</span>
                     </button>
-                    <button onclick="switchTab('proof')" id="tab-proof" class="py-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
+                    <button type="button" onclick="switchTab('proof')" id="tab-proof" class="py-3 border-b-2 border-transparent text-text-muted hover:text-text-main font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         <span>Bukti Pembayaran</span>
                     </button>
-                    @if(auth()->user()->hasPermission('audit_logs.view'))
-                    <button onclick="switchTab('audit')" id="tab-audit" class="py-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
+                    @if(auth()->user()->hasPermission('audit_logs.view') || auth()->user()->hasRole('admin'))
+                    <button type="button" onclick="switchTab('audit')" id="tab-audit" class="py-3 border-b-2 border-transparent text-text-muted hover:text-text-main font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span>Timeline & Audit Log</span>
                     </button>
@@ -384,53 +343,53 @@
                 </div>
 
                 <!-- TAB PANE 1: Informasi & Catatan -->
-                <div id="pane-info" class="p-6 space-y-6 flex-1 flex flex-col justify-between">
+                <div id="pane-info" class="p-5 space-y-5 flex-1 flex flex-col justify-between">
                     
-                    <div class="space-y-6">
+                    <div class="space-y-5">
                         <!-- Financial Breakdown Itemization -->
                         <div>
-                            <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-3">Rincian Pembagian Alokasi Dana</h3>
-                            <div class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                            <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2.5">Rincian Pembagian Alokasi Dana</h3>
+                            <div class="border border-border rounded-lg overflow-hidden">
                                 <table class="w-full text-left border-collapse text-xs">
-                                    <thead class="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+                                    <thead class="bg-surface-muted/50 border-b border-border text-text-muted uppercase tracking-wider font-semibold text-[10px]">
                                         <tr>
-                                            <th class="p-3.5">Deskripsi Alokasi</th>
-                                            <th class="p-3.5">Referensi / Keterangan</th>
-                                            <th class="p-3.5 text-right">Nominal</th>
+                                            <th class="p-3">Deskripsi Alokasi</th>
+                                            <th class="p-3">Referensi / Keterangan</th>
+                                            <th class="p-3 text-right">Nominal</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium">
+                                    <tbody class="divide-y divide-border font-medium">
                                         <tr>
-                                            <td class="p-3.5">
-                                                <span class="font-bold text-slate-900 dark:text-white block">Pelunasan {{ $invoiceLabel }}</span>
-                                                <span class="text-[10px] text-slate-400">{{ $invoiceSubtitle }}</span>
+                                            <td class="p-3">
+                                                <span class="font-semibold text-text-main block">Pelunasan {{ $invoiceLabel }}</span>
+                                                <span class="text-[10px] text-text-muted">{{ $invoiceSubtitle }}</span>
                                             </td>
-                                            <td class="p-3.5 font-mono text-slate-600 dark:text-slate-400">
+                                            <td class="p-3 font-mono text-text-muted">
                                                 {{ $payment->invoice->invoice_number ?? '-' }}
                                             </td>
-                                            <td class="p-3.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                            <td class="p-3 text-right font-mono font-semibold text-text-main tabular-nums">
                                                 Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}
                                             </td>
                                         </tr>
                                         @if((float) $payment->overpay_amount > 0)
-                                        <tr class="bg-sky-50/30 dark:bg-sky-950/20">
-                                            <td class="p-3.5">
-                                                <span class="font-bold text-sky-700 dark:text-sky-300 block">Alokasi Lebih Bayar (Deposit Pelanggan)</span>
+                                        <tr class="bg-sky-500/5">
+                                            <td class="p-3">
+                                                <span class="font-semibold text-sky-700 dark:text-sky-300 block">Alokasi Lebih Bayar (Deposit Pelanggan)</span>
                                                 <span class="text-[10px] text-sky-600 dark:text-sky-400">Disimpan untuk pemotongan tagihan berikutnya</span>
                                             </td>
-                                            <td class="p-3.5 font-mono text-sky-600 dark:text-sky-400">
+                                            <td class="p-3 font-mono text-sky-600 dark:text-sky-400">
                                                 Overpay / Saldo
                                             </td>
-                                            <td class="p-3.5 text-right font-mono font-bold text-sky-600 dark:text-sky-400">
+                                            <td class="p-3 text-right font-mono font-semibold text-sky-600 dark:text-sky-400 tabular-nums">
                                                 Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}
                                             </td>
                                         </tr>
                                         @endif
                                     </tbody>
-                                    <tfoot class="bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-700 font-bold">
+                                    <tfoot class="bg-surface-muted/40 border-t border-border font-semibold">
                                         <tr>
-                                            <td colspan="2" class="p-3.5 text-slate-900 dark:text-white">TOTAL UANG DITERIMA DARI PELANGGAN</td>
-                                            <td class="p-3.5 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                                            <td colspan="2" class="p-3 text-text-main text-xs">TOTAL UANG DITERIMA DARI PELANGGAN</td>
+                                            <td class="p-3 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400 tabular-nums">
                                                 Rp {{ number_format($totalMoneyReceived, 0, ',', '.') }}
                                             </td>
                                         </tr>
@@ -440,33 +399,33 @@
                         </div>
 
                         <!-- Remarks / Notes Box -->
-                        <div class="space-y-2">
-                            <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Catatan Petugas</h3>
-                            <div class="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
+                        <div class="space-y-1.5">
+                            <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">Catatan Petugas</h3>
+                            <div class="p-3.5 bg-surface-muted/40 rounded-lg border border-border text-xs text-text-main leading-relaxed font-sans">
                                 {{ $payment->note ?: 'Tidak ada catatan khusus untuk transaksi ini.' }}
                             </div>
                         </div>
 
                         @if($payment->old_payment_id || $payment->old_transaction_id || $payment->old_request_id)
-                        <div class="space-y-2">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Audit Visibilitas Data Migrasi Legacy</h3>
-                            <div class="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2 text-xs">
+                        <div class="space-y-1.5">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-text-muted">Audit Visibilitas Data Migrasi Legacy</h3>
+                            <div class="p-3.5 bg-surface-muted/40 rounded-lg border border-border space-y-2 text-xs">
                                 @if($payment->old_payment_id)
-                                <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700/60">
-                                    <span class="text-slate-500">ID Bayar Lama:</span>
-                                    <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_payment_id }}</span>
+                                <div class="flex justify-between items-center pb-2 border-b border-border">
+                                    <span class="text-text-muted">ID Bayar Lama:</span>
+                                    <span class="font-mono font-semibold text-text-main">{{ $payment->old_payment_id }}</span>
                                 </div>
                                 @endif
                                 @if($payment->old_transaction_id)
-                                <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700/60">
-                                    <span class="text-slate-500">ID Transaksi Lama:</span>
-                                    <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_transaction_id }}</span>
+                                <div class="flex justify-between items-center pb-2 border-b border-border">
+                                    <span class="text-text-muted">ID Transaksi Lama:</span>
+                                    <span class="font-mono font-semibold text-text-main">{{ $payment->old_transaction_id }}</span>
                                 </div>
                                 @endif
                                 @if($payment->old_request_id)
                                 <div class="flex justify-between items-center">
-                                    <span class="text-slate-500">ID Permintaan Lama:</span>
-                                    <span class="font-mono font-bold text-slate-800 dark:text-slate-200">{{ $payment->old_request_id }}</span>
+                                    <span class="text-text-muted">ID Permintaan Lama:</span>
+                                    <span class="font-mono font-semibold text-text-main">{{ $payment->old_request_id }}</span>
                                 </div>
                                 @endif
                             </div>
@@ -477,38 +436,38 @@
                 </div>
 
                 <!-- TAB PANE 2: Bukti Pembayaran -->
-                <div id="pane-proof" class="hidden p-6 space-y-4 flex-1">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Lampiran Bukti Pembayaran / Struk Transfer</h3>
+                <div id="pane-proof" class="hidden p-5 space-y-4 flex-1">
+                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">Lampiran Bukti Pembayaran / Struk Transfer</h3>
                     
                     @if($payment->proof_file)
-                        <div class="p-6 bg-slate-50 dark:bg-slate-900/40 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-center space-y-3">
-                            <div class="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto">
-                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <div class="p-6 bg-surface-muted/30 border border-dashed border-border rounded-lg text-center space-y-3">
+                            <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mx-auto border border-primary/20">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
                             </div>
                             <div>
-                                <p class="font-bold text-sm text-slate-800 dark:text-slate-200">Lampiran Bukti Terdaftar</p>
-                                <p class="text-xs font-mono text-slate-400 max-w-sm mx-auto mt-0.5 truncate">{{ $payment->proof_file }}</p>
+                                <p class="font-semibold text-sm text-text-main">Lampiran Bukti Terdaftar</p>
+                                <p class="text-xs font-mono text-text-muted max-w-sm mx-auto mt-0.5 truncate">{{ $payment->proof_file }}</p>
                             </div>
-                            <a href="{{ asset('storage/' . $payment->proof_file) }}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs">
+                            <a href="{{ asset('storage/' . $payment->proof_file) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-medium transition-colors shadow-xs">
                                 <span>Lihat Bukti Pembayaran</span>
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                             </a>
                         </div>
                     @else
                         <!-- Proof Placeholder Box -->
-                        <div class="p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-center bg-slate-50/50 dark:bg-slate-900/30 space-y-3">
-                            <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <div class="p-6 border border-dashed border-border rounded-lg text-center bg-surface-muted/30 space-y-2">
+                            <div class="w-10 h-10 rounded-lg bg-surface-muted text-text-muted flex items-center justify-center mx-auto border border-border">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
                             </div>
                             <div>
-                                <p class="font-bold text-sm text-slate-800 dark:text-slate-200">
+                                <p class="font-semibold text-xs text-text-main">
                                     {{ strtolower($payment->payment_method) === 'cash' ? 'Pembayaran Tunai Langsung Kasir' : 'Belum Ada Lampiran File Bukti' }}
                                 </p>
-                                <p class="text-xs text-slate-400 max-w-sm mx-auto mt-0.5">
+                                <p class="text-[11px] text-text-muted max-w-sm mx-auto mt-0.5">
                                     Transaksi tunai kasir POP tidak mewajibkan upload foto fisik, namun kwitansi resmi dapat dicetak kapan saja.
                                 </p>
                             </div>
@@ -517,40 +476,40 @@
                 </div>
 
                 <!-- TAB PANE 3: Timeline & Audit Log -->
-                @if(auth()->user()->hasPermission('audit_logs.view'))
-                <div id="pane-audit" class="hidden p-6 space-y-4 flex-1">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Riwayat Audit Pembayaran</h3>
+                @if(auth()->user()->hasPermission('audit_logs.view') || auth()->user()->hasRole('admin'))
+                <div id="pane-audit" class="hidden p-5 space-y-3.5 flex-1">
+                    <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider">Riwayat Audit Pembayaran</h3>
                     
                     @if($payment->relationLoaded('auditLogs') && $payment->auditLogs->count() > 0)
-                        <div class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                        <div class="border border-border rounded-lg overflow-hidden">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
-                                    <tr class="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase tracking-wider text-[10px]">
-                                        <th class="p-3">Waktu</th>
-                                        <th class="p-3">Aksi</th>
-                                        <th class="p-3">User Operator</th>
-                                        <th class="p-3">Detail Perubahan Data</th>
+                                    <tr class="bg-surface-muted/50 border-b border-border text-text-muted uppercase tracking-wider text-[10px] font-semibold">
+                                        <th class="p-2.5">Waktu</th>
+                                        <th class="p-2.5">Aksi</th>
+                                        <th class="p-2.5">User Operator</th>
+                                        <th class="p-2.5">Detail Perubahan Data</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium">
+                                <tbody class="divide-y divide-border font-medium">
                                     @foreach($payment->auditLogs as $index => $auditLog)
                                     <tr>
-                                        <td class="p-3 font-mono text-slate-500 whitespace-nowrap">
+                                        <td class="p-2.5 font-mono text-text-muted whitespace-nowrap tabular-nums">
                                             {{ optional($auditLog->created_at)->format('d/m/Y H:i') }}
                                         </td>
-                                        <td class="p-3">
-                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                        <td class="p-2.5">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                                 {{ ucwords(str_replace('_', ' ', $auditLog->action)) }}
                                             </span>
                                         </td>
-                                        <td class="p-3 font-bold text-slate-800 dark:text-slate-200">
+                                        <td class="p-2.5 font-medium text-text-main">
                                             {{ $auditLog->user->name ?? '-' }}
                                         </td>
-                                        <td class="p-3">
-                                            <button onclick="toggleJsonView('json-{{ $index }}')" class="text-sky-600 dark:text-sky-400 hover:underline font-mono text-[11px] cursor-pointer">
+                                        <td class="p-2.5">
+                                            <button type="button" onclick="toggleJsonView('json-{{ $index }}')" class="text-primary hover:underline font-mono text-[11px] cursor-pointer">
                                                 [+] Lihat JSON Payload
                                             </button>
-                                            <pre id="json-{{ $index }}" class="hidden mt-2 p-3 bg-slate-900 text-emerald-400 font-mono text-[10px] rounded-xl overflow-x-auto custom-scrollbar">{{ json_encode([
+                                            <pre id="json-{{ $index }}" class="hidden mt-2 p-3 bg-slate-900 text-emerald-400 font-mono text-[10px] rounded-lg overflow-x-auto custom-scrollbar">{{ json_encode([
                                                 'old_values' => $auditLog->old_values,
                                                 'new_values' => $auditLog->new_values,
                                             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
@@ -561,7 +520,7 @@
                             </table>
                         </div>
                     @else
-                        <div class="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-500 text-center">
+                        <div class="p-4 bg-surface-muted/30 rounded-lg border border-border text-xs text-text-muted text-center">
                             Belum ada entri audit log untuk transaksi pembayaran ini.
                         </div>
                     @endif
@@ -569,102 +528,103 @@
                 @endif
 
             </div>
-        </div>
 
-        <!-- RIGHT DETAILS PANEL (4 cols) -->
-        <div class="lg:col-span-4 flex flex-col p-6 flex-1 justify-between">
-            <div>
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/60">
-                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tagihan Terkait</span>
-                    @if($payment->invoice_id)
-                    <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
-                        <span>Lihat Tagihan</span>
-                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                    </a>
+            <!-- RIGHT DETAILS PANEL (4 cols) -->
+            <div class="lg:col-span-4 flex flex-col p-5 flex-1 justify-between bg-surface-muted/10">
+                <div>
+                    <div class="flex items-center justify-between pb-3 border-b border-border">
+                        <span class="text-xs font-semibold text-text-muted uppercase tracking-wider">Tagihan Terkait</span>
+                        @if($payment->invoice_id)
+                        <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+                            <span>Lihat Tagihan</span>
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </a>
+                        @endif
+                    </div>
+
+                    @if($payment->invoice)
+                    <div class="space-y-3 text-xs pt-3.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-text-muted">No. Invoice:</span>
+                            <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="font-mono font-semibold text-primary hover:underline">
+                                {{ $payment->invoice->invoice_number }}
+                            </a>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-text-muted">Periode Tagihan:</span>
+                            <span class="font-mono font-medium text-text-main">{{ $payment->invoice->billing_period ?? '-' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-text-muted">Total Invoice:</span>
+                            <span class="font-mono font-medium text-text-main tabular-nums">Rp {{ number_format((float) ($payment->invoice->total_amount ?? 0), 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+                    @else
+                    <div class="pt-3.5">
+                        <p class="text-xs text-text-muted italic">Tidak terhubung ke invoice tertentu.</p>
+                    </div>
                     @endif
                 </div>
 
                 @if($payment->invoice)
-                <div class="space-y-3.5 text-xs pt-4">
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-500 dark:text-slate-400">No. Invoice:</span>
-                        <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline">
-                            {{ $payment->invoice->invoice_number }}
-                        </a>
+                <div class="pt-3.5 mt-5 border-t border-border">
+                    <div class="p-3 rounded-lg bg-surface-muted/50 border border-border flex items-center justify-between">
+                        <span class="text-xs text-text-muted font-medium">Sisa Tagihan:</span>
+                        <span class="font-mono font-bold text-sm {{ (float)($payment->invoice->remaining_amount ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }} tabular-nums">
+                            Rp {{ number_format((float) ($payment->invoice->remaining_amount ?? 0), 0, ',', '.') }} {{ (float)($payment->invoice->remaining_amount ?? 0) == 0 ? '(Lunas)' : '' }}
+                        </span>
                     </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-500 dark:text-slate-400">Periode Tagihan:</span>
-                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">{{ $payment->invoice->billing_period ?? '-' }}</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-500 dark:text-slate-400">Total Invoice:</span>
-                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">Rp {{ number_format((float) ($payment->invoice->total_amount ?? 0), 0, ',', '.') }}</span>
-                    </div>
-                </div>
-                @else
-                <div class="pt-4">
-                    <p class="text-xs text-slate-400 italic">Tidak terhubung ke invoice tertentu.</p>
                 </div>
                 @endif
             </div>
-
-            @if($payment->invoice)
-            <div class="pt-4 mt-6 border-t border-slate-100 dark:border-slate-700/60">
-                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
-                    <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Sisa Tagihan:</span>
-                    <span class="font-mono font-bold text-sm {{ (float)($payment->invoice->remaining_amount ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}">
-                        Rp {{ number_format((float) ($payment->invoice->remaining_amount ?? 0), 0, ',', '.') }} {{ (float)($payment->invoice->remaining_amount ?? 0) == 0 ? '(Lunas)' : '' }}
-                    </span>
-                </div>
-            </div>
-            @endif
         </div>
+        
     </div>
-    
+
 </div>
 
 <!-- MODAL: TOLAK PEMBAYARAN -->
 @can('payments.reject')
     @if($payment->payment_status->value === 'valid')
     <div id="rejectModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs hidden flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
-            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between bg-rose-50/60 dark:bg-rose-950/40">
+        <div class="bg-surface rounded-lg max-w-md w-full overflow-hidden shadow-lg border border-border">
+            <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-rose-500/10">
                 <div class="flex items-center gap-2.5">
-                    <div class="p-2 rounded-xl bg-rose-600 text-white shrink-0">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <div class="p-1.5 rounded-md bg-rose-600 text-white shrink-0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                         </svg>
                     </div>
                     <div>
-                        <h3 class="font-bold text-slate-900 dark:text-white text-base">Kembalikan Pembayaran {{ $payment->payment_number }}</h3>
-                        <p class="text-[10px] text-slate-500">Tagihan akan dihitung ulang & kembali belum lunas</p>
+                        <h3 class="font-semibold text-text-main text-sm">Kembalikan Pembayaran {{ $payment->payment_number }}</h3>
+                        <p class="text-[10px] text-text-muted">Tagihan akan dihitung ulang & kembali belum lunas</p>
                     </div>
                 </div>
-                <button type="button" onclick="closeRejectModal()" class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg cursor-pointer">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <button type="button" onclick="closeRejectModal()" class="p-1 text-text-muted hover:text-text-main rounded-md cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
 
-            <form id="rejectForm" method="POST" action="{{ route('payments.reject', $payment->id) }}" class="p-6 space-y-4 text-xs">
+            <form id="rejectForm" method="POST" action="{{ route('payments.reject', $payment->id) }}" class="p-5 space-y-3.5 text-xs">
                 @csrf
-                <p class="text-slate-600 dark:text-slate-300 leading-relaxed">
+                <p class="text-text-muted leading-relaxed">
                     Mengembalikan transaksi ini membatalkan status pelunasan invoice terkait dan membalikkan alokasi deposit. Kalau pembayarannya dari bulan yang sudah tutup buku, laporan bulan itu tidak berubah — pengembaliannya tercatat di bulan ini.
                 </p>
 
                 <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">Alasan Pengembalian *</label>
-                    <textarea name="reject_reason" id="rejectReasonInput" rows="4" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20" placeholder="Contoh: Bukti transfer tidak sah / Duplikasi input kasir / Rekonsiliasi kas tidak sesuai">{{ old('reject_reason') }}</textarea>
+                    <label class="block font-medium text-text-main mb-1.5">Alasan Pengembalian *</label>
+                    <textarea name="reject_reason" id="rejectReasonInput" rows="3" required class="w-full p-2.5 rounded-lg border border-border bg-surface text-xs text-text-main focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500" placeholder="Contoh: Bukti transfer tidak sah / Duplikasi input kasir / Rekonsiliasi kas tidak sesuai">{{ old('reject_reason') }}</textarea>
                     @error('reject_reason')
                         <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
                     @enderror
                 </div>
 
                 <!-- Modal Action Buttons -->
-                <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-end gap-2">
-                    <button type="button" onclick="closeRejectModal()" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
+                <div class="pt-3 border-t border-border flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeRejectModal()" class="px-3 py-1.5 rounded-lg border border-border font-medium text-text-muted hover:bg-surface-muted cursor-pointer transition-colors">
                         Batal
                     </button>
-                    <button type="submit" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md shadow-rose-600/20 active:scale-95 cursor-pointer">
+                    <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-xs transition-colors cursor-pointer">
                         Ya, Kembalikan Pembayaran
                     </button>
                 </div>
@@ -683,10 +643,10 @@
             if (!btn || !pane) return;
 
             if (key === tabKey) {
-                btn.className = 'py-4 border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer';
+                btn.className = 'py-3 border-b-2 border-primary text-primary font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer';
                 pane.classList.remove('hidden');
             } else {
-                btn.className = 'py-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer';
+                btn.className = 'py-3 border-b-2 border-transparent text-text-muted hover:text-text-main font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer';
                 pane.classList.add('hidden');
             }
         });

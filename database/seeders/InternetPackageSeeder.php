@@ -52,25 +52,25 @@ class InternetPackageSeeder extends Seeder
             $this->home('NetP110', 'Penawaran Khusus', '25 Mbps', 25, 110000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
             $this->home('NetP125', 'Penawaran Khusus', '30 Mbps', 30, 125000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
 
-            $this->businessBroadband('NetSoLite75', '70 Mbps 1:8', 70, 8, 450000, ['Unlimited', '1 AP + 1 Router'], 'IP Private', 500000),
-            $this->businessBroadband('NetSoLite100', '100 Mbps 1:8', 100, 8, 550000, ['Unlimited', '1 AP + 1 Router'], 'IP Private', 500000),
-            $this->businessBroadband('NetSo100', '100 Mbps 1:4', 100, 4, 700000, ['Unlimited', '1 AP & 1 Router'], '1 Public Static', 250000),
-            $this->businessBroadband('NetSo200', '200 Mbps 1:4', 200, 4, 1350000, ['Unlimited', '1 AP & 1 Router'], '1 Public Static', 2500000),
-            $this->businessBroadband('NetSo300', '300 Mbps 1:4', 300, 4, 2150000, ['Unlimited', '1 AP & 1 Router'], '1 Public Static', 2500000),
-            $this->businessBroadband('NetSo500', '500 Mbps 1:4', 500, 4, 3200000, ['Unlimited', '2 AP & 1 Router'], '2 Public Static', 2500000),
-            $this->businessBroadband('NetSo1G', '1 Gbps 1:4', 1000, 4, 5900000, ['Unlimited', '3 AP & 1 Router'], '2 Public Static', 2500000),
+            $this->businessBroadband('NetSoLite75', '70 Mbps 1:8', 70, 8, 450000, ['Unlimited', '1 AP + 1 Router'], 'IP Private', 500000, 1),
+            $this->businessBroadband('NetSoLite100', '100 Mbps 1:8', 100, 8, 550000, ['Unlimited', '1 AP + 1 Router'], 'IP Private', 500000, 1),
+            $this->businessBroadband('NetSo100', '100 Mbps 1:4', 100, 4, 700000, ['Unlimited', '1 AP & 1 Router'], '1 Public Static', 250000, 1),
+            $this->businessBroadband('NetSo200', '200 Mbps 1:4', 200, 4, 1350000, ['Unlimited', '1 AP & 1 Router'], '1 Public Static', 2500000, 1),
+            $this->businessBroadband('NetSo300', '300 Mbps 1:4', 300, 4, 2150000, ['Unlimited', '1 AP & 1 Router'], '1 Public Static', 2500000, 1),
+            $this->businessBroadband('NetSo500', '500 Mbps 1:4', 500, 4, 3200000, ['Unlimited', '2 AP & 1 Router'], '2 Public Static', 2500000, 2),
+            $this->businessBroadband('NetSo1G', '1 Gbps 1:4', 1000, 4, 5900000, ['Unlimited', '3 AP & 1 Router'], '2 Public Static', 2500000, 3),
 
-            $this->sme('NetBLite25', 'Up To 35 Mbps', 35, 200000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6'], 5, 150000),
-            $this->sme('NetBLite55', 'Up To 55 Mbps', 55, 250000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6'], 7, 150000),
-            $this->sme('NetBLite110', 'Up To 110 Mbps', 110, 390000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi5'], 15, 250000),
-            $this->sme('NetBLite165', 'Up To 165 Mbps', 165, 490000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi6'], 30, 250000),
-            $this->sme('NetBLite330', 'Up To 330 Mbps', 330, 690000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi6'], 50, 250000),
-            $this->sme('NetBLite550', 'Up To 550 Mbps', 550, 980000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi6'], 60, 250000),
+            $this->sme('NetBLite25', 'Up To 35 Mbps', 35, 200000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6'], 5, 150000, 1),
+            $this->sme('NetBLite55', 'Up To 55 Mbps', 55, 250000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6'], 7, 150000, 1),
+            $this->sme('NetBLite110', 'Up To 110 Mbps', 110, 390000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi5'], 15, 250000, 2),
+            $this->sme('NetBLite165', 'Up To 165 Mbps', 165, 490000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi6'], 30, 250000, 2),
+            $this->sme('NetBLite330', 'Up To 330 Mbps', 330, 690000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi6'], 50, 250000, 2),
+            $this->sme('NetBLite550', 'Up To 550 Mbps', 550, 980000, ['Login Portal', 'Bandwidth Management', '1 AP Wifi6 + 1 AP Wifi6'], 60, 250000, 2),
 
-            $this->dedicated('Dedicated100', '100 Mbps', 100, 3500000, ['2 AP Wifi6 & 1 Router'], '1 IP Public', 2500000),
-            $this->dedicated('Dedicated250', '250 Mbps', 250, 6500000, ['2 AP Wifi6 & 1 Router'], '1 IP Public', 2500000),
-            $this->dedicated('Dedicated500', '500 Mbps', 500, 12000000, ['2 AP Wifi6 & 1 Router'], '2 IP Public', 2500000),
-            $this->dedicated('Dedicated1G', '1 Gbps', 1000, 23000000, ['2 AP Wifi6 & 1 Router'], '2 IP Public', 2500000),
+            $this->dedicated('Dedicated100', '100 Mbps', 100, 3500000, ['2 AP Wifi6 & 1 Router'], '1 IP Public', 2500000, 2),
+            $this->dedicated('Dedicated250', '250 Mbps', 250, 6500000, ['2 AP Wifi6 & 1 Router'], '1 IP Public', 2500000, 2),
+            $this->dedicated('Dedicated500', '500 Mbps', 500, 12000000, ['2 AP Wifi6 & 1 Router'], '2 IP Public', 2500000, 2),
+            $this->dedicated('Dedicated1G', '1 Gbps', 1000, 23000000, ['2 AP Wifi6 & 1 Router'], '2 IP Public', 2500000, 2),
 
             $this->khusus('Net138 Khusus', 'Khusus Broadband Home Internet Only', '50 Mbps', 50, 138000, 'Singleband', [], null, 12, 'Gratis', 'Kontrak 12M'),
             $this->khusus('Net150 Khusus', 'Khusus Broadband Home Internet Only', '100 Mbps', 100, 150000, 'Dualband', [], null, 8, 'Gratis', 'Kontrak 8M'),
@@ -119,6 +119,7 @@ class InternetPackageSeeder extends Seeder
         array $features,
         string $ipAddressType,
         int $installationFee,
+        int $maxAdditionalDevices = 0,
     ): array {
         return $this->package($code, 'Paket Bisnis Broadband', 'Bisnis Broadband 1:4 & 1:8', $bandwidthLabel, $downloadSpeed, $monthlyPrice, [
             'contention_ratio' => $contentionRatio,
@@ -128,6 +129,7 @@ class InternetPackageSeeder extends Seeder
             'installation_fee' => $installationFee,
             'installation_fee_label' => 'Rp '.number_format($installationFee, 0, ',', '.'),
             'terms' => 'Masa kontrak 1 Tahun',
+            'max_additional_devices' => $maxAdditionalDevices,
         ]);
     }
 
@@ -143,12 +145,14 @@ class InternetPackageSeeder extends Seeder
         array $features,
         int $maxUsers,
         int $registrationFee,
+        int $maxAdditionalDevices = 0,
     ): array {
         return $this->package($code, 'Paket Bisnis UKM', 'Cafe & Warung Kopi / UKM', $bandwidthLabel, $downloadSpeed, $monthlyPrice, [
             'features' => $features,
             'max_users' => $maxUsers,
             'installation_fee' => $registrationFee,
             'installation_fee_label' => 'Biaya Registrasi Rp '.number_format($registrationFee, 0, ',', '.'),
+            'max_additional_devices' => $maxAdditionalDevices,
         ]);
     }
 
@@ -164,6 +168,7 @@ class InternetPackageSeeder extends Seeder
         array $features,
         string $ipAddressType,
         int $installationFee,
+        int $maxAdditionalDevices = 0,
     ): array {
         return $this->package($code, 'Paket Bisnis Dedicated', 'Internet Bisnis Dedicated', $bandwidthLabel, $downloadSpeed, $monthlyPrice, [
             'features' => $features,
@@ -172,6 +177,7 @@ class InternetPackageSeeder extends Seeder
             'installation_fee' => $installationFee,
             'installation_fee_label' => 'Rp '.number_format($installationFee, 0, ',', '.'),
             'terms' => 'Masa kontrak 1 Tahun',
+            'max_additional_devices' => $maxAdditionalDevices,
         ]);
     }
 

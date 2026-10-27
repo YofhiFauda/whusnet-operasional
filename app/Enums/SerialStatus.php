@@ -28,6 +28,12 @@ enum SerialStatus: string
     case SCRAPPED = 'scrapped';
     case QUARANTINE = 'quarantine';
 
+    /**
+     * Aset netap di infrastruktur jaringan (ODC/ODP/splitter). Bukan
+     * INSTALLED — status itu khusus unit yang sudah jadi milik pelanggan.
+     */
+    case DEPLOYED = 'deployed';
+
     public function label(): string
     {
         return match ($this) {
@@ -43,6 +49,7 @@ enum SerialStatus: string
             self::LOST => 'Hilang',
             self::SCRAPPED => 'Dimusnahkan',
             self::QUARANTINE => 'Karantina',
+            self::DEPLOYED => 'Terpasang di Infrastruktur',
         };
     }
 
@@ -55,7 +62,7 @@ enum SerialStatus: string
     public function badgeVariant(): string
     {
         return match ($this) {
-            self::AVAILABLE, self::INSTALLED => 'success',
+            self::AVAILABLE, self::INSTALLED, self::DEPLOYED => 'success',
             self::RECEIVED, self::ISSUED, self::IN_USE => 'info',
             self::RESERVED, self::TRANSFERRED, self::RETURNED => 'warning',
             self::DAMAGED, self::LOST, self::SCRAPPED, self::QUARANTINE => 'error',

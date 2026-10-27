@@ -129,6 +129,23 @@ class Task extends Model
         return $this->hasOne(TaskCreqDetail::class);
     }
 
+    /**
+     * Antrean verifikasi biaya untuk task MTN polos — hanya terisi kalau
+     * laporan MTN ditandai berbayar. Lihat TaskMaintenanceBillingDetail.
+     */
+    public function maintenanceBillingDetail(): HasOne
+    {
+        return $this->hasOne(TaskMaintenanceBillingDetail::class);
+    }
+
+    /**
+     * Baris breakdown biaya yang sudah diverifikasi CS (C-REQ & MTN).
+     */
+    public function billingItems(): HasMany
+    {
+        return $this->hasMany(TaskBillingItem::class);
+    }
+
     public function report(): HasOne
     {
         return $this->hasOne(TaskReport::class);
@@ -244,5 +261,41 @@ class Task extends Model
         $reference = $this->slaReferenceTime();
 
         return $deadline->lt($reference);
+    }
+
+    /**
+     * Flag radius absen QR, dibaca ulang dari `started_distance_meters` yang
+     * SUDAH TERSIMPAN saat task dimulai (bukan dihitung ulang terhadap
+     * koordinat pelanggan SEKARANG) — alamat pelanggan bisa berubah setelah
+     * task dimulai, kalau dihitung ulang bisa menampilkan flag yang beda dari
+     * yang sebenarnya menggerbang absen itu. Pembagian ambang sama persis
+     * `QrAttendanceService::evaluateRadius()`, SENGAJA disalin bukan dipanggil
+     * ulang — method itu butuh jarak live (customer+latlng), di sini cuma
+     * jarak yang sudah jadi angka.
+     *
+     * @return string|null `ok`/`perlu_review`/`out_of_radius` kalau ada
+     *                     jaraknya, `tanpa_koordinat` kalau absen via QR
+     *                     tapi gak kesimpen jaraknya, `null` kalau task ini
+     *                     gak pernah dimulai lewat absen QR sama sekali.
+     */
+    public function attendanceFlag(): ?string
+    {
+        if ($this->started_via !== 'qr_scan') {
+            return null;
+        }
+
+        if ($this->started_distance_meters === null) {
+            return 'tanpa_koordinat';
+        }
+
+        if ($this->started_distance_meters <= config('qr.attendance_radius_meters')) {
+            return 'ok';
+        }
+
+        if ($this->started_distance_meters <= config('qr.attendance_hard_limit_meters')) {
+            return 'perlu_review';
+        }
+
+        return 'out_of_radius';
     }
 }

@@ -77,6 +77,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.view',
                 'dashboard.view',
                 'fop_analytics.view',
+                'network_nodes.view',
                 'fop_tasks.view',
                 'invoices.print',
                 'invoices.view',
@@ -89,7 +90,7 @@ class RolePermissionSeeder extends Seeder
                 'packages.view',
                 'payments.view',
                 'pops.view',
-                'qr_scan_logs.view', // Dashboard anomali scan QR (docs/plan/qr-code/)
+                'qr_scan_logs.view', // Riwayat percobaan scan QR (docs/plan/qr-code/)
                 'reports.export',
                 'reports.view',
                 'roles.view',
@@ -102,10 +103,13 @@ class RolePermissionSeeder extends Seeder
                 'warehouse.view',
                 'warehouse_custody.view',
                 'warehouse_issue.view',
+                'warehouse_report.sold_to_customer.view',
                 'warehouse_report.view',
                 'warehouse_stock_request.view',
                 'warehouse_traceability.view',
                 'warehouse_transfer.view',
+                'warehouse_branch_sale.view',
+                'warehouse_branch_sale_price.view',
             ],
 
             'admin' => [
@@ -124,6 +128,7 @@ class RolePermissionSeeder extends Seeder
                 'collector_worksheet.validate',
                 'collector_worksheet.view',
                 'customer_balance.view', // Saldo Pelanggan (ADHOC-92) — read-only, keuangan
+                'customer_cable_crossings.view', // Daftar Kabel Melintang Jalan (ADHOC-205)
                 'customers.detail.address.view',
                 'customers.detail.devices.view',
                 'customers.detail.devices.view_sensitive',
@@ -428,6 +433,7 @@ class RolePermissionSeeder extends Seeder
                 'pops.update',
                 'pops.view',
                 'qr_scan.view', // Scan QR Internal (2026-08-27)
+                'qr_scan_logs.view', // Riwayat percobaan scan QR untuk pengawasan FOP
                 'task.approve',
                 'task.assign.team',
                 'task.cancel',
@@ -441,6 +447,11 @@ class RolePermissionSeeder extends Seeder
                 'tickets.history.view',
                 'tickets.qr.create',
                 'tickets.view',
+                'network_nodes.view',
+                'network_nodes.create',
+                'network_nodes.update',
+                'network_nodes.register_infra',
+                'warehouse.usage.view', // Rekap Pemakaian Material Lapangan (harian/mingguan/bulanan/custom)
                 'warehouse_custody.view',
                 'warehouse_traceability.view',
             ],
@@ -497,12 +508,15 @@ class RolePermissionSeeder extends Seeder
                 'warehouse.view',
                 'warehouse_transfer.view',
                 'warehouse_transfer.receive',
+                'warehouse_branch_sale.view',
+                'warehouse_branch_sale.receive',
                 'warehouse_issue.view',
                 'warehouse_issue.create',
                 'warehouse_custody.view',
                 'warehouse_traceability.view',
                 'warehouse_reassign.create',
                 'warehouse_report.view',
+                'warehouse_report.sold_to_customer.view',
                 'warehouse_stock_request.view',
                 'warehouse_stock_request.create',
                 'warehouse_stock_request.cancel',
@@ -526,6 +540,7 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_issue.create',
                 'warehouse_issue.view',
                 'warehouse_reassign.create',
+                'warehouse_report.sold_to_customer.view',
                 'warehouse_report.view',
                 'warehouse_stock_request.approve',
                 'warehouse_stock_request.cancel',
@@ -537,6 +552,10 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_transfer.receive',
                 'warehouse_transfer.view',
                 'warehouse_transfer_invoice.view',
+                'warehouse_branch_sale.view',
+                'warehouse_branch_sale.create',
+                'warehouse_branch_sale.receive',
+                'warehouse_branch_sale_price.view',
             ],
 
             'sales' => [
@@ -620,6 +639,7 @@ class RolePermissionSeeder extends Seeder
                 'collector_worksheet.validate',
                 'collector_worksheet.view', // Cross check kolektor DALAM scope POP-nya
                 'customer_balance.view', // Saldo Pelanggan (ADHOC-92) DALAM scope POP-nya
+                'customer_cable_crossings.view', // Kabel Melintang Jalan (ADHOC-205) DALAM scope POP-nya
                 'customers.create',
                 'customers.deactivate', // Terminasi langganan dalam scope POP-nya
                 'customers.detail.address.update',
@@ -687,6 +707,7 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_issue.create',
                 'warehouse_issue.view',
                 'warehouse_reassign.create', // reassign custody teknisi resign/cuti cabangnya sendiri
+                'warehouse_report.sold_to_customer.view', // laporan barang terjual ke pelanggan, discope cabangnya sendiri
                 'warehouse_report.view', // laporan agregat, discope EffectiveAccessService ke cabangnya sendiri
                 'warehouse_stock_request.cancel',
                 'warehouse_stock_request.create',
@@ -694,6 +715,10 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_traceability.view',
                 'warehouse_transfer.receive',
                 'warehouse_transfer.view',
+                'warehouse_branch_sale.view',
+                'warehouse_branch_sale.create',
+                'warehouse_branch_sale.receive',
+                'warehouse_branch_sale_price.view',
             ],
 
             'kolektor' => [

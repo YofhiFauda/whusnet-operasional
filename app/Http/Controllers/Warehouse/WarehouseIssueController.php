@@ -122,7 +122,7 @@ class WarehouseIssueController extends Controller
         // yang nunggu dikonfirmasi di /warehouse/transfers/pending.
         $pendingTransferCount = InventoryTransfer::query()
             ->where('to_pop_id', $validated['pop_id'])
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
             ->count();
 
         $balanceItems = InventoryBalance::query()
@@ -136,6 +136,7 @@ class WarehouseIssueController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,
@@ -161,6 +162,7 @@ class WarehouseIssueController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,
@@ -180,6 +182,7 @@ class WarehouseIssueController extends Controller
 
                 return [
                     'item_id' => $item->id,
+                    'code' => $item->code,
                     'name' => $item->name,
                     'unit' => $item->unit,
                     'tracking_type' => $item->tracking_type->value,

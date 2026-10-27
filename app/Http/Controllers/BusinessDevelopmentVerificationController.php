@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\CustomerAcquisition;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Services\BusinessDevelopmentVerificationQueue;
 use App\Services\CustomerVerificationDetailService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
@@ -53,17 +54,10 @@ use Illuminate\View\View;
  */
 class BusinessDevelopmentVerificationController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, BusinessDevelopmentVerificationQueue $queue): View
     {
-        $access = app(EffectiveAccessService::class);
-        $user = $request->user();
-
-        $customers = Customer::query()
+        $customers = $queue->forUser($request->user())
             ->with(['customerService.internetPackage', 'pop'])
-            ->where('status', WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value)
-            ->when(! $access->hasAllPopAccess($user), function ($query) use ($access, $user) {
-                $query->whereIn('pop_id', $access->getAllowedPopIds($user));
-            })
             ->orderBy('updated_at')
             ->get();
 
@@ -127,12 +121,25 @@ class BusinessDevelopmentVerificationController extends Controller
             // dikonfirmasi ke pelanggan (lihat docblock kelas ini).
             $billing = $initialInvoiceService->withInstallationFee($pending['billing'], (float) $validated['installation_fee']);
 
+            // Harga "Jual Modem" (ownership modem sewa/beli, 2026-10-09, task
+            // 4 koreksi) — dibaca dari snapshot yang SAMA, bukan dihitung
+            // ulang: `finalVerify()` sudah menitipkannya di
+            // `$pending['billing']['modem_sale_amount']` (lewat
+            // `calculate()`). Kategori Bisnis tidak dikecualikan dari "Beli
+            // dari Gudang" — tidak ada alasan bisnis buat itu — jadi
+            // nominalnya WAJIB ikut diteruskan ke `issue()`, kalau tidak
+            // argumen defaultnya (0.0) menimpa `$billing['modem_sale_amount']`
+            // di dalam `issue()` dan baris tagihannya lenyap diam-diam padahal
+            // SN-nya sudah kejual (ownership CUSTOMER, custody kepotong).
+            $modemSaleAmount = (float) ($pending['billing']['modem_sale_amount'] ?? 0);
+
             $initialInvoice = $initialInvoiceService->issue(
                 $customer,
                 $customer->customerService,
                 $billing,
                 $pending['issue_date'],
-                auth()->id()
+                auth()->id(),
+                $modemSaleAmount
             );
 
             $oldStatus = $customer->status;

@@ -15,7 +15,7 @@
 </div>
 
 <!-- Form Container -->
-<form action="{{ route('master.items.update', $item) }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto" x-data="{ trackingType: '{{ old('tracking_type', $item->tracking_type->value) }}' }">
+<form action="{{ route('master.items.update', $item) }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto" x-data="{ trackingType: '{{ old('tracking_type', $item->tracking_type->value) }}', categoryId: '{{ old('item_category_id', $item->item_category_id) }}', modemCategoryId: '{{ $categories->firstWhere('code', 'modem_ont')?->id }}' }">
     @csrf
     @method('PUT')
 
@@ -53,7 +53,7 @@
             <!-- Tipe -->
             <div>
                 <label for="item_category_id" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kategori <span class="text-rose-500">*</span></label>
-                <select name="item_category_id" id="item_category_id" required
+                <select name="item_category_id" id="item_category_id" x-model="categoryId" required
                         class="w-full px-3 py-2 border @error('item_category_id') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 bg-white dark:bg-slate-800">
                     @foreach($categories as $category)
                         <option value="{{ $category->id }}" {{ (int) old('item_category_id', $item->item_category_id) === $category->id ? 'selected' : '' }}>{{ $category->name }}{{ $category->is_active ? '' : ' (nonaktif)' }}</option>
@@ -106,8 +106,8 @@
         @if($trackingTypeLocked)
         <div class="flex items-center gap-2">
             <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->tracking_type->label() }}</span>
-            @if($item->tracking_type->value === 'serialized')
             <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->ownership_mode->label() }}</span>
+            @if($item->tracking_type->value === 'serialized')
             <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->auto_generate_serial ? 'SN Digenerate Sistem' : 'SN Manual' }}</span>
             @endif
         </div>
@@ -124,16 +124,42 @@
             <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
         @enderror
 
-        <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
+        {{-- Kepemilikan berlaku buat SEMUA cara lacak — lihat catatan di
+             create.blade.php. Cuma opsi "Aset Perusahaan" yang SERIALIZED-only. --}}
+        <div class="pt-2">
             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kepemilikan</label>
-            <select name="ownership_mode" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <select name="ownership_mode" x-effect="if ((trackingType !== 'serialized' && $el.value === 'company_asset') || (categoryId === modemCategoryId && $el.value !== 'installable')) { $el.value = 'installable' }" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
                 @foreach($ownershipModes as $om)
-                <option value="{{ $om->value }}" {{ old('ownership_mode', $item->ownership_mode->value) === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
+                <option value="{{ $om->value }}" @if($om !== \App\Enums\OwnershipMode::INSTALLABLE) :disabled="categoryId === modemCategoryId{{ $om === \App\Enums\OwnershipMode::COMPANY_ASSET ? " || trackingType !== 'serialized'" : '' }}" @endif {{ old('ownership_mode', $item->ownership_mode->value) === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
                 @endforeach
             </select>
-            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — gak pernah tercatat terpasang ke pelanggan, cuma dipinjam-pakaikan lalu wajib balik.</p>
+            <p x-show="categoryId === modemCategoryId" x-cloak class="mt-1 text-[11px] font-semibold text-sky-700 dark:text-sky-400">Modem/ONT merupakan perangkat yang dipasang ke pelanggan dan tetap dapat ditelusuri di Peta Infrastruktur.</p>
+            @error('ownership_mode')<p class="mt-1 text-[10px] font-semibold text-rose-500">{{ $message }}</p>@enderror
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — cuma Bernomor Seri, gak pernah tercatat terpasang, dipinjam-pakaikan lalu wajib balik. "Aset Infrastruktur" buat barang yang dipasang netap ke titik jaringan (ODP, splitter, kabel feeder).</p>
+        </div>
 
-            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5 mt-4">Sumber Serial Number</label>
+        <div class="pt-2">
+            <div class="mb-1.5 flex items-center gap-1.5">
+                <label for="infrastructure_node_type_id" class="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300">Tipe Node Tujuan</label>
+                <details class="group relative">
+                    <summary aria-label="Penjelasan Tipe Node Tujuan" class="flex size-4 cursor-pointer list-none items-center justify-center rounded-full border border-slate-400 text-[10px] font-bold leading-none text-slate-500 hover:border-sky-500 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-500 dark:text-slate-400 [&::-webkit-details-marker]:hidden">?</summary>
+                    <div class="absolute left-0 top-full z-30 mt-2 w-64 rounded-md border border-slate-200 bg-white p-3 text-xs font-normal normal-case leading-relaxed tracking-normal text-slate-700 shadow-lg dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                        Jenis node jaringan tempat aset infrastruktur boleh dipasang, bukan lokasi tertentu. Contoh: OLT memakai tipe OLT. Modem/ONT dipasang ke pelanggan, jadi kolom ini tidak digunakan.
+                    </div>
+                </details>
+            </div>
+            <select name="infrastructure_node_type_id" id="infrastructure_node_type_id" :disabled="categoryId === modemCategoryId" class="disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-slate-900 dark:disabled:text-slate-500 w-full sm:w-1/2 px-3 py-2 rounded-md border border-slate-300 bg-white text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                <option value="">Fleksibel (selain komponen OLT)</option>
+                @foreach($nodeTypes as $nodeType)
+                    <option value="{{ $nodeType->id }}" @selected((int) old('infrastructure_node_type_id', $item->infrastructure_node_type_id) === $nodeType->id)>{{ $nodeType->name }}</option>
+                @endforeach
+            </select>
+            
+            @error('infrastructure_node_type_id')<p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>@enderror
+        </div>
+        @include('master.items.partials.infrastructure-location-kind', ['selectedLocationKind' => old('infrastructure_location_kind', $item->infrastructure_location_kind?->value)])
+        <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Sumber Serial Number</label>
             <select name="auto_generate_serial" :disabled="trackingType !== 'serialized'" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
                 <option value="0" {{ old('auto_generate_serial', $item->auto_generate_serial ? '1' : '0') === '0' ? 'selected' : '' }}>Manual (barang punya SN asli dari vendor — modem, ONT, router)</option>
                 <option value="1" {{ old('auto_generate_serial', $item->auto_generate_serial ? '1' : '0') === '1' ? 'selected' : '' }}>Digenerate Sistem (barang gak punya SN — ODP, Splitter, dll)</option>

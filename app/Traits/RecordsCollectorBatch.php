@@ -312,7 +312,7 @@ trait RecordsCollectorBatch
 
         return response()->json([
             'success' => true,
-            'message' => "{$outcome['processed']} pembayaran berhasil dicatat untuk kolektor {$collector->name}.",
+            'message' => "{$outcome['processed']} pembayaran berhasil dicatat untuk ".($source === CollectorRole::TEKNISI ? 'teknisi' : 'kolektor')." {$collector->name}.",
             'processed' => $outcome['processed'],
             'results' => $outcome['results'],
         ]);

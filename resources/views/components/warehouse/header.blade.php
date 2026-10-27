@@ -16,6 +16,7 @@
     $canViewCustody = $user->hasPermission('warehouse_custody.view');
     $canViewTraceability = $user->hasPermission('warehouse_traceability.view');
     $canViewReport = $user->hasPermission('warehouse_report.view');
+    $canViewSoldToCustomer = $user->hasPermission('warehouse_report.sold_to_customer.view');
     $canViewStockRequest = $user->hasPermission('warehouse_stock_request.view');
     $canViewTransfer = $user->hasPermission('warehouse_transfer.view');
 
@@ -252,6 +253,14 @@
                 <span>Laporan</span>
             </a>
             @endif
+            @if($canViewSoldToCustomer)
+            <a href="{{ route('warehouse.reports.sold-to-customer') }}"
+               data-active-tab="{{ $active === 'sold-to-customer' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {{ $tabClass('sold-to-customer') }}">
+                <svg class="w-3.5 h-3.5 {{ $tabIconClass('sold-to-customer') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Laporan Barang Terjual</span>
+            </a>
+            @endif
 
             @if($canViewWarehouse || $canViewTraceability || $canViewTransfer)
             <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
@@ -276,6 +285,16 @@
                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {{ $tabClass('transfers-pending') }}">
                 <svg class="w-3.5 h-3.5 {{ $tabIconClass('transfers-pending') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span>Konfirmasi Transfer</span>
+                @if(($badge_transfer_confirmation_count ?? 0) > 0)
+                    <span data-badge="transfer-confirmation" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">{{ $badge_transfer_confirmation_count }}</span>
+                @endif
+            </a>
+            @endif
+            @if($user->hasPermission('warehouse_branch_sale.view'))
+            <a href="{{ route('warehouse.branch-sales.index') }}"
+               data-active-tab="{{ $active === 'branch-sales' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold {{ $tabClass('branch-sales') }}">
+                <span>Jual Beli Cabang</span>
             </a>
             @endif
             @if($canViewTraceability)
@@ -506,6 +525,12 @@
                                 <span>Laporan</span>
                             </a>
                             @endif
+                            @if($canViewSoldToCustomer)
+                            <a href="{{ route('warehouse.reports.sold-to-customer') }}" class="{{ $mobDropdownClass('sold-to-customer') }}">
+                                <svg class="w-3.5 h-3.5 {{ $mobDropdownIconClass('sold-to-customer') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span>Barang Terjual</span>
+                            </a>
+                            @endif
                             @if($canViewTraceability)
                             <a href="{{ route('warehouse.traceability.index') }}" class="{{ $mobDropdownClass('traceability') }}">
                                 <svg class="w-3.5 h-3.5 {{ $mobDropdownIconClass('traceability') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -520,6 +545,9 @@
                             <a href="{{ route('warehouse.transfers.pending') }}" class="{{ $mobDropdownClass('transfers-pending') }}">
                                 <svg class="w-3.5 h-3.5 {{ $mobDropdownIconClass('transfers-pending') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 <span>Konfirmasi Transfer</span>
+                                @if(($badge_transfer_confirmation_count ?? 0) > 0)
+                                    <span data-badge="transfer-confirmation" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">{{ $badge_transfer_confirmation_count }}</span>
+                                @endif
                             </a>
                             @endif
                             @if($canViewCustody)
@@ -627,6 +655,15 @@
             </a>
             @endif
 
+            @if($canViewSoldToCustomer)
+            <a href="{{ route('warehouse.reports.sold-to-customer') }}"
+               data-active-tab="{{ $active === 'sold-to-customer' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap {{ $tabClass('sold-to-customer') }} transition-all shrink-0 active:scale-95">
+                <svg class="w-3.5 h-3.5 {{ $tabIconClass('sold-to-customer') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Barang Terjual</span>
+            </a>
+            @endif
+
             @if($canViewWarehouse)
             <a href="{{ route('warehouse.stock.index') }}"
                data-active-tab="{{ $active === 'stock' ? 'true' : 'false' }}"
@@ -651,6 +688,9 @@
                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap {{ $tabClass('transfers-pending') }} transition-all shrink-0 active:scale-95">
                 <svg class="w-3.5 h-3.5 {{ $tabIconClass('transfers-pending') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                 <span>Transfer</span>
+                @if(($badge_transfer_confirmation_count ?? 0) > 0)
+                    <span data-badge="transfer-confirmation" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">{{ $badge_transfer_confirmation_count }}</span>
+                @endif
             </a>
             @endif
 

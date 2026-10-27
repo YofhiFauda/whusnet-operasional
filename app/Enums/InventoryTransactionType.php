@@ -65,6 +65,30 @@ enum InventoryTransactionType: string
      */
     case INSTALL = 'install';
 
+    /**
+     * Unit SERIALIZED/QUANTITY/ROLL terpasang netap ke titik infrastruktur
+     * jaringan (ODC/ODP/splitter). Bukan ke pelanggan — beda dari INSTALL,
+     * jadi tidak masuk `customer_technical_details`.
+     */
+    case DEPLOY = 'deploy';
+
+    /**
+     * Pencabutan dari titik infrastruktur oleh teknisi (mis. saat ODP dibongkar).
+     * Hasil cabut ditahan untuk pemeriksaan Gudang sebelum masuk custody baru;
+     * tidak menyentuh saldo gudang atau menambah panjang roll asal.
+     */
+    case RETRIEVE_INFRA = 'retrieve_infra';
+
+    /**
+     * SN yang sudah lama berdiri di lapangan (aset lama, mis. opname chassis
+     * eksisting), belum pernah lewat RECEIVE/ISSUE/DEPLOY — tidak ada jejak
+     * ledger sebelumnya. SATU-SATUNYA tipe yang boleh membuat SN langsung
+     * `DEPLOYED` TANPA `FopTask` DAN tanpa pernah `ISSUED` ke custody teknisi
+     * (`InventoryService::registerExistingInfraSerial()`) — beda dari DEPLOY
+     * yang selalu berasal dari custody teknisi yang sudah ada.
+     */
+    case REGISTER_INFRA = 'register_infra';
+
     public function label(): string
     {
         return match ($this) {
@@ -76,6 +100,9 @@ enum InventoryTransactionType: string
             self::TRANSFER_CUSTODY => 'Alih Custody Teknisi',
             self::STOCK_OPNAME => 'Stok Opname',
             self::INSTALL => 'Terpasang di Pelanggan',
+            self::DEPLOY => 'Terpasang di Infrastruktur',
+            self::RETRIEVE_INFRA => 'Dicabut dari Infrastruktur',
+            self::REGISTER_INFRA => 'Registrasi Aset Lama (Infrastruktur)',
         };
     }
 }

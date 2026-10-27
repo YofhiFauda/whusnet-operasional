@@ -15,8 +15,13 @@ use App\Models\InventorySerial;
  * Kenapa perlu: data perangkat tersebar di empat tempat — Inventori Gudang
  * (serial terpasang), `customer_devices` (tabel terstruktur), `customer_
  * technical_details` (laporan pemasangan & hasil migrasi legacy), dan kolom
- * lama di `customers` (`ont_sn`, `vlan_id`, `odp_code`). Detail membaca
- * keempatnya dengan urutan cadangan, tapi Edit dulu cuma membaca
+ * lama di `customers` (`ont_sn`, `vlan_id`, `odp_code`). Untuk ODP khusus,
+ * ada sumber KELIMA yang menang di atas semua itu: assignment port struktural
+ * (`network_port_assignments`, lewat Master Node/Peta Infrastruktur) — field
+ * teks `odp_number`/`odp_port` di atas diisi manual dari form terpisah dan
+ * gampang menyimpang begitu teknisi assign ulang pelanggan tanpa balik edit
+ * form itu. Detail membaca kelimanya dengan urutan cadangan, tapi Edit dulu
+ * cuma membaca
  * `customer_devices` — di DB dev 1.681 pelanggan SN-nya tampil di Detail tapi
  * kosong di Edit (kasus Siti Juariyah, SN `ZTEGC7DD8857` cuma ada di `ont_sn`
  * & `router_or_ont_serial`). Dua salinan urutan cadangan pasti menyimpang
@@ -72,8 +77,29 @@ class CustomerDeviceProfileService
     {
         $device = $customer->customerDevice;
         $tech = $customer->customerTechnicalDetail;
+
+        // Assignment port ODP struktural (network_port_assignments) adalah
+        // sumber kebenaran posisi fisik pelanggan di jaringan -- sama yang
+        // dipakai kartu "Lokasi Jaringan" di Detail Pelanggan. Field teks
+        // `odp_number`/`odp_port` di customer_technical_details diisi manual
+        // dari form Pemasangan/Edit, independen dari assign port struktural,
+        // jadi gampang menyimpang begitu teknisi ganti ODP pelanggan lewat
+        // Master Node/Peta tapi gak balik edit form Pemasangan (bug temuan
+        // user 2026-10-22: Ardiyanto sudah dipindah ke ODP-JETIS-01 Port 1
+        // tapi tech->odp_number masih "Odp 13 JTWN"). Assignment aktif WAJIB
+        // menang di atas ketiga fallback legacy.
+        $activeNetworkAssignment = $customer->portAssignments()
+            ->whereNull('released_at')
+            ->with('port.node')
+            ->latest('id')
+            ->first();
+        // Perangkat tambahan (AP, STB) bukan perangkat utama — jangan sampai
+        // AP yang dipasang belakangan tampil sebagai "perangkat utama" di Detail.
+        // whereDoesntHave (bukan whereHas is_extra=false): `items.item_category_id`
+        // nullable — modem tanpa kategori tetap harus dianggap perangkat utama.
         $installedInventorySerial = InventorySerial::where('customer_id', $customer->id)
             ->where('status', SerialStatus::INSTALLED->value)
+            ->whereDoesntHave('item.category', fn ($query) => $query->where('is_customer_extra_device', true))
             ->with('item')
             ->latest('installed_at')
             ->first();
@@ -104,8 +130,10 @@ class CustomerDeviceProfileService
             'macAddress' => $installedInventorySerial?->mac_address ?: ($device?->mac_address ?: ($tech?->router_mac ?: $tech?->antenna_mac)),
             'vlanId' => $device?->vlan_id ?: ($tech?->vlan ?: $customer->vlan_id),
             'ssid' => $device?->wifi_ssid ?: $tech?->ssid,
-            'odpCode' => $device?->odp ?: ($tech?->odp_number ?: $customer->odp_code),
-            'odpPort' => $device?->odp_port ?: $tech?->odp_port,
+            'odpCode' => $activeNetworkAssignment?->port?->node?->code ?: ($device?->odp ?: ($tech?->odp_number ?: $customer->odp_code)),
+            'odpPort' => $activeNetworkAssignment?->port?->number !== null
+                ? (string) $activeNetworkAssignment->port->number
+                : ($device?->odp_port ?: $tech?->odp_port),
             'rxPower' => $device?->signal_rx_power !== null
                 ? $device->signal_rx_power.' dBm'
                 : (($tech?->fiber_signal ?: $tech?->wireless_signal) ?: null),

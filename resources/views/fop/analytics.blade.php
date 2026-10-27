@@ -9,24 +9,35 @@
 <div class="flex flex-col gap-6 max-w-screen-2xl mx-auto font-sans text-text-main">
 
     {{-- ══ Page Header ══════════════════════════════════════════════ --}}
-    <div class="page-header flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between mb-2">
+    <div class="page-header flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-2">
         <div class="page-header-left">
-            <div class="flex items-center gap-2">
-                <svg class="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">Dashboard Analitik FOP</h1>
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-2xs">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">Dashboard Analitik FOP</h1>
+                    <p class="text-xs text-text-muted mt-0.5 font-sans">Pola & performa lintas periode — alat kerja, material gudang, wilayah, teknisi, backlog, & durasi pengerjaan.</p>
+                </div>
             </div>
-            <p class="text-xs text-text-muted mt-0.5 font-sans">Pola & performa lintas periode — alat kerja, wilayah, teknisi, backlog, durasi pengerjaan. Beda dari FOP Dashboard (operasional harian): halaman ini buat evaluasi mingguan/bulanan, bukan realtime shift.</p>
+        </div>
+        <div class="flex items-center gap-2.5 flex-wrap">
+            {{-- Dual Mode Switcher: Operasional Harian vs Rekapitulasi Analitik --}}
+            <div class="inline-flex rounded-lg border border-border bg-surface p-1 shadow-2xs">
+                <a href="{{ route('fop.dashboard') }}" class="px-2.5 py-1 text-xs font-medium text-text-muted hover:text-text-main transition-colors">⚡ Operasional Harian</a>
+                <span class="px-2.5 py-1 text-xs font-bold rounded-md bg-primary text-white">📊 Rekapitulasi &amp; Analitik</span>
+            </div>
         </div>
     </div>
 
     {{-- ══ Filter ═══════════════════════════════════════════════════ --}}
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 shadow-xs">
+    <div class="bg-surface border border-border rounded-xl p-4 shadow-xs">
         <form action="{{ route('fop.analytics') }}" method="GET" class="flex flex-wrap items-end gap-3">
             <div>
-                <label for="granularity" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Granularitas</label>
-                <select name="granularity" id="granularity" class="px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                <label for="granularity" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Granularitas</label>
+                <select name="granularity" id="granularity" class="px-3 py-2 text-xs font-medium border border-border rounded-lg bg-surface-muted text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     <option value="harian" {{ $granularity === 'harian' ? 'selected' : '' }}>Harian (30 hari)</option>
                     <option value="mingguan" {{ $granularity === 'mingguan' ? 'selected' : '' }}>Mingguan (12 minggu)</option>
                     <option value="bulanan" {{ $granularity === 'bulanan' ? 'selected' : '' }}>Bulanan (12 bulan)</option>
@@ -34,27 +45,27 @@
                 </select>
             </div>
             <div>
-                <label for="from" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Dari</label>
-                <input type="date" name="from" id="from" value="{{ $periodFrom }}" class="px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                <label for="from" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Dari</label>
+                <input type="date" name="from" id="from" value="{{ $periodFrom }}" class="px-3 py-2 text-xs font-medium border border-border rounded-lg bg-surface-muted text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
             </div>
             <div>
-                <label for="to" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Sampai</label>
-                <input type="date" name="to" id="to" value="{{ $periodTo }}" class="px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                <label for="to" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Sampai</label>
+                <input type="date" name="to" id="to" value="{{ $periodTo }}" class="px-3 py-2 text-xs font-medium border border-border rounded-lg bg-surface-muted text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
             </div>
             <div class="w-full sm:w-64">
-                <label for="pop_id" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">POP</label>
-                <select name="pop_id" id="pop_id" class="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                <label for="pop_id" class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">POP</label>
+                <select name="pop_id" id="pop_id" class="w-full px-3 py-2 text-xs font-medium border border-border rounded-lg bg-surface-muted text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     <option value="">— Semua POP Terjangkau —</option>
                     @foreach($pops as $pop)
                     <option value="{{ $pop->id }}" {{ (string) $popFilter === (string) $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
                     @endforeach
                 </select>
             </div>
-            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer">
+            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer">
                 <span>Terapkan</span>
             </button>
         </form>
-        <p class="mt-2 text-[10px] text-slate-400">Isi "Dari"/"Sampai" buat rentang custom (mengalahkan granularitas), atau kosongkan lalu pilih granularitas buat rentang default otomatis.</p>
+        <p class="mt-2 text-[10px] text-text-muted">Isi "Dari"/"Sampai" buat rentang custom (mengalahkan granularitas), atau kosongkan lalu pilih granularitas buat rentang default otomatis.</p>
     </div>
 
     {{-- ══ KPI Strip ════════════════════════════════════════════════ --}}
@@ -63,7 +74,7 @@
             <div class="metric-card-label"><span>Pemakaian Alat Kerja</span></div>
             <div class="metric-card-value-container">
                 <p class="metric-card-value">{{ $toolTotal }}</p>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-sans uppercase tracking-wider bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400">{{ $toolTypesUsed }}/{{ $toolTypesActive }} jenis</span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-sans uppercase tracking-wider bg-surface-muted text-text-muted">{{ $toolTypesUsed }}/{{ $toolTypesActive }} jenis</span>
             </div>
             <div class="mt-1">@include('fop.partials.analytics-delta-badge', ['delta' => $periodComparison['tool_total']['delta_pct'], 'invert' => false])</div>
         </div>
@@ -75,7 +86,7 @@
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-sans uppercase tracking-wider bg-error-bg text-error border border-error-border">{{ $backlogStats['over_sla'] }} Lewat SLA</span>
                 @endif
             </div>
-            <p class="mt-1 text-[9px] text-slate-300 dark:text-slate-600">Snapshot live, gak dibandingkan periode</p>
+            <p class="mt-1 text-[9px] text-text-muted">Snapshot live, gak dibandingkan periode</p>
         </div>
         <div class="metric-card status-info">
             <div class="metric-card-label"><span>Rata-Rata Durasi Solving</span></div>
@@ -89,132 +100,231 @@
         </div>
     </div>
 
-    {{-- ══ Section 1 — Barang Gudang ═════════════════════════════════ --}}
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 shadow-xs">
-        <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-3">Ranking Barang Gudang Terpakai</h3>
-        @if(empty($materialRanking))
-        <p class="text-xs text-slate-400 py-6 text-center">Gak ada pemakaian barang gudang tercatat di periode ini.</p>
+    {{-- ══ Section 0 — Ranking Pemakaian Alat Kerja ═══════════════════ --}}
+    <div class="bg-surface border border-border rounded-xl p-5 shadow-xs">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+                <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Ranking Pemakaian Alat Kerja</h3>
+                <p class="text-[11px] text-text-muted mt-0.5">Frekuensi pemakaian alat kerja (Fusion Splicer, OPM, Cleaver, dll.) pada task lapangan</p>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-muted border border-border text-text-muted">
+                {{ $toolTypesUsed }}/{{ $toolTypesActive }} Jenis Terpakai
+            </span>
+        </div>
+        @if(empty($toolRanking))
+        <p class="text-xs text-text-muted py-6 text-center">Gak ada pemakaian alat kerja tercatat di periode ini.</p>
         @else
-        <div id="materialRankingChartLegend" class="flex flex-wrap gap-3 mb-2 text-[11px] font-semibold"></div>
-        <div class="overflow-x-auto scroll-smooth"><svg id="materialRankingChart" role="img" aria-label="Grafik ranking barang gudang terpakai"></svg></div>
+        <div class="overflow-x-auto scroll-smooth">
+            <table class="min-w-full divide-y divide-border text-xs">
+                <thead class="bg-surface-muted">
+                    <tr>
+                        <th class="px-4 py-2.5 text-left font-bold text-text-muted uppercase tracking-wider">Alat Kerja</th>
+                        <th class="px-4 py-2.5 text-right font-bold text-text-muted uppercase tracking-wider">Total Dipakai</th>
+                        <th class="px-4 py-2.5 text-left font-bold text-text-muted uppercase tracking-wider w-1/3">Proporsi Pemakaian</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    @php $toolProportionBase = $toolTotal > 0 ? $toolTotal : 1; @endphp
+                    @foreach($toolRanking as $tr)
+                    @php $toolProportionPercent = round(($tr['total'] / $toolProportionBase) * 100); @endphp
+                    <tr class="hover:bg-surface-muted/60 transition-colors">
+                        <td class="px-4 py-2.5 font-semibold text-text-main"><a href="{{ route('fop.analytics.drilldown', ['kind' => 'tool', 'value' => $tr['tool_name'], 'from' => $periodFrom, 'to' => $periodTo, 'pop_id' => $popFilter]) }}" class="text-primary hover:underline">{{ $tr['tool_name'] }}</a></td>
+                        <td class="px-4 py-2.5 text-right font-mono font-bold text-text-main">{{ $tr['total'] }}</td>
+                        <td class="px-4 py-2.5">
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1 bg-surface-muted rounded-full h-2 overflow-hidden border border-border/50">
+                                    <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: {{ min(100, $toolProportionPercent) }}%"></div>
+                                </div>
+                                <span class="text-[10px] font-mono text-text-muted w-10 text-right">{{ $toolProportionPercent }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
         @endif
     </div>
 
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 shadow-xs">
+    {{-- ══ Section 1 — Barang Gudang yang Digunakan Teknisi ══════════ --}}
+    <div class="bg-surface border border-border rounded-xl p-5 shadow-xs">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+                <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Barang Gudang yang Digunakan Teknisi</h3>
+                <p class="text-[11px] text-text-muted mt-0.5">Rekapitulasi material dan barang gudang terpakai pada pelaksanaan task lapangan</p>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-muted border border-border text-text-muted">
+                {{ count($materialRanking) }} Jenis Barang Terpakai
+            </span>
+        </div>
+        @if(empty($materialRanking))
+        <p class="text-xs text-text-muted py-6 text-center">Gak ada pemakaian barang gudang tercatat di periode ini.</p>
+        @else
+        {{-- Grafik Bar Ranking --}}
+        <div id="materialRankingChartLegend" class="flex flex-wrap gap-3 mb-2 text-[11px] font-semibold"></div>
+        <div class="overflow-x-auto scroll-smooth mb-4"><svg id="materialRankingChart" role="img" aria-label="Grafik ranking barang gudang terpakai"></svg></div>
+
+        {{-- Tabel Rincian Pemakaian Barang Gudang --}}
+        <div class="overflow-x-auto scroll-smooth border-t border-border pt-3">
+            <table class="min-w-full divide-y divide-border text-xs">
+                <thead class="bg-surface-muted">
+                    <tr>
+                        <th class="px-4 py-2.5 text-left font-bold text-text-muted uppercase tracking-wider">Nama Barang Gudang</th>
+                        <th class="px-4 py-2.5 text-right font-bold text-text-muted uppercase tracking-wider">Total Digunakan</th>
+                        <th class="px-4 py-2.5 text-left font-bold text-text-muted uppercase tracking-wider w-1/3">Distribusi Pemakaian</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    @php $maxMaterialUsage = collect($materialRanking)->max('total') ?: 1; @endphp
+                    @foreach($materialRanking as $mr)
+                    <tr class="hover:bg-surface-muted/60 transition-colors">
+                        <td class="px-4 py-2.5 font-semibold text-text-main"><a href="{{ route('fop.analytics.drilldown', ['kind' => 'material', 'value' => $mr['item_name'], 'from' => $periodFrom, 'to' => $periodTo, 'pop_id' => $popFilter]) }}" class="text-primary hover:underline">{{ $mr['item_name'] }}</a></td>
+                        <td class="px-4 py-2.5 text-right font-mono font-bold text-text-main">
+                            {{ rtrim(rtrim(number_format($mr['total'], 2, ',', '.'), '0'), ',') }}
+                            <span class="text-[10px] text-text-muted font-normal">{{ $mr['unit'] ?? '' }}</span>
+                        </td>
+                        <td class="px-4 py-2.5">
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1 bg-surface-muted rounded-full h-2 overflow-hidden border border-border/50">
+                                    <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: {{ min(100, round(($mr['total'] / $maxMaterialUsage) * 100)) }}%"></div>
+                                </div>
+                                <span class="text-[10px] font-mono text-text-muted w-10 text-right">{{ round(($mr['total'] / $maxMaterialUsage) * 100) }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endif
+    </div>
+
+    <div class="bg-surface border border-border rounded-xl p-5 shadow-xs">
         <div class="flex items-center justify-between mb-1">
-            <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Tren Pemakaian Barang Gudang (Top 5)</h3>
-            <span class="text-[10px] text-slate-400">Granularitas ikut filter di atas</span>
+            <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Tren Pemakaian Barang Gudang (Top 5)</h3>
+            <span class="text-[10px] text-text-muted">Granularitas ikut filter di atas</span>
         </div>
         @if(empty($materialTrendChart['rows']))
-        <p class="text-xs text-slate-400 py-6 text-center">Gak ada tren pemakaian barang gudang tercatat di periode ini.</p>
+        <p class="text-xs text-text-muted py-6 text-center">Gak ada tren pemakaian barang gudang tercatat di periode ini.</p>
         @else
         <div id="materialTrendChartLegend" class="flex flex-wrap gap-3 mb-2 text-[11px] font-semibold"></div>
         <div class="overflow-x-auto scroll-smooth"><svg id="materialTrendChart" role="img" aria-label="Grafik tren pemakaian barang gudang per periode"></svg></div>
         @endif
     </div>
 
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 shadow-xs">
+    <div class="bg-surface border border-border rounded-xl p-5 shadow-xs">
         <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
-            <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Modem/ONT Terpasang — Instalasi vs Maintenance</h3>
+            <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Modem/ONT Terpasang</h3>
             <div class="flex items-center gap-3 text-[11px] font-semibold">
-                <span class="text-slate-500 dark:text-slate-400">Instalasi: <span class="text-slate-800 dark:text-slate-100">{{ $modemInstalasiTotal }}</span></span>
-                <span class="text-slate-500 dark:text-slate-400">Maintenance: <span class="text-slate-800 dark:text-slate-100">{{ $modemMaintenanceTotal }}</span></span>
+                <span class="text-text-muted">Instalasi: <span class="text-text-main font-bold">{{ $modemInstalasiTotal }}</span></span>
+                <span class="text-text-muted">Maintenance: <span class="text-text-main font-bold">{{ $modemMaintenanceTotal }}</span></span>
+                <span class="text-text-muted">C-REQ: <span class="text-text-main font-bold">{{ $modemCreqTotal }}</span></span>
+                @if($modemOtherTotal > 0)<span class="text-text-muted">Lainnya: <span class="text-text-main font-bold">{{ $modemOtherTotal }}</span></span>@endif
             </div>
         </div>
         @if(empty($modemRanking))
-        <p class="text-xs text-slate-400 py-6 text-center">Gak ada modem/ONT terpasang tercatat di periode ini.</p>
+        <p class="text-xs text-text-muted py-6 text-center">Gak ada modem/ONT terpasang tercatat di periode ini.</p>
         @else
         <div id="modemChartLegend" class="flex flex-wrap gap-3 mb-2 text-[11px] font-semibold"></div>
-        <div class="overflow-x-auto scroll-smooth"><svg id="modemChart" role="img" aria-label="Grafik modem terpasang per model, instalasi vs maintenance"></svg></div>
-        @if($modemMaintenanceTotal === 0)
-        <p class="text-[10px] text-slate-400 mt-2">Maintenance masih 0 — jalur ganti modem saat maintenance belum mencatat SN di sistem, bukan berarti gak pernah terjadi di lapangan.</p>
-        @endif
+        <div class="overflow-x-auto scroll-smooth"><svg id="modemChart" role="img" aria-label="Grafik modem terpasang per model"></svg></div>
         @endif
     </div>
 
-    {{-- ══ Section 2 — Wilayah ══════════════════════════════════════ --}}
+    {{-- ══ Section 3 — Wilayah ══════════════════════════════════════ --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
-            <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
-                <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Pemasangan per Kecamatan</h3>
+        <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+            <div class="px-5 py-3.5 border-b border-border">
+                <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Pemasangan per Kecamatan</h3>
             </div>
-            @include('fop.partials.analytics-region-table', ['rows' => $regionInstallation, 'total' => $regionInstallationTotal, 'emptyText' => 'Gak ada pemasangan selesai di periode ini.'])
+            @include('fop.partials.analytics-region-table', ['rows' => $regionInstallation, 'kind' => 'region_installation', 'total' => $regionInstallationTotal, 'emptyText' => 'Gak ada pemasangan selesai di periode ini.'])
         </div>
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
-            <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
-                <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Task Maintenance per Kecamatan</h3>
-                <p class="text-[10px] text-slate-400 mt-0.5">Proksi "komplain" — belum ada tabel komplain terpisah.</p>
+        <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+            <div class="px-5 py-3.5 border-b border-border">
+                <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Task Maintenance per Kecamatan</h3>
+                <p class="text-[10px] text-text-muted mt-0.5">Proksi "komplain" — belum ada tabel komplain terpisah.</p>
             </div>
-            @include('fop.partials.analytics-region-table', ['rows' => $regionMaintenance, 'total' => $regionMaintenanceTotal, 'emptyText' => 'Gak ada task maintenance di periode ini.'])
+            @include('fop.partials.analytics-region-table', ['rows' => $regionMaintenance, 'kind' => 'region_maintenance', 'total' => $regionMaintenanceTotal, 'emptyText' => 'Gak ada task maintenance di periode ini.'])
         </div>
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
-            <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
-                <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Task Dibatalkan per Kecamatan</h3>
-                <p class="text-[10px] text-slate-400 mt-0.5">Proksi "task gagal" — belum ada status "gagal" tersendiri.</p>
+        <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+            <div class="px-5 py-3.5 border-b border-border">
+                <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Task Dibatalkan per Kecamatan</h3>
+                <p class="text-[10px] text-text-muted mt-0.5">Proksi "task gagal" — belum ada status "gagal" tersendiri.</p>
             </div>
-            @include('fop.partials.analytics-region-table', ['rows' => $regionCancelled, 'total' => $regionCancelledTotal, 'emptyText' => 'Gak ada task dibatalkan di periode ini.'])
+            @include('fop.partials.analytics-region-table', ['rows' => $regionCancelled, 'kind' => 'region_cancelled', 'total' => $regionCancelledTotal, 'emptyText' => 'Gak ada task dibatalkan di periode ini.'])
         </div>
     </div>
 
-    {{-- ══ Section 3 — Teknisi ══════════════════════════════════════ --}}
+    {{-- ══ Section 4 — Teknisi ══════════════════════════════════════ --}}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
-            <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
-                <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Beban Tugas Teknisi</h3>
-                <p class="text-[10px] text-slate-400 mt-0.5">Jumlah assignment (semua status), tim &gt;1 orang dihitung per orang.</p>
+        <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+            <div class="px-5 py-3.5 border-b border-border">
+                <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Beban Tugas Teknisi</h3>
+                <p class="text-[10px] text-text-muted mt-0.5">Jumlah assignment (semua status), tim &gt;1 orang dihitung per orang.</p>
             </div>
-            @include('fop.partials.analytics-leaderboard-table', ['rows' => $workloadLeaderboard, 'total' => $workloadLeaderboardTotal, 'emptyText' => 'Gak ada assignment tercatat di periode ini.'])
+            @include('fop.partials.analytics-leaderboard-table', ['rows' => $workloadLeaderboard, 'kind' => 'workload', 'total' => $workloadLeaderboardTotal, 'emptyText' => 'Gak ada assignment tercatat di periode ini.'])
         </div>
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
-            <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
-                <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Solving Terbanyak</h3>
+        <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+            <div class="px-5 py-3.5 border-b border-border">
+                <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Solving Terbanyak</h3>
                 @if($completedByWarning)
                 <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">⚠ {{ \Illuminate\Support\Carbon::parse('2026-08-07')->translatedFormat('d M Y') }} — kolom pencatat penyelesai baru mulai dilacak sejak tanggal itu, angka historis sebelumnya mungkin belum lengkap.</p>
                 @endif
             </div>
-            @include('fop.partials.analytics-leaderboard-table', ['rows' => $solvingLeaderboard, 'total' => $solvingLeaderboardTotal, 'emptyText' => 'Gak ada task selesai tercatat di periode ini.'])
+            @include('fop.partials.analytics-leaderboard-table', ['rows' => $solvingLeaderboard, 'kind' => 'solving', 'total' => $solvingLeaderboardTotal, 'emptyText' => 'Gak ada task selesai tercatat di periode ini.'])
         </div>
     </div>
 
-    {{-- ══ Section 4 — Backlog ══════════════════════════════════════ --}}
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
-        <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60">
-            <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Backlog Task Belum Dikerjakan</h3>
-            <p class="text-[10px] text-slate-400 mt-0.5">Draft/Terjadwal/Pending/Lapor Nanti, terlama di atas · {{ $backlogStats['total'] }} total · <strong>gak ikut filter periode di atas</strong>, selalu tampilkan seluruh antrean aktif.</p>
+    {{-- ══ Section 5 — Backlog ══════════════════════════════════════ --}}
+    <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
+        <div class="px-5 py-3.5 border-b border-border">
+            <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Backlog Task Belum Dikerjakan</h3>
+            <p class="text-[10px] text-text-muted mt-0.5">Draft/Terjadwal/Pending/Lapor Nanti, terlama di atas · {{ $backlogStats['total'] }} total · <strong>gak ikut filter periode di atas</strong>, selalu tampilkan seluruh antrean aktif.</p>
         </div>
         @if($backlog->isEmpty())
         <div class="p-16 text-center">
-            <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200">Gak ada backlog</h4>
-            <p class="text-xs text-slate-400 mt-1">Semua task sudah tertangani.</p>
+            <h4 class="text-sm font-bold text-text-main">Gak ada backlog</h4>
+            <p class="text-xs text-text-muted mt-1">Semua task sudah tertangani.</p>
         </div>
         @else
         <div class="overflow-x-auto scroll-smooth">
-            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                <thead class="bg-slate-50 dark:bg-slate-800/60">
+            <table class="min-w-full divide-y divide-border">
+                <thead class="bg-surface-muted">
                     <tr>
-                        <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Task</th>
-                        <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pelanggan</th>
-                        <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tipe</th>
-                        <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Umur</th>
-                        <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">SLA</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-bold text-text-muted uppercase tracking-wider">Task</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-bold text-text-muted uppercase tracking-wider">Pelanggan</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-bold text-text-muted uppercase tracking-wider">Tipe</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-bold text-text-muted uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3.5 text-right text-xs font-bold text-text-muted uppercase tracking-wider">Umur</th>
+                        <th class="px-6 py-3.5 text-right text-xs font-bold text-text-muted uppercase tracking-wider">SLA</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
+                <tbody class="bg-surface divide-y divide-border">
                     @foreach($backlog as $row)
-                    <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-700/30">
-                        <td class="px-6 py-3.5 text-sm font-mono text-slate-700 dark:text-slate-300">{{ $row['task_number'] ?? '—' }}</td>
-                        <td class="px-6 py-3.5 text-sm text-slate-700 dark:text-slate-300">{{ $row['customer_name'] }}</td>
-                        <td class="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{{ $row['task_type_label'] }}</td>
-                        <td class="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{{ $row['status_label'] }}</td>
-                        <td class="px-6 py-3.5 text-right font-mono text-sm text-slate-600 dark:text-slate-300">{{ $row['umur_jam'] }} jam</td>
+                    <tr class="hover:bg-surface-muted/60 transition-colors">
+                        <td class="px-6 py-3.5 text-sm font-mono text-text-main">
+                            @if($row['task_number'])
+                            @if(auth()->user()->hasPermission('task.view.all'))
+                            <a href="{{ route('tasks.show', $row['id']) }}" class="text-primary hover:text-primary-hover hover:underline">{{ $row['task_number'] }}</a>
+                            @elseif(auth()->user()->hasPermission('fop_tasks.view') && $row['fop_task_id'])
+                            <a href="{{ route('fop-tasks.history.show', $row['fop_task_id']) }}" class="text-primary hover:underline">{{ $row['task_number'] }}</a>
+                            @else
+                            {{ $row['task_number'] }}
+                            @endif
+                            @else
+                            —
+                            @endif
+                        </td>
+                        <td class="px-6 py-3.5 text-sm text-text-main">{{ $row['customer_name'] }}</td>
+                        <td class="px-6 py-3.5 text-sm text-text-secondary">{{ $row['task_type_label'] }}</td>
+                        <td class="px-6 py-3.5 text-sm text-text-secondary">{{ $row['status_label'] }}</td>
+                        <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">{{ $row['umur_jam'] }} jam</td>
                         <td class="px-6 py-3.5 text-right">
                             @if($row['over_sla'])
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-error-bg text-error border border-error-border">Lewat SLA</span>
                             @elseif($row['sla_deadline'])
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400">Dalam SLA</span>
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-muted text-text-muted">Dalam SLA</span>
                             @else
-                            <span class="text-[10px] text-slate-300">—</span>
+                            <span class="text-[10px] text-text-muted">—</span>
                             @endif
                         </td>
                     </tr>
@@ -222,25 +332,51 @@
                 </tbody>
             </table>
         </div>
-        <div class="px-5 py-3 border-t border-slate-100 dark:border-slate-700/60">
+        <div class="px-5 py-3 border-t border-border">
             {{ $backlog->links() }}
         </div>
         @endif
     </div>
 
-    {{-- ══ Section 5 — Durasi Terlama ═══════════════════════════════ --}}
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 shadow-xs">
+    {{-- ══ Section 6 — Durasi Terlama ═══════════════════════════════ --}}
+    <div class="bg-surface border border-border rounded-xl p-5 shadow-xs">
         <div class="flex items-center justify-between mb-3">
-            <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Top 20 Task Durasi Pengerjaan Terlama</h3>
+            <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Top 20 Task Durasi Pengerjaan Terlama</h3>
             @if($durationAverage !== null)
-            <span class="text-[10px] text-slate-400">Baseline rata-rata periode: {{ number_format($durationAverage, 0, ',', '.') }} menit</span>
+            <span class="text-[10px] text-text-muted">Baseline rata-rata periode: {{ number_format($durationAverage, 0, ',', '.') }} menit</span>
             @endif
         </div>
         @if(empty($durationRanking))
-        <p class="text-xs text-slate-400 py-6 text-center">Gak ada task selesai dengan durasi tercatat di periode ini.</p>
+        <p class="text-xs text-text-muted py-6 text-center">Gak ada task selesai dengan durasi tercatat di periode ini.</p>
         @else
         <div id="durationChartLegend" class="flex flex-wrap gap-3 mb-2 text-[11px] font-semibold"></div>
         <div class="overflow-x-auto scroll-smooth"><svg id="durationChart" role="img" aria-label="Grafik ranking durasi pengerjaan terlama"></svg></div>
+
+        {{-- Chart cuma kebagian task_number+durasi — teknisi & tipe task
+             (sudah dihitung controller, dulu kebuang gak dipakai) ditaruh di
+             tabel ini biar kebaca siapa yang paling lama ngerjain apa. --}}
+        <div class="overflow-x-auto scroll-smooth border-t border-border pt-3 mt-3">
+            <table class="min-w-full divide-y divide-border text-xs">
+                <thead class="bg-surface-muted">
+                    <tr>
+                        <th class="px-4 py-2.5 text-left font-bold text-text-muted uppercase tracking-wider">Task</th>
+                        <th class="px-4 py-2.5 text-left font-bold text-text-muted uppercase tracking-wider">Teknisi</th>
+                        <th class="px-4 py-2.5 text-left font-bold text-text-muted uppercase tracking-wider">Tipe</th>
+                        <th class="px-4 py-2.5 text-right font-bold text-text-muted uppercase tracking-wider">Durasi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    @foreach($durationRanking as $dr)
+                    <tr class="hover:bg-surface-muted/60 transition-colors">
+                        <td class="px-4 py-2.5 font-mono text-text-main">@if(auth()->user()->hasPermission('task.view.all'))<a href="{{ route('tasks.show', $dr['id']) }}" class="text-primary hover:underline">{{ $dr['task_number'] ?? '—' }}</a>@elseif(auth()->user()->hasPermission('fop_tasks.view') && $dr['fop_task_id'])<a href="{{ route('fop-tasks.history.show', $dr['fop_task_id']) }}" class="text-primary hover:underline">{{ $dr['task_number'] ?? '—' }}</a>@else{{ $dr['task_number'] ?? '—' }}@endif</td>
+                        <td class="px-4 py-2.5 text-text-main">{{ $dr['teknisi'] ?? '—' }}</td>
+                        <td class="px-4 py-2.5 text-text-secondary">{{ $dr['task_type'] }}</td>
+                        <td class="px-4 py-2.5 text-right font-mono font-semibold text-text-main">{{ number_format($dr['durasi_menit'], 0, ',', '.') }} menit</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
         @endif
     </div>
 </div>
@@ -372,7 +508,7 @@
         document.getElementById("modemChart"),
         document.getElementById("modemChartLegend"),
         modemRows, "item_name",
-        [{key:"instalasi", label:"Instalasi"}, {key:"maintenance", label:"Maintenance"}]
+        [{key:"instalasi", label:"Instalasi"}, {key:"maintenance", label:"Maintenance"}, {key:"creq", label:"C-REQ"}, {key:"other", label:"Lainnya"}]
     );
 
     var durationRows = @json($durationRanking);

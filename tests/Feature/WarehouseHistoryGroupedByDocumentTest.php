@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
@@ -122,5 +123,33 @@ class WarehouseHistoryGroupedByDocumentTest extends TestCase
             ->assertSee('Barang Keluar')
             ->assertSee('Penyesuaian')
             ->assertSee('Router Strip Test');
+    }
+
+    #[Test]
+    public function filter_teknisi_hanya_menampilkan_mutasi_yang_melibatkan_teknisi_terpilih(): void
+    {
+        $owner = $this->seedBase();
+        $cabang = Pop::create(['code' => 'HGT-CABANG', 'pop_code' => 'HGTC', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'Cabang Filter Teknisi', 'type' => 'cabang', 'status' => 'active']);
+        $category = ItemCategory::where('code', 'media_converter')->firstOrFail();
+        $item = Item::create(['code' => 'HGT-ITEM', 'name' => 'Barang Filter Teknisi', 'item_category_id' => $category->id, 'unit' => 'unit', 'tracking_type' => 'quantity']);
+        $first = User::factory()->create(['name' => 'Teknisi Satu']);
+        $second = User::factory()->create(['name' => 'Teknisi Dua']);
+
+        foreach ([[$first, 'ISS-FIRST'], [$second, 'ISS-SECOND']] as [$technician, $reference]) {
+            InventoryTransaction::create([
+                'type' => 'issue',
+                'reference_number' => $reference,
+                'item_id' => $item->id,
+                'qty' => 1,
+                'from_pop_id' => $cabang->id,
+                'to_technician_id' => $technician->id,
+                'created_by' => $owner->id,
+            ]);
+        }
+
+        $response = $this->actingAs($owner)->get(route('warehouse.history.index', ['technician_id' => $first->id]));
+
+        $response->assertOk()->assertSee('ISS-FIRST')->assertDontSee('ISS-SECOND');
+        $this->assertSame(1, $response->viewData('ledger')->total());
     }
 }

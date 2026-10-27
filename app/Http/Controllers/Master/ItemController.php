@@ -2,16 +2,19 @@
 
 namespace App\Http\Controllers\Master;
 
+use App\Enums\InfrastructureLocationKind;
 use App\Enums\OwnershipMode;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NetworkNodeType;
 use App\Services\MasterRecordRemovalService;
 use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -56,8 +59,9 @@ class ItemController extends Controller
         $categories = ItemCategory::active()->ordered()->get();
         $trackingTypes = TrackingType::cases();
         $ownershipModes = OwnershipMode::cases();
+        $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
 
-        return view('master.items.create', compact('categories', 'trackingTypes', 'ownershipModes'));
+        return view('master.items.create', compact('categories', 'trackingTypes', 'ownershipModes', 'nodeTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -82,9 +86,10 @@ class ItemController extends Controller
             ->get();
         $trackingTypes = TrackingType::cases();
         $ownershipModes = OwnershipMode::cases();
+        $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
         $trackingTypeLocked = $item->inventoryTransactions()->exists();
 
-        return view('master.items.edit', compact('item', 'categories', 'trackingTypes', 'ownershipModes', 'trackingTypeLocked'));
+        return view('master.items.edit', compact('item', 'categories', 'trackingTypes', 'ownershipModes', 'trackingTypeLocked', 'nodeTypes'));
     }
 
     public function update(Request $request, Item $item): RedirectResponse
@@ -143,6 +148,8 @@ class ItemController extends Controller
             'item_category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
             'unit' => ['required', 'string', 'max:20'],
             'is_active' => 'required|boolean',
+            'infrastructure_node_type_id' => ['nullable', 'integer', Rule::exists('network_node_types', 'id')],
+            'infrastructure_location_kind' => ['nullable', Rule::enum(InfrastructureLocationKind::class)],
         ];
 
         if (! $locked) {
@@ -182,7 +189,50 @@ class ItemController extends Controller
         }
 
         $validated = $request->validate($rules);
+        $category = ItemCategory::query()->findOrFail($validated['item_category_id']);
+        $ownership = $locked
+            ? $item->ownership_mode->value
+            : ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value);
+        if ($category->code === 'modem_ont' && $ownership !== OwnershipMode::INSTALLABLE->value) {
+            throw ValidationException::withMessages([
+                'ownership_mode' => 'Modem/ONT pelanggan harus menggunakan kepemilikan Dipasang ke Pelanggan.',
+            ]);
+        }
+        if ($item && ! $request->exists('infrastructure_node_type_id')) {
+            $validated['infrastructure_node_type_id'] = $item->infrastructure_node_type_id;
+        }
 
+        $effectiveOwnership = $locked ? $item->ownership_mode->value : ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value);
+        $nodeTypeId = isset($validated['infrastructure_node_type_id']) ? (int) $validated['infrastructure_node_type_id'] : null;
+        $validated['infrastructure_node_type_id'] = $nodeTypeId;
+        if ($nodeTypeId !== null && $effectiveOwnership !== OwnershipMode::INFRASTRUCTURE_ASSET->value) {
+            throw ValidationException::withMessages(['infrastructure_node_type_id' => 'Tipe node hanya berlaku untuk aset infrastruktur.']);
+        }
+        if ($item && $item->infrastructure_node_type_id !== $nodeTypeId
+            && $item->inventorySerials()->where('status', 'deployed')->exists()) {
+            throw ValidationException::withMessages(['infrastructure_node_type_id' => 'Tipe node tidak dapat diganti selama ada SN terpasang.']);
+        }
+
+        // Posisi Pemasangan (Task 6 rancangan hierarki §10.4): hanya aset
+        // infrastruktur atau aset perusahaan (Switch/SFP) bernomor seri. Untuk
+        // aset perusahaan, kolom inilah satu-satunya izin eksplisit untuk netap
+        // di jaringan (InventoryService::assertSerialItemFitsLocation()).
+        if ($item && ! $request->exists('infrastructure_location_kind')) {
+            $validated['infrastructure_location_kind'] = $item->infrastructure_location_kind?->value;
+        }
+        $locationKind = ($validated['infrastructure_location_kind'] ?? null) ?: null;
+        $validated['infrastructure_location_kind'] = $locationKind;
+        $effectiveTracking = $locked ? $item->tracking_type->value : ($validated['tracking_type'] ?? null);
+        if ($locationKind !== null && (
+            ! in_array($effectiveOwnership, [OwnershipMode::INFRASTRUCTURE_ASSET->value, OwnershipMode::COMPANY_ASSET->value], true)
+            || $effectiveTracking !== TrackingType::SERIALIZED->value
+        )) {
+            throw ValidationException::withMessages(['infrastructure_location_kind' => 'Posisi pemasangan hanya untuk aset infrastruktur/aset perusahaan bernomor seri.']);
+        }
+        if ($item && $item->infrastructure_location_kind?->value !== $locationKind
+            && $item->inventorySerials()->where('status', 'deployed')->exists()) {
+            throw ValidationException::withMessages(['infrastructure_location_kind' => 'Posisi pemasangan tidak dapat diganti selama ada SN terpasang.']);
+        }
         // Server-side, jangan cuma percaya field `unit` disabled di klien
         // (bisa diakalin lewat devtools) — roll SELALU meter, gak ada jalan
         // lain (koreksi 2026-09-16, akar laporan "tampilan 1.000 roll
@@ -196,13 +246,23 @@ class ItemController extends Controller
         }
 
         if (! $locked) {
-            // Qty/Batch gak relevan sama sumbu kepemilikan (cuma SERIALIZED yang
-            // bisa jadi Aset Perusahaan) — dipaksa installable biar gak ada
-            // kombinasi ganjil "kabel drum berstatus aset perusahaan".
             $trackingType = TrackingType::from($validated['tracking_type']);
-            $validated['ownership_mode'] = $trackingType === TrackingType::SERIALIZED
-                ? ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value)
-                : OwnershipMode::INSTALLABLE->value;
+            if ($trackingType === TrackingType::SERIALIZED) {
+                $validated['ownership_mode'] = $validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value;
+            } else {
+                // QUANTITY/ROLL: boleh INSTALLABLE (default) atau INFRASTRUCTURE_ASSET
+                // (aksesoris/kabel yang dipasang netap ke titik jaringan, bukan ke
+                // pelanggan — lihat InventoryService::deployQuantity()/deployRoll()).
+                // Dulu dipaksa INSTALLABLE tanpa celah → jalur deploy QUANTITY/ROLL
+                // gak pernah kejangkau dari UI. COMPANY_ASSET TIDAK berlaku di
+                // sini — itu konsep alat kerja yang dipinjam-pakaikan lalu WAJIB
+                // balik (OTDR dst), bukan barang habis pakai/dipasang netap;
+                // kalau dikirim tetap diturunkan ke INSTALLABLE.
+                $submitted = $validated['ownership_mode'] ?? null;
+                $validated['ownership_mode'] = in_array($submitted, [OwnershipMode::INSTALLABLE->value, OwnershipMode::INFRASTRUCTURE_ASSET->value], true)
+                    ? $submitted
+                    : OwnershipMode::INSTALLABLE->value;
+            }
 
             // Non-SERIALIZED gak punya konsep sumber SN sama sekali — paksa
             // false, bukan cuma andalkan `prohibited` (kolom tetap kudu keisi

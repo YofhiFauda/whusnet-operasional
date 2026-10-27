@@ -59,6 +59,15 @@
             <?php endif; ?>
 
             
+            <?php if($openCableCrossingCount > 0): ?>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30" title="Kabel melintang jalan yang belum selesai. Wajib ditarik saat Deact.">
+                    <i class="fa-solid fa-triangle-exclamation mr-1 text-[10px] opacity-70"></i>
+                    Kabel melintang: <?php echo e($openCableCrossingCount); ?>
+
+                </span>
+            <?php endif; ?>
+
+            
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customer_balance.view')): ?>
                 <?php if($customerBalance > 0): ?>
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20" title="Saldo aktif pelanggan ini — otomatis dipakai untuk tagihan Bulanan berikutnya begitu terbit (FIFO periode terlama dulu). Lihat riwayat di tab Billing.">
@@ -176,6 +185,26 @@
 
             </span>
             <span class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">Redaman: <?php echo e($customer->customerTechnicalDetail->fiber_signal ?? ($customer->customerDevice->signal_power ?? '-')); ?></span>
+            <?php if (isset($component)) { $__componentOriginaldaa46128741911989d4bffe5bf5b15e9 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldaa46128741911989d4bffe5bf5b15e9 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.warehouse.acquisition-badge','data' => ['device' => $customer->customerDevice,'class' => 'mt-1.5 self-start']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('warehouse.acquisition-badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['device' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($customer->customerDevice),'class' => 'mt-1.5 self-start']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldaa46128741911989d4bffe5bf5b15e9)): ?>
+<?php $attributes = $__attributesOriginaldaa46128741911989d4bffe5bf5b15e9; ?>
+<?php unset($__attributesOriginaldaa46128741911989d4bffe5bf5b15e9); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldaa46128741911989d4bffe5bf5b15e9)): ?>
+<?php $component = $__componentOriginaldaa46128741911989d4bffe5bf5b15e9; ?>
+<?php unset($__componentOriginaldaa46128741911989d4bffe5bf5b15e9); ?>
+<?php endif; ?>
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>
@@ -657,6 +686,39 @@
                 </div>
                 <?php endif; ?>
             </div>
+
+            
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('network_nodes.view')): ?>
+            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                    <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Lokasi Jaringan</span>
+                </div>
+                <?php if($customerNetworkLocation): ?>
+                <div class="p-5 space-y-3 text-xs">
+                    <div class="flex flex-wrap items-center gap-1.5 font-mono">
+                        <?php if($customerNetworkLocation['olt']): ?>
+                            <a href="<?php echo e(route('network.nodes.show', $customerNetworkLocation['olt'])); ?>" class="rounded border border-slate-200 dark:border-slate-700 px-2 py-1 font-semibold text-slate-800 dark:text-slate-100 hover:border-sky-500 hover:text-sky-700"><?php echo e($customerNetworkLocation['olt']->code); ?></a>
+                            <span class="text-slate-300">→</span>
+                            <a href="<?php echo e(route('network.infrastructure-slots.show', $customerNetworkLocation['slot'])); ?>" class="rounded border border-slate-200 dark:border-slate-700 px-2 py-1 text-slate-700 dark:text-slate-200 hover:border-sky-500 hover:text-sky-700"><?php echo e($customerNetworkLocation['slot']->displayName()); ?></a>
+                            <span class="text-slate-300">→</span>
+                            <a href="<?php echo e(route('network.infrastructure-ports.show', $customerNetworkLocation['pon'])); ?>" class="rounded border border-slate-200 dark:border-slate-700 px-2 py-1 text-slate-700 dark:text-slate-200 hover:border-sky-500 hover:text-sky-700"><?php echo e($customerNetworkLocation['pon']->displayName()); ?></a>
+                            <span class="text-slate-300">→</span>
+                        <?php else: ?>
+                            <span class="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">OLT/Slot/PON belum terhubung</span>
+                            <span class="text-slate-300">→</span>
+                        <?php endif; ?>
+                        <a href="<?php echo e(route('network.nodes.show', $customerNetworkLocation['odp'])); ?>" class="rounded border border-slate-200 dark:border-slate-700 px-2 py-1 font-semibold text-slate-800 dark:text-slate-100 hover:border-sky-500 hover:text-sky-700"><?php echo e($customerNetworkLocation['odp']->code); ?></a>
+                        <span class="text-slate-300">·</span>
+                        <span class="text-slate-500">Port <?php echo e($customerNetworkLocation['port_number']); ?></span>
+                    </div>
+                </div>
+                <?php else: ?>
+                <div class="p-8 text-center text-slate-400 text-xs">
+                    Belum ada assignment port ODP aktif untuk pelanggan ini.
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- TAB 5: SURVEY -->
@@ -1843,6 +1905,8 @@ unset($__errorArgs, $__bag); ?>
     function closeTestReportModal() { closeModal('test-report-modal'); }
     function openDeviceModal() { openModal('device-modal'); }
     function closeDeviceModal() { closeModal('device-modal'); }
+    function openAdditionalDeviceModal() { openModal('additional-device-modal'); }
+    function closeAdditionalDeviceModal() { closeModal('additional-device-modal'); }
 
 </script>
 <?php $__env->stopSection(); ?>

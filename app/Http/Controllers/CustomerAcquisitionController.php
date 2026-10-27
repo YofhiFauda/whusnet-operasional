@@ -166,14 +166,14 @@ class CustomerAcquisitionController extends Controller
         // dibaca tanpa kunci, jadi dua request bisa lolos bersamaan dan menerbitkan
         // dua tagihan. Kunci baris akuisisi lalu cek ulang di dalam transaksi; invoice
         // dan penautannya harus commit atau gagal bersama (tak ada invoice yatim).
-        $invoice = DB::transaction(function () use ($customerAcquisition, $validated, $installationFeeInvoiceService): ?Invoice {
+        $invoice = DB::transaction(function () use ($customerAcquisition, $validated, $installationFeeInvoiceService, $user): ?Invoice {
             $locked = CustomerAcquisition::query()->whereKey($customerAcquisition->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->installation_fee_invoice_id) {
                 return null;
             }
 
-            $invoice = $installationFeeInvoiceService->issue($locked->customer, (float) $validated['installation_fee']);
+            $invoice = $installationFeeInvoiceService->issue($locked->customer, (float) $validated['installation_fee'], $user->id);
 
             $locked->update([
                 'installation_fee' => $validated['installation_fee'],

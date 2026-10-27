@@ -149,14 +149,15 @@ class CreqBillingVerificationTest extends TestCase
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     private function payloadSetujui(): array
     {
         return [
             'manual_subtype_name' => 'Pasang Repeater',
-            'description' => 'Pasang repeater tambahan atas permintaan pelanggan.',
-            'amount' => '150.000',
+            'items' => [
+                ['name' => 'Pasang repeater tambahan atas permintaan pelanggan.', 'amount' => '150.000'],
+            ],
         ];
     }
 
@@ -198,8 +199,10 @@ class CreqBillingVerificationTest extends TestCase
         $this->beriLayanan();
 
         $this->actingAs($this->helpdesk)
-            ->put(route('tasks.creq-billing.approve', $this->task), array_merge($this->payloadSetujui(), ['amount' => '']))
-            ->assertSessionHasErrors('amount');
+            ->put(route('tasks.creq-billing.approve', $this->task), array_merge($this->payloadSetujui(), [
+                'items' => [['name' => 'Pasang Repeater', 'amount' => '']],
+            ]))
+            ->assertSessionHasErrors('items.0.amount');
 
         $this->detail->refresh();
         $this->assertSame(CReqVerificationStatus::PENDING, $this->detail->verification_status);

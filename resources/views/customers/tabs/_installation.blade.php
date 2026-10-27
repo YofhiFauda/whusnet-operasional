@@ -20,7 +20,13 @@
         ->whereHas('fopTask', fn ($q) => $q->where('category', \App\Enums\TaskType::PEMASANGAN->value))
         ->orderBy('id')->get();
 
-    $hasTestReport = $tech && ($tech->test_date || $tech->test_download !== null || $tech->test_upload !== null || $tech->latency_ms !== null);
+    // Rute kabel melintang jalan (ADHOC-205) — semua rute pelanggan, termasuk yang
+    // sudah ditarik, supaya riwayat penyelesaiannya tetap terlihat.
+    $cableCrossings = \App\Models\CustomerCableCrossing::with(['points', 'deactTask'])
+        ->where('customer_id', $customer->id)
+        ->orderBy('id')->get();
+
+    $hasTestReport = $tech &&($tech->test_date || $tech->test_download !== null || $tech->test_upload !== null || $tech->latency_ms !== null);
 @endphp
 
 <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -80,6 +86,75 @@
 </div>
 @endif
 @endcan
+
+{{-- Kabel melintang jalan (ADHOC-205): rute lengkap beserta titik koordinat dan hasil penarikan. --}}
+@if($cableCrossings->isNotEmpty())
+<div class="p-4 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 rounded-lg space-y-3">
+    <div>
+        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+            <i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> Kabel Melintang Jalan
+        </h3>
+        <p class="text-[11px] text-slate-500 mt-0.5">Rute kabel dari titik awal sampai rumah pelanggan. Yang belum ditarik wajib diselesaikan saat Deact.</p>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-xs">
+            <thead class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <tr>
+                    <th class="px-2 py-1.5 text-left">Jalan</th>
+                    <th class="px-2 py-1.5 text-left">Rute (titik koordinat)</th>
+                    <th class="px-2 py-1.5 text-left">Meter</th>
+                    <th class="px-2 py-1.5 text-left">Status</th>
+                    <th class="px-2 py-1.5 text-left">Penyelesaian</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-amber-200/70 dark:divide-amber-900/50">
+                @foreach($cableCrossings as $crossing)
+                <tr class="align-top">
+                    <td class="px-2 py-2">
+                        <div class="font-semibold text-slate-900 dark:text-slate-100">{{ $crossing->nama_jalan }}</div>
+                        @if($crossing->jenis_jalan)<div class="text-[11px] text-slate-500">{{ $crossing->jenis_jalan }}</div>@endif
+                        <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($crossing->foto_bukti) }}" target="_blank" class="text-[11px] text-sky-600 dark:text-sky-400 hover:underline">Foto bukti pemasangan</a>
+                    </td>
+                    <td class="px-2 py-2 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                        @foreach($crossing->points as $point)
+                            <div>{{ $point->urutan }}. {{ $point->label ? $point->label.' — ' : '' }}{{ $point->latitude }}, {{ $point->longitude }}</div>
+                        @endforeach
+                    </td>
+                    <td class="px-2 py-2 text-slate-700 dark:text-slate-300">
+                        {{ $crossing->meter_terpakai ? rtrim(rtrim(number_format((float) $crossing->meter_terpakai, 2, ',', '.'), '0'), ',').' m' : '—' }}
+                    </td>
+                    <td class="px-2 py-2">
+                        @php
+                            $badgeClass = match ($crossing->status) {
+                                \App\Enums\CableCrossingStatus::TERPASANG => 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+                                \App\Enums\CableCrossingStatus::TIDAK_BISA_DITARIK => 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30',
+                                default => 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
+                            };
+                        @endphp
+                        <span class="inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold {{ $badgeClass }}">{{ $crossing->status->label() }}</span>
+                    </td>
+                    <td class="px-2 py-2 text-slate-600 dark:text-slate-400">
+                        @if($crossing->deactTask)
+                            <div>Task <a href="{{ route('tasks.show', $crossing->deactTask) }}" class="text-sky-600 dark:text-sky-400 hover:underline">{{ $crossing->deactTask->task_number }}</a></div>
+                            <div class="text-[11px]">{{ $crossing->diselesaikan_at?->format('d/m/Y H:i') }}</div>
+                        @else
+                            <span class="text-slate-400">Belum ada task Deact</span>
+                        @endif
+                        @if($crossing->foto_penarikan)
+                            <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($crossing->foto_penarikan) }}" target="_blank" class="block text-[11px] text-sky-600 dark:text-sky-400 hover:underline">Foto penarikan</a>
+                        @endif
+                        @if($crossing->alasan_tidak_ditarik)
+                            <div class="mt-1 text-[11px] text-rose-700 dark:text-rose-300">Alasan: {{ $crossing->alasan_tidak_ditarik }}</div>
+                        @endif
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
 
 @if($customer->installations->count() > 0)
     <div class="space-y-6">

@@ -1,0 +1,209 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\InfrastructureCapacityUnit;
+use App\Models\AuditLog;
+use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
+use App\Models\NetworkPortAssignment;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Kapasitas PON manual + Red Zone (§16.3, keputusan user 21-10-2026;
+ * disesuaikan Task 9 rancangan "Slot & PON sebagai node" 2026-10-24).
+ *
+ * Satuan = PELANGGAN AKTIF: satu pelanggan dengan assignment port ODP aktif
+ * pada ODP yang jadi ANAK LANGSUNG PON ini (`network_nodes.parent_id`)
+ * dihitung satu unit — berapa pun ONT-nya (ONT tidak pernah jadi dasar
+ * hitung). Assignment aktif ganda untuk pelanggan yang sama sudah ditolak
+ * di DB (`network_customer_active_unique`). Kapasitas ODP (port pelanggan)
+ * adalah ukuran lain dan TIDAK dicampur di sini.
+ *
+ * Konsep "koneksi terverifikasi" (dulu lewat `InfrastructureConnection`)
+ * DIHAPUS Task 9 — uplink ODP→PON sekarang murni `parent_id`, tidak ada lagi
+ * status terverifikasi/belum untuk dilaporkan terpisah. `summary()` karena
+ * itu tidak punya kunci `unverified` lagi.
+ */
+class PonCapacityService
+{
+    public function used(NetworkNode $pon): int
+    {
+        return $this->customersOn($pon);
+    }
+
+    /**
+     * @return array{used: int, capacity: ?int, threshold: ?int, unit: string, unit_label: string, red_zone: ?bool, is_full: bool, remaining: ?int}
+     */
+    public function summary(NetworkNode $pon): array
+    {
+        return $this->summarize($pon, $this->used($pon));
+    }
+
+    /**
+     * Versi massal `summary()` untuk daftar PON (pohon lazy-load, Peta):
+     * SATU query agregat `COUNT(DISTINCT customer_id)` dikelompokkan per
+     * `parent_id` ODP, bukan satu query per PON. Tanpa ini halaman yang
+     * membuka satu Slot (16 PON) atau Peta penuh (ribuan PON) menembak query
+     * sebanyak jumlah PON. Semantik hitung WAJIB identik dengan
+     * `customersOn()` (ada tes kesetaraan) — kalau aturan "satu pelanggan =
+     * satu unit" berubah, ubah keduanya.
+     *
+     * @param  iterable<NetworkNode>  $pons
+     * @return array<int, array{used: int, capacity: ?int, threshold: ?int, unit: string, unit_label: string, red_zone: ?bool, is_full: bool, remaining: ?int}>
+     */
+    public function summaries(iterable $pons): array
+    {
+        $pons = collect($pons)->keyBy('id');
+        if ($pons->isEmpty()) {
+            return [];
+        }
+
+        $usedByPon = [];
+        foreach ($pons->keys()->chunk(500) as $chunk) {
+            $rows = DB::table('network_port_assignments as assignment')
+                ->join('network_node_ports as port', 'port.id', '=', 'assignment.network_node_port_id')
+                ->join('network_nodes as odp', 'odp.id', '=', 'port.network_node_id')
+                ->where('assignment.active_key', 1)
+                ->whereNotNull('assignment.customer_id')
+                ->whereIn('odp.parent_id', $chunk->all())
+                ->groupBy('odp.parent_id')
+                ->selectRaw('odp.parent_id as pon_id, COUNT(DISTINCT assignment.customer_id) as used')
+                ->get();
+            foreach ($rows as $row) {
+                $usedByPon[(int) $row->pon_id] = (int) $row->used;
+            }
+        }
+
+        return $pons->map(fn (NetworkNode $pon): array => $this->summarize($pon, $usedByPon[$pon->id] ?? 0))->all();
+    }
+
+    /**
+     * Pelanggan aktif per ODP (panel Manajemen Node — PON): aturan hitung
+     * SAMA dengan `summaries()` — satu pelanggan = satu unit, hanya
+     * assignment aktif ber-customer — tapi dikelompokkan per ODP, bukan per
+     * PON induknya. Karena itu jumlah angka ini atas semua ODP anak sebuah
+     * PON selalu sama dengan `used` PON itu (ada tes kesetaraan); kalau
+     * aturan berubah, ubah ketiganya. Satu query berapa pun jumlah ODP-nya.
+     *
+     * @param  iterable<NetworkNode>  $odps
+     * @return array<int, int> id ODP => jumlah pelanggan aktif
+     */
+    public function customersPerOdp(iterable $odps): array
+    {
+        $ids = collect($odps)->pluck('id')->all();
+        if ($ids === []) {
+            return [];
+        }
+
+        $counts = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $rows = DB::table('network_port_assignments as assignment')
+                ->join('network_node_ports as port', 'port.id', '=', 'assignment.network_node_port_id')
+                ->where('assignment.active_key', 1)
+                ->whereNotNull('assignment.customer_id')
+                ->whereIn('port.network_node_id', $chunk)
+                ->groupBy('port.network_node_id')
+                ->selectRaw('port.network_node_id as odp_id, COUNT(DISTINCT assignment.customer_id) as used')
+                ->get();
+            foreach ($rows as $row) {
+                $counts[(int) $row->odp_id] = (int) $row->used;
+            }
+        }
+
+        return array_replace(array_fill_keys($ids, 0), $counts);
+    }
+
+    /**
+     * @return array{used: int, capacity: ?int, threshold: ?int, unit: string, unit_label: string, red_zone: ?bool, is_full: bool, remaining: ?int}
+     */
+    private function summarize(NetworkNode $pon, int $used): array
+    {
+        $capacity = $pon->capacity;
+        $threshold = $pon->red_zone_threshold;
+
+        // Red Zone hanya boleh diklaim bila kapasitas & ambang sama-sama
+        // valid — null berarti "belum bisa dinilai", BUKAN "aman".
+        $redZone = ($capacity !== null && $capacity > 0 && $threshold !== null && $threshold > 0)
+            ? $used * 100 >= $threshold * $capacity
+            : null;
+
+        return [
+            'used' => $used,
+            'capacity' => $capacity,
+            'threshold' => $threshold,
+            'unit' => InfrastructureCapacityUnit::PELANGGAN_AKTIF->value,
+            'unit_label' => InfrastructureCapacityUnit::PELANGGAN_AKTIF->label(),
+            'red_zone' => $redZone,
+            'is_full' => $capacity !== null && $capacity > 0 && $used >= $capacity,
+            'remaining' => $capacity !== null ? max(0, $capacity - $used) : null,
+        ];
+    }
+
+    public function updateCapacity(NetworkNode $pon, int $capacity, int $threshold, User $actor): NetworkNode
+    {
+        if (! $pon->isPon()) {
+            throw ValidationException::withMessages(['capacity' => 'Kapasitas pelanggan aktif hanya untuk PON.']);
+        }
+        if ($capacity < 1) {
+            throw ValidationException::withMessages(['capacity' => 'Kapasitas PON minimal 1 pelanggan aktif.']);
+        }
+        if ($threshold < 1 || $threshold > 100) {
+            throw ValidationException::withMessages(['red_zone_threshold' => 'Ambang Red Zone bernilai 1–100 persen.']);
+        }
+
+        return DB::transaction(function () use ($pon, $capacity, $threshold, $actor): NetworkNode {
+            $pon = NetworkNode::query()->lockForUpdate()->findOrFail($pon->id);
+            $used = $this->used($pon);
+
+            if ($capacity < $used) {
+                throw ValidationException::withMessages([
+                    'capacity' => "Kapasitas {$capacity} di bawah pemakaian aktif {$used} pelanggan. Tangani koneksi terdampak dahulu.",
+                ]);
+            }
+
+            $old = ['capacity' => $pon->capacity, 'red_zone_threshold' => $pon->red_zone_threshold];
+            $pon->forceFill(['capacity' => $capacity, 'red_zone_threshold' => $threshold]);
+            if (! $pon->isDirty()) {
+                return $pon;
+            }
+
+            // saveQuietly: audit ditulis eksplisit di bawah dengan pelaku +
+            // pemakaian saat itu; trait RecordsAuditLogs tidak boleh menulis
+            // baris kedua untuk perubahan yang sama.
+            $pon->saveQuietly();
+
+            AuditLog::create([
+                'user_id' => $actor->id,
+                // Modul audit dipertahankan sama walau entitasnya sekarang
+                // NetworkNode (Task 9) — supaya riwayat lama & baru tetap
+                // tampil satu daftar konsisten di halaman audit.
+                'module' => 'Port Infrastruktur',
+                'action' => 'capacity_change',
+                'auditable_type' => NetworkNode::class,
+                'auditable_id' => $pon->id,
+                'old_values' => $old,
+                'new_values' => ['capacity' => $capacity, 'red_zone_threshold' => $threshold, 'used_at_change' => $used],
+                'ip_address' => request()?->ip(),
+                'user_agent' => request()?->userAgent(),
+                'created_at' => now(),
+            ]);
+
+            return $pon;
+        });
+    }
+
+    private function customersOn(NetworkNode $pon): int
+    {
+        $odpIds = NetworkNode::query()->where('parent_id', $pon->id)->select('id');
+
+        return NetworkPortAssignment::query()
+            ->where('active_key', 1)
+            ->whereNotNull('customer_id')
+            ->whereIn('network_node_port_id', NetworkNodePort::query()->whereIn('network_node_id', $odpIds)->select('id'))
+            ->distinct()
+            ->count('customer_id');
+    }
+}

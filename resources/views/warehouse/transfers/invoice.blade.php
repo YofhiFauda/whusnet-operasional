@@ -292,12 +292,11 @@
             </tr>
             <tr>
                 <td>
-                    <div class="row"><span class="label">Jatuh Tempo</span>-</div>
                     <div class="row"><span class="label">Penjual</span>PT CONNEXA DIGITAL NETWORK</div>
                     <div class="row"><span class="label">Pembayaran</span>Internal (Non-Kas)</div>
                 </td>
                 <td>
-                    <div class="row"><span class="label">Metode</span>Transfer Gudang Pusat → Cabang</div>
+                    <div class="row"><span class="label">Metode</span>Transfer Gudang Pusat ke Cabang</div>
                 </td>
             </tr>
         </table>

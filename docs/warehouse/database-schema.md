@@ -105,6 +105,7 @@ Satu baris per unit fisik barang SERIALIZED.
 | `customer_id` | FK `customers` nullable, null-on-delete | Diisi kalau `status=INSTALLED` |
 | `fop_task_id` | FK `fop_tasks` nullable, null-on-delete | |
 | `installed_at` | `timestamp` nullable | |
+| `ownership` | `string(20)` default `company` | `App\Enums\DeviceOwnership` (`company`/`customer`, 2026-10-09). Penanda SATU-SATUNYA "modem ini wajib balik pas putus atau tidak". `customer` = dibeli pelanggan lewat gudang (Beli dari Gudang) — tidak diretur saat DEAC/swap. Data lama dibiarkan `company` (tanpa backfill). |
 
 Konsistensi "cuma satu lokasi yang keisi sesuai status" ditegakkan Service/Observer, **bukan** DB constraint (kombinasi status×lokasi terlalu banyak untuk CHECK constraint portable SQLite/MySQL).
 
@@ -230,11 +231,26 @@ Penulis: `pickupSerialFromCustomer()` (deac, `received_at` kosong) → dilengkap
 
 Tabel pasangannya `task_device_retrievals` (laporan per **task**: hasil, foto kondisi, kelengkapan, catatan) didokumentasikan di [task-teknisi/database-schema.md](../task-teknisi/database-schema.md).
 
+## `inventory_serial_sales` (`2026_10_09_090200`, ownership modem sewa/beli)
+
+Ledger penjualan satu unit SN ke pelanggan (Beli dari Gudang). Ditulis hanya lewat `InventoryService::recordSerialSale()`, harga harus > 0.
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `inventory_serial_id` | FK `inventory_serials`, restrict | SN yang dijual |
+| `customer_id` | FK `customers`, restrict | Pembeli |
+| `fop_task_id` | FK `fop_tasks` nullable, restrict | Task tempat penjualan terjadi (PSB, C-REQ, atau MTN). Terisi untuk semua jalur; tidak ada jalur tanpa task |
+| `price` | `decimal(12,2)` | Harga jual final. Dikoreksi CS saat Verifikasi Biaya (write-back dari `task_billing_items`) |
+| `created_by` | FK `users`, restrict | |
+| timestamps | | |
+
+Sumber Laporan Barang Terjual ke Pelanggan (`warehouse.reports.sold-to-customer`, POP-scoped lewat `customer.pop_id`). Baris rincian tagihan ada di `task_billing_items.inventory_serial_sale_id` (modul task teknisi).
 ## Relasi Model Penting
 
 - `InventoryBalance` — `belongsTo(Pop)`, `belongsTo(Item)`; `scopeLowStock()`, `isLowStock()`.
 - `InventorySerial` — cast `status => SerialStatus`; relasi `item`, `currentPop`, `currentTechnician`, `issuedFromPop`, `customer`, `fopTask`.
 - `InventoryTransaction` — cast `type => InventoryTransactionType`; relasi lengkap ke pop/technician/serial/transfer/fopTask/createdBy.
+- `InventorySerialSale` — `belongsTo(InventorySerial)`, `belongsTo(Customer)`, `belongsTo(FopTask)`, `belongsTo(User, created_by)`. Dibuat lewat `InventoryService::recordSerialSale()`.
 - `InventoryTransfer` — cast `status => TransferStatus`; `hasMany(InventoryTransaction, 'inventory_transfer_id')`; `isInTransit()`.
 - `TechnicianCustody` — cast `status => CustodyStatus`; `scopeActive()`, `ageLabel()`.
 - `StockRequest`/`StockRequestItem` — cast `status => StockRequestStatus`; `StockRequestItem::remaining()`, `isFullyFulfilled()`.

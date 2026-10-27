@@ -67,6 +67,39 @@ class CollectorDepositController extends Controller
             ->with('success', "Setoran {$deposit->deposit_number} terkirim. Menunggu verifikasi admin — saldo Anda kembali nol.");
     }
 
+    /** Admin menyetor seluruh saldo Teknisi dari Worksheet Admin. */
+    public function storeForTechnician(Request $request, User $technician): RedirectResponse
+    {
+        abort_unless($technician->isTechnician(), 404);
+        abort_unless(
+            $this->balance->isVisibleTo($technician, $request->user()),
+            403,
+            'Posisi kas teknisi ini memuat POP di luar scope Anda.'
+        );
+
+        $validated = $request->validate([
+            'idempotency_key' => 'nullable|string|max:191',
+        ]);
+
+        $destination = ['technician' => $technician->id, 'tab' => 'setor'];
+
+        try {
+            $deposit = $this->deposits->submit(
+                $technician,
+                $validated['idempotency_key'] ?? null,
+                $request->user(),
+            );
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('collector-worksheet.technicians.show', $destination)
+                ->withErrors(['deposit' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('collector-worksheet.technicians.show', $destination)
+            ->with('success', "Setoran {$deposit->deposit_number} tercatat atas nama {$technician->name}. Menunggu verifikasi admin.");
+    }
+
     /**
      * Admin menyetor SELURUH saldo kolektor `$collector` atas namanya —
      * dari Worksheet Admin, bukan Worklist Kolektor. Satu-satunya alasan ini
@@ -177,6 +210,13 @@ class CollectorDepositController extends Controller
 
     private function backToWorksheet(CollectorDeposit $deposit): RedirectResponse
     {
+        if ($deposit->collector?->isTechnician()) {
+            return redirect()->route('collector-worksheet.technicians.show', [
+                'technician' => $deposit->collector_id,
+                'tab' => 'setor',
+            ]);
+        }
+
         return redirect()->route('collector-worksheet.show', [
             'collector' => $deposit->collector_id,
             'tab' => 'setoran',

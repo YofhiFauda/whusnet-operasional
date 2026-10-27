@@ -23,6 +23,7 @@ use LogicException;
     'name',
     'type',
     'parent_id',
+    'uplink_node_id',
     'address',
     'village',
     'district',
@@ -46,6 +47,7 @@ class Pop extends Model
     {
         return [
             'parent_id' => 'integer',
+            'uplink_node_id' => 'integer',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
         ];
@@ -101,6 +103,42 @@ class Pop extends Model
     }
 
     /**
+     * Naik dari sebuah id POP (bisa Mini POP) sampai ketemu POP bertipe
+     * `cabang` — satu sumber kebenaran buat "dua POP ini satu Cabang atau
+     * beda Cabang", dipakai guard lintas-cabang di `InventoryService`,
+     * `NetworkPortAssignmentService`, dan `NetworkNode::resolvePop()`.
+     *
+     * BERHENTI di Cabang, JANGAN naik ke akar. Hierarki produksi tiga tingkat:
+     * Pusat > Cabang > Mini POP (`app:import-legacy-sql --pusat-code` memasang
+     * `parent_id` Cabang ke Pusat). Versi lama naik sampai akar, jadi semua
+     * Cabang terbaca sebagai Pusat dan guard lintas-cabang lolos diam-diam
+     * (Jetis = Sandya). Dijaga `CabangResolutionUnderPusatTest`.
+     *
+     * POP Pusat (atau POP tanpa Cabang di atasnya) mengembalikan akarnya
+     * sendiri — Pusat bukan bagian Cabang mana pun. Pohon POP dangkal, jadi
+     * walk ini aman tanpa cache.
+     */
+    public static function resolveCabangId(?int $popId): ?int
+    {
+        if ($popId === null) {
+            return null;
+        }
+
+        $pop = self::find($popId);
+
+        if (! $pop) {
+            return null;
+        }
+
+        $node = $pop;
+        while ($node && ! $node->isCabang() && $node->parent_id) {
+            $node = self::find($node->parent_id);
+        }
+
+        return $node?->id ?? $pop->id;
+    }
+
+    /**
      * @return HasMany<InventoryBalance, $this>
      */
     public function inventoryBalances(): HasMany
@@ -123,9 +161,31 @@ class Pop extends Model
      *
      * @return HasMany<Pop, $this>
      */
+    public function uplinkNode(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'uplink_node_id');
+    }
+
     public function children(): HasMany
     {
         return $this->hasMany(Pop::class, 'parent_id');
+    }
+
+    /**
+     * Aset berserial DEPLOYED langsung di Mini POP ini (tanpa OLT/Switch
+     * tujuan) — pasangan `NetworkNode::deployedSerials()` (§16.1). Bukan stok
+     * Gudang (`current_pop_id`).
+     *
+     * @return HasMany<InventorySerial, $this>
+     */
+    public function directlyDeployedSerials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class, 'current_infrastructure_pop_id');
+    }
+
+    public function deployedSerials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class, 'current_mini_pop_id');
     }
 
     public function userRoleScopeTargets(): HasMany

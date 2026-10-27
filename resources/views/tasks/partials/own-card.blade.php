@@ -26,7 +26,7 @@
 @endphp
 
 <div id="task-card-{{ $task->id }}"
-     class="relative bg-surface border border-border rounded-2xl overflow-hidden pl-5 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all duration-200 {{ $task->status->value === 'in_progress' ? 'ring-1 ring-amber-400 shadow-md shadow-amber-400/5' : '' }}"
+     class="relative bg-surface border border-border rounded-lg overflow-hidden pl-5 hover:border-slate-300 dark:hover:border-slate-700 transition-colors shadow-2xs {{ $task->status->value === 'in_progress' ? 'ring-1 ring-amber-500' : '' }}"
      data-task-id="{{ $task->id }}"
      data-task-type="{{ $task->task_type->value }}"
      data-task-status="{{ $task->status->value }}"
@@ -38,7 +38,7 @@
      data-scheduled-timestamp="{{ $task->scheduled_at?->timestamp ?? 0 }}">
 
     {{-- Left priority/status bar --}}
-    <div class="absolute left-0 top-0 bottom-0 w-1.5 {{ $accentColor }}"></div>
+    <div class="absolute left-0 top-0 bottom-0 w-1.5 {{ $accentColor }} rounded-l-lg"></div>
 
     <div class="p-4 sm:p-5 flex flex-col justify-between h-full">
         <div>
@@ -100,7 +100,7 @@
 
             {{-- Coordinates display: selalu tampil kalau data ada, gak nunggu task dimulai --}}
             @if($lat && $lng)
-            <div class="mt-3 p-2.5 bg-surface-muted border border-border rounded-xl flex items-center justify-between gap-3" data-coordinate-card>
+            <div class="mt-2.5 p-2 bg-surface-muted border border-border rounded-lg flex items-center justify-between gap-3" data-coordinate-card>
                 <div class="flex flex-col gap-0.5 min-w-0">
                     <span class="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Koordinat Lokasi</span>
                     <span class="font-mono text-[10px] text-text-secondary truncate">
@@ -186,8 +186,8 @@
                 <a href="https://www.google.com/maps/search/?api=1&query={{ $lat }},{{ $lng }}"
                    target="_blank" 
                    title="Petunjuk Arah Maps"
-                   class="inline-flex items-center justify-center gap-1.5 p-2.5 min-[426px]:px-3.5 rounded-xl border border-border bg-surface text-text-secondary hover:bg-sky-50 dark:hover:bg-sky-950/30 hover:text-sky-600 dark:hover:text-sky-400 hover:border-sky-200 dark:hover:border-sky-900/50 active:scale-95 transition-all shadow-sm cursor-pointer font-ui">
-                    <svg class="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                   class="inline-flex items-center justify-center gap-1.5 p-2 min-[426px]:px-3 rounded-lg border border-border bg-surface text-text-secondary hover:bg-sky-50 dark:hover:bg-sky-950/30 hover:text-sky-600 dark:hover:text-sky-400 hover:border-sky-200 dark:hover:border-sky-900/50 transition-colors shadow-2xs cursor-pointer font-ui">
+                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
@@ -200,7 +200,7 @@
             <div class="flex items-center gap-2 flex-1 justify-end min-w-0">
                 @if($task->status->value !== 'terjadwal')
                 <a href="{{ route('tasks.show', $task) }}"
-                   class="inline-flex items-center justify-center text-xs font-bold py-2.5 px-3.5 border border-border rounded-xl bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main transition-all duration-150 shadow-sm cursor-pointer whitespace-nowrap active:scale-95 font-ui">
+                   class="inline-flex items-center justify-center text-xs font-semibold py-2 px-3 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main transition-colors shadow-2xs cursor-pointer whitespace-nowrap font-ui">
                     Buka Detail
                 </a>
                 @endif
@@ -211,7 +211,7 @@
                         <form action="{{ route('customers.survey.start', $task->customer_id) }}" method="POST" class="flex-1 max-w-[200px]">
                             @csrf
                             <button type="submit"
-                                    class="w-full text-center text-xs font-bold py-2.5 px-4 rounded-xl text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:scale-[0.98] transition-all shadow-md shadow-amber-500/10 cursor-pointer whitespace-nowrap font-ui">
+                                    class="w-full text-center text-xs font-semibold py-2 px-3.5 rounded-lg text-white bg-amber-600 hover:bg-amber-700 transition-colors shadow-2xs cursor-pointer whitespace-nowrap font-ui">
                                 Mulai Survey
                             </button>
                         </form>
@@ -221,7 +221,7 @@
                         <form action="{{ route('customers.installation.start', $task->customer_id) }}" method="POST" class="flex-1 max-w-[200px]">
                             @csrf
                             <button type="submit"
-                                    class="w-full text-center text-xs font-bold py-2.5 px-4 rounded-xl text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:scale-[0.98] transition-all shadow-md shadow-amber-500/10 cursor-pointer whitespace-nowrap font-ui">
+                                    class="w-full text-center text-xs font-semibold py-2 px-3.5 rounded-lg text-white bg-amber-600 hover:bg-amber-700 transition-colors shadow-2xs cursor-pointer whitespace-nowrap font-ui">
                                 Mulai Pemasangan
                             </button>
                         </form>
@@ -231,7 +231,7 @@
                         <form action="{{ route('tasks.start', $task) }}" method="POST" class="flex-1 max-w-[200px]">
                             @csrf
                             <button type="submit"
-                                    class="w-full text-center text-xs font-bold py-2.5 px-4 rounded-xl text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:scale-[0.98] transition-all shadow-md shadow-amber-500/10 cursor-pointer whitespace-nowrap font-ui">
+                                    class="w-full text-center text-xs font-semibold py-2 px-3.5 rounded-lg text-white bg-amber-600 hover:bg-amber-700 transition-colors shadow-2xs cursor-pointer whitespace-nowrap font-ui">
                                 {{ $task->task_type->value === \App\Enums\TaskType::MAINTENANCE->value && !request()->routeIs('tasks.own.card-partial') ? 'Mulai Maintenance' : 'Mulai Task' }}
                             </button>
                         </form>
@@ -252,12 +252,12 @@
                         };
                     @endphp
                     @if($task->status->value === 'in_progress')
-                        <x-task.report-choice-dialog :task="$task" :report-url="$reportUrl" class="inline-flex items-center justify-center text-center text-xs font-bold py-2.5 px-4 rounded-xl text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:scale-[0.98] transition-all shadow-md shadow-emerald-500/10 cursor-pointer whitespace-nowrap font-ui">
+                        <x-task.report-choice-dialog :task="$task" :report-url="$reportUrl" class="inline-flex items-center justify-center text-center text-xs font-semibold py-2 px-3.5 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-2xs cursor-pointer whitespace-nowrap font-ui">
                             Isi Laporan
                         </x-task.report-choice-dialog>
                     @else
                         <a href="{{ $reportUrl }}"
-                           class="inline-flex items-center justify-center text-center text-xs font-bold py-2.5 px-4 rounded-xl text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:scale-[0.98] transition-all shadow-md shadow-emerald-500/10 cursor-pointer whitespace-nowrap font-ui">
+                           class="inline-flex items-center justify-center text-center text-xs font-semibold py-2 px-3.5 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-2xs cursor-pointer whitespace-nowrap font-ui">
                             Lanjutkan Laporan
                         </a>
                     @endif

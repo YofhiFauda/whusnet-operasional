@@ -107,8 +107,8 @@
                                     :class="{
                                         'badge-success': result.condition_label === 'Baru',
                                         'badge-error': result.condition_label === 'Bekas — Rusak',
-                                        'badge-info': result.condition_label === 'Bekas — Sudah Dicek',
-                                        'badge-warning': result.condition_label === 'Bekas — Belum Dicek',
+                                        'badge-warning': result.condition_label === 'Bekas — Sudah Dicek',
+                                        'badge-info': result.condition_label === 'Bekas — Belum Dicek',
                                     }"
                                     x-text="result.condition_label"></span>
                             </template>

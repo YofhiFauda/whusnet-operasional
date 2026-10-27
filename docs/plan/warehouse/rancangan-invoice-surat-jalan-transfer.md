@@ -83,3 +83,43 @@ Invoice bisa dicetak kapan saja setelah dispatch (gak nunggu confirm — nilai b
 - Tidak bikin sistem approval/persetujuan baru sebelum dispatch — dokumen ini cuma pencatatan, bukan gerbang baru di alur transfer.
 - Tidak menyentuh Issue/Adjustment/Custody — cuma Transfer Pusat→Cabang.
 - Tidak menyimpan bukti TTD digital dalam bentuk apa pun (foto/gambar/tanda tangan elektronik) — Kepala Gudang, Admin Gudang Pusat, maupun PJ Cabang. Ketiganya manual di kertas.
+
+---
+
+## 9. Addendum rancangan: jual barang antar OLT/cabang melalui Gudang Pusat (2026-10-12)
+
+**Status: rancangan post-MVP, belum diimplementasikan.** Bagian 1–8 di atas mendokumentasikan transfer dan PDF yang sudah berjalan (ADHOC-81); addendum ini hanya berlaku untuk mode jual antar unit yang berbeda dari transfer/restock biasa. Latar belakang dan jejak pertanyaan ada di docs/plan/task-teknisi/analisa-gap-ownership-modem-dan-rincian-billing-creq.md, Gap 5.
+
+### 9.1 Tujuan dan batas sistem
+
+Barang yang dibeli untuk OLT A dapat berada secara fisik di Gudang Pusat setelah retur. Ketika barang itu dialihkan untuk OLT B, transaksi dicatat sebagai jual dari unit operasional asal A ke unit tujuan B, dikelola oleh Pusat. Investor yang terkait dengan masing-masing OLT tidak menjadi master data aplikasi: aplikasi ini khusus operasional. Identitas pihak penjual secara hukum, hak investor, jurnal, pajak, dan penyelesaian uang ke investor tetap di luar aplikasi. Lokasi fisik Pusat tidak boleh ditafsirkan sebagai asal/pemilik barang.
+
+Untuk setiap barang/SN, rancangan perlu membedakan **unit OLT/cabang asal**, **gudang fisik saat ini**, **gudang cabang penerima**, dan **OLT/cabang tujuan penggunaan**. Transfer yang berjalan sekarang hanya menerima gudang bertipe Cabang sebagai tujuan fisik; jika OLT B adalah Mini POP di bawah Cabang B, OLT tujuan tidak boleh dipaksa masuk ke field gudang penerima yang sama. Asal operasional tetap terlacak setelah retur ke Pusat. Stok barang kuantitas dari beberapa asal perlu tetap dapat dipisahkan.
+
+### 9.2 Keputusan bisnis yang sudah dikonfirmasi user
+
+| Hal | Aturan |
+|---|---|
+| Penentu harga jual | **Gudang Pusat** mengisi harga jual per barang. PIC Gudang Cabang tidak dapat menentukan atau mengubahnya. Harga jual berbeda dari nilai taksiran retur dan unit_price_snapshot biaya/nilai stok. |
+| Waktu pembayaran | **Boleh setelah pengiriman dan penerimaan.** Belum dibayar tidak menghalangi dispatch atau konfirmasi fisik. Pusat melacak status pembayaran untuk tindak lanjut operasional. |
+| Waktu barang boleh dipakai | **Setelah SN/qty yang benar dikonfirmasi diterima secara fisik** di gudang tujuan, barang boleh tersedia dan di-issue/dipasang untuk OLT tujuan walaupun belum lunas. Barang dalam perjalanan atau selisih penerimaan tidak boleh dipakai. |
+| Hak memulai transaksi | Hanya operator dengan permission jual khusus **dan** kewenangan Gudang Pusat. Scope all_pop saja tidak cukup. PIC Gudang Cabang tidak dapat memulai jual-beli/transfer antar cabang. |
+| Barang rusak | Tidak boleh dijual. Kandidat awal Gap 5 adalah barang retur used_good yang sudah diperiksa di Pusat; used_damaged, DAMAGED, QUARANTINE, SCRAPPED, dan bekas belum diperiksa ditolak di service. |
+
+### 9.3 Alur dan data transaksi
+
+1. Pusat memilih SN/qty yang tersedia di Gudang Pusat, sudah layak jual, dan memiliki asal operasional yang jelas. Pusat memilih gudang cabang penerima serta OLT/cabang tujuan penggunaan, lalu mengisi harga jual per baris. Transaksi jual harus dibedakan dari transfer/restock biasa.
+2. Dispatch membuat barang keluar dari stok Pusat dan berstatus dalam perjalanan. Surat jalan tetap berisi barang/SN/qty tanpa harga. Harga jual dan asal/tujuan dibekukan sebagai snapshot transaksi agar riwayat tidak berubah mengikuti penilaian stok atau perubahan master POP.
+3. Petugas penerima di cabang tujuan dapat mengonfirmasi barang fisik yang cocok melalui aksi penerimaan terbatas. Hak ini tidak mencakup pembuatan jual, pemilihan asal lain, perubahan harga, atau melihat rekap harga lintas cabang. Stok tujuan bertambah hanya sebesar SN/qty yang dikonfirmasi; selisih tetap berstatus perlu investigasi.
+4. Setelah diterima, barang boleh dipakai untuk OLT tujuan tanpa menunggu pembayaran. Status fisik dan status pembayaran adalah dua alur independen. Pusat mencatat konfirmasi pembayaran dan memantau transaksi belum dibayar; pencatatan kas/bank dan pembukuan investor tetap di luar aplikasi.
+5. Riwayat SN menyambungkan OLT/cabang asal → retur → Pusat → jual → cabang penerima/OLT tujuan. Pembatalan/koreksi yang sudah bergerak fisik harus memakai jejak pembalik, bukan menghapus transaksi.
+
+Minimal data baru yang perlu dirancang saat implementasi: penanda jenis transaksi pada transfer, identitas unit asal dan OLT tujuan terpisah dari gudang fisik, harga jual per baris, status/referensi pembayaran operasional, serta audit aktor dan waktu. Jangan menimpa unit_price_snapshot yang sudah bermakna biaya/nilai stok. Existing inventory_serials.ownership (company/customer) tetap untuk relasi modem terhadap pelanggan, bukan identitas asal OLT.
+
+### 9.4 Dokumen, laporan, dan akses
+
+PDF Invoice transfer pada Bagian 4 mengambil unit_price_snapshot dari ledger, sehingga **belum merupakan dokumen harga jual mode baru**. Saat implementasi, tentukan dokumen bernilai khusus mode jual dengan harga jual dari snapshot transaksi; surat jalan fisik tetap tanpa harga. Dokumen ini tidak menjadi invoice pelanggan dan tidak masuk ke invoices/payments pelanggan.
+
+Pusat melihat daftar transaksi jual antar OLT/cabang, SN/qty, asal/tujuan, harga jual, status fisik, status pembayaran, serta daftar belum dibayar dan selisih penerimaan. Cabang penerima hanya melihat kiriman masuk dan stok dalam scope-nya. PIC Gudang Cabang tidak melihat harga atau rekap lintas cabang. Laporan ini terpisah dari "Barang Terjual ke Pelanggan" dan dari transfer/restock biasa.
+
+**Masih perlu keputusan sebelum implementasi:** dasar persetujuan harga oleh pihak asal yang disimpan/dirujuk Pusat; apakah barang new ikut dijual; format dokumen bernilai mode jual; apakah pembayaran sebagian didukung dan bagaimana bukti konfirmasinya dicatat. Aturan pajak serta pihak penjual formal diputuskan di luar aplikasi setelah status hukum diketahui.

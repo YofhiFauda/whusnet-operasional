@@ -20,6 +20,7 @@ use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskTeamService;
+use App\Services\FopUnifiedDashboardService;
 use App\Services\TaskService;
 use App\Services\TeknisiWorkloadService;
 use Illuminate\Http\Request;
@@ -39,7 +40,8 @@ class FopDashboardController extends Controller
 
     public function __construct(
         private readonly EffectiveAccessService $accessService,
-        private readonly TeknisiWorkloadService $teknisiWorkload
+        private readonly TeknisiWorkloadService $teknisiWorkload,
+        private readonly FopUnifiedDashboardService $unifiedService
     ) {}
 
     /**
@@ -373,6 +375,15 @@ class FopDashboardController extends Controller
             })
             ->values();
 
+        // ── Unified Multi-Module Telemetry & Pipeline ──────────────
+        $pipelineSummary = $this->unifiedService->getCustomerPipelineSummary($hasAllPopAccess, $allowedPopIds);
+        $heroMetrics = $this->unifiedService->getHeroMetrics($user, $hasAllPopAccess, $allowedPopIds, $today, $stats, $teknisiList);
+        $fieldTickets = $this->unifiedService->getActiveFieldTickets($hasAllPopAccess, $allowedPopIds);
+        $warehouseTelemetry = $this->unifiedService->getWarehouseTelemetry($hasAllPopAccess, $allowedPopIds, $today);
+        $odpSummary = $this->unifiedService->getOdpSummary($hasAllPopAccess, $allowedPopIds);
+        $emergencyAlerts = $this->unifiedService->getEmergencyAlerts($hasAllPopAccess, $allowedPopIds);
+        $materialUsageDetail = $this->unifiedService->getMaterialUsageDetail($hasAllPopAccess, $allowedPopIds, $today);
+
         return view('fop.dashboard', compact(
             'surveyQueue',
             'stats',
@@ -381,6 +392,13 @@ class FopDashboardController extends Controller
             'activeTeams',
             'activeFopTeams',
             'pops',
+            'pipelineSummary',
+            'heroMetrics',
+            'fieldTickets',
+            'warehouseTelemetry',
+            'odpSummary',
+            'emergencyAlerts',
+            'materialUsageDetail',
         ));
     }
 

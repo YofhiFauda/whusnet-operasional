@@ -74,20 +74,7 @@
         </div>
 
         @if($transfer->isInTransit() && auth()->user()->hasPermission('warehouse_transfer.receive') && $canReceive)
-        {{--
-            Konfirmasi SEKALIGUS, bukan centang per barang (koreksi
-            2026-09-18, keputusan eksplisit user) — checkbox per-SN/roll
-            yang dulu dipasang 2026-09-04 buat anti-manipulasi kebalik jadi
-            beban di kiriman ratusan/ribuan item. Kompensasinya: TIDAK ADA
-            partial-receive lagi dari form ini (semua baris dispatch
-            otomatis dianggap cocok 100% begitu ditekan, lihat
-            `WarehouseTransferController::receive()`), dan gerbang terakhir
-            sebelum submit adalah MODAL WARNING eksplisit (bukan basa-basi
-            `confirm()` browser) yang minta staf udah cek fisik dulu.
-            Selisih fisik yang ketauan belakangan tetap lewat jalur
-            Adjustment/opname terpisah (kontrol-anti-manipulasi.md §7),
-            BUKAN form ini.
-        --}}
+        {{-- Sisa per baris tetap terbuka sampai diterima pada konfirmasi berikutnya. --}}
         <form id="transfer-receive-form" action="{{ route('warehouse.transfers.receive', $transfer) }}" method="POST">
             @csrf
 
@@ -98,6 +85,7 @@
                             <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Barang / Item</th>
                             <th class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Detail / Lot / SN</th>
                             <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Jumlah Dikirim</th>
+                            <th class="px-6 py-3.5 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sisa / Diterima Sekarang</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -125,6 +113,21 @@
                                     {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} {{ $line->item->unit }}
                                 @endif
                             </td>
+                            <td class="px-6 py-4 text-right text-xs text-slate-700 dark:text-slate-300">
+                                @if(($remainingByLine[$line->id] ?? 0) > 0)
+                                    <span class="block mb-1 font-semibold">Sisa {{ (float) $remainingByLine[$line->id] }} {{ $line->roll ? 'meter' : ($line->serial ? 'unit' : $line->item->unit) }}</span>
+                                    @if($line->serial)
+                                        <label><input type="checkbox" name="confirmed_serial_numbers[]" value="{{ $line->serial->serial_number }}" class="mr-1">Diterima</label>
+                                    @elseif($line->roll)
+                                        <label><input type="checkbox" name="confirmed_roll_codes[]" value="{{ $line->roll->roll_code }}" class="mr-1">Diterima</label>
+                                    @else
+                                        <label class="sr-only" for="received_qty_{{ $line->id }}">Jumlah diterima {{ $line->item->name }}</label>
+                                        <input type="number" id="received_qty_{{ $line->id }}" name="confirmed_quantities[{{ $line->id }}]" min="0" max="{{ (float) $remainingByLine[$line->id] }}" step="0.01" value="0" class="w-24 px-2 py-1 text-right rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900">
+                                    @endif
+                                @else
+                                    <span class="text-emerald-600 dark:text-emerald-400 font-semibold">Sudah diterima</span>
+                                @endif
+                            </td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -132,8 +135,9 @@
             </div>
             <div class="p-5 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                    Periksa fisik seluruh barang di atas dulu, baru tekan tombol ini — barang akan dianggap diterima 100% sesuai daftar.
+                    Isi barang yang benar-benar diterima untuk konfirmasi parsial. Sisa tetap dalam perjalanan dan dapat diterima kemudian.
                 </p>
+                <button type="submit" name="receive_mode" value="partial" class="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold cursor-pointer">Terima Sisa / Parsial</button>
                 <button type="button" x-data @click="$dispatch('open-modal', 'confirm-receive-transfer')" class="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                     <span>Konfirmasi & Terima Semua Barang</span>
@@ -149,7 +153,7 @@
                 Pastikan seluruh fisik barang sudah diperiksa dan sesuai dengan dokumen pengiriman (Surat Jalan). Tindakan ini akan langsung menambahkan stok ke {{ $transfer->toPop->name }} dan <strong>tidak dapat dibatalkan</strong>.
             </p>
             <x-slot name="footer">
-                <button type="submit" form="transfer-receive-form" class="w-full sm:w-auto inline-flex justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold cursor-pointer">
+                <button type="submit" form="transfer-receive-form" name="receive_mode" value="all" class="w-full sm:w-auto inline-flex justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold cursor-pointer">
                     Ya, Konfirmasi Terima Semua
                 </button>
                 <button type="button" @click="$dispatch('close-modal', 'confirm-receive-transfer')" class="w-full sm:w-auto inline-flex justify-center px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm font-semibold cursor-pointer">
@@ -275,6 +279,27 @@
     </div>
     @endif
 </div>
+
+@if($canCloseMissing && collect($remainingByLine)->contains(fn ($qty) => $qty > 0))
+<div class="mt-5 rounded-lg border border-rose-200 bg-rose-50/70 p-5 dark:border-rose-900 dark:bg-rose-950/30">
+    <h2 class="text-sm font-bold text-rose-800 dark:text-rose-300">Tutup Sisa Hilang</h2>
+    <p class="mt-1 text-xs text-rose-700 dark:text-rose-300">Gunakan setelah pemeriksaan fisik memastikan sisa kiriman tidak akan diterima. Semua sisa dicatat sebagai kerugian; stok yang sudah diterima tetap utuh.</p>
+    <form method="POST" action="{{ route('warehouse.transfers.close-missing', $transfer) }}" enctype="multipart/form-data" class="mt-4 space-y-3">
+        @csrf
+        <div>
+            <label for="missing_reason" class="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-200">Kronologi dan hasil pemeriksaan <span class="text-rose-600">*</span></label>
+            <textarea id="missing_reason" name="reason" rows="2" required maxlength="500" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{{ old('reason') }}</textarea>
+            @error('reason') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+        </div>
+        <div>
+            <label for="missing_evidence" class="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-200">Bukti pemeriksaan <span class="text-rose-600">*</span></label>
+            <input id="missing_evidence" type="file" name="evidence" accept="image/*" required class="w-full text-xs text-slate-700 dark:text-slate-200">
+            @error('evidence') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+        </div>
+        <button type="submit" class="rounded-lg bg-rose-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-800">Tutup Sisa Hilang</button>
+    </form>
+</div>
+@endif
 
 @vite(['resources/js/barcode-scan.js'])
 

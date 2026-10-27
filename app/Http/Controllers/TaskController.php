@@ -11,8 +11,11 @@ use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\InventorySerial;
+use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
 use App\Models\Pop;
 use App\Models\Task;
+use App\Models\TaskInfrastructureAction;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Notifications\AppNotification;
@@ -216,6 +219,7 @@ class TaskController extends Controller
             'completedBy',
             'auditLogs.user',
             'maintenanceReport',
+            'creqDetail',
             // fopTask.notes (pointer/catatan FOP) & fopTask.ticket->catatan_teknis
             // (asesmen NOC) SENGAJA gak pernah digabung ke task->description
             // (lihat FopTaskController::store()/update() & TicketService::
@@ -246,7 +250,21 @@ class TaskController extends Controller
         // adanya satu klik user tampil dua baris. Lihat App\Support\TaskAuditTimeline.
         $statusTimeline = TaskAuditTimeline::for($task);
 
-        return view('tasks.show', compact('task', 'recentMaintenanceTasks', 'statusTimeline'));
+        $infraActions = in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true)
+            ? TaskInfrastructureAction::query()->where('task_id', $task->id)
+                ->with(['node', 'technician', 'transactions.serial.item', 'transactions.item'])
+                ->orderBy('id')->get()
+            : collect();
+
+        $targetNodeIds = $infraActions->pluck('mutation.target_node_id')->filter()->unique();
+        $portIds = $infraActions->flatMap(fn ($action) => [
+            $action->mutation['port_id'] ?? null,
+            $action->mutation['target_port_id'] ?? null,
+        ])->filter()->unique();
+        $infraTargetNodes = NetworkNode::query()->whereIn('id', $targetNodeIds)->get()->keyBy('id');
+        $infraPorts = NetworkNodePort::query()->whereIn('id', $portIds)->get()->keyBy('id');
+
+        return view('tasks.show', compact('task', 'recentMaintenanceTasks', 'statusTimeline', 'infraActions', 'infraTargetNodes', 'infraPorts'));
     }
 
     /**

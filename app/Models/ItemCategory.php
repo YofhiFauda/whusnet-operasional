@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'is_active',
     'sort_order',
     'equipment_class',
+    'is_customer_extra_device',
 ])]
 class ItemCategory extends Model
 {
@@ -51,6 +52,7 @@ class ItemCategory extends Model
         return [
             'is_system' => 'boolean',
             'is_active' => 'boolean',
+            'is_customer_extra_device' => 'boolean',
             'equipment_class' => EquipmentClass::class,
         ];
     }

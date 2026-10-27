@@ -5,6 +5,7 @@ namespace App\Enums;
 enum ActionCode: string
 {
     case VIEW = 'view';
+    case PUBLISH = 'publish';
     case CREATE = 'create';
     case UPDATE = 'update';
     case DELETE = 'delete';
@@ -77,4 +78,14 @@ enum ActionCode: string
      * terpisah, bukan numpang wildcard `.update` yang lebih longgar.
      */
     case CHANGE = 'change';
+
+    /**
+     * Registrasi SN aset infrastruktur yang sudah lama berdiri di lapangan
+     * tapi belum pernah masuk ledger (`InventoryTransactionType::REGISTER_INFRA`).
+     * SENGAJA bukan `CREATE` biasa — jalur ledger khusus ini bisa menciptakan
+     * aset langsung `DEPLOYED` TANPA jejak penerimaan Gudang normal
+     * (RECEIVE/ISSUE), jadi permission-nya digerbangi sempit & terpisah,
+     * bukan numpang wildcard `network_nodes.create`.
+     */
+    case REGISTER_INFRA = 'register_infra';
 }

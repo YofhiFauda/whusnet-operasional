@@ -16,6 +16,12 @@ class FeatureSeeder extends Seeder
         // 1. Root Features
         $features = [
             [
+                'code' => 'manuals',
+                'name' => 'Pusat Panduan',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 30,
+            ],
+            [
                 'code' => 'dashboard',
                 'name' => 'Dashboard',
                 'type' => FeatureType::ROOT,

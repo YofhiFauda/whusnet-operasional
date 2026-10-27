@@ -182,11 +182,7 @@ class PaymentService
      */
     private function splitAmount(float $tunai, float $saldoDipakai, float $remaining): array
     {
-        $totalReceived = Money::add($tunai, $saldoDipakai);
-        $appliedAmount = Money::min($totalReceived, $remaining);
-        $overpayAmount = Money::sub($totalReceived, $appliedAmount);
-
-        return [$appliedAmount, $overpayAmount];
+        return Money::splitApplied($tunai, $saldoDipakai, $remaining);
     }
 
     /**
@@ -425,7 +421,15 @@ class PaymentService
      */
     private function resolveActiveBankAccount(mixed $bankAccountId): BankAccount
     {
-        $bankAccount = $bankAccountId ? BankAccount::find($bankAccountId) : null;
+        if (! $bankAccountId) {
+            throw ValidationException::withMessages([
+                'bank_account_id' => 'Pilih rekening tujuan untuk metode Transfer.',
+            ]);
+        }
+
+        // Dikunci (lockForUpdate), bukan cuma find(): rekening bisa
+        // dinonaktifkan admin di antara form dibuka dan disubmit.
+        $bankAccount = BankAccount::query()->whereKey($bankAccountId)->lockForUpdate()->first();
 
         if (! $bankAccount) {
             throw ValidationException::withMessages([

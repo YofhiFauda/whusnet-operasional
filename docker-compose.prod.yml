@@ -30,7 +30,7 @@ services:
       # baca env runtime container. Lihat catatan di Dockerfile.prod stage `assets`.
       args:
         VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
-    image: whusnet-app:${APP_VERSION:-latest}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment: &app_env
       CONTAINER_ROLE: app
@@ -164,7 +164,7 @@ services:
       - app_network
 
   redis:
-    image: redis:alpine
+    image: redis:8.10-alpine
     restart: unless-stopped
     # `--requirepass` WAJIB nyala di sini — app/horizon/reverb/scheduler
     # semua dikirim REDIS_PASSWORD (lihat &app_env), jadi kalau server ini
@@ -190,7 +190,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
       target: runtime
-    image: whusnet-app:${APP_VERSION:-latest}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       <<: *app_env
@@ -222,7 +222,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
       target: runtime
-    image: whusnet-app:${APP_VERSION:-latest}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       <<: *app_env
@@ -255,7 +255,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
       target: runtime
-    image: whusnet-app:${APP_VERSION:-latest}
+    image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       <<: *app_env

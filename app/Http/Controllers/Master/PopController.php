@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
+use App\Models\NetworkNode;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
 use App\Services\MasterRecordRemovalService;
@@ -149,11 +150,25 @@ class PopController extends Controller
     {
         $this->authorizePopScope($pop);
 
+        // Slot tidak lagi relasi Eloquent: Slot/PON kini baris `network_nodes`
+        // (anak chassis), jadi detail POP hanya perlu chassis + SN-nya.
         $pop->load(['parent', 'children' => function ($q) {
             $q->orderBy('name');
         }]);
 
-        return view('master.pop.show', compact('pop'));
+        // Sejak Task 1, chassis OLT boleh ditambatkan langsung ke POP
+        // `cabang` (bukan cuma `mini_pop`) — lihat NetworkNodeTypeSeeder
+        // (`olt_chassis` => pops ['mini_pop', 'cabang']). Query ini WAJIB
+        // ikut dua tipe itu, bukan cuma `mini_pop`, supaya chassis yang
+        // ditambatkan ke Cabang gak hilang dari Detail POP-nya.
+        $chassisNodes = in_array($pop->type, ['mini_pop', 'cabang'], true)
+            ? NetworkNode::query()->where('anchor_pop_id', $pop->id)
+                ->whereHas('nodeType', fn ($query) => $query->where('code', 'olt_chassis'))
+                ->with(['deployedSerials.item'])
+                ->orderBy('code')->get()
+            : collect();
+
+        return view('master.pop.show', compact('pop', 'chassisNodes'));
     }
 
     /**

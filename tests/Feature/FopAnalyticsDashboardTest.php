@@ -215,10 +215,12 @@ class FopAnalyticsDashboardTest extends TestCase
 
         $fopInstalasi = $this->makeFopTask($this->popA, $this->customerA, TaskType::PEMASANGAN, 'TFOP-FA-MODEM-1');
         $fopMaintenance = $this->makeFopTask($this->popA, $this->customerA, TaskType::MAINTENANCE, 'TFOP-FA-MODEM-2');
+        $fopCreq = $this->makeFopTask($this->popA, $this->customerA, TaskType::CREQ, 'TFOP-FA-MODEM-3');
 
         InventoryTransaction::create(['type' => 'install', 'item_id' => $modem->id, 'qty' => 1, 'fop_task_id' => $fopInstalasi->id, 'created_by' => $owner->id]);
         InventoryTransaction::create(['type' => 'install', 'item_id' => $modem->id, 'qty' => 1, 'fop_task_id' => $fopInstalasi->id, 'created_by' => $owner->id]);
         InventoryTransaction::create(['type' => 'install', 'item_id' => $modem->id, 'qty' => 1, 'fop_task_id' => $fopMaintenance->id, 'created_by' => $owner->id]);
+        InventoryTransaction::create(['type' => 'install', 'item_id' => $modem->id, 'qty' => 1, 'fop_task_id' => $fopCreq->id, 'created_by' => $owner->id]);
 
         $response = $this->actingAs($owner)->get(route('fop.analytics'));
 
@@ -226,6 +228,9 @@ class FopAnalyticsDashboardTest extends TestCase
         $response->assertSee('Modem ONT Test');
         $this->assertSame(2, $response->viewData('modemInstalasiTotal'));
         $this->assertSame(1, $response->viewData('modemMaintenanceTotal'));
+        $this->assertSame(1, $response->viewData('modemCreqTotal'));
+        $response->assertSee('Maintenance:');
+        $response->assertSee('{key:"maintenance", label:"Maintenance"}', false);
     }
 
     public function test_beban_tugas_dihitung_per_assignment_bukan_per_task(): void
@@ -262,6 +267,22 @@ class FopAnalyticsDashboardTest extends TestCase
         // punya started_at/completed_at, jadi wajar muncul di section 5 (durasi
         // terlama), cuma harus TIDAK muncul di section 4 (backlog).
         $response->assertDontSee('TASK-FA-CANCEL');
+    }
+
+    /**
+     * Regresi — backlog dulu nol link, task_number plain text padahal `$row['id']`
+     * udah ada di data (ADHOC audit dashboard, 2026-10-12). Sekarang wajib
+     * link ke detail Task.
+     */
+    public function test_backlog_task_number_adalah_link_ke_detail_task(): void
+    {
+        $owner = $this->makeOwner();
+        $task = $this->makeTask($owner, $this->customerA, $this->popA, TaskType::PEMASANGAN, TaskStatus::DRAFT, 'TASK-FA-LINK');
+
+        $response = $this->actingAs($owner)->get(route('fop.analytics'));
+
+        $response->assertOk();
+        $response->assertSee(route('tasks.show', $task->id), false);
     }
 
     public function test_backlog_dipaginate_bukan_dipotong_diam_diam(): void
@@ -304,6 +325,11 @@ class FopAnalyticsDashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('TASK-FA-DUR');
+        $response->assertSee(route('tasks.show', $task->id), false);
+        // Regresi — teknisi/tipe task sudah dihitung controller tapi dulu
+        // dibuang gak dipakai di view (ADHOC audit dashboard, 2026-10-12).
+        $response->assertSee($owner->name);
+        $response->assertSee('Maintenance');
     }
 
     public function test_filter_pop_id_mempersempit_ranking_wilayah(): void
@@ -421,6 +447,13 @@ class FopAnalyticsDashboardTest extends TestCase
         $response->assertOk();
         $response->assertSee('id="materialTrendChart"', false);
         $response->assertDontSee('Gak ada tren pemakaian barang gudang');
+
+        $this->actingAs($owner)->get(route('fop.analytics.drilldown', [
+            'kind' => 'material',
+            'value' => 'Kabel Dropcore',
+            'from' => now()->subDay()->toDateString(),
+            'to' => now()->addDay()->toDateString(),
+        ]))->assertOk()->assertSee($fopTask->task_number);
     }
 
     /**
@@ -448,6 +481,8 @@ class FopAnalyticsDashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('1/1 jenis');
+        $response->assertSee('Ranking Pemakaian Alat Kerja');
+        $response->assertSee('Alat Tren');
     }
 
     /**
@@ -526,5 +561,72 @@ class FopAnalyticsDashboardTest extends TestCase
         app(EffectiveAccessService::class)->clearCache($fopUser);
 
         $this->actingAs($fopUser)->get(route('fop.analytics'))->assertOk();
+    }
+
+    public function test_ranking_barang_gudang_dan_mode_switcher_muncul_di_view(): void
+    {
+        $owner = $this->makeOwner();
+        $item = Item::create(['code' => 'FC-SC-TEST', 'name' => 'Fast Connector SC Test', 'unit' => 'pcs']);
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-FA-MAT-RANK',
+            'task_date' => now(),
+            'category' => TaskType::PEMASANGAN->value,
+            'tugas' => 'Task Material Ranking',
+            'pop_id' => $this->popA->id,
+            'customer_id' => $this->customerA->id,
+            'issue' => 'Test Material Ranking',
+            'status' => TaskStatus::DRAFT->value,
+            'priority' => FopTaskPriority::MEDIUM->value,
+        ]);
+        TaskMaterial::create([
+            'fop_task_id' => $fopTask->id,
+            'customer_id' => $this->customerA->id,
+            'kind' => MaterialKind::TERPAKAI->value,
+            'item_id' => $item->id,
+            'item_type' => 'aksesoris_pasang',
+            'item_name' => 'Fast Connector SC Test',
+            'qty' => 5,
+            'unit' => 'pcs',
+            'recorded_by' => $owner->id,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('fop.analytics'));
+
+        $response->assertOk();
+        $response->assertViewHas('materialRanking');
+        $this->assertNotEmpty($response->viewData('materialRanking'));
+        $response->assertSee('Barang Gudang yang Digunakan Teknisi');
+        $response->assertSee('Fast Connector SC Test');
+        $response->assertSee('5');
+        $response->assertSee('pcs');
+        // Section ranking alat kerja (ADHOC-153) — sempat ter-hitung di
+        // controller ($toolRanking) tapi gak pernah dirender di blade,
+        // sampai ditemukan & diperbaiki (2026-10-10). Sekarang WAJIB tampil.
+        $response->assertSee('Ranking Pemakaian Alat Kerja');
+        $response->assertSee('⚡ Operasional Harian');
+        $response->assertSee('📊 Rekapitulasi & Analitik');
+    }
+
+    public function test_drilldown_ranking_wilayah_memuat_task_sesuai_pop_scope(): void
+    {
+        $owner = $this->makeOwner();
+        $localTask = $this->makeTask($owner, $this->customerA, $this->popA, TaskType::PEMASANGAN, TaskStatus::SELESAI, 'TASK-FA-DETAIL-A');
+        $this->makeTask($owner, $this->customerB, $this->popB, TaskType::PEMASANGAN, TaskStatus::SELESAI, 'TASK-FA-DETAIL-B');
+
+        $popAdmin = $this->makePopAdmin($this->popA);
+        $period = ['from' => now()->subDay()->toDateString(), 'to' => now()->addDay()->toDateString()];
+        $this->actingAs($popAdmin)->get(route('fop.analytics'))
+            ->assertOk()
+            ->assertSee('/fop/analitik/rincian', false);
+
+        $this->actingAs($popAdmin)->get(route('fop.analytics.drilldown', $period + [
+            'kind' => 'region_installation',
+            'value' => $this->districtA->id,
+        ]))->assertOk()->assertSee($localTask->task_number);
+
+        $this->actingAs($popAdmin)->get(route('fop.analytics.drilldown', $period + [
+            'kind' => 'region_installation',
+            'value' => $this->districtB->id,
+        ]))->assertOk()->assertDontSee('TASK-FA-DETAIL-B');
     }
 }

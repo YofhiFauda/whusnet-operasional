@@ -37,7 +37,8 @@ class DatabaseSeeder extends Seeder
         $this->call(BankAccountFeatureSeeder::class); // Master Rekening Bank (ADHOC-95)
         $this->call(QrFeatureSeeder::class); // QR Pelanggan (Fase 1) Permission QR
         $this->call(WarehouseFeatureSeeder::class); // Gudang/Inventory (ADHOC-54, Fase 1)
-        $this->call(FopAnalyticsFeatureSeeder::class); // Dashboard Analitik FOP
+        $this->call(FopAnalyticsFeatureSeeder::class);
+        $this->call(NetworkNodeTypeSeeder::class); // Master Tipe Node Jaringan (ODC/ODP/dll + flag perilaku)
         $this->call(CustomerAcquisitionFeatureSeeder::class); // Customer Acquisition (Busdev) - Pelanggan Aktif < 30 Hari
         $this->call(BusinessDevelopmentVerificationFeatureSeeder::class); // Antrean Menunggu Verifikasi BD (pelanggan Bisnis pra-ACTIVE)
         $this->call(CustomerRegistrationVerificationFeatureSeeder::class); // Antrean Verifikasi Registrasi (ADHOC-73)
@@ -45,8 +46,11 @@ class DatabaseSeeder extends Seeder
         $this->call(CustomerTerminationReasonFeatureSeeder::class); // Master Alasan Putus Langganan (ADHOC-69)
         $this->call(BillingWaiverFeatureSeeder::class); // Pembebasan Tagihan Periode (ADHOC-87)
         $this->call(CustomerBalanceFeatureSeeder::class); // Saldo Pelanggan — Bayar di Muka + Auto-Pakai (ADHOC-92)
+        $this->call(CustomerCableCrossingFeatureSeeder::class); // Kabel Melintang Jalan (ADHOC-205)
         $this->call(CreqBillingVerificationFeatureSeeder::class); // Antrean Verifikasi Biaya C-REQ (docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)
         $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.*/warehouse*.*/fop_analytics.*/customer_acquisitions.*/agents.*/package_restrictions.*/sales_omset_dashboard.*/customer_registration_verification.*/termination_reasons.*/billing_waivers.*/customer_balance.*/creq_billing_verification.* ke-sync ke owner
+        $this->call(ManualFeatureSeeder::class); // Idempotent; tidak mengubah matriks izin role
+        $this->call(ManualArticleSeeder::class); // Artikel awal Infrastruktur; tidak menimpa revisi admin
         $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
         $this->call(ItemCategorySeeder::class); // Kategori tambahan non-system (modem_ont, router_gateway) — sebelum ItemSeeder, dirujuk barangnya
         $this->call(ItemSeeder::class); // Isi awal master barang — tambah sisanya lewat Master Data
@@ -54,6 +58,8 @@ class DatabaseSeeder extends Seeder
 
         // $this->call(CustomerSeeder::class);
         // $this->call(MasterPopSeeder::class);
+        // $this->call(WarehouseExampleSeeder::class);
+        // $this->call(NetworkInventoryExampleSeeder::class); // Contoh data Inventaris Infrastruktur (ADHOC-167)
 
         // $this->call(TechnicianSeeder::class);
         // $this->call(PicGudangSeeder::class); // Demo PIC Gudang Jetis & Sandya (ADHOC-120), WAJIB setelah RoleSeeder/RolePermissionSeeder

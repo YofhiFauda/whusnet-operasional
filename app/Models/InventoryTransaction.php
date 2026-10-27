@@ -33,6 +33,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'unit_price_snapshot',
     'from_pop_id',
     'to_pop_id',
+    'from_network_node_id',
+    'to_network_node_id',
+    'from_mini_pop_id',
+    'to_mini_pop_id',
+    'from_infrastructure_pop_id',
+    'to_infrastructure_pop_id',
+    'from_infrastructure_slot_id',
+    'to_infrastructure_slot_id',
+    'from_infrastructure_port_id',
+    'to_infrastructure_port_id',
     'from_technician_id',
     'to_technician_id',
     'fop_task_id',
@@ -41,6 +51,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'evidence_file_path',
     'resulting_status',
     'created_by',
+    'source_inventory_transaction_id',
+    'source_custody_id',
+    'action_key',
+    'action_fingerprint',
 ])]
 class InventoryTransaction extends Model
 {
@@ -53,7 +67,61 @@ class InventoryTransaction extends Model
             'type' => InventoryTransactionType::class,
             'qty' => 'decimal:2',
             'unit_price_snapshot' => 'decimal:2',
+            'from_network_node_id' => 'integer',
+            'to_network_node_id' => 'integer',
+            'from_mini_pop_id' => 'integer',
+            'to_mini_pop_id' => 'integer',
+            'from_infrastructure_pop_id' => 'integer',
+            'to_infrastructure_pop_id' => 'integer',
+            'from_infrastructure_slot_id' => 'integer',
+            'to_infrastructure_slot_id' => 'integer',
+            'from_infrastructure_port_id' => 'integer',
+            'to_infrastructure_port_id' => 'integer',
+            'to_pop_id' => 'integer',
+            'from_pop_id' => 'integer',
         ];
+    }
+
+    public function fromMiniPop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'from_mini_pop_id');
+    }
+
+    public function toMiniPop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'to_mini_pop_id');
+    }
+
+    public function fromInfrastructurePop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'from_infrastructure_pop_id');
+    }
+
+    public function toInfrastructurePop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'to_infrastructure_pop_id');
+    }
+
+    // Nama kolom *_slot_id/*_port_id bersifat historis: kini berisi id node bertipe
+    // Slot / PON / Port Switch di network_nodes (FK ke network_nodes.id).
+    public function fromInfrastructureSlot(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'from_infrastructure_slot_id');
+    }
+
+    public function toInfrastructureSlot(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'to_infrastructure_slot_id');
+    }
+
+    public function fromInfrastructurePort(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'from_infrastructure_port_id');
+    }
+
+    public function toInfrastructurePort(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'to_infrastructure_port_id');
     }
 
     public function transfer(): BelongsTo
@@ -84,6 +152,16 @@ class InventoryTransaction extends Model
     public function toPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'to_pop_id');
+    }
+
+    public function fromNetworkNode(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'from_network_node_id');
+    }
+
+    public function toNetworkNode(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNode::class, 'to_network_node_id');
     }
 
     public function fromTechnician(): BelongsTo

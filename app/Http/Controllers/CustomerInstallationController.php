@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DeviceOwnership;
 use App\Enums\EquipmentClass;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
@@ -22,15 +23,21 @@ use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
+use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
+use App\Services\AdditionalDeviceCustodyService;
+use App\Services\CableCrossingService;
 use App\Services\CustomerVerificationEditService;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
 use App\Services\InventoryService;
+use App\Services\NetworkPortAssignmentService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
@@ -191,6 +198,22 @@ class CustomerInstallationController extends Controller
                 app(TaskService::class)->cancel($task, auth()->user(), $validated['reason']);
             }
 
+            // Celah yang DISADARI (ADHOC-190 task 4): perangkat tambahan yang
+            // sudah di-install di langkah Perangkat Tambahan (step 5, langsung
+            // installSerial() — beda dari ONT utama yang baru dieksekusi di
+            // storeSpeedtest()) TIDAK ikut direvert di sini kalau pemasangan
+            // dibatalkan. SN-nya tetap INSTALLED ke pelanggan ini & baris
+            // customer_additional_devices tetap "terpasang". SAAT INI BELUM ADA
+            // jalur pemulihan lewat UI untuk kasus ini: cancel() memindah
+            // pelanggan ke REJECTED, sedangkan alur retur pelanggan
+            // (`Warehouse\WarehouseCustomerReturnController::scopedTerminatedCustomers()`)
+            // cuma menerima pelanggan berstatus `terminated`. Pemulihannya
+            // butuh penyesuaian data/inventori manual (SN dikembalikan ke
+            // gudang + baris perangkat tambahan ditandai ditarik). Revert
+            // otomatis sengaja tidak dibuat di sini — retur SN wajib lewat
+            // transit + konfirmasi gudang (ADHOC-108), bukan langsung ditulis.
+            // Follow-up task kalau ini jadi masalah berulang.
+
             $installation = $customer->installations()->latest()->first();
             if ($installation) {
                 $installation->installation_status = 'failed';
@@ -220,14 +243,44 @@ class CustomerInstallationController extends Controller
     {
         $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
 
-        return $teamTechnicianIds === []
-            ? collect()
-            : InventorySerial::query()
-                ->whereIn('current_technician_id', $teamTechnicianIds)
-                ->where('status', SerialStatus::ISSUED->value)
-                ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
-                ->with('item')
-                ->get();
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        // Cuma tampilkan SN yang asal cabangnya SAMA dengan cabang task ini
+        // (laporan user: modem Jetis kepakai di Sandya) — teknisi yang pegang
+        // custody dari 2 cabang beda (mis. scope lintas cabang) gak boleh
+        // lihat/pilih SN cabang lain buat task ini. Penegakan SEBENARNYA
+        // tetap di `InventoryService::installSerial()` — filter ini cuma
+        // UX, biar teknisi gak ketolak belakangan pas sudah isi laporan.
+        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
+
+        return InventorySerial::query()
+            ->whereIn('current_technician_id', $teamTechnicianIds)
+            ->where('status', SerialStatus::ISSUED->value)
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
+            // AP/STB (`is_customer_extra_device`) punya langkahnya sendiri
+            // (ADHOC-190, eligibleExtraDeviceSerialsForTeam()) — kalau ikut
+            // ditawarkan di sini, AP bisa terpilih jadi perangkat UTAMA dan
+            // ditimpa ke customer_devices/ont_sn lewat installSerial(true).
+            ->whereDoesntHave('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item')
+            ->get();
+    }
+
+    /**
+     * Padanan `eligibleSerialsForTeam()` khusus perangkat tambahan (AP/STB,
+     * ADHOC-190) — query-nya tinggal di AdditionalDeviceCustodyService supaya
+     * dropdown di report() dan validasi `Rule::in` di
+     * CustomerInstallationAdditionalDeviceController::store() pakai sumber
+     * yang sama persis.
+     */
+    private function eligibleExtraDeviceSerialsForTeam(?Task $task)
+    {
+        return app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task);
     }
 
     /**
@@ -254,14 +307,25 @@ class CustomerInstallationController extends Controller
             return collect();
         }
 
+        // Sama filter cabang dengan `eligibleSerialsForTeam()` — lot custody
+        // dari cabang lain gak ditampilkan di sini (UX; penegakan sebenarnya
+        // di `InventoryService::consumeFromCustody()`).
+        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
+
         return TechnicianCustody::query()
             ->whereIn('technician_id', $teamTechnicianIds)
             ->active()
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
             ->with('item.category')
             ->get()
+            // Aset infrastruktur dikecualikan — `consumeFromCustody()`
+            // menolaknya (jalurnya deployQuantity() di laporan O-REQ/INFR REQ).
             ->filter(fn (TechnicianCustody $custody) => $custody->item
                 && $custody->item->tracking_type !== TrackingType::SERIALIZED
-                && $custody->item->effective_equipment_class === EquipmentClass::PASIF)
+                && $custody->item->effective_equipment_class === EquipmentClass::PASIF
+                && $custody->item->ownership_mode !== OwnershipMode::INFRASTRUCTURE_ASSET)
             ->groupBy('item_id')
             ->map(function ($rows) {
                 $item = $rows->first()->item;
@@ -291,17 +355,30 @@ class CustomerInstallationController extends Controller
     {
         $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
 
-        return $teamTechnicianIds === []
-            ? collect()
-            : InventoryRoll::query()
-                ->whereIn('current_technician_id', $teamTechnicianIds)
-                ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
-                ->where('length_remaining', '>', 0)
-                ->with('item')
-                ->get();
+        if ($teamTechnicianIds === []) {
+            return collect();
+        }
+
+        // Sama filter cabang dengan `eligibleSerialsForTeam()` — roll dari
+        // cabang lain gak ditampilkan di sini (UX; penegakan sebenarnya di
+        // `InventoryService::consumeFromRoll()`).
+        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
+
+        return InventoryRoll::query()
+            ->whereIn('current_technician_id', $teamTechnicianIds)
+            ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+            ->where('length_remaining', '>', 0)
+            // Roll infrastruktur (feeder) gak boleh dipotong ke pelanggan —
+            // `consumeFromRoll()` menolaknya (jalurnya deployRoll()).
+            ->whereHas('item', fn ($q) => $q->where('ownership_mode', '!=', OwnershipMode::INFRASTRUCTURE_ASSET->value))
+            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
+                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
+            }))
+            ->with('item')
+            ->get();
     }
 
-    public function report(Customer $customer, Request $request)
+    public function report(Customer $customer, Request $request, CableCrossingService $cableCrossings)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
@@ -371,6 +448,12 @@ class CustomerInstallationController extends Controller
         // INDIVIDUAL (bukan agregat) yang lagi di custody tim ini.
         $eligibleRolls = $this->eligibleRollsForTeam($task);
 
+        // Langkah Perangkat Tambahan (ADHOC-190) — partial cuma tampil kalau
+        // paket mengatur perangkat tambahan (limit > 0).
+        $eligibleExtraDeviceSerials = $this->eligibleExtraDeviceSerialsForTeam($task);
+        $requiredExtraDevices = (int) ($customer->customerService?->internetPackage?->max_additional_devices ?? 0);
+        $additionalDeviceRequirements = $customer->customerService?->internetPackage?->additionalDeviceRequirements() ?? [];
+
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
         // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
         // Tanpa prefill teknisi cenderung mengosongkan seksi ini, dan
@@ -434,24 +517,31 @@ class CustomerInstallationController extends Controller
             ? $installWorkTools
             : $workToolService->surveyRowsForCustomer($customer);
 
-        // Gerbang Laporan Speedtest (ADHOC): panel step 6 cuma kebuka kalau
-        // Laporan Pemasangan & Perangkat sudah lengkap — 3 foto wajib +
-        // minimal satu baris material terpakai. Dihitung dari data
-        // tersimpan, BUKAN dari status installation, supaya tahan reload
-        // & tidak butuh kolom baru buat menandai "tahap pemasangan selesai".
+        // Gerbang Laporan Speedtest (ADHOC, koreksi 2026-10-12): panel step 6
+        // cuma kebuka kalau Laporan Pemasangan & Perangkat sudah lengkap — 3
+        // foto wajib. Material Terpakai/Perangkat Pasif SENGAJA TIDAK ikut
+        // syarat ini lagi (permintaan eksplisit user) — opsional di semua
+        // laporan termasuk Pemasangan, sama seperti Maintenance. Dihitung
+        // dari data tersimpan, BUKAN dari status installation, supaya tahan
+        // reload & tidak butuh kolom baru buat menandai "tahap pemasangan
+        // selesai".
         $pemasanganComplete = $installation
             && $installation->installation_photo
             && $installation->contract_photo
-            && $installation->signature_photo
-            && $installFopTask
-            && $installFopTask->materials()->terpakai()->exists();
+            && $installation->signature_photo;
 
         // Dropdown untuk form koreksi Step 1 (kota) & Step 3 (paket internet).
         $cities = City::orderBy('name')->get(['id', 'name']);
         $internetPackages = InternetPackage::orderBy('name')->get();
         $surveyFields = $customer->latestSurvey?->difficultyAndNote() ?? ['difficulty_level' => null, 'survey_note' => null];
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif'));
+        $hasManagedOdp = $this->managedOdpNodeIds($customer)->isNotEmpty();
+        $odpPortOptions = $this->odpPortsFor($customer);
+        $currentOdpPortId = $odpPortOptions->first(fn (NetworkNodePort $port) => $port->activeAssignment->first()?->customer_id === $customer->id)?->id;
+
+        $cableCrossingRows = $cableCrossings->formRows($installation ? $cableCrossings->terpasangForInstallation($installation) : collect());
+
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'droppedFreeformEstimateNames', 'cities', 'internetPackages', 'surveyFields', 'estimasiPerangkatAktif', 'estimasiRoll', 'estimasiPasif', 'odpPortOptions', 'currentOdpPortId', 'hasManagedOdp', 'eligibleExtraDeviceSerials', 'requiredExtraDevices', 'additionalDeviceRequirements', 'cableCrossingRows'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -575,19 +665,10 @@ class CustomerInstallationController extends Controller
                 return redirect()->back()->withInput()->withErrors(['speedtest_photo' => 'Foto hasil speedtest wajib diunggah saat status selesai.']);
             }
 
-            // Pemasangan selesai tanpa satupun material tercatat hampir pasti
-            // laporan yang belum diisi, bukan pemasangan tanpa material.
-            // Dicek di sini (bukan di rules) supaya baris qty 0 / nama kosong
-            // ikut terhitung tidak valid — aturan yang sama dipakai
-            // TaskMaterialService waktu menyimpan.
-            $hasMaterial = collect($validated['materials'] ?? [])->contains(
-                fn ($row) => (float) ($row['qty'] ?? 0) > 0
-                    && (! empty($row['item_id']) || trim((string) ($row['item_name'] ?? '')) !== '')
-            );
-
-            if (! $hasMaterial) {
-                return redirect()->back()->withInput()->withErrors(['materials' => 'Perangkat pasif terpakai wajib diisi minimal satu baris saat status selesai.']);
-            }
+            // Material Terpakai/Perangkat Pasif OPSIONAL (koreksi 2026-10-12,
+            // permintaan eksplisit user) — dulu wajib minimal satu baris saat
+            // status selesai, sekarang disamakan dengan laporan lain
+            // (Maintenance dkk) yang sudah opsional dari awal.
         }
 
         // Calculate speed conformity if package exists
@@ -852,7 +933,11 @@ class CustomerInstallationController extends Controller
             'internet_package_id' => 'required|exists:internet_packages,id',
         ]);
 
-        app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+        try {
+            app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $request->user());
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return $this->redirectBackToInstallationReport($request, $customer, 'Paket internet pelanggan diperbarui.');
     }
@@ -983,7 +1068,7 @@ class CustomerInstallationController extends Controller
      * apa adanya supaya alur admin manual (radio installation_status) tidak
      * ikut berubah perilaku.
      */
-    public function storePemasangan(Request $request, Customer $customer)
+    public function storePemasangan(Request $request, Customer $customer, CableCrossingService $cableCrossings)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
@@ -1017,6 +1102,18 @@ class CustomerInstallationController extends Controller
         // submit tanpa pilih roll tetap harus jalan biasa.
         $eligibleRollIds = $this->eligibleRollsForTeam($assignmentTask)->pluck('id');
 
+        // Ownership modem (rancangan ownership modem sewa/beli, 2026-10-09,
+        // task 4) — radio 2 opsi (Beli Sendiri/Beli dari Gudang) CUMA relevan
+        // & wajib kalau `contract_type` pelanggan 'beli'. Pelanggan 'sewa'
+        // (default/legacy) tidak pernah mengirim field ini — perilakunya
+        // harus identik sebelum task ini (ownership COMPANY, lihat
+        // storeSpeedtest()).
+        $contractType = $customer->customerService?->contract_type;
+        $modemAcquisitionChoiceInput = $request->input('modem_acquisition_choice');
+
+        $hasManagedOdp = $this->managedOdpNodeIds($customer)->isNotEmpty();
+        $managedOdpPorts = $this->odpPortsFor($customer);
+
         $validated = $request->validate([
             // Informasi Perangkat Aktif + Nomor/Port ODP — SATU-SATUNYA syarat
             // wajib buat tombol Aktivasi (ADHOC). Nomor/Slot/Port OLT sengaja
@@ -1040,8 +1137,9 @@ class CustomerInstallationController extends Controller
             'pppoe_username' => 'nullable|string|max:150',
             'pppoe_password' => 'nullable|string|max:150',
             'router_number' => 'nullable|string|max:50',
-            'odp_number' => 'required|string|max:100',
-            'odp_port' => 'required|string|max:50',
+            'network_node_port_id' => [Rule::requiredIf($hasManagedOdp), 'nullable', 'integer', Rule::in($managedOdpPorts->pluck('id'))],
+            'odp_number' => [Rule::requiredIf(! $hasManagedOdp), 'nullable', 'string', 'max:100'],
+            'odp_port' => [Rule::requiredIf(! $hasManagedOdp), 'nullable', 'string', 'max:50'],
             'olt_number' => 'nullable|string|max:50',
             'olt_slot' => 'nullable|string|max:20',
             'olt_port' => 'nullable|string|max:50',
@@ -1054,13 +1152,61 @@ class CustomerInstallationController extends Controller
             // pesan custom di bawah, bukan cuma "format salah". Draft
             // pointer doang — aksi INSTALL sungguhan baru jalan di
             // storeSpeedtest(), lihat komentar di sana.
-            'selected_inventory_serial_id' => ['required', 'integer', Rule::in($eligibleSerialIds)],
+            // 'beli_sendiri' DIKECUALIKAN dari wajib SN (rancangan ownership
+            // modem sewa/beli, 2026-10-09, task 4) — modem itu milik
+            // pelanggan sendiri, gak pernah lewat gudang, jadi gak ada SN
+            // custody buat dipilih sama sekali. Semua pilihan lain (null/
+            // 'beli_gudang') tetap wajib SN seperti perilaku lama.
+            //
+            // Sebaliknya 'beli_sendiri' + SN terisi DITOLAK (prohibited), bukan
+            // diabaikan: combobox SN cuma disembunyikan x-show, nilai lamanya
+            // (mis. dari draft 'beli_gudang' sebelumnya) tetap ikut ter-POST.
+            // Kalau lolos, storeSpeedtest() meng-install SN itu sebagai Sewa
+            // (COMPANY) SEKALIGUS recordCustomerOwnedDevice() menimpa
+            // customer_devices jadi BELI_SENDIRI — flag SN & flag perangkat
+            // saling bertentangan.
+            'selected_inventory_serial_id' => [
+                Rule::requiredIf($modemAcquisitionChoiceInput !== 'beli_sendiri'),
+                Rule::prohibitedIf($modemAcquisitionChoiceInput === 'beli_sendiri'),
+                'nullable',
+                'integer',
+                Rule::in($eligibleSerialIds),
+            ],
 
             // OPSIONAL — sama pola draft pointer di atas (dibatasi custody
             // tim ini), aksi potong-meter sungguhan (consumeFromRoll()) baru
             // jalan di storeSpeedtest().
             'selected_inventory_roll_id' => ['nullable', 'integer', Rule::in($eligibleRollIds)],
             'roll_meters_used' => ['nullable', 'numeric', 'min:0.01', 'required_with:selected_inventory_roll_id'],
+
+            // Cara pemilikan modem — WAJIB hanya kalau `contract_type`
+            // pelanggan 'beli' (gate utama task ini). Pelanggan 'sewa' tidak
+            // pernah mengirim field ini (radio-nya gak dirender di view),
+            // jadi draft pointer-nya selamanya null untuk mereka — identik
+            // perilaku sebelum task ini.
+            // Sebaliknya pelanggan NON-'beli' (sewa/legacy) DILARANG mengirim
+            // field ini sama sekali — radio-nya memang tidak dirender, jadi
+            // nilai apa pun di sini datang dari POST rakitan. Tanpa penjaga ini
+            // pelanggan kontrak Sewa bisa "membeli" modem dari gudang (SN jadi
+            // ownership CUSTOMER + baris Jual Modem) lewat request tangan.
+            'modem_acquisition_choice' => [
+                'nullable',
+                Rule::requiredIf($contractType === 'beli'),
+                Rule::prohibitedIf($contractType !== 'beli'),
+                Rule::in(['beli_sendiri', 'beli_gudang']),
+            ],
+            // 'Beli Sendiri' — modem milik pelanggan sendiri, TIDAK PERNAH
+            // lewat gudang (§DeviceOwnership, sama pola Task 3). Field manual
+            // ini (bukan brand/model/serial_number di atas — serial_number
+            // 'prohibited') yang dipakai `recordCustomerOwnedDevice()`.
+            'manual_device_brand' => ['nullable', 'string', 'max:100', 'required_if:modem_acquisition_choice,beli_sendiri'],
+            'manual_device_model' => ['nullable', 'string', 'max:100', 'required_if:modem_acquisition_choice,beli_sendiri'],
+            'manual_device_serial_number' => ['nullable', 'string', 'max:100', 'required_if:modem_acquisition_choice,beli_sendiri'],
+            // 'Beli dari Gudang' — SN custody dijual ke pelanggan, harga ini
+            // diteruskan ke `InitialInvoiceService` sebagai baris "Jual
+            // Modem" di tagihan AWAL (lihat storeSpeedtest() &
+            // CustomerVerificationController::finalVerify()).
+            'modem_sale_price' => ['nullable', 'numeric', 'min:0.01', 'required_if:modem_acquisition_choice,beli_gudang'],
 
             'installation_photo' => 'nullable|image|max:2048',
             'contract_photo' => 'nullable|image|max:2048',
@@ -1101,14 +1247,42 @@ class CustomerInstallationController extends Controller
             'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
             'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
             'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
+            'modem_acquisition_choice.required' => 'Pilih cara pemilikan modem (Beli Sendiri/Beli dari Gudang) — pelanggan ini kontraknya Beli.',
+            'manual_device_brand.required_if' => 'Brand modem wajib diisi untuk Beli Sendiri.',
+            'manual_device_model.required_if' => 'Model modem wajib diisi untuk Beli Sendiri.',
+            'manual_device_serial_number.required_if' => 'Serial number modem wajib diisi untuk Beli Sendiri.',
+            'modem_sale_price.required_if' => 'Harga jual modem wajib diisi untuk Beli dari Gudang.',
+            'selected_inventory_serial_id.prohibited' => 'Beli Sendiri tidak memakai SN dari Gudang — kosongkan pilihan SN custody.',
+            'modem_acquisition_choice.prohibited' => 'Cara pemilikan modem hanya untuk pelanggan kontrak Beli.',
         ]);
+
+        // Rute kabel melintang jalan (ADHOC-205) — divalidasi terpisah karena
+        // aturannya bergantung pada checkbox. Kalau checkbox tidak dicentang,
+        // rute yang ikut terkirim diabaikan (lihat pemanggilan sync di bawah).
+        $crossingOn = $request->boolean('cable_crossing');
+        $crossingInput = $request->validate(
+            $cableCrossings->pemasanganRules($crossingOn),
+            $cableCrossings->messages(),
+        );
+
+        if (! empty($validated['network_node_port_id'])) {
+            $selectedOdpPort = $managedOdpPorts->firstWhere('id', (int) $validated['network_node_port_id']);
+            $validated['odp_number'] = $selectedOdpPort->node->code;
+            $validated['odp_port'] = (string) $selectedOdpPort->number;
+        }
 
         // selected_inventory_serial_id sudah divalidasi wajib & anggota
         // custody tim ini di atas — SN yang disimpan SELALU berasal dari sini,
         // gak ada lagi teks manual yang bisa menyimpang. Mencegah dua sumber
         // kebenaran: installSerial() di storeSpeedtest() jalan dari
         // selected_inventory_serial_id yang sama persis.
-        $validated['serial_number'] = InventorySerial::findOrFail($validated['selected_inventory_serial_id'])->serial_number;
+        //
+        // 'beli_sendiri' DIKECUALIKAN (rancangan ownership modem sewa/beli,
+        // 2026-10-09, task 4) — field itu sengaja kosong/tidak wajib karena
+        // modem gak lewat gudang sama sekali, jadi gak ada SN buat dicari.
+        if (! empty($validated['selected_inventory_serial_id'])) {
+            $validated['serial_number'] = InventorySerial::findOrFail($validated['selected_inventory_serial_id'])->serial_number;
+        }
 
         // Sisa custody Material Terpakai (koreksi lanjutan ADHOC-54,
         // 2026-09-12) — CUMA peringatan informasional di flash message, BUKAN
@@ -1160,6 +1334,10 @@ class CustomerInstallationController extends Controller
         // beneran kebuka ($pemasanganComplete di report(), abort_unless di
         // storeSpeedtest()) — teknisi tetap harus balik tekan Aktivasi lagi
         // setelah upload foto & catat material supaya Fase 6 kebuka.
+        if ($crossingOn) {
+            $cableCrossings->assertInstallationPhotos($installation, $crossingInput['cable_crossings']);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -1175,11 +1353,27 @@ class CustomerInstallationController extends Controller
             $installation->installation_note = $validated['installation_note'] ?? null;
             // Draft pointer doang — resubmit-safe, gak ada side effect ke
             // inventory_serials di sini (cuma nunjuk, belum diinstall).
-            $installation->selected_inventory_serial_id = $validated['selected_inventory_serial_id'] ?? null;
+            //
+            // 'beli_sendiri' → SN draft DIKOSONGKAN eksplisit, bukan sekadar
+            // "apa pun yang tervalidasi": draft lama (mis. 'beli_gudang' + SN X)
+            // tidak boleh tertinggal, karena storeSpeedtest() meng-install apa
+            // pun yang ada di pointer ini.
+            $installation->selected_inventory_serial_id = ($validated['modem_acquisition_choice'] ?? null) === 'beli_sendiri'
+                ? null
+                : ($validated['selected_inventory_serial_id'] ?? null);
             // Roll kabel — draft pointer sama, konsumsi sungguhan (potong
             // meter) baru jalan di storeSpeedtest().
             $installation->selected_inventory_roll_id = $validated['selected_inventory_roll_id'] ?? null;
             $installation->roll_meters_used = $validated['roll_meters_used'] ?? null;
+
+            // Ownership modem — draft pointer sama pola di atas (resubmit-safe,
+            // eksekusi sungguhan installSerial()/recordCustomerOwnedDevice()/
+            // recordSerialSale() baru jalan di storeSpeedtest()).
+            $installation->modem_acquisition_choice = $validated['modem_acquisition_choice'] ?? null;
+            $installation->manual_device_brand = $validated['manual_device_brand'] ?? null;
+            $installation->manual_device_model = $validated['manual_device_model'] ?? null;
+            $installation->manual_device_serial_number = $validated['manual_device_serial_number'] ?? null;
+            $installation->modem_sale_price = $validated['modem_sale_price'] ?? null;
 
             // Status TETAP in_progress di sini — completed baru ditetapkan di
             // storeSpeedtest(), begitu Laporan Speedtest ikut tersimpan.
@@ -1223,6 +1417,14 @@ class CustomerInstallationController extends Controller
             }
 
             $installation->save();
+
+            // Rute kabel melintang disinkron ke pemasangan ini (draft, sama seperti
+            // pointer roll di atas). Eksekusi final tetap di storeSpeedtest().
+            $cableCrossings->syncFromPemasangan($installation, $customer, $request->user(), $crossingOn, $crossingInput['cable_crossings'] ?? [], $installation->selected_inventory_roll_id);
+
+            if (! empty($validated['network_node_port_id'])) {
+                app(NetworkPortAssignmentService::class)->assignCustomer($selectedOdpPort, $customer, $request->user());
+            }
 
             // Redaman awal disimpan di customer_technical_details, bukan
             // kolom installation — konsisten dengan store() & modal admin.
@@ -1292,30 +1494,29 @@ class CustomerInstallationController extends Controller
 
             DB::commit();
 
-            // Pesan sukses beda tergantung apakah foto+material sudah lengkap
-            // (Fase 6 kebuka) atau belum (Aktivasi tersimpan, tapi teknisi masih
-            // harus balik lagi upload foto & catat material). Hitung ulang di
-            // sini (bukan pakai $pemasanganComplete dari report(), request beda)
-            // — logika sama persis, lihat catatan di report().
-            $hasMaterialTerpakai = $installFopTask && $installFopTask->materials()->terpakai()->exists();
+            // Pesan sukses beda tergantung apakah foto sudah lengkap (Fase 6
+            // kebuka) atau belum (Aktivasi tersimpan, tapi teknisi masih
+            // harus balik lagi upload foto). Hitung ulang di sini (bukan
+            // pakai $pemasanganComplete dari report(), request beda) — logika
+            // sama persis, lihat catatan di report(). Material Terpakai
+            // SENGAJA TIDAK ikut syarat ini (koreksi 2026-10-12, permintaan
+            // eksplisit user) — opsional, sama seperti laporan lain.
             $fase6Unlocked = $installation->installation_photo
                 && $installation->contract_photo
-                && $installation->signature_photo
-                && $hasMaterialTerpakai;
+                && $installation->signature_photo;
 
             // Kasus nyata (2026-09-12, laporan Siti Nuryani 2): teknisi menekan
-            // Aktivasi berkali-kali yakin sudah isi foto+material, tapi
-            // hasFile()/materials-nya kosong tiap kali — flash generik "lengkapi
-            // foto & material" gak nunjuk mana yang sebenarnya belum nyangkut,
-            // jadi teknisi gak sadar submit-nya gak membawa apa-apa. Sebutkan
-            // persis yang kosong di sini supaya ketauan dari pesan sukses ini
-            // sendiri, bukan cuma dari status "Fase 6 terkunci" yang generik.
+            // Aktivasi berkali-kali yakin sudah isi foto, tapi hasFile()-nya
+            // kosong tiap kali — flash generik "lengkapi foto" gak nunjuk mana
+            // yang sebenarnya belum nyangkut, jadi teknisi gak sadar submit-nya
+            // gak membawa apa-apa. Sebutkan persis yang kosong di sini supaya
+            // ketauan dari pesan sukses ini sendiri, bukan cuma dari status
+            // "Fase 6 terkunci" yang generik.
             if (! $fase6Unlocked) {
                 $missingParts = array_filter([
                     ! $installation->installation_photo ? 'Foto Pemasangan' : null,
                     ! $installation->contract_photo ? 'Foto Kontrak' : null,
                     ! $installation->signature_photo ? 'Foto TTD Pelanggan' : null,
-                    ! $hasMaterialTerpakai ? 'Material Terpakai (minimal 1 baris, jumlah > 0)' : null,
                 ]);
 
                 $message = 'Data Pemasangan & Perangkat tersimpan, TAPI belum lengkap untuk membuka Laporan Speedtest — belum tersimpan: '
@@ -1379,16 +1580,32 @@ class CustomerInstallationController extends Controller
         $materialService = app(TaskMaterialService::class);
         $installFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN);
 
+        // Material Terpakai/Perangkat Pasif SENGAJA TIDAK ikut syarat gerbang
+        // ini (koreksi 2026-10-12, permintaan eksplisit user) — opsional,
+        // sama seperti laporan lain (Maintenance dkk). Foto tetap wajib.
         abort_unless(
             $installation
                 && $installation->installation_photo
                 && $installation->contract_photo
                 && $installation->signature_photo
-                && $installFopTask
-                && $installFopTask->materials()->terpakai()->exists(),
+                && $installFopTask,
             422,
             'Selesaikan dan simpan Laporan Pemasangan & Perangkat (tekan Aktivasi) terlebih dahulu sebelum mengisi Laporan Speedtest.'
         );
+
+        // Langkah Perangkat Tambahan (ADHOC-190, spec §4.2) WAJIB sudah
+        // disubmit kalau paket mengatur perangkat tambahan — titik selesai
+        // Laporan Pemasangan itu di sini, jadi kalau gak dijaga, teknisi bisa
+        // melewati langkah itu sama sekali dan AP/STB yang dibawa gak pernah
+        // diputuskan nasibnya. Kelengkapan per perangkat sudah dicek di
+        // CustomerInstallationAdditionalDeviceController::store(); di sini
+        // cukup penandanya.
+        $requiredExtraDevices = (int) ($customer->customerService?->internetPackage?->max_additional_devices ?? 0);
+        if ($requiredExtraDevices > 0 && $installation->extra_devices_reported_at === null) {
+            return redirect()->back()->withInput()->withErrors([
+                'extra_devices' => "Paket pelanggan ini mengatur {$requiredExtraDevices} perangkat tambahan — simpan langkah Perangkat Tambahan di Step 5 terlebih dahulu.",
+            ]);
+        }
 
         $validated = $request->validate([
             'test_upload' => 'required|numeric',
@@ -1496,7 +1713,26 @@ class CustomerInstallationController extends Controller
                 // ke-track Inventory, gak wajib diisi.
                 if ($installation->selected_inventory_serial_id) {
                     $serial = InventorySerial::findOrFail($installation->selected_inventory_serial_id);
-                    app(InventoryService::class)->installSerial($serial, $customer, $installFopTask, $teamTechnicians, auth()->user());
+
+                    // Ownership modem (rancangan ownership modem sewa/beli,
+                    // 2026-10-09, task 4) — 'beli_gudang' = SN dijual ke
+                    // pelanggan (ownership CUSTOMER di `inventory_serials`),
+                    // selain itu (null/'beli_gudang' tidak terpilih tapi SN
+                    // tetap dipilih, sama seperti 'sewa_gudang' Task 3) =
+                    // perilaku lama (ownership COMPANY) — ini JUGA berarti
+                    // `contract_type=sewa` byte-identik dengan sebelum task
+                    // ini, karena `modem_acquisition_choice` selamanya null.
+                    $ownership = $installation->modem_acquisition_choice === 'beli_gudang' ? DeviceOwnership::CUSTOMER : DeviceOwnership::COMPANY;
+
+                    app(InventoryService::class)->installSerial($serial, $customer, $installFopTask, $teamTechnicians, auth()->user(), true, $ownership);
+
+                    // Ledger penjualan — CUMA kalau beneran "Beli dari Gudang".
+                    // `modem_sale_price` sudah wajib diisi lewat validasi
+                    // (`required_if:modem_acquisition_choice,beli_gudang`)
+                    // begitu lolos ke sini (storePemasangan()).
+                    if ($installation->modem_acquisition_choice === 'beli_gudang') {
+                        app(InventoryService::class)->recordSerialSale($serial, $customer, $installFopTask, (float) $installation->modem_sale_price, auth()->user());
+                    }
                 }
 
                 // Roll kabel — draft pointer dari storePemasangan() dieksekusi
@@ -1506,6 +1742,20 @@ class CustomerInstallationController extends Controller
                     $roll = InventoryRoll::findOrFail($installation->selected_inventory_roll_id);
                     app(InventoryService::class)->consumeFromRoll($roll, (float) $installation->roll_meters_used, $teamTechnicians, $installFopTask, $customer, auth()->user());
                 }
+            }
+
+            // 'Beli Sendiri' (rancangan ownership modem sewa/beli, 2026-10-09,
+            // task 4) — modem milik pelanggan sendiri, TIDAK PERNAH lewat
+            // gudang: TIDAK gantung custody tim/FopTask (beda dari cabang
+            // SN-install di atas), jadi dieksekusi di luar blok
+            // `if ($task && $installFopTask && ...)`, sama pola Task 3
+            // (`TaskMaintenanceController::store()`).
+            if ($installation->modem_acquisition_choice === 'beli_sendiri') {
+                app(InventoryService::class)->recordCustomerOwnedDevice($customer, [
+                    'brand' => $installation->manual_device_brand,
+                    'model' => $installation->manual_device_model,
+                    'serial_number' => $installation->manual_device_serial_number,
+                ], auth()->user());
             }
 
             if ($task) {
@@ -1538,5 +1788,38 @@ class CustomerInstallationController extends Controller
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Port ODP yang tersedia di cabang pelanggan, termasuk port miliknya
+     * sendiri saat laporan dipilih ulang. Node cabang lain tidak dikirim ke UI.
+     */
+    private function managedOdpNodeIds(Customer $customer): Collection
+    {
+        $branchId = Pop::resolveCabangId($customer->pop_id);
+        if ($branchId === null) {
+            return collect();
+        }
+
+        $popIds = Pop::query()->where('parent_id', $branchId)->pluck('id')->push($branchId)->all();
+
+        return NetworkNode::query()
+            ->inPops($popIds)
+            ->whereHas('nodeType', fn ($query) => $query->where('code', 'odp'))
+            ->pluck('id');
+    }
+
+    private function odpPortsFor(Customer $customer): Collection
+    {
+        return NetworkNodePort::query()
+            ->whereIn('network_node_id', $this->managedOdpNodeIds($customer))
+            ->where(function ($query) use ($customer) {
+                $query->where('is_used', false)
+                    ->orWhereHas('activeAssignment', fn ($assignment) => $assignment->where('customer_id', $customer->id));
+            })
+            ->with(['node', 'activeAssignment'])
+            ->orderBy('network_node_id')
+            ->orderBy('number')
+            ->get();
     }
 }

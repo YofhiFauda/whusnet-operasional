@@ -332,7 +332,7 @@ class InventoryReceiveService
         usort($lines, fn ($a, $b) => $a['item_id'] <=> $b['item_id']);
 
         return DB::transaction(function () use ($pusat, $lines, $actor, $notes) {
-            $referenceNumber = $this->generateReferenceNumber();
+            $referenceNumber = app(NumberSequenceService::class)->ledgerNumber('RCV');
 
             foreach ($lines as $line) {
                 $item = Item::findOrFail($line['item_id']);
@@ -350,28 +350,6 @@ class InventoryReceiveService
 
             return $referenceNumber;
         });
-    }
-
-    /**
-     * `RCV-YYYYMMDD-NNNNNN` — stempel tanggal PENUH (buat dibaca manusia:
-     * "kapan persisnya"), tapi lingkup reset counter-nya per BULAN (`YYYYMM`),
-     * BUKAN per hari — nomor terus nambah tiap hari dalam bulan yang sama,
-     * baru balik ke 000001 begitu bulan berganti (keputusan eksplisit user,
-     * 2026-09-03). LIKE `RCV-{yearMonth}%` sengaja gak py hyphen penutup —
-     * "202609" adalah prefix literal dari "20260903...", jadi otomatis
-     * nyakup semua tanggal di bulan itu tanpa perlu date range query.
-     */
-    private function generateReferenceNumber(): string
-    {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
-
-        $lastNum = InventoryTransaction::where('reference_number', 'like', "RCV-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('RCV-%s-%06d', $today, $lastNum + 1);
     }
 
     /**

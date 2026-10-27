@@ -568,6 +568,46 @@
 
         <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
             <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60">
+                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Pemakaian Kabel</h4>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Total terpakai: <strong>{{ (float) $rollUsage->sum('qty') }} meter</strong> dari roll ini.</p>
+            </div>
+            <div class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                @forelse($rollUsage as $usage)
+                    <div class="px-4 sm:px-6 py-3 text-xs flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p class="font-semibold text-slate-800 dark:text-slate-100">{{ $usage->fopTask?->task_number ?? 'Task tidak tersedia' }} — {{ $usage->fopTask?->tugas ?? 'Pemakaian kabel' }}</p>
+                            <p class="text-slate-500 dark:text-slate-400">{{ $usage->customer?->full_name ?? $usage->fopTask?->customer?->full_name ?? $usage->fopTask?->pop?->name ?? 'Lokasi tidak tercatat' }} · {{ $usage->created_at?->translatedFormat('d M Y') }}</p>
+                        </div>
+                        <span class="font-mono font-bold text-slate-800 dark:text-slate-100">{{ (float) $usage->qty }} meter</span>
+                    </div>
+                @empty
+                    <p class="px-4 sm:px-6 py-4 text-xs text-slate-500 dark:text-slate-400">Belum ada pemakaian kabel untuk pekerjaan pelanggan.</p>
+                @endforelse
+            </div>
+        </div>
+
+        @if($rollInfraUsage->isNotEmpty())
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60">
+                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Pemakaian Infrastruktur</h4>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Total dipasang: <strong>{{ (float) $rollInfraUsage->sum('qty') }} meter</strong>.</p>
+            </div>
+            <div class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                @foreach($rollInfraUsage as $usage)
+                <div class="px-4 sm:px-6 py-3 text-xs flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <p class="font-semibold text-slate-800 dark:text-slate-100">{{ $usage->notes ?? 'Pemakaian infrastruktur' }}</p>
+                        <p class="text-slate-500 dark:text-slate-400">{{ $usage->fopTask?->task_number ?? $usage->reference_number }} · {{ $usage->created_at?->translatedFormat('d M Y') }}</p>
+                    </div>
+                    <span class="font-mono font-bold text-slate-800 dark:text-slate-100">{{ (float) $usage->qty }} meter</span>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60">
                 <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Riwayat Ledger Roll (RECEIVE/TRANSFER/ISSUE/RETURN/ADJUSTMENT)</h4>
                 <p class="text-[11px] text-slate-400 mt-0.5">Pemakaian harian (potong meter) TIDAK masuk ledger ini — cukup tercatat di Laporan Task teknisi.</p>
             </div>

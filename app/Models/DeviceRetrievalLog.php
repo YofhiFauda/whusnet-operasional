@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CReqCategory;
 use App\Enums\DeviceRetrievalSource;
 use App\Enums\ItemCondition;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -111,11 +112,20 @@ class DeviceRetrievalLog extends Model
     public function originLabel(): string
     {
         if ($this->source === DeviceRetrievalSource::CREQ_SWAP) {
-            $category = $this->task?->creqDetail?->category;
+            $category = null;
+            if ($this->relationLoaded('task') && $this->task) {
+                if ($this->task->relationLoaded('creqDetail')) {
+                    $category = $this->task->creqDetail?->category;
+                } elseif (! $this->task->preventsLazyLoading) {
+                    $category = $this->task->creqDetail?->category;
+                }
+            } elseif (! $this->relationLoaded('task') && ! $this->preventsLazyLoading) {
+                $category = $this->task?->creqDetail?->category;
+            }
 
             return match ($category) {
-                \App\Enums\CReqCategory::MIGRASI => 'Bekas Migrasi',
-                \App\Enums\CReqCategory::TAMBAH_MODEM => 'Bekas Ganti Modem',
+                CReqCategory::MIGRASI => 'Bekas Migrasi',
+                CReqCategory::TAMBAH_MODEM => 'Bekas Ganti Modem',
                 default => 'Bekas Ganti Modem (C-REQ)',
             };
         }

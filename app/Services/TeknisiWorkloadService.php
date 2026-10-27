@@ -26,7 +26,7 @@ class TeknisiWorkloadService
 {
     /**
      * @param  array<int>  $allowedPopIds
-     * @return Collection<int, array{id:int, name:string, initials:string, status:string, task_count:int, location:string}>
+     * @return Collection<int, array{id:int, name:string, initials:string, status:string, task_count:int, overdue_count:int, location:string, workload_percent:int, overloaded:bool, tool_badges:array<int, string>}>
      */
     public function summarize(bool $hasAllPopAccess, array $allowedPopIds, ?Carbon $today = null): Collection
     {
@@ -49,8 +49,9 @@ class TeknisiWorkloadService
 
         $activeByUser = $this->activeTaskByUser($teknisiIds);
         $countByUser = $this->scheduledCountByUser($teknisiIds, $today);
+        $maxTaskCount = max(1, (int) $countByUser->max('total'));
 
-        return $teknisi->map(function (User $t) use ($activeByUser, $countByUser) {
+        return $teknisi->map(function (User $t) use ($activeByUser, $countByUser, $maxTaskCount) {
             $activeTask = $activeByUser->get($t->id);
             $counts = $countByUser[$t->id] ?? ['total' => 0, 'overdue' => 0];
             $taskCount = (int) $counts['total'];
@@ -66,6 +67,9 @@ class TeknisiWorkloadService
                     default => 'standby',
                 },
                 'task_count' => $taskCount,
+                'workload_percent' => (int) round($taskCount / $maxTaskCount * 100),
+                'overloaded' => $taskCount > 4,
+                'tool_badges' => $activeTask?->fopTask?->workTools->pluck('tool_name')->unique()->values()->all() ?? [],
                 // Pecahan tunggakan dari `task_count`. Angka gabungan saja
                 // menyamarkan beda antara "3 task hari ini" (normal) dan "3 task
                 // yang seharusnya kelar 3 hari lalu" (perlu ditangani) — padahal
@@ -94,7 +98,7 @@ class TeknisiWorkloadService
             ->join('task_teams', 'task_teams.task_id', '=', 'tasks.id')
             ->whereIn('task_teams.user_id', $teknisiIds)
             ->where('tasks.status', TaskStatus::IN_PROGRESS->value)
-            ->with(['customer.village', 'customer.district', 'customer.city'])
+            ->with(['customer.village', 'customer.district', 'customer.city', 'fopTask.workTools'])
             ->orderByDesc('tasks.started_at')
             ->select('tasks.*', 'task_teams.user_id as team_user_id')
             ->get()

@@ -117,17 +117,16 @@
 - **Risiko utama:** credit lama bisa langsung kepake di generator tanggal 1 pertama setelah deploy — wajib `billing:apply-balance --dry-run` dulu sebelum go-live.
 
 ---
-(PROSES)
+(DITUTUP ATAS KEPUTUSAN USER 2026-10-23)
 ## 10. Request Deaktivasi + Cuti Berlangganan — ADHOC-87
 
 **Dokumen:** [`analisa-rancangan-request-deaktivasi-bebas-tagihan-periode.md`](analisa-rancangan-request-deaktivasi-bebas-tagihan-periode.md)
-**Status:** Hampir clear — keputusan utama udah dijawab semua (2026-09-21). Beberapa **default rancangan** (K1/K2/K3/K5/K6 di §7 dokumen: hard-delete jadi status `batal` bukan `DELETE`, satu kemampuan dua pintu, cuma invoice belum dibayar yang bisa dibebaskan, Cuti gak auto-isolir, cabut waiver gak hidupin invoice lagi) **boleh jalan apa adanya** kecuali lo koreksi — bukan blocker, cuma perlu direview sekilas sebelum coding.
+**Status:** Ditutup dari backlog aktif atas keputusan user 2026-10-23. Implementasi akhirnya memakai satu pintu `Cuti Berlangganan / Bebaskan Tagihan Periode` di Detail Pelanggan; alur Putus Langganan terpisah. Catatan rancangan dua pintu di dokumen asal adalah histori. Verifikasi ulang kode/data tidak dilakukan.
 
-**Inti:**
-- Satu kemampuan, dua pintu: **Request Putus Langganan** (dropdown riwayat tagihan + catatan, terminate) dan **Cuti Berlangganan** (bebasin tagihan periode tanpa ubah status pelanggan).
-- Tabel baru `customer_billing_waivers`. Jendela mundur **1 bulan** (bulan berjalan + 1 sebelumnya).
-- Hanya invoice **Bulanan** tanpa pembayaran (`paid_amount = 0`) yang bisa dibebaskan — Aktivasi/Tagihan Manual/denda gak kena.
-- Irisan sama ADHOC-69 (form Putus Langganan pakai ini dalam satu transaksi) & ADHOC-70 (denda tetap lewat Tagihan Manual, gak kena waiver).
+**Inti implementasi terakhir (lihat dokumen rancangan, deviasi 2026-09-24):**
+- Pembebasan tagihan periode dilakukan dari Detail Pelanggan melalui `CustomerBillingWaiverController`, terpisah dari terminasi.
+- Form Putus Langganan hanya memproses alasan, denda, dan catatan; bila perlu membebaskan tagihan, admin melakukan langkah Cuti secara terpisah.
+- Histori invoice dipertahankan; perubahan `batal` dan pencegahan terbit ulang mengikuti aturan waiver yang tercatat pada rancangan.
 
 ---
 
@@ -136,7 +135,7 @@
 - [x] ADHOC-84 — Alokasi Pembayaran & Saldo — Selesai 2026-09-23
 - [x] ADHOC-70 — Tagihan Manual
 - [x] ADHOC-69 — Putus Langganan
-- [ ] ADHOC-87 — Request Deaktivasi + Cuti
+- [x] ADHOC-87 — Request Deaktivasi + Cuti (ditutup atas keputusan user 2026-10-23)
 - [x] ADHOC-92 — Saldo Pelanggan — Selesai 2026-09-24
 - [x] ADHOC-68 — Upgrade/Downgrade Paket
 - [x] ADHOC-94 — Perubahan Kwitansi *(independen, sisipkan kapan aja)* — Selesai 2026-09-23

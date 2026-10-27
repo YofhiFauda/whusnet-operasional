@@ -1,0 +1,606 @@
+
+                
+                <!-- Tree Header & Filter -->
+                <div class="p-4 border-b border-slate-100 space-y-3 bg-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="ph-fill ph-tree-structure text-blue-600 text-base"></i>
+                                Hirarki Topologi Node
+                            </h2>
+                            <p class="text-[11px] text-slate-500">Pilih node untuk mengelola port &amp; lokasi</p>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="expandAllNodes(true)" class="px-2 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition" title="Buka Semua Hirarki">
+                                <i class="ph ph-arrows-out-line-vertical"></i> Buka Semua
+                            </button>
+                            <button onclick="expandAllNodes(false)" class="px-2 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition" title="Tutup Semua Hirarki">
+                                <i class="ph ph-arrows-in-line-vertical"></i> Tutup
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search & Type Filter inside Tree (Law of Proximity) -->
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input id="treeSearchInput" oninput="renderTree()" type="text" placeholder="Filter nama node / kode..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-blue-500 outline-none transition">
+                        </div>
+                        <select id="treeTypeFilter" onchange="renderTree()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium focus:bg-white focus:border-blue-500 outline-none cursor-pointer">
+                            <option value="ALL">Semua Tipe</option>
+                            <option value="POP">POP / Cabang</option>
+                            <option value="OLT">OLT / PON</option>
+                            <option value="FDR">Feeder (FDR)</option>
+                            <option value="ODP">ODP</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Legend / Quick Summary Bar -->
+                <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Total: <strong class="text-slate-700">14 Node</strong></span>
+                    <div class="flex items-center gap-3">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Normal</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Hampir Penuh</span>
+                    </div>
+                </div>
+
+                <!-- Scrollable Tree List (Single-line indent, zero nested boxes!) -->
+                <div id="networkTreeContainer" class="flex-1 overflow-y-auto p-3 space-y-0.5 select-none">
+                <div class="">
+                    <div onclick="selectNode('POP-WHUSNET')" class=" group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('POP-WHUSNET')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-blue-600 text-white border-blue-600 shrink-0">
+                                P
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="WHUSNET — Pusat / Server Utama (POP Utama / Data Center)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">WHUSNET</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Pusat / Server Utama</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                                <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded opacity-85 group-hover:opacity-100">
+                                    POP
+                                </span>
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('CORE-WHUSNET-PUSAT')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('CORE-WHUSNET-PUSAT')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-slate-100 text-slate-700 border-slate-300 shrink-0">
+                                SRV
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="CORE-WHUSNET-PUSAT — Kabel Core Server ke POP WHUSNET (Server Utama)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">CORE-WHUSNET-PUSAT</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Kabel Core Server ke POP WHUSNET</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('BB-PUSAT-JETIS-01')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('BB-PUSAT-JETIS-01')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-indigo-50 text-indigo-700 border-indigo-200 shrink-0">
+                                BB
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="BB-PUSAT-JETIS-01 — Backbone WHUSNET ke Jetis (Backbone / Transport)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">BB-PUSAT-JETIS-01</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Backbone WHUSNET ke Jetis</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('POP-JETIS')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('POP-JETIS')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-blue-500 text-white border-blue-500 shrink-0">
+                                C
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="Jetis — Cabang Jetis (POP Cabang)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">Jetis</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Cabang Jetis</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                                <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded opacity-85 group-hover:opacity-100">
+                                    POP
+                                </span>
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('AGG-JETIS-01')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('AGG-JETIS-01')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-purple-50 text-purple-700 border-purple-200 shrink-0">
+                                AGG
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="AGG-JETIS-01 — Agregasi Jetis (Router/Switch Agregasi POP)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">AGG-JETIS-01</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Agregasi Jetis</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('MPOP-C1')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('MPOP-C1')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-cyan-600 text-white border-cyan-600 shrink-0">
+                                M
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="C1 — Mini POP C1 (Mini POP Outdoor Cabinet)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">C1</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Mini POP C1</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                                <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded opacity-85 group-hover:opacity-100">
+                                    POP
+                                </span>
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('OLT-JETIS-01')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('OLT-JETIS-01')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-amber-50 text-amber-800 border-amber-200 shrink-0">
+                                OLT
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="OLT-JETIS-01 — OLT Jetis 01 (Chassis OLT EPON/GPON)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">OLT-JETIS-01</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">OLT Jetis 01</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('PON-JETIS-01')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('PON-JETIS-01')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-orange-50 text-orange-700 border-orange-200 shrink-0">
+                                PON
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="PON-JETIS-01 — PON Jetis 01 (PON Port / Card)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">PON-JETIS-01</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">PON Jetis 01</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('FDR-JETIS-01')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('FDR-JETIS-01')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-sky-50 text-sky-700 border-sky-200 shrink-0">
+                                FDR
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="FDR-JETIS-01 — Feeder Jetis Utama 01 (Kabel Feeder Distribusi)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">FDR-JETIS-01</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Feeder Jetis Utama 01</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    2/12
+                                </span>
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('ODP-JETIS-01')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 bg-blue-50/90 text-blue-950 ring-1 ring-blue-500/40 shadow-2xs font-medium">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <span class="w-5 h-5 flex items-center justify-center shrink-0">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                                </span>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+                                ODP
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="ODP-JETIS-01 — ODP Gang Mawar Jetis (Optical Distribution Point (ODP))">
+                                <span class="text-xs font-semibold text-blue-700 font-mono">ODP-JETIS-01</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-blue-900">ODP Gang Mawar Jetis</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    1/12
+                                </span>
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                </div>
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('ODP-JETIS-02')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <span class="w-5 h-5 flex items-center justify-center shrink-0">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                                </span>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+                                ODP
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="ODP-JETIS-02 — ODP Perumahan Griya Jetis Asri (Optical Distribution Point (ODP))">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">ODP-JETIS-02</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">ODP Perumahan Griya Jetis Asri</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border bg-amber-50 text-amber-700 border-amber-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                    8/12
+                                </span>
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('BB-PUSAT-SANDYA-01')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('BB-PUSAT-SANDYA-01')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-indigo-50 text-indigo-700 border-indigo-200 shrink-0">
+                                BB
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="BB-PUSAT-SANDYA-01 — Backbone WHUSNET ke Sandya (Backbone / Transport)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">BB-PUSAT-SANDYA-01</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Backbone WHUSNET ke Sandya</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('POP-SANDYA')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <button onclick="event.stopPropagation(); toggleNodeExpand('POP-SANDYA')" class="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition shrink-0">
+                                    <i class="ph-bold ph-caret-down text-xs"></i>
+                                </button>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-blue-500 text-white border-blue-500 shrink-0">
+                                C
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="Sandya — Cabang Sandya (POP Cabang Distribusi)">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">Sandya</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">Cabang Sandya</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                            
+                                <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded opacity-85 group-hover:opacity-100">
+                                    POP
+                                </span>
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                        <div class="space-y-0.5">
+                            
+                <div class="ml-4 pl-2 tree-line">
+                    <div onclick="selectNode('ODP-SANDYA-01')" class="tree-node-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all my-0.5 hover:bg-slate-100/80 text-slate-700">
+                        
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <!-- Expand/Collapse Chevron -->
+                            
+                                <span class="w-5 h-5 flex items-center justify-center shrink-0">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                                </span>
+                            
+
+                            <!-- Type Badge -->
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+                                ODP
+                            </span>
+
+                            <!-- Code & Name (Clean single-line with tooltip on hover, no cramped truncation!) -->
+                            <div class="min-w-0 flex-1 truncate" title="ODP-SANDYA-01 — ODP contoh Sandya 01 (Optical Distribution Point (ODP))">
+                                <span class="text-xs font-semibold text-slate-800 font-mono">ODP-SANDYA-01</span>
+                                <span class="text-slate-300 mx-1">-</span>
+                                <span class="text-xs text-slate-500">ODP contoh Sandya 01</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Side Status Pill or POP Link -->
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    0/8
+                                </span>
+                            
+                            
+                        </div>
+                    </div>
+
+                    <!-- Children Container -->
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div>
+                        </div>
+                    
+                </div></div>
+            

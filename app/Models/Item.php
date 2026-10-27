@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EquipmentClass;
+use App\Enums\InfrastructureLocationKind;
 use App\Enums\OwnershipMode;
 use App\Enums\TrackingType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -29,6 +30,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'code',
     'name',
     'item_category_id',
+    'infrastructure_node_type_id',
+    'infrastructure_location_kind',
     'unit',
     'is_active',
     'tracking_type',
@@ -53,7 +56,13 @@ class Item extends Model
             'equipment_class_override' => EquipmentClass::class,
             'meter_per_roll' => 'decimal:2',
             'minimum_length' => 'decimal:2',
+            'infrastructure_location_kind' => InfrastructureLocationKind::class,
         ];
+    }
+
+    public function infrastructureNodeType(): BelongsTo
+    {
+        return $this->belongsTo(NetworkNodeType::class, 'infrastructure_node_type_id');
     }
 
     public function category(): BelongsTo

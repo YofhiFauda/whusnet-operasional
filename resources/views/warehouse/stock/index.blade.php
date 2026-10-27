@@ -685,8 +685,8 @@
                                                 :class="{
                                                     'badge-success': serial.condition === 'new',
                                                     'badge-error': serial.condition === 'used_damaged',
-                                                    'badge-info': serial.condition === 'used_good' && serial.condition_checked,
-                                                    'badge-warning': serial.condition === 'used_good' && !serial.condition_checked,
+                                                    'badge-warning': serial.condition === 'used_good' && serial.condition_checked,
+                                                    'badge-info': serial.condition === 'used_good' && !serial.condition_checked,
                                                 }"
                                                 x-text="serial.condition === 'new' ? 'Baru' : (serial.condition === 'used_damaged' ? 'Bekas — Rusak' : (serial.condition_checked ? 'Bekas — Sudah Dicek' : 'Bekas — Belum Dicek'))"></span>
                                         </td>

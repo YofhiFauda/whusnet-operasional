@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\CustodyStatus;
+use App\Enums\DeviceOwnership;
 use App\Enums\InventoryTransactionType;
+use App\Enums\ItemCondition;
 use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Models\InventoryBalance;
@@ -110,7 +112,7 @@ class InventoryAdjustmentService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::ADJUSTMENT,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('ADJ'),
                 'item_id' => $itemId,
                 'lot_no' => $lotNo === '' ? null : $lotNo,
                 'qty' => $qtyDelta,
@@ -141,13 +143,14 @@ class InventoryAdjustmentService
             throw new InvalidArgumentException('Qty adjustment tidak boleh nol.');
         }
 
-        $newRemaining = (float) $custody->qty_remaining + $qtyDelta;
+        return DB::transaction(function () use ($custody, $qtyDelta, $reason, $actor, $notes, $evidenceFilePath) {
+            $custody = TechnicianCustody::query()->lockForUpdate()->findOrFail($custody->id);
+            $newRemaining = (float) $custody->qty_remaining + $qtyDelta;
 
-        if ($newRemaining < 0) {
-            throw new InvalidArgumentException("Adjustment bikin sisa custody jadi negatif: {$custody->qty_remaining} + ({$qtyDelta}) < 0.");
-        }
+            if ($newRemaining < 0) {
+                throw new InvalidArgumentException("Adjustment bikin sisa custody jadi negatif: {$custody->qty_remaining} + ({$qtyDelta}) < 0.");
+            }
 
-        return DB::transaction(function () use ($custody, $qtyDelta, $newRemaining, $reason, $actor, $notes, $evidenceFilePath) {
             // Kalau sisa jadi 0 → CONSUMED, gak peduli status asal. Tapi
             // kalau sisa jadi POSITIF ("ditemukan lagi" pas opname) padahal
             // status asalnya RETURNED/CONSUMED (terminal — CustodyStatus
@@ -168,7 +171,7 @@ class InventoryAdjustmentService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::ADJUSTMENT,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('ADJ'),
                 'item_id' => $custody->item_id,
                 'lot_no' => $custody->lot_no,
                 'qty' => $qtyDelta,
@@ -214,15 +217,17 @@ class InventoryAdjustmentService
         // sebelumnya SN yang udah SCRAPPED bisa "diadjust lagi" jadi LOST,
         // bolak-balik status yang harusnya udah selesai (ketauan audit
         // 2026-09-02). Status sama juga ditolak, itu bukan koreksi apa pun.
-        if ($serial->status === SerialStatus::SCRAPPED) {
-            throw new InvalidArgumentException("SN {$serial->serial_number} udah SCRAPPED (write-off final) — gak bisa diubah status lagi.");
-        }
-
-        if ($serial->status === $newStatus) {
-            throw new InvalidArgumentException("SN {$serial->serial_number} udah berstatus {$newStatus->value} — gak ada perubahan buat dicatat.");
-        }
-
         return DB::transaction(function () use ($serial, $newStatus, $reason, $actor, $notes, $evidenceFilePath) {
+            $serial = InventorySerial::query()->lockForUpdate()->findOrFail($serial->id);
+
+            if ($serial->status === SerialStatus::SCRAPPED) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} udah SCRAPPED (write-off final) — gak bisa diubah status lagi.");
+            }
+
+            if ($serial->status === $newStatus) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} udah berstatus {$newStatus->value} — gak ada perubahan buat dicatat.");
+            }
+
             $updates = ['status' => $newStatus];
 
             // Serial yang lagi INSTALLED di pelanggan ditarik status lost/
@@ -238,20 +243,138 @@ class InventoryAdjustmentService
                 $updates['installed_at'] = null;
             }
 
+            // SN yang DEPLOYED ke node infrastruktur ditarik status-nya: SN-nya
+            // udah gak ada di node itu, pointer lokasinya harus ikut lepas
+            // (sama logikanya dengan customer_id di atas, beda konsep lokasi).
+            //
+            // Node + Cabang-nya DISNAPSHOT dulu sebelum pointer dikosongkan —
+            // kalau tidak, baris ADJUSTMENT gak punya lokasi asal sama sekali
+            // (SN DEPLOYED selalu `current_pop_id = null` sejak deploySerial()),
+            // jadi kerugian aset infrastruktur gak ketauan dari titik mana dan
+            // gak muncul di riwayat Gudang yang memfilter per `from_pop_id`.
+            // Cabang di-resolve SAAT transaksi (pola sama snapshot ledger
+            // DEPLOY/RETRIEVE_INFRA) — node dipindah belakangan, histori tetap.
+            //
+            // Posisi kanonis (Task 6, §16.1): SN DEPLOYED bisa berada di Mini
+            // POP, node, Slot, atau Port — semua kolom lokasi dilepas dan
+            // posisi asal dicatat dengan FK yang sama di ledger.
+            $fromNetworkNodePopId = null;
+            $fromLocationColumns = [];
+
+            if ($serial->status === SerialStatus::DEPLOYED) {
+                $inventory = app(InventoryService::class);
+                $fromLocation = $inventory->currentLocationOf($serial);
+                $fromNetworkNodePopId = $fromLocation?->cabangId;
+                $fromLocationColumns = $inventory->transactionLocationColumns('from', $fromLocation);
+                $updates = [...$updates, ...$inventory->serialLocationColumns(null)];
+            }
+
             $serial->update($updates);
+
+            $unitCost = InventoryTransaction::query()
+                ->where('serial_id', $serial->id)
+                ->where('type', InventoryTransactionType::RECEIVE->value)
+                ->whereNotNull('unit_price_snapshot')
+                ->oldest('id')
+                ->value('unit_price_snapshot');
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::ADJUSTMENT,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('ADJ'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => -1,
-                'from_pop_id' => $serial->current_pop_id,
+                'unit_price_snapshot' => $unitCost,
+                'from_pop_id' => $serial->current_pop_id ?? $fromNetworkNodePopId,
                 'from_technician_id' => $serial->current_technician_id,
+                ...$fromLocationColumns,
                 'reason' => $reason,
                 'notes' => $notes,
                 'evidence_file_path' => $evidenceFilePath,
                 'resulting_status' => $newStatus->value,
+                'created_by' => $actor->id,
+            ]);
+        });
+    }
+
+    /**
+     * Barang SN yang telah diperbaiki internal masuk kembali ke stok setelah
+     * pemeriksaan fisik. Harga unit mengikuti perolehan fisik unit yang sama.
+     */
+    public function restoreRepairedSerial(InventorySerial $serial, string $reason, User $actor, string $evidenceFilePath): InventoryTransaction
+    {
+        $this->assertReason($reason);
+
+        if (blank($evidenceFilePath)) {
+            throw new InvalidArgumentException('Bukti pemeriksaan barang selesai diperbaiki wajib diunggah.');
+        }
+
+        return DB::transaction(function () use ($serial, $reason, $actor, $evidenceFilePath) {
+            $serial = InventorySerial::query()->lockForUpdate()->findOrFail($serial->id);
+
+            if (! in_array($serial->status, [SerialStatus::DAMAGED, SerialStatus::QUARANTINE], true)) {
+                throw new InvalidArgumentException('Hanya barang rusak atau karantina yang dapat dinyatakan selesai diperbaiki.');
+            }
+
+            if ($serial->current_pop_id === null || $serial->current_technician_id !== null || ! $serial->currentPop?->isWarehouse()) {
+                throw new InvalidArgumentException('Barang harus diperiksa secara fisik di Gudang sebelum kembali tersedia.');
+            }
+
+            if ($serial->ownership === DeviceOwnership::CUSTOMER) {
+                throw new InvalidArgumentException('Barang milik pelanggan tidak boleh masuk kembali ke stok perusahaan.');
+            }
+
+            $source = InventoryTransaction::query()
+                ->where('serial_id', $serial->id)
+                ->where('type', InventoryTransactionType::ADJUSTMENT->value)
+                ->whereIn('resulting_status', [SerialStatus::DAMAGED->value, SerialStatus::QUARANTINE->value])
+                ->latest('id')
+                ->first();
+
+            $lastAvailableId = InventoryTransaction::query()
+                ->where('serial_id', $serial->id)
+                ->where('resulting_status', SerialStatus::AVAILABLE->value)
+                ->max('id') ?? 0;
+            $hasRecognizedDamage = InventoryTransaction::query()
+                ->where('serial_id', $serial->id)
+                ->where('type', InventoryTransactionType::ADJUSTMENT->value)
+                ->where('resulting_status', SerialStatus::DAMAGED->value)
+                ->where('id', '>', $lastAvailableId)
+                ->exists();
+
+            $cost = InventoryTransaction::query()
+                ->where('serial_id', $serial->id)
+                ->where('type', InventoryTransactionType::RECEIVE->value)
+                ->whereNotNull('unit_price_snapshot')
+                ->oldest('id')
+                ->value('unit_price_snapshot');
+
+            $cost ??= InventoryTransaction::query()
+                ->where('serial_id', $serial->id)
+                ->whereNotNull('unit_price_snapshot')
+                ->oldest('id')
+                ->value('unit_price_snapshot');
+
+            $serial->update([
+                'status' => SerialStatus::AVAILABLE,
+                'condition' => ItemCondition::USED_GOOD,
+                'condition_checked_at' => now(),
+                'condition_checked_by' => $actor->id,
+            ]);
+
+            return InventoryTransaction::create([
+                'type' => InventoryTransactionType::ADJUSTMENT,
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('ADJ'),
+                'item_id' => $serial->item_id,
+                'serial_id' => $serial->id,
+                'qty' => 1,
+                'unit_price_snapshot' => $cost,
+                'to_pop_id' => $serial->current_pop_id,
+                'reason' => $hasRecognizedDamage ? 'repaired' : 'inspection_cleared',
+                'notes' => $reason,
+                'evidence_file_path' => $evidenceFilePath,
+                'resulting_status' => SerialStatus::AVAILABLE->value,
+                'source_inventory_transaction_id' => $source?->id,
                 'created_by' => $actor->id,
             ]);
         });
@@ -280,23 +403,26 @@ class InventoryAdjustmentService
             throw new InvalidArgumentException("Transisi ke {$newStatus->label()} wajib disertai bukti fisik (foto kondisi barang / BAP kehilangan) — kontrol-anti-manipulasi.md §2.");
         }
 
-        if ($roll->status === RollStatus::SCRAPPED) {
-            throw new InvalidArgumentException("Roll {$roll->roll_code} udah SCRAPPED (write-off final) — gak bisa diubah status lagi.");
-        }
-
-        if ($roll->status === $newStatus) {
-            throw new InvalidArgumentException("Roll {$roll->roll_code} udah berstatus {$newStatus->value} — gak ada perubahan buat dicatat.");
-        }
-
         return DB::transaction(function () use ($roll, $newStatus, $reason, $actor, $notes, $evidenceFilePath) {
+            $roll = InventoryRoll::query()->lockForUpdate()->findOrFail($roll->id);
+
+            if ($roll->status === RollStatus::SCRAPPED) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} udah SCRAPPED (write-off final) — gak bisa diubah status lagi.");
+            }
+
+            if ($roll->status === $newStatus) {
+                throw new InvalidArgumentException("Roll {$roll->roll_code} udah berstatus {$newStatus->value} — gak ada perubahan buat dicatat.");
+            }
+
             $roll->update(['status' => $newStatus]);
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::ADJUSTMENT,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('ADJ'),
                 'item_id' => $roll->item_id,
                 'roll_id' => $roll->id,
                 'qty' => -$roll->length_remaining,
+                'unit_price_snapshot' => $roll->unit_price_snapshot,
                 'from_pop_id' => $roll->current_pop_id,
                 'from_technician_id' => $roll->current_technician_id,
                 'reason' => $reason,
@@ -342,29 +468,96 @@ class InventoryAdjustmentService
         }
     }
 
-    /**
-     * `ADJ-YYYY-NNNN` — sama alasan sama pola `InventoryReassignService::generateReferenceNumber()`
-     * (RSG-), ketauan audit 2026-09-02 event ADJUSTMENT gak py nomor dokumen
-     * sama sekali. Race generate-nya SENGAJA gak dibenahi (lihat catatan
-     * pelingkupan P0/P1 docs/TASKS.md).
-     */
-    /**
-     * `ADJ-YYYYMMDD-NNNNNN` — lihat docblock sama persis di
-     * `InventoryReceiveService::generateReferenceNumber()` buat alasan
-     * lengkap (tanggal penuh buat dibaca, reset counter per BULAN bukan per
-     * hari, keputusan eksplisit user 2026-09-03).
-     */
-    private function generateReferenceNumber(): string
+    public function recordSerialStockOpname(InventorySerial $serial, Pop $pop, bool $isPresent, User $actor, string $reason, string $evidenceFilePath): InventoryTransaction
     {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
+        $this->assertReason($reason);
+        if (blank($evidenceFilePath) || ! $pop->isWarehouse()) {
+            throw new InvalidArgumentException('Opname unit membutuhkan gudang dan bukti pemeriksaan fisik.');
+        }
 
-        $lastNum = InventoryTransaction::where('reference_number', 'like', "ADJ-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
+        return DB::transaction(function () use ($serial, $pop, $isPresent, $actor, $reason, $evidenceFilePath) {
+            $serial = InventorySerial::query()->lockForUpdate()->findOrFail($serial->id);
+            if ($serial->current_pop_id !== $pop->id || $serial->status !== SerialStatus::AVAILABLE) {
+                throw new InvalidArgumentException('SN harus berstatus tersedia di gudang yang diopname.');
+            }
 
-        return sprintf('ADJ-%s-%06d', $today, $lastNum + 1);
+            $price = InventoryTransaction::query()
+                ->where('serial_id', $serial->id)->whereNotNull('unit_price_snapshot')
+                ->oldest('id')->value('unit_price_snapshot');
+            $loss = $isPresent ? null : $this->adjustSerialStatus($serial, SerialStatus::LOST, 'lost', $actor, $reason, $evidenceFilePath);
+
+            return InventoryTransaction::create([
+                'type' => InventoryTransactionType::STOCK_OPNAME,
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('OPN'),
+                'item_id' => $serial->item_id,
+                'serial_id' => $serial->id,
+                'qty' => $isPresent ? 1 : 0,
+                'unit_price_snapshot' => $price,
+                'to_pop_id' => $isPresent ? $pop->id : null,
+                'source_inventory_transaction_id' => $loss?->id,
+                'reason' => 'stock_opname_diff',
+                'notes' => $reason,
+                'evidence_file_path' => $evidenceFilePath,
+                'resulting_status' => $isPresent ? SerialStatus::AVAILABLE->value : SerialStatus::LOST->value,
+                'created_by' => $actor->id,
+            ]);
+        });
+    }
+
+    public function recordRollStockOpname(InventoryRoll $roll, Pop $pop, float $countedLength, User $actor, string $reason, string $evidenceFilePath): InventoryTransaction
+    {
+        $this->assertReason($reason);
+        if (blank($evidenceFilePath) || ! $pop->isWarehouse()) {
+            throw new InvalidArgumentException('Opname roll membutuhkan gudang dan bukti pemeriksaan fisik.');
+        }
+
+        return DB::transaction(function () use ($roll, $pop, $countedLength, $actor, $reason, $evidenceFilePath) {
+            $roll = InventoryRoll::query()->lockForUpdate()->findOrFail($roll->id);
+            if ($roll->current_pop_id !== $pop->id || $roll->status !== RollStatus::AVAILABLE) {
+                throw new InvalidArgumentException('Roll harus berstatus tersedia di gudang yang diopname.');
+            }
+            if ($countedLength < 0 || $countedLength > (float) $roll->length_total) {
+                throw new InvalidArgumentException('Panjang fisik roll harus antara nol dan panjang awal roll.');
+            }
+
+            $delta = round($countedLength - (float) $roll->length_remaining, 2);
+            $correction = null;
+            if ($countedLength <= 0) {
+                $correction = $this->adjustRollStatus($roll, RollStatus::LOST, 'lost', $actor, $reason, $evidenceFilePath);
+            } elseif ($delta != 0.0) {
+                $correction = InventoryTransaction::create([
+                    'type' => InventoryTransactionType::ADJUSTMENT,
+                    'reference_number' => app(NumberSequenceService::class)->ledgerNumber('ADJ'),
+                    'item_id' => $roll->item_id,
+                    'roll_id' => $roll->id,
+                    'qty' => $delta,
+                    'unit_price_snapshot' => $roll->unit_price_snapshot,
+                    'from_pop_id' => $delta < 0 ? $pop->id : null,
+                    'to_pop_id' => $delta > 0 ? $pop->id : null,
+                    'reason' => $delta < 0 ? 'lost' : 'stock_opname_diff',
+                    'notes' => $reason,
+                    'evidence_file_path' => $evidenceFilePath,
+                    'created_by' => $actor->id,
+                ]);
+                $roll->update(['length_remaining' => $countedLength]);
+            }
+
+            return InventoryTransaction::create([
+                'type' => InventoryTransactionType::STOCK_OPNAME,
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('OPN'),
+                'item_id' => $roll->item_id,
+                'roll_id' => $roll->id,
+                'qty' => $countedLength,
+                'unit_price_snapshot' => $roll->unit_price_snapshot,
+                'to_pop_id' => $countedLength > 0 ? $pop->id : null,
+                'source_inventory_transaction_id' => $correction?->id,
+                'reason' => 'stock_opname_diff',
+                'notes' => $reason,
+                'evidence_file_path' => $evidenceFilePath,
+                'resulting_status' => $countedLength > 0 ? RollStatus::AVAILABLE->value : RollStatus::LOST->value,
+                'created_by' => $actor->id,
+            ]);
+        });
     }
 
     /**
@@ -422,7 +615,7 @@ class InventoryAdjustmentService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::STOCK_OPNAME,
-                'reference_number' => $this->generateOpnameReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('OPN'),
                 'item_id' => $itemId,
                 'lot_no' => $lotNo === '' ? null : $lotNo,
                 'qty' => $delta,
@@ -432,22 +625,5 @@ class InventoryAdjustmentService
                 'created_by' => $actor->id,
             ]);
         });
-    }
-
-    /**
-     * `OPN-YYYYMMDD-NNNNNN` — series terpisah dari `ADJ-`, pola sama
-     * `generateReferenceNumber()` di atas.
-     */
-    private function generateOpnameReferenceNumber(): string
-    {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
-
-        $lastNum = InventoryTransaction::where('reference_number', 'like', "OPN-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('OPN-%s-%06d', $today, $lastNum + 1);
     }
 }

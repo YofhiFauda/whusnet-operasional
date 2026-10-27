@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'modem',
     'features',
     'max_users',
+    'max_additional_devices',
     'ip_address_type',
     'contract_period_months',
     'installation_fee',
@@ -56,6 +57,7 @@ class InternetPackage extends Model
             'total_price' => 'decimal:2',
             'features' => 'array',
             'max_users' => 'integer',
+            'max_additional_devices' => 'integer',
             'contract_period_months' => 'integer',
             'installation_fee' => 'decimal:2',
             'is_active' => 'boolean',
@@ -117,6 +119,34 @@ class InternetPackage extends Model
         }
 
         return $type->defaultHandlingSlaHours();
+    }
+
+    /**
+     * Hanya AP yang jadi perangkat tambahan pelanggan. Router di paket (mis.
+     * "3 AP & 1 Router") tetap tampil di kartu paket, tapi dikelola server —
+     * tidak dipasang di pelanggan, jadi tidak ikut kebutuhan pemasangan.
+     *
+     * @return array<string, int>
+     */
+    public function additionalDeviceRequirements(): array
+    {
+        $requirements = ['access_point' => 0];
+
+        foreach ($this->features ?? [] as $feature) {
+            if (! is_string($feature)) {
+                continue;
+            }
+
+            preg_match_all('/(?<![A-Za-z0-9])(\\d+)\\s*AP(?![A-Za-z0-9])/i', $feature, $matches, PREG_SET_ORDER);
+
+            foreach ($matches as $match) {
+                $requirements['access_point'] += (int) $match[1];
+            }
+        }
+
+        return array_sum($requirements) === (int) $this->max_additional_devices
+            ? array_filter($requirements)
+            : [];
     }
 
     public function calculateTotalPrice(): float

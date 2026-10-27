@@ -3,7 +3,7 @@
 @section('title', 'Laporan Maintenance — ' . $task->task_number)
 
 @section('content')
-<div class="mx-auto px-2 py-4 sm:px-4" style="max-width:960px">
+<div class="mx-auto px-2 py-4 sm:px-4 pb-28 sm:pb-8" style="max-width:960px">
 
     {{-- ══ Page Header — naked, no card ══════════════════════════════════ --}}
     <div class="mb-5">
@@ -57,7 +57,8 @@
         <span id="client-error-text"></span>
     </div>
 
-    <form id="maintenance-form" action="{{ route('tasks.maintenance.store', $task) }}" method="POST" enctype="multipart/form-data" class="no-confirm">
+    <form id="maintenance-form" action="{{ route('tasks.maintenance.store', $task) }}" method="POST" enctype="multipart/form-data" class="no-confirm"
+          x-data="{ modemOwnership: @js(old('modem_ownership_choice', 'tidak_ganti')), infraRows: @js(old('infra_actions', [])), addInfraRow() { this.infraRows.push({ action_key: window.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.floor(Math.random() * 16); return (c === 'x' ? r : (r & 3 | 8)).toString(16); }), action_type: 'inspect', network_node_id: '' }); } }">
         @csrf
 
         {{-- ══ Main Form Panel — satu card utama ══════════════════════════ --}}
@@ -185,6 +186,42 @@
             </div>
             @endif
 
+            @if($task->task_type === \App\Enums\TaskType::MAINTENANCE)
+            {{-- ── Section 1c: Task Berbayar (MTN polos) ──
+                 Sama seperti checkbox "Task Berbayar" C-REQ di atas, tapi
+                 field & model beda (`mtn_is_billable`/`mtn_billing_note` →
+                 `TaskMaintenanceBillingDetail`, bukan `TaskCreqDetail`) —
+                 dua sumber kebenaran terpisah biar gak collide di satu
+                 form. Review akhir (2026-10-10, finding #1): guard sempat
+                 `@unless(... === CREQ)`, yang juga lolos untuk O-REQ/INFR
+                 REQ — tapi antrean Verifikasi Biaya cuma mengenali CREQ &
+                 MAINTENANCE, jadi O-REQ/INFR yang ditandai berbayar lewat
+                 checkbox ini kebentuk tapi gak pernah kelihatan di antrean
+                 CS. Diperketat ke exact match MAINTENANCE (selaras dengan
+                 guard eksekusi di TaskMaintenanceController::store()) —
+                 kalau $isCreq, checkbox "Task Berbayar" C-REQ di atas sudah
+                 cukup; nampilin dua checkbox sekaligus di satu form cuma
+                 bikin teknisi bingung mana yang kepake. --}}
+            <div class="px-6 py-4" style="border-bottom:1px solid var(--color-border)">
+                <p class="mb-4" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
+                    Task Berbayar
+                </p>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="mtn_is_billable" id="mtn_is_billable" value="1" onchange="mtnToggleBillable()" @checked(old('mtn_is_billable'))>
+                    <span style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">Task ini berbayar (perlu verifikasi CS)</span>
+                </label>
+                <div id="mtn-billing-note-wrap" class="hidden mt-2">
+                    <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                        Catatan Biaya <span style="color:var(--color-error)">*</span>
+                    </label>
+                    <textarea name="mtn_billing_note" id="mtn_billing_note" rows="3" maxlength="1000"
+                              placeholder="Jelaskan pekerjaan berbayar ini untuk ditinjau CS..."
+                              class="w-full rounded-md text-sm"
+                              style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;resize:vertical;outline:none">{{ old('mtn_billing_note') }}</textarea>
+                </div>
+            </div>
+            @endif
+
             {{-- ── Section 2: Material Terpakai ────────────────────────
                  Menggantikan lima kolom teks lama (kabel/modem/patchcord/
                  sleeve/lainnya) — satu kolom per jenis barang, hardcode, tidak
@@ -227,33 +264,107 @@
                 <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
                     Isi HANYA kalau teknisi membawa &amp; memasang modem/ONT pengganti dari Gudang. Kalau tidak bawa/ganti modem, biarkan kosong.
                 </p>
-                @if($eligibleSerials->isNotEmpty())
-                    @php
-                        // Sisa stok Perangkat Aktif per jenis barang (koreksi lanjutan
-                        // ADHOC-54, 2026-09-12) — sama pola installations/report.blade.php:
-                        // SERIALIZED gak punya qty, jadi dihitung dari JUMLAH SN yang masih
-                        // ISSUED di custody tim, dikelompokkan per nama barang.
-                        $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)
-                            ->map->count();
-                        // Combobox (components/combobox.blade.php): SN dicari lewat
-                        // ketikan, bukan scroll <select>. Opsi "Tidak ganti modem"
-                        // (value kosong) = default, jadi SN tidak tersimpan.
-                        $serialOptions = collect([['value' => '', 'label' => 'Tidak ganti modem', 'search' => 'tidak ganti modem']])
-                            ->concat($eligibleSerials->map(fn ($serial) => [
-                                'value' => $serial->id,
-                                'label' => 'SN ' . $serial->serial_number . ' — ' . $serial->item->name,
-                                'search' => $serial->serial_number . ' ' . $serial->item->name,
-                                'hint' => 'Sisa custody tim: ' . $serialCountsByItem[$serial->item->name] . ' unit',
-                            ]))->values();
-                    @endphp
-                    <x-combobox id="selected_inventory_serial_id" name="selected_inventory_serial_id" :options-expr="json_encode($serialOptions)" :value-expr="json_encode((string) old('selected_inventory_serial_id', ''))" placeholder="Ketik SN atau nama perangkat..." />
-                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Perangkat yang diambil lewat Gudang (custody Anda) — SN yang tersimpan otomatis sama persis dengan yang dipilih di sini.</p>
-                @else
-                    <select disabled class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-surface-muted);color:var(--color-text-muted);padding:10px 12px">
-                        <option>Tidak ada SN di custody Anda</option>
-                    </select>
-                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Anda belum mengambil modem dari Gudang — kalau maintenance ini gak perlu ganti modem, abaikan saja.</p>
-                @endif
+
+                {{-- Radio ownership modem (rancangan ownership modem sewa/beli,
+                     2026-10-09) — menentukan cara pemilikan modem yang
+                     dipasang: tetap aset perusahaan (Sewa Gudang), dijual ke
+                     pelanggan (Beli dari Gudang), atau milik pelanggan sendiri
+                     yang gak pernah lewat gudang sama sekali (Beli Sendiri).
+                     Default "Tidak Ganti Modem" — SN gak kesentuh (perilaku
+                     lama). --}}
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    @foreach([
+                        'tidak_ganti' => 'Tidak Ganti Modem',
+                        'sewa_gudang' => 'Sewa Gudang',
+                        'beli_sendiri' => 'Beli Sendiri',
+                        'beli_gudang' => 'Beli dari Gudang',
+                    ] as $value => $label)
+                    <label class="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer transition-colors"
+                           style="border:1px solid var(--color-border);background:var(--color-background)"
+                           :style="modemOwnership === '{{ $value }}' ? 'border-color:var(--color-primary);background:rgba(2,132,199,0.08)' : ''">
+                        <input type="radio" name="modem_ownership_choice" value="{{ $value }}" x-model="modemOwnership"
+                               @checked(old('modem_ownership_choice', 'tidak_ganti') === $value)
+                               class="h-3.5 w-3.5">
+                        <span style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">{{ $label }}</span>
+                    </label>
+                    @endforeach
+                </div>
+
+                {{-- fieldset :disabled — x-show cuma menyembunyikan; tanpa ini SN
+                     yang sempat dipilih tetap ter-POST walau radio sudah pindah,
+                     dan server (TaskMaintenanceController::store) menolaknya. --}}
+                <div x-show="modemOwnership === 'sewa_gudang' || modemOwnership === 'beli_gudang'" x-cloak>
+                    <fieldset class="min-w-0" :disabled="!(modemOwnership === 'sewa_gudang' || modemOwnership === 'beli_gudang')">
+                    @if($eligibleSerials->isNotEmpty())
+                        @php
+                            // Sisa stok Perangkat Aktif per jenis barang (koreksi lanjutan
+                            // ADHOC-54, 2026-09-12) — sama pola installations/report.blade.php:
+                            // SERIALIZED gak punya qty, jadi dihitung dari JUMLAH SN yang masih
+                            // ISSUED di custody tim, dikelompokkan per nama barang.
+                            $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)
+                                ->map->count();
+                            // Combobox (components/combobox.blade.php): SN dicari lewat
+                            // ketikan, bukan scroll <select>. Opsi "Tidak ganti modem"
+                            // (value kosong) = default, jadi SN tidak tersimpan.
+                            $serialOptions = collect([['value' => '', 'label' => 'Tidak ganti modem', 'search' => 'tidak ganti modem']])
+                                ->concat($eligibleSerials->map(fn ($serial) => [
+                                    'value' => $serial->id,
+                                    'label' => 'SN ' . $serial->serial_number . ' — ' . $serial->item->name,
+                                    'search' => $serial->serial_number . ' ' . $serial->item->name,
+                                    'hint' => 'Sisa custody tim: ' . $serialCountsByItem[$serial->item->name] . ' unit',
+                                ]))->values();
+                        @endphp
+                        <x-combobox id="selected_inventory_serial_id" name="selected_inventory_serial_id" :options-expr="json_encode($serialOptions)" :value-expr="json_encode((string) old('selected_inventory_serial_id', ''))" placeholder="Ketik SN atau nama perangkat..." />
+                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Perangkat yang diambil lewat Gudang (custody Anda) — SN yang tersimpan otomatis sama persis dengan yang dipilih di sini.</p>
+                    @else
+                        <select disabled class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-surface-muted);color:var(--color-text-muted);padding:10px 12px">
+                            <option>Tidak ada SN di custody Anda</option>
+                        </select>
+                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Anda belum mengambil modem dari Gudang — kalau maintenance ini gak perlu ganti modem, abaikan saja.</p>
+                    @endif
+
+                    {{-- Harga jual — wajib untuk "Beli dari Gudang" saja. --}}
+                    <div x-show="modemOwnership === 'beli_gudang'" x-cloak class="mt-3">
+                        <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                            Harga Jual Modem <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <input type="number" step="0.01" min="0.01" name="modem_sale_price" value="{{ old('modem_sale_price') }}" placeholder="Contoh: 150000"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, bukan sewa.</p>
+                    </div>
+                    </fieldset>
+                </div>
+
+                {{-- Beli Sendiri — modem milik pelanggan sendiri, gak pernah lewat
+                     gudang. Input manual, BUKAN dari custody/SN gudang. --}}
+                <div x-show="modemOwnership === 'beli_sendiri'" x-cloak class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                        <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">
+                            Brand <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <input type="text" name="manual_device_brand" value="{{ old('manual_device_brand') }}" maxlength="100" placeholder="mis. TP-Link"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                    </div>
+                    <div>
+                        <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">
+                            Model <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <input type="text" name="manual_device_model" value="{{ old('manual_device_model') }}" maxlength="100" placeholder="mis. Archer C6"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                    </div>
+                    <div>
+                        <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">
+                            Serial Number <span style="color:var(--color-error)">*</span>
+                        </label>
+                        <input type="text" name="manual_device_serial_number" value="{{ old('manual_device_serial_number') }}" maxlength="100" placeholder="SN di stiker perangkat"
+                               class="w-full rounded-md text-sm"
+                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                    </div>
+                    <p class="col-span-1 sm:col-span-3 text-[10px] leading-relaxed" style="color:var(--color-text-muted)">Modem milik pelanggan sendiri — tidak lewat Gudang, tidak ada SN custody yang terpakai.</p>
+                </div>
             </div>
 
             {{-- ── Section 2c: Roll Kabel (Opsional) ─────────────────────
@@ -286,6 +397,189 @@
                     <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Tidak ada roll kabel di custody Anda — abaikan kalau gak perlu.</p>
                 @endif
             </div>
+
+            {{-- ── Section 2d: Pasang/Ganti Infrastruktur (O-REQ/INFR REQ) ──
+                 Aset yang dipasang NETAP di titik jaringan (ODC/ODP/splitter),
+                 bukan ke pelanggan. Pemilih lokasi SENGAJA <x-combobox> datar
+                 berlabel breadcrumb lengkap (Cabang → Mini POP → node), bukan
+                 dropdown berjenjang: pola "pilih satu dari banyak, cari lewat
+                 ketikan" di repo ini memang combobox, dan breadcrumb sudah
+                 memuat seluruh jalur pohon sebagai teks yang bisa dicari.
+                 Daftar cuma node di cabang task; validasi server
+                 (TaskMaintenanceController::store) tetap menolak node di luar
+                 cabang task / scope POP Anda. --}}
+            @if($task->task_type === \App\Enums\TaskType::OREQ || $task->task_type === \App\Enums\TaskType::INFR)
+            <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
+                <p class="mb-1" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
+                    Pasang/Ganti Infrastruktur <span class="font-normal normal-case" style="color:var(--color-text-muted)">(opsional)</span>
+                </p>
+                <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
+                    Isi kalau pekerjaan ini memasang/mengganti aset infrastruktur (ODC/ODP/splitter/kabel feeder/dll) secara netap di titik jaringan — bukan ke pelanggan. Kalau tidak, biarkan kosong.
+                </p>
+
+                @include('tasks.partials.infra-action-rows')
+                <fieldset :disabled="infraRows.length > 0" x-show="infraRows.length === 0">
+                @if($infraNodeOptions->isEmpty())
+                    <p class="text-[11px] mb-2 font-semibold" style="color:var(--color-warning,#d97706)">⚠ Belum ada titik jaringan terdaftar di cabang task ini — pemasangan infrastruktur belum bisa dicatat.</p>
+                @else
+                    @php
+                        $infraNodeChildren = $infraNodeOptions->groupBy(fn ($node) => $node->parent_id ?? 0);
+                    @endphp
+                    <fieldset class="rounded-lg border border-border bg-surface p-3" data-infra-node-tree>
+                        <legend class="px-1 text-xs font-semibold text-text-secondary">Lokasi (Titik Jaringan)</legend>
+                        <label class="flex items-center gap-2 text-xs text-text-secondary">
+                            <input type="radio" name="infra_target_network_node_id" value="" @checked(old('infra_target_network_node_id', '') === '')>
+                            Tidak ada lokasi dipilih
+                        </label>
+                        <div class="mt-2 space-y-2">
+                            @foreach($infraNodeChildren->get(0, collect())->groupBy('anchor_pop_id') as $infraRoots)
+                            <details class="rounded-lg border border-border p-2" open>
+                                <summary class="cursor-pointer text-xs font-semibold text-text-main">{{ $infraRoots->first()->anchorPop?->name ?? 'POP' }}</summary>
+                                <div class="mt-2 space-y-2 border-l border-border pl-3">
+                                    @foreach($infraRoots as $infraTreeNode)
+                                    @include('tasks.partials.infra-node-option', ['infraTreeNode' => $infraTreeNode, 'infraNodeChildren' => $infraNodeChildren])
+                                    @endforeach
+                                </div>
+                            </details>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                    @error('infra_target_network_node_id')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
+
+                    {{-- SN infrastruktur yang dipasang (dari custody tim) --}}
+                    <label class="block mb-1.5 mt-3" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">Pasang SN Infrastruktur</label>
+                    @if($eligibleInfraSerials->isNotEmpty())
+                        @php
+                            $infraSerialOptions = collect([['value' => '', 'label' => 'Tidak pasang SN', 'search' => 'tidak pasang sn']])
+                                ->concat($eligibleInfraSerials->map(fn ($serial) => [
+                                    'value' => $serial->id,
+                                    'label' => 'SN ' . $serial->serial_number . ' — ' . $serial->item->name,
+                                    'search' => $serial->serial_number . ' ' . $serial->item->name,
+                                ]))->values();
+                        @endphp
+                        <x-combobox id="infra_selected_serial_id" name="infra_selected_serial_id" :options-expr="json_encode($infraSerialOptions)" :value-expr="json_encode((string) old('infra_selected_serial_id', ''))" placeholder="Ketik SN..." />
+                        @error('infra_selected_serial_id')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
+                    @else
+                        <p class="text-[10px] leading-relaxed" style="color:var(--color-text-muted)">Tidak ada SN aset infrastruktur di custody tim Anda.</p>
+                    @endif
+
+                    {{-- SN lama yang dicabut — sumbernya SN yang SUDAH terpasang
+                         di titik jaringan cabang ini, bukan custody tim. --}}
+                    @if($eligibleInfraRetrievableSerials->isNotEmpty())
+                        @php
+                            $oldSerialOptions = collect([['value' => '', 'label' => 'Tidak cabut apa pun', 'search' => 'tidak cabut']])
+                                ->concat($eligibleInfraRetrievableSerials->map(fn ($serial) => [
+                                    'value' => $serial->id,
+                                    'label' => 'SN ' . $serial->serial_number . ' — ' . ($serial->item->name ?? '(barang dihapus)'),
+                                    'search' => $serial->serial_number . ' ' . ($serial->item->name ?? '') . ' ' . ($serial->currentNetworkNode?->breadcrumbLabel() ?? ''),
+                                    'hint' => $serial->currentNetworkNode?->breadcrumbLabel(),
+                                ]))->values();
+                        @endphp
+                        <label class="block mb-1.5 mt-3" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">Cabut SN Lama <span class="font-normal" style="color:var(--color-text-muted)">(opsional, kalau ganti aset)</span></label>
+                        <x-combobox id="infra_retrieve_old_serial_id" name="infra_retrieve_old_serial_id" :options-expr="json_encode($oldSerialOptions)" :value-expr="json_encode((string) old('infra_retrieve_old_serial_id', ''))" placeholder="Ketik SN lama..." />
+                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">SN yang dicabut kembali ke custody Anda.</p>
+                        @error('infra_retrieve_old_serial_id')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
+                    @endif
+
+                    {{-- Barang qty (aksesoris/closure) --}}
+                    @if($eligibleInfraCustody->isNotEmpty())
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3">
+                            <div>
+                                <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">Barang (Qty)</label>
+                                <select name="infra_quantity_item_id" class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                                    <option value="">Tidak pakai barang qty</option>
+                                    @foreach($eligibleInfraCustody as $row)
+                                    <option value="{{ $row['item_id'] }}" @selected((string) old('infra_quantity_item_id') === (string) $row['item_id'])>{{ $row['name'] }} (sisa {{ rtrim(rtrim(number_format($row['available'], 2, ',', '.'), '0'), ',') }} {{ $row['unit'] }})</option>
+                                    @endforeach
+                                </select>
+                                @error('infra_quantity_item_id')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">Qty Terpakai</label>
+                                <input type="number" step="0.01" min="0.01" name="infra_quantity_qty" value="{{ old('infra_quantity_qty') }}" class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                                @error('infra_quantity_qty')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Roll infrastruktur (kabel feeder/distribusi) --}}
+                    @if($eligibleInfraRolls->isNotEmpty())
+                        @php
+                            $infraRollOptions = collect([['value' => '', 'label' => 'Tidak pakai roll', 'search' => 'tidak pakai roll']])
+                                ->concat($eligibleInfraRolls->map(fn ($roll) => [
+                                    'value' => $roll->id,
+                                    'label' => ($roll->item->name ?? '(barang dihapus)') . ' — ' . $roll->roll_code,
+                                    'search' => $roll->roll_code . ' ' . ($roll->item->name ?? ''),
+                                    'hint' => 'Sisa ' . rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') . ' m',
+                                ]))->values();
+                        @endphp
+                        <label class="block mb-1.5 mt-3" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">Roll Kabel Infrastruktur</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <x-combobox id="infra_selected_roll_id" name="infra_selected_roll_id" :options-expr="json_encode($infraRollOptions)" :value-expr="json_encode((string) old('infra_selected_roll_id', ''))" placeholder="Ketik kode roll..." />
+                            <input type="number" step="0.01" min="0.01" name="infra_roll_meters_used" value="{{ old('infra_roll_meters_used') }}" placeholder="Meter terpakai"
+                                   class="w-full rounded-md text-sm"
+                                   style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                        </div>
+                        @error('infra_selected_roll_id')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
+                        @error('infra_roll_meters_used')<p class="text-[10px] mt-1" style="color:var(--color-error)">{{ $message }}</p>@enderror
+                    @endif
+
+                    <div class="mt-5 border-t border-border pt-4">
+                        <p class="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Koreksi atau cabut material terpasang</p>
+                        <p class="mb-3 text-xs leading-relaxed text-text-secondary">Pilih transaksi DEPLOY asal. Koreksi memperbaiki catatan tanpa cabut fisik; Cabut mencatat material yang benar-benar dilepas dan menahannya untuk pemeriksaan.</p>
+                        @if($infraMaterialSources->isEmpty())
+                            <p class="text-xs text-text-muted">Belum ada transaksi material infrastruktur pada node yang dapat Anda akses.</p>
+                        @else
+                            <input type="hidden" name="infra_material_action_key" value="{{ old('infra_material_action_key', $infraMaterialActionKey) }}">
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label for="infra_material_action" class="mb-1.5 block text-xs font-medium text-text-secondary">Tindakan</label>
+                                    <select id="infra_material_action" name="infra_material_action" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                        <option value="">Tidak ada koreksi/cabut</option>
+                                        <option value="correct" @selected(old('infra_material_action') === 'correct')>Koreksi catatan</option>
+                                        <option value="retrieve" @selected(old('infra_material_action') === 'retrieve')>Cabut fisik</option>
+                                    </select>
+                                    @error('infra_material_action')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="infra_material_source_transaction_id" class="mb-1.5 block text-xs font-medium text-text-secondary">Transaksi DEPLOY asal</label>
+                                    <select id="infra_material_source_transaction_id" name="infra_material_source_transaction_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                        <option value="">Pilih transaksi</option>
+                                        @foreach($infraMaterialSources as $source)
+                                            <option value="{{ $source->id }}" @selected((string) old('infra_material_source_transaction_id') === (string) $source->id)>{{ $source->reference_number }} · {{ $source->item?->name }} · {{ $source->qty }} {{ $source->item?->unit }} · {{ $source->toNetworkNode?->breadcrumbLabel() }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('infra_material_source_transaction_id')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="infra_material_correct_roll_id" class="mb-1.5 block text-xs font-medium text-text-secondary">Roll sebenarnya (khusus koreksi kode roll)</label>
+                                    <select id="infra_material_correct_roll_id" name="infra_material_correct_roll_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                        <option value="">Roll pada transaksi asal sudah benar</option>
+                                        @foreach($eligibleInfraRolls as $roll)
+                                            <option value="{{ $roll->id }}" @selected((string) old('infra_material_correct_roll_id') === (string) $roll->id)>{{ $roll->roll_code }} · sisa {{ $roll->length_remaining }} meter</option>
+                                        @endforeach
+                                    </select>
+                                    @error('infra_material_correct_roll_id')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="infra_material_qty" class="mb-1.5 block text-xs font-medium text-text-secondary">Jumlah akhir / jumlah dicabut</label>
+                                    <input id="infra_material_qty" type="number" step="0.01" min="0" name="infra_material_qty" value="{{ old('infra_material_qty') }}" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                                    <p class="mt-1 text-xs text-text-muted">Koreksi: jumlah yang masih terpasang. Cabut: jumlah yang dilepas.</p>
+                                    @error('infra_material_qty')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="infra_material_reason" class="mb-1.5 block text-xs font-medium text-text-secondary">Alasan dan kondisi fisik</label>
+                                    <input id="infra_material_reason" type="text" maxlength="500" name="infra_material_reason" value="{{ old('infra_material_reason') }}" class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main" placeholder="Contoh: feeder rusak, 10 m dicabut">
+                                    @error('infra_material_reason')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
+                                </div>
+                            </div>
+                            <p class="mt-3 text-xs leading-relaxed text-text-muted">Untuk koreksi node, pilih Lokasi (Titik Jaringan) di atas. Cabut fisik memakai node pada transaksi asal yang masih aktif. Koreksi/cabut tidak dapat digabung dengan pemasangan barang baru dalam satu submit saat ini.</p>
+                        @endif
+                    </div>
+                @endif
+                </fieldset>
+            </div>
+            @endif
 
             {{-- ── Section 3: Alat Kerja ───────────────────────────────── --}}
             <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
@@ -380,14 +674,11 @@
                 </div>
             </div>
 
-            {{-- ── Form Footer: Actions ────────────────────────────────── --}}
-            <div class="px-6 py-4 flex items-center justify-between gap-3" style="background:var(--color-background);border-radius:0 0 0.5rem 0.5rem">
+            {{-- ── Form Footer: Actions (Fixed on mobile, static on desktop) ── --}}
+            <div class="fixed sm:static bottom-0 inset-x-0 z-30 px-4 sm:px-6 py-2.5 sm:py-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2.5 shrink-0 sm:rounded-b-lg shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.3)] sm:shadow-none pb-[calc(env(safe-area-inset-bottom)+0.625rem)] sm:pb-3.5">
                 <a href="{{ route('tasks.show', $task) }}"
-                   class="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md transition-colors"
-                   style="border:1px solid var(--color-border);color:var(--color-text-secondary);background:var(--color-surface)"
-                   onmouseover="this.style.background='var(--color-surface-muted,#F1F5F9)'"
-                   onmouseout="this.style.background='var(--color-surface)'">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                   class="hidden sm:inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                     Batal
@@ -395,14 +686,11 @@
 
                 <button type="submit"
                         id="submit-btn"
-                        class="inline-flex items-center gap-2 text-sm font-semibold px-6 py-2 rounded-md text-white transition-colors"
-                        style="background:var(--color-success);cursor:pointer"
-                        onmouseover="this.style.opacity='0.9'"
-                        onmouseout="this.style.opacity='1'">
+                        class="w-full sm:w-auto min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-2 text-xs font-semibold px-6 py-2.5 sm:py-2 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 transition-colors shadow-xs cursor-pointer whitespace-nowrap ml-auto">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    Simpan Laporan
+                    <span>Simpan Laporan</span>
                 </button>
             </div>
 
@@ -491,6 +779,28 @@ document.getElementById('maintenance-form')?.addEventListener('submit', function
         btn.style.opacity = '0.75';
         btn.style.cursor = 'not-allowed';
     }
+});
+
+// Toggle catatan biaya untuk MTN polos — fungsi ini SELALU dirender (di
+// luar @@if task_type) walau checkbox/elemen Section 1c di atas cuma ada
+// untuk task_type MAINTENANCE (final review 2026-10-10, finding #1:
+// diperketat dari `! $isCreq`/NON-C-REQ ke exact match MAINTENANCE).
+// Guard `if (!checkbox || !wrap) return;` bikin fungsi ini aman no-op
+// untuk task_type lain (elemennya tidak ada di DOM) — gak perlu gerbang
+// @@if tambahan di sini. Nama fungsi beda dari creqToggleBillable() biar
+// gak collision kalau task_type-nya CREQ (dua blok sama-sama ter-render).
+function mtnToggleBillable() {
+    const checkbox = document.getElementById('mtn_is_billable');
+    const wrap = document.getElementById('mtn-billing-note-wrap');
+    const note = document.getElementById('mtn_billing_note');
+    if (!checkbox || !wrap) return;
+
+    wrap.classList.toggle('hidden', !checkbox.checked);
+    if (note) note.required = checkbox.checked;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    mtnToggleBillable();
 });
 
 @if($task->task_type === \App\Enums\TaskType::CREQ)

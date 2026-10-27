@@ -1,22 +1,22 @@
 {{-- Tabel ranking kecamatan — dipakai 3x di fop/analytics.blade.php (pemasangan/maintenance/dibatalkan) --}}
 @if(empty($rows))
 <div class="p-10 text-center">
-    <p class="text-xs text-slate-400">{{ $emptyText }}</p>
+    <p class="text-xs text-text-muted">{{ $emptyText }}</p>
 </div>
 @else
 <div class="overflow-x-auto scroll-smooth">
-    <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-        <thead class="bg-slate-50 dark:bg-slate-800/60">
+    <table class="min-w-full divide-y divide-border">
+        <thead class="bg-surface-muted">
             <tr>
-                <th class="px-5 py-2.5 text-left text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Kecamatan</th>
-                <th class="px-5 py-2.5 text-right text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Jumlah</th>
+                <th class="px-5 py-2.5 text-left text-[10px] font-bold text-text-muted uppercase tracking-wider">Kecamatan</th>
+                <th class="px-5 py-2.5 text-right text-[10px] font-bold text-text-muted uppercase tracking-wider">Jumlah</th>
             </tr>
         </thead>
-        <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
+        <tbody class="bg-surface divide-y divide-border">
             @foreach($rows as $row)
-            <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-700/30">
-                <td class="px-5 py-2.5 text-xs text-slate-700 dark:text-slate-300">{{ $row['district_name'] }}</td>
-                <td class="px-5 py-2.5 text-right font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $row['total'] }}</td>
+            <tr class="hover:bg-surface-muted/60 transition-colors">
+                <td class="px-5 py-2.5 text-xs text-text-main font-medium"><a href="{{ route('fop.analytics.drilldown', ['kind' => $kind, 'value' => $row['district_id'], 'from' => $periodFrom, 'to' => $periodTo, 'pop_id' => $popFilter]) }}" class="text-primary hover:underline">{{ $row['district_name'] }}</a></td>
+                <td class="px-5 py-2.5 text-right font-mono text-xs font-semibold text-text-main">{{ $row['total'] }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -27,7 +27,7 @@
      segitu kecamatan yang ada (dulu `limit(20)` mentah tanpa indikasi ini). --}}
 @isset($total)
 @if($total > count($rows))
-<p class="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-700/60">Menampilkan top {{ count($rows) }} dari {{ $total }} kecamatan.</p>
+<p class="px-5 py-2.5 text-[10px] text-text-muted border-t border-border">Menampilkan top {{ count($rows) }} dari {{ $total }} kecamatan.</p>
 @endif
 @endisset
 @endif

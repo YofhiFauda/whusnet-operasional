@@ -169,13 +169,16 @@ class MaterialReportFlowTest extends TestCase
         $this->assertSame('90.00', $rows->first()->qty);
     }
 
-    public function test_pemasangan_selesai_wajib_punya_material(): void
+    /**
+     * Koreksi user (2026-10-12): Material Terpakai/Perangkat Pasif OPSIONAL
+     * di semua laporan, termasuk Pemasangan — dulu khusus Pemasangan status
+     * `completed` wajib minimal 1 baris material, beda dari laporan lain
+     * (Maintenance dkk) yang sudah opsional dari awal. Foto tetap wajib.
+     */
+    public function test_pemasangan_selesai_tidak_wajib_punya_material(): void
     {
         $this->customer->update(['status' => 'installation_in_progress']);
 
-        // Foto-foto wajib ikut dikirim karena guard-nya berjalan lebih dulu.
-        // Tidak ada file yang benar-benar ditulis: request berhenti di guard
-        // material sebelum tahap upload.
         $response = $this->actingAs($this->actor)
             ->post(route('customers.installation.store', $this->customer->id), [
                 'device_type' => 'ont',
@@ -187,7 +190,7 @@ class MaterialReportFlowTest extends TestCase
                 'materials' => [],
             ]);
 
-        $response->assertSessionHasErrors('materials');
+        $response->assertSessionHasNoErrors();
     }
 
     public function test_pemasangan_gagal_tidak_wajib_material(): void

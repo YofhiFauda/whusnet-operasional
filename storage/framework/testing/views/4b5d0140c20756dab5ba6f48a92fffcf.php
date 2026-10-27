@@ -204,11 +204,11 @@
                         <span class="block text-sm font-bold text-text-main"><?php echo e($survey->technician->name ?? '-'); ?></span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Surveyor 2</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Teknisi Kedua</span>
                         <span class="block text-sm text-text-main"><?php echo e($survey->surveyor2->name ?? '-'); ?></span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Surveyor 3</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Teknisi Ketiga</span>
                         <span class="block text-sm text-text-main"><?php echo e($survey->surveyor3->name ?? '-'); ?></span>
                     </div>
                 </div>

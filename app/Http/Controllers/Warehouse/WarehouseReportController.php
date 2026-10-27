@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Warehouse;
 use App\Enums\InventoryTransactionType;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
+use App\Models\InventorySerialSale;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\Pop;
@@ -42,13 +43,7 @@ class WarehouseReportController extends Controller
     {
         $user = auth()->user();
 
-        $pops = Pop::query()
-            ->warehouse()
-            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
-            ->orderBy('type')
-            ->orderBy('name')
-            ->get();
-
+        $pops = $this->accessibleWarehousePops($access, $user);
         $popIds = $pops->pluck('id');
 
         $period = $request->query('period') ?: now()->format('Y-m');
@@ -60,6 +55,16 @@ class WarehouseReportController extends Controller
         $movementRows = $this->buildMovementSummary($popIds, $popFilter, $periodStart, $periodEnd, $stockAsOf);
         $adjustmentRows = $this->buildAdjustmentSummary($popIds, $popFilter, $periodStart, $periodEnd);
         $movementCounts = $this->buildMovementCounts($popIds, $popFilter, $periodStart, $periodEnd);
+
+        // Tab "Barang Terjual" (sub-permission TERPISAH dari warehouse_report.view,
+        // lihat routes/web.php) — data cuma dihitung kalau user benar-benar
+        // punya izinnya, bukan cuma disembunyikan di view. Ikut filter
+        // periode/POP yang sama dengan tab Mutasi/Kerugian (keputusan user
+        // 2026-10-12), bukan "semua waktu" seperti halaman standalone lama.
+        $soldToCustomerSales = collect();
+        if ($user->hasPermission('warehouse_report.sold_to_customer.view')) {
+            $soldToCustomerSales = $this->buildSoldToCustomerSales($popIds, $popFilter, $periodStart, $periodEnd);
+        }
 
         // Total Nilai Kerugian (ADHOC-79) — cuma RUSAK+HILANG yang dihitung
         // (keputusan eksplisit user 2026-09-17), reason lain (quarantine/
@@ -96,8 +101,77 @@ class WarehouseReportController extends Controller
             ->all();
 
         return view('warehouse.reports.index', compact(
-            'pops', 'period', 'popFilter', 'movementRows', 'adjustmentRows', 'movementCounts', 'kpi', 'lossChartData'
+            'pops', 'period', 'popFilter', 'movementRows', 'adjustmentRows', 'movementCounts', 'kpi', 'lossChartData', 'soldToCustomerSales'
         ));
+    }
+
+    /**
+     * Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli, Task 9,
+     * .superpowers/sdd/2026-10-09-ownership-modem-sewa-beli/). Read-only murni
+     * — baris `InventorySerialSale` sudah ditulis oleh `InventoryService::
+     * recordSerialSale()` (Task 1-6), laporan ini CUMA menyusun ulang buat
+     * tampilan, BUKAN sumber kebenaran baru.
+     *
+     * Halaman standalone ini dan tab "Barang Terjual" di `index()` berbagi
+     * `buildSoldToCustomerSales()` yang sama (2026-10-12) — filter
+     * periode/POP konsisten di dua tempat, bukan dua sumber kebenaran.
+     *
+     * POP scope: SATU-SATUNYA cara data sale beda cabang bisa dibedakan di
+     * sini cuma lewat `customer->pop_id` (sale itu sendiri gak punya kolom
+     * pop_id) — pelanggan yang beli-nya menentukan cabang mana baris ini
+     * "milik". `accessibleWarehousePops()` sudah menegakkan deny-by-default
+     * (array kosong = filter `whereIn('pop_id', [])` = kosong, bukan "semua"),
+     * jadi tidak perlu ditafsirkan ulang di sini.
+     */
+    public function soldToCustomer(Request $request, EffectiveAccessService $access): View
+    {
+        $user = auth()->user();
+
+        $pops = $this->accessibleWarehousePops($access, $user);
+        $popIds = $pops->pluck('id');
+
+        $period = $request->query('period') ?: now()->format('Y-m');
+        $popFilter = $request->integer('pop_id') ?: null;
+
+        $periodStart = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+        $periodEnd = $periodStart->copy()->endOfMonth();
+
+        $sales = $this->buildSoldToCustomerSales($popIds, $popFilter, $periodStart, $periodEnd);
+
+        return view('warehouse.reports.sold-to-customer', compact('sales', 'pops', 'period', 'popFilter'));
+    }
+
+    /**
+     * POP yang statusnya Gudang (`Pop::WAREHOUSE_TYPES`) DAN terjangkau user
+     * — satu fungsi dipakai `index()` dan `soldToCustomer()` biar dua laporan
+     * ini selalu sepakat soal "cabang mana yang keliatan", bukan dihitung
+     * ulang dengan logic yang bisa menyimpang pelan-pelan.
+     */
+    private function accessibleWarehousePops(EffectiveAccessService $access, $user): Collection
+    {
+        return Pop::query()
+            ->warehouse()
+            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Baris `InventorySerialSale` terpotong POP (lewat `customer.pop_id`,
+     * sale sendiri gak punya kolom pop_id) dan periode — pola `$scopedPops`
+     * yang sama dengan `buildMovementSummary()`/`buildAdjustmentSummary()`.
+     */
+    private function buildSoldToCustomerSales(Collection $popIds, ?int $popFilter, Carbon $periodStart, Carbon $periodEnd): Collection
+    {
+        $scopedPops = $popFilter ? collect([$popFilter])->intersect($popIds) : $popIds;
+
+        return InventorySerialSale::query()
+            ->with(['inventorySerial.item', 'customer.pop', 'fopTask', 'createdBy'])
+            ->whereHas('customer', fn ($q) => $q->whereIn('pop_id', $scopedPops))
+            ->whereBetween('created_at', [$periodStart, $periodEnd])
+            ->latest('id')
+            ->get();
     }
 
     /**
@@ -435,6 +509,27 @@ class WarehouseReportController extends Controller
                     $row['count'],
                     $row['total_qty'],
                     $row['unit_cost'] ?? '',
+                    $row['loss_value'] ?? '',
+                ]);
+            }
+        }
+
+        $scrappedRollRows = collect($adjustmentRows)->filter(fn (array $row) => $row['reason'] === 'scrapped'
+            && $itemsById->get($row['item_id'])?->tracking_type === TrackingType::ROLL);
+        if ($scrappedRollRows->isNotEmpty()) {
+            if (! $isFirstSheet) {
+                $writer->addNewSheetAndMakeItCurrent();
+            }
+            $isFirstSheet = false;
+            $writer->nameCurrentSheet('Kerugian Sisa Kabel');
+            $writer->addHeader(['Gudang', 'Barang', 'Jumlah (Meter)', 'Harga per Meter (Rp)', 'Nilai Rugi (Rp)']);
+            foreach ($scrappedRollRows as $row) {
+                $meterPerRoll = (float) $itemsById->get($row['item_id'])->meter_per_roll;
+                $writer->addRow([
+                    $row['pop_label'],
+                    $row['item_name'],
+                    $row['total_qty'] * $meterPerRoll,
+                    $meterPerRoll > 0 && $row['unit_cost'] !== null ? $row['unit_cost'] / $meterPerRoll : '',
                     $row['loss_value'] ?? '',
                 ]);
             }
@@ -815,13 +910,15 @@ class WarehouseReportController extends Controller
             ->where(function ($q) use ($scopedPops, $popFilter) {
                 $q->whereIn('to_pop_id', $scopedPops)
                     ->orWhereIn('from_pop_id', $scopedPops)
+                    ->orWhereHas('roll', fn ($rollQuery) => $rollQuery->whereIn('issued_from_pop_id', $scopedPops))
+                    ->orWhereHas('transfer', fn ($transferQuery) => $transferQuery->whereIn('from_pop_id', $scopedPops))
                     // Custody teknisi (from_pop_id null) TETAP ikut kalau gak
                     // ada filter POP eksplisit — kerugian custody tetap
                     // relevan dipantau HQ walau gak bisa diatribusi ke cabang.
                     ->when(! $popFilter, fn ($qq) => $qq->orWhere(fn ($qqq) => $qqq->whereNull('to_pop_id')->whereNull('from_pop_id')));
             })
             ->whereBetween('created_at', [$start, $end])
-            ->with(['toPop', 'fromPop', 'item'])
+            ->with(['toPop', 'fromPop', 'item', 'roll.issuedFromPop', 'transfer.fromPop'])
             ->get();
 
         $reasonLabels = InventoryAdjustmentService::REASON_CATEGORIES + [
@@ -829,6 +926,7 @@ class WarehouseReportController extends Controller
             // itu daftar `reason` buat adjustCustody(), SCRAPPED bukan
             // pilihan reason di sana (cuma tujuan status serial/roll).
             'scrapped' => 'Dimusnahkan (Scrapped)',
+            'available' => 'Dipulihkan Setelah Perbaikan',
         ];
 
         // Reason yang dihitung sbg NILAI RUGI finansial (keputusan eksplisit
@@ -842,13 +940,13 @@ class WarehouseReportController extends Controller
         // bulan itu. Satu baris = satu kategori + satu lokasi + satu item =
         // satu satuan, aman dijumlah.
         return $rows->groupBy(function (InventoryTransaction $row) {
-            $popLabel = $row->toPop->name ?? $row->fromPop->name ?? '— (Custody Teknisi)';
+            $popLabel = $row->toPop->name ?? $row->fromPop->name ?? $row->roll?->issuedFromPop?->name ?? $row->transfer?->fromPop?->name ?? '— (Custody Teknisi)';
             $category = $row->resulting_status ?? $row->reason;
 
-            return $category.'|'.$popLabel.'|'.$row->item_id;
+            return $category.'|'.$popLabel.'|'.$row->item_id.($category === 'available' ? '|'.$row->reason : '');
         })->map(function ($group) use ($reasonLabels, $lossReasons) {
             $first = $group->first();
-            $popLabel = $first->toPop->name ?? $first->fromPop->name ?? '— (Custody Teknisi)';
+            $popLabel = $first->toPop->name ?? $first->fromPop->name ?? $first->roll?->issuedFromPop?->name ?? $first->transfer?->fromPop?->name ?? '— (Custody Teknisi)';
             $category = $first->resulting_status ?? $first->reason;
             $totalQty = (float) $group->sum(fn ($r) => abs((float) $r->qty));
 
@@ -857,9 +955,33 @@ class WarehouseReportController extends Controller
             $unit = $first->item->unit ?? '';
             $displayQty = $totalQty;
 
-            if (in_array($category, $lossReasons, true)) {
+            $isScrappedRoll = $category === 'scrapped' && $first->item?->tracking_type === TrackingType::ROLL;
+            if (in_array($category, $lossReasons, true) || $isScrappedRoll) {
                 $unitCost = $this->resolveLastCostForItem($first->item_id);
                 $lossValue = $unitCost !== null ? $totalQty * $unitCost : null;
+
+                if ($group->every(fn (InventoryTransaction $row) => ($row->serial_id !== null || $row->roll_id !== null || $row->reason === 'lost_in_transfer') && $row->unit_price_snapshot !== null)) {
+                    $lossValue = $group->sum(fn (InventoryTransaction $row) => abs((float) $row->qty) * (float) $row->unit_price_snapshot);
+                    $unitCost = $totalQty > 0 ? $lossValue / $totalQty : null;
+                }
+
+                if ($isScrappedRoll) {
+                    $prices = $group->map(fn (InventoryTransaction $row) => $row->unit_price_snapshot ?? $row->roll?->unit_price_snapshot ?? $unitCost);
+                    if ($prices->contains(null)) {
+                        $lossValue = null;
+                    } else {
+                        $lossValue = $group->values()->sum(fn (InventoryTransaction $row, int $index) => abs((float) $row->qty) * (float) $prices[$index]);
+                        $unitCost = $totalQty > 0 ? $lossValue / $totalQty : null;
+                    }
+                }
+            }
+
+            if ($category === 'available' && $first->reason === 'repaired') {
+                $prices = $group->map(fn (InventoryTransaction $row) => $row->unit_price_snapshot);
+                if (! $prices->contains(null)) {
+                    $lossValue = -$group->sum(fn (InventoryTransaction $row) => (float) $row->qty * (float) $row->unit_price_snapshot);
+                    $unitCost = $totalQty > 0 ? abs($lossValue) / $totalQty : null;
+                }
             }
 
             // Barang ROLL tampil dalam satuan ROLL di Laporan Bulanan
@@ -886,7 +1008,7 @@ class WarehouseReportController extends Controller
             return [
                 'reason' => $category,
                 'reason_label' => $reasonLabels[$category] ?? $category,
-                'pop_id' => $first->to_pop_id ?? $first->from_pop_id, // null = custody teknisi, gak bisa diatribusi ke POP mana pun (dipakai export() buat plotting per-POP)
+                'pop_id' => $first->to_pop_id ?? $first->from_pop_id ?? $first->roll?->issued_from_pop_id ?? $first->transfer?->from_pop_id, // null = custody teknisi, gak bisa diatribusi ke POP mana pun (dipakai export() buat plotting per-POP)
                 'pop_label' => $popLabel,
                 'item_id' => $first->item_id,
                 'item_name' => $first->item->name ?? '(item dihapus)',

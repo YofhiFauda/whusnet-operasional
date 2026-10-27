@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CustodyStatus;
+use App\Enums\DeviceOwnership;
 use App\Enums\DeviceRetrievalSource;
 use App\Enums\InventoryTransactionType;
 use App\Enums\ItemCondition;
@@ -14,6 +15,7 @@ use App\Models\DeviceRetrievalLog;
 use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
+use App\Models\InventorySerialSale;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\Pop;
@@ -64,11 +66,17 @@ class InventoryReassignService
             throw new InvalidArgumentException("Return custody cuma boleh ke Gudang Pusat/Cabang — {$cabang->name} bertipe '{$cabang->type}'.");
         }
 
-        if ((float) $custody->qty_remaining <= 0) {
-            throw new InvalidArgumentException('Custody ini sudah habis/kosong — tidak ada yang bisa dikembalikan.');
-        }
-
         return DB::transaction(function () use ($custody, $cabang, $reason, $actor, $notes) {
+            $custody = TechnicianCustody::query()->lockForUpdate()->findOrFail($custody->id);
+
+            if ((float) $custody->qty_remaining <= 0) {
+                throw new InvalidArgumentException('Custody ini sudah habis/kosong — tidak ada yang bisa dikembalikan.');
+            }
+
+            if (! $custody->issued_from_pop_id || (int) $custody->issued_from_pop_id !== $cabang->id) {
+                throw new InvalidArgumentException('Custody hanya boleh kembali ke cabang asal Issue.');
+            }
+
             $qty = (float) $custody->qty_remaining;
             $lotNo = $custody->lot_no ?? '';
 
@@ -83,7 +91,7 @@ class InventoryReassignService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETURN,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $custody->item_id,
                 'lot_no' => $custody->lot_no,
                 'qty' => $qty,
@@ -113,6 +121,11 @@ class InventoryReassignService
                 throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan ISSUED — gak bisa direturn dari custody.");
             }
 
+            if (! ($serial->issued_from_pop_id ?? $serial->current_pop_id)
+                || (int) ($serial->issued_from_pop_id ?? $serial->current_pop_id) !== $cabang->id) {
+                throw new InvalidArgumentException('SN hanya boleh kembali ke cabang asal Issue.');
+            }
+
             $fromTechnicianId = $serial->current_technician_id;
 
             $serial->update([
@@ -123,7 +136,7 @@ class InventoryReassignService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETURN,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -199,7 +212,7 @@ class InventoryReassignService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETURN,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -250,9 +263,18 @@ class InventoryReassignService
             $reason = "Pengambilan alat — Task {$task->task_number} (putus langganan).";
             $fopTaskId = $task->fopTask?->id;
 
+            if ($existing) {
+                $this->assertNotCustomerOwned($existing);
+            }
+
             if ($existing && $existing->status === SerialStatus::RETURNED && $existing->customer_id === $customer->id) {
                 return $existing;
             }
+
+            // Penjaga jalur tulis, bukan cuma filter daftar hint di form DEAC:
+            // SN yang diketik manual tetap harus ditolak kalau modem itu sudah
+            // dibeli pelanggan (Beli dari Gudang) — perusahaan tidak berhak
+            // "mengambil" barang milik pelanggan saat putus langganan.
 
             [$serial, $isLegacy] = $this->claimSerialFromCustomer($serialNumber, $existing, $item, $customer, [
                 'status' => SerialStatus::RETURNED,
@@ -279,7 +301,7 @@ class InventoryReassignService
 
             InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETURN,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -381,7 +403,7 @@ class InventoryReassignService
             // (kirim ke Pusat, Pusat konfirmasi) sebelum jadi `AVAILABLE`.
             InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETURN,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -434,6 +456,8 @@ class InventoryReassignService
     private function claimSerialFromCustomer(string $serialNumber, ?InventorySerial $existing, ?Item $item, Customer $customer, array $attributes, array $newOnly = []): array
     {
         if ($existing) {
+            $this->assertNotCustomerOwned($existing);
+
             if ($existing->status !== SerialStatus::INSTALLED || $existing->customer_id !== $customer->id) {
                 $where = $existing->status === SerialStatus::INSTALLED
                     ? 'terpasang di pelanggan lain'
@@ -461,6 +485,14 @@ class InventoryReassignService
         ]);
 
         return [$serial, true];
+    }
+
+    private function assertNotCustomerOwned(InventorySerial $serial): void
+    {
+        if ($serial->ownership === DeviceOwnership::CUSTOMER
+            || InventorySerialSale::where('inventory_serial_id', $serial->id)->exists()) {
+            throw new InvalidArgumentException("SN {$serial->serial_number} adalah modem milik pelanggan (dibeli dari gudang) — tidak boleh diterima sebagai stok perusahaan.");
+        }
     }
 
     /**
@@ -523,7 +555,7 @@ class InventoryReassignService
 
             $transaction = InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETURN,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -540,18 +572,20 @@ class InventoryReassignService
             // kondisi AWAL (observasi Cabang, bisa ditimpa Pusat di Tahap 3).
             // Log yang dicari = yang masih menunggu diterima; kosong berarti
             // SN ini RETURNED sebelum ADHOC-88 dan tidak punya jejak — dilewati.
-            DeviceRetrievalLog::query()
+            $retrievalLog = DeviceRetrievalLog::query()
                 ->where('serial_id', $serial->id)
                 ->whereNull('received_at')
                 ->latest('retrieved_at')
-                ->first()
-                ?->update([
-                    'item_id' => $serial->item_id,
-                    'received_by' => $actor->id,
-                    'received_at' => now(),
-                    'condition' => $condition,
-                    'estimated_value' => $value,
-                ]);
+                ->first();
+
+            $retrievalLog?->update([
+                'item_id' => $serial->item_id,
+                'received_by' => $actor->id,
+                'received_at' => now(),
+                'warehouse_pop_id' => $retrievalLog->warehouse_pop_id ?? $cabang->id,
+                'condition' => $condition,
+                'estimated_value' => $value,
+            ]);
 
             return $transaction;
         });
@@ -596,6 +630,7 @@ class InventoryReassignService
 
         $serial->update([
             'condition' => $finalCondition,
+            'status' => $finalCondition === ItemCondition::USED_DAMAGED ? SerialStatus::DAMAGED : $serial->status,
             'condition_checked_at' => now(),
             'condition_checked_by' => $actor->id,
         ]);
@@ -630,6 +665,10 @@ class InventoryReassignService
                 throw new InvalidArgumentException("Roll {$roll->roll_code} sudah habis (0 meter) — tidak ada yang bisa dikembalikan.");
             }
 
+            if (! $roll->issued_from_pop_id || (int) $roll->issued_from_pop_id !== $cabang->id) {
+                throw new InvalidArgumentException('Roll hanya boleh kembali ke cabang asal Issue.');
+            }
+
             $fromTechnicianId = $roll->current_technician_id;
             $qty = (float) $roll->length_remaining;
 
@@ -641,7 +680,7 @@ class InventoryReassignService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETURN,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $roll->item_id,
                 'roll_id' => $roll->id,
                 'qty' => $qty,
@@ -678,7 +717,7 @@ class InventoryReassignService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::TRANSFER_CUSTODY,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $roll->item_id,
                 'roll_id' => $roll->id,
                 'qty' => $roll->length_remaining,
@@ -727,7 +766,7 @@ class InventoryReassignService
 
             InventoryTransaction::create([
                 'type' => InventoryTransactionType::TRANSFER_CUSTODY,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $custody->item_id,
                 'lot_no' => $custody->lot_no,
                 'qty' => $qty,
@@ -758,13 +797,18 @@ class InventoryReassignService
                 throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan ISSUED — gak bisa dialihkan.");
             }
 
+            if (! ($serial->issued_from_pop_id ?? $serial->current_pop_id)
+                || (int) ($serial->issued_from_pop_id ?? $serial->current_pop_id) !== $cabang->id) {
+                throw new InvalidArgumentException('SN hanya boleh kembali ke cabang asal Issue.');
+            }
+
             $fromTechnicianId = $serial->current_technician_id;
 
             $serial->update(['current_technician_id' => $newTechnician->id]);
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::TRANSFER_CUSTODY,
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RSG'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -809,33 +853,5 @@ class InventoryReassignService
                 );
             }
         }
-    }
-
-    /**
-     * `RSG-YYYY-NNNN` — Reassign/Return sebelumnya gak py nomor dokumen sama
-     * sekali, beda dari RECEIVE/TRANSFER/ISSUE, jadi event ini gak bisa
-     * dicari/di-grouping di Traceability (ketauan audit 2026-09-02). Pola
-     * `MAX+1` sama persis `InventoryReceiveService`/`InventoryTransferService`/
-     * `InventoryIssueService` — race generate-nya SENGAJA gak dibenahi di sini
-     * (lihat catatan pelingkupan P0/P1 di docs/TASKS.md, pola yang sama juga
-     * dipakai TicketService/TaskService/FopTaskProvisioningService).
-     */
-    /**
-     * `RSG-YYYYMMDD-NNNNNN` — lihat docblock sama persis di
-     * `InventoryReceiveService::generateReferenceNumber()` buat alasan
-     * lengkap (tanggal penuh buat dibaca, reset counter per BULAN bukan per
-     * hari, keputusan eksplisit user 2026-09-03).
-     */
-    private function generateReferenceNumber(): string
-    {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
-
-        $lastNum = InventoryTransaction::where('reference_number', 'like', "RSG-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('RSG-%s-%06d', $today, $lastNum + 1);
     }
 }

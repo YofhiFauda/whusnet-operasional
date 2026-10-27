@@ -225,3 +225,63 @@ erDiagram
 | `vlan_id` | varchar(20), nullable | VLAN layanan. |
 | `created_at`, `updated_at` | timestamp | Timestamp Laravel. |
 
+## Tabel Infrastruktur Jaringan
+
+Diperbarui 2026-10-24 (ADHOC-213, Slot/PON sebagai node). Rancangan: `docs/superpowers/specs/2026-10-24-slot-pon-sebagai-node-design.md` (lihat bagian Koreksi D1-D5) dan `docs/plan/infrastruktur/rancangan-hierarki-infrastruktur-server-pop-mini-pop.md`.
+
+Hierarki `Mini POP -> OLT/Switch -> Slot -> PON/Port -> ODP` adalah satu pohon `network_nodes` (`parent_id`). POP diturunkan dari rantai induk lewat `NetworkNode::resolvePop()`; Slot/PON/Port tidak punya `anchor_pop_id`.
+
+### `network_node_types` - tipe node dan aturan induk
+
+Tipe node yang ada: `server`, `olt_chassis` (nama code historis, artinya OLT), `switch_mini_pop`, `odp`, ditambah empat tipe posisi baru (migrasi `2026_10_24_000001_add_position_columns_and_types_to_network_nodes`):
+
+| Code | Nama | Induk sah (`network_node_type_rules`) |
+| --- | --- | --- |
+| `olt_slot` | Slot OLT | `olt_chassis` |
+| `olt_pon` | PON | `olt_slot` |
+| `switch_slot` | Slot Switch | `switch_mini_pop` |
+| `switch_port` | Port Switch | `switch_slot` |
+| `odp` | ODP | `olt_pon` (rule anchor ODP ke Cabang/Mini POP dicabut; hanya menutup penempatan baru, baris lama tidak diubah - D2) |
+
+Tipe lama `odc`, `pon_port`, `olt_card`, `aggregation_switch`, `core_router` sudah dihapus (ADHOC-211/212) dan tidak dihidupkan lagi. Aturan induk ditegakkan di `NetworkNodeService::assertTypePlacement()`.
+
+### `network_nodes` - kolom tambahan
+
+| Kolom | Tipe | Keterangan |
+| --- | --- | --- |
+| `number` | unsigned smallint, nullable | Nomor Slot/PON/Port, unik per induk. |
+| `capacity_unit` | varchar(30), nullable | Satuan kapasitas (mis. pelanggan aktif untuk PON). |
+| `is_logical` | boolean, default false | Slot logis (Slot 1 internal Switch dengan port tetap). |
+| `record_status` | varchar(30), nullable | Status pendataan (`InfrastructureRecordStatus`: `belum_didata`, `terverifikasi`, `rusak_nonaktif`); `NULL` dibaca `belum_didata`. Terpisah dari `status` (D1). |
+| `red_zone_threshold` | unsigned tinyint, nullable | Ambang Red Zone per PON (persen). |
+| `code` | varchar(**120**), unique | Dilebarkan dari 50 supaya muat kode turunan (D3); Slot/PON/Port diturunkan otomatis `{kode induk}-S{n}` / `-P{n}`. |
+
+`capacity` dan `status` (`active`/`inactive`) yang sudah ada dipakai ulang: `capacity` pada OLT/Switch = jumlah slot, pada Slot = jumlah PON/Port, pada PON = kapasitas pelanggan aktif.
+
+Indeks: `unique(code)` (global) dan `unique(parent_id, number)` bernama `network_nodes_parent_number_unique` (nomor unik per induk, bukan global).
+
+### Tabel yang dibuang
+
+| Tabel | Migrasi | Pengganti |
+| --- | --- | --- |
+| `infrastructure_slots` | `2026_10_24_000002_retarget_location_foreign_keys_to_network_nodes` | Node `olt_slot`/`switch_slot` |
+| `infrastructure_ports` | idem | Node `olt_pon`/`switch_port` |
+| `infrastructure_legacy_mappings` | idem | - (alat legacy dipensiunkan, D4) |
+| `olt_slots` | `2026_10_25_000001_drop_olt_slots_table` | Node `olt_slot`; konsep kartu terpasang di slot tidak ada lagi |
+
+Migrasi `000002` bersifat destruktif untuk data posisi lama (slot, port, koneksi, mapping, dan saldo/serial yang lokasinya hanya slot/port itu). Ia menolak jalan di luar `testing` kecuali `INFRA_CONFIRM_DUMMY_RESET=true` (config `infrastructure.confirm_dummy_reset`) **bila ada baris lama yang akan dibuang**, tidak pernah menghapus `network_nodes`/ODP/`network_node_ports`/`network_port_assignments` (D2), dan `down()` melempar exception (tidak dapat dibalik).
+
+### FK lokasi yang diarahkan ulang ke `network_nodes.id`
+
+Nama kolom "slot" dan "port" dipertahankan; hanya target FK yang berpindah (`restrictOnDelete`). Artinya sekarang "node bertipe slot" dan "node bertipe PON/Port Switch".
+
+| Tabel | Kolom |
+| --- | --- |
+| `inventory_serials` | `current_infrastructure_slot_id`, `current_infrastructure_port_id` |
+| `inventory_transactions` | `from_infrastructure_slot_id`, `to_infrastructure_slot_id`, `from_infrastructure_port_id`, `to_infrastructure_port_id` |
+| `infrastructure_balances` | `infrastructure_slot_id`, `infrastructure_port_id` |
+| `task_infrastructure_actions` | `work_infrastructure_slot_id`, `work_infrastructure_port_id`, `end_from_infrastructure_port_id`, `end_to_infrastructure_port_id` |
+| `fop_tasks` | `scope_infrastructure_slot_id`, `scope_infrastructure_port_id` |
+| `infrastructure_connections` | `source_infrastructure_port_id`, `target_infrastructure_port_id` |
+
+`infrastructure_connections` kini hanya untuk sambungan Port Switch; ODP ke PON tidak memakainya (uplink = `parent_id`). `network_node_ports` (port fisik ODP yang diisi pelanggan) dan `network_port_assignments` tidak berubah. Kolom `legacy_olt_slot_id`/`legacy_network_node_id` ikut hilang bersama tabelnya.

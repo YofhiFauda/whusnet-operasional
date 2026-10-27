@@ -36,7 +36,7 @@
     $checkedAccessories = old('accessories', $existing?->accessories ?? []);
 @endphp
 
-<div class="max-w-4xl mx-auto space-y-4 pb-8">
+<div class="max-w-4xl mx-auto space-y-4 pb-28 sm:pb-8">
 
     {{-- ══ Breadcrumb (Design.md §13) ════════════════════════════════════════ --}}
     <nav class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -151,7 +151,17 @@
                     </p>
                 </div>
 
-                @if($installedSerials->isNotEmpty())
+                @if($showOwnershipSkipBanner)
+                <div class="p-3 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2 font-ui">
+                    <svg class="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                        <span class="font-semibold">Modem pelanggan ini sudah menjadi milik sendiri (sudah dibeli) — tidak perlu ditarik.</span>
+                        <p class="mt-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">Tidak ada SN milik perusahaan yang tersisa di pelanggan ini. Cukup konfirmasi — tidak perlu isi SN.</p>
+                    </div>
+                </div>
+                @elseif($installedSerials->isNotEmpty())
                 <div class="p-3 rounded-lg bg-sky-50/70 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 text-xs text-sky-800 dark:text-sky-300 flex items-start gap-2 font-ui">
                     <svg class="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -181,6 +191,7 @@
                 </div>
                 @endif
 
+                @unless($showOwnershipSkipBanner)
                 {{-- Dynamic Serial Input Rows --}}
                 <div class="space-y-3">
                     <template x-for="(row, i) in rows" :key="i">
@@ -221,6 +232,7 @@
                     </svg>
                     Tambah SN
                 </button>
+                @endunless
 
                 {{-- Foto Kondisi Alat --}}
                 <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
@@ -251,6 +263,60 @@
                 </div>
             </div>
 
+            {{-- ── Section 2b: KABEL MELINTANG JALAN (ADHOC-205) ──
+                 Wajib diisi semua sebelum DEAC bisa ditutup, berapa pun hasil
+                 modemnya. Penarikan kabel tidak masuk stok (kabel sudah keluar). --}}
+            @if($pendingCableCrossings->isNotEmpty())
+            <div class="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 space-y-3">
+                <h2 class="text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 font-ui">
+                    Kabel Melintang Jalan
+                </h2>
+                <p class="text-xs text-slate-600 dark:text-slate-400 font-ui">
+                    Saat pemasangan, kabel ini tercatat melintang jalan. Tarik kabelnya, atau catat alasan kalau tidak bisa ditarik. Task ini belum bisa ditutup sebelum semua rute diisi.
+                </p>
+
+                @foreach($pendingCableCrossings as $crossing)
+                <div class="rounded-lg border border-slate-200 dark:border-slate-800 p-3 space-y-3" x-data="{ result: @js(old("cable_crossings.{$crossing->id}.status", '')) }">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-100 font-ui">{{ $crossing->nama_jalan }}</p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 font-ui">
+                            {{ $crossing->jenis_jalan ?? 'Jenis jalan belum diisi' }}@if($crossing->meter_terpakai) · {{ rtrim(rtrim(number_format((float) $crossing->meter_terpakai, 2, ',', '.'), '0'), ',') }} m @endif
+                        </p>
+                        <ol class="mt-1.5 space-y-0.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                            @foreach($crossing->points as $point)
+                            <li>{{ $point->urutan }}. {{ $point->label ? $point->label.' — ' : '' }}{{ $point->latitude }}, {{ $point->longitude }}</li>
+                            @endforeach
+                        </ol>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui has-[:checked]:border-sky-600 has-[:checked]:bg-sky-50/60 dark:has-[:checked]:bg-sky-950/40">
+                            <input type="radio" name="cable_crossings[{{ $crossing->id }}][status]" value="ditarik" x-model="result" class="accent-sky-600">
+                            Kabel sudah ditarik
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui has-[:checked]:border-sky-600 has-[:checked]:bg-sky-50/60 dark:has-[:checked]:bg-sky-950/40">
+                            <input type="radio" name="cable_crossings[{{ $crossing->id }}][status]" value="tidak_bisa_ditarik" x-model="result" class="accent-sky-600">
+                            Tidak bisa ditarik
+                        </label>
+                    </div>
+
+                    <div x-show="result === 'ditarik'" x-cloak class="space-y-1.5">
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui">Foto Penarikan <span class="text-red-500">*</span></label>
+                        <input type="file" name="cable_crossings[{{ $crossing->id }}][foto]" accept="image/*"
+                               class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-950/60 dark:file:text-sky-300 font-ui transition-colors cursor-pointer">
+                    </div>
+
+                    <div x-show="result === 'tidak_bisa_ditarik'" x-cloak class="space-y-1.5">
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui">Alasan tidak bisa ditarik <span class="text-red-500">*</span></label>
+                        <textarea name="cable_crossings[{{ $crossing->id }}][alasan]" rows="2" maxlength="500"
+                                  placeholder="Mis. kabel tertanam di aspal, perlu galian"
+                                  class="w-full rounded-lg text-xs sm:text-sm font-ui bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 p-2.5 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-colors resize-y">{{ old("cable_crossings.{$crossing->id}.alasan") }}</textarea>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
             {{-- ── Section 3: CATATAN / ALASAN (Design.md §4) ── --}}
             <div class="p-5 sm:p-6 space-y-2">
                 <label class="block text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 font-ui">
@@ -266,18 +332,18 @@
             </div>
         </div>
 
-        {{-- ══ Submit Actions (Design.md §9 & §15: Solid Sky Blue, rounded-lg 8px) ══ --}}
-        <div class="mt-4 flex items-center justify-end gap-3">
+        {{-- ══ Submit Actions (Fixed on mobile, static on desktop) ══ --}}
+        <div class="fixed sm:static bottom-0 inset-x-0 z-30 px-4 sm:px-0 py-2.5 sm:py-0 bg-white dark:bg-slate-900 sm:bg-transparent border-t sm:border-t-0 border-slate-200 dark:border-slate-800 flex items-center justify-between sm:justify-end gap-2.5 shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.3)] sm:shadow-none pb-[calc(env(safe-area-inset-bottom)+0.625rem)] sm:pb-0 sm:mt-4">
             <a href="{{ route('tasks.show', $task) }}"
-               class="px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg transition-colors font-ui">
+               class="hidden sm:inline-flex items-center px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg transition-colors font-ui shadow-xs">
                 Batal
             </a>
             <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 active:bg-sky-800 rounded-lg transition-colors shadow-xs font-ui cursor-pointer">
+                    class="w-full sm:w-auto min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 active:bg-sky-800 rounded-lg transition-colors shadow-xs font-ui cursor-pointer whitespace-nowrap">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
-                Simpan Laporan &amp; Selesaikan Task
+                <span>Simpan Laporan &amp; Selesaikan Task</span>
             </button>
         </div>
     </form>

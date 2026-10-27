@@ -453,6 +453,72 @@ class Customer extends Model
     }
 
     /**
+     * Penempatan port jaringan (ODP) pelanggan ini.
+     *
+     * @return HasMany<NetworkPortAssignment, $this>
+     */
+    public function portAssignments(): HasMany
+    {
+        return $this->hasMany(NetworkPortAssignment::class);
+    }
+
+    /**
+     * @return list<array{name:string,serial_number:string,source:string}>
+     */
+    public function networkPortModems(): array
+    {
+        $modems = [];
+
+        $add = function (?string $serialNumber, string $name, string $source) use (&$modems): void {
+            $serialNumber = trim((string) $serialNumber);
+            if ($serialNumber === '') {
+                return;
+            }
+
+            foreach ($modems as $index => $modem) {
+                if (strcasecmp($modem['serial_number'], $serialNumber) === 0) {
+                    $modems[$index]['source'] .= ' + '.$source;
+
+                    return;
+                }
+            }
+
+            $modems[] = [
+                'name' => $name,
+                'serial_number' => $serialNumber,
+                'source' => $source,
+            ];
+        };
+
+        $device = $this->customerDevice;
+        $knownSerials = array_filter([
+            $device?->serial_number,
+            $this->customerTechnicalDetail?->router_or_ont_serial,
+            $this->ont_sn,
+        ]);
+
+        foreach ($this->inventorySerials as $serial) {
+            $isModemCategory = $serial->item?->category?->code === 'modem_ont';
+            $matchesCustomerRecord = collect($knownSerials)->contains(
+                fn ($knownSerial): bool => strcasecmp(trim((string) $knownSerial), trim($serial->serial_number)) === 0
+            );
+            if ($isModemCategory || $matchesCustomerRecord) {
+                $add($serial->serial_number, $serial->item?->name ?? 'Modem/ONT', 'Gudang');
+            }
+        }
+
+        if ($device && in_array(strtolower((string) $device->device_type), ['ont', 'onu', 'modem'], true)) {
+            $deviceName = trim(($device->brand ?? '').' '.($device->model ?? ''));
+            $add($device->serial_number, $deviceName ?: 'Modem/ONT', 'Perangkat pelanggan');
+        }
+
+        $add($this->customerTechnicalDetail?->router_or_ont_serial, 'Modem/ONT', 'Data teknis');
+        $add($this->ont_sn, 'Modem/ONT', 'Data pelanggan lama');
+
+        return $modems;
+    }
+
+    /**
      * Invariant: maksimal satu baris `revoked_at IS NULL` per pelanggan,
      * ditegakkan CustomerQrTokenObserver::creating() — relasi ini aman
      * dipakai sebagai "token QR yang lagi berlaku".
@@ -478,6 +544,14 @@ class Customer extends Model
     public function installations(): HasMany
     {
         return $this->hasMany(CustomerInstallation::class);
+    }
+
+    /**
+     * @return HasMany<CustomerCableCrossing, $this>
+     */
+    public function cableCrossings(): HasMany
+    {
+        return $this->hasMany(CustomerCableCrossing::class);
     }
 
     /**
@@ -517,6 +591,14 @@ class Customer extends Model
     public function customerDevice(): HasOne
     {
         return $this->hasOne(CustomerDevice::class);
+    }
+
+    /**
+     * @return HasMany<CustomerAdditionalDevice, $this>
+     */
+    public function additionalDevices(): HasMany
+    {
+        return $this->hasMany(CustomerAdditionalDevice::class);
     }
 
     /**

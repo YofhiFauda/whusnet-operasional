@@ -64,6 +64,8 @@ class CustomerPackageService
             throw new InvalidArgumentException('Paket baru sama dengan paket yang sedang berjalan.');
         }
 
+        $this->assertAdditionalDevicesWithinLimit($customer, $newPackage);
+
         $isUpgrade = (float) $newPackage->monthly_price > (float) $service->monthly_price;
         $currentPeriod = now()->format('Y-m');
 
@@ -136,6 +138,32 @@ class CustomerPackageService
             'monthly_price' => $monthlyPrice,
             'total_monthly_bill' => $totalBill,
         ]);
+    }
+
+    /**
+     * Ganti paket (upgrade MAUPUN downgrade) diblok kalau jumlah perangkat
+     * tambahan (AP/STB, dll. — `CustomerAdditionalDevice`) pelanggan melebihi
+     * `max_additional_devices` paket baru. Downgrade adalah kasus utama di
+     * sini karena limit paket yang lebih murah biasanya lebih kecil — guard
+     * ini SENGAJA dipanggil di luar blok `if ($isUpgrade)` di atas.
+     *
+     * Public karena dipakai ulang di dua jalur LAIN yang juga bisa mengubah
+     * `customer_services.internet_package_id` tanpa lewat `change()` di atas:
+     * `CustomerController::update()` (form Edit Pelanggan) dan
+     * `CustomerVerificationEditService::updatePackage()` (koreksi paket dari
+     * layar Verifikasi). Jangan duplikasi logic ini — satu sumber kebenaran.
+     */
+    public function assertAdditionalDevicesWithinLimit(Customer $customer, InternetPackage $newPackage): void
+    {
+        $count = $customer->additionalDevices()->count();
+
+        if ($count > $newPackage->max_additional_devices) {
+            throw new RuntimeException(
+                "Ganti paket diblok — pelanggan punya {$count} perangkat tambahan, ".
+                "melebihi batas {$newPackage->max_additional_devices} di paket \"{$newPackage->name}\". ".
+                'Hapus perangkat tambahan dulu sebelum ganti paket.'
+            );
+        }
     }
 
     /**
@@ -239,11 +267,23 @@ class CustomerPackageService
         // Biaya sekali-bayar yang sudah melekat di invoice AWAL (instalasi,
         // kabel, tiang, materai) TIDAK ikut diprorate — cuma porsi paket
         // internet yang berubah. Untuk invoice BULANAN, semua kolom ini nol.
+        //
+        // "Jual Modem" (ownership modem sewa/beli) WAJIB ikut di sini walau
+        // tidak punya kolom di `invoices` — nominalnya cuma hidup di baris
+        // `invoice_items`, jadi dibaca dari baris itu SEBELUM dibangun ulang.
+        // Tanpa ini subtotal & daftar baris sama-sama kehilangan nominal modem
+        // (invarian builder tetap lolos karena keduanya kompak salah), baris
+        // "Jual Modem" lenyap, dan kalau invoice sudah lunas selisihnya malah
+        // dikreditkan balik sebagai "deposit downgrade" — padahal modemnya
+        // tetap milik pelanggan.
+        $modemSaleAmount = $this->existingModemSaleAmount($invoice);
+
         $oneTimeFees = Money::sum([
             $invoice->extra_installation_fee ?? 0,
             $invoice->extra_cable_fee ?? 0,
             $invoice->extra_pole_fee ?? 0,
             $invoice->other_fee ?? 0,
+            $modemSaleAmount,
         ]);
 
         $fullSubtotal = Money::add($subtotalPaket, $oneTimeFees);
@@ -262,7 +302,7 @@ class CustomerPackageService
         $invoice->total_amount = $totalInvoicePeriode;
         $invoice->save();
 
-        $this->rebuildInvoiceItems($invoice, $subtotalPaket, $currentPeriod);
+        $this->rebuildInvoiceItems($invoice, $subtotalPaket, $currentPeriod, $modemSaleAmount);
 
         $invoice->recalculateFromPayments();
 
@@ -311,8 +351,10 @@ class CustomerPackageService
      * yang sama dipakai saat invoice ini pertama kali terbit — biaya sekali-bayar
      * (instalasi/kabel/tiang/materai) diambil dari kolom invoice yang sudah ada,
      * cuma porsi `prorate_amount`-nya yang diganti dengan `$subtotalPaket` baru.
+     * Nominal "Jual Modem" tidak punya kolom invoice, jadi dioper dari
+     * `existingModemSaleAmount()` yang dibaca sebelum baris lama dihapus.
      */
-    private function rebuildInvoiceItems(Invoice $invoice, float $subtotalPaket, string $billingPeriod): void
+    private function rebuildInvoiceItems(Invoice $invoice, float $subtotalPaket, string $billingPeriod, float $modemSaleAmount = 0.0): void
     {
         if ($invoice->invoice_type?->value === InvoiceType::AWAL->value) {
             $billing = [
@@ -321,6 +363,7 @@ class CustomerPackageService
                 'extra_cable_fee' => (float) ($invoice->extra_cable_fee ?? 0),
                 'extra_pole_fee' => (float) ($invoice->extra_pole_fee ?? 0),
                 'other_fee' => (float) ($invoice->other_fee ?? 0),
+                'modem_sale_amount' => $modemSaleAmount,
             ];
 
             $this->itemBuilder->rebuildFor($invoice, $this->initialInvoiceService->lineSpecs($billing));
@@ -334,6 +377,28 @@ class CustomerPackageService
             'description' => "Langganan {$billingPeriod} (prorata ganti paket)",
             'amount' => $subtotalPaket,
         ]]);
+    }
+
+    /**
+     * Nominal baris "Jual Modem" yang SAAT INI ditagih invoice ini.
+     *
+     * Sumbernya baris `invoice_items` invoice itu sendiri — bukan
+     * `inventory_serial_sales`, karena ledger penjualan bisa berisi banyak
+     * baris per pelanggan (tukar modem dsb.) dan tidak terikat ke invoice
+     * tertentu. Hanya AWAL yang pernah membawa baris ini; BULANAN selalu 0.
+     */
+    private function existingModemSaleAmount(Invoice $invoice): float
+    {
+        if ($invoice->invoice_type?->value !== InvoiceType::AWAL->value) {
+            return 0.0;
+        }
+
+        return Money::sum(
+            $invoice->items()
+                ->whereHas('subcategory', fn ($query) => $query->where('code', 'jual_modem'))
+                ->pluck('amount')
+                ->all()
+        );
     }
 
     /**

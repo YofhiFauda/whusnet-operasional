@@ -35,7 +35,7 @@ class WarehouseStockPositionService
 {
     /**
      * @param  Collection<int, int>  $popIds  POP dalam scope aktor.
-     * @return Collection<int, array{item: Item, total: float, per_pop: Collection<int, array{pop_id: int, qty: float, lots: array<int, array{lot_no: string, qty: float}>}>, held: float, problem: float, in_transit: float, holders: Collection<int, array{user_id: int, name: string, qty: float}>, last_activity: array{type: string, by: string, at: Carbon|null, ref: string|null}|null, condition_summary: Collection<int, array{condition: ItemCondition, count: int}>|null}>
+     * @return Collection<int, array{item: Item, total: float, per_pop: Collection<int, array{pop_id: int, qty: float, lots: array<int, array{lot_no: string, qty: float}>}>, held: float, problem: float, in_transit: float, holders: Collection<int, array{user_id: int, name: string, qty: float}>, last_activity: array{type: string, by: string, at: Carbon|null, ref: string|null}|null, condition_summary: Collection<int, array{condition: ItemCondition, checked: bool, count: int}>|null}>
      */
     public function summarize(
         Collection $popIds,
@@ -122,7 +122,7 @@ class WarehouseStockPositionService
      * dijumlah di `availableByPopAndItem()`, supaya totalnya konsisten.
      *
      * @param  Collection<int, int>  $popIds
-     * @return Collection<int, Collection<int, array{condition: ItemCondition, count: int}>>
+     * @return Collection<int, Collection<int, array{condition: ItemCondition, checked: bool, count: int}>>
      */
     private function conditionByItem(Collection $popIds): Collection
     {
@@ -130,22 +130,25 @@ class WarehouseStockPositionService
             ->whereIn('current_pop_id', $popIds)
             ->where('status', SerialStatus::AVAILABLE->value)
             ->select('item_id', 'condition')
+            ->selectRaw("CASE WHEN `condition` = 'used_good' AND `condition_checked_at` IS NOT NULL THEN 1 ELSE 0 END as checked")
             ->selectRaw('COUNT(*) as count')
             ->groupBy('item_id', 'condition')
+            ->groupByRaw("CASE WHEN `condition` = 'used_good' AND `condition_checked_at` IS NOT NULL THEN 1 ELSE 0 END")
             ->get();
 
         return $rows->groupBy('item_id')->map(function ($perItem) {
             return $perItem->map(fn ($row) => [
                 'condition' => $row->condition,
+                'checked' => (bool) $row->checked,
                 'count' => (int) $row->count,
             ])->values();
         });
     }
 
     /**
-     * Qty per item yang sedang DALAM PERJALANAN (transfer IN_TRANSIT yang asal
+     * Qty per item yang sedang DALAM PERJALANAN (transfer terbuka yang asal
      * atau tujuannya dalam scope) — analisa-ui-ux §U1. Dihitung dari leg
-     * dispatch (`from_pop_id` terisi) transfer in-transit; satuan mengikuti
+     * dispatch dikurangi penerimaan yang sudah terkonfirmasi; satuan mengikuti
      * tracking (serial = 1/baris, roll = qty meter, quantity = qty).
      *
      * @param  Collection<int, int>  $popIds
@@ -154,7 +157,7 @@ class WarehouseStockPositionService
     private function inTransitByItem(Collection $popIds): Collection
     {
         $transferIds = InventoryTransfer::query()
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
             ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)->orWhereIn('to_pop_id', $popIds))
             ->pluck('id');
 
@@ -162,13 +165,21 @@ class WarehouseStockPositionService
             return collect();
         }
 
-        return InventoryTransaction::query()
+        $dispatch = InventoryTransaction::query()
             ->whereIn('inventory_transfer_id', $transferIds)
-            ->whereNotNull('from_pop_id') // leg dispatch (barang keluar), bukan leg confirm
+            ->whereNotNull('from_pop_id')
             ->selectRaw('item_id, SUM(qty) as qty')
             ->groupBy('item_id')
-            ->pluck('qty', 'item_id')
-            ->map(fn ($q) => (float) $q);
+            ->pluck('qty', 'item_id');
+
+        $received = InventoryTransaction::query()
+            ->whereIn('inventory_transfer_id', $transferIds)
+            ->whereNotNull('to_pop_id')
+            ->selectRaw('item_id, SUM(qty) as qty')
+            ->groupBy('item_id')
+            ->pluck('qty', 'item_id');
+
+        return $dispatch->map(fn ($qty, $itemId) => max(0, round((float) $qty - (float) ($received[$itemId] ?? 0), 2)));
     }
 
     /**

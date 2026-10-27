@@ -11,6 +11,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <form method="GET" action="{{ route('warehouse.stock-requests.index') }}" class="flex items-center gap-2">
             <select name="status" onchange="this.form.submit()" class="px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                <option value="open" {{ $statusFilter === 'open' ? 'selected' : '' }}>Perlu Ditindak (Pending + Sebagian)</option>
                 <option value="pending" {{ $statusFilter === 'pending' ? 'selected' : '' }}>Menunggu Diproses</option>
                 <option value="partial" {{ $statusFilter === 'partial' ? 'selected' : '' }}>Sebagian Dipenuhi</option>
                 <option value="fulfilled" {{ $statusFilter === 'fulfilled' ? 'selected' : '' }}>Sudah Dipenuhi</option>

@@ -20,6 +20,11 @@ class ActionSeeder extends Seeder
                 'description' => 'Melihat daftar data atau detail halaman',
             ],
             [
+                'code' => ActionCode::PUBLISH,
+                'name' => 'Publish',
+                'description' => 'Menerbitkan atau menarik artikel panduan',
+            ],
+            [
                 'code' => ActionCode::CREATE,
                 'name' => 'Create',
                 'description' => 'Menambah data baru',
@@ -138,6 +143,11 @@ class ActionSeeder extends Seeder
                 'code' => ActionCode::CHANGE,
                 'name' => 'Change',
                 'description' => 'Ganti paket internet pelanggan aktif, terpisah dari update field umum',
+            ],
+            [
+                'code' => ActionCode::REGISTER_INFRA,
+                'name' => 'Register Infra',
+                'description' => 'Registrasi aset infrastruktur lama yang belum pernah masuk ledger gudang',
             ],
         ];
 

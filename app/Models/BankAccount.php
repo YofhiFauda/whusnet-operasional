@@ -60,6 +60,26 @@ class BankAccount extends Model
     }
 
     /**
+     * Kunci baris & kembalikan rekening HANYA kalau masih aktif — satu
+     * sumber pengecekan race terakhir di bawah lock DB, dipakai dua jalur
+     * pembayaran (`PaymentService::resolveActiveBankAccount()` jalur admin,
+     * `CollectorPaymentService::record()` jalur batch). Rekening bisa
+     * dinonaktifkan admin di antara validasi optimis (sebelum transaksi) dan
+     * commit — tanpa lock di sini payment tetap tersimpan atas rekening yang
+     * sudah nonaktif.
+     */
+    public static function lockActiveOrNull(mixed $id): ?self
+    {
+        if (! $id) {
+            return null;
+        }
+
+        $account = static::query()->whereKey($id)->lockForUpdate()->first();
+
+        return $account && $account->is_active ? $account : null;
+    }
+
+    /**
      * Daftar rekening aktif dalam bentuk siap pakai untuk dropdown yang
      * diisi lewat JSON (modal bayar) — cuma field yang dibutuhkan UI.
      *

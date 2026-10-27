@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DeviceAcquisitionSource;
 use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'connection_mode',
     'technical_note',
     'device_retrieved_at',
+    'acquisition_source',
 ])]
 class CustomerDevice extends Model
 {
@@ -51,6 +53,7 @@ class CustomerDevice extends Model
         return [
             'signal_rx_power' => 'decimal:2',
             'device_retrieved_at' => 'datetime',
+            'acquisition_source' => DeviceAcquisitionSource::class,
         ];
     }
 

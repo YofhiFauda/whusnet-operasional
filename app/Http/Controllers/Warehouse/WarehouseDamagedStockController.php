@@ -91,7 +91,7 @@ class WarehouseDamagedStockController extends Controller
                         ->orWhereHas('item', fn ($i) => $i->where('name', 'like', "%{$search}%"));
                 });
             })
-            ->with(['item', 'currentPop', 'issuedFromPop', 'latestRetrievalLog'])
+            ->with(['item', 'currentPop', 'issuedFromPop', 'latestRetrievalLog.task.creqDetail'])
             ->orderByDesc('updated_at')
             ->paginate(25, ['*'], 'serial_page')
             ->withQueryString();

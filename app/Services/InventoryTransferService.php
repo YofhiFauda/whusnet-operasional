@@ -7,6 +7,7 @@ use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Enums\TransferStatus;
+use App\Models\BranchInventorySale;
 use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
@@ -46,6 +47,46 @@ class InventoryTransferService
             throw new InvalidArgumentException("Transfer cuma boleh dikirim KE Gudang Cabang — {$toCabang->name} bertipe '{$toCabang->type}'.");
         }
 
+        return $this->dispatchStockTransfer($fromPusat, $toCabang, $lines, $actor);
+    }
+
+    /**
+     * Transfer stok biasa Cabang ke Pusat. Berbeda dari pengiriman retur
+     * modem (RTR) yang wajib melewati pemeriksaan kondisi khusus.
+     *
+     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
+     */
+    public function createReverseTransfer(Pop $fromCabang, Pop $toPusat, array $lines, ?User $actor = null): InventoryTransfer
+    {
+        if (! $fromCabang->isCabang() || ! $toPusat->isPusat()) {
+            throw new InvalidArgumentException('Transfer balik stok biasa harus dari Gudang Cabang ke Gudang Pusat.');
+        }
+
+        return $this->dispatchStockTransfer($fromCabang, $toPusat, $lines, $actor);
+    }
+
+    /**
+     * @param  list<array{item_id:int, serial_numbers:list<string>}>  $lines
+     */
+    public function createBranchSaleTransfer(Pop $fromCabang, Pop $toCabang, array $lines, User $actor): InventoryTransfer
+    {
+        if (! $fromCabang->isCabang() || ! $toCabang->isCabang() || $fromCabang->id === $toCabang->id) {
+            throw new InvalidArgumentException('Jual beli SN harus terjadi antara dua Cabang berbeda.');
+        }
+        foreach ($lines as $line) {
+            if (Item::findOrFail($line['item_id'])->tracking_type !== TrackingType::SERIALIZED) {
+                throw new InvalidArgumentException('Hanya barang ber-SN per unit yang dapat dijual antar Cabang.');
+            }
+        }
+
+        return $this->dispatchStockTransfer($fromCabang, $toCabang, $lines, $actor);
+    }
+
+    /**
+     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
+     */
+    private function dispatchStockTransfer(Pop $fromPusat, Pop $toCabang, array $lines, ?User $actor): InventoryTransfer
+    {
         if ($lines === []) {
             throw new InvalidArgumentException('Transfer wajib py minimal 1 baris barang.');
         }
@@ -56,7 +97,7 @@ class InventoryTransferService
 
         return DB::transaction(function () use ($fromPusat, $toCabang, $lines, $actor) {
             $transfer = InventoryTransfer::create([
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('TRF'),
                 'from_pop_id' => $fromPusat->id,
                 'to_pop_id' => $toCabang->id,
                 'status' => TransferStatus::IN_TRANSIT,
@@ -110,7 +151,11 @@ class InventoryTransferService
                 'item_id' => $item->id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
-                'unit_price_snapshot' => $this->resolveLastCost($item, null),
+                'unit_price_snapshot' => InventoryTransaction::query()
+                    ->where('serial_id', $serial->id)
+                    ->whereNotNull('unit_price_snapshot')
+                    ->latest('id')
+                    ->value('unit_price_snapshot') ?? $this->resolveLastCost($item, null),
                 'from_pop_id' => $fromPusat->id,
                 'created_by' => $actor?->id,
             ]);
@@ -235,17 +280,50 @@ class InventoryTransferService
                 throw new InvalidArgumentException("Transfer {$transfer->reference_number} sudah dikonfirmasi sebelumnya ({$transfer->status->label()}).");
             }
 
+            $isForward = $transfer->fromPop?->isPusat() && $transfer->toPop?->isCabang();
+            $isReverse = $transfer->fromPop?->isCabang() && $transfer->toPop?->isPusat();
+            $branchSale = BranchInventorySale::query()->with('lines')
+                ->where('inventory_transfer_id', $transfer->id)->first();
+            $isBranchSale = $branchSale !== null
+                && $transfer->fromPop?->isCabang()
+                && $transfer->toPop?->isCabang();
+
+            if (str_starts_with($transfer->reference_number, 'RTR-') || (! $isForward && ! $isReverse && ! $isBranchSale)) {
+                throw new InvalidArgumentException('Pengiriman retur dikonfirmasi per SN lewat halaman Retur ke Pusat.');
+            }
+
             $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll'])->get();
+            $confirmedLines = $transfer->transactions()->whereNotNull('to_pop_id')->get();
             $isPartial = false;
 
             foreach ($dispatchLines as $line) {
+                $previouslyReceived = $confirmedLines->filter(fn (InventoryTransaction $receipt) => $receipt->source_inventory_transaction_id === $line->id
+                    || ($receipt->source_inventory_transaction_id === null
+                        && $receipt->item_id === $line->item_id
+                        && $receipt->serial_id === $line->serial_id
+                        && $receipt->roll_id === $line->roll_id
+                        && ($receipt->lot_no ?? '') === ($line->lot_no ?? '')))
+                    ->sum(fn (InventoryTransaction $receipt) => (float) $receipt->qty);
+                $remainingQty = round((float) $line->qty - $previouslyReceived, 2);
+                if ($remainingQty < 0) {
+                    throw new InvalidArgumentException("Transfer {$transfer->reference_number} memiliki penerimaan melebihi jumlah kirim.");
+                }
+
                 if ($line->serial_id !== null) {
                     $matched = in_array($line->serial->serial_number, $confirmedSerialNumbers, true);
+
+                    if ($remainingQty === 0.0) {
+                        if ($matched) {
+                            throw new InvalidArgumentException("SN {$line->serial->serial_number} sudah diterima sebelumnya.");
+                        }
+
+                        continue;
+                    }
 
                     if (! $matched) {
                         $isPartial = true;
 
-                        continue; // SN tetap TRANSFERRED — limbo, butuh investigasi manual.
+                        continue;
                     }
 
                     $line->serial->update([
@@ -259,8 +337,11 @@ class InventoryTransferService
                         'inventory_transfer_id' => $transfer->id,
                         'item_id' => $line->item_id,
                         'serial_id' => $line->serial_id,
+                        'source_inventory_transaction_id' => $line->id,
                         'qty' => 1,
-                        'unit_price_snapshot' => $line->unit_price_snapshot,
+                        'unit_price_snapshot' => $isBranchSale
+                            ? $branchSale->lines->firstWhere('inventory_serial_id', $line->serial_id)?->sale_price
+                            : $line->unit_price_snapshot,
                         'to_pop_id' => $transfer->to_pop_id,
                         'created_by' => $actor->id,
                     ]);
@@ -271,10 +352,18 @@ class InventoryTransferService
                 if ($line->roll_id !== null) {
                     $matched = in_array($line->roll->roll_code, $confirmedRollCodes, true);
 
+                    if ($remainingQty === 0.0) {
+                        if ($matched) {
+                            throw new InvalidArgumentException("Roll {$line->roll->roll_code} sudah diterima sebelumnya.");
+                        }
+
+                        continue;
+                    }
+
                     if (! $matched) {
                         $isPartial = true;
 
-                        continue; // Roll tetap TRANSFERRED — limbo, butuh investigasi manual.
+                        continue;
                     }
 
                     $line->roll->update([
@@ -288,6 +377,7 @@ class InventoryTransferService
                         'inventory_transfer_id' => $transfer->id,
                         'item_id' => $line->item_id,
                         'roll_id' => $line->roll_id,
+                        'source_inventory_transaction_id' => $line->id,
                         'qty' => $line->qty,
                         'unit_price_snapshot' => $line->unit_price_snapshot,
                         'to_pop_id' => $transfer->to_pop_id,
@@ -298,12 +388,13 @@ class InventoryTransferService
                 }
 
                 $lotNo = $line->lot_no ?? '';
-                $dispatchedQty = (float) $line->qty;
-                $confirmedForItem = $confirmedQuantities[$line->item_id] ?? 0;
+                $confirmedForItem = isset($confirmedQuantities['_lines'])
+                    ? ($confirmedQuantities['_lines'][$line->id] ?? 0)
+                    : ($confirmedQuantities[$line->item_id] ?? 0);
                 $confirmedQty = is_array($confirmedForItem) ? (float) ($confirmedForItem[$lotNo] ?? 0) : (float) $confirmedForItem;
 
-                if ($confirmedQty > $dispatchedQty) {
-                    throw new InvalidArgumentException("Qty diterima ({$confirmedQty}) buat item #{$line->item_id} melebihi yang dikirim ({$dispatchedQty}).");
+                if ($confirmedQty > $remainingQty) {
+                    throw new InvalidArgumentException("Qty diterima ({$confirmedQty}) buat item #{$line->item_id} melebihi sisa transfer ({$remainingQty}).");
                 }
 
                 // Negatif itu input rusak (bug form/typo), bukan "0 diterima"
@@ -315,7 +406,7 @@ class InventoryTransferService
                     throw new InvalidArgumentException("Qty diterima buat item #{$line->item_id} tidak boleh negatif ({$confirmedQty}).");
                 }
 
-                if ($confirmedQty < $dispatchedQty) {
+                if ($confirmedQty < $remainingQty) {
                     $isPartial = true;
                 }
 
@@ -336,6 +427,7 @@ class InventoryTransferService
                     'inventory_transfer_id' => $transfer->id,
                     'item_id' => $line->item_id,
                     'lot_no' => $lotNo === '' ? null : $lotNo,
+                    'source_inventory_transaction_id' => $line->id,
                     'qty' => $confirmedQty,
                     'unit_price_snapshot' => $line->unit_price_snapshot,
                     'to_pop_id' => $transfer->to_pop_id,
@@ -348,6 +440,94 @@ class InventoryTransferService
                 'received_by' => $actor->id,
                 'received_at' => now(),
             ]);
+
+            return $transfer->fresh();
+        });
+    }
+
+    /**
+     * Tutup seluruh sisa transfer yang dipastikan hilang. Dispatch telah
+     * mengurangi stok pengirim, sehingga baris rugi tidak boleh memiliki
+     * from_pop_id/to_pop_id yang akan mengubah saldo gudang kedua kalinya.
+     */
+    public function closeMissingTransfer(InventoryTransfer $transfer, string $reason, string $evidenceFilePath, User $actor): InventoryTransfer
+    {
+        if (blank($reason) || blank($evidenceFilePath)) {
+            throw new InvalidArgumentException('Alasan dan bukti kehilangan transfer wajib diisi.');
+        }
+
+        return DB::transaction(function () use ($transfer, $reason, $evidenceFilePath, $actor) {
+            $transfer = InventoryTransfer::query()->lockForUpdate()->findOrFail($transfer->id);
+
+            if (! $transfer->isInTransit() || ! str_starts_with($transfer->reference_number, 'TRF-')) {
+                throw new InvalidArgumentException('Hanya sisa transfer stok biasa yang masih terbuka dapat ditutup sebagai hilang.');
+            }
+
+            $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->get();
+            $receivedLines = $transfer->transactions()->whereNotNull('to_pop_id')->get();
+            $hasMissing = false;
+
+            foreach ($dispatchLines as $line) {
+                $received = $receivedLines
+                    ->filter(fn (InventoryTransaction $receipt) => $receipt->source_inventory_transaction_id === $line->id
+                        || ($receipt->source_inventory_transaction_id === null
+                            && $receipt->item_id === $line->item_id
+                            && $receipt->serial_id === $line->serial_id
+                            && $receipt->roll_id === $line->roll_id
+                            && ($receipt->lot_no ?? '') === ($line->lot_no ?? '')))
+                    ->sum(fn (InventoryTransaction $receipt) => (float) $receipt->qty);
+                $missingQty = round((float) $line->qty - $received, 2);
+
+                if ($missingQty < 0) {
+                    throw new InvalidArgumentException('Penerimaan transfer melebihi jumlah yang dikirim.');
+                }
+
+                if ($missingQty <= 0) {
+                    continue;
+                }
+
+                $hasMissing = true;
+
+                if ($line->serial_id !== null) {
+                    $serial = InventorySerial::query()->lockForUpdate()->findOrFail($line->serial_id);
+                    if ($serial->status !== SerialStatus::TRANSFERRED) {
+                        throw new InvalidArgumentException("SN {$serial->serial_number} tidak lagi dalam perjalanan.");
+                    }
+                    $serial->update(['status' => SerialStatus::LOST]);
+                }
+
+                if ($line->roll_id !== null) {
+                    $roll = InventoryRoll::query()->lockForUpdate()->findOrFail($line->roll_id);
+                    if ($roll->status !== RollStatus::TRANSFERRED) {
+                        throw new InvalidArgumentException("Roll {$roll->roll_code} tidak lagi dalam perjalanan.");
+                    }
+                    $roll->update(['status' => RollStatus::LOST]);
+                }
+
+                InventoryTransaction::create([
+                    'type' => InventoryTransactionType::ADJUSTMENT,
+                    'reference_number' => app(NumberSequenceService::class)->ledgerNumber('ADJ'),
+                    'inventory_transfer_id' => $transfer->id,
+                    'source_inventory_transaction_id' => $line->id,
+                    'item_id' => $line->item_id,
+                    'lot_no' => $line->lot_no,
+                    'serial_id' => $line->serial_id,
+                    'roll_id' => $line->roll_id,
+                    'qty' => -$missingQty,
+                    'unit_price_snapshot' => $line->unit_price_snapshot,
+                    'reason' => 'lost_in_transfer',
+                    'notes' => $reason,
+                    'evidence_file_path' => $evidenceFilePath,
+                    'resulting_status' => 'lost',
+                    'created_by' => $actor->id,
+                ]);
+            }
+
+            if (! $hasMissing) {
+                throw new InvalidArgumentException('Tidak ada sisa kiriman yang dapat ditutup sebagai hilang.');
+            }
+
+            $transfer->update(['status' => TransferStatus::CLOSED_LOST]);
 
             return $transfer->fresh();
         });
@@ -382,24 +562,5 @@ class InventoryTransferService
             ->value('unit_price_snapshot');
 
         return $price !== null ? (float) $price : null;
-    }
-
-    /**
-     * `TRF-YYYYMMDD-NNNNNN` — lihat docblock sama persis di
-     * `InventoryReceiveService::generateReferenceNumber()` buat alasan
-     * lengkap (tanggal penuh buat dibaca, reset counter per BULAN bukan per
-     * hari, keputusan eksplisit user 2026-09-03).
-     */
-    private function generateReferenceNumber(): string
-    {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
-
-        $lastNum = InventoryTransfer::where('reference_number', 'like', "TRF-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('TRF-%s-%06d', $today, $lastNum + 1);
     }
 }

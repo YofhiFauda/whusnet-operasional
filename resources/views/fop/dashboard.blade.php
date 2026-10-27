@@ -6,263 +6,333 @@
 @section('breadcrumb_parent_url', '/')
 
 @section('content')
-<div x-data="fopDashboardHandler()" class="flex flex-col gap-5 sm:gap-6 max-w-screen-2xl mx-auto font-sans text-text-main px-1 sm:px-0">
+<div x-data="fopDashboardHandler()" class="flex flex-col gap-4 sm:gap-5 max-w-screen-2xl mx-auto font-sans text-text-main px-1 sm:px-0">
 
     {{-- ══ Page Header ══════════════════════════════════════════════ --}}
-    <div class="page-header flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between mb-1">
+    <div class="page-header flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div class="page-header-left">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-2xs">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                     </svg>
                 </div>
-                <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">FOP Dashboard</h1>
+                <div>
+                    <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">FOP Operational Command Center</h1>
+                    <p class="text-xs text-text-muted mt-0.5 font-sans">Monitoring terpadu modul lapangan, armada teknisi, material, & SLA · {{ now()->translatedFormat('l, d F Y') }}</p>
+                </div>
             </div>
-            <p class="text-xs text-text-muted mt-0.5 font-sans">Ringkasan pengerjaan harian lapangan dan koordinasi tim teknisi · {{ now()->translatedFormat('l, d F Y') }}</p>
         </div>
-        <div>
-            <a href="{{ route('fop-tasks.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors shadow-2xs font-sans">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+        <div class="flex items-center gap-2.5 flex-wrap">
+            {{-- Dual Mode Switcher: Operasional Harian vs Rekapitulasi Analitik --}}
+            <div class="inline-flex rounded-lg border border-border bg-surface p-1 shadow-2xs">
+                <span class="px-2.5 py-1 text-xs font-bold rounded-md bg-primary text-white">⚡ Operasional Harian</span>
+                @can('fop_analytics.view')
+                <a href="{{ route('fop.analytics') }}" class="px-2.5 py-1 text-xs font-medium text-text-muted hover:text-text-main transition-colors">📊 Rekapitulasi &amp; Analitik</a>
+                @endcan
+            </div>
+
+            <a href="{{ route('fop-tasks.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-surface border border-border text-text-main rounded-lg hover:bg-surface-muted transition-colors shadow-2xs font-sans">
+                <svg class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                 <span>Kelola Task FOP</span>
             </a>
         </div>
     </div>
 
-    {{-- ══ Stat Cards ═══════════════════════════════════════════════ --}}
-    <div id="stat-cards-container" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <!-- Card 1: Antrean Survey -->
-        <div class="metric-card {{ ($stats['overdue_survey'] ?? 0) > 0 ? 'status-error' : 'status-info' }}">
-            <div>
-                <div class="metric-card-label">
-                    <span>Antrean Survey</span>
-                    <svg class="h-4 w-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" />
-                    </svg>
-                </div>
-                <div class="metric-card-value-container">
-                    <p class="metric-card-value">{{ $stats['antrian_survey'] }}</p>
-                    @if(($stats['overdue_survey'] ?? 0) > 0)
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-sans uppercase tracking-wider bg-error-bg text-error border border-error-border animate-pulse">
-                            {{ $stats['overdue_survey'] }} Overdue
+    {{-- ══ ZONA 1: Emergency Incident Ticker ════════════════════════ --}}
+    @include('fop.partials._emergency_ticker')
+
+    {{-- ══ ZONA 2: Operational Health Pulse (Hero Metrics) ═════════ --}}
+    @include('fop.partials._hero_metrics')
+
+    {{-- ══ ZONA 3: Customer Delivery Pipeline (Stepper Funnel) ═════ --}}
+    @include('fop.partials._pipeline_funnel')
+
+    {{-- ══ ZONA 4: Two-Column Unified Command Grid ═════════════════ --}}
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+
+        {{-- ── Left Column (Tactical Board - 7 Cols / ~58%) ──────────── --}}
+        <div class="xl:col-span-7 flex flex-col gap-4">
+
+            {{-- Tactical Tab Switcher Bar --}}
+            <div class="flex items-center justify-between bg-surface border border-border rounded-xl p-1.5 shadow-2xs">
+                <div class="flex items-center gap-1 flex-wrap">
+                    <button type="button"
+                            @click="activeTacticalTab = 'teams'"
+                            :class="activeTacticalTab === 'teams' ? 'bg-primary text-white shadow-xs font-bold' : 'text-text-secondary hover:bg-surface-muted font-medium'"
+                            class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        <span>Team FOP Aktif</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="activeTacticalTab === 'teams' ? 'bg-white/20 text-white' : 'bg-surface-muted text-text-muted'">
+                            {{ $activeFopTeams->count() }}
                         </span>
-                    @endif
-                </div>
-            </div>
-            <p class="metric-card-footer">Pelanggan baru terdaftar</p>
-        </div>
+                    </button>
 
-        <!-- Card 2: Perlu Aksi FOP -->
-        <div class="metric-card {{ ($stats['overdue_installation'] ?? 0) > 0 ? 'status-error' : (($stats['perlu_aksi_fop'] ?? 0) > 0 ? 'status-warning' : '') }}">
-            <div>
-                <div class="metric-card-label">
-                    <span>Perlu Aksi FOP</span>
-                    <svg class="h-4 w-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                </div>
-                <div class="metric-card-value-container">
-                    <p class="metric-card-value">{{ $stats['perlu_aksi_fop'] }}</p>
-                    @if(($stats['overdue_installation'] ?? 0) > 0)
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-sans uppercase tracking-wider bg-error-bg text-error border border-error-border animate-pulse">
-                            {{ $stats['overdue_installation'] }} Overdue
+                    <button type="button"
+                            @click="activeTacticalTab = 'survey'"
+                            :class="activeTacticalTab === 'survey' ? 'bg-primary text-white shadow-xs font-bold' : 'text-text-secondary hover:bg-surface-muted font-medium'"
+                            class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                        <span>Antrean Survey</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="activeTacticalTab === 'survey' ? 'bg-white/20 text-white' : 'bg-surface-muted text-text-muted'">
+                            {{ $surveyQueue->count() }}
                         </span>
-                    @endif
-                </div>
-            </div>
-            <p class="metric-card-footer">Survey selesai & verifikasi</p>
-        </div>
+                    </button>
 
-        <!-- Card 3: Sedang Berjalan -->
-        <div class="metric-card status-info">
-            <div>
-                <div class="metric-card-label">
-                    <span>Sedang Berjalan</span>
-                    <svg class="h-4 w-4 text-text-muted shrink-0 animate-spin" style="animation-duration: 8s" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
-                    </svg>
+                    <button type="button"
+                            @click="activeTacticalTab = 'tickets'"
+                            :class="activeTacticalTab === 'tickets' ? 'bg-primary text-white shadow-xs font-bold' : 'text-text-secondary hover:bg-surface-muted font-medium'"
+                            class="px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        <span>Tiket Gangguan & C-REQ</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="activeTacticalTab === 'tickets' ? 'bg-white/20 text-white' : 'bg-surface-muted text-text-muted'">
+                            {{ $fieldTickets->count() }}
+                        </span>
+                    </button>
                 </div>
-                <div class="metric-card-value-container">
-                    <p class="metric-card-value">{{ $stats['berjalan'] }}</p>
-                </div>
-            </div>
-            <p class="metric-card-footer">Task aktif lapangan hari ini</p>
-        </div>
 
-        <!-- Card 4: Selesai Hari Ini -->
-        <div class="metric-card status-success">
-            <div>
-                <div class="metric-card-label">
-                    <span>Selesai Hari Ini</span>
-                    <svg class="h-4 w-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-                <div class="metric-card-value-container">
-                    <p class="metric-card-value">{{ $stats['selesai_hari_ini'] }}</p>
+                <div class="hidden sm:flex items-center gap-2 pr-2 text-[10px] text-text-muted">
+                    <span class="inline-block w-2 h-2 rounded-full bg-success"></span>
+                    <span>Live Command</span>
                 </div>
             </div>
-            <p class="metric-card-footer">Target harian yang tercapai</p>
-        </div>
-    </div>
 
-    {{-- ══ Pemakaian Alat Gudang (Hari Ini) ════════════════════════ --}}
-    <div id="gudang-stats-container" class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Pemakaian Alat Gudang (Hari Ini)</p>
-            @can('warehouse_report.view')
-            <a href="{{ route('warehouse.reports.index') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
-                <span>Lihat Laporan Gudang</span>
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-            </a>
-            @endcan
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div class="metric-card status-info">
-                <div>
-                    <div class="metric-card-label"><span>Keluar dari Gudang</span></div>
-                    <div class="metric-card-value-container">
-                        <p class="metric-card-value">{{ rtrim(rtrim(number_format($gudangStats['keluar'], 2, ',', '.'), '0'), ',') }}</p>
-                    </div>
-                </div>
-                <p class="metric-card-footer">Diserahkan ke teknisi hari ini</p>
-            </div>
-            <div class="metric-card status-success">
-                <div>
-                    <div class="metric-card-label"><span>Terpakai</span></div>
-                    <div class="metric-card-value-container">
-                        <p class="metric-card-value">{{ rtrim(rtrim(number_format($gudangStats['terpakai'], 2, ',', '.'), '0'), ',') }}</p>
-                    </div>
-                </div>
-                <p class="metric-card-footer">Dipasang/dihabiskan di laporan hari ini</p>
-            </div>
-            <div class="metric-card status-warning">
-                <div>
-                    <div class="metric-card-label"><span>Sisa di Tangan Teknisi</span></div>
-                    <div class="metric-card-value-container">
-                        <p class="metric-card-value">{{ rtrim(rtrim(number_format($gudangStats['sisa_di_teknisi'], 2, ',', '.'), '0'), ',') }}</p>
-                    </div>
-                </div>
-                <p class="metric-card-footer">Belum dipakai / belum dikembalikan</p>
-            </div>
-        </div>
-    </div>
-
-    {{-- ══ Team FOP Aktif ══════════════════════════════════════════ --}}
-    <div id="fop-teams-board" class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Team FOP Aktif</p>
-            <a href="{{ route('fop-tasks.index') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
-                <span>Kelola Tim & Jadwal</span>
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-            </a>
-        </div>
-        @if($activeFopTeams->count() > 0)
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-            @foreach($activeFopTeams as $team)
-            <div @dragover.prevent="onTeamDragOver({{ $team['id'] }})"
-                 @dragleave="onTeamDragLeave({{ $team['id'] }})"
-                 @drop.prevent="onTeamDrop({{ $team['id'] }})"
-                 :class="dragOverTeamId === {{ $team['id'] }} ? 'border-primary ring-4 ring-primary/10 bg-primary/5 shadow-md scale-[1.01]' : 'border-border bg-surface shadow-xs'"
-                 class="flex flex-col border rounded-xl overflow-hidden hover:shadow-md hover:border-primary-border/60 transition-all duration-200">
-                
-                {{-- Header: nama team + tanggal --}}
-                <button type="button" @click="openTeamDetail({{ $team['id'] }})"
-                        class="text-left px-4 py-3 border-b border-border bg-surface-muted hover:bg-slate-200/50 dark:hover:bg-slate-700/50 flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
-                    <span class="text-xs font-bold text-text-main font-sans">{{ $team['name'] }}</span>
-                    <span class="text-[10px] text-text-muted font-medium font-sans bg-surface px-2 py-0.5 rounded border border-border shadow-xs">{{ $team['work_date'] }}</span>
-                </button>
-
-                {{-- Body: list task (draggable di Desktop / Tap-to-move di Mobile) --}}
-                <div class="p-3 sm:p-4 flex-1 flex flex-col gap-2 max-h-56 overflow-y-auto custom-scrollbar">
-                    @forelse($team['tasks'] as $t)
-                    <div draggable="{{ $t['draggable'] ? 'true' : 'false' }}"
-                         @dragstart="{{ $t['draggable'] ? 'true' : 'false' }} ? startTaskDrag($event, {{ $t['fop_task_id'] }}, {{ $team['id'] }}, @js($t['tugas'])) : $event.preventDefault()"
-                         @dragend="endTaskDrag()"
-                         @click="openTeamDetail({{ $team['id'] }})"
-                         :class="[
-                            'flex items-center justify-between text-[11px] rounded-lg p-2 sm:px-2.5 sm:py-2 border transition-all duration-150 shadow-xs',
-                            dragging && dragging.fopTaskId === {{ $t['fop_task_id'] }}
-                                ? 'opacity-40 border-dashed bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'
-                                : ({{ $t['draggable'] ? 'true' : 'false' }}
-                                    ? 'cursor-grab hover:bg-slate-100 dark:hover:bg-slate-700/50 border-border hover:border-primary/30'
-                                    : 'cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60')
-                         ]">
-                        <div class="flex items-center gap-2 truncate flex-1 mr-1">
-                            @if($t['draggable'])
-                            <!-- Drag Handle Icon on desktop -->
-                            <svg class="hidden md:block h-3.5 w-3.5 text-text-disabled shrink-0 cursor-grab" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8.5 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+            {{-- 1. TAB CONTENT: Team FOP Aktif (Drag & Drop Board) --}}
+            <div x-show="activeTacticalTab === 'teams'" class="flex flex-col gap-3">
+                <div id="fop-teams-board" class="flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Team FOP Aktif Hari Ini</p>
+                        <a href="{{ route('fop-tasks.index') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
+                            <span>Kelola Tim & Jadwal</span>
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                             </svg>
-                            @endif
-                            <div class="flex flex-col gap-0.5 truncate flex-1">
-                                <span class="text-text-main font-semibold truncate">{{ $t['tugas'] }}</span>
-                                <span class="text-[9px] text-text-muted truncate font-sans">{{ $t['customer_name'] }}</span>
+                        </a>
+                    </div>
+                    @if($activeFopTeams->count() > 0)
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        @foreach($activeFopTeams as $team)
+                        <div @dragover.prevent="onTeamDragOver({{ $team['id'] }})"
+                             @dragleave="onTeamDragLeave({{ $team['id'] }})"
+                             @drop.prevent="onTeamDrop({{ $team['id'] }})"
+                             :class="dragOverTeamId === {{ $team['id'] }} ? 'border-primary ring-4 ring-primary/10 bg-primary/5 shadow-md scale-[1.01]' : 'border-border bg-surface shadow-xs'"
+                             class="flex flex-col border rounded-xl overflow-hidden hover:shadow-md hover:border-primary-border/60 transition-all duration-200">
+
+                            {{-- Header: nama team + tanggal --}}
+                            <button type="button" @click="openTeamDetail({{ $team['id'] }})"
+                                    class="text-left px-4 py-3 border-b border-border bg-surface-muted hover:bg-slate-200/50 dark:hover:bg-slate-700/50 flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
+                                <div>
+                                    <span class="text-xs font-bold text-text-main font-sans">{{ $team['name'] }}</span>
+                                    <span class="text-[10px] text-text-muted font-mono block mt-0.5">{{ $team['completed_tasks'] }}/{{ $team['total_tasks'] }} Selesai ({{ $team['progress_percent'] }}%)</span>
+                                </div>
+                                <span class="text-[10px] text-text-muted font-medium font-sans bg-surface px-2 py-0.5 rounded border border-border shadow-xs">{{ $team['work_date'] }}</span>
+                            </button>
+
+                            {{-- Body: list task (draggable di Desktop / Tap-to-move di Mobile) --}}
+                            <div class="p-3 sm:p-4 flex-1 flex flex-col gap-2 max-h-56 overflow-y-auto custom-scrollbar">
+                                @forelse($team['tasks'] as $t)
+                                <div draggable="{{ $t['draggable'] ? 'true' : 'false' }}"
+                                     @dragstart="{{ $t['draggable'] ? 'true' : 'false' }} ? startTaskDrag($event, {{ $t['fop_task_id'] }}, {{ $team['id'] }}, @js($t['tugas'])) : $event.preventDefault()"
+                                     @dragend="endTaskDrag()"
+                                     @click="openTeamDetail({{ $team['id'] }})"
+                                     :class="[
+                                        'flex items-center justify-between text-[11px] rounded-lg p-2 sm:px-2.5 sm:py-2 border transition-all duration-150 shadow-xs',
+                                        dragging && dragging.fopTaskId === {{ $t['fop_task_id'] }}
+                                            ? 'opacity-40 border-dashed bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'
+                                            : ({{ $t['draggable'] ? 'true' : 'false' }}
+                                                ? 'cursor-grab hover:bg-slate-100 dark:hover:bg-slate-700/50 border-border hover:border-primary/30'
+                                                : 'cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60')
+                                     ]">
+                                    <div class="flex items-center gap-2 truncate flex-1 mr-1">
+                                        @if($t['draggable'])
+                                        <svg class="hidden md:block h-3.5 w-3.5 text-text-disabled shrink-0 cursor-grab" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M8.5 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-10 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm5 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+                                        </svg>
+                                        @endif
+                                        <div class="flex flex-col gap-0.5 truncate flex-1">
+                                            <span class="text-text-main font-semibold truncate">{{ $t['tugas'] }}</span>
+                                            <span class="text-[9px] text-text-muted truncate font-sans">{{ $t['customer_name'] }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-1.5 shrink-0 ml-1">
+                                        <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border font-sans"
+                                            style="{{ $t['status_style'] }}">
+                                            {{ $t['status'] }}
+                                        </span>
+
+                                        @if($t['draggable'] && $activeFopTeams->count() > 1)
+                                        <button type="button"
+                                                @click.stop="openMobileSwitchTeamModal({{ $t['fop_task_id'] }}, {{ $team['id'] }}, @js($t['tugas']))"
+                                                class="md:hidden p-1 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 cursor-pointer shadow-2xs"
+                                                title="Pindahkan ke Tim Lain">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                        </button>
+                                        @endif
+                                    </div>
+                                </div>
+                                @empty
+                                <div class="flex flex-col items-center justify-center py-6 text-text-muted">
+                                    <svg class="h-6 w-6 text-text-disabled mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5" />
+                                    </svg>
+                                    <p class="text-[10px] italic font-sans">Belum ada pengerjaan hari ini</p>
+                                </div>
+                                @endforelse
+                            </div>
+
+                            {{-- Footer: avatar teknisi + total --}}
+                            <button type="button" @click="openTeamDetail({{ $team['id'] }})"
+                                    class="text-left px-4 py-3 border-t border-border bg-surface hover:bg-surface-muted flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
+                                <div class="flex items-center -space-x-2">
+                                    @foreach($team['members']->take(4) as $member)
+                                    <span class="h-6 w-6 rounded-full bg-primary text-white border-2 border-surface flex items-center justify-center text-[9px] font-bold tracking-tight font-sans shadow-xs" title="{{ $member['name'] }}">
+                                        {{ $member['initials'] }}
+                                    </span>
+                                    @endforeach
+                                    @if($team['members']->count() > 4)
+                                    <span class="h-6 w-6 rounded-full bg-slate-200 text-slate-700 dark:text-slate-300 border-2 border-surface flex items-center justify-center text-[9px] font-bold font-sans shadow-xs">
+                                        +{{ $team['members']->count() - 4 }}
+                                    </span>
+                                    @endif
+                                </div>
+                                <span class="text-[10px] text-text-muted font-sans font-medium">{{ $team['members']->count() }} Teknisi · {{ $team['total_tasks'] }} Task</span>
+                            </button>
+                        </div>
+                        @endforeach
+                    </div>
+                    @else
+                    <div class="bg-surface border border-border rounded-xl flex flex-col items-center justify-center py-12 text-text-muted shadow-xs">
+                        <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <p class="text-sm font-medium font-sans">Belum ada tim dengan task aktif.</p>
+                        <p class="text-xs text-text-muted mt-0.5 font-sans">Jadwalkan task di Task FOP untuk mengaktifkan tim.</p>
+                    </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- 2. TAB CONTENT: Antrean Survey (Preserved for compatibility) --}}
+            <div x-show="activeTacticalTab === 'survey'" class="flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Antrean Survey (Batas Respon 1×24 Jam)</p>
+                </div>
+
+                <div id="antrian-survey-container" class="bg-surface border border-border rounded-xl shadow-xs overflow-hidden">
+                    @if($surveyQueue->count() > 0)
+
+                    {{-- Mobile Card List (< 768px) --}}
+                    <div class="block md:hidden divide-y divide-border">
+                        @foreach($surveyQueue as $item)
+                        <div class="p-3.5 flex flex-col gap-2">
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <p class="font-bold text-text-main text-xs font-sans">{{ $item['name'] }}</p>
+                                    <p class="text-[10px] font-mono text-text-muted font-semibold">{{ $item['cid'] }} · {{ $item['pop_name'] }}</p>
+                                </div>
+                                <a href="{{ route('customers.show', $item['id']) }}"
+                                   class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs">
+                                    <span>Detail</span>
+                                    <svg class="h-3 w-3 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                </a>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
+                                <span class="text-[10px] text-text-muted">{{ $item['registered_at'] }}</span>
+                                <x-countdown-timer
+                                    deadline="{{ $item['deadline_iso'] }}"
+                                    :total-seconds="$item['total_seconds']"
+                                    label="Sisa Waktu"
+                                    :compact="true"
+                                />
                             </div>
                         </div>
-                        
-                        <div class="flex items-center gap-1.5 shrink-0 ml-1">
-                            <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border font-sans"
-                                style="{{ $t['status_style'] }}">
-                                {{ $t['status'] }}
-                            </span>
-                            
-                            {{-- Mobile Tap-to-Move Button --}}
-                            @if($t['draggable'] && $activeFopTeams->count() > 1)
-                            <button type="button"
-                                    @click.stop="openMobileSwitchTeamModal({{ $t['fop_task_id'] }}, {{ $team['id'] }}, @js($t['tugas']))"
-                                    class="md:hidden p-1 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 cursor-pointer shadow-2xs"
-                                    title="Pindahkan ke Tim Lain">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                            </button>
-                            @endif
-                        </div>
-                    </div>
-                    @empty
-                    <div class="flex flex-col items-center justify-center py-6 text-text-muted">
-                        <svg class="h-6 w-6 text-text-disabled mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5" />
-                        </svg>
-                        <p class="text-[10px] italic font-sans">Belum ada pengerjaan hari ini</p>
-                    </div>
-                    @endforelse
-                </div>
-
-                {{-- Footer: avatar teknisi + total --}}
-                <button type="button" @click="openTeamDetail({{ $team['id'] }})"
-                        class="text-left px-4 py-3 border-t border-border bg-surface hover:bg-surface-muted flex items-center justify-between shrink-0 cursor-pointer transition-colors duration-150">
-                    <div class="flex items-center -space-x-2">
-                        @foreach($team['members']->take(4) as $member)
-                        <span class="h-6 w-6 rounded-full bg-primary text-white border-2 border-surface flex items-center justify-center text-[9px] font-bold tracking-tight font-sans shadow-xs" title="{{ $member['name'] }}">
-                            {{ $member['initials'] }}
-                        </span>
                         @endforeach
-                        @if($team['members']->count() > 4)
-                        <span class="h-6 w-6 rounded-full bg-slate-200 text-slate-700 dark:text-slate-300 border-2 border-surface flex items-center justify-center text-[9px] font-bold font-sans shadow-xs">
-                            +{{ $team['members']->count() - 4 }}
-                        </span>
-                        @endif
                     </div>
-                    <span class="text-[10px] text-text-muted font-sans font-medium">{{ $team['members']->count() }} Teknisi · {{ $team['total_tasks'] }} Task</span>
-                </button>
+
+                    {{-- Desktop Table (>= 768px) --}}
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-border bg-surface-muted">
+                                    <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-2/5">Pelanggan</th>
+                                    <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">POP Cabang</th>
+                                    <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Terdaftar</th>
+                                    <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Sisa Waktu Survey</th>
+                                    <th class="px-4 py-3 w-[80px]"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border">
+                                @foreach($surveyQueue as $item)
+                                <tr class="hover:bg-surface-muted/50 transition-colors duration-150">
+                                    <td class="px-4 py-3">
+                                        <div class="flex flex-col gap-0.5">
+                                            <p class="font-bold text-text-main text-xs font-sans">{{ $item['name'] }}</p>
+                                            <p class="text-[10px] font-mono text-text-muted font-semibold tracking-tight">{{ $item['cid'] }}</p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-text-secondary text-xs font-sans font-medium">{{ $item['pop_name'] }}</td>
+                                    <td class="px-4 py-3 text-text-muted text-xs font-sans">{{ $item['registered_at'] }}</td>
+                                    <td class="px-4 py-3">
+                                        <x-countdown-timer
+                                            deadline="{{ $item['deadline_iso'] }}"
+                                            :total-seconds="$item['total_seconds']"
+                                            label="Sisa Waktu"
+                                        />
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <a href="{{ route('customers.show', $item['id']) }}"
+                                           class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs transition-all duration-150 cursor-pointer">
+                                            <span>Detail</span>
+                                            <svg class="h-3.5 w-3.5 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </a>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @else
+                    <div class="flex flex-col items-center justify-center py-12 text-text-muted">
+                        <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p class="text-sm font-medium font-sans">Tidak ada pelanggan dalam antrean survey.</p>
+                        <p class="text-xs text-text-muted mt-0.5 font-sans">Semua pendaftaran survey telah dijadwalkan.</p>
+                    </div>
+                    @endif
+                </div>
             </div>
-            @endforeach
+
+            {{-- 3. TAB CONTENT: Tiket Gangguan & C-REQ --}}
+            <div x-show="activeTacticalTab === 'tickets'" class="flex flex-col gap-3">
+                @include('fop.partials._tickets_telemetry')
+            </div>
+
         </div>
-        @else
-        <div class="bg-surface border border-border rounded-xl flex flex-col items-center justify-center py-12 text-text-muted shadow-xs">
-            <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <p class="text-sm font-medium font-sans">Belum ada tim dengan task aktif.</p>
-            <p class="text-xs text-text-muted mt-0.5 font-sans">Jadwalkan task di Task FOP untuk mengaktifkan tim.</p>
+
+        {{-- ── Right Column (Telemetry & Resources - 5 Cols / ~42%) ──── --}}
+        <div class="xl:col-span-5 flex flex-col gap-4">
+
+            {{-- Radar Teknisi & Workload Status --}}
+            @include('fop.partials._technician_radar')
+
+            {{-- Pemakaian Material & Modem Transit --}}
+            @include('fop.partials._inventory_telemetry')
+
+            {{-- Rincian Pemakaian Material & Alat Kerja Hari Ini (siapa, pelanggan/infra) --}}
+            @include('fop.partials._material_usage_detail')
+
+            {{-- Ringkasan Titik Jaringan Distribusi (ODC / ODP) --}}
+            @include('fop.partials._distribution_glance')
+
         </div>
-        @endif
+
     </div>
-    
+
+    {{-- JSON Payload for Alpine Teams State --}}
     <script type="application/json" id="fop-teams-json">@json($activeFopTeams)</script>
 
     {{-- ══ Mobile Step 1 Modal: Pilih Tim Tujuan untuk Switch ══ --}}
@@ -302,7 +372,7 @@
                 <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider">Pilih Tim Tujuan</label>
                 <div class="flex flex-col gap-2">
                     <template x-for="team in teamsData.filter(t => t.id !== mobileSwitchSelectTeamModal.fromTeamId)" :key="team.id">
-                        <button type="button" 
+                        <button type="button"
                                 @click="selectTargetTeamForMobileSwitch(team.id)"
                                 class="w-full text-left p-3 border border-border rounded-lg bg-surface hover:bg-surface-muted transition-colors flex items-center justify-between cursor-pointer">
                             <div>
@@ -377,7 +447,7 @@
                                     <a :href="t.task_id ? `{{ url('/tasks') }}/${t.task_id}` : '#'"
                                        class="block p-3.5 hover:bg-surface-muted transition-colors duration-150 cursor-pointer"
                                        :class="!t.task_id ? 'pointer-events-none opacity-60' : ''">
-                                        
+
                                         <div class="flex items-start justify-between gap-2 mb-2">
                                             <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border font-sans"
                                                   :class="t.badge_classes"
@@ -464,8 +534,8 @@
 
             <div class="p-5 space-y-4 font-sans overflow-y-auto flex-1 custom-scrollbar">
                 <p class="text-xs text-text-secondary leading-relaxed bg-primary-soft/50 p-3 rounded-lg border border-primary-border">
-                    Pindahkan task <span class="font-bold text-text-main font-mono" x-text="switchTeamModal.tugas"></span> dari 
-                    <span class="font-bold text-text-main" x-text="switchTeamModal.fromTeamName"></span> ke 
+                    Pindahkan task <span class="font-bold text-text-main font-mono" x-text="switchTeamModal.tugas"></span> dari
+                    <span class="font-bold text-text-main" x-text="switchTeamModal.fromTeamName"></span> ke
                     <span class="font-bold text-text-main" x-text="switchTeamModal.toTeamName"></span>.
                 </p>
 
@@ -520,238 +590,13 @@
         </div>
     </div>
 
-    {{-- ══ Antrean Survey ═══════════════════════════════════════════ --}}
-    <div class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Antrean Survey</p>
-            <span class="text-xs text-text-muted font-medium font-sans bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded shadow-2xs">Batas respon 1×24 jam</span>
-        </div>
-        
-        <div id="antrian-survey-container" class="bg-surface border border-border rounded-xl shadow-xs overflow-hidden">
-            @if($surveyQueue->count() > 0)
-            
-            {{-- Mobile Card List (< 768px) --}}
-            <div class="block md:hidden divide-y divide-border">
-                @foreach($surveyQueue as $item)
-                <div class="p-3.5 flex flex-col gap-2">
-                    <div class="flex items-start justify-between gap-2">
-                        <div>
-                            <p class="font-bold text-text-main text-xs font-sans">{{ $item['name'] }}</p>
-                            <p class="text-[10px] font-mono text-text-muted font-semibold">{{ $item['cid'] }} · {{ $item['pop_name'] }}</p>
-                        </div>
-                        <a href="{{ route('customers.show', $item['id']) }}"
-                           class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs">
-                            <span>Detail</span>
-                            <svg class="h-3 w-3 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
-                        </a>
-                    </div>
-                    <div class="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
-                        <span class="text-[10px] text-text-muted">{{ $item['registered_at'] }}</span>
-                        <x-countdown-timer
-                            deadline="{{ $item['deadline_iso'] }}"
-                            :total-seconds="$item['total_seconds']"
-                            label="Sisa Waktu"
-                            :compact="true"
-                        />
-                    </div>
-                </div>
-                @endforeach
-            </div>
-
-            {{-- Desktop Table (>= 768px) --}}
-            <div class="hidden md:block overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b border-border bg-surface-muted">
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-2/5">Pelanggan</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">POP Cabang</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Terdaftar</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Sisa Waktu Survey</th>
-                            <th class="px-4 py-3 w-[80px]"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @foreach($surveyQueue as $item)
-                        <tr class="hover:bg-surface-muted/50 transition-colors duration-150">
-                            <td class="px-4 py-3">
-                                <div class="flex flex-col gap-0.5">
-                                    <p class="font-bold text-text-main text-xs font-sans">{{ $item['name'] }}</p>
-                                    <p class="text-[10px] font-mono text-text-muted font-semibold tracking-tight">{{ $item['cid'] }}</p>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-text-secondary text-xs font-sans font-medium">{{ $item['pop_name'] }}</td>
-                            <td class="px-4 py-3 text-text-muted text-xs font-sans">{{ $item['registered_at'] }}</td>
-                            <td class="px-4 py-3">
-                                <x-countdown-timer
-                                    deadline="{{ $item['deadline_iso'] }}"
-                                    :total-seconds="$item['total_seconds']"
-                                    label="Sisa Waktu"
-                                />
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <a href="{{ route('customers.show', $item['id']) }}"
-                                   class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 border border-border rounded-lg bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main shadow-2xs transition-all duration-150 cursor-pointer">
-                                    <span>Detail</span>
-                                    <svg class="h-3.5 w-3.5 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </a>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            @else
-            <div class="flex flex-col items-center justify-center py-12 text-text-muted">
-                <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p class="text-sm font-medium font-sans">Tidak ada pelanggan dalam antrean survey.</p>
-                <p class="text-xs text-text-muted mt-0.5 font-sans">Semua pendaftaran survey telah dijadwalkan.</p>
-            </div>
-            @endif
-        </div>
-    </div>
-
-    {{-- ══ Status Teknisi ═══════════════════════════════════════════ --}}
-    <div class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Status Teknisi</p>
-        </div>
-        <div id="status-teknisi-container" class="bg-surface border border-border rounded-xl shadow-xs overflow-hidden">
-            @if($teknisiList->count() > 0)
-            
-            {{-- Mobile List (< 768px) --}}
-            <div class="block md:hidden divide-y divide-border">
-                @foreach($teknisiList as $tek)
-                <div class="p-3.5 flex flex-col gap-2">
-                    <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2.5">
-                            <div class="h-7 w-7 rounded-full bg-primary-soft text-primary border border-primary-border flex items-center justify-center text-[10px] font-bold shrink-0 font-sans shadow-2xs">
-                                {{ $tek['initials'] }}
-                            </div>
-                            <div>
-                                <span class="font-bold text-text-main text-xs font-sans block">{{ $tek['name'] }}</span>
-                                <span class="text-[10px] font-mono font-semibold text-text-secondary">{{ $tek['task_count'] }} Task</span>
-                                @if(($tek['overdue_count'] ?? 0) > 0)
-                                    <span class="text-[9px] font-bold text-error">({{ $tek['overdue_count'] }} tertunda)</span>
-                                @endif
-                            </div>
-                        </div>
-
-                        @if($tek['status'] === 'aktif')
-                            <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-success-bg text-success border-success-border">
-                                <span class="h-1.5 w-1.5 rounded-full bg-current animate-pulse"></span>
-                                <span>Aktif</span>
-                            </span>
-                        @elseif($tek['status'] === 'terjadwal')
-                            <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-info-bg text-info border-info-border">
-                                <span>Terjadwal</span>
-                            </span>
-                        @else
-                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full border border-border bg-slate-50 dark:bg-slate-800/50 text-text-muted font-sans">
-                                <span>Standby</span>
-                            </span>
-                        @endif
-                    </div>
-                    
-                    @if($tek['location'] && $tek['location'] !== '-')
-                    <div class="flex items-center gap-1.5 text-[11px] text-text-muted pt-1 border-t border-border/50">
-                        <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span class="truncate">{{ $tek['location'] }}</span>
-                    </div>
-                    @endif
-                </div>
-                @endforeach
-            </div>
-
-            {{-- Desktop Table (>= 768px) --}}
-            <div class="hidden md:block overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b border-border bg-surface-muted">
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-2/5">Teknisi</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Status</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Task Aktif Hari Ini</th>
-                            <th class="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans w-1/5">Lokasi Terakhir</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @foreach($teknisiList as $tek)
-                        <tr class="hover:bg-surface-muted/50 transition-colors duration-150">
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-2.5">
-                                    <div class="h-7 w-7 rounded-full bg-primary-soft text-primary border border-primary-border flex items-center justify-center text-[10px] font-bold shrink-0 font-sans shadow-2xs">
-                                        {{ $tek['initials'] }}
-                                    </div>
-                                    <span class="font-bold text-text-main text-xs font-sans">{{ $tek['name'] }}</span>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                @if($tek['status'] === 'aktif')
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-success-bg text-success border-success-border">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-current animate-pulse"></span>
-                                        <span>Aktif</span>
-                                    </span>
-                                @elseif($tek['status'] === 'terjadwal')
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-info-bg text-info border-info-border">
-                                        <span>Terjadwal</span>
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full border border-border bg-slate-50 dark:bg-slate-800/50 text-text-muted font-sans">
-                                        <span>Standby</span>
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 text-xs font-semibold font-mono text-text-secondary">
-                                {{ $tek['task_count'] }} Task
-                                @if(($tek['overdue_count'] ?? 0) > 0)
-                                    <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border border-error-border bg-error-bg text-error font-sans"
-                                          title="Task yang jadwalnya sudah lewat">
-                                        {{ $tek['overdue_count'] }} tertunda
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 text-text-secondary text-xs font-sans">
-                                @if($tek['location'] && $tek['location'] !== '-')
-                                    <div class="flex items-center gap-1.5">
-                                        <svg class="h-3.5 w-3.5 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                        <span class="truncate max-w-[280px]" title="{{ $tek['location'] }}">{{ $tek['location'] }}</span>
-                                    </div>
-                                @else
-                                    <span class="text-text-disabled italic font-light font-sans">—</span>
-                                @endif
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            @else
-            <div class="flex flex-col items-center justify-center py-12 text-text-muted border-t border-border">
-                <svg class="h-10 w-10 text-text-disabled mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <p class="text-sm font-medium font-sans">Tidak ada teknisi terdaftar di POP wilayah Anda.</p>
-                <p class="text-xs text-text-muted mt-0.5 font-sans">Daftarkan teknisi baru atau sesuaikan wilayah POP pada Manajemen User.</p>
-            </div>
-            @endif
-        </div>
-    </div>
-
 </div>
 
 @push('scripts')
 <script>
 function fopDashboardHandler() {
     return {
+        activeTacticalTab: 'teams',
         teamsData: @json($activeFopTeams),
         teamDetail: { open: false, data: null },
         dragOverTeamId: null,
@@ -816,6 +661,27 @@ function fopDashboardHandler() {
             this.dragging = { fopTaskId, fromTeamId, tugas };
             event.dataTransfer.effectAllowed = 'move';
             event.dataTransfer.setData('text/plain', String(fopTaskId));
+        },
+
+        // Native HTML5 drag & drop TIDAK auto-scroll window begitu card
+        // tujuan (mis. Team 24) ada di luar viewport — cursor cuma mengirim
+        // event `dragover`, bukan `mousemove`, jadi gak ada cara lain
+        // mendeteksi posisi kursor saat drag berlangsung selain listener ini.
+        // Dipasang sekali di window (lihat initEchoListeners/init), jalan
+        // terus selama `dragging` truthy, berhenti otomatis begitu
+        // endTaskDrag() mengosongkan `dragging`.
+        autoScrollOnDragOver(event) {
+            if (!this.dragging) return;
+            const edge = 90;
+            const maxSpeed = 22;
+            const y = event.clientY;
+            const vh = window.innerHeight;
+
+            if (y < edge) {
+                window.scrollBy(0, -Math.ceil(((edge - y) / edge) * maxSpeed));
+            } else if (y > vh - edge) {
+                window.scrollBy(0, Math.ceil(((y - (vh - edge)) / edge) * maxSpeed));
+            }
         },
 
         endTaskDrag() {
@@ -918,6 +784,7 @@ function fopDashboardHandler() {
 
         init() {
             this.initEchoListeners();
+            window.addEventListener('dragover', (e) => this.autoScrollOnDragOver(e));
         },
 
         initEchoListeners() {
@@ -947,7 +814,7 @@ function fopDashboardHandler() {
                 const html = await res.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                
+
                 ['stat-cards-container', 'status-teknisi-container'].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
@@ -964,7 +831,7 @@ function fopDashboardHandler() {
                 const html = await res.text();
                 const doc = new DOMParser().parseFromString(html, 'text/html');
 
-                ['stat-cards-container', 'antrian-survey-container', 'status-teknisi-container'].forEach(id => {
+                ['stat-cards-container', 'antrian-survey-container', 'status-teknisi-container', 'emergency-ticker-container', 'customer-pipeline-funnel'].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
                     if (el && newEl) el.innerHTML = newEl.innerHTML;

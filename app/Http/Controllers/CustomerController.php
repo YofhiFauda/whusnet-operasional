@@ -49,9 +49,11 @@ use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
 use App\Services\BillingPeriodWaiverService;
+use App\Services\CableCrossingService;
 use App\Services\CustomerBalanceService;
 use App\Services\CustomerCidService;
 use App\Services\CustomerDeviceProfileService;
+use App\Services\CustomerPackageService;
 use App\Services\CustomerRelocationService;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
@@ -788,7 +790,7 @@ class CustomerController extends Controller
         // eager-load: Model::preventLazyLoading() aktif di luar production
         // (AppServiceProvider), akses $customer->customerDevice tanpa ini
         // meledak di test & lokal.
-        $customer->load(['customerDevice', 'customerTechnicalDetail']);
+        $customer->load(['customerDevice', 'customerTechnicalDetail', 'additionalDevices.inventorySerial']);
 
         // Nilai awal step 7 = nilai yang tampil di Detail Pelanggan (urutan
         // cadangan Gudang → customer_devices → detail teknis → kolom lama),
@@ -1082,8 +1084,15 @@ class CustomerController extends Controller
             $validated['foto_kontrak'] = FileUploadService::uploadInstallationPhoto($request->file('foto_kontrak'), $customer, 'kontrak');
         }
 
+        // Paket SEBELUM transaksi — dibandingkan dengan paket baru di langkah
+        // 3 untuk tahu apakah ini benar-benar ganti paket (bukan sekadar
+        // save ulang form dengan paket yang sama). $customer->internet_package_id
+        // sendiri ditulis ulang oleh $customer->update($validated) di langkah 1,
+        // jadi harus ditangkap SEBELUM transaksi jalan.
+        $currentPackageId = $customer->customerService?->internet_package_id;
+
         try {
-            DB::transaction(function () use ($customer, $validated, $serviceStatus) {
+            DB::transaction(function () use ($customer, $validated, $serviceStatus, $currentPackageId) {
                 // 1. Update customer record. CID ikut dibuat ulang di sini oleh
                 // CustomerObserver::updating() kalau POP/Mini POP/Distribusi
                 // berubah atau CID masih kosong (ADHOC-107 R3) — controller tidak
@@ -1183,6 +1192,15 @@ class CustomerController extends Controller
                 if (! empty($validated['internet_package_id'])) {
                     $package = InternetPackage::findOrFail($validated['internet_package_id']);
 
+                    // Guard yang sama dipakai CustomerPackageService::change() —
+                    // ganti paket (termasuk dari Edit Pelanggan ini) diblok kalau
+                    // perangkat tambahan pelanggan melebihi batas paket baru.
+                    // Cuma dicek kalau paketnya BENAR-BENAR berubah — save ulang
+                    // form dengan paket yang sama tidak boleh ketahan guard ini.
+                    if ($package->id !== $currentPackageId) {
+                        app(CustomerPackageService::class)->assertAdditionalDevicesWithinLimit($customer, $package);
+                    }
+
                     $monthlyPrice = (float) $package->monthly_price;
                     $discount = (float) ($validated['discount_amount'] ?? 0.00);
                     $ppn = (float) ($validated['tax_percent'] ?? 0.00);
@@ -1253,6 +1271,12 @@ class CustomerController extends Controller
             // Transaksi sudah di-rollback; tampilkan sebagai error validasi,
             // bukan halaman 500.
             return back()->withErrors(['pop_id' => $e->getMessage()])->withInput();
+        } catch (\RuntimeException $e) {
+            // CustomerPackageService::assertAdditionalDevicesWithinLimit()
+            // menolak ganti paket — pelanggan punya perangkat tambahan
+            // melebihi batas paket baru. Transaksi sudah di-rollback;
+            // tampilkan sebagai error validasi, bukan halaman 500.
+            return back()->withErrors(['internet_package_id' => $e->getMessage()])->withInput();
         }
 
         foreach ($originalFiles as $field => $path) {
@@ -1343,7 +1367,7 @@ class CustomerController extends Controller
             'pop',
             'collector',
             'customerAddress',
-            'customerService',
+            'customerService.internetPackage',
             'customerTechnicalDetail',
             // .role ikut dimuat: tabel "Ringkasan Waktu & Penanggung Jawab" di tab
             // Ringkasan menampilkan role tiap PIC.
@@ -1357,6 +1381,9 @@ class CustomerController extends Controller
             'installations.technician2',
             'installations.technician3',
             'customerDevice',
+            // inventorySerial ikut dimuat: badge "Gudang"/"Tanpa Stok" per baris
+            // perangkat tambahan membacanya; tanpa ini Detail jadi N+1 per device.
+            'additionalDevices.inventorySerial',
             'documents.uploader',
             'invoices' => function ($query) {
                 $query->with('creator')->orderBy('billing_period', 'desc');
@@ -1676,11 +1703,43 @@ class CustomerController extends Controller
             ->limit(15)
             ->get();
 
+        // Lokasi jaringan tepat pelanggan ini (OLT -> Slot -> PON -> ODP -> Port):
+        // tanpa ini petugas harus menebak-nebak lewat drill-down manual di
+        // Master Node/Peta kalau satu Cabang punya puluhan ODP (temuan user
+        // 22-10-2026). Satu sumber: assignment port ODP aktif + koneksi PON
+        // aktif yang nge-uplink ke ODP itu — SAMA data yang dipakai proyeksi
+        // hierarki, bukan dihitung ulang dengan logic lain.
+        $activePortAssignment = $customer->portAssignments()
+            ->whereNull('released_at')
+            ->with('port.node.nodeType', 'port.node.anchorPop.parent')
+            ->latest('id')->first();
+        $customerNetworkLocation = null;
+        if ($activePortAssignment?->port?->node !== null) {
+            $odpNode = $activePortAssignment->port->node;
+            // ODP menggantung ke PON lewat parent_id; PON anak Slot, Slot anak OLT.
+            // Tabel `infrastructure_connections`/slots/ports lama sudah dibuang
+            // (Task 14), jadi rantai ini dibaca langsung dari pohon node.
+            $pon = $odpNode->uplinkPon();
+            $slot = $pon?->parent;
+            $customerNetworkLocation = [
+                'odp' => $odpNode,
+                'port_number' => $activePortAssignment->port->number,
+                'olt' => $slot?->parent,
+                'slot' => $slot,
+                'pon' => $pon,
+            ];
+        }
+
+        // Kabel melintang jalan yang belum selesai (ADHOC-205) — badge di header.
+        $openCableCrossingCount = app(CableCrossingService::class)->countOpenFor($customer);
+
         return view('customers.show', compact(
             'customer',
+            'openCableCrossingCount',
             'displayId',
             'displayIdLabel',
             'completeness',
+            'customerNetworkLocation',
             'timeline',
             'workflowStages',
             'timelineAnomaly',
@@ -3434,7 +3493,13 @@ class CustomerController extends Controller
                         ? InvoiceStatus::BELUM_DIBAYAR->value
                         : ($newRemaining <= 0 ? InvoiceStatus::LUNAS->value : InvoiceStatus::SEBAGIAN->value);
 
-                    $invoice->update([
+                    // updateQuietly() — Invoice pakai RecordsAuditLogs (default
+                    // ['updated','deleted']); ->update() biasa di loop ribuan
+                    // baris pembayaran legacy numpuk satu AuditLog per baris.
+                    // Ringkasan batch sudah dicatat sendiri (AuditLog 'confirm'
+                    // di bawah), sama alasannya dengan updateQuietly() pelanggan
+                    // di atas.
+                    $invoice->updateQuietly([
                         'paid_amount' => $newPaidAmount,
                         'remaining_amount' => $newRemaining,
                         'invoice_status' => $newStatus,

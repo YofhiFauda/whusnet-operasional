@@ -52,7 +52,7 @@ class InventoryIssueService
         usort($lines, fn ($a, $b) => $a['item_id'] <=> $b['item_id']);
 
         return DB::transaction(function () use ($cabang, $technician, $lines, $actor) {
-            $referenceNumber = $this->generateReferenceNumber();
+            $referenceNumber = app(NumberSequenceService::class)->ledgerNumber('ISS');
             $transactions = [];
 
             foreach ($lines as $line) {
@@ -269,25 +269,6 @@ class InventoryIssueService
             ->value('unit_price_snapshot');
 
         return $price !== null ? (float) $price : null;
-    }
-
-    /**
-     * `ISS-YYYYMMDD-NNNNNN` — lihat docblock sama persis di
-     * `InventoryReceiveService::generateReferenceNumber()` buat alasan
-     * lengkap (tanggal penuh buat dibaca, reset counter per BULAN bukan per
-     * hari, keputusan eksplisit user 2026-09-03).
-     */
-    private function generateReferenceNumber(): string
-    {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
-
-        $lastNum = InventoryTransaction::where('reference_number', 'like', "ISS-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('ISS-%s-%06d', $today, $lastNum + 1);
     }
 
     /**

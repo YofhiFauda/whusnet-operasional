@@ -221,6 +221,52 @@ class InstallationSpeedtestActivationGateTest extends TestCase
         $page->assertSee($installation->installation_photo);
     }
 
+    /**
+     * Koreksi user (2026-10-12): Material Terpakai/Perangkat Pasif OPSIONAL
+     * di semua laporan, termasuk Pemasangan — dulu Fase 6 (Laporan Speedtest)
+     * tetap terkunci tanpa minimal 1 baris material walau 3 foto sudah
+     * lengkap. Sekarang foto (installation/contract/signature) SATU-SATUNYA
+     * syarat buka Fase 6 — material murni opsional, sama seperti Maintenance.
+     */
+    public function test_store_pemasangan_unlocks_speedtest_tanpa_material_karena_opsional(): void
+    {
+        Storage::fake('public');
+
+        [$customer, $technician, $task, $pusat, $cabang] = $this->setupInProgressInstallation();
+
+        $response = $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), [
+            'device_type' => 'ont',
+            'connection_mode' => 'pppoe',
+            'wifi_ssid' => 'WHUSNET_NO_MATERIAL',
+            'wifi_password' => 'password123',
+            'selected_inventory_serial_id' => $this->issueActiveSerialTo($technician, $pusat, $cabang, 'ZTEGC7654321')->id,
+            'odp_number' => 'ODP-01',
+            'odp_port' => '1',
+            'installation_photo' => UploadedFile::fake()->image('installation.jpg'),
+            'contract_photo' => UploadedFile::fake()->image('contract.jpg'),
+            'signature_photo' => UploadedFile::fake()->image('signature.jpg'),
+            // 'materials' sengaja tidak dikirim sama sekali.
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+
+        // Fase 6 (Laporan Speedtest) terbuka walau tanpa material — baik di
+        // UI (panel Aktivasi hilang) maupun server (submit speedtest lolos).
+        $page = $this->actingAs($technician)->get(route('customers.installation.report', $customer->id));
+        $page->assertDontSee('Aktivasi Laporan Speedtest');
+
+        $speedtestResponse = $this->actingAs($technician)->post(route('customers.installation.speedtest', $customer->id), [
+            'test_download' => 20,
+            'test_upload' => 10,
+            'speedtest_photo' => UploadedFile::fake()->image('speedtest.jpg'),
+        ]);
+        $speedtestResponse->assertSessionHasNoErrors();
+
+        $customer->refresh();
+        $this->assertEquals('verification_admin', $customer->status);
+    }
+
     public function test_store_speedtest_completes_task_and_transitions_workflow(): void
     {
         Storage::fake('public');

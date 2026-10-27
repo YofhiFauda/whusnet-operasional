@@ -32,9 +32,9 @@ class TaskService
      * @param  array  $data  Validated data dari TaskRequest
      * @param  User  $actor  User yang membuat task (FOP)
      */
-    public function create(array $data, User $actor): Task
+    public function create(array $data, User $actor, ?FopTask $sourceFopTask = null): Task
     {
-        $task = DB::transaction(function () use ($data, $actor) {
+        $task = DB::transaction(function () use ($data, $actor, $sourceFopTask) {
             $taskType = TaskType::from($data['task_type']);
 
             $memberIds = $data['team_member_ids'] ?? [];
@@ -66,6 +66,14 @@ class TaskService
                     'user_id' => $userId,
                     'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
                 ]);
+            }
+
+            if (in_array($taskType, [TaskType::OREQ, TaskType::INFR], true)) {
+                if ($sourceFopTask !== null) {
+                    $sourceFopTask->update(['task_id' => $task->id]);
+                } else {
+                    app(FopTaskProvisioningService::class)->ensureForTask($task);
+                }
             }
 
             // Pencatatan pembuatan TIDAK ditulis di sini. Model Task memakai trait
@@ -109,12 +117,15 @@ class TaskService
         $queuedTask = $this->findQueuedTaskFor($fopTask);
 
         if (! $queuedTask) {
-            return $this->create($data, $actor);
+            return $this->create($data, $actor, $fopTask);
         }
 
         $task = DB::transaction(function () use ($queuedTask, $data, $actor) {
             $memberIds = $data['team_member_ids'] ?? [];
             $scheduledAt = $data['scheduled_at'] ?? null;
+            $status = (! empty($memberIds) && ! empty($scheduledAt))
+                ? TaskStatus::TERJADWAL->value
+                : TaskStatus::PENDING->value;
 
             // Kolom yang di-set sama persis dengan `create()` — Task antrean
             // lahir tanpa fop_id & sla_minutes (bukan lewat service ini), dan
@@ -123,9 +134,7 @@ class TaskService
                 'pop_id' => $data['pop_id'],
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
-                'status' => (! empty($memberIds) && ! empty($scheduledAt))
-                    ? TaskStatus::TERJADWAL->value
-                    : TaskStatus::PENDING->value,
+                'status' => $status,
                 'scheduled_at' => $scheduledAt,
                 'fop_id' => $actor->id,
                 'sla_minutes' => $queuedTask->task_type->slaMinutes(),
@@ -194,9 +203,7 @@ class TaskService
             // Ambil roster lama SEBELUM disync ulang — dipakai buat deteksi
             // teknisi yang di-drop, yang gak akan pernah ke-notify lewat
             // notifyTeam() karena method itu iterasi tim BARU.
-            $oldMemberIds = isset($data['team_member_ids'])
-                ? $task->teamMembers()->pluck('user_id')->all()
-                : [];
+            $oldMemberIds = $task->teamMembers()->pluck('user_id')->all();
 
             $task->update(array_merge($data, ['updated_by' => $actor->id]));
 

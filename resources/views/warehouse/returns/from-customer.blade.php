@@ -292,15 +292,8 @@
             </div>
         </div>
 
-        {{-- Nilai Taksiran --}}
-        <div>
-            <label class="{{ $labelClass }}">Nilai Taksiran per Unit (Rp) — Opsional</label>
-            <div class="relative">
-                <span class="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
-                <input type="text" inputmode="decimal" data-rupiah name="estimated_value" value="{{ old('estimated_value') }}" placeholder="0" class="{{ $inputClass }} pl-9 font-mono">
-            </div>
-            <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Dapat dikosongkan (otomatis dihitung Rp 0 di Laporan Nilai Inventori).</p>
-        </div>
+        {{-- Harga retur ditentukan Pusat --}}
+        <p class="text-xs text-slate-500 dark:text-slate-400">Harga modem retur ditentukan oleh Gudang Pusat saat konfirmasi penerimaan.</p>
 
         {{-- Catatan --}}
         <div>

@@ -100,7 +100,7 @@ class QrFeatureSeeder extends Seeder
         Feature::updateOrCreate(
             ['code' => 'qr_scan_logs'],
             [
-                'name' => 'Dashboard Anomali Scan QR',
+                'name' => 'Riwayat Scan QR',
                 'type' => FeatureType::ROOT,
                 'sort_order' => 11,
                 'is_active' => true,

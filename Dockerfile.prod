@@ -16,7 +16,7 @@
 #                   invalidasi tiap kali cuma resources/ yang berubah)
 #   3. runtime    — image akhir: PHP-FPM + kode + vendor + aset, non-root
 
-FROM node:24-alpine AS assets
+FROM node:26-alpine AS assets
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -40,11 +40,16 @@ COPY composer.json composer.lock ./
 # --no-scripts: artisan belum ada (kode app belum di-copy tahap ini), semua
 # composer script (package:discover dst) yang butuh bootstrap Laravel bakal
 # gagal. package:discover dijalankan ulang di entrypoint setelah kode lengkap.
-RUN composer install --no-dev --no-interaction --no-progress --no-scripts --optimize-autoloader --no-autoloader
+# --ignore-platform-reqs: image `composer` tidak punya ext-pcntl (disyaratkan
+# Horizon) dkk — ekstensi itu baru dipasang di tahap `runtime`, tempat vendor/
+# ini benar-benar dijalankan. Tanpa flag ini build berhenti di sini dengan
+# "laravel/horizon requires ext-pcntl". Cek ekstensi tetap terjadi saat runtime
+# lewat vendor/composer/platform_check.php.
+RUN composer install --no-dev --no-interaction --no-progress --no-scripts --optimize-autoloader --no-autoloader --ignore-platform-reqs
 COPY . .
-RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
+RUN composer dump-autoload --optimize --no-dev --classmap-authoritative --no-scripts --ignore-platform-reqs
 
-FROM php:8.4-fpm AS runtime
+FROM php:8.5-fpm-trixie AS runtime
 
 # `procps`/`netcat-openbsd` — dipakai HEALTHCHECK worker (horizon/reverb/scheduler)
 # di docker-compose.prod.yml, sama alasannya dengan Dockerfile dev.
@@ -119,7 +124,7 @@ CMD ["php-fpm"]
 # melihat aset build yang SAMA adalah masing-masing bawa salinannya sendiri
 # dari tahap `assets` yang identik. /storage/ tetap lewat volume `storage_data`
 # yang di-share dengan app — itu berkas RUNTIME (upload), bukan hasil build.
-FROM nginx:alpine AS web
+FROM nginx:1.31-alpine AS web
 COPY docker/nginx/default.prod.conf /etc/nginx/conf.d/default.conf
 COPY --from=assets /app/public/build /var/www/public/build
 COPY public/favicon.ico public/robots.txt /var/www/public/

@@ -47,6 +47,11 @@ return [
     'protected_roles' => ['owner'],
 
     'allowed_actions' => [
+        'manuals' => [
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::PUBLISH->value,
+        ],
         'dashboard' => [ActionCode::VIEW->value],
 
         'master_wilayah' => [
@@ -71,6 +76,13 @@ return [
         ],
 
         'pops' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+        ],
+
+        'master_network_node_types' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
             ActionCode::UPDATE->value,
@@ -487,6 +499,13 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Kabel Melintang Jalan (ADHOC-205) — cuma VIEW (daftar pemantauan).
+        // Penulisan rute ikut izin Pemasangan (customers.detail.installation.update)
+        // dan penyelesaiannya ikut izin task DEAC, supaya tidak ada jalur kedua.
+        'customer_cable_crossings' => [
+            ActionCode::VIEW->value,
+        ],
+
         // Master Alasan Putus Langganan (ADHOC-69) — TERPISAH dari
         // `customers.deactivate` (dokumen §4.2): role yang cuma bisa
         // memproses form putus langganan (butuh `.view` buat isi dropdown)
@@ -560,6 +579,16 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        'warehouse_branch_sale' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::RECEIVE->value,
+        ],
+
+        'warehouse_branch_sale_price' => [
+            ActionCode::VIEW->value,
+        ],
+
         'warehouse_transfer' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value, // Pusat kirim (§2.2)
@@ -620,6 +649,22 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli,
+        // Task 9) — halaman sendiri di bawah `warehouse_report`, pola sama
+        // `tickets.selesai`. Cuma VIEW, read-only — data mentah di
+        // `inventory_serial_sales` (Task 1).
+        'warehouse_report.sold_to_customer' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Rekap Pemakaian Material Lapangan (/warehouse/usage) — sub-feature
+        // di bawah `warehouse` (BUKAN root baru), supaya bisa di-grant ke
+        // `fop` tanpa ikut membuka Stok/Scan/History/Damaged/Retrievals lewat
+        // `warehouse.view` penuh — rutenya digerbangi OR (`warehouse.view|warehouse.usage.view`).
+        'warehouse.usage' => [
+            ActionCode::VIEW->value,
+        ],
+
         // Permintaan Stok Cabang→Pusat (2026-09-03) — jawaban gap "cabang
         // habis stok, Pusat gak sadar". APPROVE/REJECT dipegang sisi Pusat
         // (fulfill/tolak), CANCEL dipegang pengaju sendiri (dicek scope
@@ -633,12 +678,25 @@ return [
             ActionCode::CANCEL->value,
         ],
 
+        // Master node jaringan ber-port (ODC/ODP/dst), dulu `network_odps`.
+        // Di-rename di baris Feature yang SAMA oleh migration reshape
+        // (2026_10_12_110300), jadi role_permissions lama tetap nempel.
+        // Node kosong dapat dihapus; node dengan dependensi hanya dinonaktifkan.
+        'network_nodes' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+            ActionCode::REGISTER_INFRA->value,
+        ],
+
         // Dashboard Analitik FOP (docs/plan/analisa-dashboard-analitik-fop.md)
         // — pola & performa lintas periode (alat kerja, wilayah, beban/solving
         // teknisi, backlog, durasi terlama). Feature SENDIRI, bukan numpang
         // `task.view.all` (dashboard operasional harian `/fop`) — audiens
         // beda (dibuka mingguan/bulanan buat evaluasi, bukan tiap shift) dan
         // harus bisa dimatikan per-role independen. Cuma VIEW, read-only murni.
+
         'fop_analytics' => [
             ActionCode::VIEW->value,
         ],
@@ -889,10 +947,22 @@ return [
         'sales_omset_dashboard.view' => 'Lihat Dashboard Omset Sales',
         'business_customers.view' => 'Lihat List Pelanggan Bisnis',
         'customer_balance.view' => 'Lihat Saldo Pelanggan',
+        'customer_cable_crossings.view' => 'Lihat Daftar Kabel Melintang Jalan',
 
         // Verifikasi Biaya C-REQ (docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)
         'creq_billing_verification.view' => 'Lihat Antrean Verifikasi Biaya C-REQ',
         'creq_billing_verification.approve' => 'Setujui Biaya C-REQ (lanjut ke Tagihan Manual)',
         'creq_billing_verification.reject' => 'Tolak Biaya C-REQ',
+
+        'warehouse_branch_sale.view' => 'Lihat Dokumen Jual Beli SN Antar Cabang',
+        'warehouse_branch_sale.create' => 'Jual dan Kirim SN ke Cabang Lain',
+        'warehouse_branch_sale.receive' => 'Konfirmasi SN Dibeli dari Cabang Lain',
+        'warehouse_branch_sale_price.view' => 'Lihat Harga dan Kewajiban Jual Beli Antar Cabang',
+
+        // Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli, Task 9)
+        'warehouse_report.sold_to_customer.view' => 'Lihat Laporan Barang Terjual ke Pelanggan',
+
+        // Rekap Pemakaian Material Lapangan (/warehouse/usage)
+        'warehouse.usage.view' => 'Lihat Rekap Pemakaian Material Lapangan',
     ],
 ];
