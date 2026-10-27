@@ -225,6 +225,7 @@ Field berikut boleh kosong pada awal registrasi, namun wajib dilengkapi oleh Tek
 4.  **Batch kolektor, teknisi, dan portal staf tidak menerima lebih bayar (2026-10-05).** Tunai + saldo per tagihan tidak boleh melebihi sisa tagihan. Kelebihan uang hanya bisa dicatat lewat form Tagihan admin, yang masuk saldo pelanggan dengan konfirmasi.
 5.  **Saldo pelanggan boleh dipakai kolektor, teknisi, dan portal staf** per tagihan (checkbox "Pakai saldo", default tidak dicentang), dengan batas `min(saldo, sisa tagihan)`. Saldo bukan uang fisik dan tidak masuk setoran tunai.
 6.  **Transfer** wajib memilih rekening aktif dari master. Snapshot rekening disimpan di payment.
+7.  **Pengecualian poin 3 — import pembayaran legacy massal (ADHOC, 2026-10-26):** rekalkulasi `paid_amount`/`remaining_amount`/`invoice_status` per baris pembayaran legacy di `CustomerController::confirmImport()` memakai `Invoice::updateQuietly()`, BUKAN `update()` biasa — sengaja tidak menulis audit log per baris (`Invoice` pakai trait `RecordsAuditLogs`, default mencatat `updated`). Pencatatan pembayaran NYATA (form admin, kolektor, teknisi, portal staf) tetap wajib instan sesuai poin 3; pengecualian ini HANYA untuk jalur import data historis, yang sudah punya satu baris audit ringkasan per batch (`action: 'confirm'`, `AuditLog::create` di akhir transaksi import). Pola yang sama dipakai `Customer::updateQuietly()` di jalur import yang sama — lihat komentar di kode.
 
 ---
 

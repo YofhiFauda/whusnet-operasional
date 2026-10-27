@@ -514,6 +514,27 @@ class WarehouseReportController extends Controller
             }
         }
 
+        $scrappedRollRows = collect($adjustmentRows)->filter(fn (array $row) => $row['reason'] === 'scrapped'
+            && $itemsById->get($row['item_id'])?->tracking_type === TrackingType::ROLL);
+        if ($scrappedRollRows->isNotEmpty()) {
+            if (! $isFirstSheet) {
+                $writer->addNewSheetAndMakeItCurrent();
+            }
+            $isFirstSheet = false;
+            $writer->nameCurrentSheet('Kerugian Sisa Kabel');
+            $writer->addHeader(['Gudang', 'Barang', 'Jumlah (Meter)', 'Harga per Meter (Rp)', 'Nilai Rugi (Rp)']);
+            foreach ($scrappedRollRows as $row) {
+                $meterPerRoll = (float) $itemsById->get($row['item_id'])->meter_per_roll;
+                $writer->addRow([
+                    $row['pop_label'],
+                    $row['item_name'],
+                    $row['total_qty'] * $meterPerRoll,
+                    $meterPerRoll > 0 && $row['unit_cost'] !== null ? $row['unit_cost'] / $meterPerRoll : '',
+                    $row['loss_value'] ?? '',
+                ]);
+            }
+        }
+
         // Gak ada pergerakan/kerugian sama sekali di periode+filter ini —
         // sheet default kosongan tetap dikasih header, biar file yang
         // didownload gak nol-kolom/nol-sheet sama sekali.
@@ -889,13 +910,15 @@ class WarehouseReportController extends Controller
             ->where(function ($q) use ($scopedPops, $popFilter) {
                 $q->whereIn('to_pop_id', $scopedPops)
                     ->orWhereIn('from_pop_id', $scopedPops)
+                    ->orWhereHas('roll', fn ($rollQuery) => $rollQuery->whereIn('issued_from_pop_id', $scopedPops))
+                    ->orWhereHas('transfer', fn ($transferQuery) => $transferQuery->whereIn('from_pop_id', $scopedPops))
                     // Custody teknisi (from_pop_id null) TETAP ikut kalau gak
                     // ada filter POP eksplisit — kerugian custody tetap
                     // relevan dipantau HQ walau gak bisa diatribusi ke cabang.
                     ->when(! $popFilter, fn ($qq) => $qq->orWhere(fn ($qqq) => $qqq->whereNull('to_pop_id')->whereNull('from_pop_id')));
             })
             ->whereBetween('created_at', [$start, $end])
-            ->with(['toPop', 'fromPop', 'item'])
+            ->with(['toPop', 'fromPop', 'item', 'roll.issuedFromPop', 'transfer.fromPop'])
             ->get();
 
         $reasonLabels = InventoryAdjustmentService::REASON_CATEGORIES + [
@@ -903,6 +926,7 @@ class WarehouseReportController extends Controller
             // itu daftar `reason` buat adjustCustody(), SCRAPPED bukan
             // pilihan reason di sana (cuma tujuan status serial/roll).
             'scrapped' => 'Dimusnahkan (Scrapped)',
+            'available' => 'Dipulihkan Setelah Perbaikan',
         ];
 
         // Reason yang dihitung sbg NILAI RUGI finansial (keputusan eksplisit
@@ -916,13 +940,13 @@ class WarehouseReportController extends Controller
         // bulan itu. Satu baris = satu kategori + satu lokasi + satu item =
         // satu satuan, aman dijumlah.
         return $rows->groupBy(function (InventoryTransaction $row) {
-            $popLabel = $row->toPop->name ?? $row->fromPop->name ?? '— (Custody Teknisi)';
+            $popLabel = $row->toPop->name ?? $row->fromPop->name ?? $row->roll?->issuedFromPop?->name ?? $row->transfer?->fromPop?->name ?? '— (Custody Teknisi)';
             $category = $row->resulting_status ?? $row->reason;
 
-            return $category.'|'.$popLabel.'|'.$row->item_id;
+            return $category.'|'.$popLabel.'|'.$row->item_id.($category === 'available' ? '|'.$row->reason : '');
         })->map(function ($group) use ($reasonLabels, $lossReasons) {
             $first = $group->first();
-            $popLabel = $first->toPop->name ?? $first->fromPop->name ?? '— (Custody Teknisi)';
+            $popLabel = $first->toPop->name ?? $first->fromPop->name ?? $first->roll?->issuedFromPop?->name ?? $first->transfer?->fromPop?->name ?? '— (Custody Teknisi)';
             $category = $first->resulting_status ?? $first->reason;
             $totalQty = (float) $group->sum(fn ($r) => abs((float) $r->qty));
 
@@ -931,9 +955,33 @@ class WarehouseReportController extends Controller
             $unit = $first->item->unit ?? '';
             $displayQty = $totalQty;
 
-            if (in_array($category, $lossReasons, true)) {
+            $isScrappedRoll = $category === 'scrapped' && $first->item?->tracking_type === TrackingType::ROLL;
+            if (in_array($category, $lossReasons, true) || $isScrappedRoll) {
                 $unitCost = $this->resolveLastCostForItem($first->item_id);
                 $lossValue = $unitCost !== null ? $totalQty * $unitCost : null;
+
+                if ($group->every(fn (InventoryTransaction $row) => ($row->serial_id !== null || $row->roll_id !== null || $row->reason === 'lost_in_transfer') && $row->unit_price_snapshot !== null)) {
+                    $lossValue = $group->sum(fn (InventoryTransaction $row) => abs((float) $row->qty) * (float) $row->unit_price_snapshot);
+                    $unitCost = $totalQty > 0 ? $lossValue / $totalQty : null;
+                }
+
+                if ($isScrappedRoll) {
+                    $prices = $group->map(fn (InventoryTransaction $row) => $row->unit_price_snapshot ?? $row->roll?->unit_price_snapshot ?? $unitCost);
+                    if ($prices->contains(null)) {
+                        $lossValue = null;
+                    } else {
+                        $lossValue = $group->values()->sum(fn (InventoryTransaction $row, int $index) => abs((float) $row->qty) * (float) $prices[$index]);
+                        $unitCost = $totalQty > 0 ? $lossValue / $totalQty : null;
+                    }
+                }
+            }
+
+            if ($category === 'available' && $first->reason === 'repaired') {
+                $prices = $group->map(fn (InventoryTransaction $row) => $row->unit_price_snapshot);
+                if (! $prices->contains(null)) {
+                    $lossValue = -$group->sum(fn (InventoryTransaction $row) => (float) $row->qty * (float) $row->unit_price_snapshot);
+                    $unitCost = $totalQty > 0 ? abs($lossValue) / $totalQty : null;
+                }
             }
 
             // Barang ROLL tampil dalam satuan ROLL di Laporan Bulanan
@@ -960,7 +1008,7 @@ class WarehouseReportController extends Controller
             return [
                 'reason' => $category,
                 'reason_label' => $reasonLabels[$category] ?? $category,
-                'pop_id' => $first->to_pop_id ?? $first->from_pop_id, // null = custody teknisi, gak bisa diatribusi ke POP mana pun (dipakai export() buat plotting per-POP)
+                'pop_id' => $first->to_pop_id ?? $first->from_pop_id ?? $first->roll?->issued_from_pop_id ?? $first->transfer?->from_pop_id, // null = custody teknisi, gak bisa diatribusi ke POP mana pun (dipakai export() buat plotting per-POP)
                 'pop_label' => $popLabel,
                 'item_id' => $first->item_id,
                 'item_name' => $first->item->name ?? '(item dihapus)',

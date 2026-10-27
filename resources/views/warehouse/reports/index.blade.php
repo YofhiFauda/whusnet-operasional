@@ -242,7 +242,7 @@
         <div class="col-span-2 sm:col-span-1 bg-white dark:bg-slate-800/90 border {{ $kpi['total_loss_value'] > 0 ? 'border-rose-300 dark:border-rose-800 bg-rose-50/20 dark:bg-rose-950/20' : 'border-slate-200/80 dark:border-slate-700/80' }} rounded-xl p-3 sm:p-3.5 shadow-xs flex flex-col justify-between">
             <div class="flex items-center justify-between gap-1 mb-1">
                 <span class="text-[10px] sm:text-[11px] font-bold {{ $kpi['total_loss_value'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500' }} uppercase tracking-wider truncate">
-                    Estimasi Nilai Rugi
+                    Estimasi Rugi Bersih
                 </span>
                 <div class="w-5 h-5 rounded-md {{ $kpi['total_loss_value'] > 0 ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500' }} flex items-center justify-center shrink-0">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -252,7 +252,7 @@
                 <span class="text-base sm:text-lg font-extrabold font-mono {{ $kpi['total_loss_value'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-100' }} tabular-nums">
                     Rp {{ number_format($kpi['total_loss_value'], 0, ',', '.') }}
                 </span>
-                <span class="block text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">Rusak & Hilang</span>
+                <span class="block text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">Rusak, Hilang & Sisa Kabel Dimusnahkan</span>
             </div>
         </div>
 
@@ -548,7 +548,7 @@
                             <th class="px-5 py-3.5 text-left">Barang</th>
                             <th class="px-5 py-3.5 text-right">Jumlah Trx</th>
                             <th class="px-5 py-3.5 text-right">Total Qty</th>
-                            <th class="px-5 py-3.5 text-right">Estimasi Nilai Rugi</th>
+                            <th class="px-5 py-3.5 text-right">Estimasi Rugi Bersih</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -587,7 +587,7 @@
             
             <div class="px-5 py-3 bg-slate-50/50 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-700/60 text-[11px] text-slate-400 dark:text-slate-500 flex items-start gap-2">
                 <svg class="w-4 h-4 text-slate-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span><strong>Catatan:</strong> "— (Custody Teknisi)" menandakan kerugian terjadi saat barang di tangan teknisi (bukan di gudang fisik cabang). Nilai Rugi dihitung khusus untuk kategori Rusak & Hilang berdasarkan harga unit RECEIVE terakhir.</span>
+                <span><strong>Catatan:</strong> "— (Custody Teknisi)" menandakan kerugian terjadi saat barang di tangan teknisi (bukan di gudang fisik cabang). Nilai rugi mencakup Rusak, Hilang, dan sisa roll yang dimusnahkan. Pemulihan barang rusak mengurangi rugi; nilai unit SN/roll mengikuti harga perolehannya.</span>
             </div>
         </div>
 
@@ -649,7 +649,7 @@
             <!-- Mobile Footer Note -->
             <div class="p-3 bg-white dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 rounded-xl text-[11px] text-slate-400 dark:text-slate-500 flex items-start gap-2">
                 <svg class="w-4 h-4 text-slate-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span><strong>Keterangan:</strong> Nilai Kerugian dihitung berdasarkan harga beli terakhir dari transaksi RECEIVE untuk kategori Rusak & Hilang.</span>
+                <span><strong>Keterangan:</strong> Rugi bersih memperhitungkan pemulihan barang rusak. Unit SN/roll memakai harga perolehan unit; material kuantitas memakai harga beli terakhir.</span>
             </div>
         </div>
 

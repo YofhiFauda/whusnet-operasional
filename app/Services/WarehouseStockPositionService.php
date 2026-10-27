@@ -146,9 +146,9 @@ class WarehouseStockPositionService
     }
 
     /**
-     * Qty per item yang sedang DALAM PERJALANAN (transfer IN_TRANSIT yang asal
+     * Qty per item yang sedang DALAM PERJALANAN (transfer terbuka yang asal
      * atau tujuannya dalam scope) — analisa-ui-ux §U1. Dihitung dari leg
-     * dispatch (`from_pop_id` terisi) transfer in-transit; satuan mengikuti
+     * dispatch dikurangi penerimaan yang sudah terkonfirmasi; satuan mengikuti
      * tracking (serial = 1/baris, roll = qty meter, quantity = qty).
      *
      * @param  Collection<int, int>  $popIds
@@ -157,7 +157,7 @@ class WarehouseStockPositionService
     private function inTransitByItem(Collection $popIds): Collection
     {
         $transferIds = InventoryTransfer::query()
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
             ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)->orWhereIn('to_pop_id', $popIds))
             ->pluck('id');
 
@@ -165,13 +165,21 @@ class WarehouseStockPositionService
             return collect();
         }
 
-        return InventoryTransaction::query()
+        $dispatch = InventoryTransaction::query()
             ->whereIn('inventory_transfer_id', $transferIds)
-            ->whereNotNull('from_pop_id') // leg dispatch (barang keluar), bukan leg confirm
+            ->whereNotNull('from_pop_id')
             ->selectRaw('item_id, SUM(qty) as qty')
             ->groupBy('item_id')
-            ->pluck('qty', 'item_id')
-            ->map(fn ($q) => (float) $q);
+            ->pluck('qty', 'item_id');
+
+        $received = InventoryTransaction::query()
+            ->whereIn('inventory_transfer_id', $transferIds)
+            ->whereNotNull('to_pop_id')
+            ->selectRaw('item_id, SUM(qty) as qty')
+            ->groupBy('item_id')
+            ->pluck('qty', 'item_id');
+
+        return $dispatch->map(fn ($qty, $itemId) => max(0, round((float) $qty - (float) ($received[$itemId] ?? 0), 2)));
     }
 
     /**

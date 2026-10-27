@@ -11,16 +11,20 @@ use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
+use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
 use App\Models\Item;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
+use App\Services\FileUploadService;
 use App\Services\InventoryTransferService;
 use App\Services\WarehouseTransferActionQueue;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -69,6 +73,7 @@ class WarehouseTransferController extends Controller
         $dateTo = $request->date('date_to');
 
         $transfers = InventoryTransfer::query()
+            ->whereDoesntHave('branchSale')
             ->when(! $hasAllAccess, fn ($q) => $q->where(
                 fn ($qq) => $qq->whereIn('from_pop_id', $allowedPopIds)->orWhereIn('to_pop_id', $allowedPopIds)
             ))
@@ -88,21 +93,24 @@ class WarehouseTransferController extends Controller
         ));
     }
 
-    public function create(EffectiveAccessService $access): View
+    public function create(Request $request, EffectiveAccessService $access): View
     {
         $user = auth()->user();
+        $direction = $request->query('direction') === 'reverse' ? 'reverse' : 'forward';
 
-        $fromPops = Pop::query()->where('type', 'pusat')->orderBy('name')->get();
+        $fromPops = Pop::query()->where('type', $direction === 'reverse' ? 'cabang' : 'pusat')
+            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
+            ->orderBy('name')->get();
 
         $toPops = Pop::query()
-            ->where('type', 'cabang')
-            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
+            ->where('type', $direction === 'reverse' ? 'pusat' : 'cabang')
+            ->when($direction === 'forward' && ! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
             ->orderBy('name')
             ->get();
 
         $items = Item::active()->with('category')->orderBy('name')->get();
 
-        return view('warehouse.transfers.create', compact('fromPops', 'toPops', 'items'));
+        return view('warehouse.transfers.create', compact('fromPops', 'toPops', 'items', 'direction'));
     }
 
     /**
@@ -207,7 +215,9 @@ class WarehouseTransferController extends Controller
         $allowedPopIds = $hasAllAccess ? [] : $access->getAllowedPopIds($user);
 
         $transfers = InventoryTransfer::query()
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereDoesntHave('branchSale')
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
+            ->where('reference_number', 'like', 'TRF-%')
             ->when(! $hasAllAccess, fn ($q) => $q->where(
                 fn ($qq) => $qq->whereIn('from_pop_id', $allowedPopIds)->orWhereIn('to_pop_id', $allowedPopIds)
             ))
@@ -228,6 +238,7 @@ class WarehouseTransferController extends Controller
     public function store(Request $request, InventoryTransferService $service): RedirectResponse
     {
         $validated = $request->validate([
+            'direction' => ['sometimes', 'in:forward,reverse'],
             'from_pop_id' => 'required|integer|exists:pops,id',
             'to_pop_id' => 'required|integer|exists:pops,id|different:from_pop_id',
             'lines' => 'required|array|min:1',
@@ -240,10 +251,17 @@ class WarehouseTransferController extends Controller
 
         $fromPop = Pop::findOrFail($validated['from_pop_id']);
         $toPop = Pop::findOrFail($validated['to_pop_id']);
+        $this->assertPopInScope($fromPop, auth()->user(), app(EffectiveAccessService::class));
+        $this->assertPopAdminNotBlockedByActivePicGudang($fromPop, auth()->user());
+        $this->assertPicGudangCanActOnPop($fromPop, auth()->user());
 
         try {
             $lines = $this->normalizeLines($validated['lines']);
-            $transfer = $service->createTransfer($fromPop, $toPop, $lines, auth()->user());
+            if (($validated['direction'] ?? 'forward') === 'reverse') {
+                $transfer = $service->createReverseTransfer($fromPop, $toPop, $lines, auth()->user());
+            } else {
+                $transfer = $service->createTransfer($fromPop, $toPop, $lines, auth()->user());
+            }
         } catch (InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -252,8 +270,14 @@ class WarehouseTransferController extends Controller
             ->with('success', "Transfer {$transfer->reference_number} berhasil dibuat, menunggu konfirmasi terima di {$toPop->name}.");
     }
 
-    public function show(InventoryTransfer $transfer, EffectiveAccessService $access, WarehouseTransferActionQueue $actionQueue): View
+    public function show(InventoryTransfer $transfer, EffectiveAccessService $access, WarehouseTransferActionQueue $actionQueue): View|RedirectResponse
     {
+        if ($sale = $transfer->branchSale()->first()) {
+            abort_unless(auth()->user()->hasPermission('warehouse_branch_sale.view'), 403);
+
+            return redirect()->route('warehouse.branch-sales.show', $sale);
+        }
+
         $transfer->load(['fromPop', 'toPop', 'createdBy', 'receivedBy']);
 
         $this->assertViewableByEitherSide($transfer, $access);
@@ -261,6 +285,7 @@ class WarehouseTransferController extends Controller
         $user = auth()->user();
         $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['item.category', 'serial', 'roll', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician'])->get();
         $confirmedLines = $transfer->transactions()->whereNotNull('to_pop_id')->with(['item.category', 'serial', 'roll', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician'])->get();
+        $remainingByLine = $this->remainingByLine($dispatchLines, $confirmedLines);
 
         // Tombol "Konfirmasi Penerimaan" cuma buat sisi Cabang TUJUAN — beda
         // dari show() di atas yang boleh dua sisi. Sebelumnya view cuma cek
@@ -269,47 +294,63 @@ class WarehouseTransferController extends Controller
         // tombol Konfirmasi walau `receive()` bakal nolak 403 pas beneran
         // diklik — dirapikan biar tombolnya emang gak nongol kalau bakal
         // ditolak (ketauan audit tata-letak 2026-09-03).
-        $canReceive = in_array($transfer->to_pop_id, $actionQueue->receivablePopIds($user), true);
+        $canReceive = ! $transfer->branchSale()->exists()
+            && str_starts_with($transfer->reference_number, 'TRF-')
+            && in_array($transfer->to_pop_id, $actionQueue->receivablePopIds($user), true);
+        $canCloseMissing = ! $transfer->branchSale()->exists()
+            && str_starts_with($transfer->reference_number, 'TRF-')
+            && $transfer->isInTransit()
+            && $user->hasPermission('warehouse_adjustment.create')
+            && ($access->hasAllPopAccess($user) || in_array($transfer->from_pop_id, $access->getAllowedPopIds($user), true));
 
-        return view('warehouse.transfers.show', compact('transfer', 'dispatchLines', 'confirmedLines', 'canReceive'));
+        return view('warehouse.transfers.show', compact('transfer', 'dispatchLines', 'confirmedLines', 'remainingByLine', 'canReceive', 'canCloseMissing'));
     }
 
     /**
-     * Konfirmasi SEKALIGUS — bukan per-item lagi (koreksi 2026-09-18,
-     * keputusan eksplisit user: checkbox per-SN/roll yang tadinya kontrol
-     * anti-manipulasi jadi beban di kiriman ratusan/ribuan item). Form gak
-     * lagi kirim `confirmed_*` manual — SEMUA baris dispatch otomatis
-     * dianggap cocok 100% sesuai daftar begitu tombol ditekan (sudah
-     * dilewati modal warning di FE yang minta staf cek fisik dulu, lihat
-     * `warehouse.transfers.show`). Gak ada lagi partial-receive dari sini —
-     * selisih fisik yang ketauan belakangan lewat jalur Adjustment/opname
-     * terpisah (kontrol-anti-manipulasi.md §7), BUKAN parameter di sini.
+     * Terima seluruh sisa atau jumlah fisik per baris. Setiap penerimaan
+     * dicatat terpisah dan transfer tetap terbuka selama ada sisa.
      */
-    public function receive(InventoryTransfer $transfer, InventoryTransferService $service, EffectiveAccessService $access): RedirectResponse
+    public function receive(Request $request, InventoryTransfer $transfer, InventoryTransferService $service, EffectiveAccessService $access): RedirectResponse
     {
-        // Cuma Cabang TUJUAN yang boleh konfirmasi terima — beda dari show()
-        // yang boleh dua sisi, receive() itu aksi tulis milik satu sisi doang.
+        abort_if($transfer->branchSale()->exists(), 403);
         $this->assertPopInScope($transfer->toPop, auth()->user(), $access);
-        // Pembagian tugas PIC Gudang vs POP Admin (Kelompok H5).
         $this->assertPopAdminNotBlockedByActivePicGudang($transfer->toPop, auth()->user());
         $this->assertPicGudangCanActOnPop($transfer->toPop, auth()->user());
 
+        $validated = $request->validate([
+            'receive_mode' => ['sometimes', 'in:all,partial'],
+            'confirmed_serial_numbers' => ['sometimes', 'array'],
+            'confirmed_serial_numbers.*' => ['string'],
+            'confirmed_roll_codes' => ['sometimes', 'array'],
+            'confirmed_roll_codes.*' => ['string'],
+            'confirmed_quantities' => ['sometimes', 'array'],
+            'confirmed_quantities.*' => ['numeric', 'min:0'],
+        ]);
+
         $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll'])->get();
+        $confirmedLines = $transfer->transactions()->whereNotNull('to_pop_id')->get();
+        $remainingByLine = $this->remainingByLine($dispatchLines, $confirmedLines);
 
-        $confirmedSerialNumbers = $dispatchLines->pluck('serial.serial_number')->filter()->values()->all();
-        $confirmedRollCodes = $dispatchLines->pluck('roll.roll_code')->filter()->values()->all();
-
-        $confirmedQuantities = [];
-        foreach ($dispatchLines as $line) {
-            if ($line->serial_id !== null || $line->roll_id !== null) {
-                continue;
-            }
-
-            $lotNo = $line->lot_no ?? '';
-            if ($lotNo === '') {
-                $confirmedQuantities[$line->item_id] = ($confirmedQuantities[$line->item_id] ?? 0) + (float) $line->qty;
-            } else {
-                $confirmedQuantities[$line->item_id][$lotNo] = ($confirmedQuantities[$line->item_id][$lotNo] ?? 0) + (float) $line->qty;
+        if (($validated['receive_mode'] ?? 'all') === 'partial') {
+            $confirmedSerialNumbers = $validated['confirmed_serial_numbers'] ?? [];
+            $confirmedRollCodes = $validated['confirmed_roll_codes'] ?? [];
+            $confirmedQuantities = ['_lines' => $validated['confirmed_quantities'] ?? []];
+        } else {
+            $confirmedSerialNumbers = [];
+            $confirmedRollCodes = [];
+            $confirmedQuantities = ['_lines' => []];
+            foreach ($dispatchLines as $line) {
+                $remaining = $remainingByLine[$line->id];
+                if ($remaining <= 0) {
+                    continue;
+                }
+                if ($line->serial_id !== null) {
+                    $confirmedSerialNumbers[] = $line->serial->serial_number;
+                } elseif ($line->roll_id !== null) {
+                    $confirmedRollCodes[] = $line->roll->roll_code;
+                } else {
+                    $confirmedQuantities['_lines'][$line->id] = $remaining;
+                }
             }
         }
 
@@ -322,11 +363,58 @@ class WarehouseTransferController extends Controller
                 $confirmedRollCodes,
             );
         } catch (InvalidArgumentException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
 
         return redirect()->route('warehouse.transfers.show', $transfer)
             ->with('success', "Transfer {$transfer->reference_number} dikonfirmasi: {$transfer->status->label()}.");
+    }
+
+    public function closeMissing(Request $request, InventoryTransfer $transfer, InventoryTransferService $service, EffectiveAccessService $access): RedirectResponse
+    {
+        abort_if($transfer->branchSale()->exists(), 403);
+        $this->assertPopInScope($transfer->fromPop, auth()->user(), $access);
+        $this->assertPopAdminNotBlockedByActivePicGudang($transfer->fromPop, auth()->user());
+        $this->assertPicGudangCanActOnPop($transfer->fromPop, auth()->user());
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+            'evidence' => ['required', 'image', 'max:4096'],
+        ]);
+        $evidencePath = FileUploadService::uploadWarehouseEvidence($request->file('evidence'), 'lost-transfer');
+
+        try {
+            $service->closeMissingTransfer($transfer, $validated['reason'], $evidencePath, auth()->user());
+        } catch (InvalidArgumentException $e) {
+            Storage::disk('public')->delete($evidencePath);
+
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('warehouse.transfers.show', $transfer)
+            ->with('success', "Sisa transfer {$transfer->reference_number} ditutup sebagai barang hilang.");
+    }
+
+    /**
+     * @param  Collection<int, InventoryTransaction>  $dispatchLines
+     * @param  Collection<int, InventoryTransaction>  $confirmedLines
+     * @return array<int, float>
+     */
+    private function remainingByLine(Collection $dispatchLines, Collection $confirmedLines): array
+    {
+        $remaining = [];
+        foreach ($dispatchLines as $line) {
+            $received = $confirmedLines->filter(fn (InventoryTransaction $receipt) => $receipt->source_inventory_transaction_id === $line->id
+                || ($receipt->source_inventory_transaction_id === null
+                    && $receipt->item_id === $line->item_id
+                    && $receipt->serial_id === $line->serial_id
+                    && $receipt->roll_id === $line->roll_id
+                    && ($receipt->lot_no ?? '') === ($line->lot_no ?? '')))
+                ->sum(fn (InventoryTransaction $receipt) => (float) $receipt->qty);
+            $remaining[$line->id] = max(0, round((float) $line->qty - $received, 2));
+        }
+
+        return $remaining;
     }
 
     /**
@@ -340,6 +428,7 @@ class WarehouseTransferController extends Controller
      */
     public function invoice(InventoryTransfer $transfer, EffectiveAccessService $access, Request $request): HttpResponse
     {
+        abort_if($transfer->branchSale()->exists(), 403);
         $transfer->load(['fromPop', 'toPop', 'createdBy']);
         $this->assertViewableByEitherSide($transfer, $access);
 
@@ -413,6 +502,9 @@ class WarehouseTransferController extends Controller
      */
     public function suratJalan(InventoryTransfer $transfer, EffectiveAccessService $access, Request $request): HttpResponse
     {
+        if ($transfer->branchSale()->exists()) {
+            abort_unless($request->user()->hasPermission('warehouse_branch_sale.view'), 403);
+        }
         $transfer->load(['fromPop', 'toPop', 'createdBy']);
         $this->assertViewableByEitherSide($transfer, $access);
 

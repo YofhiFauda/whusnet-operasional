@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\ResolvesSelectedPop;
 use App\Models\InventoryTransaction;
 use App\Models\Pop;
+use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Support\LikeSearch;
 use Illuminate\Http\Request;
@@ -79,6 +80,7 @@ class WarehouseHistoryController extends Controller
         $dateTo = $request->query('date_to');
         $conditionFilter = $request->query('condition');
         $adjustmentReasonFilter = $request->query('adjustment_reason');
+        $technicianFilter = ctype_digit((string) $request->query('technician_id')) ? (int) $request->query('technician_id') : null;
 
         // Baris INSTALL (SN dipasang ke pelanggan) keluar dari tangan teknisi
         // ke pelanggan — TIDAK punya from_pop_id maupun to_pop_id, jadi dulu
@@ -96,17 +98,28 @@ class WarehouseHistoryController extends Controller
             ? Pop::query()->whereKey($popFilter)->orWhere('parent_id', $popFilter)->pluck('id')
             : collect();
 
-        $ledger = InventoryTransaction::query()
+        $scopedLedger = InventoryTransaction::query()
             ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)
                 ->orWhereIn('to_pop_id', $popIds)
                 ->orWhere(fn ($qq) => $withoutWarehouse($qq)->whereHas(
                     'fopTask',
                     fn ($tq) => $taskPopIds === null ? $tq : $tq->whereIn('pop_id', $taskPopIds)
                 )))
-            ->when($typeFilter, fn ($q) => $q->where('type', $typeFilter))
             ->when($popFilter, fn ($q) => $q->where(fn ($qq) => $qq->where('from_pop_id', $popFilter)
                 ->orWhere('to_pop_id', $popFilter)
-                ->orWhere(fn ($qqq) => $withoutWarehouse($qqq)->whereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $popFilterTaskPopIds)))))
+                ->orWhere(fn ($qqq) => $withoutWarehouse($qqq)->whereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $popFilterTaskPopIds)))));
+
+        $technicianIds = (clone $scopedLedger)
+            ->where(fn ($q) => $q->whereNotNull('from_technician_id')->orWhereNotNull('to_technician_id'))
+            ->get(['from_technician_id', 'to_technician_id'])
+            ->flatMap(fn (InventoryTransaction $row) => [$row->from_technician_id, $row->to_technician_id])
+            ->filter()->unique();
+        $technicians = User::query()->whereIn('id', $technicianIds)->orderBy('name')->get(['id', 'name']);
+
+        $ledger = $scopedLedger
+            ->when($typeFilter, fn ($q) => $q->where('type', $typeFilter))
+            ->when($technicianFilter, fn ($q) => $q->where(fn ($qq) => $qq->where('from_technician_id', $technicianFilter)
+                ->orWhere('to_technician_id', $technicianFilter)))
             // Filter Kondisi (analisa-gap-kondisi-barang.md rancangan poin 6)
             // — SERIALIZED-only, baca `serial.condition`/`condition_checked_at`,
             // BUKAN kolom sendiri di ledger (kondisi nempel di unit fisiknya,
@@ -198,7 +211,7 @@ class WarehouseHistoryController extends Controller
             'adjustment' => $groups->filter(fn ($g) => in_array($g->type->value ?? '', ['return', 'adjustment', 'stock_opname', 'transfer_custody']))->count(),
         ];
 
-        return view('warehouse.history.index', compact('ledger', 'pops', 'types', 'typeFilter', 'popFilter', 'search', 'dateFrom', 'dateTo', 'conditionFilter', 'adjustmentReasonFilter', 'summary', 'sort', 'sortDirection'));
+        return view('warehouse.history.index', compact('ledger', 'pops', 'types', 'typeFilter', 'popFilter', 'search', 'dateFrom', 'dateTo', 'conditionFilter', 'adjustmentReasonFilter', 'technicianFilter', 'technicians', 'summary', 'sort', 'sortDirection'));
     }
 
     /**

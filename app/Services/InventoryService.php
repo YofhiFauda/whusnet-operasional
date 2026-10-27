@@ -148,6 +148,7 @@ class InventoryService
                     'item_type' => $item->category?->code,
                     'item_name' => $item->name,
                     'lot_no' => $lot->lot_no,
+                    'source_custody_id' => $lot->id,
                     'qty' => $take,
                     'unit' => $item->unit,
                     'unit_price_snapshot' => $lot->unit_price_snapshot,
@@ -218,6 +219,10 @@ class InventoryService
 
             if ($serial->status !== SerialStatus::ISSUED) {
                 throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan ISSUED — gak bisa diinstall.");
+            }
+
+            if (! $serial->isClearedForIssue()) {
+                throw new InvalidArgumentException("SN {$serial->serial_number} belum lolos pemeriksaan kondisi fisik atau rusak.");
             }
 
             if (! in_array($serial->current_technician_id, $technicianIds, true)) {
@@ -298,7 +303,7 @@ class InventoryService
                 // InventoryReturnTransferService).
                 InventoryTransaction::create([
                     'type' => InventoryTransactionType::RETURN,
-                    'reference_number' => $this->generateReferenceNumber('RET'),
+                    'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RET'),
                     'item_id' => $oldSerial->item_id,
                     'serial_id' => $oldSerial->id,
                     'qty' => 1,
@@ -323,6 +328,7 @@ class InventoryService
                     'source' => DeviceRetrievalSource::CREQ_SWAP,
                     'task_id' => $fopTask->task_id,
                     'retrieved_by' => $actor->id,
+                    'warehouse_pop_id' => $oldSerial->issued_from_pop_id ?? $targetCabangId,
                     'condition' => ItemCondition::USED_GOOD,
                     'retrieved_at' => now(),
                 ]);
@@ -373,7 +379,7 @@ class InventoryService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::INSTALL,
-                'reference_number' => $this->generateReferenceNumber('INS'),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('INS'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -436,22 +442,6 @@ class InventoryService
             'price' => $price,
             'created_by' => $actor->id,
         ]);
-    }
-
-    /**
-     * Generate reference number untuk transaksi ledger (INSTALL/RETURN).
-     */
-    private function generateReferenceNumber(string $prefix = 'INS'): string
-    {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
-
-        $lastNum = InventoryTransaction::where('reference_number', 'like', "{$prefix}-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('%s-%s-%06d', $prefix, $today, $lastNum + 1);
     }
 
     /**
@@ -605,7 +595,7 @@ class InventoryService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::DEPLOY,
-                'reference_number' => $this->generateReferenceNumber('DPL'),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('DPL'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -802,6 +792,7 @@ class InventoryService
                 'status' => SerialStatus::DEPLOYED,
                 'current_network_node_id' => $node->id,
                 'current_technician_id' => null,
+                'issued_from_pop_id' => $node->resolvePop()?->id,
             ]);
 
             InventoryTransaction::create([
@@ -918,7 +909,7 @@ class InventoryService
 
                 $transaction = InventoryTransaction::create([
                     'type' => InventoryTransactionType::DEPLOY,
-                    'reference_number' => $this->generateReferenceNumber('DPL'),
+                    'reference_number' => app(NumberSequenceService::class)->ledgerNumber('DPL'),
                     'item_id' => $item->id,
                     'lot_no' => $lot->lot_no,
                     'qty' => $take,
@@ -1044,7 +1035,7 @@ class InventoryService
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::DEPLOY,
-                'reference_number' => $this->generateReferenceNumber('DPL'),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('DPL'),
                 'item_id' => $roll->item_id,
                 'roll_id' => $roll->id,
                 'lot_no' => $roll->roll_code,
@@ -1160,13 +1151,17 @@ class InventoryService
 
             $serial->update([
                 'status' => SerialStatus::ISSUED,
+                'condition' => ItemCondition::USED_GOOD,
+                'condition_checked_at' => null,
+                'condition_checked_by' => null,
+                'issued_from_pop_id' => $serial->issued_from_pop_id ?? $from?->cabangId,
                 'current_technician_id' => $actor->id,
                 ...$this->serialLocationColumns(null),
             ]);
 
             return InventoryTransaction::create([
                 'type' => InventoryTransactionType::RETRIEVE_INFRA,
-                'reference_number' => $this->generateReferenceNumber('RTR'),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('CBT'),
                 'item_id' => $serial->item_id,
                 'serial_id' => $serial->id,
                 'qty' => 1,
@@ -1250,7 +1245,8 @@ class InventoryService
         // pengganti kalau caller gak nge-rollback (ketauan audit 2026-09-02)
         // — method ini sekarang atomik sendiri, gak gantung disiplin caller.
         DB::transaction(function () use ($fopTask, $customer, $technicians, $actor) {
-            $rows = $fopTask->materials()->terpakai()->whereNotNull('item_id')->get();
+            $rows = $fopTask->materials()->terpakai()->whereNotNull('item_id')
+                ->whereNull('source_custody_id')->whereNull('lot_no')->whereNull('unit_price_snapshot')->get();
 
             foreach ($rows->groupBy('item_id') as $itemId => $itemRows) {
                 $item = Item::find($itemId);

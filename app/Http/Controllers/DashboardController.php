@@ -931,7 +931,7 @@ class DashboardController extends Controller
 
         $inTransitCount = InventoryTransfer::query()
             ->whereIn('from_pop_id', $warehousePopIds)
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
             ->count();
 
         $custodyCount = InventorySerial::query()

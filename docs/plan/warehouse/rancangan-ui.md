@@ -96,9 +96,11 @@ Setiap layar reuse pola/komponen yang sudah ada di repo — tidak bikin pola bar
 
 ### 2.3 Transfer — Terima (`warehouse_transfer.receive`)
 
-- Halaman Detail Transfer (yang sama dari 2.2) menampilkan expected items/SN + tombol "Terima" — cuma nongol buat user yang scope-nya cocok dgn gudang tujuan.
-- Klik Terima → cek per-SN: cocok → `RECEIVED`, gak cocok → badge merah "SN Mismatch", tetap bisa diproses partial (barang lain masuk, yang mismatch di-log terpisah, TIDAK block seluruh transfer — pola sama toleransi partial-match modul lain, mis. pencocokan kwitansi ADHOC-24).
-- Submit → PRG redirect balik ke halaman Detail Transfer yang sama (sekarang status `RECEIVED`/`RECEIVED_PARTIAL`).
+- Detail transfer menampilkan jumlah dikirim, jumlah yang masih dalam perjalanan, dan kontrol penerimaan per baris: jumlah untuk QUANTITY/BATCH, centang SN atau roll fisik untuk SERIALIZED/ROLL. Hanya petugas dalam scope POP tujuan yang dapat mengonfirmasi.
+- **Terima Semua** menerima seluruh sisa yang belum dikonfirmasi. **Terima Sisa / Parsial** menerima hanya isian fisik yang dipilih saat itu. Contoh: 10 SN dikirim, 8 tiba → 8 masuk stok Cabang, 2 tetap `TRANSFERRED` dan transfer berstatus `RECEIVED_PARTIAL`.
+- Setiap konfirmasi membuat baris ledger penerimaan baru yang menunjuk baris dispatch melalui `source_inventory_transaction_id`. Jumlah diterima tidak boleh melebihi sisa; SN/roll yang sudah diterima tidak boleh dikredit ulang. Transaksi memakai lock dan status dibaca ulang untuk mencegah konfirmasi ganda.
+- `RECEIVED_PARTIAL` tetap terbuka di antrean dan jumlah **Dalam Perjalanan** dihitung dari dikirim dikurangi diterima. Sisa dapat diterima pada konfirmasi berikutnya; status menjadi `RECEIVED` setelah seluruhnya diterima. Submit kembali ke detail transfer melalui PRG.
+- **Batas saat ini:** tidak ada tombol khusus menutup sisa yang dinyatakan hilang. Alur investigasi, otorisasi kerugian, dan penutupan selisih masih pekerjaan lanjutan. Rancangan lama yang menyebut badge otomatis "SN Mismatch" dan log mismatch terpisah belum diimplementasikan; sistem mencatat barang yang benar-benar diterima dan membiarkan sisanya terbuka.
 
 ### 2.4 Issue ke Teknisi (`warehouse_issue.create`)
 
@@ -121,11 +123,12 @@ Setiap layar reuse pola/komponen yang sudah ada di repo — tidak bikin pola bar
 
 ### 2.8 Asset Traceability (`warehouse_traceability.view`)
 
-- Search box: masukkan SN → halaman detail timeline (RECEIVE→TRANSFER→ISSUE→INSTALL, dst), pola sama halaman riwayat token QR (`CustomerQrController::show()`).
+- Cari SN atau kode roll untuk membuka timeline RECEIVE→TRANSFER→ISSUE→INSTALL/DEPLOY dan perubahan status.
+- Pada detail roll, pemakaian pelanggan dibaca dari `task_materials` ber-`lot_no = roll_code`: tampil nomor task, pelanggan/POP, tanggal, meter per pekerjaan, dan total. Pemakaian infrastruktur dibaca dari ledger `DEPLOY` roll yang sama: tampil tujuan tersimpan pada catatan transaksi dan meter per aksi. Pencarian maupun detail tetap mengikuti POP scope aset.
 
 ### 2.9 Ledger/Riwayat Transaksi (`warehouse.view`, bagian dari dashboard)
 
-- Tabel filter tanggal + tipe transaksi + gudang, pola sama `TaskAuditTimeline`/riwayat ticket — bukan komponen tabel baru.
+- Tabel dapat difilter menurut tanggal, tipe transaksi, gudang, dan **teknisi yang terlibat** (`from_technician_id` atau `to_technician_id`). Pilihan teknisi berasal dari transaksi dalam POP scope pengguna; ID teknisi dalam query tidak boleh melewati pembatasan scope itu.
 
 ---
 
@@ -306,3 +309,25 @@ Sesuai pentahapan §29.9/§16.8 dokumen sebelumnya — jangan dibangun sekarang:
 **Catatan teknis nempel di keputusan penomoran:** DB default repo ini SQLite (`.env.example`) — `lockForUpdate()` di situ gak ngasih row-level lock kayak MySQL/Postgres (grammar SQLite Laravel gak nerbitin `FOR UPDATE`), yang bikin generate nomor tetep aman itu SQLite ngunci seluruh file DB per write-transaction. Tetep aman di skala sekarang, tapi kalau nanti pindah backend DB, perlu row-lock beneran biar gak asumsi salah.
 
 **Masih terbuka:** tidak ada lagi — 4 poin sebelumnya semua clear. Sisa kerjaan: eksekusi ke ERD/migration beneran (di luar sprint aktif, perlu konfirmasi lompat sprint dulu).
+
+## 6. Keputusan dan keadaan operasional 2026-10-24
+
+Bagian 1–5 merekam rancangan Fase 1 dan keputusan pada saat ditulis. Bagian ini menjadi acuan untuk perubahan Gudang setelah audit 2026-10-24; rincian bug tetap ada di [temuan audit](temuan-audit-gudang-2026-10-24.md).
+
+| Alur | Keputusan / keadaan |
+|---|---|
+| Waktu pengurangan stok | Permintaan agar barang baru tercatat ketika pelanggan aktif **dibatalkan**. Stok gudang berkurang saat ISSUE ke teknisi; custody teknisi berkurang saat barang dipakai/dipasang. Aktivasi pelanggan tidak menjadi pemicu mutasi gudang baru. |
+| Penerimaan parsial | Sudah tersedia untuk SN, roll, dan kuantitas; lanjutkan sisa melalui transfer yang sama sesuai §2.3. Sisa yang dipastikan hilang ditutup dengan alasan, bukti, ledger rugi, dan status `closed_lost`; penerimaan sebelumnya tetap utuh. |
+| Kabel sisa tidak layak | Ambang **Sisa Kecil** hanya peringatan, tidak memusnahkan otomatis. Petugas memilih tindakan `SCRAPPED` dengan alasan dan bukti; status roll memblokir pemakaian lanjut, panjang sisa tetap menjadi jejak fisik. |
+| Nilai kerugian kabel | Gunakan **harga per meter milik roll asal**, bukan harga pembelian terbaru item lain. Contoh: satu roll 1.000 m berharga Rp770.000, sisa 20 m dimusnahkan → Rp770/m × 20 m = **Rp15.400**. Nilai tampil pada KPI/tab Kerugian dan lembar ekspor **Kerugian Sisa Kabel**; kerugian roll yang masih di teknisi diatribusikan ke POP asal issue. QUARANTINE belum dianggap rugi; scrap barang non-roll tetap di luar aturan khusus ini. |
+| Stok antarbulan | Stok akhir Oktober adalah saldo sebelum 1 November; stok awal November memakai batas waktu yang sama. Nilai dan kuantitas identik bila tidak ada koreksi historis. Diverifikasi lewat ekspor dua bulan dalam `WarehouseReportLossValueTest`. |
+| Barang rusak yang diperbaiki internal | Jika perbaikan tidak menimbulkan biaya dan pemeriksaan menyatakan layak pakai, harga perolehan awal Rp200.000 **tetap Rp200.000**; status rusak tidak otomatis menurunkan harga. Penurunan nilai hanya lewat keputusan penilaian terpisah bila nilai yang dapat dipulihkan lebih rendah. Transisi DAMAGED/QUARANTINE → AVAILABLE kini melalui inspeksi dengan bukti dan petugas. Laporan mencatat pemulihan nilai rugi hanya bila sebelumnya ada kerusakan yang diakui; karantina tanpa rugi tidak menciptakan pembalikan semu. |
+
+### Tindak lanjut implementasi
+
+1. Perbaikan internal SN DAMAGED/QUARANTINE kembali AVAILABLE setelah pemeriksaan, alasan, bukti foto, dan penanda kondisi USED_GOOD. Harga perolehan unit tidak berubah. Kerugian DAMAGED dibalik pada laporan ketika unit yang sama pulih; pemeriksaan QUARANTINE tanpa rugi tidak membalik nilai apa pun. Jalur SCRAPPED/LOST tetap memakai adjustment yang sudah ada.
+2. Sisa transfer stok biasa yang dinyatakan hilang, baik Pusat→Cabang maupun Cabang→Pusat, ditutup dengan alasan dan bukti. Ledger mencatat nilai rugi pada POP pengirim tanpa mengurangi stok kedua kali.
+3. Transfer stok biasa Cabang→Pusat memakai dokumen TRF dan konfirmasi penerimaan dua fase, terpisah dari retur modem RTR. Opname SN dan roll mencatat unit yang cocok dan selisih fisik; kehilangan roll dinilai dengan harga per meter roll tersebut.
+4. **Koreksi keputusan 2026-10-26:** barang habis pakai tanpa SN tidak memiliki alur penjualan Gudang. Barang yang diperjualbelikan melalui Gudang harus mempunyai SN, baik SN bawaan alat maupun SN yang dihasilkan sistem. Transfer stok antar gudang adalah mutasi persediaan tanpa harga jual atau tagihan. Alur penjualan modem SN yang sudah ada tetap berlaku; bila nanti jenis barang ber-SN lain dijual, alurnya perlu diperluas sesuai jenis barang tersebut. Tidak dibuat alur penjualan non-SN.
+
+Catatan penomoran §5 adalah keputusan historis: implementasi terbaru memakai `NumberSequenceService::ledgerNumber()` dengan `number_sequences` untuk referensi ledger, bukan `MAX+1`.

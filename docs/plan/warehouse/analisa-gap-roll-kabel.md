@@ -2,6 +2,8 @@
 
 # Analisa Gap — Fitur Kabel Per-Roll (`TrackingType::ROLL`)
 
+**Catatan status 2026-10-24:** dokumen ini adalah potret gap saat September, bukan daftar pekerjaan yang masih terbuka. Transfer/Issue/Consume/Return roll dan ambang Sisa Kecil sudah tersedia. Jejak pemakaian per pekerjaan pelanggan dan infrastruktur kini tampil pada Traceability. Sisa roll tidak dimusnahkan otomatis; bila petugas memusnahkannya dengan bukti, nilai rugi memakai harga per meter roll asal (contoh 20 m dari roll Rp770.000/1.000 m = Rp15.400). Lihat [rancangan UI §6](rancangan-ui.md) untuk status operasional terbaru.
+
 Dicatat 2026-09-15. Fitur ROLL baru dibuat (uncommitted saat analisa ini ditulis — cek `git status` sebelum lanjut, kalau udah dicommit sebagian info "belum ada" di bawah bisa basi). Konteks pemicu: pertanyaan user — "2 roll kabel 1000m, masing sisa 30m, otomatis gak kepake, gimana sistem nanganin?"
 
 ## 1. Fungsi LOT (`BATCH` + `lot_no`) vs ROLL — beda konsep

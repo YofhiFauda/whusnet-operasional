@@ -10,6 +10,7 @@ use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Pop;
+use App\Models\TaskMaterial;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryReassignService;
@@ -45,6 +46,8 @@ class WarehouseTraceabilityController extends Controller
         $serial = null;
         $roll = null;
         $ledger = collect();
+        $rollUsage = collect();
+        $rollInfraUsage = collect();
         $notFound = false;
 
         $user = auth()->user();
@@ -111,7 +114,16 @@ class WarehouseTraceabilityController extends Controller
                 // terpisah dari daftar ledger ini.
                 $ledger = InventoryTransaction::query()
                     ->where('roll_id', $roll->id)
-                    ->with(['fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'createdBy', 'transfer.fromPop', 'transfer.toPop'])
+                    ->with(['fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'createdBy', 'transfer.fromPop', 'transfer.toPop', 'fopTask'])
+                    ->orderBy('id')
+                    ->get();
+                $rollInfraUsage = $ledger->filter(fn (InventoryTransaction $event) => $event->type->value === 'deploy'
+                    && in_array($event->reason, ['infra_cable_consumption', 'infra_record_correction'], true))->values();
+                $rollUsage = TaskMaterial::query()
+                    ->terpakai()
+                    ->where('item_id', $roll->item_id)
+                    ->where('lot_no', $roll->roll_code)
+                    ->with(['fopTask.customer', 'fopTask.pop', 'customer', 'recordedBy'])
                     ->orderBy('id')
                     ->get();
             } else {
@@ -126,7 +138,7 @@ class WarehouseTraceabilityController extends Controller
 
         return view('warehouse.traceability.index', compact(
             'serialNumber', 'rollCode', 'serial', 'roll', 'ledger', 'notFound',
-            'query', 'results', 'pops', 'popFilter'
+            'query', 'results', 'pops', 'popFilter', 'rollUsage', 'rollInfraUsage'
         ));
     }
 

@@ -150,16 +150,13 @@ class InventorySerial extends Model
     }
 
     /**
-     * Gate `InventoryIssueService::issueSerialized()` (analisa-gap-kondisi-barang.md
-     * rancangan poin 4) — SN `new` gak pernah butuh cek ulang. SN bekas
-     * (`used_good`/`used_damaged`) BOLEH diissue lagi kalau SUDAH dicek
-     * fisik (`condition_checked_at` terisi, gak peduli hasil akhirnya baik
-     * atau rusak — itu keputusan staf lewat aksi "Sudah Dicek", bukan
-     * dihakimi otomatis di sini).
+     * Kondisi baru lolos langsung. Kondisi bekas baik perlu pemeriksaan,
+     * sedangkan kondisi rusak selalu ditolak walau sudah diperiksa.
      */
     public function isClearedForIssue(): bool
     {
-        return ($this->condition ?? ItemCondition::NEW) === ItemCondition::NEW || $this->condition_checked_at !== null;
+        return $this->condition !== ItemCondition::USED_DAMAGED
+            && (($this->condition ?? ItemCondition::NEW) === ItemCondition::NEW || $this->condition_checked_at !== null);
     }
 
     public function scopeStatus($query, SerialStatus $status)

@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Enums\DeviceAcquisitionSource;
 use App\Enums\DeviceOwnership;
+use App\Enums\ItemCondition;
 use App\Enums\SerialStatus;
 use App\Models\Customer;
+use App\Models\DeviceRetrievalLog;
 use App\Models\FopTask;
 use App\Models\InventorySerial;
 use App\Models\InventorySerialSale;
@@ -13,6 +15,7 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\User;
+use App\Services\InventoryReassignService;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
@@ -109,6 +112,19 @@ class InventoryServiceOwnershipTest extends TestCase
     }
 
     #[Test]
+    public function modem_rusak_tidak_bisa_diinstall_meski_status_issued(): void
+    {
+        $serial = $this->createIssuedSerial('SN-OWN-DAMAGED');
+        $serial->update([
+            'condition' => ItemCondition::USED_DAMAGED,
+            'condition_checked_at' => now(),
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        app(InventoryService::class)->installSerial($serial, $this->customer, $this->fopTask, [$this->technician], $this->actor);
+    }
+
+    #[Test]
     public function install_serial_default_ownership_company_menulis_acquisition_source_sewa(): void
     {
         $serial = $this->createIssuedSerial('SN-OWN-COMP-001');
@@ -118,6 +134,35 @@ class InventoryServiceOwnershipTest extends TestCase
 
         $this->assertSame(DeviceOwnership::COMPANY, $serial->refresh()->ownership);
         $this->assertSame(DeviceAcquisitionSource::SEWA, $this->customer->refresh()->customerDevice->acquisition_source);
+    }
+
+    #[Test]
+    public function riwayat_pengambilan_creq_swap_menyimpan_pop_gudang_cabang(): void
+    {
+        $old = $this->createIssuedSerial('SN-CREQ-SWAP-OLD');
+        $new = $this->createIssuedSerial('SN-CREQ-SWAP-NEW');
+        $service = app(InventoryService::class);
+
+        $service->installSerial($old, $this->customer, $this->fopTask, [$this->technician], $this->actor);
+        $service->installSerial($new, $this->customer, $this->fopTask, [$this->technician], $this->actor);
+
+        $log = DeviceRetrievalLog::where('serial_id', $old->id)->firstOrFail();
+        $this->assertSame($this->pop->id, (int) $log->warehouse_pop_id);
+    }
+
+    #[Test]
+    public function konfirmasi_retur_melengkapi_pop_log_lama_yang_null(): void
+    {
+        $old = $this->createIssuedSerial('SN-CREQ-NULL-OLD');
+        $new = $this->createIssuedSerial('SN-CREQ-NULL-NEW');
+        $service = app(InventoryService::class);
+        $service->installSerial($old, $this->customer, $this->fopTask, [$this->technician], $this->actor);
+        $service->installSerial($new, $this->customer, $this->fopTask, [$this->technician], $this->actor);
+        DeviceRetrievalLog::where('serial_id', $old->id)->update(['warehouse_pop_id' => null]);
+
+        app(InventoryReassignService::class)->confirmReturnedSerial($old, ItemCondition::USED_GOOD, null, $this->actor);
+
+        $this->assertSame($this->pop->id, (int) DeviceRetrievalLog::where('serial_id', $old->id)->value('warehouse_pop_id'));
     }
 
     #[Test]

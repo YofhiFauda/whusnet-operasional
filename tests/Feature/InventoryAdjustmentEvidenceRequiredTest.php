@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\SerialStatus;
+use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
@@ -65,6 +66,16 @@ class InventoryAdjustmentEvidenceRequiredTest extends TestCase
 
         $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
         $this->kabel = Item::create(['code' => 'EV-KABEL', 'name' => 'Kabel Evidence Test', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
+    }
+
+    #[Test]
+    public function adjustment_serial_memakai_status_terbaru_dari_database(): void
+    {
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $this->modem, ['EV-STALE-SN'], 250000, $this->owner);
+        InventorySerial::whereKey($serial->id)->update(['status' => SerialStatus::SCRAPPED]);
+
+        $this->expectException(InvalidArgumentException::class);
+        app(InventoryAdjustmentService::class)->adjustSerialStatus($serial, SerialStatus::LOST, 'hilang', $this->owner, null, 'bukti.jpg');
     }
 
     #[Test]
@@ -138,6 +149,17 @@ class InventoryAdjustmentEvidenceRequiredTest extends TestCase
             'status' => 'issued',
             'issued_at' => now(),
         ]);
+    }
+
+    #[Test]
+    public function adjustment_memakai_data_terbaru_bukan_model_custody_basi(): void
+    {
+        $custody = $this->makeCustody(10);
+        TechnicianCustody::whereKey($custody->id)->update(['qty_remaining' => 7]);
+
+        app(InventoryAdjustmentService::class)->adjustCustody($custody, 2, 'quarantine', $this->owner);
+
+        $this->assertEquals(9, (float) $custody->fresh()->qty_remaining);
     }
 
     #[Test]

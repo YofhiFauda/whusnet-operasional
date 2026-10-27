@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\DeviceOwnership;
 use App\Enums\DeviceRetrievalOutcome;
 use App\Enums\InventoryTransactionType;
 use App\Enums\ItemCondition;
@@ -14,6 +15,7 @@ use App\Models\Customer;
 use App\Models\CustomerDevice;
 use App\Models\DeviceRetrievalLog;
 use App\Models\InventorySerial;
+use App\Models\InventorySerialSale;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
 use App\Models\Item;
@@ -25,7 +27,11 @@ use App\Models\Task;
 use App\Models\TaskTeam;
 use App\Models\User;
 use App\Services\InventoryIssueService;
+use App\Services\InventoryReassignService;
 use App\Services\InventoryReceiveService;
+use App\Services\InventoryReturnTransferService;
+use App\Services\InventoryTransferService;
+use App\Services\WarehouseTransferActionQueue;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -147,6 +153,86 @@ class WarehouseReturnToPusatTest extends TestCase
             ->assertSessionHas('success');
 
         return $serial->refresh();
+    }
+
+    #[Test]
+    public function modem_retur_used_damaged_tidak_bisa_di_issue(): void
+    {
+        $serial = $this->dispatchForPriceTest('RTP-DAMAGED-001');
+
+        app(InventoryReturnTransferService::class)->confirmAtPusat($serial, ItemCondition::USED_DAMAGED, null, $this->owner);
+
+        $serial->refresh();
+        $this->assertSame(SerialStatus::DAMAGED, $serial->status);
+        $this->assertFalse($serial->isClearedForIssue());
+        $this->assertDatabaseHas('inventory_transactions', [
+            'serial_id' => $serial->id,
+            'to_pop_id' => $this->pusat->id,
+            'type' => InventoryTransactionType::TRANSFER->value,
+        ]);
+    }
+
+    #[Test]
+    public function transfer_retur_cabang_ke_pusat_tidak_bisa_diterima_lewat_receive_biasa(): void
+    {
+        $serial = $this->dispatchForPriceTest('RTP-BYPASS-001');
+        $transfer = InventoryTransfer::where('from_pop_id', $this->cabang->id)->where('to_pop_id', $this->pusat->id)->firstOrFail();
+
+        $this->assertFalse(app(WarehouseTransferActionQueue::class)->forUser($this->owner)->whereKey($transfer->id)->exists());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Pengiriman retur dikonfirmasi per SN');
+
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [$serial->serial_number], [], $this->owner);
+    }
+
+    #[Test]
+    public function walk_in_modem_milik_pelanggan_ditolak(): void
+    {
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $this->modem, ['RTP-SOLD-001'], 250000, $this->owner);
+        $serial->update([
+            'status' => SerialStatus::INSTALLED,
+            'ownership' => DeviceOwnership::CUSTOMER,
+            'customer_id' => $this->customer->id,
+        ]);
+        InventorySerialSale::create([
+            'inventory_serial_id' => $serial->id,
+            'customer_id' => $this->customer->id,
+            'price' => 250000,
+            'created_by' => $this->owner->id,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('milik pelanggan');
+
+        app(InventoryReassignService::class)->receiveSerialFromCustomerAtWarehouse(
+            $serial->serial_number,
+            null,
+            $this->customer,
+            $this->cabang,
+            ItemCondition::USED_GOOD,
+            null,
+            $this->owner,
+        );
+    }
+
+    #[Test]
+    public function modem_rusak_dengan_status_available_tetap_ditolak_issue(): void
+    {
+        $serial = $this->dispatchForPriceTest('RTP-DAMAGED-GUARD');
+        app(InventoryReturnTransferService::class)->confirmAtPusat($serial, ItemCondition::USED_DAMAGED, null, $this->owner);
+        $serial->refresh()->update([
+            'status' => SerialStatus::AVAILABLE,
+            'current_pop_id' => $this->cabang->id,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        app(InventoryIssueService::class)->issue(
+            $this->cabang,
+            $this->teknisi,
+            [['item_id' => $this->modem->id, 'serial_numbers' => [$serial->serial_number]]],
+            $this->owner,
+        );
     }
 
     private function dispatchForPriceTest(string $sn): InventorySerial

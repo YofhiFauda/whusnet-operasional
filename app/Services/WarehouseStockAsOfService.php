@@ -18,16 +18,10 @@ use Illuminate\Support\Collection;
  * langsung dari ledger `inventory_transactions` (append-only, satu-satunya
  * sumber kebenaran, docs/warehouse/business-logic.md §10).
  *
- * Aturan turunan buat SERIALIZED/ROLL SENGAJA sesederhana mungkin, BUKAN
- * state machine baru — cuma manfaatin konvensi kolom yang SUDAH konsisten
- * dipakai `InventoryReceiveService`/`InventoryTransferService`/
- * `InventoryIssueService`/`InventoryAdjustmentService` sejak awal (§2):
- * transaksi TERAKHIR sebuah unit SEBELUM tanggal X menentukan semuanya —
- * kalau baris itu `to_pop_id` = POP yang dicari, unit itu "stok" di situ
- * (RECEIVE/TRANSFER-confirm/RETURN/REASSIGN semua nulis `to_pop_id` pas
- * barang nyata nyampe gudang). Baris LAIN (ISSUE/TRANSFER-dispatch/
- * ADJUSTMENT/INSTALL/TRANSFER_CUSTODY) TIDAK PERNAH nulis `to_pop_id` —
- * otomatis gak terhitung stok tanpa percabangan per `type` sama sekali.
+ * Baris terakhir per SERIALIZED/ROLL menentukan lokasi stok pada cutoff.
+ * DEPLOY dan REGISTER_INFRA mencatat lokasi POP aset terpasang, sehingga
+ * keduanya dikecualikan dari saldo gudang. Replay QUANTITY juga mengecualikan
+ * kedua tipe itu karena ISSUE sudah mengurangi stok gudang.
  *
  * **"Barang Masuk"** (ADHOC-79 ronde ke-6) = SEMUA arrival ke POP ini dalam
  * satu periode, TERLEPAS dari `type`-nya (RECEIVE di Pusat MAUPUN
@@ -108,6 +102,7 @@ class WarehouseStockAsOfService
             ->where('item_id', $item->id)
             ->where(fn ($q) => $q->where('to_pop_id', $pop->id)->orWhere('from_pop_id', $pop->id))
             ->where('created_at', '<', $exclusiveCutoff)
+            ->whereNotIn('type', [InventoryTransactionType::DEPLOY->value, InventoryTransactionType::REGISTER_INFRA->value])
             ->orderBy('id')
             ->get(['id', 'lot_no', 'qty', 'to_pop_id', 'from_pop_id', 'unit_price_snapshot']);
 
@@ -203,6 +198,7 @@ class WarehouseStockAsOfService
             ->where('item_id', $item->id)
             ->where(fn ($q) => $q->where('to_pop_id', $pop->id)->orWhere('from_pop_id', $pop->id))
             ->where('created_at', '<', $exclusiveCutoff)
+            ->whereNotIn('type', [InventoryTransactionType::DEPLOY->value, InventoryTransactionType::REGISTER_INFRA->value])
             ->orderBy('id')
             ->get(['id', 'lot_no', 'qty', 'to_pop_id', 'from_pop_id']);
 
@@ -266,6 +262,7 @@ class WarehouseStockAsOfService
         $rows = InventoryTransaction::query()
             ->whereIn('id', $latestIds)
             ->where('to_pop_id', $pop->id)
+            ->whereNotIn('type', [InventoryTransactionType::DEPLOY->value, InventoryTransactionType::REGISTER_INFRA->value])
             ->orderBy('id')
             ->get(['id', 'qty', 'unit_price_snapshot']);
 

@@ -579,6 +579,16 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        'warehouse_branch_sale' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::RECEIVE->value,
+        ],
+
+        'warehouse_branch_sale_price' => [
+            ActionCode::VIEW->value,
+        ],
+
         'warehouse_transfer' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value, // Pusat kirim (§2.2)
@@ -943,6 +953,11 @@ return [
         'creq_billing_verification.view' => 'Lihat Antrean Verifikasi Biaya C-REQ',
         'creq_billing_verification.approve' => 'Setujui Biaya C-REQ (lanjut ke Tagihan Manual)',
         'creq_billing_verification.reject' => 'Tolak Biaya C-REQ',
+
+        'warehouse_branch_sale.view' => 'Lihat Dokumen Jual Beli SN Antar Cabang',
+        'warehouse_branch_sale.create' => 'Jual dan Kirim SN ke Cabang Lain',
+        'warehouse_branch_sale.receive' => 'Konfirmasi SN Dibeli dari Cabang Lain',
+        'warehouse_branch_sale_price.view' => 'Lihat Harga dan Kewajiban Jual Beli Antar Cabang',
 
         // Laporan Barang Terjual ke Pelanggan (Ownership Modem Sewa/Beli, Task 9)
         'warehouse_report.sold_to_customer.view' => 'Lihat Laporan Barang Terjual ke Pelanggan',

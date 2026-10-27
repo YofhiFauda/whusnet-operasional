@@ -88,7 +88,7 @@ class WarehouseController extends Controller
         // sengaja diikutkan: Pusat mau lihat kiriman yang belum dikonfirmasi
         // cabang, cabang mau lihat kiriman yang lagi menuju dia.
         $transitTransfers = InventoryTransfer::query()
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
             ->where(fn ($q) => $q->whereIn('from_pop_id', $popIds)->orWhereIn('to_pop_id', $popIds))
             ->with(['transactions', 'fromPop', 'toPop'])
             ->latest('id')
@@ -332,14 +332,14 @@ class WarehouseController extends Controller
 
         $inTransitTransfersByPop = InventoryTransfer::query()
             ->whereIn('from_pop_id', $popIds)
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
             ->selectRaw('from_pop_id, count(*) as cnt')
             ->groupBy('from_pop_id')
             ->pluck('cnt', 'from_pop_id');
 
         $incomingInTransitByPop = InventoryTransfer::query()
             ->whereIn('to_pop_id', $popIds)
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
             ->selectRaw('to_pop_id, count(*) as cnt')
             ->groupBy('to_pop_id')
             ->pluck('cnt', 'to_pop_id');

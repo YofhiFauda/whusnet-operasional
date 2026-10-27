@@ -711,9 +711,6 @@
                         <span class="text-slate-300">·</span>
                         <span class="text-slate-500">Port <?php echo e($customerNetworkLocation['port_number']); ?></span>
                     </div>
-                    <?php if($customerNetworkLocation['olt'] && ! $customerNetworkLocation['verified']): ?>
-                        <p class="text-[11px] text-amber-600 dark:text-amber-400">Uplink PON→ODP belum terverifikasi.</p>
-                    <?php endif; ?>
                 </div>
                 <?php else: ?>
                 <div class="p-8 text-center text-slate-400 text-xs">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Enums\DeviceOwnership;
 use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
@@ -17,6 +18,7 @@ use App\Services\FileUploadService;
 use App\Services\InventoryAdjustmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use InvalidArgumentException;
@@ -153,6 +155,53 @@ class WarehouseAdjustmentController extends Controller
         return redirect()->route('warehouse.stock.index')->with('success', 'Stock opname tercatat.');
     }
 
+    public function createUnitOpname(EffectiveAccessService $access): View
+    {
+        $user = auth()->user();
+        $pops = Pop::query()->warehouse()
+            ->when(! $access->hasAllPopAccess($user), fn ($query) => $query->whereIn('id', $access->getAllowedPopIds($user)))
+            ->orderBy('name')->get();
+
+        return view('warehouse.adjustments.unit-opname', compact('pops'));
+    }
+
+    public function storeUnitOpname(Request $request, InventoryAdjustmentService $service, EffectiveAccessService $access): RedirectResponse
+    {
+        $validated = $request->validate([
+            'pop_id' => ['required', 'integer', 'exists:pops,id'],
+            'tracking_type' => ['required', Rule::in(['serialized', 'roll'])],
+            'code' => ['required', 'string', 'max:100'],
+            'is_present' => ['required_if:tracking_type,serialized', 'nullable', 'boolean'],
+            'counted_length' => ['required_if:tracking_type,roll', 'nullable', 'numeric', 'min:0'],
+            'reason' => ['required', 'string', 'max:500'],
+            'evidence' => ['required', 'image', 'max:4096'],
+        ]);
+
+        $pop = Pop::findOrFail($validated['pop_id']);
+        $this->assertPopInScope($pop, auth()->user(), $access);
+        $this->assertPopAdminNotBlockedByActivePicGudang($pop, auth()->user());
+        $this->assertPicGudangCanActOnPop($pop, auth()->user());
+
+        $unit = $validated['tracking_type'] === 'serialized'
+            ? InventorySerial::query()->where('serial_number', $validated['code'])->where('current_pop_id', $pop->id)->firstOrFail()
+            : InventoryRoll::query()->where('roll_code', $validated['code'])->where('current_pop_id', $pop->id)->firstOrFail();
+        $evidencePath = FileUploadService::uploadWarehouseEvidence($request->file('evidence'), 'stock-opname');
+
+        try {
+            if ($unit instanceof InventorySerial) {
+                $service->recordSerialStockOpname($unit, $pop, (bool) $validated['is_present'], auth()->user(), $validated['reason'], $evidencePath);
+            } else {
+                $service->recordRollStockOpname($unit, $pop, (float) $validated['counted_length'], auth()->user(), $validated['reason'], $evidencePath);
+            }
+        } catch (InvalidArgumentException $e) {
+            Storage::disk('public')->delete($evidencePath);
+
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('warehouse.stock.index')->with('success', 'Opname unit fisik berhasil dicatat.');
+    }
+
     public function createCustody(TechnicianCustody $custody, EffectiveAccessService $access): View
     {
         $this->assertPopIdInScope($custody->issued_from_pop_id, auth()->user(), $access);
@@ -245,6 +294,38 @@ class WarehouseAdjustmentController extends Controller
      * `InventoryAdjustmentService::adjustRollStatus()`), cuma status +
      * evidence.
      */
+    public function createRepairSerial(InventorySerial $serial, EffectiveAccessService $access): View
+    {
+        $this->assertPopIdInScope($serial->current_pop_id, auth()->user(), $access);
+        abort_unless(in_array($serial->status, [SerialStatus::DAMAGED, SerialStatus::QUARANTINE], true)
+            && $serial->current_technician_id === null
+            && $serial->ownership !== DeviceOwnership::CUSTOMER, 404);
+
+        $serial->load(['item', 'currentPop']);
+
+        return view('warehouse.adjustments.repair-serial', compact('serial'));
+    }
+
+    public function storeRepairSerial(Request $request, InventorySerial $serial, InventoryAdjustmentService $service, EffectiveAccessService $access): RedirectResponse
+    {
+        $this->assertPopIdInScope($serial->current_pop_id, auth()->user(), $access);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+            'evidence' => ['required', 'image', 'max:4096'],
+        ]);
+
+        $evidencePath = FileUploadService::uploadWarehouseEvidence($request->file('evidence'), 'repaired');
+
+        try {
+            $service->restoreRepairedSerial($serial, $validated['reason'], auth()->user(), $evidencePath);
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('warehouse.damaged.index')->with('success', "SN {$serial->serial_number} selesai diperbaiki dan kembali tersedia.");
+    }
+
     public function createRoll(InventoryRoll $roll, EffectiveAccessService $access): View
     {
         $this->assertPopIdInScope($roll->issued_from_pop_id ?? $roll->current_pop_id, auth()->user(), $access);

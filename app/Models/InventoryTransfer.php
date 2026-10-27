@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Header MUTABLE buat Transfer Pusat→Cabang. SENGAJA BUKAN bagian dari
@@ -67,8 +68,13 @@ class InventoryTransfer extends Model
         return $this->hasMany(InventoryTransaction::class, 'inventory_transfer_id');
     }
 
+    public function branchSale(): HasOne
+    {
+        return $this->hasOne(BranchInventorySale::class, 'inventory_transfer_id');
+    }
+
     public function isInTransit(): bool
     {
-        return $this->status === TransferStatus::IN_TRANSIT;
+        return in_array($this->status, [TransferStatus::IN_TRANSIT, TransferStatus::RECEIVED_PARTIAL], true);
     }
 }

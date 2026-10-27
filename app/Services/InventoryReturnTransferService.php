@@ -73,7 +73,7 @@ class InventoryReturnTransferService
             }
 
             $transfer = InventoryTransfer::create([
-                'reference_number' => $this->generateReferenceNumber(),
+                'reference_number' => app(NumberSequenceService::class)->ledgerNumber('RTR'),
                 'from_pop_id' => $cabang->id,
                 'to_pop_id' => $pusat->id,
                 'status' => TransferStatus::IN_TRANSIT,
@@ -161,7 +161,7 @@ class InventoryReturnTransferService
 
             $serial->update([
                 'item_id' => $correctedItem?->id ?? $serial->item_id,
-                'status' => SerialStatus::AVAILABLE,
+                'status' => $condition === ItemCondition::USED_DAMAGED ? SerialStatus::DAMAGED : SerialStatus::AVAILABLE,
                 'condition' => $condition,
                 'condition_checked_at' => now(),
                 'condition_checked_by' => $actor->id,
@@ -201,18 +201,5 @@ class InventoryReturnTransferService
 
             return $transaction;
         });
-    }
-
-    private function generateReferenceNumber(): string
-    {
-        $yearMonth = date('Ym');
-        $today = date('Ymd');
-
-        $lastNum = InventoryTransfer::where('reference_number', 'like', "RTR-{$yearMonth}%")
-            ->pluck('reference_number')
-            ->map(fn ($number) => (int) substr($number, strrpos($number, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('RTR-%s-%06d', $today, $lastNum + 1);
     }
 }

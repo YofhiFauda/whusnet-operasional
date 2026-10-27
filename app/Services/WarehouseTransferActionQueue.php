@@ -44,7 +44,9 @@ class WarehouseTransferActionQueue
     public function forUser(User $user): Builder
     {
         return InventoryTransfer::query()
-            ->where('status', TransferStatus::IN_TRANSIT->value)
+            ->whereDoesntHave('branchSale')
+            ->whereIn('status', [TransferStatus::IN_TRANSIT->value, TransferStatus::RECEIVED_PARTIAL->value])
+            ->where('reference_number', 'like', 'TRF-%')
             ->whereIn('to_pop_id', $this->receivablePopIds($user));
     }
 }

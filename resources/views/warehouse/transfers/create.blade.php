@@ -63,12 +63,13 @@
     <x-warehouse.header
         active="stock"
         title="Transfer Antar Gudang"
-        subtitle="Distribusi stok material & perangkat Pusat $\rightarrow$ Cabang"
+        subtitle="{{ $direction === 'reverse' ? 'Transfer stok biasa Cabang → Pusat' : 'Distribusi stok material & perangkat Pusat → Cabang' }}"
         backUrl="{{ route('warehouse.stock.index') }}"
     />
 
     <form id="transfer-form" action="{{ route('warehouse.transfers.store') }}" method="POST">
         @csrf
+        <input type="hidden" name="direction" value="{{ $direction }}">
 
         {{-- ========================================================
              SINGLE CONTAINER PANEL (Card Budget = 1)

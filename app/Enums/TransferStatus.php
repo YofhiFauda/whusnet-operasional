@@ -5,7 +5,7 @@ namespace App\Enums;
 /**
  * Status header `inventory_transfers` — MUTABLE, beda dari status ledger
  * (`InventoryTransactionType` dkk) yang append-only. Satu kali transisi
- * `IN_TRANSIT` → `RECEIVED`/`RECEIVED_PARTIAL`, gak berulang-ulang diedit —
+ * `IN_TRANSIT` → `RECEIVED_PARTIAL` → `RECEIVED` (bisa beberapa penerimaan) —
  * pola sama `Ticket::status` (mutable) berdampingan `ticket_histories`
  * (append-only). Lihat migration `create_inventory_transfers_table` +
  * docs/plan/warehouse/rancangan-ui.md §3.6.
@@ -21,12 +21,16 @@ enum TransferStatus: string
     /** Diterima sebagian — ada SN mismatch/qty kurang (§2.3 rancangan-ui.md). */
     case RECEIVED_PARTIAL = 'received_partial';
 
+    /** Sisa kiriman yang tidak tiba telah dinyatakan hilang dan ditutup. */
+    case CLOSED_LOST = 'closed_lost';
+
     public function label(): string
     {
         return match ($this) {
             self::IN_TRANSIT => 'Dalam Perjalanan',
             self::RECEIVED => 'Diterima Penuh',
             self::RECEIVED_PARTIAL => 'Diterima Sebagian',
+            self::CLOSED_LOST => 'Ditutup — Sisa Hilang',
         };
     }
 
@@ -40,7 +44,7 @@ enum TransferStatus: string
         return match ($this) {
             self::IN_TRANSIT => 'warning',
             self::RECEIVED => 'success',
-            self::RECEIVED_PARTIAL => 'error',
+            self::RECEIVED_PARTIAL, self::CLOSED_LOST => 'error',
         };
     }
 }

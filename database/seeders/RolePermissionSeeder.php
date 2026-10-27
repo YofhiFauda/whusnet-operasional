@@ -108,6 +108,8 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_stock_request.view',
                 'warehouse_traceability.view',
                 'warehouse_transfer.view',
+                'warehouse_branch_sale.view',
+                'warehouse_branch_sale_price.view',
             ],
 
             'admin' => [
@@ -506,6 +508,8 @@ class RolePermissionSeeder extends Seeder
                 'warehouse.view',
                 'warehouse_transfer.view',
                 'warehouse_transfer.receive',
+                'warehouse_branch_sale.view',
+                'warehouse_branch_sale.receive',
                 'warehouse_issue.view',
                 'warehouse_issue.create',
                 'warehouse_custody.view',
@@ -548,6 +552,10 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_transfer.receive',
                 'warehouse_transfer.view',
                 'warehouse_transfer_invoice.view',
+                'warehouse_branch_sale.view',
+                'warehouse_branch_sale.create',
+                'warehouse_branch_sale.receive',
+                'warehouse_branch_sale_price.view',
             ],
 
             'sales' => [
@@ -707,6 +715,10 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_traceability.view',
                 'warehouse_transfer.receive',
                 'warehouse_transfer.view',
+                'warehouse_branch_sale.view',
+                'warehouse_branch_sale.create',
+                'warehouse_branch_sale.receive',
+                'warehouse_branch_sale_price.view',
             ],
 
             'kolektor' => [

@@ -95,6 +95,15 @@
                     <td class="px-4 py-3.5"><x-warehouse.condition-badge :condition="$serial->condition" :checked="$serial->condition_checked_at !== null" /></td>
                     <td class="px-4 py-3.5 font-semibold">{{ $serial->currentPop?->name ?? $serial->issuedFromPop?->name ?? '-' }}</td>
                     <td class="px-4 py-3.5 text-right">
+                        @if(auth()->user()->hasPermission('warehouse_adjustment.create')
+                            && in_array($serial->status, [\App\Enums\SerialStatus::DAMAGED, \App\Enums\SerialStatus::QUARANTINE], true)
+                            && $serial->current_pop_id !== null
+                            && $serial->current_technician_id === null
+                            && $serial->ownership !== \App\Enums\DeviceOwnership::CUSTOMER
+                            && $pops->contains('id', $serial->current_pop_id))
+                            <a href="{{ route('warehouse.adjustments.serial.repair.create', $serial) }}"
+                               class="mr-3 font-bold text-emerald-700 hover:underline dark:text-emerald-400">Selesai Diperbaiki</a>
+                        @endif
                         <a href="{{ route('warehouse.traceability.index', ['q' => $serial->serial_number]) }}"
                            class="text-sky-600 dark:text-sky-400 font-bold hover:underline">Lacak →</a>
                     </td>

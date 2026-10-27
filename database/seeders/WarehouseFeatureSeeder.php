@@ -66,6 +66,8 @@ class WarehouseFeatureSeeder extends Seeder
         $roots = [
             ['code' => 'warehouse', 'name' => 'Dashboard & Ledger Gudang', 'sort_order' => 13],
             ['code' => 'warehouse_transfer', 'name' => 'Transfer Antar Gudang', 'sort_order' => 14],
+            ['code' => 'warehouse_branch_sale', 'name' => 'Jual Beli SN Antar Cabang', 'sort_order' => 23],
+            ['code' => 'warehouse_branch_sale_price', 'name' => 'Harga Jual Beli Antar Cabang', 'sort_order' => 24],
             ['code' => 'warehouse_issue', 'name' => 'Issue ke Teknisi', 'sort_order' => 15],
             ['code' => 'warehouse_custody', 'name' => 'Custody Teknisi (Semua)', 'sort_order' => 16],
             ['code' => 'warehouse_traceability', 'name' => 'Asset Traceability', 'sort_order' => 17],
@@ -118,6 +120,6 @@ class WarehouseFeatureSeeder extends Seeder
 
         app(PermissionGeneratorService::class)->generate();
 
-        $this->command?->info('WarehouseFeatureSeeder: 10 feature gudang + 1 sub-feature digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
+        $this->command?->info('WarehouseFeatureSeeder: feature Gudang dan sub-feature digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
     }
 }

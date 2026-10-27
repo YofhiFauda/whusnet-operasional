@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
@@ -36,7 +37,7 @@ use Tests\TestCase;
  *    grup sendiri, nilai rugi gak pernah kehitung. Lihat docblock
  *    `WarehouseReportController::buildAdjustmentSummary()`.
  * 2. Nilai Rugi (qty x last-cost RECEIVE terakhir) cuma dihitung buat
- *    kategori RUSAK+HILANG, kategori lain (quarantine/scrapped) null.
+ *    kategori RUSAK+HILANG, quarantine tidak dihitung; sisa roll yang dimusnahkan dihitung.
  */
 class WarehouseReportLossValueTest extends TestCase
 {
@@ -497,6 +498,36 @@ class WarehouseReportLossValueTest extends TestCase
 
     private const COL_BARANG_MASUK_NILAI = 7;
 
+    #[Test]
+    public function stok_akhir_oktober_sama_dengan_stok_awal_november(): void
+    {
+        $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $item = Item::create(['code' => 'RLV-LINTAS-BULAN', 'name' => 'Kabel Lintas Bulan', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $item, 100, 770, $this->owner);
+        InventoryTransaction::query()->where('item_id', $item->id)->update(['created_at' => '2026-10-15 12:00:00']);
+
+        $rows = [];
+        foreach (['2026-10', '2026-11'] as $period) {
+            $response = $this->actingAs($this->owner)->get(route('warehouse.reports.export', ['period' => $period]));
+            $response->assertOk();
+            $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'test-lintas-bulan-'.uniqid().'.xlsx';
+            copy($response->baseResponse->getFile()->getPathname(), $path);
+            $rows[$period] = $this->readPopSheetRow($path, $this->pusat->name, 'Kabel Lintas Bulan');
+            @unlink($path);
+        }
+
+        $this->assertNotNull($rows['2026-10']);
+        $this->assertNotNull($rows['2026-11']);
+        $oktoberAkhir = $rows['2026-10'];
+        $novemberAwal = $rows['2026-11'];
+        $this->assertEquals(
+            (float) $oktoberAkhir[self::COL_STOK_AKHIR_QTY_LAMA] + (float) $oktoberAkhir[self::COL_STOK_AKHIR_QTY_BARU],
+            (float) $novemberAwal[self::COL_STOK_AWAL_QTY_LAMA] + (float) $novemberAwal[self::COL_STOK_AWAL_QTY_BARU]
+        );
+        $this->assertEquals(77000, (float) $oktoberAkhir[self::COL_STOK_AKHIR_NILAI]);
+        $this->assertEquals(77000, (float) $novemberAwal[12]);
+    }
+
     private const COL_STOK_AWAL_QTY_LAMA = 8;
 
     private const COL_STOK_AWAL_HARGA_LAMA = 9;
@@ -546,5 +577,48 @@ class WarehouseReportLossValueTest extends TestCase
         }
 
         return null;
+    }
+
+    #[Test]
+    public function sisa_roll_dua_puluh_meter_yang_dimusnahkan_masuk_kerugian_sesuai_harga_roll_asal(): void
+    {
+        $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $item = Item::create(['code' => 'RLV-ROLL-SISA', 'name' => 'Kabel Sisa Musnah', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'roll', 'meter_per_roll' => 1000]);
+        $roll = app(InventoryReceiveService::class)->receiveRoll($this->pusat, $item, 1, null, 770000, $this->owner)[0];
+        $technician = User::factory()->create();
+        $roll->update([
+            'length_remaining' => 20,
+            'status' => RollStatus::IN_USE,
+            'current_pop_id' => null,
+            'current_technician_id' => $technician->id,
+            'issued_from_pop_id' => $this->pusat->id,
+        ]);
+
+        app(InventoryAdjustmentService::class)->adjustRollStatus(
+            $roll, RollStatus::SCRAPPED, 'Sisa 20 meter tidak dapat dipakai', $this->owner, null, 'warehouse/evidence/scrap/roll.jpg'
+        );
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.reports.index'));
+        $response->assertOk();
+        $row = collect($response->viewData('adjustmentRows'))->firstWhere('reason', 'scrapped');
+
+        $this->assertNotNull($row);
+        $this->assertEquals(15400, $row['loss_value']);
+        $this->assertEquals(20, $row['total_qty'] * 1000);
+        $this->assertEquals(15400, $response->viewData('kpi')['total_loss_value']);
+
+        $scoped = $this->actingAs($this->owner)->get(route('warehouse.reports.index', ['pop_id' => $this->pusat->id]));
+        $scoped->assertOk();
+        $this->assertEquals(15400, collect($scoped->viewData('adjustmentRows'))->firstWhere('reason', 'scrapped')['loss_value']);
+
+        $export = $this->actingAs($this->owner)->get(route('warehouse.reports.export'));
+        $export->assertOk();
+        $tempPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'test-scrap-roll-'.uniqid().'.xlsx';
+        copy($export->baseResponse->getFile()->getPathname(), $tempPath);
+        $scrapRows = SimpleExcelReader::create($tempPath, 'xlsx')->fromSheetName('Kerugian Sisa Kabel')->getRows()->toArray();
+        $scrapRow = collect($scrapRows)->firstWhere('Barang', 'Kabel Sisa Musnah');
+        $this->assertNotNull($scrapRow);
+        $this->assertEquals(15400, (float) $scrapRow['Nilai Rugi (Rp)']);
+        @unlink($tempPath);
     }
 }

@@ -3493,7 +3493,13 @@ class CustomerController extends Controller
                         ? InvoiceStatus::BELUM_DIBAYAR->value
                         : ($newRemaining <= 0 ? InvoiceStatus::LUNAS->value : InvoiceStatus::SEBAGIAN->value);
 
-                    $invoice->update([
+                    // updateQuietly() — Invoice pakai RecordsAuditLogs (default
+                    // ['updated','deleted']); ->update() biasa di loop ribuan
+                    // baris pembayaran legacy numpuk satu AuditLog per baris.
+                    // Ringkasan batch sudah dicatat sendiri (AuditLog 'confirm'
+                    // di bawah), sama alasannya dengan updateQuietly() pelanggan
+                    // di atas.
+                    $invoice->updateQuietly([
                         'paid_amount' => $newPaidAmount,
                         'remaining_amount' => $newRemaining,
                         'invoice_status' => $newStatus,

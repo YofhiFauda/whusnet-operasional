@@ -34,37 +34,59 @@
                 </div>
             @endif
 
-            {{-- 1. Device Type Selector --}}
+            {{-- 1. Device Type Selector — baca dari $nodeTypes (tipe aktif network_node_types,
+                 bukan array hardcode) supaya tipe baru yang dibuat admin lewat Master Tipe
+                 Node otomatis muncul di sini tanpa sentuh Blade/JS lagi. `createType` diisi
+                 `code` ASLI dari DB (bukan alias singkat lama) biar lurus dengan `nodeTypeIds`
+                 yang sudah dikirim per-code dari controller. Slot & PON tetap 2 tombol statis
+                 — keduanya bukan baris `network_node_types`, melainkan konsep struktural
+                 `InfrastructureSlot`/`InfrastructurePort` yang beda model sepenuhnya. --}}
             <div>
                 <label class="mb-2 block text-[10px] font-bold uppercase tracking-wider text-text-muted">1. Tipe Perangkat / Titik</label>
                 <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                    @foreach(['server'=>'Server','switch'=>'Switch','olt'=>'OLT','slot'=>'SLOT','pon'=>'PON','odp'=>'ODP'] as $code=>$label)
-                        @php($allowed = in_array($code, ['slot','pon']) ? auth()->user()->hasPermission('network_nodes.update') : auth()->user()->hasPermission('network_nodes.create'))
-                        <button type="button" data-device-type="{{ $code }}" @click="chooseCreateType('{{ $code }}')" @disabled(! $allowed)
+                    @foreach($nodeTypes->reject(fn ($type) => $type->code === 'odp') as $nodeType)
+                        <button type="button" data-device-type="{{ $nodeType->code }}" @click="chooseCreateType('{{ $nodeType->code }}')" @disabled(! auth()->user()->hasPermission('network_nodes.create'))
+                                :class="createType === '{{ $nodeType->code }}' ? 'border-sky-600 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 font-bold shadow-2xs' : 'border-border bg-surface text-text-secondary hover:bg-surface-muted font-semibold'"
+                                class="rounded-lg border p-2.5 text-xs text-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                            {{ $nodeType->name }}
+                        </button>
+                    @endforeach
+
+                    @foreach(['slot' => 'SLOT', 'pon' => 'PON'] as $code => $label)
+                        <button type="button" data-device-type="{{ $code }}" @click="chooseCreateType('{{ $code }}')" @disabled(! auth()->user()->hasPermission('network_nodes.update'))
                                 :class="createType === '{{ $code }}' ? 'border-sky-600 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 font-bold shadow-2xs' : 'border-border bg-surface text-text-secondary hover:bg-surface-muted font-semibold'"
                                 class="rounded-lg border p-2.5 text-xs text-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                             {{ $label }}
                         </button>
                     @endforeach
+
+                    @if($odpType = $nodeTypes->firstWhere('code', 'odp'))
+                        <button type="button" data-device-type="odp" @click="chooseCreateType('odp')" @disabled(! auth()->user()->hasPermission('network_nodes.create'))
+                                :class="createType === 'odp' ? 'border-sky-600 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 font-bold shadow-2xs' : 'border-border bg-surface text-text-secondary hover:bg-surface-muted font-semibold'"
+                                class="rounded-lg border p-2.5 text-xs text-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                            {{ $odpType->name }}
+                        </button>
+                    @endif
                 </div>
             </div>
 
             {{-- Context Guidance --}}
             <div x-show="createType" class="p-3 rounded-lg bg-surface-muted/50 border border-border text-[11px] text-text-secondary leading-relaxed">
                 <p x-show="createType === 'server'"><strong>Server</strong> ditempatkan di <strong>POP Pusat</strong> sebagai akar topologi pusat jaringan.</p>
-                <p x-show="createType === 'switch'"><strong>Switch</strong> ditempatkan di <strong>Mini POP</strong> lalu memiliki <strong>SLOT</strong> dan <strong>Port Switch</strong>.</p>
-                <p x-show="createType === 'olt'"><strong>OLT</strong> ditempatkan di <strong>Cabang/Mini POP</strong> lalu memiliki <strong>SLOT</strong> dan <strong>PON</strong>.</p>
+                <p x-show="createType === 'switch_mini_pop'"><strong>Switch</strong> ditempatkan di <strong>Mini POP</strong> lalu memiliki <strong>SLOT</strong> dan <strong>Port Switch</strong>.</p>
+                <p x-show="createType === 'olt_chassis'"><strong>OLT</strong> ditempatkan di <strong>Cabang/Mini POP</strong> lalu memiliki <strong>SLOT</strong> dan <strong>PON</strong>.</p>
                 <p x-show="createType === 'slot'"><strong>SLOT</strong> ditambahkan pada perangkat induk <strong>OLT</strong> atau <strong>Switch</strong> yang sudah ada.</p>
                 <p x-show="createType === 'pon'"><strong>PON</strong> ditambahkan pada <strong>SLOT OLT</strong> induk; beban port mengikuti pelanggan aktif.</p>
                 <p x-show="createType === 'odp'"><strong>ODP</strong> wajib dibuat sebagai anak langsung <strong>PON</strong> (Task 12) — pilih PON induknya di bawah.</p>
             </div>
 
-            {{-- Form A: Nodes (Server, Switch, OLT, ODP) --}}
+            {{-- Form A: Nodes (Server, Switch, OLT, ODP, dan tipe baru apapun yang punya
+                 anchor_pop_id/parent_id langsung — bukan Slot/PON) --}}
             @can('network_nodes.create')
-            <form x-show="['server','switch','olt','odp'].includes(createType)" method="POST" action="{{ route('network.nodes.store') }}" class="space-y-4 pt-1">
+            <form x-show="!['slot','pon'].includes(createType) && createType" method="POST" action="{{ route('network.nodes.store') }}" class="space-y-4 pt-1">
                 @csrf
                 <input type="hidden" name="device_type" :value="createType">
-                <input type="hidden" name="node_type_id" :value="nodeTypeIds[({server:'server',switch:'switch_mini_pop',olt:'olt_chassis',odp:'odp'})[createType]] || ''">
+                <input type="hidden" name="node_type_id" :value="nodeTypeIds[createType] || ''">
 
                 <div x-show="createType !== 'odp'">
                     <label class="block text-xs font-semibold text-text-secondary mb-1">2. POP penempatan fisik <span class="text-rose-500">*</span></label>
@@ -126,9 +148,9 @@
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
                         <label class="block text-xs font-semibold text-text-secondary mb-1">
-                            <span x-text="createType === 'odp' ? 'Jumlah Port ODP *' : 'Kapasitas Slot (opsional)'"></span>
+                            <span x-text="nodeTypeHasPorts[createType] ? 'Jumlah Port *' : 'Kapasitas (opsional, tidak dipakai tipe ini)'"></span>
                         </label>
-                        <input id="create-modal-capacity-input" name="capacity" type="number" value="{{ old('capacity') }}" min="1" max="1000" :required="createType === 'odp'" placeholder="Contoh: 8"
+                        <input id="create-modal-capacity-input" name="capacity" type="number" value="{{ old('capacity') }}" min="1" max="1000" :required="!!nodeTypeHasPorts[createType]" :disabled="!nodeTypeHasPorts[createType]" placeholder="Contoh: 8"
                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-mono text-text-main focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                     </div>
                     <div>

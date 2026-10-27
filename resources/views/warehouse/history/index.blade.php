@@ -75,12 +75,12 @@
         'label' => 'Mutasi Gudang',
     ];
 
-    $hasActiveFilters = (bool) ($typeFilter || $popFilter || $search || $dateFrom || $dateTo || $conditionFilter || $adjustmentReasonFilter);
+    $hasActiveFilters = (bool) ($typeFilter || $popFilter || $search || $dateFrom || $dateTo || $conditionFilter || $adjustmentReasonFilter || $technicianFilter);
 @endphp
 
 <div x-data="{
          currentType: '{{ $typeFilter }}',
-         showAdvancedFilters: {{ ($popFilter || $dateFrom || $dateTo || $conditionFilter || $adjustmentReasonFilter) ? 'true' : 'false' }},
+         showAdvancedFilters: {{ ($popFilter || $dateFrom || $dateTo || $conditionFilter || $adjustmentReasonFilter || $technicianFilter) ? 'true' : 'false' }},
          detailDrawerOpen: false,
          activeDetail: null,
          openDetail(item) {
@@ -355,6 +355,17 @@
                  x-transition:leave-end="opacity-0 -translate-y-2"
                  class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 text-xs">
                 
+                <!-- Filter Teknisi -->
+                <div>
+                    <label for="technician_id" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Teknisi</label>
+                    <select name="technician_id" id="technician_id" onchange="this.form.submit()" class="w-full px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none">
+                        <option value="">— Semua Teknisi —</option>
+                        @foreach($technicians as $technician)
+                        <option value="{{ $technician->id }}" {{ $technicianFilter === $technician->id ? 'selected' : '' }}>{{ $technician->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <!-- Filter Kondisi Fisik -->
                 <div>
                     <label for="condition" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Kondisi Fisik Barang (SN)</label>

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
     <meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
 
-    <title><?php echo $__env->yieldContent('title', 'Whusnet Operasional'); ?></title>
+    <title><?php echo $__env->yieldContent('title', 'Ruang Kerja Whusnet'); ?></title>
 
     <style>
         html, body {
@@ -54,17 +54,19 @@
                   transition-transform duration-300 md:static md:translate-x-0 -translate-x-full">
 
         
-        <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 dark:border-slate-800/60 shrink-0 brand-container">
-            <div class="flex items-center gap-3 brand-link">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-base shadow-sm shadow-sky-500/25 shrink-0">
-                    W
+        <div class="h-16 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-800/60 shrink-0 brand-container">
+            <a href="/" class="flex items-center gap-3 brand-link group">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-xs tracking-tight shadow-sm shadow-sky-500/25 shrink-0 transition-transform duration-200 group-hover:scale-105">
+                    RKW
                 </div>
-                <div class="flex items-center gap-2 sidebar-text">
-                    <span class="font-extrabold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight">WHUSNET</span>
+                <div class="flex flex-col sidebar-text">
+                    <span class="font-extrabold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight">RUANG KERJA</span>
+                    <span class="text-[9px] font-bold text-sky-600 dark:text-sky-400 tracking-wider uppercase mt-0.5">WHUSNET</span>
                 </div>
-            </div>
+            </a>
             <button onclick="toggleSidebar()"
-                    class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Tutup Menu">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -72,13 +74,13 @@
         </div>
 
         
-        <nav class="flex-1 overflow-y-auto pl-3.5 pr-2 py-4 space-y-6 custom-scrollbar">
+        <nav class="flex-1 overflow-y-auto pl-3 pr-2 py-4 space-y-5 custom-scrollbar">
 
             
             <div>
-                <div class="sidebar-group-header">
-                    <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Operasional</p>
-                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2.5 mx-2"></div>
+                <div class="sidebar-group-header px-2.5 mb-1.5">
+                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Operasional</p>
+                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
 
@@ -86,7 +88,7 @@
                     <a href="/" title="Dashboard"
                        class="sidebar-nav-item <?php echo e(Request::is('/') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
-                            <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500 <?php echo e(Request::is('/') ? 'text-sky-600 dark:text-sky-400' : ''); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('/') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
                             </svg>
                             <span class="sidebar-text">Dashboard</span>
@@ -95,44 +97,47 @@
                     <?php endif; ?>
 
                     <?php if(auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.create') || auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.detail.survey.view') || auth()->user()->hasPermission('customers.detail.installation.view') || auth()->user()->hasPermission('customers.terminated.view') || auth()->user()->hasPermission('customers.failed.view') || auth()->user()->hasPermission('customer_cable_crossings.view')): ?>
+                    <?php
+                        $isPelangganActive = Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*');
+                        $badgePelangganTotal = ($badge_registration_verification_count ?? 0) + ($badge_creq_billing_verification_count ?? 0) + ($badge_survey_count ?? 0) + ($badge_verification_count ?? 0);
+                    ?>
                     
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')"
                                 title="Pelanggan"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       <?php echo e(Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*')
-                                           ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold'
-                                           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                                class="sidebar-nav-item <?php echo e($isPelangganActive ? 'sidebar-nav-item-active' : ''); ?>">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e($isPelangganActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87"/><path stroke-linecap="round" stroke-linejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"/>
                                 </svg>
                                 <span class="sidebar-text">Pelanggan</span>
                             </div>
-                            <svg id="chevron-pelanggan"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300
-                                        <?php echo e(Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
-                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
-                            </svg>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <?php if($badgePelangganTotal > 0): ?>
+                                    <span class="sidebar-parent-badge px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500 text-white leading-none shadow-xs"><?php echo e($badgePelangganTotal); ?></span>
+                                <?php endif; ?>
+                                <svg id="chevron-pelanggan"
+                                     class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isPelangganActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
+                                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                                </svg>
+                            </div>
                         </button>
 
                         <div id="submenu-pelanggan"
-                             class="submenu-container <?php echo e(Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') || Request::is('customer-registration-verifications*') || Request::is('tasks-creq-billing*') ? 'is-open' : ''); ?>">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                             class="submenu-container <?php echo e($isPelangganActive ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l-2 border-slate-100 dark:border-slate-800/80 space-y-0.5 text-xs pr-1 py-0.5">
 
                                 <?php if(auth()->user()->hasPermission('customers.create')): ?>
                                 <a href="/customers/create"
-                                   class="block py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::is('customers/create') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Registrasi Pelanggan
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('customers/create') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Registrasi Pelanggan</span>
                                 </a>
                                 <?php endif; ?>
 
                                 <?php if(auth()->user()->hasPermission('customer_registration_verification.view')): ?>
                                 <a href="<?php echo e(route('customer-registration-verifications.index')); ?>"
-                                   class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::is('customer-registration-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('customer-registration-verifications*') ? 'sidebar-subitem-active' : ''); ?>">
                                     <span>Verifikasi Registrasi</span>
                                     <?php if(isset($badge_registration_verification_count) && $badge_registration_verification_count > 0): ?>
                                         <span class="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full"><?php echo e($badge_registration_verification_count); ?></span>
@@ -141,8 +146,7 @@
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('creq_billing_verification.view')): ?>
                                 <a href="<?php echo e(route('tasks.creq-billing.index')); ?>"
-                                   class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::is('tasks-creq-billing*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('tasks-creq-billing*') ? 'sidebar-subitem-active' : ''); ?>">
                                     <span>Verifikasi Biaya C-REQ</span>
                                     <?php if(isset($badge_creq_billing_verification_count) && $badge_creq_billing_verification_count > 0): ?>
                                         <span class="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full"><?php echo e($badge_creq_billing_verification_count); ?></span>
@@ -151,8 +155,7 @@
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('customers.detail.survey.view')): ?>
                                 <a href="<?php echo e(route('surveys.queue')); ?>"
-                                   class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::routeIs('surveys.queue') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('surveys.queue') ? 'sidebar-subitem-active' : ''); ?>">
                                     <span>Antrean Survey</span>
                                     <?php if(isset($badge_survey_count) && $badge_survey_count > 0): ?>
                                         <span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full"><?php echo e($badge_survey_count); ?></span>
@@ -161,8 +164,7 @@
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('customers.detail.installation.view')): ?>
                                 <a href="<?php echo e(route('verifications.queue')); ?>"
-                                   class="flex items-center justify-between py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::routeIs('verifications.queue') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('verifications.queue') ? 'sidebar-subitem-active' : ''); ?>">
                                     <span>Verif &amp; Pemasangan</span>
                                     <?php if(isset($badge_verification_count) && $badge_verification_count > 0): ?>
                                         <span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full"><?php echo e($badge_verification_count); ?></span>
@@ -172,38 +174,33 @@
                                 <?php if(auth()->user()->hasPermission('customers.view')): ?>
                                 <a href="/customers"
                                    aria-current="<?php echo e(Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'page' : ''); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    List Pelanggan
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>List Pelanggan</span>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('customer_cable_crossings.view')): ?>
                                 <a href="<?php echo e(route('customer-cable-crossings.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::routeIs('customer-cable-crossings.*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Kabel Melintang Jalan
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('customer-cable-crossings.*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Kabel Melintang Jalan</span>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('customers.failed.view')): ?>
                                 <a href="<?php echo e(route('customers.failed')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::routeIs('customers.failed') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Pelanggan Gagal
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('customers.failed') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Pelanggan Gagal</span>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('customers.terminated.view')): ?>
                                 <a href="<?php echo e(route('customers.terminated')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::routeIs('customers.terminated') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Pelanggan Putus
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('customers.terminated') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Pelanggan Putus</span>
                                 </a>
                                 <?php endif; ?>
 
                                 <?php if(auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.import')): ?>
                                 <a href="/customers/import"
-                                   class="block py-1.5 px-3 rounded-md transition-colors
-                                          <?php echo e(Request::is('customers/import') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Import Pelanggan
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('customers/import') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Import Pelanggan</span>
                                 </a>
                                 <?php endif; ?>
                             </div>
@@ -213,8 +210,7 @@
 
                     <?php if(auth()->user()->hasPermission('invoices.view')): ?>
                     <a href="<?php echo e(route('invoices.belum-lunas')); ?>" title="Tagihan"
-                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::is('invoices*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                       class="sidebar-nav-item <?php echo e(Request::is('invoices*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('invoices*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>
@@ -226,8 +222,7 @@
 
                     <?php if(auth()->user()->hasPermission('payments.view')): ?>
                     <a href="<?php echo e(route('payments.index')); ?>" title="Pembayaran"
-                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::routeIs('payments.index') || (Request::is('payments*') && !Request::routeIs('payments.overpay')) ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                       class="sidebar-nav-item <?php echo e(Request::routeIs('payments.index') || (Request::is('payments*') && !Request::routeIs('payments.overpay')) ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::routeIs('payments.index') || (Request::is('payments*') && !Request::routeIs('payments.overpay')) ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
@@ -237,8 +232,7 @@
                     </a>
 
                     <a href="<?php echo e(route('payments.overpay')); ?>" title="Overpay"
-                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::routeIs('payments.overpay') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                       class="sidebar-nav-item <?php echo e(Request::routeIs('payments.overpay') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::routeIs('payments.overpay') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -250,8 +244,7 @@
 
                     <?php if(auth()->user()->hasPermission('collector_worksheet.view')): ?>
                     <a href="<?php echo e(route('collector-worksheet.index')); ?>" title="Worksheet Admin (Kolektor)"
-                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::is('collector-worksheet*') || Request::is('payment-batches*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                       class="sidebar-nav-item <?php echo e(Request::is('collector-worksheet*') || Request::is('payment-batches*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('collector-worksheet*') || Request::is('payment-batches*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-8.13a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm6 8a4 4 0 1 1 0-8"/>
@@ -263,8 +256,7 @@
 
                     <?php if(auth()->user()->hasPermission('cash_deposit.view')): ?>
                     <a href="<?php echo e(route('cash-deposits.index')); ?>" title="Setoran Kas (Admin → Owner/Bank)"
-                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::is('cash-deposits*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                       class="sidebar-nav-item <?php echo e(Request::is('cash-deposits*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('cash-deposits*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3Z"/>
@@ -276,16 +268,19 @@
 
                     <?php if(auth()->user()->isTechnician() && auth()->user()->hasPermission('kolektor.pay')): ?>
                     <a href="<?php echo e(route('technician-payments.index')); ?>" title="Catat Pembayaran"
-                       class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200
-                              <?php echo e(Request::is('technician-payments*') ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
-                        <span class="sidebar-text">Catat Pembayaran</span>
+                       class="sidebar-nav-item <?php echo e(Request::is('technician-payments*') ? 'sidebar-nav-item-active' : ''); ?>">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('technician-payments*') ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm7-5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/>
+                            </svg>
+                            <span class="sidebar-text">Catat Pembayaran</span>
+                        </div>
                     </a>
                     <?php endif; ?>
 
                     <?php if(auth()->user()->hasPermission('kolektor.view') && ! auth()->user()->isTechnician()): ?>
                     <a href="<?php echo e(route('collector-worklist.index')); ?>" title="Worklist Kolektor"
-                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::is('collector-worklist*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                       class="sidebar-nav-item <?php echo e(Request::is('collector-worklist*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('collector-worklist*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4"/>
@@ -297,55 +292,73 @@
 
                     
                     <?php if(auth()->user()->hasPermission('customer_acquisitions.view') || auth()->user()->hasPermission('sales_omset_dashboard.view') || auth()->user()->hasPermission('agents.view') || auth()->user()->hasPermission('package_restrictions.view') || auth()->user()->hasPermission('business_development_verification.view') || auth()->user()->hasPermission('business_customers.view')): ?>
+                    <?php
+                        $isBusdevActive = Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*');
+                        $badgeBusdevTotal = $badge_business_development_verification_count ?? 0;
+                    ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-busdev', 'chevron-busdev')"
                                 title="Business Development"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       <?php echo e(Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                                class="sidebar-nav-item <?php echo e($isBusdevActive ? 'sidebar-nav-item-active' : ''); ?>">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e($isBusdevActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <rect x="3" y="7" width="18" height="13" rx="2"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                 </svg>
                                 <span class="sidebar-text">Business Development</span>
                             </div>
-                            <svg id="chevron-busdev"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e(Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
-                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
-                            </svg>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <?php if($badgeBusdevTotal > 0): ?>
+                                    <span class="sidebar-parent-badge px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500 text-white leading-none shadow-xs"><?php echo e($badgeBusdevTotal); ?></span>
+                                <?php endif; ?>
+                                <svg id="chevron-busdev"
+                                     class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isBusdevActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
+                                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                                </svg>
+                            </div>
                         </button>
                         <div id="submenu-busdev"
-                             class="submenu-container <?php echo e(Request::is('customer-acquisitions*') || Request::is('business-development*') || Request::is('business-development-verifications*') ? 'is-open' : ''); ?>">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                             class="submenu-container <?php echo e($isBusdevActive ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l-2 border-slate-100 dark:border-slate-800/80 space-y-0.5 text-xs pr-1 py-0.5">
                                 <?php if(auth()->user()->hasPermission('customer_acquisitions.view')): ?>
                                 <a href="<?php echo e(route('customer-acquisitions.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('customer-acquisitions*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Pelanggan Aktif &lt; 30 Hari</a>
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('customer-acquisitions*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Pelanggan Aktif &lt; 30 Hari</span>
+                                </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('business_development_verification.view')): ?>
                                 <a href="<?php echo e(route('business-development-verifications.index')); ?>"
-                                   class="flex items-center justify-between gap-2 py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('business-development-verifications*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('business-development-verifications*') ? 'sidebar-subitem-active' : ''); ?>">
                                     <span>Menunggu Verifikasi BD</span>
                                     <?php if(($badge_business_development_verification_count ?? 0) > 0): ?>
-                                        <span data-badge="bd-verification" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400"><?php echo e($badge_business_development_verification_count); ?></span>
+                                        <span data-badge="bd-verification" class="sidebar-badge rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400"><?php echo e($badge_business_development_verification_count); ?></span>
                                     <?php endif; ?>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('business_customers.view')): ?>
                                 <a href="<?php echo e(route('business-development.business-customers.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('business-development/business-customers*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">List Pelanggan Bisnis</a>
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('business-development/business-customers*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>List Pelanggan Bisnis</span>
+                                </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('sales_omset_dashboard.view')): ?>
                                 <a href="<?php echo e(route('business-development.sales-omset.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('business-development/sales-omset*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Omset Sales</a>
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('business-development/sales-omset*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Omset Sales</span>
+                                </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('agents.view')): ?>
                                 <a href="<?php echo e(route('business-development.agents.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('business-development/agents*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Agent</a>
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('business-development/agents*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Master Agent</span>
+                                </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('package_restrictions.view')): ?>
                                 <a href="<?php echo e(route('business-development.package-restrictions.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('business-development/package-restrictions*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Restriksi Paket</a>
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('business-development/package-restrictions*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Restriksi Paket</span>
+                                </a>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -357,60 +370,62 @@
             
             <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('qr_scan_logs.view') || auth()->user()->hasPermission('network_nodes.view')): ?>
             <div>
-                <div class="sidebar-group-header">
-                    <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Jaringan &amp; Lapangan</p>
-                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2.5 mx-2"></div>
+                <div class="sidebar-group-header px-2.5 mb-1.5">
+                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Jaringan &amp; Lapangan</p>
+                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
 
                     <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('fop_analytics.view')): ?>
                     <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('fop_analytics.view')): ?>
+                    <?php
+                        $isTasksActive = Request::is('tasks*') || Request::is('fop*');
+                    ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-tasks', 'chevron-tasks')"
                                 title="Penjadwalan Teknis"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       <?php echo e(Request::is('tasks*') || Request::is('fop*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                                class="sidebar-nav-item <?php echo e($isTasksActive ? 'sidebar-nav-item-active' : ''); ?>">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('tasks*') || Request::is('fop*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e($isTasksActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"/><path stroke-linecap="round" stroke-linejoin="round" d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>
                                 </svg>
                                 <span class="sidebar-text">Penjadwalan Teknis</span>
                             </div>
                             <svg id="chevron-tasks"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e(Request::is('tasks*') || Request::is('fop*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isTasksActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
                         <div id="submenu-tasks"
-                             class="submenu-container <?php echo e(Request::is('tasks*') || Request::is('fop*') ? 'is-open' : ''); ?>">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                             class="submenu-container <?php echo e($isTasksActive ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l-2 border-slate-100 dark:border-slate-800/80 space-y-0.5 text-xs pr-1 py-0.5">
                                 <?php if(auth()->user()->hasPermission('task.view.all')): ?>
                                 <a href="<?php echo e(route('fop.dashboard')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('fop.dashboard') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    FOP Dashboard
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('fop.dashboard') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>FOP Dashboard</span>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('fop_analytics.view')): ?>
                                 <a href="<?php echo e(route('fop.analytics')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('fop.analytics') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Dashboard Analitik FOP
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('fop.analytics') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Dashboard Analitik FOP</span>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('fop_tasks.view')): ?>
                                 <a href="<?php echo e(route('fop-tasks.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('fop-tasks.index') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Task FOP
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('fop-tasks.index') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Task FOP</span>
                                 </a>
                                 <a href="<?php echo e(route('fop-tasks.history')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('fop-tasks.history') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Riwayat Task FOP
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('fop-tasks.history') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Riwayat Task FOP</span>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('task.view.own')): ?>
                                 <a href="<?php echo e(route('tasks.own')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('tasks.own') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Task Saya
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('tasks.own') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Task Saya</span>
                                 </a>
                                 <?php endif; ?>
                             </div>
@@ -418,10 +433,9 @@
                     </div>
                     <?php else: ?>
                     <a href="<?php echo e(route('tasks.own')); ?>" title="Task Saya"
-                       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::routeIs('tasks.own') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                       class="sidebar-nav-item <?php echo e(Request::routeIs('tasks.own') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
-                            <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::routeIs('tasks.own') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>
                             </svg>
                             <span class="sidebar-text">Task Saya</span>
@@ -431,82 +445,103 @@
                     <?php endif; ?>
 
                     <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('network_nodes.view')): ?>
-                    <a href="<?php echo e(route('network.nodes.index')); ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium <?php echo e(Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60'); ?>">
-                        <span class="sidebar-text">Master Node Jaringan &amp; Port</span>
+                    <a href="<?php echo e(route('network.nodes.index')); ?>" title="Master Node Jaringan &amp; Port"
+                       class="sidebar-nav-item <?php echo e(Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'sidebar-nav-item-active' : ''); ?>">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+                            </svg>
+                            <span class="sidebar-text truncate">Master Node Jaringan &amp; Port</span>
+                        </div>
                         <?php if(($badge_node_attention_count ?? 0) > 0): ?>
-                            <span id="node-attention-count" class="ml-auto bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full" title="Node dengan perangkat baru terpasang"><?php echo e($badge_node_attention_count); ?></span>
+                            <span id="node-attention-count" class="sidebar-badge bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full" title="Node dengan perangkat baru terpasang"><?php echo e($badge_node_attention_count); ?></span>
                         <?php endif; ?>
                     </a>
-                    <a href="<?php echo e(route('network.map.index')); ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium <?php echo e(Request::routeIs('network.map.*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60'); ?>">
-                        <span class="sidebar-text">Peta Infrastruktur ISP</span>
+
+                    <a href="<?php echo e(route('network.map.index')); ?>" title="Peta Infrastruktur ISP"
+                       class="sidebar-nav-item <?php echo e(Request::routeIs('network.map.*') ? 'sidebar-nav-item-active' : ''); ?>">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::routeIs('network.map.*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                            </svg>
+                            <span class="sidebar-text truncate">Peta Infrastruktur ISP</span>
+                        </div>
                     </a>
                     <?php endif; ?>
 
                     <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('qr_scan_logs.view')): ?>
-                    <a href="<?php echo e(route('qr-scan-logs.index')); ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium <?php echo e(Request::routeIs('qr-scan-logs.index') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60'); ?>">
-                        <span class="sidebar-text">Riwayat Scan QR</span>
+                    <a href="<?php echo e(route('qr-scan-logs.index')); ?>" title="Riwayat Scan QR"
+                       class="sidebar-nav-item <?php echo e(Request::routeIs('qr-scan-logs.index') ? 'sidebar-nav-item-active' : ''); ?>">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::routeIs('qr-scan-logs.index') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1zm12 0h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1zM5 20h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1z"/>
+                            </svg>
+                            <span class="sidebar-text truncate">Riwayat Scan QR</span>
+                        </div>
                     </a>
                     <?php endif; ?>
 
                     <?php if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('noc_worksheet.view') || auth()->user()->hasPermission('noc_dashboard.view')): ?>
+                    <?php
+                        $isTicketingActive = Request::is('tickets*') || Request::is('noc/*');
+                    ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-ticketing', 'chevron-ticketing')"
                                 title="Ticketing"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       <?php echo e((Request::is('tickets*') || Request::is('noc/*')) ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                                class="sidebar-nav-item <?php echo e($isTicketingActive ? 'sidebar-nav-item-active' : ''); ?>">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 <?php echo e((Request::is('tickets*') || Request::is('noc/*')) ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e($isTicketingActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 11h3a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 11h-3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 11a9 9 0 1 1 18 0"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 16v2a4 4 0 0 1-4 4h-5"/>
                                 </svg>
                                 <span class="sidebar-text">Ticketing</span>
                             </div>
                             <svg id="chevron-ticketing"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e((Request::is('tickets*') || Request::is('noc/*')) ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isTicketingActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
                         <div id="submenu-ticketing"
-                             class="submenu-container <?php echo e((Request::is('tickets*') || Request::is('noc/*')) ? 'is-open' : ''); ?>">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                             class="submenu-container <?php echo e($isTicketingActive ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l-2 border-slate-100 dark:border-slate-800/80 space-y-0.5 text-xs pr-1 py-0.5">
                                 <?php if(auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.update')): ?>
                                 <a href="<?php echo e(route('tickets.create')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('tickets.create') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Worksheet Helpdesk
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('tickets.create') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Worksheet Helpdesk</span>
                                 </a>
                                 <?php endif; ?>
 
                                 <?php if(auth()->user()->hasPermission('noc_worksheet.view')): ?>
                                 <a href="<?php echo e(route('noc.worksheet')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('noc.worksheet*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Worksheet NOC
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('noc.worksheet*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Worksheet NOC</span>
                                 </a>
                                 <?php endif; ?>
 
                                 <?php if(auth()->user()->hasPermission('noc_dashboard.view')): ?>
                                 <a href="<?php echo e(route('noc.dashboard')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('noc.dashboard') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Dashboard NOC
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('noc.dashboard') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Dashboard NOC</span>
                                 </a>
                                 <?php endif; ?>
 
                                 <?php if(auth()->user()->hasPermission('tickets.selesai.view')): ?>
                                 <a href="<?php echo e(route('tickets.selesai')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('tickets.selesai') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Ticket Selesai
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('tickets.selesai') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Ticket Selesai</span>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('tickets.dibatalkan.view')): ?>
                                 <a href="<?php echo e(route('tickets.dibatalkan')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('tickets.dibatalkan') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Ticket Dibatalkan
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('tickets.dibatalkan') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Ticket Dibatalkan</span>
                                 </a>
                                 <?php endif; ?>
 
                                 <?php if(auth()->user()->hasPermission('tickets.history.view')): ?>
                                 <a href="<?php echo e(route('tickets.history')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('tickets.history') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    History Ticketing
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('tickets.history') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>History Ticketing</span>
                                 </a>
                                 <?php endif; ?>
                             </div>
@@ -520,60 +555,62 @@
             
             <?php if(auth()->user()->hasPermission('reports.view') || auth()->user()->hasPermission('audit_logs.view')): ?>
             <div>
-                <div class="sidebar-group-header">
-                    <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Laporan</p>
-                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2.5 mx-2"></div>
+                <div class="sidebar-group-header px-2.5 mb-1.5">
+                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Laporan</p>
+                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
 
                     <?php if(auth()->user()->hasPermission('reports.view')): ?>
+                    <?php
+                        $isReportsActive = Request::is('reports*');
+                    ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-laporan', 'chevron-laporan')"
                                 title="Laporan"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       <?php echo e(Request::is('reports*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                                class="sidebar-nav-item <?php echo e($isReportsActive ? 'sidebar-nav-item-active' : ''); ?>">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('reports*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e($isReportsActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v16a2 2 0 0 0 2 2h16"/><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-5 5-4-4-3 3"/>
                                 </svg>
                                 <span class="sidebar-text">Laporan</span>
                             </div>
                             <svg id="chevron-laporan"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e(Request::is('reports*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isReportsActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
                         <div id="submenu-laporan"
-                             class="submenu-container <?php echo e(Request::is('reports*') ? 'is-open' : ''); ?>">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                             class="submenu-container <?php echo e($isReportsActive ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l-2 border-slate-100 dark:border-slate-800/80 space-y-0.5 text-xs pr-1 py-0.5">
                                 <a href="<?php echo e(route('reports.customers.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/customers*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Laporan Pelanggan
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('reports/customers*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Laporan Pelanggan</span>
                                 </a>
                                 <a href="<?php echo e(route('reports.invoices.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/invoices*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Laporan Tagihan
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('reports/invoices*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Laporan Tagihan</span>
                                 </a>
                                 <a href="<?php echo e(route('reports.payments.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Laporan Pembayaran
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('reports/payments*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Laporan Pembayaran</span>
                                 </a>
                                 <?php if(auth()->user()->hasPermission('collector_report.view')): ?>
                                 <a href="<?php echo e(route('reports.collector-monthly.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/collector-monthly*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Laporan Bulanan Admin
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('reports/collector-monthly*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Laporan Bulanan Admin</span>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('collector_payment_report.view')): ?>
                                 <a href="<?php echo e(route('reports.collector-payments.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/collector-payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Laporan Bayar Kolektor
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('reports/collector-payments*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Laporan Bayar Kolektor</span>
                                 </a>
                                 <?php endif; ?>
                                 <a href="<?php echo e(route('reports.imports.index')); ?>"
-                                   class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('reports/imports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                    Laporan Import Data
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('reports/imports*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Laporan Import Data</span>
                                 </a>
                             </div>
                         </div>
@@ -582,8 +619,7 @@
 
                     <?php if(auth()->user()->hasPermission('audit_logs.view')): ?>
                     <a href="<?php echo e(route('audit-logs.index')); ?>" title="Audit Log"
-                       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::is('audit-logs*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                       class="sidebar-nav-item <?php echo e(Request::is('audit-logs*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('audit-logs*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>
@@ -599,69 +635,71 @@
             
             <?php if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view')): ?>
             <div>
-                <div class="sidebar-group-header">
-                    <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Master &amp; Pengaturan</p>
-                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2.5 mx-2"></div>
+                <div class="sidebar-group-header px-2.5 mb-1.5">
+                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Master &amp; Pengaturan</p>
+                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
 
                     <?php if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view')): ?>
+                    <?php
+                        $isMasterActive = Request::is('master*');
+                    ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-master', 'chevron-master')"
                                 title="Master Data"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       <?php echo e(Request::is('master*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                                class="sidebar-nav-item <?php echo e($isMasterActive ? 'sidebar-nav-item-active' : ''); ?>">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('master*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e($isMasterActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <ellipse cx="12" cy="5" rx="9" ry="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 5V19A9 3 0 0 0 21 19V5"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 12A9 3 0 0 0 21 12"/>
                                 </svg>
                                 <span class="sidebar-text">Master Data</span>
                             </div>
                             <svg id="chevron-master"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e(Request::is('master*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isMasterActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
                         <div id="submenu-master"
-                             class="submenu-container <?php echo e(Request::is('master*') ? 'is-open' : ''); ?>">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                             class="submenu-container <?php echo e($isMasterActive ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l-2 border-slate-100 dark:border-slate-800/80 space-y-0.5 text-xs pr-1 py-0.5">
                                 <?php if(auth()->user()->hasPermission('master_wilayah.view')): ?>
-                                <a href="/master/wilayah" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/wilayah') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Data Wilayah</a>
+                                <a href="/master/wilayah" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/wilayah') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Data Wilayah</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('pops.view')): ?>
-                                <a href="/master/pop" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/pop*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master POP/Cabang</a>
+                                <a href="/master/pop" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/pop*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master POP/Cabang</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('master_distribusi.view')): ?>
-                                <a href="/master/distribusi" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/distribusi*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Distribusi</a>
+                                <a href="/master/distribusi" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/distribusi*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Distribusi</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('packages.view')): ?>
-                                <a href="/master/paket" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/paket*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Paket Internet</a>
-                                <a href="<?php echo e(route('master.package-categories.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/package-categories*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Kategori Paket</a>
+                                <a href="/master/paket" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/paket*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Paket Internet</span></a>
+                                <a href="<?php echo e(route('master.package-categories.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/package-categories*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Kategori Paket</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('master_status_pelanggan.view')): ?>
-                                <a href="/master/status-langganan" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/status-langganan') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Status Pelanggan</a>
+                                <a href="/master/status-langganan" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/status-langganan') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Status Pelanggan</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('sla_timeline.view')): ?>
-                                <a href="/master/sla-timeline" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/sla-timeline*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Timeline SLA</a>
+                                <a href="/master/sla-timeline" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/sla-timeline*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Timeline SLA</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('ticket_issue_categories.view')): ?>
-                                <a href="/master/issue-categories" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/issue-categories*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Kategori Tiket</a>
+                                <a href="/master/issue-categories" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/issue-categories*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Kategori Tiket</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('items.view')): ?>
-                                <a href="/master/items" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/items*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Item (Barang)</a>
+                                <a href="/master/items" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/items*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Item (Barang)</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('item_categories.view')): ?>
-                                <a href="/master/item-categories" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/item-categories*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Kategori Item</a>
+                                <a href="/master/item-categories" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/item-categories*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Kategori Item</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('work_tools.view')): ?>
-                                <a href="/master/work-tools" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/work-tools*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Alat Kerja</a>
+                                <a href="/master/work-tools" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/work-tools*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Alat Kerja</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('master_rekening.view')): ?>
-                                <a href="<?php echo e(route('master.rekening.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/rekening*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Rekening Bank</a>
+                                <a href="<?php echo e(route('master.rekening.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/rekening*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Rekening Bank</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('termination_reasons.view')): ?>
-                                <a href="<?php echo e(route('master.termination-reasons.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('master/termination-reasons*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Master Alasan Putus Langganan</a>
+                                <a href="<?php echo e(route('master.termination-reasons.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('master/termination-reasons*') ? 'sidebar-subitem-active' : ''); ?>"><span>Master Alasan Putus Langganan</span></a>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -669,31 +707,33 @@
                     <?php endif; ?>
 
                     <?php if(auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view')): ?>
+                    <?php
+                        $isUsersActive = Request::is('users*') || Request::is('roles*');
+                    ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-settings', 'chevron-settings')"
                                 title="Pengguna & RBAC"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       <?php echo e(Request::is('users*') || Request::is('roles*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                                class="sidebar-nav-item <?php echo e($isUsersActive ? 'sidebar-nav-item-active' : ''); ?>">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('users*') || Request::is('roles*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e($isUsersActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 15H6a4 4 0 0 0-4 4v2"/>
                                 </svg>
                                 <span class="sidebar-text">Pengguna &amp; RBAC</span>
                             </div>
                             <svg id="chevron-settings"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e(Request::is('users*') || Request::is('roles*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isUsersActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
                         <div id="submenu-settings"
-                             class="submenu-container <?php echo e(Request::is('users*') || Request::is('roles*') ? 'is-open' : ''); ?>">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                             class="submenu-container <?php echo e($isUsersActive ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l-2 border-slate-100 dark:border-slate-800/80 space-y-0.5 text-xs pr-1 py-0.5">
                                 <?php if(auth()->user()->hasPermission('users.view')): ?>
-                                <a href="/users" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('users*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Manajemen User &amp; POP</a>
+                                <a href="/users" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('users*') ? 'sidebar-subitem-active' : ''); ?>"><span>Manajemen User &amp; POP</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('roles.view')): ?>
-                                <a href="<?php echo e(route('roles.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('roles*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Role &amp; Permission</a>
+                                <a href="<?php echo e(route('roles.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('roles*') ? 'sidebar-subitem-active' : ''); ?>"><span>Role &amp; Permission</span></a>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -705,64 +745,60 @@
 
             
             <?php if(auth()->user()->hasPermission('warehouse.view') || auth()->user()->hasPermission('warehouse_transfer.view') || auth()->user()->hasPermission('warehouse_issue.view') || auth()->user()->hasPermission('warehouse_custody.view') || auth()->user()->hasPermission('warehouse_traceability.view') || auth()->user()->hasPermission('warehouse_adjustment.create') || auth()->user()->hasPermission('warehouse_reassign.create') || auth()->user()->hasPermission('warehouse_report.view') || auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
+            <?php
+                $isWarehouseActive = Request::is('warehouse*');
+            ?>
             <div>
-                <div class="sidebar-group-header">
-                    <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Gudang &amp; Inventory</p>
-                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2.5 mx-2"></div>
+                <div class="sidebar-group-header px-2.5 mb-1.5">
+                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Gudang &amp; Inventory</p>
+                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-warehouse', 'chevron-warehouse')"
                                 title="Gudang"
-                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                       <?php echo e(Request::is('warehouse*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                                class="sidebar-nav-item <?php echo e($isWarehouseActive ? 'sidebar-nav-item-active' : ''); ?>">
                             <div class="flex items-center gap-3 sidebar-item-content">
-                                <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('warehouse*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e($isWarehouseActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4"/>
                                 </svg>
                                 <span class="sidebar-text">Gudang</span>
                             </div>
                             <svg id="chevron-warehouse"
-                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e(Request::is('warehouse*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isWarehouseActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
                         <div id="submenu-warehouse"
-                             class="submenu-container <?php echo e(Request::is('warehouse*') ? 'is-open' : ''); ?>">
-                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
-                                
+                             class="submenu-container <?php echo e($isWarehouseActive ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l-2 border-slate-100 dark:border-slate-800/80 space-y-0.5 text-xs pr-1 py-0.5">
                                 <?php if(auth()->user()->hasPermission('warehouse.view')): ?>
-                                <a href="<?php echo e(route('warehouse.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Dashboard Gudang</a>
-                                <a href="<?php echo e(route('warehouse.stock.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/stock*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Kelola Stok</a>
-                                
-                                <a href="<?php echo e(route('warehouse.history.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/history*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Riwayat Mutasi</a>
-                                
-                                <a href="<?php echo e(route('warehouse.retrievals.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/retrievals*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Riwayat Ambil Alat</a>
-                                
-                                <a href="<?php echo e(route('warehouse.usage.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/usage*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Pemakaian Material</a>
-                                
-                                <a href="<?php echo e(route('warehouse.scan.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/scan*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Scan Barang</a>
+                                <a href="<?php echo e(route('warehouse.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse') ? 'sidebar-subitem-active' : ''); ?>"><span>Dashboard Gudang</span></a>
+                                <a href="<?php echo e(route('warehouse.stock.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/stock*') ? 'sidebar-subitem-active' : ''); ?>"><span>Kelola Stok</span></a>
+                                <a href="<?php echo e(route('warehouse.history.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/history*') ? 'sidebar-subitem-active' : ''); ?>"><span>Riwayat Mutasi</span></a>
+                                <a href="<?php echo e(route('warehouse.retrievals.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/retrievals*') ? 'sidebar-subitem-active' : ''); ?>"><span>Riwayat Ambil Alat</span></a>
+                                <a href="<?php echo e(route('warehouse.usage.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/usage*') ? 'sidebar-subitem-active' : ''); ?>"><span>Pemakaian Material</span></a>
+                                <a href="<?php echo e(route('warehouse.scan.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/scan*') ? 'sidebar-subitem-active' : ''); ?>"><span>Scan Barang</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_custody.view')): ?>
-                                <a href="<?php echo e(route('warehouse.custody.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Barang di Tangan Teknisi</a>
+                                <a href="<?php echo e(route('warehouse.custody.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : ''); ?>"><span>Barang di Tangan Teknisi</span></a>
                                 <?php endif; ?>
-                                
                                 <?php if(auth()->user()->hasPermission('warehouse_reassign.create')): ?>
-                                <a href="<?php echo e(route('warehouse.returns.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e((Request::is('warehouse/returns') || (Request::is('warehouse/returns/*') && ! Request::is('warehouse/returns/from-customer*'))) ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Terima Retur Modem</a>
-                                <a href="<?php echo e(route('warehouse.returns.from-customer.create')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/returns/from-customer*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Terima dari Pelanggan</a>
+                                <a href="<?php echo e(route('warehouse.returns.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e((Request::is('warehouse/returns') || (Request::is('warehouse/returns/*') && ! Request::is('warehouse/returns/from-customer*'))) ? 'sidebar-subitem-active' : ''); ?>"><span>Terima Retur Modem</span></a>
+                                <a href="<?php echo e(route('warehouse.returns.from-customer.create')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/returns/from-customer*') ? 'sidebar-subitem-active' : ''); ?>"><span>Terima dari Pelanggan</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_traceability.view')): ?>
-                                <a href="<?php echo e(route('warehouse.traceability.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/traceability*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Lacak Barang / SN</a>
+                                <a href="<?php echo e(route('warehouse.traceability.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/traceability*') ? 'sidebar-subitem-active' : ''); ?>"><span>Lacak Barang / SN</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_report.view')): ?>
-                                <a href="<?php echo e(route('warehouse.reports.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/reports') || (Request::is('warehouse/reports/*') && ! Request::is('warehouse/reports/sold-to-customer*')) ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Laporan Gudang</a>
+                                <a href="<?php echo e(route('warehouse.reports.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/reports') || (Request::is('warehouse/reports/*') && ! Request::is('warehouse/reports/sold-to-customer*')) ? 'sidebar-subitem-active' : ''); ?>"><span>Laporan Gudang</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_report.sold_to_customer.view')): ?>
-                                <a href="<?php echo e(route('warehouse.reports.sold-to-customer')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/reports/sold-to-customer*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Laporan Barang Terjual</a>
+                                <a href="<?php echo e(route('warehouse.reports.sold-to-customer')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/reports/sold-to-customer*') ? 'sidebar-subitem-active' : ''); ?>"><span>Laporan Barang Terjual</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
-                                <a href="<?php echo e(route('warehouse.stock-requests.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Permintaan Stok</a>
+                                <a href="<?php echo e(route('warehouse.stock-requests.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : ''); ?>"><span>Permintaan Stok</span></a>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -774,15 +810,15 @@
         </nav>
 
         
-        <div class="p-3 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/60 dark:bg-slate-900/60 shrink-0 sidebar-footer">
-            <div class="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/70 shadow-xs sidebar-footer-box transition-all hover:border-slate-300 dark:hover:border-slate-600">
+        <div class="p-3 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50 shrink-0 sidebar-footer">
+            <div class="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/70 shadow-2xs sidebar-footer-box transition-all hover:border-slate-300 dark:hover:border-slate-600">
                 <div class="flex items-center gap-2.5 overflow-hidden sidebar-user-info">
                     <div class="relative shrink-0">
                         <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs" title="<?php echo e(Auth::user()->name ?? 'Administrator'); ?>">
                             <?php echo e(strtoupper(substr(Auth::user()->name ?? 'AD', 0, 2))); ?>
 
                         </div>
-                        <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-slate-800"></span>
+                        <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-slate-900"></span>
                     </div>
                     <div class="truncate sidebar-footer-info">
                         <p class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate"><?php echo e(Auth::user()->name ?? 'Administrator'); ?></p>
@@ -791,7 +827,7 @@
                 </div>
                 <form id="logout-form" action="<?php echo e(route('logout')); ?>" method="POST" class="hidden"><?php echo csrf_field(); ?></form>
                 <button onclick="event.preventDefault(); window.Confirm('Konfirmasi Keluar', 'Yakin ingin keluar dari sistem?', 'warning', () => document.getElementById('logout-form').submit());"
-                        class="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors sidebar-footer-info"
+                        class="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors sidebar-footer-info cursor-pointer"
                         title="Keluar">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16 17 5-5-5-5"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12H9"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

@@ -15,9 +15,9 @@ class AuthTest extends TestCase
         $response = $this->get('/login');
 
         $response->assertStatus(200);
-        $response->assertSee('Login - Whusnet Billing');
-        $response->assertSee('WHUS');
-        $response->assertSee('NET');
+        $response->assertSee('Login - Ruang Kerja Whusnet');
+        $response->assertSee('RUANG KERJA');
+        $response->assertSee('WHUSNET');
         $response->assertSee('showPassword', false);
         $response->assertSee('Tampilkan / sembunyikan kata sandi', false);
     }

@@ -245,6 +245,18 @@ class WarehouseStockPositionTest extends TestCase
     }
 
     #[Test]
+    public function in_transit_setelah_penerimaan_parsial_hanya_menghitung_sisa(): void
+    {
+        $transfer = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabangB, [['item_id' => $this->kabel->id, 'qty' => 40]], $this->owner);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, [], [$this->kabel->id => 30], $this->owner);
+
+        $row = $this->summary(collect([$this->pusat->id, $this->cabangA->id, $this->cabangB->id]))
+            ->firstWhere(fn ($r) => $r['item']->id === $this->kabel->id);
+
+        $this->assertSame(10.0, $row['in_transit']);
+    }
+
+    #[Test]
     public function ringkasan_bisa_disort_by_total_desc(): void
     {
         $modem = Item::create(['code' => 'WSP-SORT', 'name' => 'Modem Sort Posisi', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'serialized']);

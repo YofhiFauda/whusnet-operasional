@@ -421,6 +421,8 @@ class NetworkNodeController extends Controller
                 $node->ports()->create(['number' => $number, 'is_used' => false]);
             }
 
+            AuditLog::log($node, 'create', null, $node->only(['code', 'name', 'node_type_id', 'parent_id', 'anchor_pop_id', 'status']));
+
             return $node;
         });
 
@@ -562,9 +564,9 @@ class NetworkNodeController extends Controller
                 // memuat SATU ODP itu dengan inspector ODP lengkap (grid port,
                 // modal port, relokasi). URL dirender di sini, bukan dirakit klien.
                 'select_url' => $child->nodeType?->code === 'odp' ? route('network.nodes.index', ['node' => $child->id]) : null,
+                'inspector_url' => $child->nodeType?->code === 'odp' ? route('network.nodes.inspector', $child) : null,
                 'path' => $parentPath.' / '.($child->isPosition() ? $child->displayName() : $child->code),
             ];
-                'inspector_url' => $child->nodeType?->code === 'odp' ? route('network.nodes.inspector', $child) : null,
         })->values()]);
     }
 

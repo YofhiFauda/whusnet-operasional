@@ -92,6 +92,7 @@ use App\Http\Controllers\TicketDibatalkanController;
 use App\Http\Controllers\TicketHistoryController;
 use App\Http\Controllers\TicketSelesaiController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Warehouse\BranchInventorySaleController;
 use App\Http\Controllers\Warehouse\InfrastructureRecoveryController;
 use App\Http\Controllers\Warehouse\WarehouseAdjustmentController;
 use App\Http\Controllers\Warehouse\WarehouseController;
@@ -909,6 +910,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/warehouse/stock/threshold', [WarehouseStockController::class, 'storeThreshold'])->name('warehouse.stock.threshold.store');
     });
 
+    Route::middleware('permission:warehouse_branch_sale.view')->group(function () {
+        Route::get('/warehouse/branch-sales', [BranchInventorySaleController::class, 'index'])->name('warehouse.branch-sales.index');
+    });
+    Route::middleware('permission:warehouse_branch_sale.create')->group(function () {
+        Route::get('/warehouse/branch-sales/create', [BranchInventorySaleController::class, 'create'])->name('warehouse.branch-sales.create');
+        Route::post('/warehouse/branch-sales', [BranchInventorySaleController::class, 'store'])->name('warehouse.branch-sales.store');
+        Route::post('/warehouse/branch-sales/{sale}/close-missing', [BranchInventorySaleController::class, 'closeMissing'])->name('warehouse.branch-sales.close-missing');
+    });
+    Route::middleware('permission:warehouse_branch_sale.receive')->group(function () {
+        Route::post('/warehouse/branch-sales/{sale}/receive', [BranchInventorySaleController::class, 'receive'])->name('warehouse.branch-sales.receive');
+    });
+
+    Route::middleware('permission:warehouse_branch_sale.view')->get('/warehouse/branch-sales/{sale}', [BranchInventorySaleController::class, 'show'])->name('warehouse.branch-sales.show');
+
     // Barang Masuk (RECEIVE) — reuse permission warehouse_transfer.create,
     // lihat docblock WarehouseReceiveController buat alasannya.
     Route::middleware('permission:warehouse_transfer.create')->group(function () {
@@ -954,6 +969,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/warehouse/transfers/{transfer}/receive', [WarehouseTransferController::class, 'receive'])->name('warehouse.transfers.receive');
     });
 
+    Route::middleware('permission:warehouse_adjustment.create')->group(function () {
+        Route::post('/warehouse/transfers/{transfer}/close-missing', [WarehouseTransferController::class, 'closeMissing'])->name('warehouse.transfers.close-missing');
+    });
+
     Route::middleware('permission:warehouse_issue.view')->group(function () {
         Route::get('/warehouse/issues/{reference}', [WarehouseIssueController::class, 'show'])->name('warehouse.issues.show');
     });
@@ -973,10 +992,14 @@ Route::middleware('auth')->group(function () {
         // sama aktor (staf gudang) yang boleh lapor rusak/hilang.
         Route::get('/warehouse/adjustments/opname/create', [WarehouseAdjustmentController::class, 'createOpname'])->name('warehouse.adjustments.opname.create');
         Route::post('/warehouse/adjustments/opname', [WarehouseAdjustmentController::class, 'storeOpname'])->name('warehouse.adjustments.opname.store');
+        Route::get('/warehouse/adjustments/opname/unit/create', [WarehouseAdjustmentController::class, 'createUnitOpname'])->name('warehouse.adjustments.unit-opname.create');
+        Route::post('/warehouse/adjustments/opname/unit', [WarehouseAdjustmentController::class, 'storeUnitOpname'])->name('warehouse.adjustments.unit-opname.store');
         Route::get('/warehouse/adjustments/custody/{custody}/create', [WarehouseAdjustmentController::class, 'createCustody'])->name('warehouse.adjustments.custody.create');
         Route::post('/warehouse/adjustments/custody/{custody}', [WarehouseAdjustmentController::class, 'storeCustody'])->name('warehouse.adjustments.custody.store');
         Route::get('/warehouse/adjustments/serial/{serial}/create', [WarehouseAdjustmentController::class, 'createSerial'])->name('warehouse.adjustments.serial.create');
         Route::post('/warehouse/adjustments/serial/{serial}', [WarehouseAdjustmentController::class, 'storeSerial'])->name('warehouse.adjustments.serial.store');
+        Route::get('/warehouse/adjustments/serial/{serial}/repair', [WarehouseAdjustmentController::class, 'createRepairSerial'])->name('warehouse.adjustments.serial.repair.create');
+        Route::post('/warehouse/adjustments/serial/{serial}/repair', [WarehouseAdjustmentController::class, 'storeRepairSerial'])->name('warehouse.adjustments.serial.repair.store');
         Route::get('/warehouse/adjustments/roll/{roll}/create', [WarehouseAdjustmentController::class, 'createRoll'])->name('warehouse.adjustments.roll.create');
         Route::post('/warehouse/adjustments/roll/{roll}', [WarehouseAdjustmentController::class, 'storeRoll'])->name('warehouse.adjustments.roll.store');
     });
@@ -1240,6 +1263,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/network/nodes/{node}', [NetworkNodeController::class, 'show'])->name('network.nodes.show');
         Route::get('/network/nodes/{node}/children', [NetworkNodeController::class, 'children'])->name('network.nodes.children');
         Route::get('/network/nodes/{node}/panel', [NetworkNodeController::class, 'panel'])->name('network.nodes.panel');
+        Route::get('/network/nodes/{node}/inspector', [NetworkNodeController::class, 'inspector'])->name('network.nodes.inspector');
         Route::get('/network/nodes/{node}/pon-options', [NetworkNodeController::class, 'ponOptions'])->name('network.nodes.pon-options');
         Route::get('/network/nodes/{node}/registrasi-aset', [InfraAssetRegistrationController::class, 'create'])->name('network.nodes.register-asset.create');
         Route::post('/network/nodes/{node}/seen', [NetworkNodeController::class, 'markSeen'])->name('network.nodes.seen');
@@ -1263,7 +1287,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/network/nodes/{node}/generate-structure', [GenerateInfrastructureStructureController::class, 'store'])->name('network.nodes.generate-structure.store');
         Route::post('/network/nodes/{node}/infrastructure-slots', [InfrastructurePositionController::class, 'storeSlot'])->name('network.nodes.infrastructure-slots.store');
         Route::post('/network/infrastructure-slots/{slot}/ports', [InfrastructurePositionController::class, 'storePort'])->name('network.infrastructure-slots.ports.store');
-        Route::get('/network/nodes/{node}/inspector', [NetworkNodeController::class, 'inspector'])->name('network.nodes.inspector');
         Route::post('/network/infrastructure-ports/{port}/connections', [InfrastructurePositionController::class, 'connect'])->name('network.infrastructure-ports.connections.store');
         Route::post('/network/infrastructure-connections/{connection}/verify', [InfrastructurePositionController::class, 'verifyConnection'])->name('network.infrastructure-connections.verify');
         Route::post('/network/infrastructure-connections/{connection}/release', [InfrastructurePositionController::class, 'releaseConnection'])->name('network.infrastructure-connections.release');

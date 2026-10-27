@@ -9,6 +9,7 @@ use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\InventoryAdjustmentService;
 use App\Services\InventoryReassignService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
@@ -71,6 +72,15 @@ class InventoryReassignRollTest extends TestCase
             'current_technician_id' => $this->teknisi->id,
             'issued_from_pop_id' => $this->cabang->id,
         ]);
+    }
+
+    #[Test]
+    public function adjustment_roll_memakai_status_terbaru_dari_database(): void
+    {
+        InventoryRoll::whereKey($this->roll->id)->update(['status' => RollStatus::SCRAPPED]);
+
+        $this->expectException(InvalidArgumentException::class);
+        app(InventoryAdjustmentService::class)->adjustRollStatus($this->roll, RollStatus::LOST, 'hilang', $this->owner, null, 'bukti.jpg');
     }
 
     #[Test]

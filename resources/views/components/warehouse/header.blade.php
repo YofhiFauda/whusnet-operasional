@@ -290,6 +290,13 @@
                 @endif
             </a>
             @endif
+            @if($user->hasPermission('warehouse_branch_sale.view'))
+            <a href="{{ route('warehouse.branch-sales.index') }}"
+               data-active-tab="{{ $active === 'branch-sales' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold {{ $tabClass('branch-sales') }}">
+                <span>Jual Beli Cabang</span>
+            </a>
+            @endif
             @if($canViewTraceability)
             <a href="{{ route('warehouse.traceability.index') }}"
                data-active-tab="{{ $active === 'traceability' ? 'true' : 'false' }}"

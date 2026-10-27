@@ -84,7 +84,7 @@ services:
       assets:
         condition: service_completed_successfully
     environment:
-      APP_NAME: Whusnet-Operasional
+      APP_NAME: "RUANG KERJA WHUSNET"
       # DB_* SENGAJA tak diulang di sini (2026-08-03). Compose `environment:`
       # jadi env var level-OS container — lapisan ini menang atas .env DAN
       # atas .env.testing/phpunit.xml `force="true"` saat `php artisan test`

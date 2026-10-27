@@ -24,11 +24,8 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Koreksi 2026-09-18 (keputusan eksplisit user): Konfirmasi Terima Transfer
- * gak lagi centang per-SN/roll/qty — satu tombol "Konfirmasi & Terima Semua
- * Barang" (dilewati modal warning di FE), server otomatis anggap SEMUA baris
- * dispatch cocok 100%. Juga cek hint "transfer belum dikonfirmasi" di
- * halaman Issue create (`warehouse_issue.available-stock`).
+ * Terima semua tetap tersedia untuk kiriman lengkap. Terima parsial mencatat
+ * tiap SN/roll/qty yang benar-benar tiba dan membiarkan sisa tetap terbuka.
  */
 class WarehouseTransferReceiveSimplifiedTest extends TestCase
 {
@@ -103,7 +100,7 @@ class WarehouseTransferReceiveSimplifiedTest extends TestCase
     }
 
     #[Test]
-    public function halaman_show_tidak_ada_checkbox_konfirmasi_lagi(): void
+    public function halaman_show_menyediakan_terima_semua_dan_terima_parsial(): void
     {
         $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
         $kabel = Item::create(['code' => 'RCV-KABEL2', 'name' => 'Dropcore RCV 2', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
@@ -119,9 +116,8 @@ class WarehouseTransferReceiveSimplifiedTest extends TestCase
         $response->assertOk()
             ->assertSee('Konfirmasi & Terima Semua Barang', false)
             ->assertSee('Ya, Konfirmasi Terima Semua')
-            ->assertDontSee('name="confirmed_quantities', false)
-            ->assertDontSee('name="confirmed_serial_numbers', false)
-            ->assertDontSee('type="checkbox"', false);
+            ->assertSee('Terima Sisa / Parsial')
+            ->assertSee('name="confirmed_quantities', false);
     }
 
     #[Test]
@@ -163,5 +159,61 @@ class WarehouseTransferReceiveSimplifiedTest extends TestCase
 
         $response->assertOk()->assertJsonPath('pending_transfer_count', 0);
         $this->assertNotEmpty($response->json('items'));
+    }
+
+    #[Test]
+    public function penerimaan_sebagian_dapat_dilanjutkan_tanpa_menggandakan_stok(): void
+    {
+        $category = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $item = Item::create(['code' => 'RCV-PARTIAL', 'name' => 'Kabel Partial', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $item, 100, 770, $this->owner);
+        $transfer = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabang, [['item_id' => $item->id, 'qty' => 100]], $this->owner);
+        $dispatch = $transfer->transactions()->whereNotNull('from_pop_id')->firstOrFail();
+
+        $this->actingAs($this->owner)->post(route('warehouse.transfers.receive', $transfer), [
+            'receive_mode' => 'partial',
+            'confirmed_quantities' => [$dispatch->id => 80],
+        ])->assertRedirect(route('warehouse.transfers.show', $transfer));
+        $this->assertSame(TransferStatus::RECEIVED_PARTIAL, $transfer->fresh()->status);
+        $this->assertEquals(80, InventoryBalance::where('pop_id', $this->cabang->id)->where('item_id', $item->id)->value('qty'));
+        $this->actingAs($this->owner)->get(route('warehouse.transfers.show', $transfer))
+            ->assertOk()->assertSee('20 meter')->assertSee('Terima Sisa');
+
+        $this->actingAs($this->owner)->post(route('warehouse.transfers.receive', $transfer), [
+            'receive_mode' => 'partial',
+            'confirmed_quantities' => [$dispatch->id => 30],
+        ])->assertSessionHas('error');
+        $this->assertEquals(80, InventoryBalance::where('pop_id', $this->cabang->id)->where('item_id', $item->id)->value('qty'));
+
+        $this->actingAs($this->owner)->post(route('warehouse.transfers.receive', $transfer), [
+            'receive_mode' => 'partial',
+            'confirmed_quantities' => [$dispatch->id => 20],
+        ])->assertRedirect(route('warehouse.transfers.show', $transfer));
+        $this->assertSame(TransferStatus::RECEIVED, $transfer->fresh()->status);
+        $this->assertEquals(100, InventoryBalance::where('pop_id', $this->cabang->id)->where('item_id', $item->id)->value('qty'));
+        $this->assertEquals(2, $transfer->transactions()->whereNotNull('to_pop_id')->count());
+    }
+
+    #[Test]
+    public function penerimaan_sebagian_sn_tidak_boleh_dikonfirmasi_dua_kali(): void
+    {
+        $category = ItemCategory::where('code', 'modem_ont')->firstOrFail();
+        $item = Item::create(['code' => 'RCV-PARTIAL-SN', 'name' => 'Modem Partial', 'item_category_id' => $category->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
+        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $item, ['SN-PART-1', 'SN-PART-2'], 200000, $this->owner);
+        $transfer = app(InventoryTransferService::class)->createTransfer($this->pusat, $this->cabang, [['item_id' => $item->id, 'serial_numbers' => ['SN-PART-1', 'SN-PART-2']]], $this->owner);
+
+        $this->actingAs($this->owner)->post(route('warehouse.transfers.receive', $transfer), [
+            'receive_mode' => 'partial',
+            'confirmed_serial_numbers' => ['SN-PART-1'],
+        ])->assertRedirect(route('warehouse.transfers.show', $transfer));
+        $this->assertSame(TransferStatus::RECEIVED_PARTIAL, $transfer->fresh()->status);
+        $this->assertEquals(1, InventorySerial::where('current_pop_id', $this->cabang->id)->where('item_id', $item->id)->count());
+
+        $this->actingAs($this->owner)->post(route('warehouse.transfers.receive', $transfer), [
+            'receive_mode' => 'partial',
+            'confirmed_serial_numbers' => ['SN-PART-2'],
+        ])->assertRedirect(route('warehouse.transfers.show', $transfer));
+        $this->assertSame(TransferStatus::RECEIVED, $transfer->fresh()->status);
+        $this->assertEquals(2, InventorySerial::where('current_pop_id', $this->cabang->id)->where('item_id', $item->id)->count());
     }
 }

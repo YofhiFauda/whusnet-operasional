@@ -7,6 +7,8 @@
 
 <x-warehouse.header active="stock" title="Stock Opname" subtitle="Catat hasil hitung fisik barang di gudang — sistem hitung sendiri selisihnya, hasil PAS (gak ada selisih) tetap wajib disimpan sebagai bukti opname sudah dilakukan." backUrl="{{ route('warehouse.stock.index') }}" />
 
+<a href="{{ route('warehouse.adjustments.unit-opname.create') }}" class="mb-4 inline-flex rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">Opname SN / Roll →</a>
+
 <div class="max-w-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-6 sm:p-8 shadow-xs">
     <div class="mb-6 pb-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
         <div class="flex items-center gap-3">

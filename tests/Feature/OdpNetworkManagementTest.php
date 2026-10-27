@@ -889,4 +889,74 @@ class OdpNetworkManagementTest extends TestCase
         $this->assertSame('inactive', $used->fresh()->status);
         $this->assertModelExists($port);
     }
+
+    /**
+     * Rancangan "Aksi Cepat Hapus Node" (docs/plan/infrastruktur/rancangan-
+     * aksi-cepat-crud-node.md, Bagian 1) — tombol Hapus di List hanya boleh
+     * tampil untuk user ber-permission `network_nodes.delete`. `atasan`
+     * cuma punya `network_nodes.view` (RolePermissionSeeder), jadi cocok
+     * jadi kasus "tidak berizin".
+     */
+    public function test_index_menampilkan_tombol_hapus_node_hanya_untuk_yang_berizin(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $atasan = User::factory()->create(['role_id' => Role::where('code', 'atasan')->firstOrFail()->id]);
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $this->makeNode($pop->id, 'ODP-HAPUS-01', 'ODP Hapus Test');
+
+        $this->actingAs($owner)->get(route('network.nodes.index'))
+            ->assertOk()
+            ->assertSee('Hapus Node');
+
+        $this->actingAs($atasan)->get(route('network.nodes.index'))
+            ->assertOk()
+            ->assertDontSee('Hapus Node');
+    }
+
+    /**
+     * Rancangan Bagian 2.A — type-selector modal Tambah dibaca dari
+     * `$nodeTypes` (tabel `network_node_types`), bukan array hardcode.
+     * Tipe baru yang dibuat admin harus otomatis muncul tanpa sentuh Blade.
+     */
+    public function test_modal_tambah_menampilkan_tipe_node_baru_tanpa_sentuh_kode(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        NetworkNodeType::create([
+            'code' => 'test-dynamic-type',
+            'name' => 'Tipe Dinamis Baru',
+            'has_ports' => false,
+            'is_active' => true,
+            'sort_order' => 99,
+        ]);
+
+        $this->actingAs($owner)->get(route('network.nodes.index'))
+            ->assertOk()
+            ->assertSee('data-device-type="test-dynamic-type"', false)
+            ->assertSee('Tipe Dinamis Baru');
+    }
+
+    /**
+     * Rancangan Bagian 2.B — `village`/`district`/`city` kecantol di state
+     * JS modal Edit tanpa input sebelumnya; sekarang ada jalur UI-nya.
+     * Validasi controller (`locationRules()`) sudah menerima field ini sejak
+     * awal — tes ini membuktikan jalur submit end-to-end benar-benar tersimpan.
+     */
+    public function test_edit_node_menyimpan_desa_kecamatan_dan_kota(): void
+    {
+        $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
+        $pop = Pop::factory()->create(['type' => 'cabang']);
+        $node = $this->makeNode($pop->id, 'ODP-LOKASI-01', 'ODP Lokasi');
+
+        $this->actingAs($owner)->patch(route('network.nodes.update', $node), [
+            'name' => $node->name,
+            'village' => 'Desa Siman',
+            'district' => 'Kecamatan Siman',
+            'city' => 'Ponorogo',
+        ])->assertRedirect(route('network.nodes.show', $node));
+
+        $node->refresh();
+        $this->assertSame('Desa Siman', $node->village);
+        $this->assertSame('Kecamatan Siman', $node->district);
+        $this->assertSame('Ponorogo', $node->city);
+    }
 }

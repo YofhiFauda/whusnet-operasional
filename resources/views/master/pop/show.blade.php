@@ -17,7 +17,7 @@
 @if(in_array($pop->type, ['mini_pop', 'cabang'], true))
 @can('network_nodes.view')
 <section class="mb-6 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-    <h3 class="text-xs font-bold uppercase text-slate-700 dark:text-slate-300">Chassis OLT terpasang</h3>
+    <h3 class="text-xs font-bold uppercase text-slate-700 dark:text-slate-300">OLT terpasang</h3>
     @forelse($chassisNodes as $chassis)
     <div class="mt-2 text-xs text-slate-700 dark:text-slate-300">
         <a href="{{ route('network.nodes.show', $chassis) }}" class="font-semibold text-sky-700 hover:underline dark:text-sky-400">{{ $chassis->code }} · {{ $chassis->name }}</a>
@@ -28,7 +28,7 @@
         @endforelse
     </div>
     @empty
-    <p class="mt-2 text-xs text-slate-500">Belum ada chassis OLT tercatat.</p>
+    <p class="mt-2 text-xs text-slate-500">Belum ada OLT tercatat.</p>
     @endforelse
 </section>
 @endcan

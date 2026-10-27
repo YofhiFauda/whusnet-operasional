@@ -4,6 +4,7 @@ namespace Tests\Feature\Warehouse;
 
 use App\Enums\CustodyStatus;
 use App\Enums\InventoryTransactionType;
+use App\Enums\ItemCondition;
 use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Exceptions\InsufficientCustodyException;
@@ -19,6 +20,7 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\TechnicianCustody;
 use App\Models\User;
+use App\Services\InventoryReassignService;
 use App\Services\InventoryService;
 use App\Services\NetworkNodeService;
 use Database\Seeders\RoleSeeder;
@@ -100,6 +102,27 @@ class InventoryServiceDeployTest extends TestCase
             'current_technician_id' => $this->technician->id,
             'issued_from_pop_id' => ($issuedFrom ?? $this->cabangA)->id,
         ]);
+    }
+
+    #[Test]
+    public function aset_infrastruktur_dicabut_wajib_diperiksa_sebelum_issue(): void
+    {
+        $item = $this->makeItem('DPL-CHECK', 'serialized', 'infrastructure_asset');
+        $serial = $this->issuedSerial($item, 'SN-DPL-CHECK');
+        app(InventoryService::class)->deploySerial($serial, $this->odc, $this->fopTask, [$this->technician], $this->actor);
+
+        $retrieval = app(InventoryService::class)->retrieveSerialFromLocation($serial, $this->fopTask, $this->actor);
+        $this->assertStringStartsWith('CBT-', $retrieval->reference_number);
+
+        $serial->refresh();
+        $this->assertSame(ItemCondition::USED_GOOD, $serial->condition);
+        $this->assertNull($serial->condition_checked_at);
+        $this->assertFalse($serial->isClearedForIssue());
+
+        app(InventoryReassignService::class)->returnSerialToWarehouse($serial, $this->cabangA, 'Selesai dicabut', $this->actor);
+        $serial->refresh();
+        $this->assertSame(SerialStatus::AVAILABLE, $serial->status);
+        $this->assertFalse($serial->isClearedForIssue());
     }
 
     #[Test]
@@ -279,7 +302,7 @@ class InventoryServiceDeployTest extends TestCase
         $this->assertSame($this->odc->id, (int) $transaction->from_network_node_id);
         $this->assertSame($this->cabangA->id, (int) $transaction->from_pop_id);
         $this->assertSame($this->actor->id, (int) $transaction->to_technician_id);
-        $this->assertStringStartsWith('RTR-', $transaction->reference_number);
+        $this->assertStringStartsWith('CBT-', $transaction->reference_number);
     }
 
     #[Test]
