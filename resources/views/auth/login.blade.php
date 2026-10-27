@@ -6,6 +6,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#081d32">
     <title>Login - Ruang Kerja Whusnet</title>
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="alternate icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -144,7 +147,7 @@
         .hero-top, .hero-bottom, .hero-body { position: relative; z-index: 1; }
         .hero-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
         .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
-        .brand-symbol { width: 37px; height: 37px; flex: none; }
+        .brand-symbol { width: 37px; height: 37px; flex: none; object-fit: contain; }
         .brand-wordmark { font-size: 17px; font-weight: 800; letter-spacing: -.055em; }
         .brand-caption { display: block; margin-top: 1px; font-size: 10px; font-weight: 500; letter-spacing: .065em; color: rgba(221, 241, 255, .62); }
         .hero-body { max-width: 680px; width: 100%; margin-block: auto; padding-block: 28px; }
@@ -188,7 +191,7 @@
         }
         .workspace-note { font-size: 10.5px; letter-spacing: .12em; font-weight: 700; color: var(--muted-soft); text-transform: uppercase; }
         .mobile-brand { display: none; align-items: center; gap: 9px; color: var(--text); font-size: 15px; font-weight: 800; letter-spacing: -.04em; }
-        .mobile-brand .brand-symbol { width: 30px; height: 30px; }
+        .mobile-brand .brand-symbol { width: 30px; height: 30px; object-fit: contain; }
         .theme-switch { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--stroke-soft); background: transparent; color: var(--muted); cursor: pointer; transition: color .2s, background .2s, border-color .2s; }
         .theme-switch:hover { background: var(--surface-subtle); color: var(--text); border-color: var(--stroke); }
         .theme-switch svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -219,8 +222,9 @@
         .reveal-password { position: absolute; top: 0; right: 4px; bottom: 0; display: grid; place-items: center; width: 42px; padding: 0; color: var(--muted); border: none; background: transparent; cursor: pointer; }
         .reveal-password:hover { color: var(--text); }
         .reveal-password svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-        .field-error { margin: 7px 0 0; color: #dc4b4b; font-size: 12px; line-height: 1.5; }
-        .form-error-summary { border-left: 3px solid #dc4b4b; background: var(--surface-subtle); padding: 10px 13px; color: var(--text); border-radius: 0 7px 7px 0; font-size: 12.5px; line-height: 1.5; }
+        .field-error { margin: 7px 0 0; color: #dc4b4b; font-size: 12px; line-height: 1.5; display: flex; align-items: center; gap: 6px; }
+        .field-error svg { width: 14px; height: 14px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; }
+
         .recover-details { position: relative; }
         .recover { color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; list-style: none; }
         .recover::-webkit-details-marker { display: none; }
@@ -316,11 +320,7 @@
 
             <header class="hero-top">
                 <div class="brand" aria-label="Ruang Kerja Whusnet">
-                    <svg class="brand-symbol" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-                        <rect width="40" height="40" rx="10" fill="white" fill-opacity=".12" />
-                        <path d="M8.5 13.5L14.8 27 20 16.4 25.2 27 31.5 13.5" stroke="#F1FBFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
-                        <path d="M17 10.5H23" stroke="#8EDCF7" stroke-width="2.5" stroke-linecap="round" />
-                    </svg>
+                    <img src="{{ asset('logo.svg') }}" alt="Whusnet Logo" class="brand-symbol" />
                     <span>
                         <span class="brand-wordmark"><span>RUANG KERJA</span> <span>WHUSNET</span></span>
                         <span class="brand-caption">OPERATIONAL PLATFORM</span>
@@ -360,17 +360,31 @@
 
         <!-- Right: no ornamental cards; meaningful help text anchors the form. -->
         <section class="signin-pane" aria-labelledby="signin-title">
+            <header class="signin-top" style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 12px;">
+                <div class="mobile-brand" aria-label="Ruang Kerja Whusnet">
+                    <img src="{{ asset('logo.svg') }}" alt="Whusnet Logo" class="brand-symbol" />
+                    <span>RUANG KERJA WHUSNET</span>
+                </div>
+                <div class="workspace-note" style="margin-left: auto; margin-right: 12px;">Akses Internal</div>
+                <button type="button" class="theme-switch" x-on:click="toggleTheme()" title="Ubah tema" aria-label="Ubah tema">
+                    <svg x-show="!dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></svg>
+                    <svg x-show="dark" x-cloak viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                </button>
+            </header>
             <div class="signin-center">
                 <span class="form-eyebrow">RUANG KERJA WHUSNET / SIGN IN</span>
                 <h2 class="signin-heading" id="signin-title">Senang Anda kembali.</h2>
                 <p class="signin-description">Masuk pakai akun kerja Anda, lanjutkan dari tempat terakhir Anda berhenti.</p>
-
-                @if ($errors->any())
-                    <p class="form-error-summary" role="alert">Login belum berhasil. Periksa kembali informasi akun Anda.</p>
-                @endif
-
                 <form action="{{ route('login') }}" method="POST" class="login-form"
-                    x-data="{ submitting: false, showPassword: false }"
+                    x-data="{
+                        submitting: false,
+                        showPassword: false,
+                        password: '',
+                        get hasMinLength() { return this.password.length >= 8; },
+                        get hasMixedCase() { return /[A-Z]/.test(this.password) && /[a-z]/.test(this.password); },
+                        get hasNumber() { return /[0-9]/.test(this.password); },
+                        get hasSymbol() { return /[^A-Za-z0-9]/.test(this.password); }
+                    }"
                     x-on:submit="submitting = true">
                     @csrf
 
@@ -386,13 +400,18 @@
                                 @error('email') aria-invalid="true" aria-describedby="email-error" @enderror>
                         </div>
                         @error('email')
-                            <p id="email-error" class="field-error" role="alert">{{ $message }}</p>
+                            <p id="email-error" class="field-error" role="alert">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                <span>{{ $message }}</span>
+                            </p>
                         @enderror
                     </div>
 
                     <div class="field">
                         <div class="field-heading">
-                            <label class="field-label" for="password">Kata sandi</label>
+                            <div class="password-label-wrap">
+                                <label class="field-label" for="password">Kata sandi</label>
+                            </div>
                             <details class="recover-details">
                                 <summary class="recover">Lupa kata sandi?</summary>
                                 <p class="recover-help">Lupa sandi? Minta admin atau tim support bantu buatkan yang baru.</p>
@@ -401,6 +420,7 @@
                         <div class="field-control">
                             <input class="field-input password-input @error('password') has-error @enderror"
                                 id="password" name="password" type="password"
+                                x-model="password"
                                 x-bind:type="showPassword ? 'text' : 'password'"
                                 autocomplete="current-password" required placeholder="Masukkan kata sandi"
                                 @error('password') aria-invalid="true" aria-describedby="password-error" @enderror>
@@ -410,7 +430,7 @@
                                 x-bind:aria-label="showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
                                 x-bind:aria-pressed="showPassword.toString()">
                                 <svg x-show="!showPassword" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M2.3 12s3.5-6.5 9.7-6.5 9.7 6.5 9.7 6.5-3.5 6.5-9.7 6.5S2.3 12 2.3 12Z" /><circle cx="12" cy="12" r="3" />
+                                    <path d="M2.3 12s3.5-6.5 9.7-6.5 9.7 6.5-3.5 6.5-9.7 6.5S2.3 12 2.3 12Z" /><circle cx="12" cy="12" r="3" />
                                 </svg>
                                 <svg x-show="showPassword" x-cloak viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M3 3l18 18M10.6 5.6A11.2 11.2 0 0 1 12 5.5c6.2 0 9.7 6.5 9.7 6.5a13 13 0 0 1-3.1 3.7M6.1 6.8A14.3 14.3 0 0 0 2.3 12s3.5 6.5 9.7 6.5c1.2 0 2.3-.2 3.3-.6M10 10a3 3 0 0 0 4 4" />
@@ -418,14 +438,65 @@
                             </button>
                         </div>
                         @error('password')
-                            <p id="password-error" class="field-error" role="alert">{{ $message }}</p>
+                            <p id="password-error" class="field-error" role="alert">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                <span>{{ $message }}</span>
+                            </p>
                         @enderror
+
+                        {{-- Password Criteria Checklist --}}
+                        <div class="mt-2.5 space-y-1 text-[11px] text-slate-500 dark:text-slate-400"
+                            x-show="password.length > 0"
+                            x-transition:enter="transition-all duration-300 ease-out"
+                            x-transition:enter-start="opacity-0 -translate-y-2 scale-[0.98]"
+                            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave="transition-all duration-200 ease-in"
+                            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                            x-transition:leave-end="opacity-0 -translate-y-1.5 scale-[0.98]"
+                            x-cloak>
+                            <div class="flex items-center gap-1.5 transition-colors duration-200 ease-out"
+                                :class="hasMinLength ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''">
+                                <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200 ease-out"
+                                    :class="hasMinLength ? 'scale-110' : 'scale-100'"
+                                    fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                </svg>
+                                <span>Minimal 8 karakter</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 transition-colors duration-200 ease-out"
+                                :class="hasMixedCase ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''">
+                                <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200 ease-out"
+                                    :class="hasMixedCase ? 'scale-110' : 'scale-100'"
+                                    fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                </svg>
+                                <span>Huruf besar dan huruf kecil</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 transition-colors duration-200 ease-out"
+                                :class="hasNumber ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''">
+                                <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200 ease-out"
+                                    :class="hasNumber ? 'scale-110' : 'scale-100'"
+                                    fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                </svg>
+                                <span>Minimal 1 angka</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 transition-colors duration-200 ease-out"
+                                :class="hasSymbol ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''">
+                                <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200 ease-out"
+                                    :class="hasSymbol ? 'scale-110' : 'scale-100'"
+                                    fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                </svg>
+                                <span>Minimal 1 simbol (!@#$%dst)</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="remember-row">
                         <label class="remember-option" for="remember">
                             <input id="remember" type="checkbox" name="remember" value="1" {{ old('remember') ? 'checked' : '' }}>
-                            <span>Ingat sesi saya</span>
+                            <span>Ingat saya</span>
                         </label>
                     </div>
 

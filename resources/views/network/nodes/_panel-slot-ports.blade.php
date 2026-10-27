@@ -35,13 +35,21 @@
     </form>
     @endcan
 
-    <div class="divide-y divide-border rounded-lg border border-border overflow-hidden">
+    @php
+        // Nomor 1..kapasitas Slot supaya yang kosong kelihatan; kapasitas besar
+        // tidak digambar penuh (panel berat) — cukup yang terdata.
+        $portByNumber = $ports->keyBy('number');
+        $maxTiles = 512;
+        $tileTotal = ($slot->capacity !== null && $slot->capacity > 0 && $slot->capacity <= $maxTiles) ? (int) $slot->capacity : 0;
+        $emptyNumbers = collect($tileTotal > 0 ? range(1, $tileTotal) : [])->reject(fn ($n) => $portByNumber->has($n))->values();
+    @endphp
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-slot-ports="{{ $slot->id }}">
         @forelse($ports as $port)
         @php
             $summary = $ponSummaries[$port->id] ?? null;
             $occupancy = $occupancies[$port->id] ?? null;
         @endphp
-        <div data-panel-port="{{ $port->id }}" class="flex flex-wrap items-center justify-between gap-3 bg-surface px-3.5 py-2.5">
+        <div data-panel-port="{{ $port->id }}" class="flex flex-col justify-between gap-3 rounded-xl border border-sky-200 dark:border-sky-900 bg-surface-muted/30 p-3.5">
             <div class="min-w-0 space-y-1">
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="text-xs font-bold font-mono text-text-main">{{ $port->displayName() }}</span>
@@ -66,8 +74,16 @@
             </div>
         </div>
         @empty
-        <p class="bg-surface p-3.5 text-xs text-text-muted">Belum ada {{ $portLabel }} pada Slot ini.</p>
+            @if($emptyNumbers->isEmpty())
+            <p class="rounded-xl border border-border bg-surface p-3.5 text-xs text-text-muted sm:col-span-2 xl:col-span-3">Belum ada {{ $portLabel }} pada Slot ini.</p>
+            @endif
         @endforelse
+        @foreach($emptyNumbers as $number)
+        <div data-panel-empty="{{ $number }}" class="flex items-center justify-between gap-2 rounded-xl border border-dashed border-border bg-surface px-3.5 py-3">
+            <span class="text-xs font-bold font-mono text-text-muted">{{ $portLabel }} {{ $number }}</span>
+            <span class="text-[10px] text-text-muted">Kosong — belum didata</span>
+        </div>
+        @endforeach
     </div>
 
     @can('network_nodes.update')

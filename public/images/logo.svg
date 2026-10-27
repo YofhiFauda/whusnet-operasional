@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="300 295 660 660" fill="none">
+  <defs>
+    <linearGradient id="upper" x1="370" y1="530" x2="690" y2="365" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8DE5F7"/>
+      <stop offset="1" stop-color="#A5ECFA"/>
+    </linearGradient>
+    <linearGradient id="left" x1="380" y1="600" x2="650" y2="890" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#009FF5"/>
+      <stop offset="1" stop-color="#07AFF5"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="490" y1="680" x2="759" y2="777" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00C9EE"/>
+      <stop offset="1" stop-color="#00A7ED"/>
+    </linearGradient>
+    <linearGradient id="right" x1="902" y1="593" x2="624" y2="898" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#203583"/>
+      <stop offset="1" stop-color="#17266B"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="674" y1="471" x2="797" y2="606" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#049FEF"/>
+      <stop offset="1" stop-color="#0079E8"/>
+    </linearGradient>
+    <linearGradient id="dot" x1="757" y1="387" x2="869" y2="475" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00C9EA"/>
+      <stop offset="1" stop-color="#04C0E7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left rounded sweeping arc -->
+  <path d="M 350 626
+    C 351 592, 380 568, 416 568
+    C 463 568, 498 597, 500 642
+    C 499 704, 512 777, 543 818
+    C 575 863, 616 878, 656 889
+    C 512 890, 357 795, 350 643
+    C 350 637, 350 630, 350 626 Z" fill="url(#left)"/>
+
+  <!-- Upper light-cyan crescent -->
+  <path d="M 350 627
+    C 345 501, 420 402, 518 363
+    C 572 340, 622 339, 666 347
+    C 702 349, 720 363, 722 387
+    C 724 422, 696 457, 656 459
+    C 578 457, 520 504, 505 570
+    C 502 591, 499 614, 500 642
+    C 496 596, 463 568, 418 568
+    C 378 568, 350 592, 350 627 Z" fill="url(#upper)"/>
+
+  <!-- Outer deep blue swoosh -->
+  <path d="M 658 476
+    C 704 480, 747 509, 797 524
+    C 821 529, 843 526, 858 534
+    C 891 548, 904 593, 900 644
+    C 896 720, 851 797, 781 843
+    C 740 873, 690 888, 653 889
+    C 604 887, 565 861, 542 817
+    C 601 802, 659 802, 703 766
+    C 754 727, 784 670, 781 632
+    C 785 577, 736 500, 658 476 Z" fill="url(#right)"/>
+
+  <!-- Thin bright-blue upper-right wave -->
+  <path d="M 658 476
+    C 702 478, 745 509, 797 524
+    C 817 528, 836 528, 851 531
+    C 805 538, 783 572, 781 625
+    C 770 557, 728 497, 658 476 Z" fill="url(#ribbon)"/>
+
+  <!-- Turquoise inner sweep -->
+  <path d="M 500 644
+    C 507 701, 550 744, 614 750
+    C 675 758, 728 736, 762 685
+    C 743 744, 709 788, 649 813
+    C 614 825, 576 827, 542 817
+    C 515 773, 498 715, 500 644 Z" fill="url(#inner)"/>
+
+  <!-- Separate upper-right circular accent -->
+  <circle cx="816" cy="430" r="70" fill="url(#dot)"/>
+</svg>

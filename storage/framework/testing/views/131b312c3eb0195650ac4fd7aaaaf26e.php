@@ -8,6 +8,10 @@
 
     <title><?php echo $__env->yieldContent('title', 'Ruang Kerja Whusnet'); ?></title>
 
+    <link rel="icon" type="image/svg+xml" href="<?php echo e(asset('favicon.svg')); ?>">
+    <link rel="alternate icon" type="image/png" href="<?php echo e(asset('favicon.png')); ?>">
+    <link rel="shortcut icon" href="<?php echo e(asset('favicon.ico')); ?>">
+
     <style>
         html, body {
             height: 100%;
@@ -56,9 +60,7 @@
         
         <div class="h-16 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-800/60 shrink-0 brand-container">
             <a href="/" class="flex items-center gap-3 brand-link group">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-xs tracking-tight shadow-sm shadow-sky-500/25 shrink-0 transition-transform duration-200 group-hover:scale-105">
-                    RKW
-                </div>
+                <img src="<?php echo e(asset('logo.svg')); ?>" alt="Whusnet Logo" class="w-9 h-9 object-contain shrink-0 transition-transform duration-200 group-hover:scale-105">
                 <div class="flex flex-col sidebar-text">
                     <span class="font-extrabold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight">RUANG KERJA</span>
                     <span class="text-[9px] font-bold text-sky-600 dark:text-sky-400 tracking-wider uppercase mt-0.5">WHUSNET</span>
@@ -243,25 +245,31 @@
                     <?php endif; ?>
 
                     <?php if(auth()->user()->hasPermission('collector_worksheet.view')): ?>
-                    <a href="<?php echo e(route('collector-worksheet.index')); ?>" title="Worksheet Admin (Kolektor)"
+                    <a href="<?php echo e(route('collector-worksheet.index', ['pending_deposits' => 1])); ?>" title="Worksheet Admin (Kolektor)"
                        class="sidebar-nav-item <?php echo e(Request::is('collector-worksheet*') || Request::is('payment-batches*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('collector-worksheet*') || Request::is('payment-batches*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-8.13a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm6 8a4 4 0 1 1 0-8"/>
                             </svg>
                             <span class="sidebar-text">Worksheet Admin</span>
+                            <?php if(($badge_collector_deposit_count ?? 0) > 0): ?>
+                            <span data-badge="collector-deposit" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600"><?php echo e($badge_collector_deposit_count); ?></span>
+                            <?php endif; ?>
                         </div>
                     </a>
                     <?php endif; ?>
 
                     <?php if(auth()->user()->hasPermission('cash_deposit.view')): ?>
-                    <a href="<?php echo e(route('cash-deposits.index')); ?>" title="Setoran Kas (Admin → Owner/Bank)"
+                    <a href="<?php echo e(route('cash-deposits.index', ['status' => 'menunggu'])); ?>" title="Setoran Kas (Admin → Owner/Bank)"
                        class="sidebar-nav-item <?php echo e(Request::is('cash-deposits*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('cash-deposits*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3Z"/>
                             </svg>
                             <span class="sidebar-text">Setoran Kas</span>
+                            <?php if(($badge_cash_deposit_count ?? 0) > 0): ?>
+                            <span data-badge="cash-deposit" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600"><?php echo e($badge_cash_deposit_count); ?></span>
+                            <?php endif; ?>
                         </div>
                     </a>
                     <?php endif; ?>
@@ -763,6 +771,9 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4"/>
                                 </svg>
                                 <span class="sidebar-text">Gudang</span>
+                                <?php if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0)) > 0): ?>
+                                <span class="sidebar-parent-badge rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white"><?php echo e(($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0)); ?></span>
+                                <?php endif; ?>
                             </div>
                             <svg id="chevron-warehouse"
                                  class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isWarehouseActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
@@ -797,8 +808,15 @@
                                 <?php if(auth()->user()->hasPermission('warehouse_report.sold_to_customer.view')): ?>
                                 <a href="<?php echo e(route('warehouse.reports.sold-to-customer')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/reports/sold-to-customer*') ? 'sidebar-subitem-active' : ''); ?>"><span>Laporan Barang Terjual</span></a>
                                 <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('warehouse_transfer.view') && auth()->user()->hasPermission('warehouse_transfer.receive')): ?>
+                                <a href="<?php echo e(route('warehouse.transfers.pending')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('warehouse.transfers.pending') ? 'sidebar-subitem-active' : ''); ?>"><span>Konfirmasi Transfer</span>
+                                    <?php if(($badge_transfer_confirmation_count ?? 0) > 0): ?><span data-badge="transfer-confirmation" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600"><?php echo e($badge_transfer_confirmation_count); ?></span><?php endif; ?>
+                                </a>
+                                <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
-                                <a href="<?php echo e(route('warehouse.stock-requests.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : ''); ?>"><span>Permintaan Stok</span></a>
+                                <a href="<?php echo e(route('warehouse.stock-requests.index', ['status' => 'open'])); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : ''); ?>"><span>Permintaan Stok</span>
+                                    <?php if(($badge_stock_request_count ?? 0) > 0): ?><span data-badge="stock-request" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600"><?php echo e($badge_stock_request_count); ?></span><?php endif; ?>
+                                </a>
                                 <?php endif; ?>
                             </div>
                         </div>

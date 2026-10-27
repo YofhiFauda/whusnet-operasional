@@ -112,7 +112,8 @@ class MasterNodeDevicePanelLazyTest extends TestCase
         // Perangkat: 2 Slot terdata, kapasitas perangkat belum didata.
         $this->assertMatchesRegularExpression('/data-capacity-used="2" data-capacity-total=""/', $html);
         // TIDAK ada kartu PON/form Tambah PON di level OLT.
-        $this->assertStringNotContainsString('PON 3', $html);
+        // PON kini tampil sebagai petak ringkas di kartu Slot (permintaan user 2026-10-27), tetap tanpa kartu detail/form PON.
+        $this->assertStringContainsString('data-slot-tile="filled"', $html);
         $this->assertStringNotContainsString('data-panel-port=', $html);
         $this->assertStringNotContainsString('data-component-port=', $html);
         $this->assertStringNotContainsString('Tambah PON', $html);

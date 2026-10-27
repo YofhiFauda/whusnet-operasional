@@ -40,6 +40,26 @@ fi
 wait_for_tcp "$REDIS_HOST" "${REDIS_PORT:-6379}" "redis"
 
 if [ "$ROLE" = "app" ]; then
+    # Buang marker siap dari boot sebelumnya. /tmp ikut bertahan di
+    # `docker restart` (filesystem container sama), jadi tanpa ini healthcheck
+    # langsung lolos sebelum migrate+cache di bawah selesai dan horizon/nginx
+    # yang gate di `app: service_healthy` start di skema lama.
+    rm -f /tmp/app-ready
+
+    # Volume `cache_data` menutupi bootstrap/cache image dan bertahan antar
+    # deploy, jadi packages.php/services.php/config.php di dalamnya bisa
+    # BASI: dari deploy sebelumnya, atau (kalau image dibangun lokal) terbawa
+    # `COPY .` dari mesin dev dan menyebut provider paket dev (Boost dst)
+    # yang tidak ada di vendor prod → package:discover mati dengan
+    # `Class "Laravel\Boost\BoostServiceProvider" not found`. Buang semua
+    # sebelum discover; langkah di bawah menulis ulang yang benar.
+    rm -f bootstrap/cache/*.php
+
+    # Volume `storage_data` juga bertahan: subfolder yang baru ditambah image
+    # tidak ikut muncul di volume lama. view:cache & session butuh ini ada.
+    mkdir -p storage/logs storage/app/public \
+        storage/framework/cache/data storage/framework/sessions storage/framework/views
+
     # package:discover diulang di sini (bukan cuma saat build) karena tahap
     # `vendor` di Dockerfile.prod jalan --no-scripts sebelum kode app ada —
     # provider paket pihak ketiga (Horizon, Reverb, dll) belum terdaftar

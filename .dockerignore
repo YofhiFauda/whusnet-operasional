@@ -39,3 +39,8 @@ CHANGELOG.md
 *.md
 *.xlsx
 image.png
+
+# Cache bootstrap dari mesin dev (packages.php dkk) memuat provider paket dev
+# yang tidak ada di vendor prod. Dibuat ulang di entrypoint.
+bootstrap/cache/*
+!bootstrap/cache/.gitignore

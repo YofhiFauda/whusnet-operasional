@@ -71,6 +71,23 @@
         </div>
     @endif
 
+    @if(auth()->user()->hasPermission('collector_worksheet.validate') && ($pendingDeposits->total() > 0 || request()->boolean('pending_deposits')))
+        <section id="pending-deposits" class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+            <h2 class="mb-3 text-sm font-bold text-amber-800 dark:text-amber-300">Setoran Menunggu Verifikasi ({{ $pendingDeposits->total() }})</h2>
+            <div class="space-y-2">
+                @forelse($pendingDeposits as $deposit)
+                    <a href="{{ $deposit->collector?->isTechnician() ? route('collector-worksheet.technicians.show', ['technician' => $deposit->collector_id, 'tab' => 'setor']) : route('collector-worksheet.show', ['collector' => $deposit->collector_id, 'tab' => 'setoran']) }}" class="flex items-center justify-between rounded-lg bg-white p-3 text-xs text-slate-700 hover:text-sky-700 dark:bg-slate-800 dark:text-slate-200">
+                        <span>{{ $deposit->deposit_number }} : {{ $deposit->collector?->name }}</span>
+                        <span>Periksa</span>
+                    </a>
+                @empty
+                    <p class="text-xs text-slate-600 dark:text-slate-300">Tidak ada setoran yang perlu diverifikasi.</p>
+                @endforelse
+            </div>
+            {{ $pendingDeposits->links() }}
+        </section>
+    @endif
+
     {{-- Summary Stat Cards --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {{-- Total Kolektor --}}

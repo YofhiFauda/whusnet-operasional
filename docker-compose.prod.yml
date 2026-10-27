@@ -164,7 +164,7 @@ services:
       - app_network
 
   redis:
-    image: redis:alpine
+    image: redis:8.10-alpine
     restart: unless-stopped
     # `--requirepass` WAJIB nyala di sini — app/horizon/reverb/scheduler
     # semua dikirim REDIS_PASSWORD (lihat &app_env), jadi kalau server ini

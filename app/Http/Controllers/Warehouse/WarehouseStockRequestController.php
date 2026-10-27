@@ -33,11 +33,12 @@ class WarehouseStockRequestController extends Controller
         $hasAllAccess = $access->hasAllPopAccess($user);
         $allowedPopIds = $hasAllAccess ? [] : $access->getAllowedPopIds($user);
 
-        $statusFilter = $request->query('status', 'pending');
+        $statusFilter = $request->query('status', 'open');
 
         $requests = StockRequest::query()
             ->when(! $hasAllAccess, fn ($q) => $q->whereIn('cabang_pop_id', $allowedPopIds))
-            ->when($statusFilter !== 'all', fn ($q) => $q->where('status', $statusFilter))
+            ->when($statusFilter === 'open', fn ($q) => $q->whereIn('status', ['pending', 'partial']))
+            ->when(! in_array($statusFilter, ['all', 'open'], true), fn ($q) => $q->where('status', $statusFilter))
             ->with(['cabangPop', 'requestedBy', 'items.item'])
             ->latest('id')
             ->paginate(20)

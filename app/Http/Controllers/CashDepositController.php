@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\CashDepositStatus;
 use App\Models\CashDeposit;
 use App\Models\User;
+use App\Services\ActionQueueBadgeService;
 use App\Services\AdminCashBalanceService;
 use App\Services\CashDepositService;
 use App\Services\OwnerCashBalanceService;
@@ -72,9 +73,9 @@ class CashDepositController extends Controller
             ? $request->query('status')
             : null;
 
-        $deposits = CashDeposit::query()
-            ->realDeposits()
-            ->applyUserScope($viewer)
+        $deposits = ($status === 'menunggu'
+            ? app(ActionQueueBadgeService::class)->cashDeposits($viewer)
+            : CashDeposit::query()->realDeposits()->applyUserScope($viewer))
             ->when($status === 'menunggu', fn ($q) => $q->where('status', CashDepositStatus::MENUNGGU_VERIFIKASI->value))
             ->when($status === 'selesai', fn ($q) => $q->where('status', '!=', CashDepositStatus::MENUNGGU_VERIFIKASI->value))
             ->with([
@@ -95,11 +96,7 @@ class CashDepositController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $jumlahMenunggu = CashDeposit::query()
-            ->realDeposits()
-            ->applyUserScope($viewer)
-            ->where('status', CashDepositStatus::MENUNGGU_VERIFIKASI->value)
-            ->count();
+        $jumlahMenunggu = app(ActionQueueBadgeService::class)->cashDeposits($viewer)->count();
 
         // Banner titik nol. Tanpa ini, Owner membaca saldo hari pertama sebagai
         // seluruh riwayat perusahaan padahal uang lama sudah lama masuk bank

@@ -480,7 +480,7 @@ class NetworkNodeController extends Controller
             // sama dengan panel Master Node (daftar Slot + kapasitas); PON/
             // Port tiap Slot dibuka di Detail Slot — satu level per halaman.
             'deviceSlots' => InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) !== null
-                ? $node->slots()->with('nodeType')->withCount('children')->get()
+                ? $node->slots()->with(['nodeType', 'children' => fn ($q) => $q->orderBy('number'), 'children.nodeType'])->withCount('children')->get()
                 : collect(),
         ]);
     }
@@ -678,7 +678,7 @@ class NetworkNodeController extends Controller
         if (InfrastructureSlotKind::forDeviceTypeCode($node->nodeType?->code) !== null) {
             return view('network.nodes._panel-device-slots', [
                 'device' => $node,
-                'slots' => $node->slots()->with('nodeType')->withCount('children')->get(),
+                'slots' => $node->slots()->with(['nodeType', 'children' => fn ($q) => $q->orderBy('number'), 'children.nodeType'])->withCount('children')->get(),
                 'inMasterNode' => true,
             ]);
         }

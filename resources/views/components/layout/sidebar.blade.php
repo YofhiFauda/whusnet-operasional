@@ -1,7 +1,7 @@
 <aside class="w-64 bg-surface border-r border-border h-screen sticky top-0 hidden md:flex flex-col transition-all duration-300" :class="{ 'w-16': !sidebarOpen, 'w-64': sidebarOpen }">
-    <div class="h-16 flex items-center justify-center border-b border-border px-4">
+    <div class="h-16 flex items-center justify-center border-b border-border px-4 gap-2.5">
+        <img src="{{ asset('logo.svg') }}" alt="Whusnet Logo" class="w-8 h-8 object-contain shrink-0">
         <span class="font-bold text-lg text-primary truncate" x-show="sidebarOpen">Whusnet OSS</span>
-        <span class="font-bold text-lg text-primary" x-show="!sidebarOpen">W</span>
     </div>
     
     <nav class="flex-1 overflow-y-auto p-3 space-y-1.5">

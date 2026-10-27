@@ -6,7 +6,7 @@
 # `public/build` ada di .gitignore, jadi tidak ikut `COPY . /var/www`; harus
 # dibangun di sini supaya image tidak bergantung pada host yang kebetulan
 # sudah menjalankan `npm run build`.
-FROM node:24-alpine AS assets
+FROM node:26-alpine AS assets
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -16,7 +16,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM php:8.4-fpm
+FROM php:8.5-fpm-trixie AS runtime
 
 # Install system dependencies
 #

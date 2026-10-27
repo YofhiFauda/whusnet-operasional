@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -39,6 +40,53 @@ class AuthTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    public function test_user_can_login_with_remember_me(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'remember@whusnet.net',
+            'password' => bcrypt('password'),
+            'status' => 'active',
+            'remember_token' => null,
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'remember@whusnet.net',
+            'password' => 'password',
+            'remember' => '1',
+        ]);
+
+        $response->assertRedirect('/');
+        $this->assertAuthenticatedAs($user);
+
+        // Verify remember_token was generated in database
+        $user->refresh();
+        $this->assertNotNull($user->remember_token);
+
+        // Verify remember cookie is set in response
+        $response->assertCookie(Auth::guard()->getRecallerName());
+    }
+
+    public function test_user_login_without_remember_me_does_not_set_cookie(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'noremember@whusnet.net',
+            'password' => bcrypt('password'),
+            'status' => 'active',
+            'remember_token' => null,
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'noremember@whusnet.net',
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect('/');
+        $this->assertAuthenticatedAs($user);
+
+        // Verify remember cookie is not present
+        $response->assertCookieMissing(Auth::guard()->getRecallerName());
+    }
+
     public function test_user_cannot_login_with_invalid_credentials(): void
     {
         $user = User::factory()->create([
@@ -52,8 +100,21 @@ class AuthTest extends TestCase
             'password' => 'wrong-password',
         ]);
 
-        $response->assertSessionHasErrors('email');
+        $response->assertSessionHasErrors([
+            'email' => 'Email atau kata sandi yang Anda masukkan tidak sesuai.',
+        ]);
         $this->assertGuest();
+    }
+
+    public function test_login_page_renders_password_criteria_helper(): void
+    {
+        $response = $this->get('/login');
+
+        $response->assertStatus(200);
+        $response->assertSee('Minimal 8 karakter', false);
+        $response->assertSee('Huruf besar dan huruf kecil', false);
+        $response->assertSee('Minimal 1 angka', false);
+        $response->assertSee('Minimal 1 simbol (!@#$%dst)', false);
     }
 
     public function test_inactive_user_cannot_login(): void

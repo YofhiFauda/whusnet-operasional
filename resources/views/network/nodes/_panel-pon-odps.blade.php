@@ -42,12 +42,12 @@
     </form>
     @endcan
 
-    <div class="divide-y divide-border rounded-lg border border-border overflow-hidden">
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         @forelse($odps as $odp)
         @php
             $odpCapacity = \App\Support\MasterNodeInspector::capacity((int) $odp->ports_count, (int) $odp->used_ports_count) + ['red_zone' => $odp->isInRedZone()];
         @endphp
-        <div data-panel-odp="{{ $odp->id }}" class="flex flex-wrap items-center justify-between gap-3 bg-surface px-3.5 py-2.5">
+        <div data-panel-odp="{{ $odp->id }}" class="flex flex-col justify-between gap-3 rounded-xl border border-border bg-surface-muted/30 p-3.5">
             <div class="min-w-0 space-y-1">
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="text-xs font-bold font-mono text-text-main">{{ $odp->code }}</span>
@@ -67,7 +67,7 @@
             </div>
         </div>
         @empty
-        <p class="bg-surface p-3.5 text-xs text-text-muted">Belum ada ODP yang tersambung ke PON ini.</p>
+        <p class="rounded-xl border border-dashed border-border bg-surface p-3.5 text-xs text-text-muted sm:col-span-2 xl:col-span-3">Belum ada ODP yang tersambung ke PON ini.</p>
         @endforelse
     </div>
 

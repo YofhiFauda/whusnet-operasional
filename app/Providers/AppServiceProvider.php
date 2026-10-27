@@ -23,6 +23,7 @@ use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TaskObserver;
 use App\Policies\TaskPolicy;
+use App\Services\ActionQueueBadgeService;
 use App\Services\BusinessDevelopmentVerificationQueue;
 use App\Services\EffectiveAccessService;
 use App\Services\NetworkNodeAttentionService;
@@ -372,7 +373,12 @@ class AppServiceProvider extends ServiceProvider
                 ? app(BusinessDevelopmentVerificationQueue::class)->forUser($user)->count()
                 : 0;
 
-            $view->with('badge_business_development_verification_count', $count);
+            $queues = app(ActionQueueBadgeService::class);
+            $view->with('badge_business_development_verification_count', $count)
+                ->with('badge_transfer_confirmation_count', $user?->hasPermission('warehouse_transfer.receive') ? app(WarehouseTransferActionQueue::class)->forUser($user)->count() : 0)
+                ->with('badge_stock_request_count', $user ? $queues->stockRequests($user)->count() : 0)
+                ->with('badge_collector_deposit_count', $user ? $queues->collectorDeposits($user)->count() : 0)
+                ->with('badge_cash_deposit_count', $user ? $queues->cashDeposits($user)->count() : 0);
         });
 
         View::composer('components.warehouse.header', function ($view): void {

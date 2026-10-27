@@ -20,6 +20,7 @@ use App\Models\Pop;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Services\ActionQueueBadgeService;
 use App\Services\AdminCashBalanceService;
 use App\Services\CollectorBalanceService;
 use App\Services\CollectorVisitService;
@@ -101,6 +102,11 @@ class CollectorWorksheetController extends Controller
 
     public function index(Request $request): View
     {
+        $pendingDeposits = app(ActionQueueBadgeService::class)->collectorDeposits($request->user())
+            ->with('collector.role')
+            ->latest('submitted_at')
+            ->paginate(10, ['*'], 'pending_page');
+
         $collectors = User::query()
             ->whereHas('role', fn ($q) => $q->where('code', 'kolektor'))
             ->withCount(['assignedCustomers as customer_count' => function ($q) {
@@ -241,6 +247,7 @@ class CollectorWorksheetController extends Controller
             ->values();
 
         return view('collector-worksheet.index', compact(
+            'pendingDeposits',
             'technicianRows',
             'activityChannels',
             'kasTunai',

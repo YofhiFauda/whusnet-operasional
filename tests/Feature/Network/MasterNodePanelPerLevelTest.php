@@ -117,7 +117,7 @@ class MasterNodePanelPerLevelTest extends TestCase
         $slot = $this->positions->createSlot($olt, 1, ['capacity' => 16]);
         $sibling = $this->positions->createSlot($olt, 2);
         $pon = $this->positions->createPort($slot, 3, ['capacity' => 4, 'red_zone_threshold' => 50]);
-        $siblingPon = $this->positions->createPort($sibling, 9, ['capacity' => 64]);
+        $siblingPon = $this->positions->createPort($sibling, 20, ['capacity' => 64]);
         $this->odp($pon, 'ODP-SATU-A', 4, 2);
 
         $html = $this->actingAs($this->cabangUser($this->cabangA))->get(route('network.nodes.panel', $slot))
@@ -138,12 +138,50 @@ class MasterNodePanelPerLevelTest extends TestCase
         $this->assertMatchesRegularExpression('/data-capacity-used="1" data-capacity-total="16"/', $html);
         // PON slot saudara & ODP (level bawah) tidak ikut.
         $this->assertStringNotContainsString('data-panel-port="'.$siblingPon->id.'"', $html);
-        $this->assertStringNotContainsString('PON 9', $html);
+        $this->assertStringNotContainsString('PON 20', $html);
         $this->assertStringNotContainsString('ODP-SATU-A', $html);
         $this->assertStringNotContainsString('data-panel-odp=', $html);
         $this->assertStringNotContainsString('<html', $html);
         // Tombol drill-down membawa panel_url PON dari server.
         $this->assertStringContainsString(e(json_encode(route('network.nodes.panel', $pon))), $html);
+    }
+
+    #[Test]
+    public function panel_olt_menggambar_kartu_slot_dengan_petak_pon_terisi_dan_kosong(): void
+    {
+        $olt = $this->device('olt_chassis', $this->cabangA, 'OLT-PETAK');
+        $slot = $this->positions->createSlot($olt, 1, ['capacity' => 4]);
+        $pon = $this->positions->createPort($slot, 2, ['capacity' => 8]);
+        $besar = $this->positions->createSlot($olt, 2, ['capacity' => 600]);
+
+        $html = $this->actingAs($this->cabangUser($this->cabangA))->get(route('network.nodes.panel', $olt))
+            ->assertOk()
+            ->assertSee('data-slot-tiles="'.$slot->id.'"', false)
+            ->getContent();
+
+        // 4 petak: nomor 2 terisi (bisa diklik → panel PON), 1/3/4 kosong.
+        $this->assertSame(1, substr_count($html, 'data-slot-tile="filled"'));
+        $this->assertSame(3, substr_count($html, 'data-slot-tile="empty"'));
+        $this->assertStringContainsString(e(json_encode(route('network.nodes.panel', $pon))), $html);
+        // Kapasitas 500 tidak digambar per petak.
+        $this->assertStringNotContainsString('data-slot-tiles="'.$besar->id.'"', $html);
+        $this->assertStringContainsString('terlalu besar digambar per petak', $html);
+    }
+
+    #[Test]
+    public function panel_slot_menampilkan_pon_kosong_sampai_kapasitas_slot(): void
+    {
+        $olt = $this->device('olt_chassis', $this->cabangA, 'OLT-KOSONG');
+        $slot = $this->positions->createSlot($olt, 1, ['capacity' => 4]);
+        $this->positions->createPort($slot, 3, ['capacity' => 4]);
+
+        $html = $this->actingAs($this->cabangUser($this->cabangA))->get(route('network.nodes.panel', $slot))
+            ->assertOk()->getContent();
+
+        foreach ([1, 2, 4] as $number) {
+            $this->assertStringContainsString('data-panel-empty="'.$number.'"', $html);
+        }
+        $this->assertStringNotContainsString('data-panel-empty="3"', $html);
     }
 
     #[Test]
