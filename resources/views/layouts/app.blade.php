@@ -18,6 +18,7 @@
         Safari versi lama).
     --}}
     <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+    <meta name="description" content="@yield('meta_description', 'Sistem Billing dan Operasional ISP Whusnet')">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>@yield('title', 'Ruang Kerja Whusnet')</title>
@@ -59,9 +60,14 @@
          bikin Alpine memperingatkan "detected multiple instances". -->
 
     <!-- Styles / Scripts -->
+    @include('partials.web-fonts')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+
+<a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-sky-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:font-semibold focus:text-xs">
+    Lewati ke konten utama
+</a>
 
 {{--
     h-dvh, bukan h-screen (=100vh): di real device, address bar mobile
@@ -88,13 +94,14 @@
                 <img src="{{ asset('logo.svg') }}" alt="Whusnet Logo" class="w-9 h-9 object-contain shrink-0 transition-transform duration-200 group-hover:scale-105">
                 <div class="flex flex-col sidebar-text">
                     <span class="font-extrabold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight">RUANG KERJA</span>
-                    <span class="text-[9px] font-bold text-sky-600 dark:text-sky-400 tracking-wider uppercase mt-0.5">WHUSNET</span>
+                    <span class="text-[9px] font-bold text-sky-700 dark:text-sky-400 tracking-wider uppercase mt-0.5">WHUSNET</span>
                 </div>
             </a>
             <button onclick="toggleSidebar()"
                     class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    title="Tutup Menu">
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    title="Tutup Menu"
+                    aria-label="Tutup menu navigasi">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
@@ -106,7 +113,7 @@
             {{-- ── Group: OPERASIONAL ── --}}
             <div>
                 <div class="sidebar-group-header px-2.5 mb-1.5">
-                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Operasional</p>
+                    <p class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest sidebar-text">Operasional</p>
                     <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
@@ -141,11 +148,11 @@
                             </div>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 @if($badgePelangganTotal > 0)
-                                    <span class="sidebar-parent-badge px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500 text-white leading-none shadow-xs">{{ $badgePelangganTotal }}</span>
+                                    <span class="sidebar-parent-badge px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-800 dark:bg-amber-700 text-white leading-none shadow-xs">{{ $badgePelangganTotal }}</span>
                                 @endif
                                 <svg id="chevron-pelanggan"
                                      class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ $isPelangganActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}"
-                                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                                 </svg>
                             </div>
@@ -167,7 +174,7 @@
                                    class="flex items-center justify-between sidebar-subitem {{ Request::is('customer-registration-verifications*') ? 'sidebar-subitem-active' : '' }}">
                                     <span>Verifikasi Registrasi</span>
                                     @if(isset($badge_registration_verification_count) && $badge_registration_verification_count > 0)
-                                        <span class="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_registration_verification_count }}</span>
+                                        <span class="bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_registration_verification_count }}</span>
                                     @endif
                                 </a>
                                 @endif
@@ -176,7 +183,7 @@
                                    class="flex items-center justify-between sidebar-subitem {{ Request::is('tasks-creq-billing*') ? 'sidebar-subitem-active' : '' }}">
                                     <span>Verifikasi Biaya C-REQ</span>
                                     @if(isset($badge_creq_billing_verification_count) && $badge_creq_billing_verification_count > 0)
-                                        <span class="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_creq_billing_verification_count }}</span>
+                                        <span class="bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_creq_billing_verification_count }}</span>
                                     @endif
                                 </a>
                                 @endif
@@ -185,7 +192,7 @@
                                    class="flex items-center justify-between sidebar-subitem {{ Request::routeIs('surveys.queue') ? 'sidebar-subitem-active' : '' }}">
                                     <span>Antrean Survey</span>
                                     @if(isset($badge_survey_count) && $badge_survey_count > 0)
-                                        <span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_survey_count }}</span>
+                                        <span class="bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-200 border border-sky-300 dark:border-sky-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_survey_count }}</span>
                                     @endif
                                 </a>
                                 @endif
@@ -194,7 +201,7 @@
                                    class="flex items-center justify-between sidebar-subitem {{ Request::routeIs('verifications.queue') ? 'sidebar-subitem-active' : '' }}">
                                     <span>Verif &amp; Pemasangan</span>
                                     @if(isset($badge_verification_count) && $badge_verification_count > 0)
-                                        <span class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_verification_count }}</span>
+                                        <span class="bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-200 border border-sky-300 dark:border-sky-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_verification_count }}</span>
                                     @endif
                                 </a>
                                 @endif
@@ -342,7 +349,7 @@
                             </div>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 @if($badgeBusdevTotal > 0)
-                                    <span class="sidebar-parent-badge px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500 text-white leading-none shadow-xs">{{ $badgeBusdevTotal }}</span>
+                                    <span class="sidebar-parent-badge px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-600 text-white leading-none shadow-xs">{{ $badgeBusdevTotal }}</span>
                                 @endif
                                 <svg id="chevron-busdev"
                                      class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ $isBusdevActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}"
@@ -404,7 +411,7 @@
             @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('qr_scan_logs.view') || auth()->user()->hasPermission('network_nodes.view'))
             <div>
                 <div class="sidebar-group-header px-2.5 mb-1.5">
-                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Jaringan &amp; Lapangan</p>
+                    <p class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest sidebar-text">Jaringan &amp; Lapangan</p>
                     <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
@@ -589,7 +596,7 @@
             @if(auth()->user()->hasPermission('reports.view') || auth()->user()->hasPermission('audit_logs.view'))
             <div>
                 <div class="sidebar-group-header px-2.5 mb-1.5">
-                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Laporan</p>
+                    <p class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest sidebar-text">Laporan</p>
                     <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
@@ -669,7 +676,7 @@
             @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('master_rekening.view') || auth()->user()->hasPermission('termination_reasons.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view'))
             <div>
                 <div class="sidebar-group-header px-2.5 mb-1.5">
-                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Master &amp; Pengaturan</p>
+                    <p class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest sidebar-text">Master &amp; Pengaturan</p>
                     <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
@@ -783,7 +790,7 @@
             @endphp
             <div>
                 <div class="sidebar-group-header px-2.5 mb-1.5">
-                    <p class="text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest sidebar-text">Gudang &amp; Inventory</p>
+                    <p class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest sidebar-text">Gudang &amp; Inventory</p>
                     <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2 mx-1"></div>
                 </div>
                 <div class="space-y-1">
@@ -797,7 +804,7 @@
                                 </svg>
                                 <span class="sidebar-text">Gudang</span>
                                 @if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0)) > 0)
-                                <span class="sidebar-parent-badge rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white">{{ ($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) }}</span>
+                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{{ ($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) }}</span>
                                 @endif
                             </div>
                             <svg id="chevron-warehouse"
@@ -864,7 +871,7 @@
                     </div>
                     <div class="truncate sidebar-footer-info">
                         <p class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{{ Auth::user()->name ?? 'Administrator' }}</p>
-                        <p class="text-[10px] text-slate-400 dark:text-slate-500 truncate">{{ Auth::user()->email ?? 'admin@whusnet.net' }}</p>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate">{{ Auth::user()->email ?? 'admin@whusnet.net' }}</p>
                     </div>
                 </div>
                 <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">@csrf</form>
@@ -896,8 +903,9 @@
             <div class="flex items-center gap-2 min-w-0">
                 {{-- Mobile menu toggle --}}
                 <button onclick="toggleSidebar()"
+                        aria-label="Buka menu navigasi"
                         class="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M4 6h16M4 18h16"/>
                     </svg>
                 </button>
@@ -907,8 +915,9 @@
                     {{-- Panel-left toggle (desktop) --}}
                     <button onclick="toggleDesktopSidebar()"
                             class="hidden md:flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-400 dark:hover:text-slate-100 transition-colors"
-                            title="Toggle Sidebar">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            title="Toggle Sidebar"
+                            aria-label="Perkecil atau perluas navigasi samping">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <rect width="18" height="18" x="3" y="3" rx="2"/>
                             <path d="M9 3v18"/>
                         </svg>
@@ -930,25 +939,27 @@
                     <svg class="hidden sm:block h-3 w-3 text-slate-300 dark:text-slate-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/>
                     </svg>
-                    <span aria-current="page" class="font-semibold text-sky-600 dark:text-sky-400 truncate">@yield('page_title', 'Dashboard')</span>
+                    <span aria-current="page" class="font-semibold text-sky-700 dark:text-sky-400 truncate">@yield('page_title', 'Dashboard')</span>
                 </nav>
             </div>
 
             {{-- Center: Global Search (desktop only) --}}
             <div class="hidden md:block flex-1 max-w-sm lg:max-w-md">
                 <div class="relative">
-                    <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <label for="globalSearch" class="sr-only">Pencarian global</label>
+                    <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"/>
                     </svg>
                     <input type="search" id="globalSearch" onkeydown="handleGlobalSearch(event)"
                            placeholder="Cari pelanggan, CID, invoice, tiket, IP…"
+                           aria-label="Pencarian global"
                            class="w-full h-9 pl-10 pr-16 rounded-full border border-slate-200 dark:border-slate-700
                                   bg-white/70 dark:bg-slate-800/70 text-xs text-slate-800 dark:text-slate-100
                                   placeholder-slate-400 dark:placeholder-slate-500
                                   focus:outline-none focus:bg-white dark:focus:bg-slate-800
                                   focus:border-sky-600 dark:focus:border-sky-500
                                   focus:ring-2 focus:ring-sky-600/12 transition-all">
-                    <kbd class="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-slate-50 dark:bg-slate-900">/</kbd>
+                    <kbd class="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-slate-50 dark:bg-slate-900" aria-hidden="true">/</kbd>
                 </div>
             </div>
 
@@ -992,17 +1003,20 @@
                 {{-- User Menu --}}
                 <div class="relative" x-data="{ open: false }">
                     <button @click="open = !open" @click.outside="open = false"
+                            :aria-expanded="open ? 'true' : 'false'"
+                            aria-haspopup="true"
                             class="flex items-center gap-2 py-1 pl-1 pr-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-                        <span class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300
-                                     border border-sky-200 dark:border-sky-700 font-bold text-[11px]
+                        <span class="sr-only">Menu Pengguna: </span>
+                        <span class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-200
+                                     border border-sky-300 dark:border-sky-700 font-bold text-[11px]
                                      flex items-center justify-center">
                             {{ strtoupper(substr(Auth::user()->name ?? 'AD', 0, 2)) }}
                         </span>
                         <span class="hidden lg:flex flex-col items-start leading-tight">
                             <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">{{ Auth::user()->name ?? 'Administrator' }}</span>
-                            <span class="text-[10px] text-slate-400 dark:text-slate-500">{{ \App\Support\IndonesianDate::dateTime(now()) }}</span>
+                            <span class="text-[10px] text-slate-500 dark:text-slate-400">{{ \App\Support\IndonesianDate::dateTime(now()) }}</span>
                         </span>
-                        <svg class="h-3 w-3 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <svg class="h-3 w-3 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                         </svg>
                     </button>
@@ -1075,7 +1089,7 @@
         {{-- Peta Infrastruktur butuh kanvas penuh tanpa margin/scroll halaman
              (topologi di-pan di dalam, drawer detail buka-tutup sendiri) —
              satu-satunya rute yang melepas padding+scroll <main> default. --}}
-        <main class="flex-1 overflow-y-auto scroll-smooth {{ Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8' }}">
+        <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto scroll-smooth focus:outline-none {{ Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8' }}">
             @yield('content')
         </main>
     </div>

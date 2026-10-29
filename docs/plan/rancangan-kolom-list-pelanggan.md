@@ -1,6 +1,6 @@
 # Rancangan: Kolom List Pelanggan Dapat Diatur (Pilih, Urut Drag-Drop, Sort ASC/DESC)
 
-**Status:** 📝 RANCANGAN FINAL (semua keputusan dijawab user 2026-10-27), **belum diimplementasi** — menunggu instruksi mulai. Di luar sprint aktif; dibuat atas permintaan eksplisit user.
+**Status:** ✅ DIIMPLEMENTASI 2026-10-28 (ADHOC-226). Penyimpangan dari rancangan saat implementasi dicatat di §15. Di luar sprint aktif; dibuat atas permintaan eksplisit user.
 
 **Alur kerja:** analisa → dokumentasi (dokumen ini) → implementasi **hanya setelah diinstruksikan user**.
 
@@ -203,3 +203,16 @@ Regresi: `CustomerListFilterKeepsStatusGroupTest` dan test List Pelanggan yang a
 | K1 | Daftar kolom | Final: CID, Nama Lengkap, POP & Desa, Paket Internet, No. Telepon, Jatuh Tempo, Tagihan, Berkas, Status, Email, NIK, Gender, Alamat, Kecamatan, Kota, Mini POP, Kolektor, Tanggal Daftar, Sales. |
 | K2 | NIK & email dibatasi permission? | Tidak. Boleh tampil untuk semua pemegang `customers.view`. |
 | K3 | Survey & Verifikasi Pelanggan ikut preferensi? | Tidak. Dibiarkan seperti sekarang; fitur hanya di List Pelanggan utama. |
+
+## 15. Penyimpangan Saat Implementasi (2026-10-28)
+
+| Rancangan | Implementasi | Alasan |
+|---|---|---|
+| JSON `[{"key","visible"}]` | JSON daftar key kolom **tampil**, berurutan (`["cid","nama",...]`) | Kolom tak terdaftar otomatis tersembunyi; tidak perlu merge flag `visible`. Kunci usang dibuang saat baca, kosong → default. |
+| Kunci katalog baru ditambahkan di akhir | Tidak otomatis; muncul sebagai kolom tersembunyi yang bisa dicentang | Sederhana, tidak mengubah tampilan user yang sudah punya preferensi. |
+| Sort kolom relasi via join | Subquery korelasi di `ORDER BY` | Tanpa `select customers.*`, tanpa risiko menggandakan baris. |
+| Tombol Reset di panel | Ada (tombol "Reset" di panel Kolom) | — |
+| Pembatasan `hidden 2xl:table-cell` | Dihapus | Pilihan user menggantikan pembatasan responsif per kolom. |
+| Panel centang | Terapkan = simpan lalu muat ulang halaman | Kolom baru butuh data & eager load dari server. |
+
+Berkas: `app/Support/CustomerListColumns.php`, `app/Services/CustomerListColumnService.php`, `app/Http/Controllers/CustomerListColumnController.php`, `app/Models/UserTablePreference.php`, migrasi `2026_10_28_083128_create_user_table_preferences_table.php`, partial `resources/views/customers/partials/columns/_*.blade.php` dan `_list_columns_script.blade.php`.

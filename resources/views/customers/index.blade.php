@@ -41,7 +41,8 @@
 {{-- ────────────────────────────────────────────────────────────
      MAIN DATA CONTAINER: TABLE VIEW (DESKTOP) & CARD VIEW (MOBILE)
 ──────────────────────────────────────────────────────────── --}}
-<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
+<section aria-labelledby="heading-tabel-pelanggan" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
+    <h2 id="heading-tabel-pelanggan" class="sr-only">Tabel Data Pelanggan</h2>
     @if(!empty($statusGroup))
     {{-- Header grup survey/verification. Grup failed/terminated tidak lewat sini
          lagi — punya halaman sendiri. --}}
@@ -58,7 +59,7 @@
     @include('customers.partials._list_table')
 
     @include('customers.partials._list_pagination')
-</div>
+</section>
 
 @include('customers.partials._quick_hub_modal')
 @endsection

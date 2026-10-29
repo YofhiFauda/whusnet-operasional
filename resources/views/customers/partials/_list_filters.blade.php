@@ -6,57 +6,124 @@
      /customers?status_group=… — tanpa hidden input ini, menekan "Cari" dari dua
      grup itu melempar balik ke daftar default. Lihat
      CustomerListFilterKeepsStatusGroupTest. --}}
-<div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 shadow-sm space-y-3 mb-5">
+<section aria-labelledby="heading-filter-pelanggan" class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 shadow-sm space-y-3 mb-5">
+    <h2 id="heading-filter-pelanggan" class="sr-only">Filter dan Pencarian Pelanggan</h2>
 
     <!-- Status Tabs & Search Row -->
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <!-- Status Tabs Filter -->
-        <div class="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl w-fit text-xs font-semibold shrink-0">
+        <nav aria-label="Filter status pelanggan" class="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl w-fit text-xs font-semibold shrink-0">
             <a href="{{ route('customers.index') }}"
+               @if($status === '' && empty($statusGroup)) aria-current="page" @endif
                class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer
-                      {{ $status === '' && empty($statusGroup) ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100' }}">
+                      {{ $status === '' && empty($statusGroup) ? 'bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100' }}">
                 <span>Semua</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
-                             {{ $status === '' && empty($statusGroup) ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400' : 'bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">{{ $totalCustomers }}</span>
+                             {{ $status === '' && empty($statusGroup) ? 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-200' : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200' }}">{{ $totalCustomers }}</span>
             </a>
             <a href="{{ route('customers.index', ['status' => 'active']) }}"
+               @if($status === 'active') aria-current="page" @endif
                class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer
-                      {{ $status === 'active' ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100' }}">
+                      {{ $status === 'active' ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100' }}">
                 <span>Aktif</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
-                             {{ $status === 'active' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">{{ $statusCounts['active'] ?? 0 }}</span>
+                             {{ $status === 'active' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200' : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200' }}">{{ $statusCounts['active'] ?? 0 }}</span>
             </a>
             <a href="{{ route('customers.index', ['status' => 'suspended']) }}"
+               @if($status === 'suspended') aria-current="page" @endif
                class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer
-                      {{ $status === 'suspended' ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100' }}">
+                      {{ $status === 'suspended' ? 'bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100' }}">
                 <span>Isolir</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
-                             {{ $status === 'suspended' ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400' : 'bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">{{ $statusCounts['suspended'] ?? 0 }}</span>
+                             {{ $status === 'suspended' ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200' : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200' }}">{{ $statusCounts['suspended'] ?? 0 }}</span>
             </a>
-        </div>
+        </nav>
 
         <!-- Search & Density Control -->
         <div class="flex items-center gap-3 w-full lg:w-auto">
-            <form action="{{ url()->current() }}" method="GET" id="searchForm" class="relative flex-1 max-w-full sm:max-w-md lg:max-w-xs xl:max-w-md">
+            <form action="{{ url()->current() }}" method="GET" id="searchForm" role="search" class="relative flex-1 max-w-full sm:max-w-md lg:max-w-xs xl:max-w-md">
                 @if($statusGroup !== '')
                     <input type="hidden" name="status_group" value="{{ $statusGroup }}">
                 @endif
                 @if($status !== '')
                     <input type="hidden" name="status" value="{{ $status }}">
                 @endif
-                <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <label for="search" class="sr-only">Cari pelanggan</label>
+                <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 <input type="text" name="search" id="search" value="{{ $search }}"
                        placeholder="Cari Nama, CID, HP, atau Desa..."
+                       aria-label="Cari pelanggan berdasarkan Nama, CID, HP, atau Desa"
                        class="w-full h-9 pl-10 pr-4 rounded-full border border-slate-200 dark:border-slate-700
                               bg-slate-50/50 dark:bg-slate-800/60 text-xs text-slate-800 dark:text-slate-100
                               placeholder-slate-400 dark:placeholder-slate-500
                               focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all">
             </form>
 
-            <div class="hidden sm:flex items-center gap-2 text-xs text-slate-500 shrink-0">
-                <div class="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-[11px] font-medium">
-                    <button type="button" onclick="setDensity('comfortable')" id="density-comfortable" class="px-2.5 py-1 rounded-lg transition-all">Longgar</button>
-                    <button type="button" onclick="setDensity('compact')" id="density-compact" class="px-2.5 py-1 rounded-lg transition-all">Rapat</button>
+            {{-- Pemilih kolom (cuma List Pelanggan utama). Centang → kolom masuk tabel,
+                 disimpan per user di DB lalu halaman dimuat ulang (kolom baru butuh
+                 data dari server). Urutan diatur dengan drag-drop header tabel.
+                 URL simpan/reset dirender server lewat route(). --}}
+            @if($customizable)
+            <div class="relative shrink-0 hidden sm:block"
+                 x-data="{
+                    open: false, busy: false,
+                    visible: @js(array_keys($columns)),
+                    updateUrl: @js(route('customers.list-columns.update')),
+                    resetUrl: @js(route('customers.list-columns.destroy')),
+                    toggle(key) { const i = this.visible.indexOf(key); i >= 0 ? this.visible.splice(i, 1) : this.visible.push(key); },
+                    async send(method, url, body) {
+                        this.busy = true;
+                        try {
+                            const res = await fetch(url, { method, body, headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content } });
+                            if (!res.ok) throw new Error('gagal');
+                            window.location.reload();
+                        } catch (e) {
+                            this.busy = false;
+                            alert('Kolom gagal disimpan.');
+                        }
+                    },
+                    apply() {
+                        if (!this.visible.length) { alert('Pilih minimal satu kolom.'); return; }
+                        this.send('PUT', this.updateUrl, JSON.stringify({ columns: this.visible }));
+                    },
+                    reset() { this.send('DELETE', this.resetUrl); }
+                 }"
+                 @click.outside="open = false" @keydown.escape="open = false">
+                <button type="button" @click="open = !open"
+                        :aria-expanded="open ? 'true' : 'false'"
+                        aria-haspopup="dialog"
+                        aria-label="Atur kolom tabel"
+                        class="h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 inline-flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m6 10V7M4 7h16M4 17h16"/></svg>
+                    <span>Kolom</span>
+                </button>
+                <div x-show="open" x-cloak x-transition
+                     role="dialog" aria-label="Pengaturan visibilitas kolom tabel"
+                     class="absolute right-0 z-30 mt-2 w-64 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-3 space-y-2">
+                    <p class="text-[11px] text-slate-600 dark:text-slate-400">Centang kolom yang ditampilkan. Geser judul kolom di tabel untuk mengubah urutan.</p>
+                    <div class="max-h-64 overflow-y-auto space-y-1">
+                        @foreach(\App\Support\CustomerListColumns::all() as $colKey => $colDef)
+                            <label class="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 cursor-pointer">
+                                <input type="checkbox" class="rounded border-slate-300 text-sky-600"
+                                       aria-label="{{ $colDef['label'] }}"
+                                       :checked="visible.includes('{{ $colKey }}')" @change="toggle('{{ $colKey }}')">
+                                <span>{{ $colDef['label'] }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                        <button type="button" @click="reset()" :disabled="busy" class="text-xs text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400">Reset</button>
+                        <button type="button" @click="apply()" :disabled="busy"
+                                class="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold disabled:opacity-50">Terapkan</button>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <div class="hidden sm:flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 shrink-0">
+                <div role="group" aria-label="Kerapatan tampilan tabel" class="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-[11px] font-medium">
+                    <button type="button" onclick="setDensity('comfortable')" id="density-comfortable" aria-label="Kerapatan tampilan longgar" class="px-2.5 py-1 rounded-lg transition-all">Longgar</button>
+                    <button type="button" onclick="setDensity('compact')" id="density-compact" aria-label="Kerapatan tampilan rapat" class="px-2.5 py-1 rounded-lg transition-all">Rapat</button>
                 </div>
             </div>
         </div>
@@ -81,43 +148,56 @@
         <x-ui.wilayah-filter :selected-districts="$selectedDistricts" :selected-villages="$selectedVillages" />
 
         {{-- Paket --}}
-        <select name="package_id" id="package_id" onchange="this.form.submit()"
-                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
-            <option value="">Semua Paket Internet</option>
-            @foreach($packages as $package)
-                <option value="{{ $package->id }}" {{ $packageId == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->name }}</option>
-            @endforeach
-        </select>
+        <div>
+            <label for="package_id" class="sr-only">Filter Paket Internet</label>
+            <select name="package_id" id="package_id" onchange="this.form.submit()"
+                    aria-label="Filter Paket Internet"
+                    class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="">Semua Paket Internet</option>
+                @foreach($packages as $package)
+                    <option value="{{ $package->id }}" {{ $packageId == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->name }}</option>
+                @endforeach
+            </select>
+        </div>
 
         {{-- Kelengkapan --}}
-        <select name="completeness_status" id="completeness_status" onchange="this.form.submit()"
-                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
-            <option value="">Semua Kelengkapan Berkas</option>
-            <option value="draft" {{ $completenessStatus === 'draft' ? 'selected' : '' }}>Draft</option>
-            <option value="perlu_dilengkapi" {{ $completenessStatus === 'perlu_dilengkapi' ? 'selected' : '' }}>Perlu Dilengkapi</option>
-            <option value="lengkap" {{ $completenessStatus === 'lengkap' ? 'selected' : '' }}>Lengkap</option>
-            <option value="siap_billing" {{ $completenessStatus === 'siap_billing' ? 'selected' : '' }}>Siap Billing</option>
-        </select>
+        <div>
+            <label for="completeness_status" class="sr-only">Filter Kelengkapan Berkas</label>
+            <select name="completeness_status" id="completeness_status" onchange="this.form.submit()"
+                    aria-label="Filter Kelengkapan Berkas"
+                    class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="">Semua Kelengkapan Berkas</option>
+                <option value="draft" {{ $completenessStatus === 'draft' ? 'selected' : '' }}>Draft</option>
+                <option value="perlu_dilengkapi" {{ $completenessStatus === 'perlu_dilengkapi' ? 'selected' : '' }}>Perlu Dilengkapi</option>
+                <option value="lengkap" {{ $completenessStatus === 'lengkap' ? 'selected' : '' }}>Lengkap</option>
+                <option value="siap_billing" {{ $completenessStatus === 'siap_billing' ? 'selected' : '' }}>Siap Billing</option>
+            </select>
+        </div>
 
         {{-- Kolektor --}}
         @if($collectorOptions->isNotEmpty())
-        <select name="collector_id" id="collector_id" onchange="this.form.submit()"
-                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
-            <option value="">Semua (Kolektor &amp; Tanpa Kolektor)</option>
-            <option value="none" {{ $collectorId === 'none' ? 'selected' : '' }}>Belum Ada Kolektor</option>
-            @foreach($collectorOptions as $collectorOption)
-                <option value="{{ $collectorOption->id }}" {{ (string) $collectorId === (string) $collectorOption->id ? 'selected' : '' }}>{{ $collectorOption->name }}</option>
-            @endforeach
-        </select>
+        <div>
+            <label for="collector_id" class="sr-only">Filter Kolektor</label>
+            <select name="collector_id" id="collector_id" onchange="this.form.submit()"
+                    aria-label="Filter Kolektor"
+                    class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="">Semua (Kolektor &amp; Tanpa Kolektor)</option>
+                <option value="none" {{ $collectorId === 'none' ? 'selected' : '' }}>Belum Ada Kolektor</option>
+                @foreach($collectorOptions as $collectorOption)
+                    <option value="{{ $collectorOption->id }}" {{ (string) $collectorId === (string) $collectorOption->id ? 'selected' : '' }}>{{ $collectorOption->name }}</option>
+                @endforeach
+            </select>
+        </div>
         @endif
 
         {{-- Reset Button --}}
         <div class="col-span-1 sm:col-span-2 md:col-span-1 lg:col-span-1 flex items-center gap-2">
             <a href="{{ url()->current() }}"
+               aria-label="Reset semua filter"
                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors">
-                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <svg class="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 <span>Reset Filter</span>
             </a>
         </div>
     </form>
-</div>
+</section>

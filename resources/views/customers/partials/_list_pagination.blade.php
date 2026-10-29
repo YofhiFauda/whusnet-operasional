@@ -12,7 +12,7 @@
     $btnDisabled = 'px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-600 text-xs font-semibold opacity-40 cursor-not-allowed';
     $btnActive = 'px-3 py-1.5 rounded-lg bg-sky-600 text-white font-semibold text-xs font-mono';
 @endphp
-<div class="p-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-slate-500">
+<div class="p-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-slate-600 dark:text-slate-400">
 
     <div class="flex items-center gap-4">
         <div>
@@ -37,8 +37,10 @@
                     <input type="hidden" name="{{ $qk }}" value="{{ $qv }}">
                 @endif
             @endforeach
-            <span class="hidden sm:inline">Baris</span>
-            <select name="per_page" onchange="this.form.submit()"
+            <label for="per_page_select" class="sr-only">Jumlah baris per halaman</label>
+            <span class="hidden sm:inline" aria-hidden="true">Baris</span>
+            <select name="per_page" id="per_page_select" onchange="this.form.submit()"
+                    aria-label="Jumlah baris per halaman"
                     class="h-8 pl-2 pr-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-sky-600">
                 @foreach([10, 25, 50, 100] as $ppOption)
                     <option value="{{ $ppOption }}" {{ (int) request('per_page', 10) === $ppOption ? 'selected' : '' }}>{{ $ppOption }}</option>
@@ -48,17 +50,17 @@
     </div>
 
     @if($last > 1)
-    <div class="flex items-center gap-1.5">
+    <nav aria-label="Navigasi halaman data pelanggan" class="flex items-center gap-1.5">
         @if($customers->onFirstPage())
-            <span class="{{ $btnDisabled }}">Prev</span>
+            <span class="{{ $btnDisabled }}" aria-disabled="true">Prev</span>
         @else
-            <a href="{{ $customers->previousPageUrl() }}" id="paginatePrev" class="{{ $btnBase }}">Prev</a>
+            <a href="{{ $customers->previousPageUrl() }}" id="paginatePrev" aria-label="Halaman sebelumnya" class="{{ $btnBase }}">Prev</a>
         @endif
 
         @if($winStart > 1)
-            <a href="{{ $customers->url(1) }}" class="{{ $btnBase }} font-mono">1</a>
+            <a href="{{ $customers->url(1) }}" aria-label="Halaman 1" class="{{ $btnBase }} font-mono">1</a>
             @if($winStart > 2)
-                <span class="px-1 text-slate-400">&hellip;</span>
+                <span class="px-1 text-slate-500 dark:text-slate-400" aria-hidden="true">&hellip;</span>
             @endif
         @endif
 
@@ -66,22 +68,22 @@
             @if($n === $cur)
                 <span aria-current="page" class="{{ $btnActive }}">{{ $n }}</span>
             @else
-                <a href="{{ $customers->url($n) }}" class="{{ $btnBase }} font-mono">{{ $n }}</a>
+                <a href="{{ $customers->url($n) }}" aria-label="Halaman {{ $n }}" class="{{ $btnBase }} font-mono">{{ $n }}</a>
             @endif
         @endfor
 
         @if($winEnd < $last)
             @if($winEnd < $last - 1)
-                <span class="px-1 text-slate-400">&hellip;</span>
+                <span class="px-1 text-slate-500 dark:text-slate-400" aria-hidden="true">&hellip;</span>
             @endif
-            <a href="{{ $customers->url($last) }}" class="{{ $btnBase }} font-mono">{{ $last }}</a>
+            <a href="{{ $customers->url($last) }}" aria-label="Halaman terakhir, halaman {{ $last }}" class="{{ $btnBase }} font-mono">{{ $last }}</a>
         @endif
 
         @if($customers->hasMorePages())
-            <a href="{{ $customers->nextPageUrl() }}" id="paginateNext" class="{{ $btnBase }}">Next</a>
+            <a href="{{ $customers->nextPageUrl() }}" id="paginateNext" aria-label="Halaman berikutnya" class="{{ $btnBase }}">Next</a>
         @else
-            <span class="{{ $btnDisabled }}">Next</span>
+            <span class="{{ $btnDisabled }}" aria-disabled="true">Next</span>
         @endif
-    </div>
+    </nav>
     @endif
 </div>

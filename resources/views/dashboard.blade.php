@@ -2,6 +2,7 @@
 
 @section('title', 'Dashboard - Whusnet Operasional')
 @section('page_title', 'Operational Command Center')
+@section('meta_description', 'Dashboard Operational Command Center ISP Whusnet - Monitoring Pelanggan, Finansial, dan Jaringan secara Real-time')
 
 @section('content')
 @php
@@ -29,10 +30,10 @@
 
     $pulseBadgeClass = function (string $status) {
         return match ($status) {
-            'good' => 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
-            'warning' => 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
-            'danger' => 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
-            default => 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30',
+            'good' => 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+            'warning' => 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30',
+            'danger' => 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30',
+            default => 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30',
         };
     };
 
@@ -124,16 +125,16 @@
         <div class="mt-4 pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
             <span class="text-xs font-semibold text-text-muted">Fokus Sudut Pandang:</span>
             <div class="flex flex-wrap gap-1.5 bg-surface-muted p-1 rounded-xl">
-                <button type="button" @click="activeTab = 'all'" :class="activeTab === 'all' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-text-muted hover:text-text-main font-medium'" class="px-3 py-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer">
+                <button type="button" @click="activeTab = 'all'" :class="activeTab === 'all' ? 'bg-surface text-sky-700 dark:text-sky-400 shadow-xs font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-text-main font-medium'" class="px-3 py-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer">
                     Semua Modul (360°)
                 </button>
-                <button type="button" @click="activeTab = 'finance'" :class="activeTab === 'finance' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-text-muted hover:text-text-main font-medium'" class="px-3 py-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer">
+                <button type="button" @click="activeTab = 'finance'" :class="activeTab === 'finance' ? 'bg-surface text-sky-700 dark:text-sky-400 shadow-xs font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-text-main font-medium'" class="px-3 py-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer">
                     Keuangan & Kas
                 </button>
-                <button type="button" @click="activeTab = 'ops'" :class="activeTab === 'ops' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-text-muted hover:text-text-main font-medium'" class="px-3 py-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer">
+                <button type="button" @click="activeTab = 'ops'" :class="activeTab === 'ops' ? 'bg-surface text-sky-700 dark:text-sky-400 shadow-xs font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-text-main font-medium'" class="px-3 py-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer">
                     Layanan & Jaringan
                 </button>
-                <button type="button" @click="activeTab = 'crm_warehouse'" :class="activeTab === 'crm_warehouse' ? 'bg-surface text-primary shadow-xs font-semibold' : 'text-text-muted hover:text-text-main font-medium'" class="px-3 py-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer">
+                <button type="button" @click="activeTab = 'crm_warehouse'" :class="activeTab === 'crm_warehouse' ? 'bg-surface text-sky-700 dark:text-sky-400 shadow-xs font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-text-main font-medium'" class="px-3 py-1.5 rounded-lg text-xs transition-all duration-150 cursor-pointer">
                     Pelanggan & Logistik
                 </button>
             </div>
@@ -151,7 +152,7 @@
             <p class="text-2xl font-bold font-mono text-text-main">{{ number_format($stats['active_customers']) }}</p>
             <div class="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[11px] text-text-muted">
                 <span>Total: <strong class="text-text-secondary">{{ number_format($stats['total_customers']) }}</strong></span>
-                <span class="{{ $stats['net_customer_growth'] >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold' }}">
+                <span class="{{ $stats['net_customer_growth'] >= 0 ? 'text-emerald-700 dark:text-emerald-300 font-semibold' : 'text-rose-700 dark:text-rose-300 font-semibold' }}">
                     {{ $stats['net_customer_growth'] >= 0 ? '+' : '' }}{{ number_format($stats['net_customer_growth']) }} Net
                 </span>
             </div>
@@ -161,9 +162,9 @@
         <div class="rounded-2xl border border-border bg-surface p-4 shadow-xs hover:border-primary-border transition-all duration-150">
             <div class="flex items-center justify-between text-xs text-text-muted mb-1.5">
                 <span class="font-semibold text-text-secondary">Realisasi Kas Masuk</span>
-                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Valid</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">Valid</span>
             </div>
-            <p class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 truncate">{{ $currency($stats['total_payments_amount']) }}</p>
+            <p class="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-300 truncate">{{ $currency($stats['total_payments_amount']) }}</p>
             <div class="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[11px] text-text-muted">
                 <span>Omzet: <strong class="text-text-secondary font-mono">{{ $currency($stats['total_invoices_amount']) }}</strong></span>
                 <span class="font-mono font-semibold text-text-main">{{ $stats['collection_rate'] !== null ? $stats['collection_rate'].'%' : '-' }}</span>
@@ -176,10 +177,10 @@
                 <span class="font-semibold text-text-secondary">Piutang Tagihan</span>
                 <span class="h-2 w-2 rounded-full {{ $stats['due_invoices_count'] > 0 ? 'bg-rose-500' : 'bg-emerald-500' }}"></span>
             </div>
-            <p class="text-xl font-bold font-mono text-rose-600 dark:text-rose-400 truncate">{{ $currency($stats['total_unpaid_amount']) }}</p>
+            <p class="text-xl font-bold font-mono text-rose-700 dark:text-rose-300 truncate">{{ $currency($stats['total_unpaid_amount']) }}</p>
             <div class="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[11px] text-text-muted">
                 <span>{{ number_format($stats['due_invoices_count']) }} tagihan</span>
-                <span class="text-rose-600 dark:text-rose-400 font-semibold">Periode lalu</span>
+                <span class="text-rose-700 dark:text-rose-300 font-semibold">Periode lalu</span>
             </div>
         </div>
 
@@ -187,7 +188,7 @@
         <div class="rounded-2xl border border-border bg-surface p-4 shadow-xs hover:border-primary-border transition-all duration-150">
             <div class="flex items-center justify-between text-xs text-text-muted mb-1.5">
                 <span class="font-semibold text-text-secondary">Kas Mengendap</span>
-                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">Fisik</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300">Fisik</span>
             </div>
             @php
                 $cashLapangan = ($stats['cash_at_office_amount'] ?? 0) + ($stats['cash_with_collector_amount'] ?? 0);
@@ -210,8 +211,8 @@
             @endphp
             <p class="text-2xl font-bold font-mono text-text-main">{{ number_format($activeTicketsCount) }} <span class="text-xs font-normal text-text-muted">aktif</span></p>
             <div class="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[11px]">
-                <span class="text-text-muted">SLA OK: <strong class="text-emerald-600 dark:text-emerald-400">{{ $stats['ticket_sla_compliance_rate'] ?? 100 }}%</strong></span>
-                <span class="{{ ($stats['ticket_sla_breach_count'] ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-text-muted' }}">
+                <span class="text-text-muted">SLA OK: <strong class="text-emerald-700 dark:text-emerald-300">{{ $stats['ticket_sla_compliance_rate'] ?? 100 }}%</strong></span>
+                <span class="{{ ($stats['ticket_sla_breach_count'] ?? 0) > 0 ? 'text-rose-700 dark:text-rose-300 font-bold' : 'text-text-muted' }}">
                     {{ number_format($stats['ticket_sla_breach_count'] ?? 0) }} Breach
                 </span>
             </div>
@@ -221,12 +222,12 @@
         <div class="rounded-2xl border border-border bg-surface p-4 shadow-xs hover:border-primary-border transition-all duration-150">
             <div class="flex items-center justify-between text-xs text-text-muted mb-1.5">
                 <span class="font-semibold text-text-secondary">Delivery PSB</span>
-                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">FOP</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300">FOP</span>
             </div>
             <p class="text-2xl font-bold font-mono text-text-main">{{ number_format($stats['fop_psb_completed_count'] ?? 0) }} <span class="text-xs font-normal text-text-muted">pasang</span></p>
             <div class="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[11px] text-text-muted">
                 <span>Lead time: <strong class="text-text-secondary">{{ is_null($stats['fop_psb_avg_lead_time_days'] ?? null) ? '-' : $stats['fop_psb_avg_lead_time_days'].' hr' }}</strong></span>
-                <span class="{{ (($stats['fop_overdue_psb_count'] ?? 0) + ($stats['fop_overdue_survey_count'] ?? 0)) > 0 ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-text-muted' }}">
+                <span class="{{ (($stats['fop_overdue_psb_count'] ?? 0) + ($stats['fop_overdue_survey_count'] ?? 0)) > 0 ? 'text-rose-700 dark:text-rose-300 font-semibold' : 'text-text-muted' }}">
                     {{ number_format(($stats['fop_overdue_psb_count'] ?? 0) + ($stats['fop_overdue_survey_count'] ?? 0)) }} Overdue
                 </span>
             </div>
@@ -394,7 +395,7 @@
                     <div>
                         <div class="flex items-center justify-between text-xs font-semibold text-text-secondary mb-1.5">
                             <span>Verifikasi Setoran Kas</span>
-                            <span class="text-xs text-primary font-mono">{{ $pendingCashDeposits->count() }} Menunggu</span>
+                            <span class="text-xs text-sky-700 dark:text-sky-400 font-mono font-semibold">{{ $pendingCashDeposits->count() }} Menunggu</span>
                         </div>
                         <div class="space-y-1.5">
                             @forelse($pendingCashDeposits as $deposit)
@@ -405,7 +406,7 @@
                                     </div>
                                     <div class="text-right">
                                         <span class="font-mono font-bold text-text-main block">{{ $currency($deposit->declared_amount) }}</span>
-                                        <span class="text-[10px] text-primary font-medium">Periksa &rarr;</span>
+                                        <span class="text-[10px] text-sky-700 dark:text-sky-400 font-semibold">Periksa &rarr;</span>
                                     </div>
                                 </a>
                             @empty
@@ -419,15 +420,15 @@
                     @if($canViewTickets && ($stats['ticket_sla_breach_count'] ?? 0) > 0)
                     <div class="p-3 rounded-xl border border-rose-500/30 bg-rose-500/5">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                            <span class="text-xs font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 {{ $stats['ticket_sla_breach_count'] }} Tiket Lewat Batas SLA
                             </span>
                             @if(auth()->user()->hasPermission('noc_worksheet.view'))
-                                <a href="{{ route('noc.worksheet') }}" class="text-[11px] font-bold text-rose-600 underline">Buka NOC</a>
+                                <a href="{{ route('noc.worksheet') }}" class="text-[11px] font-bold text-rose-700 dark:text-rose-400 underline">Buka NOC</a>
                             @endif
                         </div>
-                        <p class="text-[11px] text-text-muted mt-1">Perlu eskalasi segera untuk memitigasi komplain pelanggan.</p>
+                        <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1">Perlu eskalasi segera untuk memitigasi komplain pelanggan.</p>
                     </div>
                     @endif
 
@@ -435,13 +436,13 @@
                     @if($canViewWarehouse && ($stats['low_stock_count'] ?? 0) > 0)
                     <div class="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                            <span class="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                 {{ $stats['low_stock_count'] }} Barang di Bawah Stok Minimum
                             </span>
-                            <a href="{{ route('warehouse.index') }}" class="text-[11px] font-bold text-amber-600 underline">Gudang</a>
+                            <a href="{{ route('warehouse.index') }}" class="text-[11px] font-bold text-amber-700 dark:text-amber-400 underline">Gudang</a>
                         </div>
-                        <p class="text-[11px] text-text-muted mt-1">Segera kirim pasokan atau buat pengajuan transfer antar POP.</p>
+                        <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1">Segera kirim pasokan atau buat pengajuan transfer antar POP.</p>
                     </div>
                     @endif
 
@@ -450,7 +451,7 @@
                     <div class="p-3 rounded-xl border border-border bg-surface-muted/40">
                         <div class="flex items-center justify-between text-xs font-bold text-text-main">
                             <span>Antrean Lapangan Melebihi Batas</span>
-                            <a href="{{ route('fop.dashboard') }}" class="text-primary text-[11px]">Lihat FOP</a>
+                            <a href="{{ route('fop.dashboard') }}" class="text-sky-700 dark:text-sky-400 font-semibold text-[11px]">Lihat FOP</a>
                         </div>
                         <p class="text-[11px] text-text-muted mt-1">
                             {{ number_format($stats['fop_overdue_survey_count'] ?? 0) }} Survey (>24 jam) &middot; {{ number_format($stats['fop_overdue_psb_count'] ?? 0) }} Pasang Baru (>3 hari)
@@ -465,14 +466,14 @@
             <div class="rounded-2xl border border-border bg-surface p-5 shadow-xs">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-sm font-bold text-text-main">Omzet per Segmen Penjualan</h3>
-                    <a href="{{ route('business-development.sales-omset.index') }}" class="text-xs text-primary font-semibold hover:underline">Detail</a>
+                    <a href="{{ route('business-development.sales-omset.index') }}" class="text-xs text-sky-700 dark:text-sky-400 font-semibold hover:underline">Detail</a>
                 </div>
 
                 <div class="space-y-4">
                     <!-- Sales -->
                     <div>
                         <div class="flex justify-between text-xs font-semibold mb-1">
-                            <span class="text-sky-600 dark:text-sky-400">Tim Sales</span>
+                            <span class="text-sky-700 dark:text-sky-400">Tim Sales</span>
                             <span class="font-mono text-text-main">{{ $currency($stats['omset_sales_amount'] ?? 0) }}</span>
                         </div>
                         <div class="h-2 rounded-full bg-surface-muted overflow-hidden">
@@ -520,7 +521,7 @@
                     @endif
                     @if(auth()->user()->hasPermission('invoices.view'))
                         <a href="{{ route('invoices.index') }}" class="p-2.5 rounded-xl border border-border hover:border-primary-border hover:bg-surface-muted flex items-center justify-between text-text-secondary hover:text-primary transition-all">
-                            <span>Tagihan</span>
+                            <span>Daftar Tagihan</span>
                             <span>&rarr;</span>
                         </a>
                     @endif
@@ -877,12 +878,9 @@
 @endsection
 
 @section('scripts')
+@vite(['resources/js/charts.js'])
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    if (typeof window.Chart === 'undefined') {
-        return;
-    }
-
+(function () {
     const isDarkMode = document.documentElement.classList.contains('dark');
     const textColor = isDarkMode ? '#CBD5E1' : '#475569';
     const textMutedColor = isDarkMode ? '#94A3B8' : '#64748B';
@@ -898,283 +896,296 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // ── 1. CHART: TREN FINANSIAL BULANAN ────────────────────────────
-    const finTrendData = readJson('data-financial-trend');
-    const finTrendCanvas = document.getElementById('chart-financial-trend');
-    if (finTrendData && finTrendCanvas && finTrendData.labels.length > 0) {
-        new window.Chart(finTrendCanvas, {
-            type: 'bar',
-            data: {
-                labels: finTrendData.labels,
-                datasets: [
-                    {
-                        label: 'Tagihan Terbit',
-                        data: finTrendData.invoices,
-                        backgroundColor: '#0284c7', // sky-600
-                        borderRadius: 6,
-                        maxBarThickness: 32,
-                    },
-                    {
-                        label: 'Kas Masuk',
-                        data: finTrendData.payments,
-                        backgroundColor: '#10b981', // emerald-500
-                        borderRadius: 6,
-                        maxBarThickness: 32,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function (ctx) {
-                                return ctx.dataset.label + ': Rp ' + new Intl.NumberFormat('id-ID').format(ctx.raw);
+    function renderDashboardCharts() {
+        if (typeof window.Chart === 'undefined') {
+            return;
+        }
+
+        // ── 1. CHART: TREN FINANSIAL BULANAN ────────────────────────────
+        const finTrendData = readJson('data-financial-trend');
+        const finTrendCanvas = document.getElementById('chart-financial-trend');
+        if (finTrendData && finTrendCanvas && finTrendData.labels.length > 0 && !finTrendCanvas._chartInstance) {
+            finTrendCanvas._chartInstance = new window.Chart(finTrendCanvas, {
+                type: 'bar',
+                data: {
+                    labels: finTrendData.labels,
+                    datasets: [
+                        {
+                            label: 'Tagihan Terbit',
+                            data: finTrendData.invoices,
+                            backgroundColor: '#0284c7', // sky-600
+                            borderRadius: 6,
+                            maxBarThickness: 32,
+                        },
+                        {
+                            label: 'Kas Masuk',
+                            data: finTrendData.payments,
+                            backgroundColor: '#10b981', // emerald-500
+                            borderRadius: 6,
+                            maxBarThickness: 32,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.dataset.label + ': Rp ' + new Intl.NumberFormat('id-ID').format(ctx.raw);
+                                }
                             }
                         }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: textMutedColor, font: { size: 11, family: 'Inter' } }
                     },
-                    y: {
-                        grid: { color: gridColor },
-                        ticks: {
-                            color: textMutedColor,
-                            font: { size: 10, family: 'JetBrains Mono' },
-                            callback: function (val) {
-                                return 'Rp ' + (val >= 1000000 ? (val / 1000000) + 'Jt' : (val / 1000) + 'Rb');
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textMutedColor, font: { size: 11, family: 'Inter' } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textMutedColor,
+                                font: { size: 10, family: 'JetBrains Mono' },
+                                callback: function (val) {
+                                    return 'Rp ' + (val >= 1000000 ? (val / 1000000) + 'Jt' : (val / 1000) + 'Rb');
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
 
-    // ── 2. CHART: KANAL PEMBAYARAN (DONUT) ──────────────────────────
-    const paymentChannelsData = readJson('data-payment-channels');
-    const paymentChannelsCanvas = document.getElementById('chart-payment-channels');
-    if (paymentChannelsData && paymentChannelsCanvas) {
-        const labels = [];
-        const dataValues = [];
-        const bgColors = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#94a3b8'];
+        // ── 2. CHART: KANAL PEMBAYARAN (DONUT) ──────────────────────────
+        const paymentChannelsData = readJson('data-payment-channels');
+        const paymentChannelsCanvas = document.getElementById('chart-payment-channels');
+        if (paymentChannelsData && paymentChannelsCanvas && !paymentChannelsCanvas._chartInstance) {
+            const labels = [];
+            const dataValues = [];
+            const bgColors = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#94a3b8'];
 
-        Object.keys(paymentChannelsData).forEach(key => {
-            const item = paymentChannelsData[key];
-            labels.push(item.label);
-            dataValues.push(item.amount);
-        });
+            Object.keys(paymentChannelsData).forEach(key => {
+                const item = paymentChannelsData[key];
+                labels.push(item.label);
+                dataValues.push(item.amount);
+            });
 
-        new window.Chart(paymentChannelsCanvas, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: dataValues,
-                    backgroundColor: bgColors,
-                    borderWidth: isDarkMode ? 2 : 1,
-                    borderColor: isDarkMode ? '#1e293b' : '#ffffff',
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { boxWidth: 10, color: textColor, font: { size: 11 } }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function (ctx) {
-                                return ctx.label + ': Rp ' + new Intl.NumberFormat('id-ID').format(ctx.raw);
-                            }
-                        }
-                    }
+            paymentChannelsCanvas._chartInstance = new window.Chart(paymentChannelsCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: bgColors,
+                        borderWidth: isDarkMode ? 2 : 1,
+                        borderColor: isDarkMode ? '#1e293b' : '#ffffff',
+                    }]
                 },
-                cutout: '68%'
-            }
-        });
-    }
-
-    // ── 3. CHART: AGING PIUTANG (HORIZONTAL BAR) ───────────────────
-    const agingData = readJson('data-aging-receivables');
-    const agingCanvas = document.getElementById('chart-aging-receivables');
-    if (agingData && agingCanvas) {
-        new window.Chart(agingCanvas, {
-            type: 'bar',
-            data: {
-                labels: ['Lancar', '1-30 Hari', '31-60 Hari', '>60 Hari'],
-                datasets: [{
-                    data: [
-                        agingData.lancar?.amount ?? 0,
-                        agingData.days_1_30?.amount ?? 0,
-                        agingData.days_31_60?.amount ?? 0,
-                        agingData.days_over_60?.amount ?? 0,
-                    ],
-                    backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'],
-                    borderRadius: 4,
-                    maxBarThickness: 20,
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function (ctx) {
-                                return 'Rp ' + new Intl.NumberFormat('id-ID').format(ctx.raw);
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { color: gridColor },
-                        ticks: {
-                            color: textMutedColor,
-                            font: { size: 10, family: 'JetBrains Mono' },
-                            callback: function (val) {
-                                return 'Rp ' + (val >= 1000000 ? (val / 1000000) + 'Jt' : val);
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 10, color: textColor, font: { size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.label + ': Rp ' + new Intl.NumberFormat('id-ID').format(ctx.raw);
+                                }
                             }
                         }
                     },
-                    y: {
-                        grid: { display: false },
-                        ticks: { color: textColor, font: { size: 11 } }
+                    cutout: '68%'
+                }
+            });
+        }
+
+        // ── 3. CHART: AGING PIUTANG (HORIZONTAL BAR) ───────────────────
+        const agingData = readJson('data-aging-receivables');
+        const agingCanvas = document.getElementById('chart-aging-receivables');
+        if (agingData && agingCanvas && !agingCanvas._chartInstance) {
+            agingCanvas._chartInstance = new window.Chart(agingCanvas, {
+                type: 'bar',
+                data: {
+                    labels: ['Lancar', '1-30 Hari', '31-60 Hari', '>60 Hari'],
+                    datasets: [{
+                        data: [
+                            agingData.lancar?.amount ?? 0,
+                            agingData.days_1_30?.amount ?? 0,
+                            agingData.days_31_60?.amount ?? 0,
+                            agingData.days_over_60?.amount ?? 0,
+                        ],
+                        backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'],
+                        borderRadius: 4,
+                        maxBarThickness: 20,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return 'Rp ' + new Intl.NumberFormat('id-ID').format(ctx.raw);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textMutedColor,
+                                font: { size: 10, family: 'JetBrains Mono' },
+                                callback: function (val) {
+                                    return 'Rp ' + (val >= 1000000 ? (val / 1000000) + 'Jt' : val);
+                                }
+                            }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 11 } }
+                        }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
 
-    // ── 4. CHART: TOP KATEGORI GANGGUAN (HORIZONTAL BAR) ───────────
-    const issuesData = readJson('data-top-issues');
-    const issuesCanvas = document.getElementById('chart-top-issues');
-    if (issuesData && issuesCanvas && issuesData.length > 0) {
-        new window.Chart(issuesCanvas, {
-            type: 'bar',
-            data: {
-                labels: issuesData.map(i => i.name),
-                datasets: [{
-                    data: issuesData.map(i => i.total),
-                    backgroundColor: '#f43f5e',
-                    borderRadius: 4,
-                    maxBarThickness: 16,
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function (ctx) {
-                                return ctx.raw + ' Tiket';
+        // ── 4. CHART: TOP KATEGORI GANGGUAN (HORIZONTAL BAR) ───────────
+        const issuesData = readJson('data-top-issues');
+        const issuesCanvas = document.getElementById('chart-top-issues');
+        if (issuesData && issuesCanvas && issuesData.length > 0 && !issuesCanvas._chartInstance) {
+            issuesCanvas._chartInstance = new window.Chart(issuesCanvas, {
+                type: 'bar',
+                data: {
+                    labels: issuesData.map(i => i.name),
+                    datasets: [{
+                        data: issuesData.map(i => i.total),
+                        backgroundColor: '#f43f5e',
+                        borderRadius: 4,
+                        maxBarThickness: 16,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.raw + ' Tiket';
+                                }
                             }
                         }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { color: gridColor },
-                        ticks: { precision: 0, color: textMutedColor, font: { size: 10 } }
                     },
-                    y: {
-                        grid: { display: false },
-                        ticks: { color: textColor, font: { size: 11 } }
-                    }
-                }
-            }
-        });
-    }
-
-    // ── 5. CHART: SEBARAN PELANGGAN PER CABANG (HORIZONTAL BAR) ─────
-    const popData = readJson('data-pop-distribution');
-    const popCanvas = document.getElementById('chart-pop-distribution');
-    if (popData && popCanvas && popData.labels.length > 0) {
-        new window.Chart(popCanvas, {
-            type: 'bar',
-            data: {
-                labels: popData.labels,
-                datasets: [{
-                    data: popData.data,
-                    backgroundColor: '#0284c7',
-                    borderRadius: 4,
-                    maxBarThickness: 18,
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function (ctx) {
-                                return ctx.raw + ' Pelanggan';
-                            }
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { precision: 0, color: textMutedColor, font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 11 } }
                         }
                     }
+                }
+            });
+        }
+
+        // ── 5. CHART: SEBARAN PELANGGAN PER CABANG (HORIZONTAL BAR) ─────
+        const popData = readJson('data-pop-distribution');
+        const popCanvas = document.getElementById('chart-pop-distribution');
+        if (popData && popCanvas && popData.labels.length > 0 && !popCanvas._chartInstance) {
+            popCanvas._chartInstance = new window.Chart(popCanvas, {
+                type: 'bar',
+                data: {
+                    labels: popData.labels,
+                    datasets: [{
+                        data: popData.data,
+                        backgroundColor: '#0284c7',
+                        borderRadius: 4,
+                        maxBarThickness: 18,
+                    }]
                 },
-                scales: {
-                    x: {
-                        grid: { color: gridColor },
-                        ticks: { precision: 0, color: textMutedColor, font: { size: 10 } }
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.raw + ' Pelanggan';
+                                }
+                            }
+                        }
                     },
-                    y: {
-                        grid: { display: false },
-                        ticks: { color: textColor, font: { size: 11 } }
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { precision: 0, color: textMutedColor, font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 11 } }
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+
+        // ── 6. CHART: KELENGKAPAN DATA MASTER (DONUT) ───────────────────
+        const compData = readJson('data-customer-completeness');
+        const compCanvas = document.getElementById('chart-customer-completeness');
+        if (compData && compCanvas && !compCanvas._chartInstance) {
+            compCanvas._chartInstance = new window.Chart(compCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Siap Billing', 'Lengkap', 'Perlu Dilengkapi', 'Draft'],
+                    datasets: [{
+                        data: [
+                            compData.siap_billing ?? 0,
+                            compData.lengkap ?? 0,
+                            compData.perlu_dilengkapi ?? 0,
+                            compData.draft ?? 0,
+                        ],
+                        backgroundColor: ['#10b981', '#0ea5e9', '#f59e0b', '#94a3b8'],
+                        borderWidth: isDarkMode ? 2 : 1,
+                        borderColor: isDarkMode ? '#1e293b' : '#ffffff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 10, color: textColor, font: { size: 10 } }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
     }
 
-    // ── 6. CHART: KELENGKAPAN DATA MASTER (DONUT) ───────────────────
-    const compData = readJson('data-customer-completeness');
-    const compCanvas = document.getElementById('chart-customer-completeness');
-    if (compData && compCanvas) {
-        new window.Chart(compCanvas, {
-            type: 'doughnut',
-            data: {
-                labels: ['Siap Billing', 'Lengkap', 'Perlu Dilengkapi', 'Draft'],
-                datasets: [{
-                    data: [
-                        compData.siap_billing ?? 0,
-                        compData.lengkap ?? 0,
-                        compData.perlu_dilengkapi ?? 0,
-                        compData.draft ?? 0,
-                    ],
-                    backgroundColor: ['#10b981', '#0ea5e9', '#f59e0b', '#94a3b8'],
-                    borderWidth: isDarkMode ? 2 : 1,
-                    borderColor: isDarkMode ? '#1e293b' : '#ffffff',
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { boxWidth: 10, color: textColor, font: { size: 10 } }
-                    }
-                },
-                cutout: '65%'
-            }
-        });
+    if (window.Chart) {
+        renderDashboardCharts();
+    } else {
+        window.addEventListener('chart:ready', renderDashboardCharts);
     }
-});
+    document.addEventListener('DOMContentLoaded', renderDashboardCharts);
+})();
 </script>
 @endsection

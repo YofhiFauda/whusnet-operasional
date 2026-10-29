@@ -25,6 +25,7 @@ use App\Http\Controllers\CustomerFailedController;
 use App\Http\Controllers\CustomerFieldworkController;
 use App\Http\Controllers\CustomerInstallationAdditionalDeviceController;
 use App\Http\Controllers\CustomerInstallationController;
+use App\Http\Controllers\CustomerListColumnController;
 use App\Http\Controllers\CustomerNetworkAssignmentController;
 use App\Http\Controllers\CustomerPackageController;
 use App\Http\Controllers\CustomerQrController;
@@ -257,6 +258,11 @@ Route::middleware('auth')->group(function () {
     // Customers Management - Static Routes First
     Route::middleware('permission:customers.view')->group(function () {
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+        // Preferensi kolom List Pelanggan — WAJIB static & sebelum
+        // `PUT /customers/{customer}`, kalau tidak "list-columns" ditelan
+        // sebagai id pelanggan.
+        Route::put('/customers/list-columns', [CustomerListColumnController::class, 'update'])->name('customers.list-columns.update');
+        Route::delete('/customers/list-columns', [CustomerListColumnController::class, 'destroy'])->name('customers.list-columns.destroy');
     });
 
     // Daftar pemantauan Kabel Melintang Jalan (ADHOC-205) — static, sebelum /customers/{customer}.
@@ -1260,6 +1266,11 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:network_nodes.view')->group(function () {
         Route::get('/network/peta', [InfrastructureMapController::class, 'index'])->name('network.map.index');
         Route::get('/network/peta/ekspor', [InfrastructureMapController::class, 'export'])->name('network.map.export');
+        Route::get('/network/peta/pelanggan/{customer}', [InfrastructureMapController::class, 'customerOnt'])->whereNumber('customer')->name('network.map.ont');
+        Route::get('/network/peta/cari', [InfrastructureMapController::class, 'search'])->name('network.map.search');
+        Route::get('/network/peta/node/{node}/port', [InfrastructureMapController::class, 'ports'])->name('network.map.ports');
+        Route::get('/network/peta/node/{node}/anak', [InfrastructureMapController::class, 'children'])->name('network.map.children');
+        Route::get('/network/peta/node/{node}/anak-semua', [InfrastructureMapController::class, 'childrenBatch'])->name('network.map.children-batch');
         Route::get('/network/nodes', [NetworkNodeController::class, 'index'])->name('network.nodes.index');
         // Statis SEBELUM `{node}` — kalau tidak, "pon-search" ditelan route model binding.
         Route::get('/network/nodes/pon-search', [NetworkNodeController::class, 'ponSearch'])->name('network.nodes.pon-search');

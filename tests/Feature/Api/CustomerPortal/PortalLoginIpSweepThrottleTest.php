@@ -10,7 +10,8 @@ use Tests\TestCase;
  * Limiter `customer-portal-auth` (5/15menit per IP+login_id) SENDIRIAN gak
  * cukup — memberi ember baru tiap login_id, jadi penyapuan banyak login_id
  * beda dari satu IP gak pernah menyentuh batas itu (keputusan.md §1).
- * `customer-portal-auth-ip` (30/15menit murni per IP) yang menutupnya.
+ * `customer-portal-auth-ip` (150/15menit murni per IP pelanggan; dulu 30, dinaikkan
+ * karena ±30.000 pelanggan dan NAT bersama) yang menutupnya.
  */
 class PortalLoginIpSweepThrottleTest extends TestCase
 {
@@ -22,14 +23,14 @@ class PortalLoginIpSweepThrottleTest extends TestCase
         $this->setUpPortalClientSecret();
     }
 
-    public function test_31_percobaan_ke_31_login_id_berbeda_dari_satu_ip_kena_429(): void
+    public function test_151_percobaan_ke_151_login_id_berbeda_dari_satu_ip_kena_429(): void
     {
-        for ($i = 0; $i < 30; $i++) {
+        for ($i = 0; $i < 150; $i++) {
             $response = $this->loginJson("XXX-NOTFOUND{$i}", 'password-asal');
             $response->assertStatus(401);
         }
 
-        $response = $this->loginJson('XXX-NOTFOUND30', 'password-asal');
+        $response = $this->loginJson('XXX-NOTFOUND150', 'password-asal');
 
         $response->assertStatus(429);
     }

@@ -131,6 +131,8 @@ class WarehouseTraceabilityController extends Controller
             }
         }
 
+        $totalRollMetersUsed = (float) $rollUsage->sum('qty') + (float) $rollInfraUsage->sum('qty');
+
         // Jalankan pencarian daftar hanya kalau tidak sedang lookup langsung.
         if ($serialNumber === '' && $rollCode === '' && $query !== '') {
             $results = $this->searchCandidates($query, $popFilter, $access, $user);
@@ -138,7 +140,7 @@ class WarehouseTraceabilityController extends Controller
 
         return view('warehouse.traceability.index', compact(
             'serialNumber', 'rollCode', 'serial', 'roll', 'ledger', 'notFound',
-            'query', 'results', 'pops', 'popFilter', 'rollUsage', 'rollInfraUsage'
+            'query', 'results', 'pops', 'popFilter', 'rollUsage', 'rollInfraUsage', 'totalRollMetersUsed'
         ));
     }
 

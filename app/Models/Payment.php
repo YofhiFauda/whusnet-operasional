@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Collection;
 
 class Payment extends Model
 {
@@ -257,6 +258,45 @@ class Payment extends Model
     }
 
     /**
+     * Daftar pembayaran VALID satu invoice (urut cicilan) yang sudah dimuat
+     * sekaligus oleh `preloadInstallmentContext()`. Null = hitung per payment.
+     *
+     * @var Collection<int, static>|null
+     */
+    protected ?Collection $preloadedValidPayments = null;
+
+    /**
+     * Muat sekali pembayaran VALID untuk semua invoice milik `$payments`, supaya
+     * `installmentContext()` tidak menembak satu query per baris di halaman
+     * daftar (laporan kolektor: 1478 query untuk 1478 baris). Hasil identik
+     * dengan jalur per-payment — urutan & filter sama persis.
+     *
+     * @param  iterable<int, static>  $payments
+     */
+    public static function preloadInstallmentContext(iterable $payments): void
+    {
+        $payments = collect($payments);
+        $invoiceIds = $payments->pluck('invoice_id')->filter()->unique()->values();
+        if ($invoiceIds->isEmpty()) {
+            return;
+        }
+
+        $byInvoice = static::query()
+            ->whereIn('invoice_id', $invoiceIds)
+            ->where('payment_status', PaymentStatus::VALID->value)
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get(['id', 'invoice_id', 'amount'])
+            ->groupBy('invoice_id');
+
+        foreach ($payments as $payment) {
+            if ($payment->invoice_id) {
+                $payment->preloadedValidPayments = $byInvoice->get($payment->invoice_id, collect());
+            }
+        }
+    }
+
+    /**
      * Posisi cicilan payment ini pada invoice-nya ("Cicilan Ke-N") + apakah
      * payment ini yang melunasi tagihan. Dipakai konsisten di
      * payments/show, payments/receipt, invoices/show — satu sumber
@@ -275,7 +315,7 @@ class Payment extends Model
             return null;
         }
 
-        $validPayments = static::query()
+        $validPayments = $this->preloadedValidPayments ?? static::query()
             ->where('invoice_id', $this->invoice_id)
             ->where('payment_status', PaymentStatus::VALID->value)
             ->orderBy('payment_date')

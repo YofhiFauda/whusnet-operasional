@@ -115,21 +115,21 @@ class CollectorWorksheetController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Total tunggakan per kolektor. SENGAJA bukan JOIN + GROUP BY di SQL â€”
-        // HasPopScope::scopeApplyUserScope() menulis `pop_id` TANPA qualifier
-        // tabel, jadi begitu di-JOIN dengan `customers` (yang juga punya
-        // `pop_id`) langsung ambiguous di MySQL/SQLite. Volume datanya kecil
-        // (tunggakan per kolektor), agregasi di PHP lebih aman ketimbang
-        // menambal tiap query yang kebetulan JOIN sama trait scope ini.
+        // Total tunggakan per kolektor, dijumlah di SQL tanpa JOIN: scope POP
+        // (HasPopScope::scopeApplyUserScope) menulis `pop_id` tanpa qualifier tabel,
+        // jadi JOIN ke `customers` jadi ambigu — kolektor diambil lewat subquery.
         $unpaidTotals = Invoice::query()
             ->applyUserScope()
             ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
-            ->whereHas('customer', fn ($q) => $q->whereNotNull('collector_id'))
-            ->with('customer:id,collector_id')
-            ->get(['id', 'customer_id', 'remaining_amount'])
-            ->groupBy(fn (Invoice $invoice) => $invoice->customer->collector_id)
-            ->map(fn ($group) => $group->sum('remaining_amount'));
-
+            ->whereIn('customer_id', Customer::query()->select('id')->whereNotNull('collector_id'))
+            // Kolektor diambil lewat subquery berkorelasi (bukan JOIN) supaya
+            // `pop_id` tak berqualifier dari scope POP tetap tak ambigu. Dijumlah
+            // di SQL — dulu seluruh tagihan tertunggak + pelanggannya dihidrasi
+            // (puluhan ribu model) hanya untuk dijumlah per kolektor di PHP.
+            ->selectRaw('(select collector_id from customers where customers.id = invoices.customer_id) as collector_id, SUM(remaining_amount) as total')
+            ->groupBy('collector_id')
+            ->toBase()
+            ->pluck('total', 'collector_id');
         foreach ($collectors as $collector) {
             $collector->unpaid_total = (float) ($unpaidTotals[$collector->id] ?? 0);
         }

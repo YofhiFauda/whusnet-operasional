@@ -60,7 +60,7 @@ Route::prefix('v1')->group(function () {
 
 Route::prefix('customer-portal')->group(function () {
     Route::get('/ping', fn () => response()->json(['data' => ['status' => 'ok']]))
-        ->middleware(['throttle:customer-portal-api'])
+        ->middleware(['throttle:customer-portal-ping'])
         ->name('api.customer-portal.ping');
 
     // Fase 2 — semua route di bawah ini butuh client secret portal

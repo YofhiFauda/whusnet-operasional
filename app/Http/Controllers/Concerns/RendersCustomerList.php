@@ -16,6 +16,7 @@ use App\Models\Pop;
 use App\Models\SubscriptionStatus;
 use App\Models\User;
 use App\Models\Village;
+use App\Services\CustomerListColumnService;
 use App\Support\LikeSearch;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -75,6 +76,16 @@ trait RendersCustomerList
         // statusGroup != 'terminated', lihat blok filter di bawah).
         $terminationReasonId = $request->query('termination_reason_id', '');
         $sort = $request->query('sort', '');
+        $dir = strtolower((string) $request->query('dir', '')) === 'desc' ? 'desc' : 'asc';
+
+        // Kolom kustom + sort header HANYA di List Pelanggan utama (grup
+        // kosong). Survey/Verifikasi tetap kolom tetap (K3 rancangan), dan
+        // Putus/Gagal punya view sendiri yang tak memakai $columns.
+        $columnService = app(CustomerListColumnService::class);
+        $customizable = $statusGroup === '';
+        $columns = $customizable
+            ? $columnService->columnsFor($request->user())
+            : $columnService->defaultColumns();
 
         // Fase 5.6 — batasi kolom yang ditarik untuk daftar (G/row bloat).
         // `customers` punya ~45 kolom termasuk banyak yang TIDAK dipakai di list
@@ -98,6 +109,14 @@ trait RendersCustomerList
                 'created_at', 'updated_at',
             ])
             ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice', 'latestPayment', 'collector:id,name']);
+
+        // Relasi tambahan hanya dimuat kalau kolomnya sedang tampil — user
+        // dengan kolom default tidak menanggung query ekstra.
+        foreach ($columns as $column) {
+            if (isset($column['with'])) {
+                $query->with($column['with']);
+            }
+        }
 
         // List Putus (ADHOC-69 & Bug 5) butuh relasi creator (petugas input)
         // dan terminationReason untuk List Putus — dipisah supaya query List
@@ -232,7 +251,7 @@ trait RendersCustomerList
             } else {
                 $query->orderByDesc('terminated_at');
             }
-        } else {
+        } elseif (! ($customizable && $columnService->applySort($query, $sort, $dir))) {
             $query->orderBy('customer_code', 'asc');
         }
 
@@ -396,7 +415,10 @@ trait RendersCustomerList
             'collectorOptions',
             'terminationReasonId',
             'terminationReasonOptions',
-            'sort'
+            'sort',
+            'dir',
+            'columns',
+            'customizable'
         ));
     }
 }

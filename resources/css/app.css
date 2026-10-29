@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
 @import 'tailwindcss';
 @import 'nprogress/nprogress.css';
 
@@ -358,7 +356,7 @@ body {
   padding: 8px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
-  background: var(--color-primary);
+  background: var(--color-primary-hover); /* sky-700 untuk kontras WCAG AA (5.2:1) dengan teks putih */
   color: var(--color-white);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
@@ -369,7 +367,7 @@ body {
 }
 
 .btn-primary:hover {
-  background: var(--color-primary-hover);
+  background: #075985; /* sky-800 */
 }
 
 .btn-primary:focus-visible {
@@ -807,7 +805,7 @@ body {
 /* Sidebar nav item — active (menu induk) */
 .sidebar-nav-item-active {
   background: #F0F9FF;     /* sky-50 */
-  color: #0284C7;          /* sky-600 */
+  color: #0369A1;          /* sky-700 untuk kontras WCAG AA di atas sky-50 */
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.18);
 }
@@ -847,7 +845,7 @@ body {
 /* Sidebar sub-item — active */
 .sidebar-subitem-active {
   background: #F0F9FF;     /* sky-50 */
-  color: #0284C7;          /* sky-600 */
+  color: #0369A1;          /* sky-700 - WCAG AA contrast 5.27:1 on #F0F9FF */
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.18);
 }

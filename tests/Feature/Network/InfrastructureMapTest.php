@@ -36,6 +36,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\WarehouseFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -272,7 +273,7 @@ class InfrastructureMapTest extends TestCase
         $document = new \DOMDocument;
         $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
         $xpath = new \DOMXPath($document);
-        $this->assertSame(1, $xpath->query('//template[@x-for="id in layout.order" and parent::div]/svg')->length);
+        $this->assertSame(1, $xpath->query('//template[@x-for="id in renderIds" and parent::div]/svg')->length);
         $this->assertStringContainsString('edgePaths(layout)', $xpath->query('//div[contains(@class, "isp-infra")]')->item(0)->getAttribute('x-data'));
 
         $export = $this->get(route('network.map.export', ['q' => 'PETA-SN-001', 'type' => $type->code]));
@@ -395,6 +396,307 @@ class InfrastructureMapTest extends TestCase
     }
 
     #[Test]
+    public function peta_default_tidak_memuat_port_dan_kartu_ont_pelanggan_demi_memori(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $type = NetworkNodeType::factory()->create(['code' => 'odp_lazy', 'has_ports' => true]);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $type->id]);
+        $port = $node->ports()->create(['number' => 1, 'is_used' => true]);
+        $customer = Customer::factory()->create(['pop_id' => $cabang->id, 'full_name' => 'Pelanggan Lazy']);
+        NetworkPortAssignment::create([
+            'network_node_port_id' => $port->id, 'customer_id' => $customer->id,
+            'active_key' => 1, 'assigned_at' => now(),
+        ]);
+
+        $this->loginAsAdmin();
+        $payload = app(InfrastructureMapService::class)->build(auth()->user(), null, 'topology');
+
+        $this->assertArrayNotHasKey(-1000000000 - $customer->id, $payload['topologyDetails']);
+        $this->assertSame([], $payload['topologyDetails'][$node->id]['ports']);
+        $this->assertFalse($payload['topologyDetails'][$node->id]['ports_loaded']);
+        $this->assertSame(route('network.map.ports', $node), $payload['topologyDetails'][$node->id]['ports_url']);
+        $this->assertSame(1, $payload['topologyDetails'][$node->id]['used_ports_count']);
+        $this->assertFalse($node->fresh()->relationLoaded('ports'));
+
+        $this->get(route('network.map.index'))->assertOk()->assertDontSee('Pelanggan Lazy');
+    }
+
+    #[Test]
+    public function tab_pohon_dan_inventaris_hanya_dirender_saat_dibuka(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'code' => 'NODE-TAB-LAZY', 'name' => 'Node Tab Lazy']);
+        $this->loginAsAdmin();
+
+        // Topologi (default): payload kanvas memuat node, tapi baris tabel
+        // inventaris & pohon tidak dirender.
+        $default = $this->get(route('network.map.index'))->assertOk();
+        $default->assertDontSee('data-inventory-row', false);
+        // URL tab dirender server di atribut Alpine (query lain ikut terbawa).
+        $default->assertSee('tab=inventaris', false);
+        $default->assertSee('tab=pohon', false);
+
+        $this->get(route('network.map.index', ['tab' => 'inventaris']))
+            ->assertOk()->assertSee('data-inventory-row', false)->assertSee('NODE-TAB-LAZY');
+    }
+
+    #[Test]
+    public function mode_ont_mengirim_kartu_ont_lewat_endpoint_per_odp_dan_per_slot_bukan_di_payload_awal(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $slotType = NetworkNodeType::firstOrCreate(['code' => 'olt_slot'], NetworkNodeType::factory()->make(['code' => 'olt_slot', 'has_ports' => false])->toArray());
+        $odpType = NetworkNodeType::firstOrCreate(['code' => 'odp'], NetworkNodeType::factory()->make(['code' => 'odp', 'has_ports' => true])->toArray());
+        $slot = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $slotType->id, 'code' => 'SLOT-ONT-1']);
+        $odp = NetworkNode::factory()->create(['parent_id' => $slot->id, 'anchor_pop_id' => null, 'node_type_id' => $odpType->id, 'code' => 'ODP-ONT-1']);
+        $ontIds = [];
+        foreach ([1, 2] as $number) {
+            $port = $odp->ports()->create(['number' => $number, 'is_used' => true]);
+            $customer = Customer::factory()->create(['pop_id' => $cabang->id, 'full_name' => 'Pelanggan Lazy '.$number]);
+            NetworkPortAssignment::create([
+                'network_node_port_id' => $port->id, 'customer_id' => $customer->id,
+                'active_key' => 1, 'assigned_at' => now(),
+            ]);
+            $ontIds[] = -1000000000 - $customer->id;
+        }
+
+        $this->loginAsAdmin();
+        $html = $this->get(route('network.map.index', ['ont' => 1]))->assertOk()->getContent();
+
+        // Payload awal: struktur sampai ODP + URL, kartu ONT belum ada...
+        $this->assertStringContainsString('ODP-ONT-1', $html);
+        $this->assertStringContainsString('"ont_batch_url"', $html);
+        $this->assertStringNotContainsString('"typeName":"ONT pelanggan"', $html);
+        // ...tetapi pelanggan tetap bisa dicari lewat indeks.
+        $this->assertStringContainsString('pelanggan lazy 1', $html);
+
+        $perOdp = $this->getJson(route('network.map.children', ['node' => $odp, 'ont' => 1]))->assertOk()->json('nodes');
+        $this->assertEqualsCanonicalizing($ontIds, array_map('intval', array_keys($perOdp)));
+
+        $perSlot = $this->getJson(route('network.map.children-batch', ['node' => $slot, 'ont' => 1]))->assertOk()->json('nodes');
+        $this->assertEqualsCanonicalizing($ontIds, array_map('intval', array_keys($perSlot)));
+        $this->assertSame('customer_ont', $perSlot[$ontIds[0]]['type']);
+
+        // Tab Pohon/Inventaris tidak membangun kartu ONT (berat), tetapi mengingat pilihan ONT
+        // untuk tombol kembali ke Topologi.
+        foreach (['pohon', 'inventaris'] as $tab) {
+            $this->get(route('network.map.index', ['ont' => 1, 'tab' => $tab]))->assertOk()
+                ->assertSee('withOnt: false', false)->assertSee('ontRequested: true', false)
+                ->assertDontSee('"ont_batch_url"', false);
+        }
+        $this->get(route('network.map.index', ['ont' => 1]))->assertOk()
+            ->assertSee('withOnt: true', false)->assertSee('ontRequested: true', false);
+
+        // Batch hanya untuk mode ONT, dan hanya untuk Slot yang punya ONT.
+        $this->getJson(route('network.map.children-batch', ['node' => $slot]))->assertNotFound();
+        $this->getJson(route('network.map.children-batch', ['node' => $odp, 'ont' => 1]))->assertNotFound();
+    }
+
+    #[Test]
+    public function cari_pelanggan_menemukan_nama_cid_dan_sn_sesuai_izin_dan_scope(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $lain = Pop::factory()->create(['type' => 'cabang']);
+        $type = NetworkNodeType::factory()->create(['code' => 'odp_cari', 'has_ports' => true]);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $type->id, 'code' => 'ODP-CARI-1']);
+        $nodeLain = NetworkNode::factory()->create(['anchor_pop_id' => $lain->id, 'node_type_id' => $type->id]);
+
+        $customer = Customer::factory()->create(['pop_id' => $cabang->id, 'full_name' => 'Budi Pencarian', 'ont_sn' => 'ZTEGCARI001']);
+        CustomerTechnicalDetail::create(['customer_id' => $customer->id, 'router_or_ont_serial' => 'HWTCCARI777']);
+        $asing = Customer::factory()->create(['pop_id' => $lain->id, 'full_name' => 'Budi Asing']);
+        foreach ([[$node, $customer], [$nodeLain, $asing]] as $index => [$target, $pelanggan]) {
+            $port = $target->ports()->create(['number' => 1, 'is_used' => true]);
+            NetworkPortAssignment::create([
+                'network_node_port_id' => $port->id, 'customer_id' => $pelanggan->id,
+                'active_key' => 1, 'assigned_at' => now(),
+            ]);
+        }
+
+        $this->loginAsAdmin();
+        $byName = $this->getJson(route('network.map.search', ['q' => 'pencarian']))->assertOk()->json('results');
+        $this->assertCount(1, $byName);
+        $this->assertSame(-1000000000 - $customer->id, $byName[0]['ont_id']);
+        $this->assertSame('ODP-CARI-1', $byName[0]['node_code']);
+        $this->assertSame('Nama', $byName[0]['match']);
+        $this->assertSame(route('network.map.ont', $customer->id), $byName[0]['detail_url']);
+
+        // Kartu tunggal hasil cari: detail ONT + induknya, tanpa membangun seluruh peta.
+        $single = $this->getJson($byName[0]['detail_url'])->assertOk()->json();
+        $this->assertSame($node->id, $single['parent_id']);
+        $this->assertSame('customer_ont', $single['node']['type']);
+        $this->assertSame($byName[0]['ont_id'], $single['node']['id']);
+        $this->assertStringContainsString('ODP-CARI-1', $single['node']['location_description']);
+        $this->getJson(route('network.map.ont', 999999))->assertNotFound();
+
+        $bySn = $this->getJson(route('network.map.search', ['q' => 'HWTCCARI']))->assertOk()->json('results');
+        $this->assertSame('SN', $bySn[0]['match']);
+        $this->assertCount(2, $this->getJson(route('network.map.search', ['q' => 'budi']))->json('results'));
+        $this->getJson(route('network.map.search', ['q' => 'bu']))->assertUnprocessable();
+
+        // Tanpa izin SN perangkat, pencarian SN tidak menemukan apa pun.
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $role->permissions()->detach(Permission::where('code', 'customers.detail.devices.view_sensitive')->value('id'));
+        $limited = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $limited->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabang->id]);
+        $this->actingAs($limited)->getJson(route('network.map.search', ['q' => 'HWTCCARI']))->assertOk()->assertJsonCount(0, 'results');
+        // ...dan scope POP menyaring pelanggan cabang lain.
+        $this->actingAs($limited)->getJson(route('network.map.search', ['q' => 'budi']))->assertOk()->assertJsonCount(1, 'results');
+        $this->actingAs($limited)->getJson(route('network.map.ont', $asing->id))->assertNotFound();
+    }
+
+    #[Test]
+    public function jaringan_besar_mengirim_odp_per_pon_bukan_di_payload_awal(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $ponType = NetworkNodeType::firstOrCreate(['code' => 'olt_pon'], NetworkNodeType::factory()->make(['code' => 'olt_pon', 'has_ports' => false])->toArray());
+        $odpType = NetworkNodeType::firstOrCreate(['code' => 'odp'], NetworkNodeType::factory()->make(['code' => 'odp', 'has_ports' => true])->toArray());
+        $pon = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $ponType->id, 'code' => 'PON-LAZY-1']);
+        NetworkNode::factory()->count(405)->sequence(fn ($seq) => [
+            'code' => 'ODP-LAZY-'.$seq->index,
+            'parent_id' => $pon->id,
+            'anchor_pop_id' => null,
+            'node_type_id' => $odpType->id,
+        ])->create();
+
+        $this->loginAsAdmin();
+        $html = $this->get(route('network.map.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('PON-LAZY-1', $html);
+        $this->assertStringContainsString('lazy_children_count', $html);
+        // Kartu ODP tidak ada di payload kanvas...
+        $this->assertStringNotContainsString('"code":"ODP-LAZY-7"', $html);
+        // ...tetapi tetap bisa dicari lewat indeks.
+        $this->assertStringContainsString('odp-lazy-7', $html);
+
+        $nodes = $this->getJson(route('network.map.children', $pon))->assertOk()->json('nodes');
+        $this->assertCount(405, $nodes);
+        $this->assertContains('ODP-LAZY-7', array_column($nodes, 'code'));
+
+        // Tab Inventaris butuh data penuh: tidak ada pemisahan.
+        $this->get(route('network.map.index', ['tab' => 'inventaris']))->assertOk()->assertSee('ODP-LAZY-7');
+    }
+
+    #[Test]
+    public function tab_topologi_jaringan_besar_dilayani_dari_cache_dan_fresh_membangun_ulang(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $ponType = NetworkNodeType::firstOrCreate(['code' => 'olt_pon'], NetworkNodeType::factory()->make(['code' => 'olt_pon', 'has_ports' => false])->toArray());
+        $odpType = NetworkNodeType::firstOrCreate(['code' => 'odp'], NetworkNodeType::factory()->make(['code' => 'odp', 'has_ports' => true])->toArray());
+        $pon = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $ponType->id, 'code' => 'PON-CACHE-1']);
+        NetworkNode::factory()->count(405)->sequence(fn ($seq) => [
+            'code' => 'ODP-CACHE-'.$seq->index, 'parent_id' => $pon->id, 'anchor_pop_id' => null, 'node_type_id' => $odpType->id,
+        ])->create();
+
+        $this->loginAsAdmin();
+        $this->get(route('network.map.index'))->assertOk()->assertSee('PON-CACHE-1');
+
+        // Hit cache: tidak ada query ke network_nodes sama sekali.
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->get(route('network.map.index'))->assertOk()->assertSee('PON-CACHE-1')->assertSee('406 node dalam cakupan');
+        $nodeQueries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'network_nodes'))->count();
+        $this->assertSame(0, $nodeQueries, 'tab Topologi dari cache tidak boleh menyentuh network_nodes');
+
+        // ?fresh=1 membuang cache lalu membangun ulang.
+        NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'code' => 'NODE-BARU-FRESH']);
+        $this->get(route('network.map.index'))->assertDontSee('NODE-BARU-FRESH');
+        $this->get(route('network.map.index', ['fresh' => 1]))->assertRedirect(route('network.map.index'));
+        $this->get(route('network.map.index'))->assertOk()->assertSee('NODE-BARU-FRESH');
+    }
+
+    #[Test]
+    public function tombol_buka_dan_tutup_semua_tersedia_dengan_url_mode_ont_dari_server(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id]);
+        $this->loginAsAdmin();
+
+        $html = $this->get(route('network.map.index'))->assertOk()
+            ->assertSee('Buka Semua')->assertSee('Tutup Semua')
+            ->assertSee('expandAll()', false)->assertSee('collapseToSlots()', false)
+            ->getContent();
+        // URL mode ONT dirender server (dalam JSON x-data, garis miring ter-escape).
+        $this->assertStringContainsString('ont=1', $html);
+        $this->assertStringContainsString('expand=all', $html);
+
+        $this->get(route('network.map.index', ['ont' => 1, 'expand' => 'all']))
+            ->assertOk()->assertSee('startExpanded: true', false);
+
+        // Toggle "ONT pelanggan: tampil" (tanpa expand=all) tidak boleh macet di Slot:
+        // kartu ONT baru terlihat kalau lipatan PON/ODP ikut terbuka.
+        $this->get(route('network.map.index', ['ont' => 1]))
+            ->assertOk()->assertSee('startExpanded: true', false);
+        $this->get(route('network.map.index'))
+            ->assertOk()->assertSee('startExpanded: false', false);
+    }
+
+    #[Test]
+    public function children_node_di_luar_scope_pop_mendapat_404(): void
+    {
+        $cabangA = Pop::factory()->create(['type' => 'cabang']);
+        $cabangB = Pop::factory()->create(['type' => 'cabang']);
+        $ponType = NetworkNodeType::firstOrCreate(['code' => 'olt_pon'], NetworkNodeType::factory()->make(['code' => 'olt_pon', 'has_ports' => false])->toArray());
+        $odpType = NetworkNodeType::firstOrCreate(['code' => 'odp'], NetworkNodeType::factory()->make(['code' => 'odp', 'has_ports' => true])->toArray());
+        $ponAsing = NetworkNode::factory()->create(['anchor_pop_id' => $cabangB->id, 'node_type_id' => $ponType->id]);
+        NetworkNode::factory()->create(['parent_id' => $ponAsing->id, 'anchor_pop_id' => null, 'node_type_id' => $odpType->id]);
+
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $user->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabangA->id]);
+
+        $this->actingAs($user)->getJson(route('network.map.children', $ponAsing))->assertNotFound();
+    }
+
+    #[Test]
+    public function endpoint_port_node_mengembalikan_pelanggan_dan_modem_sesuai_izin(): void
+    {
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $type = NetworkNodeType::factory()->create(['code' => 'odp_ports', 'has_ports' => true]);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $type->id]);
+        $port = $node->ports()->create(['number' => 1, 'is_used' => true]);
+        $node->ports()->create(['number' => 2, 'is_used' => false]);
+        $customer = Customer::factory()->create(['pop_id' => $cabang->id, 'full_name' => 'Budi Port']);
+        CustomerTechnicalDetail::create(['customer_id' => $customer->id, 'router_or_ont_serial' => 'ONT-LAZY-1']);
+        NetworkPortAssignment::create([
+            'network_node_port_id' => $port->id, 'customer_id' => $customer->id,
+            'active_key' => 1, 'assigned_at' => now(),
+        ]);
+
+        $this->loginAsAdmin();
+        $json = $this->getJson(route('network.map.ports', $node))->assertOk()->json('ports');
+        $this->assertCount(2, $json);
+        $this->assertSame('Budi Port', $json[0]['customer_name']);
+        $this->assertSame('ONT-LAZY-1', $json[0]['customer_modems'][0]['serial_number']);
+        $this->assertSame('empty', $json[1]['kind']);
+
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $role->permissions()->detach(Permission::where('code', 'customers.detail.devices.view_sensitive')->value('id'));
+        $limited = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $limited->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabang->id]);
+
+        $hidden = $this->actingAs($limited)->getJson(route('network.map.ports', $node))->assertOk()->json('ports');
+        $this->assertTrue($hidden[0]['customer_modems_hidden']);
+        $this->assertSame([], $hidden[0]['customer_modems']);
+    }
+
+    #[Test]
+    public function endpoint_port_node_di_luar_scope_pop_mendapat_404(): void
+    {
+        $cabangA = Pop::factory()->create(['type' => 'cabang']);
+        $cabangB = Pop::factory()->create(['type' => 'cabang']);
+        $asing = NetworkNode::factory()->create(['anchor_pop_id' => $cabangB->id]);
+
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $user->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabangA->id]);
+
+        $this->actingAs($user)->getJson(route('network.map.ports', $asing))->assertNotFound();
+    }
+
+    #[Test]
     public function modem_pelanggan_di_port_odp_tampil_lengkap_di_detail_dan_peta(): void
     {
         $cabang = Pop::factory()->create(['type' => 'cabang']);
@@ -462,14 +764,17 @@ class InfrastructureMapTest extends TestCase
         ]);
 
         $this->loginAsAdmin();
-        $payload = app(InfrastructureMapService::class)->build(auth()->user(), null, 'path');
+        $payload = app(InfrastructureMapService::class)->build(auth()->user(), null, 'path', true);
         $virtualOntId = -1000000000 - $customer->id;
         $this->assertSame('customer_ont', $payload['topologyDetails'][$virtualOntId]['type']);
         $this->assertSame($node->id, $payload['topologyDetails'][$virtualOntId]['parent_id']);
         $this->assertSame(1, $payload['summary']['nodes']);
         $this->assertSame(0, NetworkNode::whereHas('nodeType', fn ($query) => $query->where('code', 'ont'))->count());
         $this->assertArrayHasKey(-1000000000 - $withoutModem->id, $payload['topologyDetails']);
-        $this->assertSame('ONT belum tercatat', $payload['topologyDetails'][-1000000000 - $withoutModem->id]['typeName']);
+        // Kartu ONT hanya membawa identitas; SN modem diambil lazy dari daftar port node induk.
+        $this->assertSame('ONT pelanggan', $payload['topologyDetails'][-1000000000 - $withoutModem->id]['typeName']);
+        $this->assertSame([], $payload['topologyDetails'][$virtualOntId]['customer_modems']);
+        $this->assertSame(route('network.map.ports', $node), $payload['topologyDetails'][$virtualOntId]['modems_url']);
         $this->get(route('network.nodes.show', $node))
             ->assertOk()->assertSee('ONT-SN-A')->assertSee('ONT-SN-B')
             ->assertSee('ONT Huawei')->assertSee('DEVICE-SN')->assertSee('ZTE F660')
@@ -477,10 +782,17 @@ class InfrastructureMapTest extends TestCase
             ->assertSee('Modem belum tercatat')
             ->assertDontSee('ROUTER-SN')->assertDontSee('OLD-ONT-SN');
 
-        $this->get(route('network.map.index'))
-            ->assertOk()->assertSee('ONT-SN-A')->assertSee('ONT-SN-B')
-            ->assertSee('DEVICE-SN')->assertSee('LEGACY-ONT-SN')->assertSee('customer_modems')->assertDontSee('ROUTER-SN')
-            ->assertDontSee('OLD-ONT-SN');
+        $this->get(route('network.map.index', ['ont' => 1]))
+            ->assertOk()->assertSee('customer_modems')->assertDontSee('ONT-SN-A')->assertDontSee('ROUTER-SN');
+
+        $ports = collect($this->getJson(route('network.map.ports', $node))->assertOk()->json('ports'));
+        $modemSerials = $ports->firstWhere('customer_cid', $payload['topologyDetails'][$virtualOntId]['code'])['customer_modems'];
+        $serials = array_column($modemSerials, 'serial_number');
+        foreach (['ONT-SN-A', 'ONT-SN-B', 'DEVICE-SN', 'LEGACY-ONT-SN'] as $expected) {
+            $this->assertContains($expected, $serials);
+        }
+        $this->assertNotContains('ROUTER-SN', $serials);
+        $this->assertNotContains('OLD-ONT-SN', $serials);
 
         $role = Role::where('code', 'fop')->firstOrFail();
         $sensitivePermissionId = Permission::where('code', 'customers.detail.devices.view_sensitive')->value('id');
@@ -495,10 +807,10 @@ class InfrastructureMapTest extends TestCase
         $this->actingAs($limitedUser)->get(route('network.nodes.show', $node))
             ->assertOk()->assertSee('SN modem dibatasi')->assertDontSee('ONT-SN-A')
             ->assertDontSee('DEVICE-SN');
-        $limitedPayload = app(InfrastructureMapService::class)->build($limitedUser, null, 'path');
+        $limitedPayload = app(InfrastructureMapService::class)->build($limitedUser, null, 'path', true);
         $this->assertSame([], $limitedPayload['topologyDetails'][$virtualOntId]['customer_modems']);
         $this->assertTrue($limitedPayload['topologyDetails'][$virtualOntId]['customer_modems_hidden']);
-        $this->actingAs($limitedUser)->get(route('network.map.index'))
+        $this->actingAs($limitedUser)->get(route('network.map.index', ['ont' => 1]))
             ->assertOk()->assertSee('customer_modems_hidden')->assertDontSee('ONT-SN-A')
             ->assertDontSee('DEVICE-SN');
     }

@@ -1412,16 +1412,22 @@ class CustomerController extends Controller
 
         // Mini POP (OLT) di bawah Cabang POP customer ini — buat modal assignment
         // Mini POP + Distribusi pasca pemasangan/aktivasi (lihat CustomerNetworkAssignmentController).
-        $availableMiniPops = $customer->pop_id
+        // Query digerbang permission yang sama dengan tombol "Atur Mini POP" di
+        // view (`customers.detail.installation.validate`) — tanpa permission itu
+        // tombolnya gak pernah dirender, jadi gak perlu tarik datanya juga.
+        $canAssignNetwork = auth()->user()->hasPermission('customers.detail.installation.validate');
+        $availableMiniPops = ($canAssignNetwork && $customer->pop_id)
             ? Pop::where('parent_id', $customer->pop_id)
                 ->where('type', 'mini_pop')
                 ->orderBy('name')
                 ->get(['id', 'name', 'pop_code'])
             : collect();
 
-        $availableDistributions = Distribution::whereIn('pop_id', $availableMiniPops->pluck('id'))
-            ->orderBy('code')
-            ->get(['id', 'pop_id', 'code', 'name']);
+        $availableDistributions = $canAssignNetwork
+            ? Distribution::whereIn('pop_id', $availableMiniPops->pluck('id'))
+                ->orderBy('code')
+                ->get(['id', 'pop_id', 'code', 'name'])
+            : collect();
 
         // Keep backward compat for views that still reference $isCustomer / $isActive
         $isActive = in_array($status, ['active', 'suspended']);
@@ -1447,20 +1453,41 @@ class CustomerController extends Controller
         // survey sungguhan dan mana tanggal hasil aritmetika. Sekarang murni dari
         // customer_surveys / customer_installations / customer_services; kalau
         // record-nya belum ada, tanggalnya '-'.
-        $latestSurvey = $customer->surveys()->latest('id')->first();
-        $latestInstallation = $customer->installations()->latest('id')->first();
+        // Tasks teknisi pelanggan ini — satu query dipakai ulang untuk timeline
+        // (survey/pemasangan terakhir di bawah) DAN tab Riwayat Ticketing,
+        // supaya tidak menembak tabel `tasks` 3x di request yang sama.
+        $customerTasks = $customer->tasks()
+            ->with([
+                'teamMembers.user',
+                'creator',
+                'updater',
+                'fop',
+                'auditLogs.user.role',
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // `surveys`/`installations` sudah dimuat lewat $customer->load() di atas
+        // — pakai koleksi yang sudah ada, JANGAN tembak query baru lewat
+        // ->surveys()/->installations() (relasi method selalu query ulang,
+        // beda dengan properti relasi yang sudah di-load).
+        $latestSurvey = $customer->surveys->sortByDesc('id')->first();
+        $latestInstallation = $customer->installations->sortByDesc('id')->first();
         $service = $customer->customerService;
 
-        $latestSurveyTask = $customer->tasks()
-            ->where('task_type', TaskType::SURVEY->value)
-            ->with(['updater', 'teamMembers.user'])
-            ->latest('id')
+        // Diambil dari $customerTasks (satu query di bawah) supaya tidak
+        // menembak tabel `tasks` 2x lagi di sini. `task_type` di-cast ke enum
+        // TaskType di model — bandingkan ke case enum-nya, BUKAN ->value,
+        // kalau tidak Collection::where() loloskan loose-compare yang gagal
+        // (enum instance tidak pernah == string).
+        $latestSurveyTask = $customerTasks
+            ->where('task_type', TaskType::SURVEY)
+            ->sortByDesc('id')
             ->first();
 
-        $latestInstallTask = $customer->tasks()
-            ->where('task_type', TaskType::PEMASANGAN->value)
-            ->with(['teamMembers.user', 'fop'])
-            ->latest('id')
+        $latestInstallTask = $customerTasks
+            ->where('task_type', TaskType::PEMASANGAN)
+            ->sortByDesc('id')
             ->first();
 
         $surveyDate = $latestSurvey?->end_date ?? $latestSurvey?->survey_date ?? ($latestSurveyTask?->scheduled_at ? Carbon::parse($latestSurveyTask->scheduled_at)->toDateString() : null);
@@ -1633,17 +1660,6 @@ class CustomerController extends Controller
             ->limit(50)
             ->get();
 
-        // 2. Tasks, Tickets, & FopTasks untuk Riwayat Ticketing
-        $customerTasks = $customer->tasks()
-            ->with([
-                'teamMembers.user',
-                'creator',
-                'fop',
-                'auditLogs.user.role',
-            ])
-            ->orderBy('created_at', 'desc')
-            ->get();
-
         // Tiket Helpdesk/NOC/FOP pelanggan ini — SATU baris per tiket, dua
         // rezim tampilan tergantung `handler` (lihat blok Ticket di view):
         //  - handler=FOP        → dirender sebagai "Ticket FOP" (data dari fopTask).
@@ -1670,13 +1686,21 @@ class CustomerController extends Controller
             ->get(['id', 'name']);
 
         // Dropdown "Ganti Paket" di tab Paket & Layanan (CustomerPackageController).
-        $availablePackages = InternetPackage::orderBy('name')->get(['id', 'name', 'monthly_price', 'download_speed_mbps', 'upload_speed_mbps']);
+        // Digerbang permission yang sama dengan form-nya di view
+        // (`customers.detail.packages.change`) — tanpa permission itu form
+        // ganti paket gak pernah dirender.
+        $availablePackages = auth()->user()->hasPermission('customers.detail.packages.change')
+            ? InternetPackage::orderBy('name')->get(['id', 'name', 'monthly_price', 'download_speed_mbps', 'upload_speed_mbps'])
+            : collect();
 
         // Dropdown alasan Putus Langganan (ADHOC-69) + eligibilitas denda
         // (masa langganan <=1 tahun, dihitung server, sama dengan
         // CustomerTerminationService — form cuma menampilkan field denda
-        // kalau eligible, guard sebenarnya tetap di Service).
-        $terminationReasons = CustomerTerminationReason::active()->orderBy('name')->get();
+        // kalau eligible, guard sebenarnya tetap di Service). Digerbang
+        // permission `customers.deactivate` yang sama dengan form-nya di view.
+        $terminationReasons = auth()->user()->hasPermission('customers.deactivate')
+            ? CustomerTerminationReason::active()->orderBy('name')->get()
+            : collect();
         $terminationPenaltyEligible = $activationDate === null
             || now()->lessThanOrEqualTo(Carbon::parse($activationDate)->addYear());
 
@@ -1686,8 +1710,12 @@ class CustomerController extends Controller
         // Langganan tidak lagi bawa periode). Dihitung juga untuk pelanggan
         // `terminated` — aksi ini sengaja tetap dibuka setelah putus (G6),
         // buat bersihin tagihan yang kelupaan dibebaskan sebelum putus resmi.
+        // Digerbang permission `billing_waivers.create` yang sama dengan
+        // form-nya di view.
         $leaveWaiverPeriods = collect();
-        if ($customer->customerService && in_array($customer->status, ['active', 'suspended', 'terminated'], true)) {
+        if ($customer->customerService
+            && auth()->user()->hasPermission('billing_waivers.create')
+            && in_array($customer->status, ['active', 'suspended', 'terminated'], true)) {
             $leaveWaiverPeriods = $waiverService->eligiblePeriods($customer, BillingWaiverSource::LEAVE);
         }
         $activeBillingWaivers = $customer->billingWaivers()->with(['invoice', 'creator'])->latest()->get();
@@ -1709,25 +1737,31 @@ class CustomerController extends Controller
         // 22-10-2026). Satu sumber: assignment port ODP aktif + koneksi PON
         // aktif yang nge-uplink ke ODP itu — SAMA data yang dipakai proyeksi
         // hierarki, bukan dihitung ulang dengan logic lain.
-        $activePortAssignment = $customer->portAssignments()
-            ->whereNull('released_at')
-            ->with('port.node.nodeType', 'port.node.anchorPop.parent')
-            ->latest('id')->first();
+        // Digerbang permission `network_nodes.view` yang sama dengan blok
+        // "Lokasi Jaringan" di view (`@can('network_nodes.view')`) — tanpa
+        // permission itu, lewati query assignment + uplinkPon()/parent chain
+        // (tiap panggilan itu bisa nembak query lazy-load tambahan).
         $customerNetworkLocation = null;
-        if ($activePortAssignment?->port?->node !== null) {
-            $odpNode = $activePortAssignment->port->node;
-            // ODP menggantung ke PON lewat parent_id; PON anak Slot, Slot anak OLT.
-            // Tabel `infrastructure_connections`/slots/ports lama sudah dibuang
-            // (Task 14), jadi rantai ini dibaca langsung dari pohon node.
-            $pon = $odpNode->uplinkPon();
-            $slot = $pon?->parent;
-            $customerNetworkLocation = [
-                'odp' => $odpNode,
-                'port_number' => $activePortAssignment->port->number,
-                'olt' => $slot?->parent,
-                'slot' => $slot,
-                'pon' => $pon,
-            ];
+        if (auth()->user()->hasPermission('network_nodes.view')) {
+            $activePortAssignment = $customer->portAssignments()
+                ->whereNull('released_at')
+                ->with('port.node.nodeType', 'port.node.anchorPop.parent')
+                ->latest('id')->first();
+            if ($activePortAssignment?->port?->node !== null) {
+                $odpNode = $activePortAssignment->port->node;
+                // ODP menggantung ke PON lewat parent_id; PON anak Slot, Slot anak OLT.
+                // Tabel `infrastructure_connections`/slots/ports lama sudah dibuang
+                // (Task 14), jadi rantai ini dibaca langsung dari pohon node.
+                $pon = $odpNode->uplinkPon();
+                $slot = $pon?->parent;
+                $customerNetworkLocation = [
+                    'odp' => $odpNode,
+                    'port_number' => $activePortAssignment->port->number,
+                    'olt' => $slot?->parent,
+                    'slot' => $slot,
+                    'pon' => $pon,
+                ];
+            }
         }
 
         // Kabel melintang jalan yang belum selesai (ADHOC-205) — badge di header.

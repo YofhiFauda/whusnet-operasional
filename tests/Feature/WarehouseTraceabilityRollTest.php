@@ -131,7 +131,7 @@ class WarehouseTraceabilityRollTest extends TestCase
 
         $response = $this->actingAs($this->owner)->get(route('warehouse.traceability.index', ['roll' => $roll->roll_code]));
 
-        $response->assertOk()->assertSee('TRACE-USED-1')->assertSee('TRACE-USED-2')->assertSee('980 meter');
+        $response->assertOk()->assertSee('TRACE-USED-1')->assertSee('TRACE-USED-2')->assertSeeText('Total terpakai: 980 meter')->assertSeeText('Tujuan pemakaian: Pusat Trace Roll Test');
         $this->assertEquals(980, $response->viewData('rollUsage')->sum('qty'));
     }
 
@@ -157,6 +157,9 @@ class WarehouseTraceabilityRollTest extends TestCase
 
         $response = $this->actingAs($this->owner)->get(route('warehouse.traceability.index', ['roll' => $roll->roll_code]));
 
-        $response->assertOk()->assertSee('Pemakaian Infrastruktur')->assertSee('ODP Selatan')->assertSee('25 meter');
+        $response->assertOk()
+            ->assertSeeText('Total terpakai: 25 meter')
+            ->assertSeeText('Lokasi pemakaian: 25 meter dipakai di ODP Selatan')
+            ->assertSee('Pemakaian Infrastruktur');
     }
 }

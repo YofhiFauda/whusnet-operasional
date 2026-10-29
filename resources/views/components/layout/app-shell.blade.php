@@ -7,6 +7,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
+    @include('partials.web-fonts')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="font-ui bg-background text-text-main antialiased min-h-screen flex">
