@@ -173,6 +173,49 @@ class StockBoardActionsTest extends StockBoardTestCase
         $this->assertCount(1, $cabang['priceTiers']);
         $this->assertSame($lot, $cabang['priceTiers'][0]['lotNo']);
         $this->assertSame($cabang['actions']['adjustUrl'], $cabang['priceTiers'][0]['opnameUrl']);
+        // Tanpa ledger RECEIVE harga memang tidak diketahui — tidak ditebak.
+        $this->assertNull($cabang['priceTiers'][0]['price']);
+    }
+
+    #[Test]
+    public function quantity_satu_harga_membawa_harga_terima_di_payload_drawer(): void
+    {
+        $konektor = $this->buatItem('SA-QP', 'Konektor Berharga', 'quantity', 'pcs');
+        app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $konektor, 7, 5000, $this->owner);
+
+        $detail = $this->payload($this->fragmen($this->papan()), $this->pusat, $konektor);
+
+        // Harga & Nilai di drawer dihitung dari tingkat harga ini.
+        $this->assertCount(1, $detail['priceTiers']);
+        $this->assertEquals(5000, $detail['priceTiers'][0]['price']);
+        $this->assertEquals(7, $detail['priceTiers'][0]['qty']);
+    }
+
+    #[Test]
+    public function quantity_dua_harga_di_cabang_minta_dan_serah_tanpa_lot_no_opname_per_harga(): void
+    {
+        $dua = $this->buatItem('SA-C2', 'Dropcore Dua Harga Cabang', 'quantity', 'meter');
+        $lotBaru = 'SA-C2-20261001-000002';
+        $this->stokQuantity($this->cabangA, $dua, 8);
+        $this->stokQuantity($this->cabangA, $dua, 5, $lotBaru);
+
+        $fragmen = $this->fragmen($this->papan());
+        $detail = $this->payload($fragmen, $this->cabangA, $dua);
+
+        $this->assertSame($this->url('warehouse.stock-requests.create', $this->cabangA, $dua), $detail['actions']['requestStockUrl']);
+        $this->assertSame($this->url('warehouse.issues.create', $this->cabangA, $dua), $detail['actions']['issueUrl']);
+        $this->assertSame($this->url('warehouse.stock.threshold.create', $this->cabangA, $dua), $detail['actions']['thresholdUrl']);
+        $this->assertNull($detail['actions']['transferUrl']);
+        $this->assertNull($detail['actions']['adjustUrl']);
+        $this->assertHref($detail['actions']['requestStockUrl'], $fragmen);
+        $this->assertHref($detail['actions']['issueUrl'], $fragmen);
+        $this->assertNoHref($this->url('warehouse.adjustments.balance.create', $this->cabangA, $dua), $fragmen);
+
+        $byLot = collect($detail['priceTiers'])->keyBy('lotNo');
+        $this->assertCount(2, $byLot);
+        foreach (['', $lotBaru] as $lot) {
+            $this->assertSame($this->url('warehouse.adjustments.balance.create', $this->cabangA, $dua, ['lot_no' => $lot]), $byLot[$lot]['opnameUrl']);
+        }
     }
 
     #[Test]

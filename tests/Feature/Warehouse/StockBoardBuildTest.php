@@ -86,6 +86,31 @@ class StockBoardBuildTest extends StockBoardTestCase
     }
 
     #[Test]
+    public function quantity_satu_harga_membawa_price_dan_dua_harga_price_null(): void
+    {
+        $dua = $this->buatItem('SB-P2', 'Dropcore Dua Harga Price', 'quantity', 'meter');
+        $satu = $this->buatItem('SB-P1', 'Konektor Satu Harga Price', 'quantity');
+        $modem = $this->buatItem('SB-PSN', 'Modem Price', 'serialized', 'unit');
+        $receive = app(InventoryReceiveService::class);
+        $receive->receiveQuantity($this->pusat, $dua, 12, 250000, $this->owner);
+        $receive->receiveQuantity($this->pusat, $dua, 10, 260000, $this->owner);
+        $receive->receiveQuantity($this->pusat, $satu, 7, 5000, $this->owner);
+        InventorySerial::create(['item_id' => $modem->id, 'serial_number' => 'SBP-1', 'status' => SerialStatus::AVAILABLE->value, 'current_pop_id' => $this->pusat->id]);
+
+        $groups = $this->build([$this->pusat->id]);
+
+        $rowSatu = $this->row($groups, $this->pusat->id, $satu->id);
+        $this->assertSame(5000.0, $rowSatu['price'], 'satu harga: price = harga RECEIVE terakhir');
+        $this->assertSame([], $rowSatu['price_tiers'], 'price_tiers tetap hanya untuk dua harga');
+
+        $rowDua = $this->row($groups, $this->pusat->id, $dua->id);
+        $this->assertNull($rowDua['price'], 'dua harga: harga ada di price_tiers, bukan price');
+        $this->assertCount(2, $rowDua['price_tiers']);
+
+        $this->assertNull($this->row($groups, $this->pusat->id, $modem->id)['price']);
+    }
+
+    #[Test]
     public function tersedia_serialized_hanya_sn_available(): void
     {
         $modem = $this->buatItem('SB-MDM', 'Modem Papan', 'serialized');

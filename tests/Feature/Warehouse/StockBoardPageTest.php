@@ -132,7 +132,10 @@ class StockBoardPageTest extends StockBoardTestCase
         $fragmen = $this->fragmen($response);
         $teks = $this->teks($fragmen);
 
-        $this->assertStringNotContainsString('Lot', $fragmen, 'istilah lot tidak boleh muncul di papan');
+        // Yang diuji teks yang TERLIHAT pengguna (tanpa tag/atribut), tanpa
+        // peduli huruf besar-kecil. Atribut boleh membawa `lot_no` (URL aksi,
+        // payload drawer) — itu bukan istilah di UI.
+        $this->assertDoesNotMatchRegularExpression('/\blot\b/iu', $teks, 'istilah lot tidak boleh muncul di teks papan');
         $this->assertStringContainsString('Harga lama', $teks);
         $this->assertStringContainsString('Harga baru', $teks);
         $this->assertStringContainsString('Rp 250.000', $teks);

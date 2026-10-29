@@ -363,6 +363,11 @@ class WarehouseStockBoardService
     }
 
     /**
+     * Satu baris papan. Kunci harga QUANTITY:
+     * - `lot_no` + `price` (?float, last-cost RECEIVE): hanya QUANTITY SATU harga;
+     *   null untuk SN/ROLL dan untuk QUANTITY dua harga.
+     * - `price_tiers` ([lot_no, qty, price]): hanya QUANTITY DUA harga, selain itu [].
+     *
      * @param  array{pop_id: int, qty: float, lots: array<int, array{lot_no: string, qty: float}>}  $slot
      * @param  Collection<string, float|null>  $thresholds
      * @param  array<string, float>  $prices
@@ -379,8 +384,13 @@ class WarehouseStockBoardService
         $min = $thresholds->get($key);
 
         $lotNo = null;
+        $price = null;
         $priceTiers = [];
         if ($tracking === TrackingType::QUANTITY) {
+            // `price_tiers` sengaja hanya terisi untuk DUA harga (tampilan
+            // "Harga lama/baru" & konsumen Task 2 bergantung padanya). Harga
+            // satu-satunya dikirim terpisah lewat `price` supaya drawer tetap
+            // bisa menampilkan Harga & Nilai tanpa mengubah arti price_tiers.
             if (count($slot['lots']) > 1) {
                 $priceTiers = array_map(fn (array $lot) => [
                     'lot_no' => $lot['lot_no'],
@@ -389,6 +399,7 @@ class WarehouseStockBoardService
                 ], $slot['lots']);
             } elseif (count($slot['lots']) === 1) {
                 $lotNo = $slot['lots'][0]['lot_no'];
+                $price = $prices[$item->id.'-'.$lotNo] ?? null;
             }
         }
 
@@ -401,6 +412,7 @@ class WarehouseStockBoardService
             'min' => $min,
             'is_low' => $min !== null && $qty < $min,
             'lot_no' => $lotNo,
+            'price' => $price,
             'price_tiers' => $priceTiers,
             'condition_summary' => $tracking === TrackingType::SERIALIZED ? ($conditions->get($key) ?? collect()) : null,
             'last_opname_at' => $opnames->get($key),

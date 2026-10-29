@@ -56,13 +56,14 @@
             ];
         }
     } elseif ($singleLot !== null) {
-        // Satu harga: harga per tingkat tidak ikut di data baris, jadi null
-        // (drawer menulis "—" dan tidak menghitung Nilai), bukan ditebak.
+        // Satu harga: harga dari `row.price` (last-cost RECEIVE). Null bila
+        // ledger tidak punya harga — drawer menulis "—" dan tidak menghitung
+        // Nilai, bukan menebak.
         $priceTiers[] = [
             'label' => 'Harga',
             'lotNo' => $singleLot,
             'qty' => (float) $row['qty'],
-            'price' => null,
+            'price' => isset($row['price']) ? (float) $row['price'] : null,
             'opnameUrl' => $opnameUrl($params),
         ];
     }
