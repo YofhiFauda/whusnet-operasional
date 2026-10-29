@@ -4,14 +4,17 @@ namespace App\Services;
 
 use App\Enums\InventoryTransactionType;
 use App\Enums\RollStatus;
+use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
 use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
+use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Support\BoardFilters;
+use App\Support\LikeSearch;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -30,14 +33,26 @@ use Illuminate\Support\Collection;
  */
 class WarehouseStockBoardService
 {
+    /** Batas pasangan (gudang, barang) hasil pencarian SN/roll: pengaman beban, bukan paginasi. */
+    private const SEARCH_PAIR_CAP = 50;
+
     public function __construct(private readonly WarehouseStockPositionService $position) {}
 
     /**
      * @param  Collection<int, int>  $popIds  POP dalam scope aktor.
-     * @return Collection<int, array{pop: Pop, sku_count: int, low_count: int, categories: Collection<int, array{category: ItemCategory|null, sku_count: int, rows: Collection<int, array<string, mixed>>}>}>
+     * @return Collection<int, array{pop: Pop, sku_count: int, low_count: int, search_truncated: bool, categories: Collection<int, array{category: ItemCategory|null, sku_count: int, rows: Collection<int, array<string, mixed>>}>}>
      */
     public function build(Collection $popIds, BoardFilters $f): Collection
     {
+        // Sanitasi defensif: pemanggil yang merakit BoardFilters langsung
+        // (bukan lewat fromRequest) tetap tidak bisa melebarkan LIKE dengan
+        // `%`/`_`. BoardFilters baru dipakai seterusnya supaya isFiltering()
+        // konsisten dengan teks yang benar-benar dicari.
+        $clean = LikeSearch::sanitize($f->search);
+        if ($clean !== $f->search) {
+            $f = new BoardFilters($f->popId, $f->categoryId, $f->tracking, $clean, $f->lowOnly);
+        }
+
         $scopedIds = $popIds->map(fn ($id) => (int) $id)->unique()->values();
 
         // Menyempitkan, bukan memperluas: popId di luar scope jatuh ke kosong.
@@ -56,7 +71,7 @@ class WarehouseStockBoardService
             ->whereIn('id', $scopedIds)
             ->get()
             ->sortBy([
-                fn (Pop $a, Pop $b) => ($b->type === 'pusat') <=> ($a->type === 'pusat'),
+                fn (Pop $a, Pop $b) => $b->isPusat() <=> $a->isPusat(),
                 fn (Pop $a, Pop $b) => strnatcasecmp($a->name, $b->name),
             ])
             ->values();
@@ -64,7 +79,21 @@ class WarehouseStockBoardService
         $warehouseIds = $pops->pluck('id');
         $available = $this->position->availableByPopAndItem($warehouseIds);
 
-        $items = $this->loadItems(array_keys($available), $f);
+        // Pencarian SN/roll hanya melihat gudang dalam scope ($warehouseIds sudah
+        // dipersempit scope): gudang luar scope tak boleh menghasilkan row,
+        // label, atau nama barang.
+        $searching = $f->search !== '';
+        $matches = $searching
+            ? $this->searchMatches($warehouseIds, $f->search)
+            : ['pairs' => collect(), 'truncated' => false];
+        $nameMatchedIds = $searching
+            ? Item::query()
+                ->where(fn ($q) => $q->where('name', 'like', "%{$f->search}%")->orWhere('code', 'like', "%{$f->search}%"))
+                ->pluck('id')
+                ->flip()
+            : collect();
+
+        $items = $this->loadItems(array_keys($available), $f, $matches['pairs']->pluck('item_id')->unique()->all());
 
         $thresholds = $this->thresholds($warehouseIds, $items->keys());
         $prices = $this->lastPrices($items);
@@ -74,7 +103,7 @@ class WarehouseStockBoardService
 
         $categoryOrder = ItemCategory::query()->ordered()->pluck('id')->flip();
 
-        $groups = $pops->map(function (Pop $pop) use ($items, $available, $thresholds, $prices, $rollCounts, $opnames, $conditions, $categoryOrder, $f) {
+        $groups = $pops->map(function (Pop $pop) use ($items, $available, $thresholds, $prices, $rollCounts, $opnames, $conditions, $categoryOrder, $f, $matches, $nameMatchedIds) {
             $rows = collect();
 
             foreach ($items as $itemId => $item) {
@@ -83,7 +112,17 @@ class WarehouseStockBoardService
                     continue;
                 }
 
+                // Cocok lewat nama/kode: lolos di semua gudang. Cocok hanya lewat
+                // SN/roll: lolos di gudang tempat unitnya ada.
+                $pair = $matches['pairs']->get($pop->id.'-'.$itemId);
+                if ($f->search !== '' && ! $nameMatchedIds->has($itemId) && $pair === null) {
+                    continue;
+                }
+
                 $row = $this->makeRow($pop, $item, $slot, $thresholds, $prices, $rollCounts, $opnames, $conditions);
+                if ($pair !== null) {
+                    $row['match_label'] = $pair['label'];
+                }
 
                 if ($f->lowOnly && ! $row['is_low']) {
                     continue;
@@ -112,6 +151,7 @@ class WarehouseStockBoardService
                 'pop' => $pop,
                 'sku_count' => $rows->count(),
                 'low_count' => $rows->where('is_low', true)->count(),
+                'search_truncated' => $matches['truncated'],
                 'categories' => $categories,
             ];
         });
@@ -126,13 +166,82 @@ class WarehouseStockBoardService
     }
 
     /**
+     * Alasan papan kosong, supaya view memilih pesan yang jujur.
+     *
+     * @param  Collection<int, int>  $popIds  POP scope aktor (bukan hasil build).
+     * @param  Collection<int, array<string, mixed>>  $groups  Hasil build().
+     * @return 'no_access'|'no_match'|'no_stock'|null
+     */
+    public function emptyState(Collection $popIds, Collection $groups, BoardFilters $f): ?string
+    {
+        if ($popIds->isEmpty()) {
+            return 'no_access';
+        }
+
+        if ($groups->contains(fn (array $group) => $group['sku_count'] > 0)) {
+            return null;
+        }
+
+        return $f->isFiltering() ? 'no_match' : 'no_stock';
+    }
+
+    /**
+     * Pasangan (gudang, barang) yang punya SN AVAILABLE / roll AVAILABLE|RECEIVED
+     * dengan kode memuat `$term`. WAJIB `whereIn(current_pop_id, $popIds)` agar
+     * SN di luar scope tidak bocor. Dibatasi SEARCH_PAIR_CAP pasangan;
+     * `truncated` true bila masih ada sisa (diambil cap+1 untuk mendeteksinya).
+     *
+     * @param  Collection<int, int>  $popIds
+     * @return array{pairs: Collection<string, array{pop_id: int, item_id: int, label: string}>, truncated: bool}
+     */
+    private function searchMatches(Collection $popIds, string $term): array
+    {
+        $cap = self::SEARCH_PAIR_CAP;
+
+        $serials = InventorySerial::query()
+            ->whereIn('current_pop_id', $popIds)
+            ->where('status', SerialStatus::AVAILABLE->value)
+            ->where('serial_number', 'like', "%{$term}%")
+            ->selectRaw('current_pop_id as pop_id, item_id, MIN(serial_number) as first_code, COUNT(*) as total')
+            ->groupBy('current_pop_id', 'item_id')
+            ->orderBy('current_pop_id')->orderBy('item_id')
+            ->limit($cap + 1)
+            ->get()
+            ->map(fn ($r) => ['pop_id' => (int) $r->pop_id, 'item_id' => (int) $r->item_id, 'code' => 'SN '.$r->first_code, 'total' => (int) $r->total]);
+
+        $rolls = InventoryRoll::query()
+            ->whereIn('current_pop_id', $popIds)
+            ->whereIn('status', [RollStatus::AVAILABLE->value, RollStatus::RECEIVED->value])
+            ->where('roll_code', 'like', "%{$term}%")
+            ->selectRaw('current_pop_id as pop_id, item_id, MIN(roll_code) as first_code, COUNT(*) as total')
+            ->groupBy('current_pop_id', 'item_id')
+            ->orderBy('current_pop_id')->orderBy('item_id')
+            ->limit($cap + 1)
+            ->get()
+            ->map(fn ($r) => ['pop_id' => (int) $r->pop_id, 'item_id' => (int) $r->item_id, 'code' => 'roll '.$r->first_code, 'total' => (int) $r->total]);
+
+        $all = $serials->concat($rolls);
+
+        $pairs = $all->take($cap)->mapWithKeys(fn (array $m) => [
+            $m['pop_id'].'-'.$m['item_id'] => [
+                'pop_id' => $m['pop_id'],
+                'item_id' => $m['item_id'],
+                'label' => 'Cocok: '.$m['code'].($m['total'] > 1 ? ' +'.($m['total'] - 1).' lagi' : ''),
+            ],
+        ]);
+
+        return ['pairs' => $pairs, 'truncated' => $all->count() > $cap];
+    }
+
+    /**
      * Item yang punya stok tersedia, sudah disaring. Tidak memfilter kategori
      * aktif: barang di kategori nonaktif tetap harus terlihat selama ada stok.
      *
      * @param  array<int, int>  $itemIds
+     * @param  array<int, int>  $matchedItemIds  Cocok lewat SN/roll (union dengan nama/kode).
      * @return Collection<int, Item>
      */
-    private function loadItems(array $itemIds, BoardFilters $f): Collection
+    private function loadItems(array $itemIds, BoardFilters $f, array $matchedItemIds = []): Collection
     {
         if ($itemIds === []) {
             return collect();
@@ -143,9 +252,10 @@ class WarehouseStockBoardService
             ->whereIn('id', $itemIds)
             ->when($f->categoryId !== null, fn ($q) => $q->where('item_category_id', $f->categoryId))
             ->when($f->tracking !== null, fn ($q) => $q->where('tracking_type', $f->tracking))
-            ->when($f->search !== '', function ($q) use ($f) {
+            ->when($f->search !== '', function ($q) use ($f, $matchedItemIds) {
                 $q->where(fn ($qq) => $qq->where('name', 'like', "%{$f->search}%")
-                    ->orWhere('code', 'like', "%{$f->search}%"));
+                    ->orWhere('code', 'like', "%{$f->search}%")
+                    ->orWhereIn('id', $matchedItemIds));
             })
             ->get()
             ->keyBy('id');
