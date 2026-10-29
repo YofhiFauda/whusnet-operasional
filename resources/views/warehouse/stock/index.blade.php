@@ -11,7 +11,7 @@
 
 {{-- Mode papan menerima $canAdjust dkk dari controller (satu sumber untuk
      papan & menu aksinya); blok di bawah hanya untuk tampilan lama. --}}
-@if($viewMode !== 'papan')
+@if(! in_array($viewMode, ['papan', 'matrix'], true))
 @php
     // Kolom Aksi & Quick Action Bar gabungan 4 permission beda — quick-shortcut
     // Transfer/Serah/Minta Stok ditambahkan 2026-09-07 biar staf gak perlu
@@ -42,27 +42,13 @@
     // tautan tetap benar setelah default dibalik ke papan.
     $viewToggle = fn (string $mode) => request()->fullUrlWithQuery(array_merge(
         ['view' => $mode, 'sort' => null, 'dir' => null, 'page' => null],
-        $mode === 'papan' ? ['item_id' => null, 'tracking_type' => null] : [],
+        in_array($mode, ['papan', 'matrix'], true) ? ['item_id' => null, 'tracking_type' => null] : [],
     ));
     $toggleClass = fn (bool $active) => $active
         ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs'
         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100';
 @endphp
-<div class="flex items-center justify-between gap-3 mb-3">
-    <div class="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold" role="tablist" aria-label="Mode tampilan stok">
-        <a href="{{ $viewToggle('papan') }}" role="tab" aria-selected="{{ $viewMode === 'papan' ? 'true' : 'false' }}"
-           class="px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'papan') }}">Papan</a>
-        <a href="{{ $viewToggle('rincian') }}" role="tab" aria-selected="{{ $viewMode === 'lot' ? 'true' : 'false' }}"
-           class="px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'lot') }}">Rincian</a>
-        <a href="{{ $viewToggle('ringkasan') }}" role="tab" aria-selected="{{ $viewMode === 'ringkasan' ? 'true' : 'false' }}"
-           class="px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'ringkasan') }}">Ringkasan per Item</a>
-    </div>
-    @if($viewMode === 'ringkasan')
-    <p class="text-[11.5px] text-slate-500 dark:text-slate-400">Total = semua gudang dalam cakupan Anda. Lot dibuka per baris.</p>
-    @endif
-</div>
-
-@if($viewMode === 'papan')
+@if(in_array($viewMode, ['papan', 'matrix'], true))
 @php
     // Keadaan lipat awal (spec §2): banyak gudang → band dilipat; terkunci
     // satu gudang atau sedang menyaring → terbuka (yang tidak cocok sudah
@@ -70,8 +56,20 @@
     // terlipat diberi x-cloak dan tidak berkedip terbuka sebelum Alpine siap.
     $collapseGudangOver = 5;
     $forceOpen = $lockedSinglePop !== null || $boardFilters->isFiltering();
-    $startOpen = $forceOpen || $groups->count() <= $collapseGudangOver;
+    $boardView = $viewMode === 'matrix' ? 'matrix' : 'papan';
+    $popCount = $viewMode === 'matrix' ? $matrix['pops']->count() : $groups->count();
+    $startOpen = $forceOpen || $popCount <= $collapseGudangOver;
 @endphp
+@if($viewMode === 'matrix')
+<!-- matriks:awal -->
+<div x-data="stockBoard({ collapseGudangOver: {{ $collapseGudangOver }} })"
+     data-pop-count="{{ $popCount }}"
+     data-force-open="{{ $forceOpen ? 'true' : 'false' }}">
+    @include('warehouse.stock.board._toolbar')
+    @include('warehouse.stock.board._matrix')
+</div>
+<!-- matriks:akhir -->
+@else
 <!-- papan:awal -->
 <div x-data="stockBoard({ collapseGudangOver: {{ $collapseGudangOver }} })"
      data-pop-count="{{ $groups->count() }}"
@@ -80,9 +78,40 @@
     @include('warehouse.stock.board._table')
 </div>
 <!-- papan:akhir -->
+@endif
 @else
 <!-- Filter & Search Toolbar Card (Structured & Responsive) -->
 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 mb-5">
+    {{-- BARIS 1: Tab Mode Tampilan Stok & Context Info --}}
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div class="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold" role="tablist" aria-label="Mode tampilan stok">
+            <a href="{{ $viewToggle('papan') }}" role="tab" aria-selected="{{ $viewMode === 'papan' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'papan') }}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/>
+                </svg>
+                <span>Papan</span>
+            </a>
+            <a href="{{ $viewToggle('rincian') }}" role="tab" aria-selected="{{ $viewMode === 'lot' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'lot') }}">
+                <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/>
+                </svg>
+                <span>Rincian</span>
+            </a>
+            <a href="{{ $viewToggle('ringkasan') }}" role="tab" aria-selected="{{ $viewMode === 'ringkasan' ? 'true' : 'false' }}"
+               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'ringkasan') }}">
+                <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/>
+                </svg>
+                <span>Ringkasan per Item</span>
+            </a>
+        </div>
+        @if($viewMode === 'ringkasan')
+        <p class="text-[11.5px] text-slate-500 dark:text-slate-400">Total = semua gudang dalam cakupan Anda. Lot dibuka per baris.</p>
+        @endif
+    </div>
+
     <form method="GET" action="{{ route('warehouse.stock.index') }}" id="stockFilterForm" class="space-y-4">
         {{-- Mode tampilan ikut terbawa saat filter diganti. `rincian` juga
              dipertahankan: setelah default dibalik ke papan, filter di

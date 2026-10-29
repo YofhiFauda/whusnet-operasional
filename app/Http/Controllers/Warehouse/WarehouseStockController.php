@@ -87,8 +87,10 @@ class WarehouseStockController extends Controller
         // Papan Gudang → Kategori → Barang (spec 2026-10-29). Bercabang SEBELUM
         // logika per lot/ringkasan supaya dua tampilan lama itu tidak berubah
         // satu baris pun selama papan masih dibuktikan di `?view=papan`.
-        if ($request->query('view') === 'papan') {
-            return $this->board($request, $user, $pops, $popIds, $popFilter, $lockedSinglePop, $modeLabel);
+        // `matrix` = sub-tampilan papan (Tabel | Matriks): filter, scope, dan izin
+        // aksi sama persis, hanya bentuk data yang dirender yang berbeda.
+        if (in_array($request->query('view'), ['papan', 'matrix'], true)) {
+            return $this->board($request, $user, $pops, $popIds, $popFilter, $lockedSinglePop, $modeLabel, $request->query('view') === 'matrix');
         }
 
         $categoryFilter = $request->integer('category_id') ?: null;
@@ -499,15 +501,26 @@ class WarehouseStockController extends Controller
      * @param  Collection<int, Pop>  $pops
      * @param  Collection<int, int>  $popIds
      */
-    private function board(Request $request, User $user, Collection $pops, Collection $popIds, ?int $popFilter, ?Pop $lockedSinglePop, string $modeLabel): View
+    private function board(Request $request, User $user, Collection $pops, Collection $popIds, ?int $popFilter, ?Pop $lockedSinglePop, string $modeLabel, bool $asMatrix = false): View
     {
         $boardFilters = BoardFilters::fromRequest($request, $popFilter);
         $board = app(WarehouseStockBoardService::class);
-        $groups = $board->build($popIds, $boardFilters);
+
+        if ($asMatrix) {
+            $matrix = $board->matrix($popIds, $boardFilters);
+            // emptyState() membaca `sku_count` per gudang; untuk matriks cukup
+            // satu "gudang" semu yang berisi jumlah barang — alasan kosongnya
+            // (no_access/no_match/no_stock) tetap satu sumber.
+            $groups = collect([['sku_count' => $matrix['categories']->sum(fn (array $c) => $c['rows']->count())]]);
+        } else {
+            $groups = $board->build($popIds, $boardFilters);
+        }
 
         return view('warehouse.stock.index', [
-            'viewMode' => 'papan',
-            'groups' => $groups,
+            'viewMode' => $asMatrix ? 'matrix' : 'papan',
+            'groups' => $asMatrix ? collect() : $groups,
+            'matrix' => $matrix ?? null,
+            'searchTruncated' => $asMatrix ? $matrix['search_truncated'] : null,
             'emptyState' => $board->emptyState($popIds, $groups, $boardFilters),
             'boardFilters' => $boardFilters,
             'categories' => ItemCategory::active()->ordered()->get(),

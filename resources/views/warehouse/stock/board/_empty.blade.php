@@ -19,6 +19,6 @@
     <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200">{{ $title }}</h4>
     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">{{ $hint }}</p>
     @if($emptyState === 'no_match')
-    <a href="{{ route('warehouse.stock.index', ['view' => 'papan', 'pop_id' => '']) }}" class="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 transition-colors">Hapus semua filter</a>
+    <a href="{{ route('warehouse.stock.index', ['view' => $boardView ?? 'papan', 'pop_id' => '']) }}" class="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 transition-colors">Hapus semua filter</a>
     @endif
 </div>

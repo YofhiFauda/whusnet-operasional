@@ -53,28 +53,11 @@ class WarehouseStockBoardService
             $f = new BoardFilters($f->popId, $f->categoryId, $f->tracking, $clean, $f->lowOnly);
         }
 
-        $scopedIds = $popIds->map(fn ($id) => (int) $id)->unique()->values();
+        $pops = $this->scopedPops($popIds, $f);
 
-        // Menyempitkan, bukan memperluas: popId di luar scope jatuh ke kosong.
-        if ($f->popId !== null) {
-            $scopedIds = $scopedIds->filter(fn ($id) => $id === $f->popId)->values();
-        }
-
-        if ($scopedIds->isEmpty()) {
+        if ($pops->isEmpty()) {
             return collect();
         }
-
-        // `orderBy('type')` tidak cukup: 'cabang' < 'pusat' secara alfabet,
-        // jadi Pusat diletakkan paling depan lewat sort PHP.
-        $pops = Pop::query()
-            ->warehouse()
-            ->whereIn('id', $scopedIds)
-            ->get()
-            ->sortBy([
-                fn (Pop $a, Pop $b) => $b->isPusat() <=> $a->isPusat(),
-                fn (Pop $a, Pop $b) => strnatcasecmp($a->name, $b->name),
-            ])
-            ->values();
 
         $warehouseIds = $pops->pluck('id');
         $available = $this->position->availableByPopAndItem($warehouseIds);
@@ -163,6 +146,129 @@ class WarehouseStockBoardService
         }
 
         return $groups->values();
+    }
+
+    /**
+     * Matriks barang × gudang untuk memantau banyak gudang sekaligus.
+     *
+     * Murni pivot dari `build()` — angka TIDAK dihitung ulang, jadi sel matriks
+     * pasti sama dengan baris tabel. Kolom = SEMUA gudang dalam scope (setelah
+     * `popId` menyempitkan), termasuk yang tidak punya baris lolos-filter,
+     * supaya lebar kolom tidak melompat saat user mengetik pencarian.
+     *
+     * Filter menentukan BARANG mana yang tampil (cukup satu gudang yang lolos),
+     * tetapi isi sel diambil dari build() TANPA filter. Kalau tidak, filter
+     * "Menipis" atau pencarian SN membuat gudang yang stoknya aman tampil "0 ⚠
+     * kosong" padahal ada stok — angka bohong di layar pemantauan.
+     *
+     * @param  Collection<int, int>  $popIds  POP dalam scope aktor.
+     * @return array{search_truncated: bool, pops: Collection<int, Pop>, categories: Collection<int, array{category: ItemCategory|null, rows: Collection<int, array{item: Item, tracking: TrackingType, unit: string, cells: array<int, array{qty: float, is_low: bool, row: array<string, mixed>|null}>}>}>}
+     */
+    public function matrix(Collection $popIds, BoardFilters $f): array
+    {
+        $pops = $this->scopedPops($popIds, $f);
+
+        if ($pops->isEmpty()) {
+            return ['pops' => $pops, 'categories' => collect(), 'search_truncated' => false];
+        }
+
+        $visible = $this->build($popIds, $f);
+
+        $truncated = $visible->contains(fn (array $group) => $group['search_truncated']);
+
+        // Barang yang lolos filter di setidaknya satu gudang.
+        $visibleItemIds = $visible
+            ->flatMap(fn (array $group) => $group['categories']->flatMap(fn (array $c) => $c['rows']))
+            ->map(fn (array $row) => $row['item']->id)
+            ->unique()
+            ->flip();
+
+        if ($visibleItemIds->isEmpty()) {
+            return ['pops' => $pops, 'categories' => collect(), 'search_truncated' => $truncated];
+        }
+
+        $unfiltered = $f->isFiltering()
+            ? $this->build($popIds, new BoardFilters($f->popId, null, null, '', false))
+            : $visible;
+
+        $items = [];
+        $cellsByItem = [];
+        foreach ($unfiltered as $group) {
+            foreach ($group['categories'] as $categoryGroup) {
+                foreach ($categoryGroup['rows'] as $row) {
+                    $itemId = $row['item']->id;
+                    if (! $visibleItemIds->has($itemId)) {
+                        continue;
+                    }
+                    $items[$itemId] ??= $row;
+                    $cellsByItem[$itemId][$group['pop']->id] = [
+                        'qty' => $row['qty'],
+                        'is_low' => $row['is_low'],
+                        'row' => $row,
+                    ];
+                }
+            }
+        }
+
+        $empty = ['qty' => 0.0, 'is_low' => false, 'row' => null];
+        $categoryOrder = ItemCategory::query()->ordered()->pluck('id')->flip();
+
+        $categories = collect($items)
+            ->map(fn (array $row, int $itemId) => [
+                'item' => $row['item'],
+                'tracking' => $row['tracking'],
+                'unit' => $row['unit'],
+                'cells' => $pops->mapWithKeys(fn (Pop $pop) => [
+                    $pop->id => $cellsByItem[$itemId][$pop->id] ?? $empty,
+                ])->all(),
+            ])
+            ->groupBy(fn (array $row) => $row['item']->item_category_id ?? 0)
+            ->map(fn (Collection $perCategory) => [
+                'category' => $perCategory->first()['item']->category,
+                'rows' => $perCategory
+                    ->sortBy(fn (array $row) => $row['item']->name, SORT_NATURAL | SORT_FLAG_CASE)
+                    ->values(),
+            ])
+            ->sortBy(fn (array $group) => $group['category'] === null
+                ? PHP_INT_MAX
+                : ($categoryOrder[$group['category']->id] ?? PHP_INT_MAX - 1))
+            ->values();
+
+        return ['pops' => $pops, 'categories' => $categories, 'search_truncated' => $truncated];
+    }
+
+    /**
+     * Gudang dalam scope, setelah `popId` menyempitkan. Pusat paling depan,
+     * lalu cabang menurut nama. Satu sumber untuk build() dan matrix() supaya
+     * urutan kolom matriks = urutan band tabel.
+     *
+     * @param  Collection<int, int>  $popIds
+     * @return Collection<int, Pop>
+     */
+    private function scopedPops(Collection $popIds, BoardFilters $f): Collection
+    {
+        $scopedIds = $popIds->map(fn ($id) => (int) $id)->unique()->values();
+
+        // Menyempitkan, bukan memperluas: popId di luar scope jatuh ke kosong.
+        if ($f->popId !== null) {
+            $scopedIds = $scopedIds->filter(fn ($id) => $id === $f->popId)->values();
+        }
+
+        if ($scopedIds->isEmpty()) {
+            return collect();
+        }
+
+        // `orderBy('type')` tidak cukup: 'cabang' < 'pusat' secara alfabet,
+        // jadi Pusat diletakkan paling depan lewat sort PHP.
+        return Pop::query()
+            ->warehouse()
+            ->whereIn('id', $scopedIds)
+            ->get()
+            ->sortBy([
+                fn (Pop $a, Pop $b) => $b->isPusat() <=> $a->isPusat(),
+                fn (Pop $a, Pop $b) => strnatcasecmp($a->name, $b->name),
+            ])
+            ->values();
     }
 
     /**
