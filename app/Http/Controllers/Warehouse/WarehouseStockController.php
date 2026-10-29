@@ -17,8 +17,11 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\TechnicianCustody;
+use App\Models\User;
 use App\Services\EffectiveAccessService;
+use App\Services\WarehouseStockBoardService;
 use App\Services\WarehouseStockPositionService;
+use App\Support\BoardFilters;
 use App\Support\LikeSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -80,6 +83,14 @@ class WarehouseStockController extends Controller
         // Konteks cabang global (analisa-ui-ux-warehouse.md §S1) — pop_id
         // eksplisit di query tetap menang; absen → pakai switcher header (session).
         $popFilter = $this->resolveSelectedPopId($request, $access, $user);
+
+        // Papan Gudang → Kategori → Barang (spec 2026-10-29). Bercabang SEBELUM
+        // logika per lot/ringkasan supaya dua tampilan lama itu tidak berubah
+        // satu baris pun selama papan masih dibuktikan di `?view=papan`.
+        if ($request->query('view') === 'papan') {
+            return $this->board($request, $user, $pops, $popIds, $popFilter, $lockedSinglePop, $modeLabel);
+        }
+
         $categoryFilter = $request->integer('category_id') ?: null;
         $itemFilter = $request->integer('item_id') ?: null;
         $search = LikeSearch::sanitize((string) $request->query('search', ''));
@@ -475,6 +486,39 @@ class WarehouseStockController extends Controller
             'pops', 'categories', 'items', 'balances', 'popFilter', 'categoryFilter', 'itemFilter', 'search', 'lowStockOnly', 'trackingFilter', 'lastOpnameByKey', 'lastPriceByKey', 'multiLotPopItemKeys',
             'canActAsPusat', 'canActAsCabang', 'lockedSinglePop', 'modeLabel', 'sort', 'sortDirection', 'viewMode', 'heldByPopItem', 'lastActorByKey'
         ));
+    }
+
+    /**
+     * Mode papan. `$popIds` sudah hasil POP scope (EffectiveAccessService) di
+     * index(); `$popFilter` hanya menyempitkan — id di luar scope membuat
+     * build() kosong, bukan membuka data gudang itu.
+     *
+     * Izin aksi dihitung di sini (bukan di Blade seperti tampilan lama) supaya
+     * partial papan — dan menu aksi Task 5 — menerima satu sumber yang sama.
+     *
+     * @param  Collection<int, Pop>  $pops
+     * @param  Collection<int, int>  $popIds
+     */
+    private function board(Request $request, User $user, Collection $pops, Collection $popIds, ?int $popFilter, ?Pop $lockedSinglePop, string $modeLabel): View
+    {
+        $boardFilters = BoardFilters::fromRequest($request, $popFilter);
+        $board = app(WarehouseStockBoardService::class);
+        $groups = $board->build($popIds, $boardFilters);
+
+        return view('warehouse.stock.index', [
+            'viewMode' => 'papan',
+            'groups' => $groups,
+            'emptyState' => $board->emptyState($popIds, $groups, $boardFilters),
+            'boardFilters' => $boardFilters,
+            'categories' => ItemCategory::active()->ordered()->get(),
+            'pops' => $pops,
+            'lockedSinglePop' => $lockedSinglePop,
+            'modeLabel' => $modeLabel,
+            'canAdjust' => $user->hasPermission('warehouse_adjustment.create'),
+            'canTransfer' => $user->hasPermission('warehouse_transfer.create'),
+            'canIssue' => $user->hasPermission('warehouse_issue.create'),
+            'canRequestStock' => $user->hasPermission('warehouse_stock_request.create'),
+        ]);
     }
 
     /**

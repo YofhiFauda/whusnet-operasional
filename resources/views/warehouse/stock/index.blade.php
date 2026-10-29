@@ -9,6 +9,9 @@
 
 <div class="mb-6 space-y-4">
 
+{{-- Mode papan menerima $canAdjust dkk dari controller (satu sumber untuk
+     papan & menu aksinya); blok di bawah hanya untuk tampilan lama. --}}
+@if($viewMode !== 'papan')
 @php
     // Kolom Aksi & Quick Action Bar gabungan 4 permission beda — quick-shortcut
     // Transfer/Serah/Minta Stok ditambahkan 2026-09-07 biar staf gak perlu
@@ -21,6 +24,7 @@
     $canRequestStock = auth()->user()->hasPermission('warehouse_stock_request.create');
     $showActionColumn = $canAdjust || $canTransfer || $canIssue || $canRequestStock;
 @endphp
+@endif
 
 <!-- Indikator Mode (rancangan-layout.md §3.3-A) — MURNI informasi, gak
      mengubah scope. Quick-action button dicabut dari sini 2026-09-07
@@ -28,28 +32,65 @@
      shortcut per barang (⋮ Aksi Cepat di tabel bawah) TETAP ada, itu
      kontekstual bukan navigasi umum. -->
 
-<!-- Pilihan tampilan: per lot (default) atau ringkasan per item (Fase 3, analisa §U1) -->
+<!-- Pilihan tampilan: Papan (spec 2026-10-29), Rincian (= daftar per lot lama,
+     `view=rincian`; tanpa `view` masih jatuh ke sini sampai papan jadi default),
+     atau ringkasan per item (Fase 3, analisa §U1) -->
 @php
-    $viewToggle = fn (string $mode) => request()->fullUrlWithQuery(['view' => $mode === 'lot' ? null : $mode, 'sort' => null, 'dir' => null, 'page' => null]);
+    // Parameter khusus tampilan lama (item_id, tracking_type, sort, dir, page)
+    // dibuang saat pindah ke papan — papan tidak membacanya, dan membawanya
+    // hanya membuat URL menyesatkan. `view=rincian` ditulis eksplisit supaya
+    // tautan tetap benar setelah default dibalik ke papan.
+    $viewToggle = fn (string $mode) => request()->fullUrlWithQuery(array_merge(
+        ['view' => $mode, 'sort' => null, 'dir' => null, 'page' => null],
+        $mode === 'papan' ? ['item_id' => null, 'tracking_type' => null] : [],
+    ));
+    $toggleClass = fn (bool $active) => $active
+        ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs'
+        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100';
 @endphp
 <div class="flex items-center justify-between gap-3 mb-3">
     <div class="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold" role="tablist" aria-label="Mode tampilan stok">
-        <a href="{{ $viewToggle('lot') }}" role="tab" aria-selected="{{ $viewMode === 'lot' ? 'true' : 'false' }}"
-           class="px-3.5 py-1.5 rounded-lg transition-all {{ $viewMode === 'lot' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100' }}">Per Lot</a>
+        <a href="{{ $viewToggle('papan') }}" role="tab" aria-selected="{{ $viewMode === 'papan' ? 'true' : 'false' }}"
+           class="px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'papan') }}">Papan</a>
+        <a href="{{ $viewToggle('rincian') }}" role="tab" aria-selected="{{ $viewMode === 'lot' ? 'true' : 'false' }}"
+           class="px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'lot') }}">Rincian</a>
         <a href="{{ $viewToggle('ringkasan') }}" role="tab" aria-selected="{{ $viewMode === 'ringkasan' ? 'true' : 'false' }}"
-           class="px-3.5 py-1.5 rounded-lg transition-all {{ $viewMode === 'ringkasan' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100' }}">Ringkasan per Item</a>
+           class="px-3.5 py-1.5 rounded-lg transition-all {{ $toggleClass($viewMode === 'ringkasan') }}">Ringkasan per Item</a>
     </div>
     @if($viewMode === 'ringkasan')
     <p class="text-[11.5px] text-slate-500 dark:text-slate-400">Total = semua gudang dalam cakupan Anda. Lot dibuka per baris.</p>
     @endif
 </div>
 
+@if($viewMode === 'papan')
+@php
+    // Keadaan lipat awal (spec §2): banyak gudang → band dilipat; terkunci
+    // satu gudang atau sedang menyaring → terbuka (yang tidak cocok sudah
+    // dibuang server). Dihitung juga di server supaya baris yang akan
+    // terlipat diberi x-cloak dan tidak berkedip terbuka sebelum Alpine siap.
+    $collapseGudangOver = 5;
+    $forceOpen = $lockedSinglePop !== null || $boardFilters->isFiltering();
+    $startOpen = $forceOpen || $groups->count() <= $collapseGudangOver;
+@endphp
+<!-- papan:awal -->
+<div x-data="stockBoard({ collapseGudangOver: {{ $collapseGudangOver }} })"
+     data-pop-count="{{ $groups->count() }}"
+     data-force-open="{{ $forceOpen ? 'true' : 'false' }}">
+    @include('warehouse.stock.board._toolbar')
+    @include('warehouse.stock.board._table')
+</div>
+<!-- papan:akhir -->
+@else
 <!-- Filter & Search Toolbar Card (Structured & Responsive) -->
 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 mb-5">
     <form method="GET" action="{{ route('warehouse.stock.index') }}" id="stockFilterForm" class="space-y-4">
-        {{-- Mode tampilan ikut terbawa saat filter diganti --}}
+        {{-- Mode tampilan ikut terbawa saat filter diganti. `rincian` juga
+             dipertahankan: setelah default dibalik ke papan, filter di
+             Rincian tidak boleh melempar user kembali ke papan. --}}
         @if($viewMode === 'ringkasan')
         <input type="hidden" name="view" value="ringkasan">
+        @elseif(request()->query('view') === 'rincian')
+        <input type="hidden" name="view" value="rincian">
         @endif
         {{-- Urutan kolom ikut terbawa saat filter diganti (analisa §A5) --}}
         @if($sort)
@@ -944,6 +985,7 @@
         </div>
     </template>
 </div>
+@endif
 </div>
 
 @push('scripts')
