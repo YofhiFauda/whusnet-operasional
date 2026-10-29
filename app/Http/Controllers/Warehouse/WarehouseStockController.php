@@ -89,7 +89,10 @@ class WarehouseStockController extends Controller
         // satu baris pun selama papan masih dibuktikan di `?view=papan`.
         // `matrix` = sub-tampilan papan (Tabel | Matriks): filter, scope, dan izin
         // aksi sama persis, hanya bentuk data yang dirender yang berbeda.
-        if (in_array($request->query('view'), ['papan', 'matrix'], true)) {
+        // Papan = tampilan DEFAULT (spec §2): tanpa `view` atau nilai tak dikenal jatuh
+        // ke papan. Per Lot lama hanya lewat `?view=rincian`, Ringkasan lewat
+        // `?view=ringkasan`; keduanya menunggu dihapus setelah papan stabil (spec §11.7).
+        if (! in_array($request->query('view'), ['rincian', 'ringkasan'], true)) {
             return $this->board($request, $user, $pops, $popIds, $popFilter, $lockedSinglePop, $modeLabel, $request->query('view') === 'matrix');
         }
 

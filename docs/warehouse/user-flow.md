@@ -41,7 +41,14 @@ Semua peran ber-permission `warehouse.view`. Kartu KPI (low stock, transit, cust
 
 ## 5. Kelola Stok (`warehouse.stock.index`)
 
-Hub gabungan (quantity balance + serial count), titik masuk ke 4 aksi lain (Receive/Transfer/Issue/Adjustment via link/tombol). View-only sendiri; `serials` (`warehouse.stock.serials`) tab tambahan.
+Hub stok berbentuk **papan**: tabel Gudang → Kategori → Barang (satu gudang satu blok, kategori jadi kelompok, satu baris per barang). Tampilan default tanpa parameter `view`.
+
+- **Tab Tabel | Matriks** (`?view=papan` / `?view=matrix`) — Matriks = barang x gudang dalam satu layar. Filter, POP scope, dan izin aksi sama persis.
+- **Drawer rincian** — klik baris untuk melihat rincian SN/roll/lot barang tersebut; aksi (Receive/Transfer/Issue/Adjustment/Opname/Ambang) lewat menu aksi per baris, tetap ke halaman create masing-masing.
+- **Rincian lama** (`?view=rincian`) — daftar Per Lot lama dengan semua parameter lama (`search`, `category_id`, `item_id`, `low_stock_only`, `sort`, `dir`, `pop_id`).
+- **Ringkasan per Item** (`?view=ringkasan`) — posisi stok satu baris per barang, tidak berubah.
+
+Rincian lama dan Ringkasan beserta modal SN/roll lama dipertahankan sementara; dihapus setelah papan terbukti stabil. View-only sendiri; `serials` (`warehouse.stock.serials`) tab tambahan.
 
 **Ambang Stok Rendah** — pengecualian pola: bukan halaman create klasik untuk pergerakan barang, tapi tetap halaman terpisah (`warehouse.stock.threshold.create` → `store`) karena mengubah `minimum_stock`/`maximum_stock` langsung (bukan lewat ledger).
 

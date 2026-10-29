@@ -1,5 +1,7 @@
 # Rancangan Kelola Stok per Gudang dan Kategori Barang
 
+> **Digantikan** oleh `docs/superpowers/specs/2026-10-29-kelola-stok-papan-gudang-design.md` (papan jadi tampilan default; Per Lot lama di `?view=rincian`). Dokumen ini hanya arsip rancangan awal.
+
 Tanggal: 2026-10-28
 Status: Rancangan untuk ditinjau; belum diimplementasikan.
 

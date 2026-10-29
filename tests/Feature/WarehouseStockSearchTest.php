@@ -61,7 +61,7 @@ class WarehouseStockSearchTest extends TestCase
         app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $kabel, 300, 5000, $this->owner);
         $balance = InventoryBalance::where('pop_id', $this->pusat->id)->where('item_id', $kabel->id)->firstOrFail();
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['search' => $balance->lot_no]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'search' => $balance->lot_no]));
 
         $response->assertOk();
         $this->assertTrue($response->viewData('balances')->contains(fn ($b) => $b->id === $balance->id));
@@ -73,7 +73,7 @@ class WarehouseStockSearchTest extends TestCase
         $modem = $this->buatItem('WSS-MODEM', 'Modem Search', 'serialized', 'pcs');
         app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['SNWS00001', 'SNWS00002'], 350000, $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['search' => 'SNWS00002']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'search' => 'SNWS00002']));
 
         $response->assertOk()->assertSee('Modem Search');
         $balances = $response->viewData('balances');
@@ -87,7 +87,7 @@ class WarehouseStockSearchTest extends TestCase
         $fo = $this->buatItem('WSS-ROLLFO', 'Kabel FO Search', 'roll', 'meter', 1000);
         $roll = app(InventoryReceiveService::class)->receiveRoll($this->pusat, $fo, 1, null, 1500000, $this->owner)[0];
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['search' => $roll->roll_code]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'search' => $roll->roll_code]));
 
         $response->assertOk()->assertSee('Kabel FO Search');
         $balances = $response->viewData('balances');
@@ -101,7 +101,7 @@ class WarehouseStockSearchTest extends TestCase
         $modem = $this->buatItem('WSS-MODEM2', 'Modem Kosong', 'serialized', 'pcs');
         app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['SNWS90001'], 350000, $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['search' => 'TIDAK-ADA-XYZ']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'search' => 'TIDAK-ADA-XYZ']));
 
         $response->assertOk();
         $this->assertCount(0, $response->viewData('balances'));

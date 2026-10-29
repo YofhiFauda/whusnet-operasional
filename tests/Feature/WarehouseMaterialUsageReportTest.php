@@ -173,7 +173,7 @@ class WarehouseMaterialUsageReportTest extends TestCase
             ->assertSuccessful();
 
         $this->actingAs($fopUser)
-            ->get(route('warehouse.stock.index'))
+            ->get(route('warehouse.stock.index', ['view' => 'rincian']))
             ->assertForbidden();
     }
 

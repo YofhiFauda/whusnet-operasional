@@ -40,6 +40,9 @@
     // dibuang saat pindah ke papan — papan tidak membacanya, dan membawanya
     // hanya membuat URL menyesatkan. `view=rincian` ditulis eksplisit supaya
     // tautan tetap benar setelah default dibalik ke papan.
+    // Reset filter harus tinggal di tampilan lama yang sedang dibuka; route() polos
+    // sekarang berarti papan, jadi user Rincian/Ringkasan akan terlempar tanpa ini.
+    $resetUrl = route('warehouse.stock.index', ['view' => $viewMode === 'ringkasan' ? 'ringkasan' : 'rincian']);
     $viewToggle = fn (string $mode) => request()->fullUrlWithQuery(array_merge(
         ['view' => $mode, 'sort' => null, 'dir' => null, 'page' => null],
         in_array($mode, ['papan', 'matrix'], true) ? ['item_id' => null, 'tracking_type' => null] : [],
@@ -156,7 +159,7 @@
                 </div>
 
                 @if($search || $popFilter || $lowStockOnly || $trackingFilter || $categoryFilter || $itemFilter)
-                <a href="{{ route('warehouse.stock.index') }}"
+                <a href="{{ $resetUrl }}"
                    class="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0"
                    title="Reset Semua Filter">
                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -274,7 +277,7 @@
         <span class="sr-only">Hapus filter {{ $chip['label'] }}</span>
     </a>
     @endforeach
-    <a href="{{ route('warehouse.stock.index') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 underline underline-offset-2 ml-1">Hapus semua</a>
+    <a href="{{ $resetUrl }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 underline underline-offset-2 ml-1">Hapus semua</a>
 </div>
 @endif
 
@@ -293,7 +296,7 @@
         <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200">Tidak ada data stok yang cocok</h4>
         <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Coba ubah kata kunci pencarian atau reset filter gudang.</p>
         @if($search || $popFilter || $lowStockOnly || $trackingFilter || $categoryFilter || $itemFilter)
-        <a href="{{ route('warehouse.stock.index') }}" class="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 transition-colors">
+        <a href="{{ $resetUrl }}" class="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 transition-colors">
             <span>Reset Semua Filter</span>
         </a>
         @endif

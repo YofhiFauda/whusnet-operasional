@@ -157,7 +157,7 @@ class WarehouseStockPositionTest extends TestCase
             ->assertSee('Rincian lot per gudang');
         $this->assertSame('ringkasan', $response->viewData('viewMode'));
 
-        $default = $this->actingAs($this->owner)->get(route('warehouse.stock.index'));
+        $default = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
         $this->assertSame('lot', $default->viewData('viewMode'));
         $default->assertDontSee('Rincian lot per gudang');
     }
