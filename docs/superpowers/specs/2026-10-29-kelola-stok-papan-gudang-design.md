@@ -148,7 +148,7 @@ Hasil audit `lot_no` di form tujuan:
 | **Opname / Sesuaikan** | mencari saldo `where lot_no = query('lot_no','')` | **wajib membawa `lot_no` yang tepat** untuk QUANTITY |
 
 Aturan baris:
-- QUANTITY satu harga: baris membawa `lot_no` tingkat itu di semua URL aksi.
+- QUANTITY satu harga: baris membawa `lot_no` tingkat itu di URL Transfer, Minta Stok, Serah Teknisi, dan Opname. **Atur Ambang tidak pernah membawa `lot_no`**: ambang disimpan dan dibaca di `lot_no=''` (koreksi 2026-10-29 dari review akhir; bila `lot_no` ikut, ambang tersimpan di lot yang tidak dibaca papan sehingga `is_low` tidak pernah menyala).
 - QUANTITY dua harga: baris utama menyembunyikan Opname dan menampilkan "Opname per harga → buka rincian"; di drawer, tiap tingkat harga punya aksi Opname sendiri yang membawa `lot_no`-nya. Aksi lain tetap di baris utama tanpa `lot_no`.
 - SERIALIZED dan ROLL: tanpa `lot_no`, seperti sekarang.
 
