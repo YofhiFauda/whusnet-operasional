@@ -23,30 +23,11 @@
         \App\Enums\TrackingType::ROLL => 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800',
         \App\Enums\TrackingType::QUANTITY => 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
     };
-    // Label kondisi SN mengikuti x-warehouse.condition-badge (used_good dipecah
-    // sudah/belum dicek). Kondisi null diperlakukan Baru, sama dengan
-    // InventorySerial::isReadyForIssue().
-    $conditionText = function ($summary) {
-        return collect($summary)->map(function (array $entry) {
-            $value = $entry['condition'] instanceof \App\Enums\ItemCondition ? $entry['condition']->value : $entry['condition'];
-            $label = match (true) {
-                $value === \App\Enums\ItemCondition::USED_DAMAGED->value => 'Bekas Rusak',
-                $value === \App\Enums\ItemCondition::USED_GOOD->value => $entry['checked'] ? 'Bekas Sudah Dicek' : 'Bekas Belum Dicek',
-                default => 'Baru',
-            };
-
-            return ['label' => $label, 'count' => $entry['count']];
-        })->groupBy('label')->map(fn ($rows, $label) => $rows->sum('count').' '.$label)->values()->implode(' · ');
-    };
-    // Dua tingkat harga: yang lebih lama = baris lot_no '' (atau yang pertama),
-    // yang lain = harga baru (ADHOC-75: maksimal 2 per barang).
-    $priceTierPair = function (array $tiers) {
-        $tiers = collect($tiers);
-        $old = $tiers->firstWhere('lot_no', '') ?? $tiers->first();
-        $new = $tiers->first(fn ($tier) => $tier !== $old);
-
-        return array_values(array_filter([['label' => 'Harga lama', 'tier' => $old], ['label' => 'Harga baru', 'tier' => $new]], fn ($pair) => $pair['tier'] !== null));
-    };
+    // Kolom tabel: 6 tetap + kolom Aksi bila ada izin aksi apa pun. Band
+    // gudang/kategori memakai angka yang sama supaya tidak kurang/lebih kolom.
+    $colspan = $showActionColumn ? 7 : 6;
+    // Label kondisi SN dan pasangan "Harga lama/baru" dihitung di partial
+    // `_detail` (satu sumber dengan drawer & menu aksi), bukan di sini.
 @endphp
 
 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
@@ -79,7 +60,7 @@
             <tbody class="border-b border-slate-200 dark:border-slate-800" data-board-pop="{{ $popKey }}">
                 {{-- Band gudang --}}
                 <tr class="bg-slate-900 dark:bg-slate-950 text-white">
-                    <td colspan="7" class="p-0">
+                    <td colspan="{{ $colspan }}" class="p-0">
                         <button type="button" @click="togglePop({{ $popKey }})"
                                 :aria-expanded="isPopOpen({{ $popKey }}).toString()"
                                 aria-expanded="{{ $startOpen ? 'true' : 'false' }}"
@@ -110,7 +91,7 @@
                 {{-- Band kategori ("rak" dalam bahasa pengguna) --}}
                 <tr class="bg-slate-100 dark:bg-slate-800/70 border-y border-slate-200 dark:border-slate-700"
                     x-show="isPopOpen({{ $popKey }})" @unless($startOpen) x-cloak @endunless>
-                    <td colspan="7" class="p-0">
+                    <td colspan="{{ $colspan }}" class="p-0">
                         <button type="button" @click="toggleCategory(@js($catKey))"
                                 :aria-expanded="isCategoryOpen(@js($catKey)).toString()"
                                 aria-expanded="true"
@@ -129,25 +110,36 @@
                     $item = $row['item'];
                     $tracking = $row['tracking'];
                     $isRoll = $tracking === \App\Enums\TrackingType::ROLL;
-                    $isSerial = $tracking === \App\Enums\TrackingType::SERIALIZED;
-                    $tiers = $tracking === \App\Enums\TrackingType::QUANTITY && count($row['price_tiers']) > 1 ? $priceTierPair($row['price_tiers']) : [];
-                    $condition = $isSerial ? $conditionText($row['condition_summary']) : '';
+                    // Payload drawer + URL aksi: satu partial (dipakai juga sel
+                    // matriks). JSON mentahnya ditaruh apa adanya di
+                    // data-stock-detail; versi array dipakai menu aksi server.
+                    $detailJson = trim(view('warehouse.stock.board._detail', compact('pop', 'row', 'canAdjust', 'canTransfer', 'canIssue', 'canRequestStock'))->render());
+                    $detail = json_decode($detailJson, true, flags: JSON_THROW_ON_ERROR);
+                    $tiers = count($detail['priceTiers']) > 1 ? $detail['priceTiers'] : [];
+                    $condition = $detail['conditionLabel'];
                     $opname = $row['last_opname_at'];
                 @endphp
-                <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors align-top {{ $row['is_low'] ? 'bg-rose-50/30 dark:bg-rose-950/10' : '' }}"
+                {{-- Klik di mana saja pada baris membuka drawer lewat tombol nama
+                     barang (satu-satunya pemicu, jadi keyboard Enter/Space dan
+                     fokus-kembali bekerja sama persis). Sel aksi menghentikan
+                     klik supaya menu tidak ikut membuka drawer. --}}
+                <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors align-top cursor-pointer {{ $row['is_low'] ? 'bg-rose-50/30 dark:bg-rose-950/10' : '' }}"
                     data-board-row data-pop-id="{{ $popKey }}" data-item-id="{{ $item->id }}"
+                    @click="$el.querySelector('[data-stock-detail]').click()"
                     x-show="isPopOpen({{ $popKey }}) && isCategoryOpen(@js($catKey))" @unless($startOpen) x-cloak @endunless>
                     {{-- Kode + Barang (di mobile juga memuat tracking/kondisi/opname) --}}
                     <td class="px-4 py-3">
                         <div class="font-mono text-[11px] text-slate-400 dark:text-slate-500">{{ $item->code }}</div>
-                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $item->name }}</div>
+                        <button type="button" data-stock-detail="{{ $detailJson }}" aria-haspopup="dialog"
+                                @click.stop="$el.focus(); $dispatch('open-stock-drawer', JSON.parse($el.dataset.stockDetail))"
+                                class="text-left text-sm font-semibold text-slate-900 dark:text-slate-100 hover:text-sky-700 dark:hover:text-sky-300 hover:underline underline-offset-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 cursor-pointer">{{ $item->name }}</button>
                         @if($row['match_label'])
                         <div class="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300">{{ $row['match_label'] }}</div>
                         @endif
                         <div class="md:hidden mt-1.5 space-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                             <div><span class="font-semibold">{{ $trackingLabel($tracking) }}</span>@if($condition !== '') · {{ $condition }}@endif</div>
-                            @foreach($tiers as $pair)
-                            <div>{{ $pair['label'] }}: {{ $fmtQty($pair['tier']['qty']) }} {{ $row['unit'] }}@if($pair['tier']['price'] !== null) · Rp {{ number_format($pair['tier']['price'], 0, ',', '.') }}@endif</div>
+                            @foreach($tiers as $tier)
+                            <div>{{ $tier['label'] }}: {{ $fmtQty($tier['qty']) }} {{ $row['unit'] }}@if($tier['price'] !== null) · Rp {{ number_format($tier['price'], 0, ',', '.') }}@endif</div>
                             @endforeach
                             <div class="{{ $opname ? '' : 'text-amber-700 dark:text-amber-400' }}">Opname: {{ $opname ? $opname->diffForHumans() : 'Belum pernah' }}</div>
                         </div>
@@ -183,8 +175,8 @@
                         @if($condition !== '')
                         {{ $condition }}
                         @elseif($tiers !== [])
-                        @foreach($tiers as $pair)
-                        <div class="whitespace-nowrap"><span class="font-semibold">{{ $pair['label'] }}</span>: <span class="font-mono">{{ $fmtQty($pair['tier']['qty']) }}</span> {{ $row['unit'] }}@if($pair['tier']['price'] !== null) · <span class="font-mono">Rp {{ number_format($pair['tier']['price'], 0, ',', '.') }}</span>@endif</div>
+                        @foreach($tiers as $tier)
+                        <div class="whitespace-nowrap"><span class="font-semibold">{{ $tier['label'] }}</span>: <span class="font-mono">{{ $fmtQty($tier['qty']) }}</span> {{ $row['unit'] }}@if($tier['price'] !== null) · <span class="font-mono">Rp {{ number_format($tier['price'], 0, ',', '.') }}</span>@endif</div>
                         @endforeach
                         @else
                         <span class="text-slate-400 dark:text-slate-500" aria-label="Tidak ada rincian kondisi">—</span>
@@ -200,7 +192,9 @@
                     </td>
 
                     @if($showActionColumn)
-                    <td class="px-4 py-3 text-right whitespace-nowrap">{{-- aksi: Task 5 --}}</td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap cursor-default" @click.stop>
+                        @include('warehouse.stock.board._actions', ['mode' => 'menu', 'detail' => $detail])
+                    </td>
                     @endif
                 </tr>
                 @endforeach
@@ -211,6 +205,8 @@
     </div>
     @endif
 </div>
+
+@include('warehouse.stock.board._drawer')
 
 @push('scripts')
 <script>
