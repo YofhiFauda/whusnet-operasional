@@ -506,6 +506,10 @@ class DummyScaleSeeder extends Seeder
         $this->flushWarehouse($serials, $tx);
 
         // 5) Aset infrastruktur terpasang: OLT, modul GPON, switch, ODP + splitter (ledger DEPLOY).
+        //    + varian QTY/ROLL (klem, sleeve splice, sisa dropcore) di `infrastructure_balances`
+        //    (beda tabel dari `inventory_balances` gudang) — supaya tab "Barang Terpasang" di
+        //    Peta Infrastruktur punya contoh ketiga `kind` (SN/QTY/ROLL), bukan cuma SN.
+        $infraBalances = [];
         foreach ($this->ref['branches'] as $b => $branch) {
             $deploy = function (string $code, int $nodeId, string $sn) use ($items, &$serials, &$tx, $newSerial, $newTx, &$serialId, $branch, $price) {
                 $item = $items[$code] ?? null;
@@ -520,8 +524,19 @@ class DummyScaleSeeder extends Seeder
                 $tx[] = $newTx(['type' => 'deploy', 'reference_number' => sprintf('DPL-%s-%06d', now()->subDays(100)->format('Ymd'), $sid), 'item_id' => $item->id, 'serial_id' => $sid, 'to_network_node_id' => $nodeId, 'unit_price_snapshot' => $price($code), 'resulting_status' => 'deployed']);
             };
 
+            $deployQty = function (string $code, int $nodeId, int $qty, string $lot = '') use ($items, &$tx, &$infraBalances, $newTx, &$txId, $price) {
+                $item = $items[$code] ?? null;
+                if (! $item) {
+                    return;
+                }
+                $refId = $txId;
+                $infraBalances[] = ['item_id' => $item->id, 'lot_no' => $lot, 'network_node_id' => $nodeId, 'qty' => $qty, 'created_at' => now()->subDays(mt_rand(30, 300)), 'updated_at' => now()];
+                $tx[] = $newTx(['type' => 'deploy', 'reference_number' => sprintf('DPL-%s-%06d', now()->subDays(90)->format('Ymd'), $refId), 'item_id' => $item->id, 'lot_no' => $lot ?: null, 'qty' => $qty, 'to_network_node_id' => $nodeId, 'unit_price_snapshot' => $price($code), 'resulting_status' => 'deployed']);
+            };
+
             foreach ($this->ref['infra']['chassis'][$b] as $i => $nodeId) {
                 $deploy('OLT-ZTE-C320', $nodeId, "DMY-OLT-{$b}-{$i}");
+                $deployQty('AKS-KLEM', $nodeId, mt_rand(4, 12));
             }
             foreach ($this->ref['infra']['slot'][$b] as $i => $nodeId) {
                 $deploy('OLT-MODULE-GPON-8P', $nodeId, "DMY-GPON-{$b}-{$i}");
@@ -530,17 +545,27 @@ class DummyScaleSeeder extends Seeder
             foreach ($this->ref['odps'][$b] as $i => $odp) {
                 $deploy('ODP-16', $odp['id'], "DMY-ODPBOX-{$b}-{$i}");
                 $deploy('SPL-1X16', $odp['id'], "DMY-SPL-{$b}-{$i}");
+                $deployQty('SLV-SPLICE', $odp['id'], mt_rand(2, 8));
+                // Lot = `roll_code` ASLI drum dropcore yang udah ada (seksi 2 di atas,
+                // format sama: `DMY-{code}-{popId}-{urutan 3 digit}`) — bukan label
+                // karangan, biar link Riwayat Gudang (by roll) beneran nyambung.
+                $deployQty('DC-1C', $odp['id'], mt_rand(5, 30), sprintf('DMY-DC-1C-%d-%03d', $branch['pop']->id, ($i % 40) + 1));
                 if (count($serials) >= 5000) {
                     $this->flushWarehouse($serials, $tx);
+                }
+                if (count($infraBalances) >= 2000) {
+                    $this->bulk('infrastructure_balances', $infraBalances);
+                    $infraBalances = [];
                 }
             }
         }
 
+        $this->bulk('infrastructure_balances', $infraBalances);
         $this->flushWarehouse($serials, $tx);
 
         $this->nextId['inventory_serials'] = $serialId;
         $this->nextId['inventory_transactions'] = $txId;
-        $this->info('Gudang: stok serial/roll/quantity, custody teknisi, transfer, aset infrastruktur terpasang.');
+        $this->info('Gudang: stok serial/roll/quantity, custody teknisi, transfer, aset infrastruktur terpasang (SN+QTY+ROLL).');
     }
 
     /**
@@ -1023,6 +1048,8 @@ class DummyScaleSeeder extends Seeder
         $nodeIds = DB::table('network_nodes')->where('code', 'like', 'DMY-%')->pluck('id');
         foreach ($nodeIds->chunk(2000) as $chunk) {
             DB::table('network_node_ports')->whereIn('network_node_id', $chunk->all())->delete();
+            // `infrastructure_balances.network_node_id` RESTRICT — harus putus dulu sebelum node dihapus di bawah.
+            DB::table('infrastructure_balances')->whereIn('network_node_id', $chunk->all())->delete();
         }
         // RESTRICT di `parent_id` (self-FK) dicek per baris, bukan per statement — urutan hapus dalam
         // satu query tak menolong, jadi putus dulu rantai induk-anaknya.

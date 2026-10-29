@@ -38,7 +38,7 @@
 
     @if($query === '')
     <div class="p-10 text-center text-xs text-slate-500 dark:text-slate-400">
-        Cari nomor SN, kode roll kabel, nomor referensi transfer, atau nomor surat jalan (format <span class="font-mono">SJ/WHUS/2026/10/005</span>).
+        Cari nomor SN, kode roll kabel, nomor referensi transfer, atau nomor surat jalan (format <span class="font-mono">SJ/WHUS/2026/10/29/TRF-17</span>).
     </div>
     @elseif($results->isEmpty())
     <div class="p-10 text-center">

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Network;
 
 use App\Http\Controllers\Controller;
 use App\Models\NetworkNode;
+use App\Models\Pop;
 use App\Services\InfrastructureMapService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -181,6 +183,20 @@ class InfrastructureMapController extends Controller
             'sort' => ['nullable', 'in:topology,utilization,free'],
             'node_id' => ['nullable', 'integer'],
             'ont' => ['nullable', 'boolean'],
+            'asset_pop_id' => ['nullable', 'integer'],
+            'asset_mini_id' => ['nullable', 'integer'],
+            'asset_olt_id' => ['nullable', 'integer'],
+            'asset_slot_id' => ['nullable', 'integer'],
+            'asset_pon_id' => ['nullable', 'integer'],
+            'asset_odp_id' => ['nullable', 'integer'],
+            'asset_page' => ['nullable', 'integer', 'min:1'],
+            'inv_pop_id' => ['nullable', 'integer'],
+            'inv_mini_id' => ['nullable', 'integer'],
+            'inv_olt_id' => ['nullable', 'integer'],
+            'inv_slot_id' => ['nullable', 'integer'],
+            'inv_pon_id' => ['nullable', 'integer'],
+            'inv_odp_id' => ['nullable', 'integer'],
+            'inv_page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $withCustomerOnt = (bool) ($filters['ont'] ?? false);
@@ -192,7 +208,7 @@ class InfrastructureMapController extends Controller
         // memakan ±2,5 dtk server (TTFB langsung ikut jelek di Lighthouse); hit
         // cache cuma merender view. `?fresh=1` (tombol "Muat Ulang") membuangnya.
         // Deep link node_id selalu lewat jalur penuh karena butuh pengecekan scope.
-        $onTopologyTab = ! isset($filters['node_id']) && ! in_array($request->query('tab'), ['inventaris', 'pohon'], true);
+        $onTopologyTab = ! isset($filters['node_id']) && ! in_array($request->query('tab'), ['inventaris', 'pohon', 'terpasang'], true);
         $viewCacheKey = 'peta:view:'.$request->user()->id.':'.($popFilter ?? 'all').':'.$sort;
         if ($onTopologyTab && ! $withCustomerOnt) {
             if ($request->boolean('fresh')) {
@@ -214,7 +230,12 @@ class InfrastructureMapController extends Controller
         // mempertahankan pilihan pengguna — tanpa pembedaan ini pindah tab membangun
         // ulang belasan ribu ONT (±13 dtk) hanya untuk daftar yang tidak menampilkannya.
         $buildOnt = $onTopologyTab && $withCustomerOnt;
-        $data = $this->map->build($request->user(), $popFilter, $sort, $buildOnt);
+        // Tab "Barang Terpasang": lewat `$lightweight` (skip eager load SN/QTY +
+        // query ledger buat SELURUH scope POP, ±2,3 dtk dari ±3,5 dtk total di 3500
+        // node) — tab ini cuma butuh childrenByNode/pathsByNode/cabangs dari sini
+        // buat resolve filter+subtree; barangnya sendiri diquery belakangan lewat
+        // `assetRowsForScopedNodes()`, DIBATASI ke subtree hasil filter.
+        $data = $this->map->build($request->user(), $popFilter, $sort, $buildOnt, lightweight: $request->query('tab') === 'terpasang');
         // Deep link dari Master Node ("Lihat detail di Peta Infrastruktur").
         // Node HARUS sudah lolos scope POP + filter pop_id di atas (nodeIndex
         // dibangun dari $nodes yang sama) — node di luar scope atau ID yang
@@ -264,11 +285,252 @@ class InfrastructureMapController extends Controller
             ] + $summaryVars, now()->addMinutes(5));
         }
 
+        // Tab "Barang Terpasang" dirender view TERPISAH (`network.map.terpasang`), bukan
+        // numpang di `network.map.index`: index.blade.php bawa `x-data` Alpine raksasa +
+        // kanvas/drawer buat tab Topologi/Pohon/Inventaris yang tetap di-walk & di-bind
+        // Alpine walau disembunyikan — itu sumber TBT ~5-6 dtk di Lighthouse Performance
+        // tab ini (lihat investigasi ADHOC). View terpasang.blade.php sama sekali tanpa
+        // Alpine: murni form GET + tabel server-rendered.
+        if ($request->query('tab') === 'terpasang') {
+            return view('network.map.terpasang', $this->assetTerpasangData($data, $request, $filters) + [
+                'cabangs' => $data['cabangs'],
+                'selectedPopId' => $data['selectedPopId'],
+                'sort' => $data['sort'],
+            ]);
+        }
+
+        // Tab Inventaris: filter cascading sama pola dengan Terpasang (POP/Mini POP/
+        // OLT/Slot/PON/ODP, "Semua" default) + paginasi 100 baris/halaman — subtree besar
+        // (ribuan node) dirender sekaligus tanpa batas = DOM raksasa, masalah performa
+        // yang sama dengan tab Terpasang sebelum ADHOC-237. `inventoryNodes` di-OVERRIDE
+        // di `$data` (bukan cuma ditambah) supaya view tetap baca key yang sama.
+        // Deep link node_id memaksa $activeTab = 'inventaris' di index.blade.php TANPA
+        // query `tab` (lihat blok @php di sana) — gate ini HARUS ikut kondisi yang sama,
+        // bukan cuma `$request->query('tab')`, atau view pecah "Undefined variable $invSelected".
+        if ($initialNodeId !== null || $request->query('tab') === 'inventaris') {
+            $data = array_merge($data, $this->inventoryFilterData($data, $request, $filters));
+        }
+
         return view('network.map.index', $data + $summaryVars + [
             'initialNodeId' => $initialNodeId,
             'withCustomerOnt' => $withCustomerOnt,
             'ontActive' => $buildOnt,
         ]);
+    }
+
+    /** Baris per halaman tabel Barang Terpasang (lihat `assetTerpasangData()`). */
+    private const ASSET_ROWS_PER_PAGE = 100;
+
+    /**
+     * Tab "Barang Terpasang": pilih satu titik di hierarki (POP/Mini
+     * POP/OLT/Slot/PON/ODP) dan tampilkan semua barang gudang yang terpasang
+     * di subtree-nya (bukan cuma device itu sendiri, seperti tab Inventaris).
+     * Seluruhnya dihitung dari data `build()` yang sudah di-scope POP user —
+     * tidak ada query baru selain opsi Mini POP (ringan, ikut `forUser()`).
+     *
+     * Hasilnya WAJIB dipaginasi di PHP (bukan query-level — `assetRowsForScopedNodes()`
+     * sudah murah karena dibatasi ke subtree) sebelum dikirim ke view: scope besar
+     * (misal subtree Jetis ±6000 baris, "Semua" ±12000 baris) kalau dirender SEKALIGUS
+     * jadi ribuan `<tr>` tanpa batas = DOM raksasa, itu sumber tab browser 1-1,6GB &
+     * skor Lighthouse ambruk di scope besar (TIDAK ada hubungannya lagi dengan Alpine,
+     * tab ini sudah 0 Alpine — lihat `terpasang.blade.php`). Jangan hilangkan paginasi.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function assetTerpasangData(array $data, Request $request, array $filters): array
+    {
+        $nodes = $data['nodes'];
+        $cabangs = $data['cabangs'];
+
+        $selectedCabangId = isset($filters['asset_pop_id']) ? (int) $filters['asset_pop_id'] : null;
+        if ($selectedCabangId !== null && ! $cabangs->contains('id', $selectedCabangId)) {
+            $selectedCabangId = null;
+        }
+
+        $miniPops = $selectedCabangId !== null
+            ? Pop::forUser($request->user())->where('type', 'mini_pop')->where('parent_id', $selectedCabangId)->orderBy('name')->get(['id', 'name'])
+            : collect();
+
+        $selectedMiniId = isset($filters['asset_mini_id']) ? (int) $filters['asset_mini_id'] : null;
+        if ($selectedMiniId !== null && ! $miniPops->contains('id', $selectedMiniId)) {
+            $selectedMiniId = null;
+        }
+
+        $oltOptions = $this->childNodeOptions($nodes, $selectedMiniId ?? $selectedCabangId, 'olt_chassis', byAnchor: true);
+        $selectedOltId = $this->validatedId($filters['asset_olt_id'] ?? null, $oltOptions);
+
+        $slotOptions = $this->childNodeOptions($nodes, $selectedOltId, 'olt_slot', byAnchor: false);
+        $selectedSlotId = $this->validatedId($filters['asset_slot_id'] ?? null, $slotOptions);
+
+        $ponOptions = $this->childNodeOptions($nodes, $selectedSlotId, 'olt_pon', byAnchor: false);
+        $selectedPonId = $this->validatedId($filters['asset_pon_id'] ?? null, $ponOptions);
+
+        $odpOptions = $this->childNodeOptions($nodes, $selectedPonId, 'odp', byAnchor: false);
+        $selectedOdpId = $this->validatedId($filters['asset_odp_id'] ?? null, $odpOptions);
+
+        $rootNodeIds = match (true) {
+            $selectedOdpId !== null => [$selectedOdpId],
+            $selectedPonId !== null => [$selectedPonId],
+            $selectedSlotId !== null => [$selectedSlotId],
+            $selectedOltId !== null => [$selectedOltId],
+            $selectedMiniId !== null => $nodes->where('anchor_pop_id', $selectedMiniId)->pluck('id')->all(),
+            $selectedCabangId !== null => $nodes->whereIn('anchor_pop_id', [$selectedCabangId, ...$miniPops->pluck('id')->all()])->pluck('id')->all(),
+            // "Semua" = default: belum pilih apapun -> seluruh node dalam scope POP user
+            // (`$nodes` sudah di-scope `build()`), bukan empty state.
+            default => $nodes->pluck('id')->all(),
+        };
+
+        // `assetRowsForScopedNodes()` (bukan `assetRowsForNodes()` + `$data['assetsByNode']`)
+        // — `$data` di sini hasil `build(..., lightweight: true)`, `assetsByNode`-nya KOSONG
+        // buat semua node. Query SN/QTY/ledger baru jalan di sini, DIBATASI ke subtree hasil
+        // filter saja — bukan seluruh node dalam scope POP. Ini intinya optimasi tab ini.
+        $allAssetRows = $this->map->assetRowsForScopedNodes(
+            $this->map->subtreeNodeIds($data['childrenByNode'], $rootNodeIds),
+            $data['pathsByNode'],
+            $request->user()->hasPermission('warehouse_traceability.view'),
+        );
+
+        $totalRows = count($allAssetRows);
+        $perPage = self::ASSET_ROWS_PER_PAGE;
+        $lastPage = max(1, (int) ceil($totalRows / $perPage));
+        $page = min($lastPage, max(1, (int) ($filters['asset_page'] ?? 1)));
+
+        return [
+            'assetMiniPops' => $miniPops,
+            'assetOltOptions' => $oltOptions,
+            'assetSlotOptions' => $slotOptions,
+            'assetPonOptions' => $ponOptions,
+            'assetOdpOptions' => $odpOptions,
+            'assetSelected' => [
+                'pop_id' => $selectedCabangId,
+                'mini_id' => $selectedMiniId,
+                'olt_id' => $selectedOltId,
+                'slot_id' => $selectedSlotId,
+                'pon_id' => $selectedPonId,
+                'odp_id' => $selectedOdpId,
+            ],
+            'assetRows' => array_slice($allAssetRows, ($page - 1) * $perPage, $perPage),
+            'assetTotalRows' => $totalRows,
+            'assetPage' => $page,
+            'assetLastPage' => $lastPage,
+            'assetPerPage' => $perPage,
+        ];
+    }
+
+    /** Baris per halaman tabel Inventaris (lihat `inventoryFilterData()`). */
+    private const INVENTORY_ROWS_PER_PAGE = 100;
+
+    /**
+     * Tab "Inventaris": filter cascading sama pola dengan `assetTerpasangData()`
+     * (POP/Mini POP/OLT/Slot/PON/ODP, "Semua" default) lalu paginasi 100 baris/halaman.
+     * Tidak ada query baru selain opsi Mini POP — `$data['inventoryNodes']` cuma
+     * difilter ke subtree hasil pilihan (in-memory, `childrenByNode` dari `build()`).
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function inventoryFilterData(array $data, Request $request, array $filters): array
+    {
+        $nodes = $data['nodes'];
+        $cabangs = $data['cabangs'];
+
+        $selectedCabangId = isset($filters['inv_pop_id']) ? (int) $filters['inv_pop_id'] : null;
+        if ($selectedCabangId !== null && ! $cabangs->contains('id', $selectedCabangId)) {
+            $selectedCabangId = null;
+        }
+
+        $miniPops = $selectedCabangId !== null
+            ? Pop::forUser($request->user())->where('type', 'mini_pop')->where('parent_id', $selectedCabangId)->orderBy('name')->get(['id', 'name'])
+            : collect();
+
+        $selectedMiniId = isset($filters['inv_mini_id']) ? (int) $filters['inv_mini_id'] : null;
+        if ($selectedMiniId !== null && ! $miniPops->contains('id', $selectedMiniId)) {
+            $selectedMiniId = null;
+        }
+
+        $oltOptions = $this->childNodeOptions($nodes, $selectedMiniId ?? $selectedCabangId, 'olt_chassis', byAnchor: true);
+        $selectedOltId = $this->validatedId($filters['inv_olt_id'] ?? null, $oltOptions);
+
+        $slotOptions = $this->childNodeOptions($nodes, $selectedOltId, 'olt_slot', byAnchor: false);
+        $selectedSlotId = $this->validatedId($filters['inv_slot_id'] ?? null, $slotOptions);
+
+        $ponOptions = $this->childNodeOptions($nodes, $selectedSlotId, 'olt_pon', byAnchor: false);
+        $selectedPonId = $this->validatedId($filters['inv_pon_id'] ?? null, $ponOptions);
+
+        $odpOptions = $this->childNodeOptions($nodes, $selectedPonId, 'odp', byAnchor: false);
+        $selectedOdpId = $this->validatedId($filters['inv_odp_id'] ?? null, $odpOptions);
+
+        $rootNodeIds = match (true) {
+            $selectedOdpId !== null => [$selectedOdpId],
+            $selectedPonId !== null => [$selectedPonId],
+            $selectedSlotId !== null => [$selectedSlotId],
+            $selectedOltId !== null => [$selectedOltId],
+            $selectedMiniId !== null => $nodes->where('anchor_pop_id', $selectedMiniId)->pluck('id')->all(),
+            $selectedCabangId !== null => $nodes->whereIn('anchor_pop_id', [$selectedCabangId, ...$miniPops->pluck('id')->all()])->pluck('id')->all(),
+            // "Semua" = default: belum pilih apapun -> seluruh node dalam scope POP user.
+            default => $nodes->pluck('id')->all(),
+        };
+
+        $subtreeIds = array_flip($this->map->subtreeNodeIds($data['childrenByNode'], $rootNodeIds));
+        $filteredNodes = $data['inventoryNodes']->filter(fn (NetworkNode $node): bool => isset($subtreeIds[$node->id]))->values();
+
+        $totalRows = $filteredNodes->count();
+        $perPage = self::INVENTORY_ROWS_PER_PAGE;
+        $lastPage = max(1, (int) ceil($totalRows / $perPage));
+        $page = min($lastPage, max(1, (int) ($filters['inv_page'] ?? 1)));
+
+        return [
+            'invMiniPops' => $miniPops,
+            'invOltOptions' => $oltOptions,
+            'invSlotOptions' => $slotOptions,
+            'invPonOptions' => $ponOptions,
+            'invOdpOptions' => $odpOptions,
+            'invSelected' => [
+                'pop_id' => $selectedCabangId,
+                'mini_id' => $selectedMiniId,
+                'olt_id' => $selectedOltId,
+                'slot_id' => $selectedSlotId,
+                'pon_id' => $selectedPonId,
+                'odp_id' => $selectedOdpId,
+            ],
+            'inventoryNodes' => $filteredNodes->slice(($page - 1) * $perPage, $perPage)->values(),
+            'invTotalRows' => $totalRows,
+            'invPage' => $page,
+            'invLastPage' => $lastPage,
+            'invPerPage' => $perPage,
+        ];
+    }
+
+    /**
+     * Opsi satu level dropdown cascading: anak dari `$parentId` (lewat
+     * `anchor_pop_id` untuk level OLT yang ditambatkan ke POP/Mini POP, atau
+     * `parent_id` untuk level Slot/PON/ODP yang ditambatkan ke node lain)
+     * bertipe `$typeCode`. `$parentId` null (belum ada level di atas
+     * terpilih) → tidak ada opsi.
+     */
+    private function childNodeOptions(Collection $nodes, ?int $parentId, string $typeCode, bool $byAnchor): Collection
+    {
+        if ($parentId === null) {
+            return new Collection;
+        }
+
+        return $nodes->filter(fn (NetworkNode $node): bool => $node->nodeType?->code === $typeCode
+            && ($byAnchor ? $node->anchor_pop_id === $parentId : $node->parent_id === $parentId))->values();
+    }
+
+    /** @param  Collection<int, NetworkNode>  $options */
+    private function validatedId(?string $raw, Collection $options): ?int
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        $id = (int) $raw;
+
+        return $options->contains('id', $id) ? $id : null;
     }
 
     /**

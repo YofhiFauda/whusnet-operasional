@@ -122,12 +122,20 @@ class WarehouseUniversalSearchTest extends TestCase
     public function cari_by_nomor_surat_jalan_ketemu_transfer_yang_sama(): void
     {
         $transfer = InventoryTransfer::first();
-        $suratJalanNumber = sprintf('SJ/WHUS/%s/%s/%03d', $transfer->created_at->format('Y'), $transfer->created_at->format('m'), $transfer->id);
+        $suratJalanNumber = sprintf('SJ/WHUS/%s/TRF-%d', $transfer->created_at->format('Y/m/d'), $transfer->id);
 
         $response = $this->actingAs($this->owner)->get(route('warehouse.search', ['q' => $suratJalanNumber]));
 
         $response->assertOk();
         $this->assertTrue($response->viewData('results')->contains(fn ($r) => $r['type'] === 'transfer' && $r['label'] === $transfer->reference_number));
+
+        $legacyNumber = sprintf('SJ/WHUS/%s/%03d', $transfer->created_at->format('Y/m'), $transfer->id);
+        $legacyResponse = $this->get(route('warehouse.search', ['q' => $legacyNumber]));
+        $this->assertTrue($legacyResponse->viewData('results')->contains(fn ($r) => $r['type'] === 'transfer' && $r['label'] === $transfer->reference_number));
+
+        $wrongDate = sprintf('SJ/WHUS/%s/TRF-%d', $transfer->created_at->copy()->addDay()->format('Y/m/d'), $transfer->id);
+        $wrongDateResponse = $this->get(route('warehouse.search', ['q' => $wrongDate]));
+        $this->assertFalse($wrongDateResponse->viewData('results')->contains(fn ($r) => $r['type'] === 'transfer' && $r['label'] === $transfer->reference_number));
     }
 
     #[Test]
@@ -146,6 +154,10 @@ class WarehouseUniversalSearchTest extends TestCase
         $transfer = InventoryTransfer::first();
         $response2 = $this->actingAs($popAdminB)->get(route('warehouse.search', ['q' => $transfer->reference_number]));
         $this->assertFalse($response2->viewData('results')->contains(fn ($r) => $r['label'] === $transfer->reference_number));
+
+        $suratJalanNumber = sprintf('SJ/WHUS/%s/TRF-%d', $transfer->created_at->format('Y/m/d'), $transfer->id);
+        $response3 = $this->get(route('warehouse.search', ['q' => $suratJalanNumber]));
+        $this->assertFalse($response3->viewData('results')->contains(fn ($r) => $r['label'] === $transfer->reference_number));
     }
 
     #[Test]

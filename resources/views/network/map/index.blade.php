@@ -38,7 +38,9 @@
     // jaringan besar tiap tab memuat ribuan baris/kartu, dan tab yang
     // tersembunyi (x-show) tetap ikut dirender + dikirim ke browser. Pindah ke
     // tab itu = navigasi biasa ke URL berikut (dirender server, bukan dirakit klien).
-    $activeTab = isset($initialNodeId) ? 'inventaris' : (request('tab') === 'inventaris' ? 'inventaris' : (request('tab') === 'pohon' ? 'pohon' : 'topologi'));
+    // Tab "Barang Terpasang" TIDAK LEWAT view ini sama sekali — lihat
+    // `network.map.terpasang` + komentar di InfrastructureMapController::index().
+    $activeTab = isset($initialNodeId) ? 'inventaris' : (in_array(request('tab'), ['inventaris', 'pohon'], true) ? request('tab') : 'topologi');
     $tabUrl = fn (string $tab): string => route('network.map.index', array_filter(['pop_id' => $selectedPopId, 'sort' => $sort, 'ont' => $withCustomerOnt ? 1 : null, 'tab' => $tab]));
     $openAllUrl = route('network.map.index', array_filter(['pop_id' => $selectedPopId, 'sort' => $sort, 'ont' => 1, 'expand' => 'all']));
 @endphp
@@ -232,8 +234,12 @@
         // halaman Pohon/Inventaris dimuat ulang bila pengguna meminta kartu ONT
         // (data ONT tidak dibangun untuk tab lain).
         goTab(name, url) {
-            const needsOnt = name === 'topologi' && this.ontRequested && !this.withOnt;
-            if (!needsOnt && (name === 'topologi' || name === this.serverTab)) {
+            // View ini (`network.map.index`) cuma nanganin Topologi/Pohon/Inventaris —
+            // Barang Terpasang pindah view terpisah (`network.map.terpasang`, tanpa Alpine
+            // sama sekali, lihat InfrastructureMapController::index()). Pindah KE tab
+            // manapun SELAIN tab yang sedang aktif = reload server biasa. Klik ulang tab
+            // yang sedang aktif tetap instan (klien saja, tanpa reload).
+            if (name === this.serverTab) {
                 this.tab = name;
                 if (name === 'topologi') {
                     if (!this.layout) this.recompute();
@@ -825,6 +831,12 @@
                 <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
                 Inventaris
             </button>
+
+            <a href="{{ $tabUrl('terpasang') }}" role="tab" aria-selected="false"
+               class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800">
+                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7 12 3 4 7l8 4 8-4Z"></path><path d="M4 7v10l8 4 8-4V7"></path><path d="M12 11v10"></path></svg>
+                Barang Terpasang
+            </a>
         </div>
 
         <!-- CABANG & ONT FILTER (FLOATING SELECT & BUTTON) -->
@@ -1061,13 +1073,13 @@
                         <!-- DYNAMIC SVG TOPOLOGY -->
                         <div x-show="layout">
                             <div class="absolute left-0 top-0"
-                                 :style="`width: ${layout.width}px; height: ${layout.height}px; transform: translate(${panX}px, ${panY}px) scale(${zoom}); transform-origin: 0 0; transition: ${isPanning ? 'none' : 'transform 0.1s ease-out'};`">
-                                <svg :width="layout.width" :height="layout.height"
+                                 :style="layout ? `width: ${layout.width}px; height: ${layout.height}px; transform: translate(${panX}px, ${panY}px) scale(${zoom}); transform-origin: 0 0; transition: ${isPanning ? 'none' : 'transform 0.1s ease-out'};` : ''">
+                                <svg :width="layout?.width || 0" :height="layout?.height || 0"
                                      class="pointer-events-none absolute left-0 top-0 text-slate-300 dark:text-slate-700/80"
-                                     x-html="edgePaths(layout)"></svg>
-                                <svg :width="layout.width" :height="layout.height"
+                                     x-html="layout ? edgePaths(layout) : ''"></svg>
+                                <svg :width="layout?.width || 0" :height="layout?.height || 0"
                                      class="pointer-events-none absolute left-0 top-0"
-                                     x-html="activePathSvg(layout)"></svg>
+                                     x-html="layout ? activePathSvg(layout) : ''"></svg>
 
                                 <template x-for="id in renderIds" :key="id">
                                     <svg :width="layout.cardW + 12" :height="layout.cardH"
@@ -1215,6 +1227,61 @@
                         </div>
                     </div>
 
+                    {{--
+                        FILTER CASCADING: POP -> MINI POP -> OLT -> SLOT -> PON -> ODP, "Semua" default.
+                        Sama pola dengan tab Terpasang (ADHOC-237/238) — subtree besar tanpa filter
+                        dirender sekaligus = DOM raksasa, makanya paginasi di bawah juga wajib.
+                    --}}
+                    <div class="border-b border-slate-200 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/20">
+                        <form method="GET" action="{{ route('network.map.index') }}" class="flex flex-wrap items-center gap-2">
+                            <input type="hidden" name="tab" value="inventaris">
+                            @if($selectedPopId)<input type="hidden" name="pop_id" value="{{ $selectedPopId }}">@endif
+                            <input type="hidden" name="sort" value="{{ $sort }}">
+
+                            <select name="inv_pop_id" onchange="this.form.submit()" class="rounded border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                <option value="">Semua POP</option>
+                                @foreach($cabangs as $cabang)
+                                    <option value="{{ $cabang->id }}" @selected($invSelected['pop_id'] === $cabang->id)>{{ $cabang->name }}</option>
+                                @endforeach
+                            </select>
+
+                            <select name="inv_mini_id" onchange="this.form.submit()" @disabled($invMiniPops->isEmpty()) class="rounded border border-slate-300 bg-white px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                <option value="">Semua Mini POP</option>
+                                @foreach($invMiniPops as $mini)
+                                    <option value="{{ $mini->id }}" @selected($invSelected['mini_id'] === $mini->id)>{{ $mini->name }}</option>
+                                @endforeach
+                            </select>
+
+                            <select name="inv_olt_id" onchange="this.form.submit()" @disabled($invOltOptions->isEmpty()) class="rounded border border-slate-300 bg-white px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                <option value="">Semua OLT</option>
+                                @foreach($invOltOptions as $olt)
+                                    <option value="{{ $olt->id }}" @selected($invSelected['olt_id'] === $olt->id)>{{ $olt->code }}</option>
+                                @endforeach
+                            </select>
+
+                            <select name="inv_slot_id" onchange="this.form.submit()" @disabled($invSlotOptions->isEmpty()) class="rounded border border-slate-300 bg-white px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                <option value="">Semua Slot</option>
+                                @foreach($invSlotOptions as $slot)
+                                    <option value="{{ $slot->id }}" @selected($invSelected['slot_id'] === $slot->id)>{{ $slot->code }}</option>
+                                @endforeach
+                            </select>
+
+                            <select name="inv_pon_id" onchange="this.form.submit()" @disabled($invPonOptions->isEmpty()) class="rounded border border-slate-300 bg-white px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                <option value="">Semua PON</option>
+                                @foreach($invPonOptions as $pon)
+                                    <option value="{{ $pon->id }}" @selected($invSelected['pon_id'] === $pon->id)>{{ $pon->code }}</option>
+                                @endforeach
+                            </select>
+
+                            <select name="inv_odp_id" onchange="this.form.submit()" @disabled($invOdpOptions->isEmpty()) class="rounded border border-slate-300 bg-white px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                <option value="">Semua ODP</option>
+                                @foreach($invOdpOptions as $odp)
+                                    <option value="{{ $odp->id }}" @selected($invSelected['odp_id'] === $odp->id)>{{ $odp->code }}</option>
+                                @endforeach
+                            </select>
+                        </form>
+                    </div>
+
                     <!-- TABLE -->
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[760px] text-left text-xs">
@@ -1289,9 +1356,30 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @if($invTotalRows > 0)
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-2.5 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                            <span>
+                                Baris {{ (($invPage - 1) * $invPerPage) + 1 }}–{{ min($invPage * $invPerPage, $invTotalRows) }}
+                                dari {{ $invTotalRows }}
+                                (hal. {{ $invPage }}/{{ $invLastPage }})
+                            </span>
+                            <div class="flex items-center gap-1.5">
+                                @if($invPage > 1)
+                                    <a href="{{ request()->fullUrlWithQuery(['inv_page' => $invPage - 1]) }}"
+                                       class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">← Sebelumnya</a>
+                                @endif
+                                @if($invPage < $invLastPage)
+                                    <a href="{{ request()->fullUrlWithQuery(['inv_page' => $invPage + 1]) }}"
+                                       class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Selanjutnya →</a>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </section>
             @endif
+
         </main>
 
         <!-- RIGHT DETAIL PANEL (DRAWER): PANEL TIGA LAPIS (POSISI / KAPASITAS / BARANG GUDANG) -->

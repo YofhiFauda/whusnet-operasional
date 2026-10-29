@@ -530,17 +530,7 @@
             @endforelse
         </div>
 
-        {{-- PAGINATION CONTAINER --}}
-        @if($customers->hasPages())
-            <div class="px-4 py-3 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/50 flex items-center justify-between">
-                <div class="text-xs text-slate-500 dark:text-slate-400">
-                    Menampilkan <span class="font-mono font-medium text-slate-700 dark:text-slate-300">{{ $customers->firstItem() ?? 0 }}</span>–<span class="font-mono font-medium text-slate-700 dark:text-slate-300">{{ $customers->lastItem() ?? 0 }}</span> dari <span class="font-mono font-medium text-slate-700 dark:text-slate-300">{{ number_format($customers->total()) }}</span> pelanggan
-                </div>
-                <div>
-                    {{ $customers->links() }}
-                </div>
-            </div>
-        @endif
+        @include('customers.partials._list_pagination')
     </div>
 </div>
 @endsection

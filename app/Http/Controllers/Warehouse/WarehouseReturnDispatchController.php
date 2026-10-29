@@ -44,7 +44,8 @@ class WarehouseReturnDispatchController extends Controller
             ->when($popFilter, fn ($q) => $q->where('current_pop_id', $popFilter))
             ->with(['item', 'currentPop', 'latestRetrievalLog.task.creqDetail'])
             ->orderByDesc('updated_at')
-            ->get();
+            ->paginate(25)
+            ->withQueryString();
 
         $pusatOptions = Pop::where('type', 'pusat')->where('status', 'active')->orderBy('name')->get(['id', 'name']);
 

@@ -9,6 +9,7 @@ use App\Models\InternetPackage;
 use App\Models\Pop;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -53,6 +54,19 @@ class CustomerDetailShowsAcquisitionSourceBadgeTest extends TestCase
             'monthly_price' => 150000,
             'status' => 'active',
         ]);
+    }
+
+    #[Test]
+    public function modem_sewa_tidak_menampilkan_badge(): void
+    {
+        $device = new CustomerDevice([
+            'device_type' => 'ONT',
+            'acquisition_source' => DeviceAcquisitionSource::SEWA,
+        ]);
+
+        $html = Blade::render('<x-warehouse.acquisition-badge :device="$device" />', ['device' => $device]);
+
+        $this->assertSame('', trim($html));
     }
 
     #[Test]

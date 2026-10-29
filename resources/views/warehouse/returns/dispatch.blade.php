@@ -73,6 +73,12 @@
             </button>
         </div>
     </form>
+
+    @if($serials->hasPages())
+    <div class="px-4 py-3.5 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30">
+        {{ $serials->links() }}
+    </div>
+    @endif
     @endif
 </div>
 

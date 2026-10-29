@@ -1025,4 +1025,144 @@ class InfrastructureMapTest extends TestCase
             $fullResponse->getContent(),
         );
     }
+
+    /**
+     * Tab "Barang Terpasang" (docs/plan/infrastruktur/rancangan-tab-barang-terpasang.md):
+     * pilih satu titik di hierarki (POP/Mini POP/OLT/Slot/PON/ODP) → barang
+     * gudang di SELURUH subtree-nya tampil, bukan cuma device itu sendiri
+     * (beda dari tab Inventaris yang device-centric).
+     */
+    #[Test]
+    public function tab_barang_terpasang_menyaring_barang_sesuai_titik_subtree_terpilih(): void
+    {
+        $cabang = Pop::factory()->create(['name' => 'Cabang Terpasang', 'type' => 'cabang']);
+        $mini = Pop::factory()->create(['name' => 'Mini Terpasang', 'type' => 'mini_pop', 'parent_id' => $cabang->id]);
+        $miniLain = Pop::factory()->create(['name' => 'Mini Lain Terpasang', 'type' => 'mini_pop', 'parent_id' => $cabang->id]);
+        $type = fn (string $code) => NetworkNodeType::where('code', $code)->firstOrFail();
+
+        $olt = NetworkNode::factory()->create(['node_type_id' => $type('olt_chassis')->id, 'anchor_pop_id' => $mini->id, 'code' => 'OLT-TERPASANG-01']);
+        $positions = app(InfrastructurePositionService::class);
+        $slot = $positions->createSlot($olt, 1);
+        $pon = $positions->createPort($slot, 1, ['capacity' => 8]);
+        $odp = NetworkNode::factory()->create(['node_type_id' => $type('odp')->id, 'parent_id' => $pon->id, 'anchor_pop_id' => null, 'code' => 'ODP-TERPASANG-01']);
+        NetworkNode::factory()->create(['anchor_pop_id' => $miniLain->id, 'code' => 'SW-TERPASANG-LAIN']);
+
+        $category = ItemCategory::create([
+            'code' => 'terpasang_test', 'name' => 'Kategori Terpasang', 'default_unit' => 'pcs',
+            'equipment_class' => 'pasif', 'is_system' => false, 'is_active' => true,
+        ]);
+        $closureItem = Item::create([
+            'code' => 'TERPASANG-CLOSURE', 'name' => 'Closure Terpasang', 'unit' => 'pcs',
+            'item_category_id' => $category->id, 'tracking_type' => 'quantity', 'ownership_mode' => 'infrastructure_asset',
+        ]);
+        InfrastructureBalance::create(['item_id' => $closureItem->id, 'lot_no' => '', 'network_node_id' => $olt->id, 'qty' => 2]);
+
+        $serialItem = Item::create([
+            'code' => 'TERPASANG-SPLITTER', 'name' => 'Splitter Terpasang', 'unit' => 'pcs',
+            'item_category_id' => $category->id, 'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+        ]);
+        InventorySerial::create([
+            'item_id' => $serialItem->id, 'serial_number' => 'TERPASANG-SN-001',
+            'status' => SerialStatus::DEPLOYED->value, 'current_network_node_id' => $odp->id,
+        ]);
+
+        $this->loginAsAdmin();
+
+        // Belum pilih apapun: "Semua" default -> seluruh barang dalam scope tampil.
+        $defaultHtml = $this->get(route('network.map.index', ['tab' => 'terpasang']))
+            ->assertOk()
+            ->assertSee('Cabang Terpasang')
+            ->assertSee('Closure Terpasang')
+            ->assertSee('Splitter Terpasang')
+            ->getContent();
+        $this->assertSame(2, substr_count($defaultHtml, 'data-asset-row'));
+
+        // Pilih POP (Cabang): semua barang di bawahnya (lewat Mini POP) tampil,
+        // barang milik Mini POP cabang lain tidak ikut.
+        $this->get(route('network.map.index', ['tab' => 'terpasang', 'asset_pop_id' => $cabang->id]))
+            ->assertOk()
+            ->assertSee('Closure Terpasang')
+            ->assertSee('Splitter Terpasang')
+            ->assertSee('Mini Terpasang'); // opsi dropdown Mini POP ikut cabang terpilih
+
+        // Pilih Mini POP spesifik: OLT dropdown kebuka (cuma OLT anchor ke Mini POP ini).
+        $miniResponse = $this->get(route('network.map.index', [
+            'tab' => 'terpasang', 'asset_pop_id' => $cabang->id, 'asset_mini_id' => $mini->id,
+        ]))->assertOk();
+        $miniResponse->assertSee('Closure Terpasang')->assertSee('Splitter Terpasang')->assertSee('OLT-TERPASANG-01');
+
+        // Turun sampai ODP spesifik: hanya barang di ODP itu (SN), QTY di OLT tidak ikut.
+        // ("Closure Terpasang" tetap ada di JSON kanvas topologi yang selalu dikirim,
+        // jadi hitung baris tabel barang, bukan cuma cek teks nama barang muncul.)
+        $odpOnlyHtml = $this->get(route('network.map.index', [
+            'tab' => 'terpasang', 'asset_pop_id' => $cabang->id, 'asset_mini_id' => $mini->id,
+            'asset_olt_id' => $olt->id, 'asset_slot_id' => $slot->id, 'asset_pon_id' => $pon->id, 'asset_odp_id' => $odp->id,
+        ]))->assertOk()->assertSee('TERPASANG-SN-001')->getContent();
+        $this->assertSame(1, substr_count($odpOnlyHtml, 'data-asset-row'));
+
+        // Service: assertion presisi tanpa noise HTML.
+        $this->loginAsAdmin();
+        $data = app(InfrastructureMapService::class)->build(auth()->user(), null, 'topology');
+        $subtreeOdp = app(InfrastructureMapService::class)->subtreeNodeIds($data['childrenByNode'], [$odp->id]);
+        $rowsOdp = app(InfrastructureMapService::class)->assetRowsForNodes($data['assetsByNode'], $data['pathsByNode'], $subtreeOdp);
+        $this->assertCount(1, $rowsOdp);
+        $this->assertSame('Splitter Terpasang', $rowsOdp[0]['name']);
+        $this->assertNotEmpty($rowsOdp[0]['path']);
+
+        $subtreeOlt = app(InfrastructureMapService::class)->subtreeNodeIds($data['childrenByNode'], [$olt->id]);
+        $rowsOlt = app(InfrastructureMapService::class)->assetRowsForNodes($data['assetsByNode'], $data['pathsByNode'], $subtreeOlt);
+        $names = array_column($rowsOlt, 'name');
+        $this->assertContains('Closure Terpasang', $names);
+        $this->assertContains('Splitter Terpasang', $names); // ODP turunan OLT ikut ter-BFS
+    }
+
+    #[Test]
+    public function tab_barang_terpasang_mengabaikan_pop_di_luar_scope_pengguna(): void
+    {
+        $cabangAman = Pop::factory()->create(['name' => 'Cabang Aman Terpasang', 'type' => 'cabang']);
+        $cabangRahasia = Pop::factory()->create(['name' => 'Cabang Rahasia Terpasang', 'type' => 'cabang']);
+        $miniRahasia = Pop::factory()->create(['name' => 'Mini Rahasia Terpasang', 'type' => 'mini_pop', 'parent_id' => $cabangRahasia->id]);
+        NetworkNode::factory()->create(['anchor_pop_id' => $cabangRahasia->id, 'code' => 'NODE-RAHASIA-TERPASANG']);
+
+        $role = Role::where('code', 'fop')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $scope = UserRoleScope::create(['user_id' => $user->id, 'role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $cabangAman->id]);
+
+        $response = $this->actingAs($user)->get(route('network.map.index', [
+            'tab' => 'terpasang', 'asset_pop_id' => $cabangRahasia->id,
+        ]));
+
+        $response->assertOk()
+            ->assertDontSee('Cabang Rahasia Terpasang')
+            ->assertDontSee('Mini Rahasia Terpasang')
+            ->assertDontSee('NODE-RAHASIA-TERPASANG')
+            // Filter di luar scope diabaikan -> balik ke "Semua" dalam scope sendiri (kosong di sini), bukan error/bocor.
+            ->assertDontSee('data-asset-row', false);
+    }
+
+    /**
+     * Payload kanvas (`#peta-data`: index/nodes/hierarchy) bisa ±4MB di scope besar
+     * (lihat investigasi Lighthouse Performance ADHOC tab "Barang Terpasang") — tab ini
+     * TIDAK PERNAH baca `window.__petaData` (tabelnya 100% server-rendered), jadi payload
+     * itu harus dikosongkan SAAT tab ini aktif, bukan selalu dikirim seperti Topologi/
+     * Pohon/Inventaris (yang masih butuh `this.nodes` buat drawer `selectNode()`).
+     */
+    #[Test]
+    public function tab_barang_terpasang_mengosongkan_payload_kanvas_topologi(): void
+    {
+        $cabang = Pop::factory()->create(['name' => 'Cabang Payload Kanvas', 'type' => 'cabang']);
+        NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'code' => 'NODE-PAYLOAD-KANVAS']);
+
+        $this->loginAsAdmin();
+
+        $terpasangHtml = $this->get(route('network.map.index', ['tab' => 'terpasang']))->assertOk()->getContent();
+        $this->assertStringNotContainsString('NODE-PAYLOAD-KANVAS', $terpasangHtml);
+
+        $topologiHtml = $this->get(route('network.map.index', ['tab' => 'topologi']))->assertOk()->getContent();
+        $this->assertStringContainsString('NODE-PAYLOAD-KANVAS', $topologiHtml);
+
+        $inventarisHtml = $this->get(route('network.map.index', ['tab' => 'inventaris']))->assertOk()->getContent();
+        $this->assertStringContainsString('NODE-PAYLOAD-KANVAS', $inventarisHtml);
+    }
 }

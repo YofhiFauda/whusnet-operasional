@@ -19,7 +19,17 @@ class InfrastructureMapService
     /**
      * @return array<string, mixed>
      */
-    public function build(User $user, ?int $selectedPopId, string $sort, bool $withCustomerOnt = false): array
+    /**
+     * `$lightweight` = true melewati eager load `deployedSerials`/`infrastructureBalances`
+     * + withCount port + 2 query agregasi `InventoryTransaction` (bagian paling berat,
+     * ±2,3 dtk dari ±3,5 dtk total di scope 3500 node — lihat investigasi ADHOC tab
+     * "Barang Terpasang"). Dipakai controller untuk tab itu SAJA: tab ini cuma butuh
+     * `childrenByNode`/`pathsByNode`/`cabangs` buat resolve filter+subtree, baru query
+     * barangnya lewat `assetRowsForScopedNodes()` — DIBATASI ke node id hasil subtree,
+     * bukan seluruh scope POP. Tab Topologi/Pohon/Inventaris TETAP `$lightweight = false`
+     * (butuh `assetsByNode` penuh buat kanvas/pencarian) — jangan diubah.
+     */
+    public function build(User $user, ?int $selectedPopId, string $sort, bool $withCustomerOnt = false, bool $lightweight = false): array
     {
         $cabangs = Pop::forUser($user)
             ->where('type', 'cabang')
@@ -52,7 +62,7 @@ class InfrastructureMapService
 
         $nodes = NetworkNode::query()
             ->when($popIds !== null, fn ($query) => $query->whereIn('network_nodes.id', $this->scopedNodeIds($popIds)))
-            ->with([
+            ->with($lightweight ? ['nodeType', 'anchorPop.parent'] : [
                 'nodeType',
                 'anchorPop.parent',
                 'deployedSerials' => fn ($query) => $query
@@ -62,10 +72,10 @@ class InfrastructureMapService
                     ->where('qty', '>', 0)
                     ->with('item'),
             ])
-            ->withCount([
+            ->when(! $lightweight, fn ($query) => $query->withCount([
                 'ports',
                 'ports as used_ports_count' => fn ($query) => $query->where('is_used', true),
-            ])
+            ]))
             ->orderBy('code')
             ->get();
 
@@ -76,48 +86,9 @@ class InfrastructureMapService
         // `$withCustomerOnt` (kartu ONT) memakai satu query baris mentah
         // (`ontRows()`), bukan 100 ribu model Eloquent.
         $nodeIds = $nodes->pluck('id')->all();
-        $serialIds = $nodes->flatMap(fn (NetworkNode $node) => $node->deployedSerials->pluck('id'))->all();
-        $serialEvents = collect();
-        $quantityEvents = collect();
-
-        if ($serialIds !== []) {
-            $latest = InventoryTransaction::query()
-                ->selectRaw('MAX(id)')
-                ->where('type', InventoryTransactionType::DEPLOY->value)
-                ->whereIn('serial_id', $serialIds)
-                ->groupBy('serial_id');
-
-            $serialEvents = InventoryTransaction::query()
-                ->whereIn('id', $latest)
-                ->with('fromTechnician', 'fopTask.task')
-                ->get()
-                ->keyBy('serial_id');
-        }
-
-        if ($nodeIds !== []) {
-            $latest = InventoryTransaction::query()
-                ->selectRaw('MAX(id)')
-                ->where(function ($query): void {
-                    $query->where('type', InventoryTransactionType::DEPLOY->value)
-                        ->orWhere(function ($correction): void {
-                            $correction->where('type', InventoryTransactionType::ADJUSTMENT->value)
-                                ->where('reason', 'infra_record_correction');
-                        });
-                })
-                ->whereIn('to_network_node_id', $nodeIds)
-                ->whereNull('serial_id')
-                ->groupBy('to_network_node_id', 'item_id', DB::raw("CASE WHEN roll_id IS NULL THEN '' ELSE COALESCE(lot_no, '') END"));
-
-            $quantityEvents = InventoryTransaction::query()
-                ->whereIn('id', $latest)
-                ->with('fromTechnician', 'createdBy', 'fopTask.task')
-                ->get()
-                ->keyBy(fn (InventoryTransaction $event): string => $this->balanceKey(
-                    $event->to_network_node_id,
-                    $event->item_id,
-                    $event->roll_id === null ? '' : $event->lot_no
-                ));
-        }
+        [$serialEvents, $quantityEvents] = $lightweight
+            ? [collect(), collect()]
+            : $this->deployEventMaps($nodeIds, $nodes->flatMap(fn (NetworkNode $node) => $node->deployedSerials->pluck('id'))->all());
 
         $assets = [];
         $paths = [];
@@ -125,45 +96,7 @@ class InfrastructureMapService
         $nodesById = $nodes->keyBy('id');
 
         foreach ($nodes as $node) {
-            $rows = [];
-
-            foreach ($node->deployedSerials as $serial) {
-                $event = $serialEvents->get($serial->id);
-                if ($event?->to_network_node_id !== $node->id) {
-                    $event = null;
-                }
-
-                $rows[] = [
-                    'kind' => 'SN',
-                    'name' => $serial->item?->name ?? 'Barang tanpa nama',
-                    'reference' => $serial->serial_number,
-                    'amount' => '1 '.$serial->item?->unit,
-                    'installed_at' => $event?->created_at?->format('d M Y H:i'),
-                    'technician' => $event?->fromTechnician?->name,
-                    'task' => $event?->fopTask?->task?->task_number ?? $event?->fopTask?->task_number,
-                    'trace_url' => $canViewTraceability ? route('warehouse.traceability.index', ['sn' => $serial->serial_number]) : null,
-                ];
-            }
-
-            foreach ($node->infrastructureBalances as $balance) {
-                $event = $quantityEvents->get($this->balanceKey(
-                    $node->id,
-                    $balance->item_id,
-                    $balance->lot_no
-                ));
-                $lot = $balance->lot_no ?: null;
-
-                $rows[] = [
-                    'kind' => $lot ? 'ROLL' : 'QTY',
-                    'name' => $balance->item?->name ?? 'Barang tanpa nama',
-                    'reference' => $lot,
-                    'amount' => rtrim(rtrim(number_format((float) $balance->qty, 2, '.', ''), '0'), '.').' '.$balance->item?->unit,
-                    'installed_at' => $event?->created_at?->format('d M Y H:i'),
-                    'technician' => $event?->fromTechnician?->name ?? $event?->createdBy?->name,
-                    'task' => $event?->fopTask?->task?->task_number ?? $event?->fopTask?->task_number,
-                    'trace_url' => ($lot && $canViewTraceability) ? route('warehouse.traceability.index', ['roll' => $lot]) : null,
-                ];
-            }
+            $rows = $lightweight ? [] : $this->rowsForDeployedNode($node, $serialEvents, $quantityEvents, $canViewTraceability);
 
             $assets[$node->id] = $rows;
             $paths[$node->id] = $this->pathFor($node, $nodesById, $paths);
@@ -903,6 +836,213 @@ class InfrastructureMapService
     private function balanceKey(?int $nodeId, ?int $itemId, ?string $lotNo): string
     {
         return $nodeId.':'.$itemId.':'.($lotNo ?? '');
+    }
+
+    /**
+     * Semua node id di bawah naungan `$rootNodeIds` (termasuk dirinya sendiri),
+     * ditelusuri dari `$childrenByNode` (hasil `build()['childrenByNode']`) di
+     * memori — tidak ada query baru. Dipakai tab "Barang Terpasang": satu
+     * titik di hierarki (POP/Mini POP/OLT/Slot/PON/ODP) → seluruh subtree-nya.
+     *
+     * @param  Collection<int, Collection<int, NetworkNode>>  $childrenByNode
+     * @param  list<int>  $rootNodeIds
+     * @return list<int>
+     */
+    public function subtreeNodeIds(Collection $childrenByNode, array $rootNodeIds): array
+    {
+        $ids = [];
+        $stack = $rootNodeIds;
+        while ($stack !== []) {
+            $id = array_pop($stack);
+            if (in_array($id, $ids, true)) {
+                continue;
+            }
+            $ids[] = $id;
+            foreach ($childrenByNode->get($id, collect()) as $child) {
+                $stack[] = $child->id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Barang (SN/ROLL/QTY) di seluruh node id yang diberikan, satu baris per
+     * barang, ditambah posisi (path lengkap) device tempat dia nempel.
+     * `$assetsByNode`/`$pathsByNode` berasal dari `build()` — tidak ada query
+     * baru di sini.
+     *
+     * @param  array<int, list<array<string, mixed>>>  $assetsByNode
+     * @param  array<int, string>  $pathsByNode
+     * @param  list<int>  $nodeIds
+     * @return list<array<string, mixed>>
+     */
+    public function assetRowsForNodes(array $assetsByNode, array $pathsByNode, array $nodeIds): array
+    {
+        $rows = [];
+        foreach ($nodeIds as $nodeId) {
+            foreach ($assetsByNode[$nodeId] ?? [] as $asset) {
+                $rows[] = [...$asset, 'path' => $pathsByNode[$nodeId] ?? null];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Versi tab "Barang Terpasang" dari `assetRowsForNodes()` — bukan baca dari
+     * `assetsByNode` hasil `build()` penuh, tapi query `deployedSerials`/
+     * `infrastructureBalances` + event ledger-nya SENDIRI, DIBATASI ke
+     * `$nodeIds` (hasil `subtreeNodeIds()`) — bukan seluruh node dalam scope POP.
+     * Ini yang bikin pindah filter cepat: begitu user mempersempit ke
+     * OLT/Slot/PON/ODP, query SN/QTY/ledger cuma jalan untuk node di subtree
+     * itu, bukan ribuan node lain di scope yang gak relevan.
+     *
+     * @param  list<int>  $nodeIds
+     * @param  array<int, string>  $pathsByNode
+     * @return list<array<string, mixed>>
+     */
+    public function assetRowsForScopedNodes(array $nodeIds, array $pathsByNode, bool $canViewTraceability): array
+    {
+        if ($nodeIds === []) {
+            return [];
+        }
+
+        $nodes = NetworkNode::query()
+            ->whereIn('id', $nodeIds)
+            ->with([
+                'deployedSerials' => fn ($query) => $query
+                    ->where('status', SerialStatus::DEPLOYED->value)
+                    ->with('item'),
+                'infrastructureBalances' => fn ($query) => $query
+                    ->where('qty', '>', 0)
+                    ->with('item'),
+            ])
+            ->get(['id']);
+
+        $serialIds = $nodes->flatMap(fn (NetworkNode $node) => $node->deployedSerials->pluck('id'))->all();
+        [$serialEvents, $quantityEvents] = $this->deployEventMaps($nodeIds, $serialIds);
+
+        $rows = [];
+        foreach ($nodes as $node) {
+            foreach ($this->rowsForDeployedNode($node, $serialEvents, $quantityEvents, $canViewTraceability) as $row) {
+                $rows[] = [...$row, 'path' => $pathsByNode[$node->id] ?? null];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Event ledger (DEPLOY/ADJUSTMENT koreksi) terbaru per SN dan per
+     * (node, item, lot) QTY/ROLL — dipakai `build()` (penuh, semua node scope)
+     * DAN `assetRowsForScopedNodes()` (dibatasi `$nodeIds`/`$serialIds` yang
+     * diberikan). Logic SAMA, cuma himpunan id yang beda — satu sumber,
+     * jangan diduplikasi di tempat lain.
+     *
+     * @param  list<int>  $nodeIds
+     * @param  list<int>  $serialIds
+     * @return array{0: Collection<int, InventoryTransaction>, 1: Collection<string, InventoryTransaction>}
+     */
+    private function deployEventMaps(array $nodeIds, array $serialIds): array
+    {
+        $serialEvents = collect();
+        $quantityEvents = collect();
+
+        if ($serialIds !== []) {
+            $latest = InventoryTransaction::query()
+                ->selectRaw('MAX(id)')
+                ->where('type', InventoryTransactionType::DEPLOY->value)
+                ->whereIn('serial_id', $serialIds)
+                ->groupBy('serial_id');
+
+            $serialEvents = InventoryTransaction::query()
+                ->whereIn('id', $latest)
+                ->with('fromTechnician', 'fopTask.task')
+                ->get()
+                ->keyBy('serial_id');
+        }
+
+        if ($nodeIds !== []) {
+            $latest = InventoryTransaction::query()
+                ->selectRaw('MAX(id)')
+                ->where(function ($query): void {
+                    $query->where('type', InventoryTransactionType::DEPLOY->value)
+                        ->orWhere(function ($correction): void {
+                            $correction->where('type', InventoryTransactionType::ADJUSTMENT->value)
+                                ->where('reason', 'infra_record_correction');
+                        });
+                })
+                ->whereIn('to_network_node_id', $nodeIds)
+                ->whereNull('serial_id')
+                ->groupBy('to_network_node_id', 'item_id', DB::raw("CASE WHEN roll_id IS NULL THEN '' ELSE COALESCE(lot_no, '') END"));
+
+            $quantityEvents = InventoryTransaction::query()
+                ->whereIn('id', $latest)
+                ->with('fromTechnician', 'createdBy', 'fopTask.task')
+                ->get()
+                ->keyBy(fn (InventoryTransaction $event): string => $this->balanceKey(
+                    $event->to_network_node_id,
+                    $event->item_id,
+                    $event->roll_id === null ? '' : $event->lot_no
+                ));
+        }
+
+        return [$serialEvents, $quantityEvents];
+    }
+
+    /**
+     * Satu baris per barang (SN/ROLL/QTY) yang nempel LANGSUNG di `$node`
+     * (bukan subtree-nya) — dipakai `build()` dan `assetRowsForScopedNodes()`.
+     * `$node->deployedSerials`/`$node->infrastructureBalances` HARUS sudah
+     * di-eager-load oleh caller (lihat 2 pemanggil di atas) — method ini
+     * tidak query apapun sendiri.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function rowsForDeployedNode(NetworkNode $node, \Illuminate\Support\Collection $serialEvents, \Illuminate\Support\Collection $quantityEvents, bool $canViewTraceability): array
+    {
+        $rows = [];
+
+        foreach ($node->deployedSerials as $serial) {
+            $event = $serialEvents->get($serial->id);
+            if ($event?->to_network_node_id !== $node->id) {
+                $event = null;
+            }
+
+            $rows[] = [
+                'kind' => 'SN',
+                'name' => $serial->item?->name ?? 'Barang tanpa nama',
+                'reference' => $serial->serial_number,
+                'amount' => '1 '.$serial->item?->unit,
+                'installed_at' => $event?->created_at?->format('d M Y H:i'),
+                'technician' => $event?->fromTechnician?->name,
+                'task' => $event?->fopTask?->task?->task_number ?? $event?->fopTask?->task_number,
+                'trace_url' => $canViewTraceability ? route('warehouse.traceability.index', ['sn' => $serial->serial_number]) : null,
+            ];
+        }
+
+        foreach ($node->infrastructureBalances as $balance) {
+            $event = $quantityEvents->get($this->balanceKey(
+                $node->id,
+                $balance->item_id,
+                $balance->lot_no
+            ));
+            $lot = $balance->lot_no ?: null;
+
+            $rows[] = [
+                'kind' => $lot ? 'ROLL' : 'QTY',
+                'name' => $balance->item?->name ?? 'Barang tanpa nama',
+                'reference' => $lot,
+                'amount' => rtrim(rtrim(number_format((float) $balance->qty, 2, '.', ''), '0'), '.').' '.$balance->item?->unit,
+                'installed_at' => $event?->created_at?->format('d M Y H:i'),
+                'technician' => $event?->fromTechnician?->name ?? $event?->createdBy?->name,
+                'task' => $event?->fopTask?->task?->task_number ?? $event?->fopTask?->task_number,
+                'trace_url' => ($lot && $canViewTraceability) ? route('warehouse.traceability.index', ['roll' => $lot]) : null,
+            ];
+        }
+
+        return $rows;
     }
 
     /**

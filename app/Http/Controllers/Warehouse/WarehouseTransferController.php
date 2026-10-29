@@ -481,7 +481,7 @@ class WarehouseTransferController extends Controller
             'total' => $total,
             'kepalaGudang' => config('warehouse.kepala_gudang'),
             'fromPopAddress' => $this->formatPopAddress($transfer->fromPop),
-            'suratJalanNumber' => $this->suratJalanNumber($transfer),
+            'suratJalanNumber' => $transfer->suratJalanNumber(),
         ])->setPaper('a4');
 
         $filename = "invoice-{$transfer->reference_number}.pdf";
@@ -515,7 +515,7 @@ class WarehouseTransferController extends Controller
         $pdf = Pdf::loadView('warehouse.transfers.surat-jalan', [
             'transfer' => $transfer,
             'lines' => $lines,
-            'suratJalanNumber' => $this->suratJalanNumber($transfer),
+            'suratJalanNumber' => $transfer->suratJalanNumber(),
             'fromPopAddress' => $this->formatPopAddress($transfer->fromPop),
             'toPopAddress' => $this->formatPopAddress($transfer->toPop),
         ])->setPaper('a4');
@@ -523,24 +523,6 @@ class WarehouseTransferController extends Controller
         $filename = "surat-jalan-{$transfer->reference_number}.pdf";
 
         return $request->boolean('download') ? $pdf->download($filename) : $pdf->stream($filename);
-    }
-
-    /**
-     * Nomor Surat Jalan format `SJ/WHUS/{tahun}/{bulan}/{urut}` (template
-     * resmi `docs/plan/warehouse/laporan/Surat_Jalan_Transfer_Gudang_WHUSNET.*`)
-     * — field TERPISAH dari `reference_number` transfer (yang dicantumkan
-     * apa adanya di baris "Referensi WO/Tiket"). Diturunkan dari `id`+
-     * `created_at` transfer, BUKAN counter baru yang disimpan — deterministik
-     * & reprint-safe (nomor sama tiap kali dicetak ulang) tanpa migration.
-     */
-    private function suratJalanNumber(InventoryTransfer $transfer): string
-    {
-        return sprintf(
-            'SJ/WHUS/%s/%s/%03d',
-            $transfer->created_at->format('Y'),
-            $transfer->created_at->format('m'),
-            $transfer->id,
-        );
     }
 
     /**

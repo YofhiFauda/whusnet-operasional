@@ -73,6 +73,11 @@ class InventoryTransfer extends Model
         return $this->hasOne(BranchInventorySale::class, 'inventory_transfer_id');
     }
 
+    public function suratJalanNumber(): string
+    {
+        return sprintf('SJ/WHUS/%s/TRF-%d', $this->created_at->format('Y/m/d'), $this->id);
+    }
+
     public function isInTransit(): bool
     {
         return in_array($this->status, [TransferStatus::IN_TRANSIT, TransferStatus::RECEIVED_PARTIAL], true);

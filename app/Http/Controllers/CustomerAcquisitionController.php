@@ -39,11 +39,16 @@ class CustomerAcquisitionController extends Controller
         // tanpa ubah kode.
         $roleId = $request->query('role_id');
         $salesUserId = $request->query('sales_user_id');
+        $search = trim((string) $request->query('q', ''));
+        $perPage = (int) $request->query('per_page', 10);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 10;
+        }
 
         $access = app(EffectiveAccessService::class);
         $user = $request->user();
 
-        $records = CustomerAcquisition::query()
+        $recordsQuery = CustomerAcquisition::query()
             ->with(['customer.customerService.internetPackage', 'customer.pop', 'customer.salesUser.role', 'installationFeeInvoice'])
             ->where('periode', $periode)
             // Wajib lewat POP scope (CLAUDE.md) — pop_admin/role ber-scope
@@ -63,8 +68,45 @@ class CustomerAcquisitionController extends Controller
                     $q->where('sales_user_id', $salesUserId);
                 });
             })
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas('customer', function ($customerQuery) use ($search) {
+                    $customerQuery->where(function ($matchingCustomer) use ($search) {
+                        $matchingCustomer->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('address', 'like', "%{$search}%")
+                            ->orWhere('customer_id', 'like', "%{$search}%")
+                            ->orWhereHas('pop', fn ($popQuery) => $popQuery->where('name', 'like', "%{$search}%"))
+                            ->orWhereHas('salesUser', fn ($salesQuery) => $salesQuery->where('name', 'like', "%{$search}%"));
+                    });
+                });
+            });
+
+        $records = (clone $recordsQuery)
             ->orderBy('verified_at')
-            ->get();
+            ->orderBy('id')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $summary = [
+            'totalLangganan' => 0.0,
+            'totalDpp' => 0.0,
+            'totalInstalasi' => 0.0,
+            'countInstalasi' => 0,
+            'pendingValidationCount' => 0,
+        ];
+
+        (clone $recordsQuery)->reorder()->chunkById(200, function ($chunk) use (&$summary): void {
+            foreach ($chunk as $record) {
+                $summary['totalLangganan'] += (float) ($record->customer?->customerService?->total_monthly_bill ?? 0);
+                $summary['totalDpp'] += (float) ($record->harga_dikurangi_ppn ?? 0);
+
+                if ($record->installationFeeInvoice !== null) {
+                    $summary['totalInstalasi'] += (float) ($record->installation_fee ?? 0);
+                    $summary['countInstalasi']++;
+                } elseif ($record->needsInstallationFeeValidation()) {
+                    $summary['pendingValidationCount']++;
+                }
+            }
+        });
 
         $periodeOptions = CustomerAcquisition::query()
             ->selectRaw('DISTINCT periode')
@@ -93,6 +135,8 @@ class CustomerAcquisitionController extends Controller
 
         return view('customer-acquisitions.index', [
             'records' => $records,
+            'summary' => $summary,
+            'search' => $search,
             'periode' => $periode,
             'periodeOptions' => $periodeOptions,
             'isCurrentPeriode' => $periode === now()->format('Y-m'),
