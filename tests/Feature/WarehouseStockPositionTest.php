@@ -409,6 +409,47 @@ class WarehouseStockPositionTest extends TestCase
         $this->assertNull($response->viewData('summarySort'));
     }
 
+    #[Test]
+    public function available_by_pop_and_item_publik_dan_sama_dengan_ringkasan(): void
+    {
+        $popIds = collect([$this->pusat->id, $this->cabangA->id, $this->cabangB->id]);
+        $service = app(WarehouseStockPositionService::class);
+
+        $available = $service->availableByPopAndItem($popIds);
+        $row = $service->summarize($popIds)->firstWhere(fn ($r) => $r['item']->id === $this->kabel->id);
+
+        $this->assertArrayHasKey($this->kabel->id, $available);
+        foreach ($row['per_pop'] as $entry) {
+            $this->assertSame($entry['qty'], $available[$this->kabel->id][$entry['pop_id']]['qty']);
+        }
+        $this->assertCount(count($row['per_pop']), $available[$this->kabel->id]);
+    }
+
+    #[Test]
+    public function condition_by_pop_and_item_memisah_kondisi_per_gudang(): void
+    {
+        $modem = Item::create(['code' => 'WSP-CBP', 'name' => 'Modem Per Gudang', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'serialized']);
+        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WSPG1', 'WSPG2', 'WSPG4'], 350000, $this->owner);
+        // Receive hanya boleh di pusat; pindahkan satu SN ke cabang A langsung (cukup untuk query posisi).
+        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WSPG3'], 350000, $this->owner);
+        InventorySerial::where('serial_number', 'WSPG3')->update(['current_pop_id' => $this->cabangA->id]);
+        InventorySerial::where('serial_number', 'WSPG2')->update(['condition' => ItemCondition::USED_DAMAGED->value]);
+        // SN non-AVAILABLE tidak boleh ikut terhitung.
+        InventorySerial::where('serial_number', 'WSPG1')->update(['status' => SerialStatus::ISSUED->value]);
+
+        $result = app(WarehouseStockPositionService::class)
+            ->conditionByPopAndItem(collect([$this->pusat->id, $this->cabangA->id]));
+
+        $pusat = $result->get("{$this->pusat->id}-{$modem->id}");
+        $this->assertSame(1, $pusat->firstWhere('condition', ItemCondition::NEW)['count']);
+        $this->assertSame(1, $pusat->firstWhere('condition', ItemCondition::USED_DAMAGED)['count']);
+        $this->assertSame(2, $pusat->sum('count'));
+
+        $a = $result->get("{$this->cabangA->id}-{$modem->id}");
+        $this->assertSame(1, $a->firstWhere('condition', ItemCondition::NEW)['count']);
+        $this->assertNull($result->get("{$this->cabangB->id}-{$modem->id}"));
+    }
+
     private function summary(Collection $popIds): Collection
     {
         return app(WarehouseStockPositionService::class)->summarize($popIds);

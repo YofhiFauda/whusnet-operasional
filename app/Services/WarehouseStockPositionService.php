@@ -146,6 +146,36 @@ class WarehouseStockPositionService
     }
 
     /**
+     * Breakdown kondisi SN AVAILABLE per gudang DAN item (papan Kelola Stok),
+     * kunci `"{popId}-{itemId}"`. Populasi sama dengan `conditionByItem()` —
+     * hanya digroup tambahan per `current_pop_id` supaya satu kartu gudang
+     * tidak menampilkan kondisi unit milik gudang lain.
+     *
+     * @param  Collection<int, int>  $popIds
+     * @return Collection<string, Collection<int, array{condition: ItemCondition, checked: bool, count: int}>>
+     */
+    public function conditionByPopAndItem(Collection $popIds): Collection
+    {
+        $rows = InventorySerial::query()
+            ->whereIn('current_pop_id', $popIds)
+            ->where('status', SerialStatus::AVAILABLE->value)
+            ->select('current_pop_id', 'item_id', 'condition')
+            ->selectRaw("CASE WHEN `condition` = 'used_good' AND `condition_checked_at` IS NOT NULL THEN 1 ELSE 0 END as checked")
+            ->selectRaw('COUNT(*) as count')
+            ->groupBy('current_pop_id', 'item_id', 'condition')
+            ->groupByRaw("CASE WHEN `condition` = 'used_good' AND `condition_checked_at` IS NOT NULL THEN 1 ELSE 0 END")
+            ->get();
+
+        return $rows->groupBy(fn ($row) => $row->current_pop_id.'-'.$row->item_id)->map(
+            fn ($perKey) => $perKey->map(fn ($row) => [
+                'condition' => $row->condition,
+                'checked' => (bool) $row->checked,
+                'count' => (int) $row->count,
+            ])->values()
+        );
+    }
+
+    /**
      * Qty per item yang sedang DALAM PERJALANAN (transfer terbuka yang asal
      * atau tujuannya dalam scope) — analisa-ui-ux §U1. Dihitung dari leg
      * dispatch dikurangi penerimaan yang sudah terkonfirmasi; satuan mengikuti
@@ -283,7 +313,7 @@ class WarehouseStockPositionService
      *
      * @return array<int, array<int, array{pop_id: int, qty: float, lots: array<int, array{lot_no: string, qty: float}>}>>
      */
-    private function availableByPopAndItem(Collection $popIds): array
+    public function availableByPopAndItem(Collection $popIds): array
     {
         $result = [];
 
