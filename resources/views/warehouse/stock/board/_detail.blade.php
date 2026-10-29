@@ -12,7 +12,8 @@
     Aturan (spec §6, hasil audit form tujuan):
     - Transfer hanya dari gudang pusat; Minta Stok & Serah Teknisi hanya dari
       cabang; Opname/Sesuaikan & Atur Ambang butuh izin adjustment.
-    - `lot_no` ikut di URL HANYA untuk QUANTITY satu harga. Form Opname mencari
+    - `lot_no` ikut di URL HANYA untuk QUANTITY satu harga, dan TIDAK PERNAH
+      di Atur Ambang (ambang selalu di lot_no ''). Form Opname mencari
       saldo `where lot_no = query('lot_no', '')` — tanpa lot_no yang tepat,
       opname barang yang seluruh stoknya di lot non-'' akan membaca saldo 0
       dan "menyesuaikan" stok yang salah.
@@ -106,7 +107,13 @@
             'requestStockUrl' => $canRequestStock && $isCabang ? route('warehouse.stock-requests.create', $params) : null,
             'issueUrl' => $canIssue && $isCabang ? route('warehouse.issues.create', $params) : null,
             'adjustUrl' => $hasTwoPrices ? null : $opnameUrl($params),
-            'thresholdUrl' => $canAdjust ? route('warehouse.stock.threshold.create', $params) : null,
+            // Atur Ambang SELALU tanpa lot_no: ambang hanya dibaca dari baris
+            // lot_no '' (WarehouseStockBoardService::thresholds()), sedangkan
+            // form menyimpan di lot_no apa pun yang ada di URL. Membawa lot X
+            // (satu harga non-'' itu normal sejak ADHOC-75) = minimum tersimpan
+            // di tempat yang tak pernah dibaca → barang tampil "Aman" padahal
+            // di bawah minimum.
+            'thresholdUrl' => $canAdjust ? route('warehouse.stock.threshold.create', $base) : null,
         ],
         // Tanda untuk menu: Opname ada, tapi hanya per tingkat harga di drawer.
         'opnamePerTier' => $hasTwoPrices && $canAdjust,

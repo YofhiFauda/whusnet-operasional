@@ -18,6 +18,7 @@ use App\Services\InventoryReceiveService;
 use App\Services\InventoryTransferService;
 use App\Services\WarehouseStockBoardService;
 use App\Support\BoardFilters;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -239,14 +240,18 @@ class StockBoardBuildTest extends StockBoardTestCase
         app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $item, 5, 1000, $this->owner);
         $this->assertNull($this->row($this->build([$this->pusat->id]), $this->pusat->id, $item->id)['last_opname_at']);
 
-        $this->travelTo(now()->subDays(3));
+        // Waktu tetap di tengah hari: perbandingan "3 hari lalu" yang relatif ke
+        // now() bisa meleset hari bila tes jalan dekat tengah malam.
+        $opnamePusat = Carbon::parse('2026-10-26 12:00:00');
+        $this->travelTo($opnamePusat);
         $this->opname($item, $this->pusat->id);
+        $this->travelTo(Carbon::parse('2026-10-29 12:00:00'));
+        $this->opname($item, $this->cabangA->id); // lebih baru, gudang lain
         $this->travelBack();
-        $this->opname($item, $this->cabangA->id);
 
         $row = $this->row($this->build([$this->pusat->id]), $this->pusat->id, $item->id);
         $this->assertNotNull($row['last_opname_at']);
-        $this->assertTrue($row['last_opname_at']->isSameDay(now()->subDays(3)), 'opname cabang lain tidak ikut');
+        $this->assertTrue($row['last_opname_at']->equalTo($opnamePusat), 'opname cabang lain tidak ikut');
     }
 
     private function opname(Item $item, int $popId): void

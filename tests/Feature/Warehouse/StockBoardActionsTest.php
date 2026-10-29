@@ -145,7 +145,7 @@ class StockBoardActionsTest extends StockBoardTestCase
     }
 
     #[Test]
-    public function quantity_satu_harga_membawa_lot_no_di_semua_url_aksi(): void
+    public function quantity_satu_harga_membawa_lot_no_kecuali_atur_ambang(): void
     {
         $kabel = $this->buatItem('SA-Q1', 'Kabel Satu Harga', 'quantity', 'meter');
         $lot = 'SA-Q1-20261001-000007';
@@ -160,7 +160,10 @@ class StockBoardActionsTest extends StockBoardTestCase
         $this->assertSame($this->url('warehouse.stock-requests.create', $this->cabangA, $kabel, $withLot), $cabang['actions']['requestStockUrl']);
         $this->assertSame($this->url('warehouse.issues.create', $this->cabangA, $kabel, $withLot), $cabang['actions']['issueUrl']);
         $this->assertSame($this->url('warehouse.adjustments.balance.create', $this->cabangA, $kabel, $withLot), $cabang['actions']['adjustUrl']);
-        $this->assertSame($this->url('warehouse.stock.threshold.create', $this->cabangA, $kabel, $withLot), $cabang['actions']['thresholdUrl']);
+        // Atur Ambang SENGAJA tanpa lot_no: ambang disimpan & dibaca papan di
+        // lot_no '' — membawa lot X akan menyimpan minimum yang tak pernah dibaca.
+        $this->assertSame($this->url('warehouse.stock.threshold.create', $this->cabangA, $kabel), $cabang['actions']['thresholdUrl']);
+        $this->assertStringNotContainsString('lot_no', $cabang['actions']['thresholdUrl']);
         foreach (['requestStockUrl', 'issueUrl', 'adjustUrl', 'thresholdUrl'] as $key) {
             $this->assertHref($cabang['actions'][$key], $fragmen);
         }
