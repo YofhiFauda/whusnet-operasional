@@ -29,6 +29,14 @@ class StockBoardFiltersTest extends TestCase
     }
 
     #[Test]
+    public function search_berbentuk_array_diabaikan_bukan_error(): void
+    {
+        $filters = BoardFilters::fromRequest(Request::create('/', 'GET', ['search' => ['x']]), null);
+
+        $this->assertSame('', $filters->search);
+    }
+
+    #[Test]
     public function is_filtering_false_bila_hanya_pop_dipilih(): void
     {
         $this->assertFalse((new BoardFilters(3, null, null, '', false))->isFiltering());

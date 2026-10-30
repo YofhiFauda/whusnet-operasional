@@ -67,7 +67,7 @@ class WarehouseStockBoardService
         // label, atau nama barang.
         $searching = $f->search !== '';
         $matches = $searching
-            ? $this->searchMatches($warehouseIds, $f->search)
+            ? $this->searchMatches($warehouseIds, $f)
             : ['pairs' => collect(), 'truncated' => false];
         $nameMatchedIds = $searching
             ? Item::query()
@@ -300,14 +300,25 @@ class WarehouseStockBoardService
      * @param  Collection<int, int>  $popIds
      * @return array{pairs: Collection<string, array{pop_id: int, item_id: int, label: string}>, truncated: bool}
      */
-    private function searchMatches(Collection $popIds, string $term): array
+    private function searchMatches(Collection $popIds, BoardFilters $f): array
     {
         $cap = self::SEARCH_PAIR_CAP;
+        $term = $f->search;
+
+        // Filter kategori/tracking diterapkan SEBELUM cap: kalau tidak, 50
+        // pasangan pertama bisa habis di kategori lain dan hasil yang sah
+        // terpotong diam-diam.
+        $scoped = $f->categoryId !== null || $f->tracking !== null;
+        $itemIds = fn () => Item::query()
+            ->when($f->categoryId !== null, fn ($q) => $q->where('item_category_id', $f->categoryId))
+            ->when($f->tracking !== null, fn ($q) => $q->where('tracking_type', $f->tracking))
+            ->select('id');
 
         $serials = InventorySerial::query()
             ->whereIn('current_pop_id', $popIds)
             ->where('status', SerialStatus::AVAILABLE->value)
             ->where('serial_number', 'like', "%{$term}%")
+            ->when($scoped, fn ($q) => $q->whereIn('item_id', $itemIds()))
             ->selectRaw('current_pop_id as pop_id, item_id, MIN(serial_number) as first_code, COUNT(*) as total')
             ->groupBy('current_pop_id', 'item_id')
             ->orderBy('current_pop_id')->orderBy('item_id')
@@ -319,6 +330,7 @@ class WarehouseStockBoardService
             ->whereIn('current_pop_id', $popIds)
             ->whereIn('status', [RollStatus::AVAILABLE->value, RollStatus::RECEIVED->value])
             ->where('roll_code', 'like', "%{$term}%")
+            ->when($scoped, fn ($q) => $q->whereIn('item_id', $itemIds()))
             ->selectRaw('current_pop_id as pop_id, item_id, MIN(roll_code) as first_code, COUNT(*) as total')
             ->groupBy('current_pop_id', 'item_id')
             ->orderBy('current_pop_id')->orderBy('item_id')
@@ -406,11 +418,17 @@ class WarehouseStockBoardService
         }
 
         $prices = [];
-        $rows = InventoryTransaction::query()
+        // Hanya baris terakhir per (item, lot) yang dibaca — ledger RECEIVE
+        // tumbuh tanpa batas, jangan tarik semuanya ke memori.
+        $latestIds = InventoryTransaction::query()
             ->where('type', InventoryTransactionType::RECEIVE->value)
             ->whereIn('item_id', $quantityIds)
             ->whereNotNull('unit_price_snapshot')
-            ->orderBy('id')
+            ->groupBy('item_id', 'lot_no')
+            ->selectRaw('MAX(id)');
+
+        $rows = InventoryTransaction::query()
+            ->whereIn('id', $latestIds)
             ->get(['item_id', 'lot_no', 'unit_price_snapshot']);
 
         foreach ($rows as $row) {

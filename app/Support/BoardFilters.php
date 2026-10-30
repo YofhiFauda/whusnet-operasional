@@ -28,6 +28,8 @@ final readonly class BoardFilters
     {
         $category = $request->query('category_id');
         $tracking = $request->query('tracking');
+        // `?search[]=x` datang sebagai array; (string) array melempar error.
+        $search = $request->query('search', '');
 
         return new self(
             popId: $resolvedPopId,
@@ -35,7 +37,7 @@ final readonly class BoardFilters
             tracking: is_string($tracking) && in_array($tracking, array_column(TrackingType::cases(), 'value'), true)
                 ? $tracking
                 : null,
-            search: LikeSearch::sanitize((string) $request->query('search', '')),
+            search: LikeSearch::sanitize(is_string($search) ? $search : ''),
             lowOnly: $request->boolean('low_stock_only'),
         );
     }
